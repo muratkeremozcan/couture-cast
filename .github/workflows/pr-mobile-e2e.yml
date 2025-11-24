@@ -17,7 +17,9 @@ jobs:
     timeout-minutes: 30
     continue-on-error: true
     env:
-      MAESTRO_VERSION: 1.37.8
+      MAESTRO_APP_ID: host.exp.exponent
+      CI: "1"
+      EXPO_NO_INTERACTIVE: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -45,19 +47,38 @@ jobs:
             echo "=== Install Expo Go ==="
             curl -L -o ~/expo-go.apk "https://d1ahtucjixef4r.cloudfront.net/Exponent-2.32.18.apk"
             adb install -r ~/expo-go.apk
-            adb shell pm list packages | grep expo
+
+            echo "=== Verify Expo Go installation ==="
+            if ! adb shell pm list packages | grep -q "host.exp.exponent"; then
+              echo "ERROR: Expo Go not installed"
+              exit 1
+            fi
+            echo "Expo Go verified installed"
 
             echo "=== Start Metro bundler ==="
             cd apps/mobile
-            npx expo start --port 8081 --non-interactive &
+            npm run start -- --offline --clear --port 8081 &
             METRO_PID=$!
-            sleep 15
+
+            echo "=== Wait for Metro to be ready ==="
+            for i in {1..60}; do
+              if curl -s http://127.0.0.1:8081 >/dev/null 2>&1; then
+                echo "Metro ready after ${i} attempts"
+                break
+              fi
+              if [ $i -eq 60 ]; then
+                echo "ERROR: Metro failed to start in 120s"
+                exit 1
+              fi
+              sleep 2
+            done
 
             echo "=== Run Maestro tests (with retry) ==="
             cd ../..
-            $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml || \
-            (sleep 20 && $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml) || \
-            (sleep 60 && $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml)
+            mkdir -p maestro/artifacts
+            $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
+            (sleep 20 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/) || \
+            (sleep 60 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/)
 
             echo "=== Cleanup ==="
             kill $METRO_PID || true
@@ -66,14 +87,18 @@ jobs:
         if: always()
         with:
           name: android-test-results
-          path: maestro/
+          path: |
+            maestro/artifacts/
+            maestro/*.png
 
   mobile-e2e-ios:
     runs-on: macos-13
     timeout-minutes: 30
     continue-on-error: true
     env:
-      MAESTRO_VERSION: 1.37.8
+      MAESTRO_APP_ID: host.exp.exponent
+      CI: "1"
+      EXPO_NO_INTERACTIVE: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -117,22 +142,41 @@ jobs:
           tar -xzf ~/expo-go.tar.gz -C ~/expo-extraction/
           xcrun simctl install "$SIMULATOR_ID" ~/expo-extraction/Exponent.app
 
-          echo "=== Verify installation ==="
-          xcrun simctl listapps "$SIMULATOR_ID" | grep -i exponent || echo "Warning: Expo Go verification failed"
+          echo "=== Verify Expo Go installation ==="
+          if ! xcrun simctl listapps "$SIMULATOR_ID" | grep -q "host.exp.Exponent"; then
+            echo "ERROR: Expo Go not installed on simulator"
+            exit 1
+          fi
+          echo "Expo Go verified installed"
 
           echo "=== Start Metro bundler ==="
           cd apps/mobile
-          npx expo start --port 8081 --non-interactive &
+          npm run start -- --offline --clear --port 8081 &
           METRO_PID=$!
+
+          echo "=== Wait for Metro to be ready ==="
+          for i in {1..60}; do
+            if curl -s http://127.0.0.1:8081 >/dev/null 2>&1; then
+              echo "Metro ready after ${i} attempts"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "ERROR: Metro failed to start in 120s"
+              kill $METRO_PID || true
+              exit 1
+            fi
+            sleep 2
+          done
+
           echo "METRO_PID=$METRO_PID" >> $GITHUB_ENV
           echo "SIMULATOR_ID=$SIMULATOR_ID" >> $GITHUB_ENV
-          sleep 15
 
       - name: Run Maestro tests (with retry)
         run: |
-          $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml || \
-          (sleep 20 && $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml) || \
-          (sleep 60 && $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml)
+          mkdir -p maestro/artifacts
+          $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
+          (sleep 20 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/) || \
+          (sleep 60 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/)
 
       - name: Cleanup
         if: always()
@@ -144,4 +188,6 @@ jobs:
         if: always()
         with:
           name: ios-test-results
-          path: maestro/
+          path: |
+            maestro/artifacts/
+            maestro/*.png
