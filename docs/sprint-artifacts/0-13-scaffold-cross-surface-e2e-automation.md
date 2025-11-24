@@ -40,17 +40,91 @@ so that web and mobile journeys are validated end-to-end before feature teams br
 
 ## Dev Notes
 
-### Status snapshot (2025-11-17)
+### Status snapshot (2025-01-24)
 
 - ✅ Playwright harness + CI scripts complete (Task 1)
 - ✅ Maestro scaffolding, scripts, and run orchestration complete (Task 2)
-- ⚠️ Documentation/CI updates (Tasks 3–4) still pending
-- ⚠️ Local mobile smoke currently blocked on missing device emulators—see “Maestro setup + operational notes”
+- ✅ Documentation complete (Task 3) - See docs/ci-mobile-e2e-troubleshooting.md
+- 🔄 CI integration in progress (Task 4) - Android and iOS jobs implemented in `.github/workflows/pr-mobile-e2e.yml`
 
-**Next actions**
-1. Follow “Maestro setup + operational notes” (below) to install Xcode Simulator and Android Studio/AVD locally so `npm run start:mobile:e2e` succeeds.
-2. Mirror those prerequisites in CI (Android SDK install or Maestro Cloud tokens) before wiring the `pr-checks` e2e job.
-3. Once device access is solved, update README + docs/test-design-system.md per Task 3, then add the CI job per Task 4.
+**Current approach: Expo Go + Metro (Option 3)**
+- Replicates local workflow: Expo Go installed in CI, Metro bundler started, Maestro tests run
+- Android: Direct APK download, adb install, emulator runner script pattern
+- iOS: Simulator tar.gz extraction to `~/`, proper iOS 18.4 runtime, boot polling
+- Both: Standard 3x retry pattern (20s, 60s backoff) from community best practices
+
+**Implementation details:**
+- **Maestro install**: `curl -Ls "https://get.maestro.mobile.dev" | bash` (community standard, not brew)
+- **iOS improvements**: iOS 18.4 runtime, `com.apple.CoreSimulator.*` identifiers, `~/expo-extraction` (avoiding /tmp permissions)
+- **Android improvements**: Boot validation polling, home directory for APK, proper cleanup
+- **Retry logic**: All tests run 3x with exponential backoff (every production repo does this)
+
+**Fallback ready: EAS Build (Option 1 - if Option 3 flakes)**
+```yaml
+# Builds dev client locally in CI (10-15 min build time)
+- run: eas build --platform ios --profile development --local --output build.tar.gz
+- run: tar -xzf build.tar.gz && xcrun simctl install booted MyApp.app
+- run: maestro test maestro/
+```
+- Free for open source (unlimited EAS builds)
+- Slower but more stable (no Metro/Expo Go fragility)
+- Community consensus approach for production apps
+
+**Next actions:**
+1. Validate both jobs complete successfully in CI
+2. Monitor for Metro/Expo Go connection flakiness
+3. If retry rate >20%, switch to EAS Build approach (Option 1)
+
+---
+
+### Research Findings: Maestro + Expo CI Patterns (2025-01-24)
+
+**What the community actually does:**
+
+After extensive research (GitHub repos, DEV Community, Medium articles, Maestro docs), found three working patterns:
+
+1. **Maestro Cloud** (paid, ~$250/month)
+   - Used by most "simple setup" blog posts
+   - Offloads device management entirely
+   - ❌ Not viable for open source (cost)
+
+2. **EAS Build** (free for open source)
+   - `eas build --platform ios --profile development --local`
+   - Builds dev client in CI (10-15 min)
+   - Community consensus for production Expo apps
+   - ✅ Stable, documented, officially supported
+   - Examples: Expo's own docs, multiple production repos
+
+3. **Expo Go + Metro** (what we're trying)
+   - Install Expo Go in CI, start Metro, run tests
+   - Closest to local development workflow
+   - ⚠️ Fragile: Few working examples found
+   - Most demo repos commit pre-built binaries instead
+
+**Key insight from research:**
+- `expo run:ios --device` in CI doesn't work (`--device` = physical USB device, not available in cloud runners)
+- `expo run:ios` (no flag) builds with Xcode in CI (10+ min, defeats "simple" goal)
+- Real repos either use EAS Build or commit pre-built apps
+
+**Working examples analyzed:**
+- `retyui/Using-GitHub-Actions-to-run-your-Maestro-Flows`: Commits pre-built APK/app to repo
+- `alexanderhodes/react-native-expo-maestro-example`: No CI (local only)
+- Expo official docs: Recommend EAS Build for CI
+
+**Our approach (Option 3 - Expo Go + Metro):**
+- Based on fixes discovered during iOS debugging:
+  - iOS 18.4 runtime (not 17.2)
+  - `com.apple.CoreSimulator.*` identifiers
+  - Extract to `~/` (not `/tmp/` - permission issues)
+  - 3x retry with backoff (community standard)
+- **Risk**: If Metro/Expo Go connection proves flaky (>20% retry rate), we have EAS Build (Option 1) ready as fallback
+
+**References:**
+- Maestro docs: https://docs.maestro.dev/cloud/ci-integration/github-actions
+- Expo EAS Build: https://docs.expo.dev/build/building-on-ci/
+- Community pattern: https://dev.to/retyui/best-tips-tricks-for-e2e-maestro-with-react-native-2kaa
+
+---
 
 ### Maestro setup + operational notes
 

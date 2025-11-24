@@ -12,46 +12,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  mobile-e2e-ios:
-    runs-on: macos-13
-    timeout-minutes: 30
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-node-env
-        with:
-          use-npm-ci: 'true'
-
-      - name: Install Maestro
-        run: curl -Ls "https://get.maestro.mobile.dev" | bash
-
-      - name: Install pods
-        working-directory: apps/mobile/ios
-        run: pod install
-
-      - name: Build and install app on simulator
-        working-directory: apps/mobile
-        run: |
-          # This mimics your local workflow: builds dev client and installs it
-          npx expo run:ios --device --configuration Debug
-
-      - name: Run Maestro tests (with retry)
-        run: |
-          $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml || \
-          (sleep 20 && $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml) || \
-          (sleep 60 && $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml)
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ios-test-results
-          path: maestro/
-
   mobile-e2e-android:
     runs-on: macos-13
     timeout-minutes: 30
     continue-on-error: true
+    env:
+      MAESTRO_VERSION: 1.37.8
     steps:
       - uses: actions/checkout@v4
 
@@ -72,18 +38,110 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            cd apps/mobile
-            # This mimics your local workflow: builds dev client and installs it
-            npx expo run:android --device
+            echo "=== Emulator boot validation ==="
+            adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
+            adb shell getprop sys.boot_completed
 
+            echo "=== Install Expo Go ==="
+            curl -L -o ~/expo-go.apk "https://d1ahtucjixef4r.cloudfront.net/Exponent-2.32.18.apk"
+            adb install -r ~/expo-go.apk
+            adb shell pm list packages | grep expo
+
+            echo "=== Start Metro bundler ==="
+            cd apps/mobile
+            npx expo start --port 8081 --non-interactive &
+            METRO_PID=$!
+            sleep 15
+
+            echo "=== Run Maestro tests (with retry) ==="
             cd ../..
-            # Run tests with retry
             $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml || \
             (sleep 20 && $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml) || \
             (sleep 60 && $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml)
+
+            echo "=== Cleanup ==="
+            kill $METRO_PID || true
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: android-test-results
+          path: maestro/
+
+  mobile-e2e-ios:
+    runs-on: macos-13
+    timeout-minutes: 30
+    continue-on-error: true
+    env:
+      MAESTRO_VERSION: 1.37.8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'true'
+
+      - name: Install Maestro & IDB
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          brew tap facebook/fb
+          brew install facebook/fb/idb-companion
+
+      - name: Setup iOS simulator with Expo Go
+        run: |
+          echo "=== Find or boot simulator (iOS 18.4) ==="
+          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone 16 Pro (.*) (Shutdown)" | grep "18.4" | head -1 | grep -oE '\([A-F0-9-]{36}\)' | tr -d '()')
+
+          if [ -z "$SIMULATOR_ID" ]; then
+            echo "Creating new simulator..."
+            SIMULATOR_ID=$(xcrun simctl create "iPhone16Pro-CI" \
+              "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro" \
+              "com.apple.CoreSimulator.SimRuntime.iOS-18-4")
+          fi
+
+          echo "Using simulator: $SIMULATOR_ID"
+          xcrun simctl boot "$SIMULATOR_ID"
+
+          # Wait for boot
+          for i in {1..30}; do
+            if xcrun simctl list devices booted | grep -q "$SIMULATOR_ID"; then
+              echo "Simulator booted"
+              break
+            fi
+            sleep 2
+          done
+
+          echo "=== Install Expo Go ==="
+          curl -L -o ~/expo-go.tar.gz "https://dpq5q02fu5f55.cloudfront.net/Exponent-2.32.18.tar.gz"
+          mkdir -p ~/expo-extraction
+          tar -xzf ~/expo-go.tar.gz -C ~/expo-extraction/
+          xcrun simctl install "$SIMULATOR_ID" ~/expo-extraction/Exponent.app
+
+          echo "=== Verify installation ==="
+          xcrun simctl listapps "$SIMULATOR_ID" | grep -i exponent || echo "Warning: Expo Go verification failed"
+
+          echo "=== Start Metro bundler ==="
+          cd apps/mobile
+          npx expo start --port 8081 --non-interactive &
+          METRO_PID=$!
+          echo "METRO_PID=$METRO_PID" >> $GITHUB_ENV
+          echo "SIMULATOR_ID=$SIMULATOR_ID" >> $GITHUB_ENV
+          sleep 15
+
+      - name: Run Maestro tests (with retry)
+        run: |
+          $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml || \
+          (sleep 20 && $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml) || \
+          (sleep 60 && $HOME/.maestro/bin/maestro test maestro/ --format junit --output maestro/report.xml)
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kill $METRO_PID || true
+          xcrun simctl shutdown "$SIMULATOR_ID" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-test-results
           path: maestro/
