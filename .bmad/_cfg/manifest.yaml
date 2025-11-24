@@ -1,0 +1,13 @@
+installation:
+  version: 6.0.0-alpha.10
+  installDate: '2025-11-17T19:29:30.926Z'
+  lastUpdated: '2025-11-17T19:29:30.926Z'
+modules:
+  - core
+  - bmm
+ides:
+  - claude-code
+  - codex
+  - cursor
+  - github-copilot
+  - windsurf

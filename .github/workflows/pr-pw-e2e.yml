@@ -1,0 +1,54 @@
+name: Playwright e2e
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: playwright-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pw-e2e:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'true'
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Build web app
+        run: npm run build --workspace web
+
+      - name: Install Playwright Chromium only
+        run: npx playwright install chromium
+
+      - name: Run Playwright local suite
+        run: npm run test:pw-local
+
+      - name: Upload Playwright artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            playwright/playwright-report/
+            playwright/test-results/
+          retention-days: 5

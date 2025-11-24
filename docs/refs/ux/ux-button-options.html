@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CoutureCast Button Hierarchy Options</title>
+<style>
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#f5f5f7; margin:0; padding:32px; color:#111; }
+  h1 { font-weight:600; margin-bottom:8px; }
+  p { max-width:720px; line-height:1.5; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:24px; margin-top:24px; }
+  .card { background:#fff; border-radius:16px; padding:20px; box-shadow:0 12px 30px rgba(0,0,0,0.08); }
+  .card h2 { margin-top:0; }
+  .buttons { display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; }
+  button { font:500 15px/1 'Inter', sans-serif; padding:12px 20px; border-radius:999px; border:none; cursor:pointer; transition:transform 0.1s ease, box-shadow 0.1s ease; }
+  button:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(0,0,0,0.12); }
+  .secondary { background:transparent; border:1px solid #111; color:#111; box-shadow:none; }
+  .secondary:hover { background:rgba(17,17,17,0.05); }
+  .tertiary { background:transparent; border:none; color:#3a3a45; text-decoration:underline; box-shadow:none; }
+  .destructive { background:#b04a4a; color:#fff; }
+  .gold { background:#c9a14a; color:#111; }
+  .charcoal { background:#111; color:#fff; }
+  .ghost { background:transparent; border:1px solid #c9a14a; color:#c9a14a; }
+  .dual-secondary { background:#c9a14a; color:#111; }
+  .dual-tertiary { background:transparent; border:1px solid #111; color:#111; }
+  .meta { font-size:13px; color:#5c5c68; margin-top:12px; }
+</style>
+</head>
+<body>
+  <h1>Button Hierarchy Concepts</h1>
+  <p>These quick mockups reflect CoutureCast's monochrome base palette (white, black, gold) so you can pick the interaction style that feels right. Hover to see elevation cues.</p>
+  <div class="grid">
+    <div class="card" id="option-1">
+      <h2>1 · Classic Monochrome Primary</h2>
+      <p>Primary actions stay bold black for contrast, with gold saved for highlights (logo, hero badge). Keeps the interface calm and couture.</p>
+      <div class="buttons">
+        <button class="charcoal">Primary</button>
+        <button class="secondary">Secondary</button>
+        <button class="tertiary">Text link</button>
+        <button class="destructive">Destructive</button>
+      </div>
+      <p class="meta">Use when you want the UI to feel minimal and let gold remain special.</p>
+    </div>
+    <div class="card" id="option-2">
+      <h2>2 · Gold Primary, Charcoal Secondary</h2>
+      <p>Elevates the core CTA with CoutureCast gold while keeping secondary actions charcoal. Great for premium emphasis.</p>
+      <div class="buttons">
+        <button class="gold">Primary</button>
+        <button class="charcoal">Secondary</button>
+        <button class="ghost">Tertiary</button>
+        <button class="destructive">Destructive</button>
+      </div>
+      <p class="meta">Best when you want the primary action to feel luxurious and instantly recognizable.</p>
+    </div>
+    <div class="card" id="option-3">
+      <h2>3 · Dual-tone Black + Gold</h2>
+      <p>Provides two solid tiers: black for primary flows, gold for important secondary/upsell moments, with outlined tertiary buttons.</p>
+      <div class="buttons">
+        <button class="charcoal">Primary</button>
+        <button class="dual-secondary">Secondary</button>
+        <button class="dual-tertiary">Tertiary</button>
+        <button class="destructive">Destructive</button>
+      </div>
+      <p class="meta">Adds hierarchy without overusing gold, but needs clear guidance so the two solids stay distinct.</p>
+    </div>
+  </div>
+</body>
+</html>

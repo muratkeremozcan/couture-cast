@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CoutureCast Responsive Options</title>
+<style>
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#f5f5f7; margin:0; padding:32px; color:#111; }
+  h1 { margin-bottom:6px; }
+  p { max-width:760px; line-height:1.5; }
+  .grid { display:grid; gap:24px; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); margin-top:28px; }
+  .card { background:#fff; border-radius:24px; padding:24px; box-shadow:0 22px 45px rgba(0,0,0,0.08); }
+  .option { border-radius:20px; background:#f9f9fb; padding:18px; margin-top:16px; border:1px solid rgba(0,0,0,0.04); }
+  .option h3 { margin:0 0 6px; font-size:18px; }
+  .canvas { border-radius:16px; background:#1e1e26; padding:16px; margin:12px 0; color:#fff; }
+  .screen { background:#fff; border-radius:16px; padding:14px; color:#111; }
+  .split { display:grid; gap:10px; grid-template-columns:repeat(2,1fr); }
+  .triple { display:grid; gap:10px; grid-template-columns:repeat(3,1fr); }
+  .lookbook { display:grid; gap:6px; grid-template-columns:repeat(2,1fr); }
+  .chip-row { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { padding:6px 10px; border-radius:999px; border:1px solid rgba(0,0,0,0.12); font-size:12px; }
+  .widget { border-radius:20px; padding:16px; background:#fff; border:1px solid rgba(0,0,0,0.05); }
+  .watch { width:190px; height:260px; border-radius:50px; background:#fff; color:#111; padding:20px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.08); }
+  .notes { font-size:13px; color:#5c5c68; }
+</style>
+</head>
+<body>
+<h1>Responsive Layout Options</h1>
+<p>Each breakpoint shows multiple layout candidates so you can decide which approach to lock into the spec.</p>
+<div class="grid">
+  <section class="card" id="desktop-options">
+    <h2>Desktop / Large</h2>
+    <div class="option">
+      <h3>A · Split Ritual + Lookbook (Current)</h3>
+      <div class="canvas">
+        <div class="split">
+          <div class="screen">
+            <strong>Hero ritual</strong>
+            <div class="chip-row"><div class="chip">Personal</div><div class="chip">Community</div></div>
+            <p class="notes">Weather + outfit + hides, hourly/week strips pinned below.</p>
+          </div>
+          <div class="screen">
+            <strong>Lookbook grid</strong>
+            <div class="lookbook">
+              <div style="height:70px; background:#f3f3f6; border-radius:12px;"></div>
+              <div style="height:70px; background:#f3f3f6; border-radius:12px;"></div>
+              <div style="height:70px; background:#f3f3f6; border-radius:12px;"></div>
+              <div style="height:70px; background:#f3f3f6; border-radius:12px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="notes">Always-on community view; planner can slide in as third column when needed.</p>
+    </div>
+    <div class="option">
+      <h3>B · Centered Ritual + Slide-out Community</h3>
+      <div class="canvas">
+        <div class="screen">
+          <strong>Centered hero (1140px)</strong>
+          <p>Lookbook lives in right drawer that slides over when summoned.</p>
+        </div>
+      </div>
+      <p class="notes">Keeps focus on hero, reduces cognitive load; community toggles as overlay panel.</p>
+    </div>
+    <div class="option">
+      <h3>C · Hero + Planner Tri-column</h3>
+      <div class="canvas">
+        <div class="triple">
+          <div class="screen"><strong>Hero</strong></div>
+          <div class="screen"><strong>Community</strong></div>
+          <div class="screen"><strong>Planner rail</strong></div>
+        </div>
+      </div>
+      <p class="notes">Great for productivity users planning full weeks; requires ≥1440px.</p>
+    </div>
+  </section>
+
+  <section class="card" id="tablet-options">
+    <h2>Tablet</h2>
+    <div class="option">
+      <h3>A · Stacked Hero → Two-column Lookbook</h3>
+      <div class="canvas">
+        <div class="screen">
+          <strong>Hero top</strong>
+          <p class="notes">Outfit tiles horizontal scroll, lookbook grid two columns underneath.</p>
+        </div>
+      </div>
+    </div>
+    <div class="option">
+      <h3>B · Split View (Hero | Community)</h3>
+      <div class="canvas">
+        <div class="split">
+          <div class="screen">Hero</div>
+          <div class="screen">Community cards</div>
+        </div>
+      </div>
+      <p class="notes">Landscape tablets show both simultaneously; portrait collapses to stack.</p>
+    </div>
+    <div class="option">
+      <h3>C · Persistent Filter Rail</h3>
+      <div class="canvas">
+        <div class="split">
+          <div class="screen">
+            <p>Left rail for chips / filters, right area for hero + cards.</p>
+          </div>
+          <div class="screen">Lookbook feed</div>
+        </div>
+      </div>
+      <p class="notes">Useful if you expect heavy filtering/tag work on tablets.</p>
+    </div>
+  </section>
+
+  <section class="card" id="mobile-options">
+    <h2>Mobile</h2>
+    <div class="option">
+      <h3>A · Single Column + Sticky Chip Row (Current)</h3>
+      <div class="canvas">
+        <div class="screen" style="width:320px;">
+          <strong>Hero</strong>
+          <p class="notes">Chips pinned below hero, community card follows, bottom nav with gold underline.</p>
+        </div>
+      </div>
+    </div>
+    <div class="option">
+      <h3>B · Segmented Control + Bottom Sheet</h3>
+      <div class="canvas">
+        <div class="screen" style="width:320px;">
+          <p>Hero shows Personal only; swipe up bottom sheet for Community feed.</p>
+        </div>
+      </div>
+      <p class="notes">Keeps hero ultra-focused, community lives in modal sheet.</p>
+    </div>
+    <div class="option">
+      <h3>C · Card Carousel + Peek Grid</h3>
+      <div class="canvas">
+        <div class="screen" style="width:320px;">
+          <p>Hero becomes card carousel; peek strip of community cards sits at bottom so users can drag up.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="widget-options">
+    <h2>Widgets / Watch / Smart Surfaces</h2>
+    <div class="option">
+      <h3>A · 2×2 Minimal Widget</h3>
+      <div class="canvas">
+        <div class="widget" style="width:240px;">
+          <strong>59° Misty</strong>
+          <p style="margin:8px 0 12px;">Look: Pleated maxi + trench</p>
+          <div style="border-radius:12px; border:1px solid rgba(0,0,0,0.08); padding:8px; font-size:12px;">Swap suggestion</div>
+        </div>
+      </div>
+    </div>
+    <div class="option">
+      <h3>B · 4×2 Rich Widget</h3>
+      <div class="canvas">
+        <div class="widget" style="width:320px;">
+          <strong>Weekly planner</strong>
+          <p>Mini cards Mon–Thu with quick outfit heads-up.</p>
+        </div>
+      </div>
+      <p class="notes">Great for iPad / desktop widgets where more space exists.</p>
+    </div>
+      <div class="option">
+      <h3>C · Watch / Wearable</h3>
+      <div class="canvas">
+        <div class="watch">
+          <div style="font-weight:600;">59°</div>
+          <div style="font-size:13px;">Pleated maxi<br/>Layered scarf</div>
+          <div style="font-size:11px; color:#C9A14A;">Gold ring = sync success</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

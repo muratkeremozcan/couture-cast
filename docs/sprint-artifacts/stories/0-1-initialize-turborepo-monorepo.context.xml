@@ -1,0 +1,172 @@
+<story-context id="{bmad_folder}/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>1</storyId>
+    <title>Initialize Turborepo monorepo</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-14T13:27:12Z</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/0-1-initialize-turborepo-monorepo.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>As a platform team</asA>
+    <iWant>I want a monorepo structure with shared packages,</iWant>
+    <soThat>so that all teams can develop features in parallel with consistent tooling and dependencies.</soThat>
+    <tasks>
+  <task id="T1" ac="AC1">
+    <title>Task 1: Refresh version verification</title>
+    <steps>
+      <step>Run node --version, npm --version and verify against architecture log</step>
+      <step>Run npm info create-expo-app version, npm info create-next-app version, npm info @nestjs/cli version</step>
+      <step>Run npm info prisma version, npm info next version, npm info expo version, npm info vitest version, npm info playwright version</step>
+      <step>Compare results with architecture doc Section "Version verification log (captured 2025-11-11)"</step>
+      <step>Update architecture doc if any versions have changed</step>
+      <step>Document any breaking changes in version update notes</step>
+    </steps>
+  </task>
+  <task id="T2" ac="AC2">
+    <title>Task 2: Initialize mobile app</title>
+    <steps>
+      <step>Run npx create-expo-app@3.10.1 apps/mobile --template (select TypeScript template)</step>
+      <step>Verify Expo Router, ESLint, Metro config, OTA-ready app.json created</step>
+      <step>Test: cd apps/mobile && npm run start successfully starts Expo dev server</step>
+    </steps>
+  </task>
+  <task id="T3" ac="AC2">
+    <title>Task 3: Initialize web app with Turborepo</title>
+    <steps>
+      <step>Run npx create-next-app@15.0.3 apps/web --typescript --eslint --tailwind --app --src-dir</step>
+      <step>Verify App Router, SWC, TypeScript, ESLint, Tailwind configured</step>
+      <step>Test: cd apps/web && npm run dev successfully starts Next.js dev server on port 3000</step>
+    </steps>
+  </task>
+  <task id="T4" ac="AC2">
+    <title>Task 4: Initialize API app</title>
+    <steps>
+      <step>Run npx @nestjs/cli@11.1.2 new apps/api --package-manager npm --skip-git</step>
+      <step>Verify NestJS modules/controllers/providers structure, TypeScript config, ESLint created</step>
+      <step>Test: cd apps/api && npm run start:dev successfully starts NestJS server on port 3001</step>
+    </steps>
+  </task>
+  <task id="T5" ac="AC3">
+    <title>Task 5: Configure Turborepo workspace</title>
+    <steps>
+      <step>Create root package.json with npm workspaces: "workspaces": ["apps/*", "      <step>Install Turborepo: npm install turbo --save-dev --workspace-root</step>
+      <step>Create turbo.json with task graph per architecture:</step>
+      <step>Create packages directories:           <step>Initialize each package with minimal package.json (name, version, main, exports)</step>
+    </steps>
+  </task>
+  <task id="T6" ac="AC4">
+    <title>Task 6: Set up shared ESLint config</title>
+    <steps>
+      <step>Create  with shared ESLint rules</step>
+      <step>Configure extends: @typescript-eslint/recommended, next/core-web-vitals, prettier</step>
+      <step>Update apps to use shared config: extends: ["@couture-cast/eslint-config"]</step>
+      <step>Install ESLint dependencies at root: npm install eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser eslint-config-next eslint-config-prettier --save-dev --workspace-root</step>
+    </steps>
+  </task>
+  <task id="T7" ac="AC4">
+    <title>Task 7: Set up shared TypeScript configs</title>
+    <steps>
+      <step>Create  with strict TypeScript settings</step>
+      <step>Create  extending base.json</step>
+      <step>Create  for shared UI packages</step>
+      <step>Update all apps to extend shared config: "extends": "@couture-cast/tsconfig/nextjs.json"</step>
+    </steps>
+  </task>
+  <task id="T8" ac="AC5">
+    <title>Task 8: Configure root scripts and verify</title>
+    <steps>
+      <step>Add root package.json scripts:</step>
+      <step>Test npm run dev starts all 3 apps (mobile, web, api) concurrently</step>
+      <step>Test npm test runs test suites (should pass or skip if no tests yet)</step>
+      <step>Test npm run build produces artifacts in .next/, dist/, build/ directories</step>
+      <step>Test npm run lint validates all TypeScript/ESLint rules</step>
+    </steps>
+  </task>
+  <task id="T9" ac="AC6">
+    <title>Task 9: Lock dependency versions</title>
+    <steps>
+      <step>Review package.json in all apps and packages</step>
+      <step>Pin versions to match architecture verification log (exact versions, no ^ or ~)</step>
+      <step>Run npm install at root to generate package-lock.json</step>
+      <step>Verify lockfile includes all dependencies with exact versions</step>
+      <step>Commit package.json and package-lock.json files</step>
+    </steps>
+  </task>
+  <task id="T10">
+    <title>Task 10: Document project structure</title>
+    <steps>
+      <step>Create README.md at root with setup instructions</step>
+      <step>Document prerequisite versions (Node 20.11.1, npm 10.5.3)</step>
+      <step>List all apps and packages with descriptions</step>
+      <step>Add "Getting Started" section with npm install && npm run dev</step>
+    </steps>
+  </task>
+</tasks>
+  </story>
+
+  <acceptanceCriteria><criteria>
+  <criterion id="AC1">FIRST: Refresh version verification log from architecture document (re-run all npm info and version commands); update architecture doc if any versions have changed since 2025-11-11.</criterion>
+  <criterion id="AC2">Execute starter template commands per architecture using verified versions (create-expo-app@3.10.1, create-next-app@15.0.3, @nestjs/cli@11.1.2).</criterion>
+  <criterion id="AC3">Configure Turborepo workspace with apps (mobile, web, api) and packages (db, tokens, ui-web, api-client, testing).</criterion>
+  <criterion id="AC4">Set up npm workspaces, shared ESLint config, TypeScript configs, and turbo.json task graph (lint → test → build).</criterion>
+  <criterion id="AC5">Verify npm run dev starts all apps; npm test runs all test suites; npm run build produces deployable artifacts.</criterion>
+  <criterion id="AC6">Lock all dependency versions in package.json files to match verified versions; commit package-lock.json.</criterion>
+</criteria></acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/epics.md" title="CoutureCast - Epic Breakdown" section="Story CC-0.1" snippet="Restates the six acceptance criteria, prerequisites, and intent for initializing the Turborepo; use it as the authoritative requirement set." />
+      <doc path="docs/bmm-architecture-20251110.md" title="CoutureCast Architecture" section="Project initialization" snippet="Lists the exact create-expo-app, create-next-app, and @nestjs/cli commands plus the instruction to re-run version checks before scaffolding." />
+      <doc path="docs/bmm-architecture-20251110.md" title="CoutureCast Architecture" section="Version verification log" snippet="Captures the Node 20.11.1, npm 10.5.3, create-expo-app 3.10.1, create-next-app 15.0.3, and @nestjs/cli 11.1.2 baselines we must re-validate in Task 1." />
+      <doc path="docs/bmm-architecture-20251110.md" title="CoutureCast Architecture" section="Project structure + consistency rules" snippet="Defines the required apps/,  infra/, and tools/ layout plus mandates TypeScript-only code, PostHog flags, and the lint → unit → schema → e2e pipeline." />
+      <doc path="README.md" title="Couture Cast Monorepo" section="Repository layout & getting started" snippet="Describes current workspace directories, npm scripts, and onboarding commands so we can extend rather than recreate them." />
+      <doc path="docs/test-design-system.md" title="Test Design System" section="Team & process guidelines / CI pipeline" snippet="Specifies Vitest + Playwright + Maestro coverage targets and the lint → unit → e2e gating that AC4/AC5 must respect." />
+      <doc path="docs/couturecast_brief.md" title="Project Brief" section="Overview" snippet="Explains why the platform needs a unified monorepo and shared packages to deliver weather-informed outfit guidance consistently across devices." />
+    </docs>
+    <code>
+      <artifact path="package.json" kind="config" symbol="root workspaces & scripts" lines="1-58" reason="Already defines npm workspaces for apps/* and  plus dev/build/test/lint scripts the story must wire into turbo." />
+      <artifact path="turbo.json" kind="config" symbol="tasks.build/lint/dev/typecheck" lines="1-15" reason="Seeds the Turborepo pipeline; needs alignment with AC4 (lint → test → build graph) instead of starting from scratch." />
+      <artifact path=".github/workflows/pr-checks.yml" kind="workflow" symbol="quality-gate job" lines="1-55" reason="Current CI runs install → typecheck → lint → build → test; useful reference when verifying AC5 end-to-end commands." />
+      <artifact path="apps/web/src/index.ts" kind="module" symbol="startWebApp" lines="1-7" reason="Placeholder implementation showing no Next.js App Router scaffold exists yet; dev work will replace this with create-next-app output." />
+      <artifact path="apps/api/src/server.ts" kind="module" symbol="startApi" lines="1-7" reason="Confirms the NestJS app is still a stub; helps scope the work needed for Task 4 and for verifying turbo build/test wiring." />
+      <artifact path=" kind="library" symbol="renderButton" lines="1-6" reason="Existing shared UI package demonstrates current TypeScript setup and naming conventions; informs how new packages (db/tokens/etc.) should be structured." />
+      <artifact path=" kind="library" symbol="createTestUser" lines="1-11" reason="Shows how shared packages depend on Faker and bundle TypeScript factories, guiding the creation of additional shared workspaces." />
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <manifest path="package.json">
+          <package name="turbo" version="^2.1.3" scope="dev" />
+          <package name="typescript" version="5.9.3" scope="dev" />
+          <package name="@typescript-eslint/eslint-plugin" version="8.46.3" scope="dev" />
+          <package name="eslint" version="8.57.1" scope="dev" />
+          <package name="lint-staged" version="15.2.10" scope="dev" />
+        </manifest>
+      </ecosystem>
+      <ecosystem name="workspace-packages">
+        <package name="@couture/ui" version="0.1.0" path=" />
+        <package name="@couture/test-utils" version="0.1.0" path=" />
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>TypeScript-only implementations with Node 20.11.1 / npm 10.5.3 per the architecture version log. Starter scaffolds must be generated with create-expo-app@3.10.1, create-next-app@15.0.3, and @nestjs/cli@11.1.2 to match AC2. Monorepo layout has to follow apps/* and  plus shared lint/tsconfig packages, and CI must preserve the lint → unit → schema → e2e ordering from docs/test-design-system.md. Logging (Pino/consola) and PostHog feature-flag wiring should remain consistent with the architecture’s consistency rules.</constraints>
+  <interfaces>
+    <interface name="npm run dev" kind="script" signature="turbo run dev --parallel" path="package.json" />
+    <interface name="npm run build" kind="script" signature="npm run --workspaces --if-present build" path="package.json" />
+    <interface name="npm run test" kind="script" signature="npm run --workspaces --if-present test" path="package.json" />
+    <interface name="npm run lint" kind="script" signature="npm run --workspaces --if-present lint && eslint --max-warnings=0 --ext .ts,.tsx apps packages" path="package.json" />
+  </interfaces>
+  <tests>
+    <standards>docs/test-design-system.md mandates Vitest for unit/integration tests, Playwright for web E2E, Maestro for mobile, and a lint → unit → schema diff → e2e pipeline enforced through Turborepo and GitHub Actions. Unit tests target 80% line coverage, integration 70%, and E2E suites prioritize journey coverage with <5% flake rate.</standards>
+    <locations>apps/*/src/**/*.{spec,test}.ts;   .github/workflows/pr-checks.yml</locations>
+    <ideas>
+      <idea ac="AC1">Automate a script that re-runs node --version / npm --version / npm info commands and compares the output to docs/bmm-architecture-20251110.md, failing if any mismatch remains unlogged.</idea>
+      <idea ac="AC2">Add smoke tests that confirm each scaffolded app responds to npm run dev (Expo bundler, Next dev server, NestJS start:dev) and exits cleanly when turborepo orchestrates them.</idea>
+      <idea ac="AC5">Create a workflow test that runs npm run dev/test/build/lint sequentially in CI and asserts that turbo fan-out covers apps/mobile, apps/web, apps/api, and all shared packages.</idea>
+      <idea ac="AC6">Write a guard test that parses every workspace package.json to ensure dependencies are pinned (no caret/tilde) and that package-lock.json is regenerated after version drift.</idea>
+    </ideas>
+  </tests>
+</story-context>

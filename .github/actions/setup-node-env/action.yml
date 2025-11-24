@@ -1,0 +1,36 @@
+name: Setup Node Environment
+description: Common setup steps for Node.js projects - node setup, caching, and dependency installation
+
+inputs:
+  use-npm-ci:
+    description: 'Use npm ci instead of npm install'
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: '.nvmrc'
+        cache: 'npm'
+
+    - name: Cache npm directories
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.npm
+          ./node_modules
+        key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-npm-
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        if [ "${{ inputs.use-npm-ci }}" == "true" ]; then
+          npm ci
+        else
+          npm install
+        fi

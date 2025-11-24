@@ -1,0 +1,11 @@
+
+flowchart TD
+    A[Home hero loads weather + outfit tiles] --> B{Mode chips}
+    B -->|Focus| C[Collapsed strips]
+    B -->|Full detail| D[Expanded hourly/week]
+    C --> E[Swap garments]
+    D --> E
+    E --> F{Keep or swap?}
+    F -->|Keep| G[Save look]
+    F -->|Swap again| E
+    G --> H[Community suggestions]

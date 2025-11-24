@@ -1,0 +1,28 @@
+appId: ${MAESTRO_APP_ID}
+name: "Mobile smoke sanity"
+tags:
+  - smoke
+  - maestro
+env:
+  APP_URL: "exp://127.0.0.1:8081/--/"
+  TAB_ONE_COPY: "Tab One"
+  TAB_TWO_COPY: "Tab Two"
+---
+
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: true
+
+- tapOn: "Enter URL manually"
+
+- inputText: ${APP_URL}
+
+- tapOn: "Connect"
+
+- pressKey: Back
+
+- pressKey: Back
+
+- takeScreenshot:
+    path: maestro/artifacts/tab-navigation.png

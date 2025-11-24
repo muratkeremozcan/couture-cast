@@ -1,0 +1,17 @@
+node_modules
+.next
+.turbo
+.bmad
+.windsurf
+.claude
+.github/chatmodes
+.github/workflows
+.vscode
+coverage
+dist
+build
+apps/**/dist
+apps/**/.next
+packages/**/dist
+AGENTS.md
+docs

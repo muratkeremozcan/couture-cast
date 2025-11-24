@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CoutureCast Design Direction Showcase</title>
+  <style>
+    :root {
+      font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+      background:#f2f2f4;
+      color:#111;
+    }
+    body { margin:0; padding:32px; }
+    h1 { margin:0 0 8px; font-size:32px; }
+    .lead { margin:0 0 24px; color:#555; max-width:900px; }
+    .controls { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+    button { border:none; border-radius:999px; padding:10px 18px; background:#111; color:#fff; cursor:pointer; font-weight:600; }
+    button.secondary { background:#fff; color:#111; border:1px solid #ccc; }
+    .viewer { position:relative; }
+    .direction { display:none; background:#fff; border-radius:28px; padding:28px; box-shadow:0 24px 60px rgba(15,15,30,0.15); margin-bottom:28px; }
+    .direction.active { display:block; }
+    .direction.comparison { width:calc(50% - 16px); display:inline-block; vertical-align:top; }
+    .meta { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+    .tags { display:flex; gap:8px; flex-wrap:wrap; }
+    .tag { background:rgba(0,0,0,0.05); border-radius:999px; padding:6px 12px; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; }
+    .canvas { border-radius:20px; overflow:hidden; border:1px solid rgba(0,0,0,0.05); margin-top:20px; }
+    .notes { margin-top:20px; display:flex; gap:16px; flex-wrap:wrap; }
+    .notes textarea { flex:1 1 220px; min-height:80px; border-radius:14px; border:1px solid rgba(0,0,0,0.12); padding:12px; font-family:inherit; }
+    .thumbs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
+    .thumbs button { width:42px; height:42px; border-radius:12px; border:2px solid transparent; padding:0; font-size:12px; }
+    .thumbs button.active { border-color:#C9A14A; }
+    .view-toggle { margin-left:auto; }
+
+    .mobile-view { display:none; }
+
+    /* Layout specific styles */
+    .hero-monolith { background:linear-gradient(135deg,#f7f7fa,#ffffff); padding:40px; position:relative; min-height:420px; }
+    .hero-monolith .time { position:absolute; top:32px; right:40px; font-size:18px; color:#444; }
+    .hero-monolith .primary { font-size:72px; font-weight:600; }
+    .hero-monolith .overlay { position:absolute; bottom:40px; right:40px; background:#fff; border-radius:20px; padding:16px 20px; box-shadow:0 18px 40px rgba(0,0,0,0.15); width:280px; }
+
+    .split-columns { display:grid; grid-template-columns:360px 1fr; min-height:540px; }
+    .split-columns .left { background:#111; color:#fff; padding:28px; display:flex; flex-direction:column; gap:20px; }
+    .split-columns .hourly { display:flex; gap:12px; }
+    .split-columns .hourly span { background:rgba(255,255,255,0.1); padding:12px; border-radius:12px; text-align:center; }
+    .split-columns .right { padding:32px; background:#fff; display:flex; flex-direction:column; gap:18px; }
+    .split-columns .outfit-row { display:flex; gap:12px; }
+
+    .lookbook-prism { display:grid; grid-template-columns:420px 1fr; min-height:520px; }
+    .lookbook-prism .hero { padding:32px; background:#faf9f7; display:flex; flex-direction:column; gap:20px; }
+    .lookbook-prism .community { padding:32px; background:#fff; display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; }
+
+    .minimal-stacks { background:#fff; padding:32px; display:flex; flex-direction:column; gap:18px; }
+    .minimal-stacks .card { border:1px solid #e5e5ef; border-radius:20px; padding:20px; }
+
+    .motion-canvas { position:relative; padding:40px; background:radial-gradient(circle at top,#101018,#040406); color:#fff; overflow:hidden; }
+    .motion-canvas::after { content:''; position:absolute; inset:0; background:url('data:image/svg+xml,%3Csvg width="160" height="160" xmlns="http://www.w3.org/2000/svg"%3E%3Ccircle cx="80" cy="80" r="78" stroke="rgba(255,255,255,0.06)" stroke-width="1" fill="none"/%3E%3C/svg%3E') center/320px repeat; opacity:0.6; pointer-events:none; }
+    .motion-canvas .content { position:relative; display:flex; gap:32px; }
+    .motion-canvas .silhouette { flex:1; background:rgba(255,255,255,0.05); border-radius:24px; padding:24px; display:flex; flex-direction:column; gap:16px; }
+    .motion-canvas .controls { flex:1; display:flex; flex-direction:column; gap:16px; }
+
+    .compass-grid { padding:32px; background:#fff; }
+    .compass-grid .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    .compass-grid .grid .cell { border:1px solid #e7e7ef; border-radius:18px; padding:16px; }
+
+    .chip { border-radius:999px; padding:8px 16px; border:1px solid rgba(0,0,0,0.12); font-size:13px; }
+
+    /* Mobile mock styles */
+    .mobile-shell { width:320px; margin:24px auto 0; border-radius:32px; background:#111; padding:18px 14px 24px; position:relative; box-shadow:0 20px 45px rgba(15,15,30,0.25); }
+    .mobile-notch { width:140px; height:18px; background:#000; border-radius:12px; margin:0 auto 14px; }
+    .mobile-card { background:#fff; border-radius:24px; padding:20px; display:flex; flex-direction:column; gap:16px; }
+    .mobile-stack { display:flex; flex-direction:column; gap:16px; }
+    .mobile-chips { display:flex; gap:8px; flex-wrap:wrap; }
+    .mobile-strip { border-radius:16px; border:1px solid #ececf5; padding:12px; font-size:13px; }
+    .mobile-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+
+    @media (max-width: 1024px) {
+      body { padding:24px; }
+      .direction { padding:22px; }
+      .thumbs button { width:38px; height:38px; }
+      .split-columns { grid-template-columns:1fr; }
+      .split-columns .left { border-radius:20px 20px 0 0; }
+      .split-columns .right { padding:24px; }
+      .split-columns .outfit-row { flex-direction:column; }
+      .lookbook-prism { grid-template-columns:1fr; }
+      .lookbook-prism .community { grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); }
+      .motion-canvas .content { flex-direction:column; }
+      .compass-grid .grid { grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }
+    }
+
+    @media (max-width: 640px) {
+      body { padding:18px; }
+      h1 { font-size:24px; }
+      .controls button { flex:1 1 120px; }
+      .direction { padding:18px; }
+      .meta { flex-direction:column; }
+      .tags { justify-content:flex-start; }
+      .hero-monolith { padding:28px; }
+      .hero-monolith .time { position:relative; top:auto; right:auto; margin-bottom:12px; display:block; }
+      .hero-monolith .overlay { position:relative; right:auto; bottom:auto; margin-top:18px; width:100%; }
+      .motion-canvas { padding:28px; }
+      .compass-grid { padding:24px; }
+      .notes { flex-direction:column; }
+      .direction.comparison { width:100%; }
+    }
+
+    body.mobile {
+      padding:20px;
+    }
+    body.mobile h1 { font-size:26px; }
+    body.mobile .lead { font-size:14px; }
+    body.mobile .direction { padding:20px; border-radius:20px; }
+    body.mobile .canvas.desktop-view { display:none; }
+    body.mobile .mobile-view { display:block; }
+    body.mobile .controls { justify-content:flex-start; }
+  </style>
+</head>
+<body>
+  <h1>Design Direction Showcase</h1>
+  <p class="lead">Here are six materially different treatments for CoutureCast’s ritual. Each screen varies layout, hierarchy, and interaction emphasis so you can spot what feels right.</p>
+  <div class="controls">
+    <button id="prev" class="secondary">◀ Prev</button>
+    <button id="next">Next ▶</button>
+    <button id="comparison" class="secondary">Toggle Comparison</button>
+    <button id="view" class="secondary">Switch to Mobile</button>
+  </div>
+  <div class="thumbs">
+    <button class="secondary thumb" data-index="0">1</button>
+    <button class="secondary thumb" data-index="1">2</button>
+    <button class="secondary thumb" data-index="2">3</button>
+    <button class="secondary thumb" data-index="3">4</button>
+    <button class="secondary thumb" data-index="4">5</button>
+    <button class="secondary thumb" data-index="5">6</button>
+  </div>
+  <div class="viewer" id="viewer">
+    <!-- Direction 1 -->
+    <section class="direction" data-index="0">
+      <div class="meta">
+        <div>
+          <h2>Monolith Hero</h2>
+          <p>Editorial & immersive · best for first-timers who need instant clarity.</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Hero first</span>
+          <span class="tag">Hide chips</span>
+          <span class="tag">Calm focus</span>
+        </div>
+      </div>
+      <div class="canvas desktop-view hero-monolith">
+        <div class="time">Wednesday · 4:02 PM</div>
+        <div class="primary">59°</div>
+        <p style="font-size:18px; max-width:360px;">Feels like 56°. Sunny calm winds. “Mulberry Layering” is on deck with suede boots and knit scarf.</p>
+        <div class="chip" style="display:inline-block; margin-top:20px;">Hide hourly ribbon</div>
+        <div class="chip" style="display:inline-block; margin-left:12px;">Swap bottoms</div>
+        <div class="overlay">
+          <strong style="display:block; font-size:18px;">Upcoming</strong>
+          <p style="margin:6px 0 0; font-size:14px; color:#555;">Thu 58° overcast · Fri 55° showers · Sat 63° bright</p>
+        </div>
+      </div>
+      <div class="canvas mobile-view mobile-shell">
+        <div class="mobile-notch"></div>
+        <div class="mobile-card mobile-stack">
+          <div style="font-size:13px; text-transform:uppercase; letter-spacing:0.12em; color:#5c5c68;">Wed · 4:02 PM</div>
+          <div style="font-size:48px; font-weight:600;">59°</div>
+          <p style="margin:0; color:#444;">Feels like 56°. Mulberry Layering ready with suede boots.</p>
+          <div class="mobile-chips">
+            <div class="chip">Hide hourly</div>
+            <div class="chip">Swap bottoms</div>
+          </div>
+          <div class="mobile-strip">Thu 58° · Fri 55° · Sat 63°</div>
+        </div>
+      </div>
+      <div class="notes">
+        <textarea placeholder="What I like…"></textarea>
+        <textarea placeholder="What I’d change…"></textarea>
+      </div>
+    </section>
+
+    <!-- Direction 2 -->
+    <section class="direction" data-index="1">
+      <div class="meta">
+        <div>
+          <h2>Strip Composer</h2>
+          <p>Structured & data-forward · best for planners juggling multiple looks.</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Dual column</span>
+          <span class="tag">Pinned forecast</span>
+          <span class="tag">Inline tweaks</span>
+        </div>
+      </div>
+      <div class="canvas desktop-view split-columns">
+        <div class="left">
+          <div style="font-size:60px; font-weight:600;">59°</div>
+          <p>Wilmette · Fresh clear</p>
+          <div class="hourly">
+            <span>4PM<br>59°</span>
+            <span>5PM<br>58°</span>
+            <span>6PM<br>55°</span>
+          </div>
+          <div>
+            <h4 style="margin:0 0 6px;">Week lookahead</h4>
+            <p style="margin:0;">Thu rain · Fri cool · Sat clear</p>
+          </div>
+          <div>
+            <h4 style="margin:0 0 6px;">Modes</h4>
+            <div class="chip" style="background:#fff;color:#111;">Focus</div>
+            <div class="chip" style="background:transparent;color:#fff;border-color:rgba(255,255,255,0.5);">Full detail</div>
+          </div>
+        </div>
+        <div class="right">
+          <div class="outfit-row">
+            <div class="card" style="flex:1; border:1px solid #ececf5; border-radius:20px; padding:16px;">
+              <h4 style="margin:0;">Hero Outfit</h4>
+              <p style="margin:6px 0 0;">Suede bucket · knit cardigan · corduroy.</p>
+              <div class="chip" style="margin-top:12px;">Swap outerwear</div>
+            </div>
+            <div class="card" style="flex:1; border:1px solid #ececf5; border-radius:20px; padding:16px;">
+              <h4 style="margin:0;">Alternates</h4>
+              <ul style="padding-left:16px; margin:8px 0 0; color:#555;">
+                <li>Tailored jumpsuit</li>
+                <li>Midi skirt set</li>
+                <li>Monochrome look</li>
+              </ul>
+            </div>
+          </div>
+          <div class="card" style="border:1px solid #ececf5; border-radius:20px; padding:18px;">
+            <h4 style="margin:0;">Community echo</h4>
+            <p style="margin:6px 0 0; color:#555;">“Rain ready” challenge trending nearby.</p>
+          </div>
+        </div>
+      </div>
+      <div class="canvas mobile-view mobile-shell">
+        <div class="mobile-notch"></div>
+        <div class="mobile-card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:13px; letter-spacing:0.08em; text-transform:uppercase; color:#5c5c68;">Wilmette</div>
+              <div style="font-size:40px; font-weight:600;">59°</div>
+            </div>
+            <div style="text-align:right; font-size:14px;">
+              <div>4PM 59°</div>
+              <div>5PM 58°</div>
+              <div>6PM 55°</div>
+            </div>
+          </div>
+          <div class="mobile-strip">Week: Thu rain · Fri cool · Sat clear</div>
+          <div class="mobile-grid">
+            <div class="mobile-strip">Hero fit • swap coat</div>
+            <div class="mobile-strip">Alternates • 3 looks</div>
+          </div>
+          <div class="mobile-strip">Community echo · Rain ready trending</div>
+        </div>
+      </div>
+      <div class="notes">
+        <textarea placeholder="What I like…"></textarea>
+        <textarea placeholder="What I’d change…"></textarea>
+      </div>
+    </section>
+
+    <!-- Direction 3 -->
+    <section class="direction" data-index="2">
+      <div class="meta">
+        <div>
+          <h2>Lookbook Prism</h2>
+          <p>Social & trend-aware · best for users balancing personal vs. community looks.</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Split canvas</span>
+          <span class="tag">Community rail</span>
+          <span class="tag">Geo trends</span>
+        </div>
+      </div>
+      <div class="canvas desktop-view lookbook-prism">
+        <div class="hero">
+          <div>
+            <h3 style="margin:0;">Today’s Ritual</h3>
+            <p style="margin:6px 0 12px;">59° · Feels calm</p>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:12px;">
+            <div style="background:#fff; border-radius:18px; padding:18px; border:1px solid #eee;">Outerwear<br><small>Berry boucle</small></div>
+            <div style="background:#fff; border-radius:18px; padding:18px; border:1px solid #eee;">Bottom<br><small>Chocolate cord</small></div>
+            <div style="background:#fff; border-radius:18px; padding:18px; border:1px solid #eee;">Accessory<br><small>Plaid scarf</small></div>
+            <div style="background:#fff; border-radius:18px; padding:18px; border:1px solid #eee;">Footwear<br><small>Weather boot</small></div>
+          </div>
+          <div>
+            <label style="font-size:13px; text-transform:uppercase; letter-spacing:0.1em;">Mode</label>
+            <div style="display:flex; gap:10px; margin-top:8px;">
+              <div class="chip">Personal</div>
+              <div class="chip" style="border-color:#C9A14A; color:#C9A14A;">Community</div>
+              <div class="chip">Sponsored</div>
+            </div>
+          </div>
+        </div>
+        <div class="community">
+          <div style="grid-column:1/-1; display:flex; justify-content:space-between; align-items:center;">
+            <strong>Community Lookbook</strong>
+            <div style="display:flex; gap:8px;">
+              <div class="chip" style="border-color:#C9A14A; color:#C9A14A;">New</div>
+              <div class="chip">Following</div>
+              <div class="chip">Near me</div>
+            </div>
+          </div>
+          <div class="card">Layered neutrals · 4.8★</div>
+          <div class="card">Prep raincore · 4.6★</div>
+          <div class="card">Downtown knit set · 4.7★</div>
+          <div class="card">Evening glow · 4.5★</div>
+          <div class="card">Community challenge: “Fog fit”</div>
+        </div>
+      </div>
+      <div class="canvas mobile-view mobile-shell">
+        <div class="mobile-notch"></div>
+        <div class="mobile-card mobile-stack">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h3 style="margin:0;">Today</h3>
+              <p style="margin:4px 0 0; color:#555;">59° · Calm</p>
+            </div>
+            <div class="mobile-chips" style="justify-content:flex-end;">
+              <div class="chip">Personal</div>
+              <div class="chip" style="border-color:#C9A14A; color:#C9A14A;">Community</div>
+            </div>
+          </div>
+          <div class="mobile-grid">
+            <div class="mobile-strip">Outerwear · Berry boucle</div>
+            <div class="mobile-strip">Bottom · Chocolate cord</div>
+            <div class="mobile-strip">Accessory · Plaid scarf</div>
+            <div class="mobile-strip">Footwear · Weather boot</div>
+          </div>
+          <div class="mobile-strip">Lookbook: Layered neutrals · Raincore · Fog fit challenge</div>
+        </div>
+      </div>
+      <div class="notes">
+        <textarea placeholder="What I like…"></textarea>
+        <textarea placeholder="What I’d change…"></textarea>
+      </div>
+    </section>
+
+    <!-- Direction 4 -->
+    <section class="direction" data-index="3">
+      <div class="meta">
+        <div>
+          <h2>Minimal Stacks</h2>
+          <p>Ultra minimal & mindful · best for users wanting zero clutter.</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Single column</span>
+          <span class="tag">Focus mode</span>
+          <span class="tag">Big toggles</span>
+        </div>
+      </div>
+      <div class="canvas desktop-view minimal-stacks">
+        <div class="card">
+          <h3 style="margin:0;">Instant glance</h3>
+          <p style="margin:6px 0 0;">59° · Feels 56° · Gentle sun</p>
+          <div style="margin-top:14px; display:flex; gap:10px;">
+            <div class="chip">Hourly</div>
+            <div class="chip">Week</div>
+            <div class="chip" style="border-color:#C9A14A; color:#C9A14A;">Focus</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin:0;">Outfit tiles</h3>
+          <div style="display:flex; gap:12px; margin-top:12px;">
+            <div style="flex:1; border:1px solid #ececf5; border-radius:18px; padding:18px; text-align:center;">Top</div>
+            <div style="flex:1; border:1px solid #ececf5; border-radius:18px; padding:18px; text-align:center;">Bottom</div>
+            <div style="flex:1; border:1px solid #ececf5; border-radius:18px; padding:18px; text-align:center;">Shoes</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin:0;">Week preview</h3>
+          <p style="margin:6px 0 0;">Tap any day to pre-plan outfits.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin:0;">Community</h3>
+          <p style="margin:6px 0 0;">Simple list of trending looks w/ like counts.</p>
+        </div>
+      </div>
+      <div class="canvas mobile-view mobile-shell">
+        <div class="mobile-notch"></div>
+        <div class="mobile-card mobile-stack">
+          <div class="mobile-strip">Instant glance · 59°</div>
+          <div class="mobile-chips">
+            <div class="chip">Hourly</div>
+            <div class="chip">Week</div>
+            <div class="chip" style="border-color:#C9A14A; color:#C9A14A;">Focus</div>
+          </div>
+          <div class="mobile-grid">
+            <div class="mobile-strip">Top tile</div>
+            <div class="mobile-strip">Bottom tile</div>
+            <div class="mobile-strip">Shoes tile</div>
+            <div class="mobile-strip">Accessory tile</div>
+          </div>
+          <div class="mobile-strip">Week preview · tap to plan</div>
+          <div class="mobile-strip">Community list · trending looks</div>
+        </div>
+      </div>
+      <div class="notes">
+        <textarea placeholder="What I like…"></textarea>
+        <textarea placeholder="What I’d change…"></textarea>
+      </div>
+    </section>
+
+    <!-- Direction 5 -->
+    <section class="direction" data-index="4">
+      <div class="meta">
+        <div>
+          <h2>Motion Canvas</h2>
+          <p>Premium & animated · best for subscribers craving cinematic stories.</p>
+        </div>
+        <div class="tags">
+          <span class="tag">Gradient field</span>
+          <span class="tag">Silhouette slider</span>
+          <span class="tag">Motion cues</span>
+        </div>
+      </div>
+      <div class="canvas desktop-view motion-canvas">
+        <div class="content">
+          <div class="silhouette">
+            <div style="display:flex; justify-content:space-between;">
+              <strong>Silhouette Studio</strong>
+              <span>Premium</span>
+            </div>
+            <div style="height:220px; background:linear-gradient(180deg,rgba(255,255,255,0.2),rgba(255,255,255,0)); border-radius:18px; position:relative;">
+              <div style="position:absolute; inset:30px 80px; border:1px dashed rgba(255,255,255,0.4); border-radius:999px;"></div>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <div class="chip" style="border-color:#0D6F62; color:#0D6F62;">Default mannequin</div>
+              <div class="chip" style="border-color:#fff; color:#fff;">My photo</div>
+            </div>
+          </div>
+          <div class="controls">
+            <div style="background:rgba(255,255,255,0.08); border-radius:18px; padding:18px;">
+              <h4 style="margin:0;">Live weather</h4>
+              <p style="margin:6px 0 0;">59° · Feels like 56° · soft sun</p>
+              <div style="margin-top:14px;">
+                <label>Motion overlay</label>
+                <input type="range" min="0" max="100" value="60" style="width:100%;">
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.08); border-radius:18px; padding:18px;">
+              <h4 style="margin:0;">Theme</h4>
+              <p style="margin:6px 0 0;">Jewel Radiance · Emerald pulse</p>
+              <div style="margin-top:12px; display:flex; gap:8px;">
+                <div class="chip" style="border-color:#0D6F62; color:#0D6F62;">Emerald</div>
+                <div class="chip" style="border-color:#6C3AA8; color:#6C3AA8;">Amethyst</div>
+                <div class="chip" style="border-color:#1F4E79; color:#1F4E79;">Sapphire</div>
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.08); border-radius:18px; padding:18px;">
+              <h4 style="margin:0;">Planner</h4>
+              <p style="margin:6px 0 0;">Swipe to preview cinematic transitions for each day.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="canvas mobile-view mobile-shell" style="background:#040406;">
+        <div class="mobile-notch" style="background:#05050a;"></div>
+        <div class="mobile-card" style="background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(255,255,255,0.1);">
+          <div style="font-size:13px; letter-spacing:0.08em; text-transform:uppercase; color:#b3bccf;">Premium Motion</div>
+          <div style="font-size:42px; font-weight:600;">59°</div>
+          <div class="mobile-strip" style="background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.1); color:#dfe5ff;">Silhouette • My photo overlay</div>
+          <div class="mobile-strip" style="background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.1); color:#dfe5ff;">Theme • Emerald pulse</div>
+          <div class="mobile-strip" style="background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.1); color:#dfe5ff;">Planner • Swipe to animate</div>
+        </div>
+      </div>
+      <div class="notes">
+        <textarea placeholder="What I like…"></textarea>
+        <textarea placeholder="What I’d change…"></textarea>
+      </div>
+    </section>
+
+    <!-- Direction 6 -->
+    <section class="direction" data-index="5">
+      <div class="meta">
+        <div>
+          <h2>Compass Grid</h2>
+          <p>Power & plan-ready · best for users balancing day-to-night agendas.</p>
+        </div>
+        <div class="tags">
+          <span class="tag">3-column grid</span>
+          <span class="tag">Agenda</span>
+          <span class="tag">Calendar sync</span>
+        </div>
+      </div>
+      <div class="canvas desktop-view compass-grid">
+        <div class="grid">
+          <div class="cell">
+            <strong>Now</strong>
+            <p style="margin:6px 0 0;">59° · Boot + boucle</p>
+            <div class="chip">Swap</div>
+          </div>
+          <div class="cell">
+            <strong>Afternoon</strong>
+            <p style="margin:6px 0 0;">Client check-in · add blazer</p>
+          </div>
+          <div class="cell">
+            <strong>Evening</strong>
+            <p style="margin:6px 0 0;">Dinner plan · velvet layer</p>
+          </div>
+          <div class="cell">
+            <strong>Wardrobe pulls</strong>
+            <ul style="margin:8px 0 0 16px; color:#555;">
+              <li>Silk scarf</li>
+              <li>Waterproof boot</li>
+              <li>Structured bag</li>
+            </ul>
+          </div>
+          <div class="cell">
+            <strong>Calendar link</strong>
+            <p style="margin:6px 0 0;">Sync with events to auto-plan looks.</p>
+          </div>
+          <div class="cell">
+            <strong>Community ping</strong>
+            <p style="margin:6px 0 0;">2 new likes on “Layered Fog Fit”.</p>
+          </div>
+        </div>
+      </div>
+      <div class="canvas mobile-view mobile-shell">
+        <div class="mobile-notch"></div>
+        <div class="mobile-card mobile-stack">
+          <div class="mobile-strip">Now · 59° · Swap</div>
+          <div class="mobile-strip">Afternoon · add blazer</div>
+          <div class="mobile-strip">Evening · velvet layer</div>
+          <div class="mobile-strip">Wardrobe pulls · scarf / boots / bag</div>
+          <div class="mobile-strip">Calendar sync · connected</div>
+          <div class="mobile-strip">Community · 2 new likes</div>
+        </div>
+      </div>
+      <div class="notes">
+        <textarea placeholder="What I like…"></textarea>
+        <textarea placeholder="What I’d change…"></textarea>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const sections = Array.from(document.querySelectorAll('.direction'));
+    const thumbs = Array.from(document.querySelectorAll('.thumb'));
+    const prev = document.getElementById('prev');
+    const next = document.getElementById('next');
+    const comparison = document.getElementById('comparison');
+    const viewToggle = document.getElementById('view');
+    let index = 0;
+    let compare = false;
+    let mobile = false;
+
+    function visibleCompareIndices() {
+      const nextIndex = (index + 1) % sections.length;
+      return [index, nextIndex];
+    }
+
+    function render() {
+      const compareIndices = visibleCompareIndices();
+      sections.forEach((section, i) => {
+        if (compare) {
+          section.classList.add('comparison');
+          const isVisible = compareIndices.includes(i);
+          section.style.display = isVisible ? 'inline-block' : 'none';
+          section.classList.toggle('active', isVisible);
+        } else {
+          section.classList.remove('comparison');
+          section.style.display = i === index ? 'block' : 'none';
+          section.classList.toggle('active', i === index);
+        }
+      });
+      thumbs.forEach((btn, i) => btn.classList.toggle('active', i === index));
+      document.body.classList.toggle('mobile', mobile);
+      viewToggle.textContent = mobile ? 'Switch to Desktop' : 'Switch to Mobile';
+    }
+
+    prev.addEventListener('click', () => {
+      index = (index - 1 + sections.length) % sections.length;
+      render();
+    });
+
+    next.addEventListener('click', () => {
+      index = (index + 1) % sections.length;
+      render();
+    });
+
+    comparison.addEventListener('click', () => {
+      compare = !compare;
+      render();
+    });
+
+    viewToggle.addEventListener('click', () => {
+      mobile = !mobile;
+      compare = false;
+      render();
+    });
+
+    thumbs.forEach(btn => btn.addEventListener('click', () => {
+      compare = false;
+      index = parseInt(btn.dataset.index, 10);
+      render();
+    }));
+
+    render();
+  </script>
+</body>
+</html>

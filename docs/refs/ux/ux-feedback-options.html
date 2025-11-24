@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CoutureCast Feedback Options</title>
+<style>
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#f5f5f7; margin:0; padding:32px; color:#111; }
+  h1 { font-weight:600; margin-bottom:8px; }
+  p { max-width:720px; line-height:1.5; }
+  .options { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:24px; margin-top:24px; }
+  .card { background:#fff; border-radius:18px; padding:24px; box-shadow:0 18px 40px rgba(0,0,0,0.08); }
+  h2 { margin-top:0; font-size:20px; }
+  .stack { display:flex; flex-direction:column; gap:12px; margin-top:16px; }
+  .banner { border-radius:12px; padding:14px 18px; display:flex; align-items:center; gap:12px; font-weight:500; }
+  .banner small { font-weight:400; color:rgba(0,0,0,0.65); display:block; }
+  .toast { width:240px; border-radius:12px; padding:14px 18px; color:#fff; font-weight:500; box-shadow:0 12px 24px rgba(0,0,0,0.18); }
+  .option-1 .success { background:#ffffff; border:2px solid #C9A14A; box-shadow:0 4px 14px rgba(201,161,74,0.25); }
+  .option-1 .success:before { content:'✔'; color:#C9A14A; }
+  .option-1 .error { background:#B04A4A; color:#fff; }
+  .option-1 .info { background:#111; color:#fff; }
+  .option-1 .loading { position:relative; padding-top:30px; }
+  .option-1 .loading::after { content:''; position:absolute; left:0; top:12px; width:100%; height:4px; background:rgba(0,0,0,0.08); border-radius:999px; }
+  .option-1 .loading::before { content:''; position:absolute; left:0; top:12px; width:55%; height:4px; background:#C9A14A; border-radius:999px; animation:pulse 1.4s infinite; }
+  @keyframes pulse { 0% { width:35%; } 50% { width:80%; } 100% { width:35%; } }
+  .mobile { margin-top:20px; border:1px solid #dadde5; border-radius:24px; padding:16px; background:#fff; }
+  .mobile h3 { margin:0 0 12px; font-size:16px; text-transform:uppercase; letter-spacing:1px; color:#5c5c68; }
+  .mobile .banner { border-radius:16px; }
+  .badge { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#5c5c68; }
+</style>
+</head>
+<body>
+<h1>Feedback Pattern Concepts</h1>
+<p>Each card shows banner + toast examples and a mobile view. Option 1 matches what we discussed: monochrome canvas with gold-highlighted successes, merlot errors, and charcoal info.</p>
+<div class="options">
+  <section class="card option-1" id="feedback-option-1">
+    <h2>1 · High-contrast Banners + Toast Stack</h2>
+    <p class="badge">Recommended baseline</p>
+    <div class="stack">
+      <div class="banner success">
+        Success — Wardrobe synced
+        <small>Gold ring + white background keeps the tone refined while signaling completion.</small>
+      </div>
+      <div class="banner error">
+        ⚠ Payment failed — Try another card
+      </div>
+      <div class="banner info">
+        ℹ Forecast updated 2 mins ago
+      </div>
+      <div class="banner loading">
+        Saving outfit...
+      </div>
+    </div>
+    <div class="stack" style="flex-direction:row; gap:16px; flex-wrap:wrap;">
+      <div class="toast" style="background:#111;">Info toast — look saved</div>
+      <div class="toast" style="background:#B04A4A;">Error toast — upload failed</div>
+      <div class="toast" style="background:#C9A14A; color:#111;">Success toast — forecast shared</div>
+    </div>
+    <div class="mobile">
+      <h3>Mobile preview</h3>
+      <div class="banner success">Silhouette saved to My Form</div>
+      <div class="banner info" style="margin-top:10px;">Widget refreshed</div>
+    </div>
+  </section>
+  <section class="card option-2" id="feedback-option-2">
+    <h2>2 · Inline Cards + Soft Toasts</h2>
+    <p>Feedback lives inside the hero/outfit cards with subtle borders and only surfaces toasts for cross-screen events.</p>
+    <div class="stack">
+      <div class="banner" style="border:2px solid rgba(17,17,17,0.1); background:#fff;">
+        Outfit saved to Lookbook
+        <small>Thin border and inline message keep the ritual calm.</small>
+      </div>
+      <div class="banner" style="border:2px dashed #B04A4A; background:#fff7f7; color:#B04A4A;">
+        Upload failed — tap to retry
+      </div>
+      <div class="banner" style="border:2px solid rgba(68,68,79,0.25); background:#f8f8fc; color:#44444F;">
+        Weather feed catching up...
+      </div>
+    </div>
+    <div class="stack" style="flex-direction:row; gap:16px; flex-wrap:wrap;">
+      <div class="toast" style="background:#111;">Global toast — New badge earned</div>
+      <div class="toast" style="background:#6c6c78;">Quiet toast — Preferences saved</div>
+    </div>
+    <div class="mobile">
+      <h3>Mobile preview</h3>
+      <div class="banner" style="border:2px solid rgba(17,17,17,0.12);">Weekly plan updated</div>
+    </div>
+  </section>
+  <section class="card option-3" id="feedback-option-3">
+    <h2>3 · Premium Accent Feedback</h2>
+    <p>Successes glow gold, errors lean into deep merlot, and informational cues use fog/silver neutrals with iconography.</p>
+    <div class="stack">
+      <div class="banner" style="background:linear-gradient(90deg,#fff,#fff9ef); border:1px solid #C9A14A; box-shadow:0 20px 40px rgba(201,161,74,0.18);">
+        ✨ Premium unlocked — Motion Canvas themes ready
+      </div>
+      <div class="banner" style="background:#361f1f; color:#fbe9e9; border:1px solid #B04A4A;">
+        ⚠ Payment issue — update billing
+      </div>
+      <div class="banner" style="background:#eff1f6; color:#2f3441; border:1px solid #cfd6e5;">
+        Forecast sync in progress
+      </div>
+    </div>
+    <div class="stack" style="flex-direction:row; gap:16px; flex-wrap:wrap;">
+      <div class="toast" style="background:#C9A14A; color:#111;">Gold toast — success</div>
+      <div class="toast" style="background:#5C5C68;">Fog toast — info</div>
+      <div class="toast" style="background:#8C5331;">Autumn toast — seasonal promo</div>
+    </div>
+    <div class="mobile">
+      <h3>Mobile preview</h3>
+      <div class="banner" style="background:#fff9ef; border:1px solid #C9A14A;">Closet synced</div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

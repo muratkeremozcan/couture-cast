@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CoutureCast Color System</title>
+  <style>
+    :root {
+      font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+      background:#f3f3f6;
+      color:#111;
+    }
+    body { margin:0; padding:40px; }
+    h1 { margin:0 0 12px; font-size:32px; }
+    p.lead { max-width:880px; line-height:1.6; margin-bottom:32px; color:#44444F; }
+    section { margin-bottom:48px; }
+    .meta { font-size:13px; text-transform:uppercase; letter-spacing:0.1em; color:#6a6a78; margin-bottom:8px; }
+    .card { background:#fff; border-radius:22px; padding:28px; box-shadow:0 16px 36px rgba(17,17,25,0.12); border:1px solid rgba(17,17,25,0.05); }
+    .grid { display:grid; gap:28px; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); }
+    .swatches { display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; }
+    .swatch { width:120px; border-radius:16px; padding:14px; color:#fff; display:flex; flex-direction:column; gap:6px; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.15); }
+    .swatch.light { color:#111; box-shadow:inset 0 0 0 1px rgba(17,17,25,0.08); }
+    .swatch span { font-size:12px; letter-spacing:0.08em; text-transform:uppercase; opacity:0.85; }
+    .swatch strong { font-size:15px; letter-spacing:0.08em; }
+    .component-demo { margin-top:22px; border-radius:18px; padding:18px; border:1px solid rgba(17,17,25,0.06); display:flex; flex-direction:column; gap:14px; }
+    .component-demo h4 { margin:0; font-size:15px; text-transform:uppercase; letter-spacing:0.1em; color:#5c5c68; }
+    .component-row { display:flex; gap:12px; flex-wrap:wrap; }
+    .component-demo button { border:none; border-radius:999px; padding:12px 22px; font-weight:600; cursor:pointer; box-shadow:0 8px 18px rgba(0,0,0,0.12); transition:transform 0.1s ease; }
+    .component-demo button:hover { transform:translateY(-1px); }
+    .component-demo .ghost { background:transparent; border:1px solid currentColor; color:inherit; box-shadow:none; }
+    .component-demo .text-button { background:transparent; border:none; color:inherit; text-decoration:underline; box-shadow:none; padding:0; }
+    .component-demo .input { flex:1 1 180px; min-width:180px; display:flex; flex-direction:column; gap:6px; font-size:13px; }
+    .component-demo .input input { border-radius:12px; border:1px solid rgba(0,0,0,0.2); padding:10px 12px; font-size:14px; }
+    .component-demo .card-preview { flex:1 1 240px; min-width:220px; border-radius:16px; padding:16px; border:1px solid rgba(0,0,0,0.08); }
+    .component-demo .chip { display:inline-block; padding:6px 12px; border-radius:999px; border:1px solid currentColor; font-size:12px; letter-spacing:0.08em; }
+
+    /* Theme tokens */
+    .demo-core { color:#111; }
+    .demo-core .primary { background:#111; color:#fff; }
+    .demo-core .secondary { background:#C9A14A; color:#111; }
+    .demo-core .ghost, .demo-core .text-button, .demo-core .card-preview, .demo-core .input input { color:#111; border-color:rgba(17,17,25,0.2); }
+    .demo-core .card-preview { background:#F5F5F7; }
+
+    .demo-jewel { color:#0D6F62; }
+    .demo-jewel .primary { background:#0D6F62; color:#fff; }
+    .demo-jewel .secondary { background:#6C3AA8; color:#fff; }
+    .demo-jewel .card-preview { background:#F4F6FB; color:#1F4E79; border-color:rgba(31,78,121,0.25); }
+    .demo-jewel .input input { border-color:rgba(13,111,98,0.4); }
+
+    .demo-umber { color:#8C5331; }
+    .demo-umber .primary { background:#B1683A; color:#fff; }
+    .demo-umber .secondary { background:#D9B38C; color:#3E2A23; }
+    .demo-umber .card-preview { background:#F3EDE6; color:#3E2A23; border-color:rgba(62,42,35,0.2); }
+
+    .demo-metallic { color:#2F333D; }
+    .demo-metallic .primary { background:#7E889A; color:#fff; }
+    .demo-metallic .secondary { background:#C9CDD8; color:#2F333D; }
+    .demo-metallic .card-preview { background:linear-gradient(135deg,#F7FBFF,#E9EDF6); color:#2F333D; border-color:rgba(47,51,61,0.15); }
+
+    .demo-bloom { color:#6D9278; }
+    .demo-bloom .primary { background:#F29BA8; color:#fff; }
+    .demo-bloom .secondary { background:#C9B7E5; color:#3E2A50; }
+    .demo-bloom .card-preview { background:#F8F3F6; color:#6D5278; border-color:rgba(109,82,120,0.2); }
+  </style>
+</head>
+<body>
+  <h1>CoutureCast Color System</h1>
+  <p class="lead">These boards keep the free experience monochrome + gold while premium tiers unlock seasonal palettes. Each block shows swatches plus buttons, chips, inputs, and cards rendered with that scheme so teams can see how the palette behaves on real UI.</p>
+
+  <section>
+    <div class="meta">Core Palette · All Users</div>
+    <div class="card">
+      <h2>Monochrome Ritual</h2>
+      <p>White canvas, black typography, and the signature gold accent define the everyday CoutureCast look.</p>
+      <div class="swatches">
+        <div class="swatch light" style="background:#FFFFFF"><span>Background</span><strong>#FFFFFF</strong></div>
+        <div class="swatch light" style="background:#F5F5F7"><span>Surface</span><strong>#F5F5F7</strong></div>
+        <div class="swatch" style="background:#111111"><span>Primary text</span><strong>#111111</strong></div>
+        <div class="swatch" style="background:#C9A14A"><span>Gold accent</span><strong>#C9A14A</strong></div>
+        <div class="swatch light" style="background:#8A8A95"><span>Fog</span><strong>#8A8A95</strong></div>
+        <div class="swatch light" style="background:#E6E6ED"><span>Cloud</span><strong>#E6E6ED</strong></div>
+      </div>
+      <div class="component-demo demo-core">
+        <h4>Component preview</h4>
+        <div class="component-row">
+          <button class="primary">Primary CTA</button>
+          <button class="secondary">Premium CTA</button>
+          <button class="ghost">Ghost</button>
+          <button class="text-button">Text action</button>
+        </div>
+        <div class="component-row">
+          <div class="input">
+            <label>Silhouette name</label>
+            <input type="text" value="Mulberry Layering" />
+          </div>
+          <div class="card-preview">
+            <strong>Today · 59° Misty</strong>
+            <p style="margin:6px 0 10px;">Pleated maxi + trench · feels like 56°</p>
+            <span class="chip">Swap bottoms</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="meta">Premium Seasonal Palettes</div>
+    <div class="grid">
+      <div class="card">
+        <span class="meta">Premium</span>
+        <h3>Jewel Radiance</h3>
+        <p>Emerald, sapphire, and amethyst overlays energize silhouettes and hero gradients.</p>
+        <div class="swatches">
+          <div class="swatch" style="background:#0D6F62"><span>Emerald</span><strong>#0D6F62</strong></div>
+          <div class="swatch" style="background:#1F4E79"><span>Sapphire</span><strong>#1F4E79</strong></div>
+          <div class="swatch" style="background:#6C3AA8"><span>Amethyst</span><strong>#6C3AA8</strong></div>
+          <div class="swatch" style="background:#12121A"><span>Obsidian</span><strong>#12121A</strong></div>
+          <div class="swatch light" style="background:#F4F6FB"><span>Pearl</span><strong>#F4F6FB</strong></div>
+        </div>
+        <div class="component-demo demo-jewel">
+          <h4>Component preview</h4>
+          <div class="component-row">
+            <button class="primary">Primary CTA</button>
+            <button class="secondary">Secondary</button>
+            <button class="ghost">Ghost</button>
+          </div>
+          <div class="component-row">
+            <div class="input">
+              <label>Theme toggle</label>
+              <input type="text" value="Emerald sheen" />
+            </div>
+            <div class="card-preview">
+              <strong>Hero overlay</strong>
+              <p>Emerald gradient with pearl typography keeps contrast high.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="meta">Premium</span>
+        <h3>Autumn Umber</h3>
+        <p>Maple and chestnut warmth support seasonal wardrobe drops.</p>
+        <div class="swatches">
+          <div class="swatch" style="background:#B1683A"><span>Maple</span><strong>#B1683A</strong></div>
+          <div class="swatch" style="background:#8C5331"><span>Chestnut</span><strong>#8C5331</strong></div>
+          <div class="swatch" style="background:#D9B38C"><span>Wheat</span><strong>#D9B38C</strong></div>
+          <div class="swatch" style="background:#3E2A23"><span>Cocoa</span><strong>#3E2A23</strong></div>
+          <div class="swatch light" style="background:#F3EDE6"><span>Frost</span><strong>#F3EDE6</strong></div>
+        </div>
+        <div class="component-demo demo-umber">
+          <h4>Component preview</h4>
+          <div class="component-row">
+            <button class="primary">Primary CTA</button>
+            <button class="secondary">Secondary</button>
+            <button class="ghost">Ghost</button>
+          </div>
+          <div class="component-row">
+            <div class="input">
+              <label>Planner label</label>
+              <input type="text" value="Maple layers" />
+            </div>
+            <div class="card-preview">
+              <strong>Weekly planner</strong>
+              <p>Chestnut headline with wheat chip keeps legibility.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="meta">Premium</span>
+        <h3>Winter Metallic</h3>
+        <p>Platinum-to-ice gradients unlock subtle weather-driven motion.</p>
+        <div class="swatches">
+          <div class="swatch" style="background:#C9CDD8"><span>Platinum</span><strong>#C9CDD8</strong></div>
+          <div class="swatch" style="background:#7E889A"><span>Steel</span><strong>#7E889A</strong></div>
+          <div class="swatch light" style="background:#E9EDF6"><span>Ice</span><strong>#E9EDF6</strong></div>
+          <div class="swatch" style="background:#2F333D"><span>Gunmetal</span><strong>#2F333D</strong></div>
+          <div class="swatch light" style="background:#F7FBFF"><span>Glacier</span><strong>#F7FBFF</strong></div>
+        </div>
+        <div class="component-demo demo-metallic">
+          <h4>Component preview</h4>
+          <div class="component-row">
+            <button class="primary">Primary CTA</button>
+            <button class="secondary">Secondary</button>
+            <button class="ghost">Ghost</button>
+          </div>
+          <div class="component-row">
+            <div class="input">
+              <label>Motion intensity</label>
+              <input type="text" value="Fog shimmer" />
+            </div>
+            <div class="card-preview">
+              <strong>Hero state</strong>
+              <p>Gradient background + steel chips respect contrast ratios.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="meta">Future drop</span>
+        <h3>Spring Bloom</h3>
+        <p>Soft coral, lilac, and dew accents queued for future releases.</p>
+        <div class="swatches">
+          <div class="swatch" style="background:#F29BA8"><span>Soft Coral</span><strong>#F29BA8</strong></div>
+          <div class="swatch" style="background:#C9B7E5"><span>Mist Lilac</span><strong>#C9B7E5</strong></div>
+          <div class="swatch" style="background:#B8E3D3"><span>Morning Dew</span><strong>#B8E3D3</strong></div>
+          <div class="swatch" style="background:#6D9278"><span>Stem</span><strong>#6D9278</strong></div>
+          <div class="swatch light" style="background:#F8F3F6"><span>Porcelain</span><strong>#F8F3F6</strong></div>
+        </div>
+        <div class="component-demo demo-bloom">
+          <h4>Component preview</h4>
+          <div class="component-row">
+            <button class="primary">Primary CTA</button>
+            <button class="secondary">Secondary</button>
+            <button class="ghost">Ghost</button>
+          </div>
+          <div class="component-row">
+            <div class="input">
+              <label>Palette label</label>
+              <input type="text" value="Spring launch" />
+            </div>
+            <div class="card-preview">
+              <strong>Community badge</strong>
+              <p>Coral success chip + porcelain card for seasonal drops.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer style="font-size:13px;color:#6A6A78;">Component previews mirror the button hierarchy, chip styling, and card treatments defined in the UX specification so engineering can reference precise color values across states.</footer>
+</body>
+</html>

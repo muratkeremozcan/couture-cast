@@ -1,0 +1,128 @@
+<story-context id="{bmad_folder}/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>0</epicId>
+    <storyId>13</storyId>
+    <title>Scaffold cross-surface E2E automation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-16T14:46:37Z</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/0-13-scaffold-cross-surface-e2e-automation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>As the master test architect</asA>
+    <iWant>I want baseline Playwright and Maestro smoke harnesses wired into CI,</iWant>
+    <soThat>so that web and mobile journeys are validated end-to-end before feature teams branch off.</soThat>
+    <tasks>
+  <task id="T1" ac="AC1,AC2">
+    <title>Task 1: Playwright harness</title>
+    <steps>
+      <step>Install @playwright/test at the repo root and add playwright/config/*.config.ts (base + per-environment) that pull WEB_E2E_BASE_URL (default http://localhost:3005), enforce Chromium-only runs, headless mode, and global action/navigation timeouts.</step>
+      <step>Encode lint rules (forbid waitForTimeout / sleep) and shared reporter settings so HTML + trace artifacts land under playwright/playwright-report for CI uploads.</step>
+      <step>Create playwright/tests/home.spec.ts that pings the Nest API health endpoint, loads apps/web on /, asserts hero copy/nav landmarks, and plugs in axe-core checks from docs/test-design-system.md.</step>
+      <step>Add npm run test:pw-local, npm run test:pw-dev, etc., and a helper start script that the Playwright webServer hook calls so smoke runs consistently locally and in CI.</step>
+    </steps>
+  </task>
+  <task id="T2" ac="AC3">
+    <title>Task 2: Maestro harness</title>
+    <steps>
+      <step>Create maestro/sanity.yaml (plus .maestro/config.yaml) that launches the Expo Router tabs experience via MOBILE_E2E_APP_URL, waits for Tab One copy, and walks the default tabs.</step>
+      <step>Provide npm scripts test:e2e:mobile, test:e2e:mobile:ci, and maestro:install that fetch the Maestro CLI (brew/zip or npm exec) and run the flows locally, on CI emulators, or Maestro Cloud.</step>
+      <step>Document how the Metro bundler or an offline bundle starts on a fixed port (e.g., expo start --offline --http 8082) before Maestro attaches, so CI runs remain deterministic.</step>
+    </steps>
+  </task>
+  <task id="T3" ac="AC4">
+    <title>Task 3: Documentation + DX updates</title>
+    <steps>
+      <step>Extend README prerequisites/command tables with the new test:e2e:* scripts, emulator requirements, Maestro Cloud usage, and troubleshooting guidance.</step>
+      <step>Add an “E2E smoke playbook” callout to docs/test-design-system.md describing when to run Playwright vs Maestro, how to tag @p0 smoke scenarios, and which env vars to set.</step>
+      <step>Document how WEB_E2E_BASE_URL and MOBILE_E2E_APP_URL are injected (e.g., .env.e2e) plus how to capture and share Playwright HTML/trace artifacts and Maestro logs.</step>
+    </steps>
+  </task>
+  <task id="T4" ac="AC4">
+    <title>Task 4: CI integration</title>
+    <steps>
+      <step>Update .github/workflows/pr-checks.yml with a new e2e job that reuses the npm cache, runs npm run build once, executes the Playwright and Maestro smoke commands, and uploads artifacts.</step>
+      <step>Mark the job continue-on-error true initially (soft gate) but still emit a status summary (e.g., E2E_SMOKE_STATUS) for dashboards.</step>
+      <step>Ensure the job can parameterize WEB_E2E_BASE_URL / MOBILE_E2E_APP_URL from workflow env and that steps are conditioned to skip when smoke suites are intentionally disabled.</step>
+    </steps>
+  </task>
+</tasks>
+  </story>
+
+  <acceptanceCriteria><criteria>
+  <criterion id="AC1">Add Playwright (Chromium) dependencies and a shared root-level playwright/config directory that reads WEB_E2E_BASE_URL, defaults to http://localhost:3005, pins headless execution, emits HTML/trace artifacts, and tags suites per docs/test-design-system.md Test Framework guidance. Provide scripts npm run test:pw-local (and environment variations) that build apps/web, serve it on port 3005, and run playwright test --project=chromium with zero hard waits.</criterion>
+  <criterion id="AC2">Create a smoke spec under playwright/tests/ that validates the Next.js landing route renders the couture hero copy, accessibility landmarks, and health pings for the Nest API BFF, using the selector guidelines and accessibility checks called out in docs/test-design-system.md (axe-core integration + P0 focus handling).</criterion>
+  <criterion id="AC3">Scaffold Maestro under maestro/ (e.g., sanity.yaml, .maestro/config.yaml) that launches the Expo Router tabs template via MOBILE_E2E_APP_URL, asserts navigation across the default tabs, and surfaces logs/artifacts. Provide scripts npm run test:e2e:mobile and npm run test:e2e:mobile:ci that install Maestro (locally + CI) and run the flow headlessly or against Maestro Cloud when no simulator is available.</criterion>
+  <criterion id="AC4">Update documentation and CI: extend README + docs/test-design-system.md with prerequisites (Node 24, Expo Go, Android Emulator or Maestro Cloud), describe how to run the new commands alongside npm run dev, and update .github/workflows/pr-checks.yml with an e2e job that reuses the install cache, runs npm run build, executes both smoke commands, uploads Playwright HTML/trace plus Maestro logs, and publishes a soft-fail status while suites stabilize.</criterion>
+</criteria></acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/epics.md" title="CoutureCast - Epic Breakdown" section="Story CC-0.13" snippet="Defines the four acceptance criteria for adding Playwright/Maestro smoke coverage plus the prerequisite stack we must respect when wiring automation into Epic 0." />
+      <doc path="docs/test-design-system.md" title="Test Design System" section="Test levels strategy" snippet="Allocates 20% of coverage to E2E and calls out Playwright (web/widgets) and Maestro (Expo) as the mandated tools with @p0 smoke tagging." />
+      <doc path="docs/test-design-system.md" title="Test Design System" section="Playwright Configuration (No Hard Waits Enforcement)" snippet="Provides the canonical config template: action/navigation timeouts plus a forbid list for waitForTimeout so new smoke suites stay deterministic." />
+      <doc path="docs/test-design-system.md" title="Test Design System" section="Cross-Surface Device Matrix" snippet="Lists the Chromium + Expo simulator/watch matrix that the new suites must target and documents how Maestro toggles network conditions." />
+      <doc path="docs/bmm-architecture-20251110.md" title="CoutureCast Architecture" section="Project structure" snippet="Positions  as the home for Playwright/Maestro harnesses alongside apps/web and apps/mobile so new assets stay inside the monorepo conventions." />
+      <doc path="README.md" title="Couture Cast Monorepo" section="Prerequisites & repository layout" snippet="Locks Node 24.x/npm 10.5.3+, outlines existing npm run dev/build/test commands, and highlights  as the future E2E workspace we will populate." />
+      <doc path="docs/sprint-artifacts/0-1-initialize-turborepo-monorepo.md" title="Story 0.1 Dev Notes" section="Dev Agent Record" snippet="Documents that  was scaffolded as a placeholder during Story 0-1, so the new harnesses should live there rather than inventing another workspace." />
+    </docs>
+    <code>
+      <artifact path="package.json" kind="config" symbol="scripts.dev/build/test" lines="1-45" reason="Holds the current dev/build/test/lint commands; we will extend it with test:pw-local and test:e2e:mobile plus helper scripts." />
+      <artifact path=".github/workflows/pr-checks.yml" kind="workflow" symbol="quality-gate job" lines="1-90" reason="Runs install → typecheck → lint → build → test; the new e2e job must hook into this pipeline and reuse its caches." />
+      <artifact path="apps/web/package.json" kind="manifest" symbol="Next.js scripts" lines="1-25" reason="Shows the Next 15.5.6 dev/build/lint commands our Playwright harness will invoke before hitting the landing route." />
+      <artifact path="apps/web/src/app/page.tsx" kind="page" symbol="Home component" lines="1-60" reason="Current Next.js hero content the smoke spec should assert while also wiring in health checks." />
+      <artifact path="apps/mobile/package.json" kind="manifest" symbol="Expo CLI scripts" lines="1-25" reason="Provides expo start/android/ios/web commands plus dependency versions for Maestro flows to attach against." />
+      <artifact path="apps/mobile/app/(tabs)/index.tsx" kind="screen" symbol="Default TabOne screen" lines="1-40" reason="Defines the copy/layout the Maestro sanity flow should verify when stepping through the tab navigator." />
+      <artifact path="apps/api/src/app.controller.ts" kind="controller" symbol="GET / health" lines="1-20" reason="Exposes the Hello World endpoint the Playwright suite can ping before loading the web experience." />
+      <artifact path=" kind="manifest" symbol="Testing workspace scaffold" lines="1-15" reason="Currently only runs build/typecheck/lint placeholders; we will add Playwright/Maestro configs and scripts here." />
+    </code>
+    <dependencies>
+      <ecosystem name="node">
+        <manifest path="package.json">
+          <package name="turbo" version="2.6.1" scope="dev" />
+          <package name="lint-staged" version="15.2.10" scope="dev" />
+          <package name="husky" version="9.1.7" scope="dev" />
+          <package name="@typescript-eslint/eslint-plugin" version="8.46.3" scope="dev" />
+          <package name="typescript" version="5.9.3" scope="dev" />
+        </manifest>
+      </ecosystem>
+      <ecosystem name="workspace-apps">
+        <manifest path="apps/web/package.json">
+          <package name="next" version="15.5.6" />
+          <package name="react" version="19.1.0" />
+          <package name="react-dom" version="19.1.0" />
+        </manifest>
+        <manifest path="apps/mobile/package.json">
+          <package name="expo" version="54.0.23" />
+          <package name="@react-navigation/native" version="7.1.20" />
+          <package name="react-native" version="0.81.5" />
+        </manifest>
+        <manifest path="apps/api/package.json">
+          <package name="@nestjs/core" version="11.1.9" />
+          <package name="rxjs" version="7.8.2" />
+          <package name="vitest" version="4.0.9" />
+        </manifest>
+      </ecosystem>
+    </dependencies>
+  </artifacts>
+
+  <constraints>Follow the Node 24.x baseline from README/.nvmrc so Playwright and Maestro binaries align with CI. All automation lives inside  per the architecture’s project structure, reusing shared ESLint/TypeScript configs instead of duplicating tooling. Playwright config must enforce the no-hard-waits rules (action timeout 10s, forbid waitForTimeout) described in docs/test-design-system.md, and Maestro flows have to respect the documented device matrix plus offline/network toggle guidance. The new e2e GitHub Actions job should layer onto the existing typecheck → lint → build → test pipeline, reuse caches, and remain optional until suites stabilize while still uploading HTML/trace/log artifacts.</constraints>
+  <interfaces>
+    <interface name="npm run dev" kind="script" signature="turbo run dev --parallel" path="package.json" />
+    <interface name="npm run build" kind="script" signature="npm run --workspaces --if-present build" path="package.json" />
+    <interface name="npm run validate" kind="script" signature="npm-run-all --aggregate-output --parallel typecheck lint test" path="package.json" />
+    <interface name="apps/web dev" kind="script" signature="node ../../node_modules/next/dist/bin/next dev" path="apps/web/package.json" />
+    <interface name="apps/mobile start" kind="script" signature="expo start" path="apps/mobile/package.json" />
+  </interfaces>
+  <tests>
+    <standards>docs/test-design-system.md requires Playwright for web/widgets, Maestro for Expo, axe-core a11y gates, and selective @p0/@p1 tagging, plus forbidding hard waits and capturing traces for every failure. Smoke suites must stay under 2 minutes, publish HTML/trace artifacts, and feed CI telemetry alongside the lint → unit → schema → e2e graph.</standards>
+    <locations>playwright/**/*; maestro/**/*; apps/web/src/app/**/*.tsx; apps/mobile/app/**/*.tsx; .github/workflows/pr-checks.yml</locations>
+    <ideas>
+      <idea ac="AC1">Add a Playwright config unit test (or lint rule) that fails when WEB_E2E_BASE_URL is undefined, headless is disabled, or forbid waitForTimeout is missing, and run `npx playwright test --list` inside npm run test:pw-local to ensure the harness builds/serves apps/web before executing.</idea>
+      <idea ac="AC2">Create a smoke spec that warms the Nest API GET / endpoint, loads the Next.js landing page, asserts the hero content + nav links, runs axe-core, and captures traces/screenshots for debugging.</idea>
+      <idea ac="AC3">Implement a Maestro sanity run that launches the Expo tabs shell (local dev server or Maestro Cloud), taps through each tab verifying copy/data-testid markers, and exercises a mocked offline toggle to prove network handling works.</idea>
+      <idea ac="AC4">Write a CI-focused test that parses README and package.json to ensure the new test:e2e:* scripts are documented, and validate the GitHub Actions workflow contains the e2e job with artifact upload + continue-on-error wiring before allowing merges.</idea>
+    </ideas>
+  </tests>
+</story-context>

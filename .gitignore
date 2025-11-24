@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp.cjs
+.pnp.loader.mjs
+.pnpm-store
+
+# Build & cache outputs
+dist/
+build/
+.turbo
+.next
+coverage/
+apps/**/dist
+apps/**/build
+packages/**/dist
+packages/**/build
+tsconfig.tsbuildinfo
+
+# Environment & tooling
+.env
+.env.*
+!.env.example
+.DS_Store
+.vscode
+
+# Playwright/Test artifacts
+test-results/
+playwright-report/
+playwright-logs/
+playwright/artifacts/
+playwright/playwright-report/
+blob-report/
+downloads/
+
+# Logs
+*.log
+npm-debug.log*
+maestro/artifacts

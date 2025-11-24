@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "@playwright/test"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "baseUrl": ".",
+    "paths": {
+      "@support/*": ["./support/*"]
+    }
+  },
+  "include": ["**/*.ts", "tests/**/*.ts", "config/**/*.ts", "support/**/*.ts"],
+  "exclude": ["node_modules", "playwright-report", "artifacts"]
+}

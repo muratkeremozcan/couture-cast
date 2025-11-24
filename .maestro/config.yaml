@@ -1,0 +1,19 @@
+defaults:
+  appId: ${MAESTRO_APP_ID:-host.exp.Exponent}
+  platform: ${MAESTRO_PLATFORM:-android}
+  tags:
+    - smoke
+
+env:
+  MOBILE_E2E_APP_URL: ${MOBILE_E2E_APP_URL:-exp://127.0.0.1:19000}
+  MAESTRO_APP_ID: ${MAESTRO_APP_ID:-host.exp.Exponent}
+  MAESTRO_DEVICE: ${MAESTRO_DEVICE:-emulator-5554}
+
+artifacts:
+  enabled: true
+  path: packages/testing/maestro/artifacts
+  retention: 14
+
+timeouts:
+  default: 15000
+  appLaunch: 30000
