@@ -90,14 +90,16 @@ npm run typecheck:clear-cache
 - `npm run db:reset` – resets DB (migrate reset + seed)
 
 Environment for DB scripts:
+
 - set `DATABASE_URL` (e.g., `postgresql://murat@localhost:5432/couture_cast?schema=public`)
 - ensure Postgres is running (macOS: `brew services start postgresql@15`)
 - if needed locally, add `PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"` when running scripts
 
 Local E2E with clean DB:
-1) `PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH" DATABASE_URL=... npm run db:reset`
-2) `npm run test:pw-local`
-3) optional cleanup after tests: `npm run db:reset`
+
+1. `PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH" DATABASE_URL=... npm run db:reset`
+2. `npm run test:pw-local`
+3. optional cleanup after tests: `npm run db:reset`
 
 ## E2E smoke (Playwright + Maestro)
 
