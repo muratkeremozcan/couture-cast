@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   mobile-e2e-android:
-    runs-on: macos-13
+    runs-on: macos-12
     timeout-minutes: 30
     continue-on-error: true
     env:
@@ -33,15 +33,17 @@ jobs:
       - name: Run tests with Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 30
+          target: google_apis
           arch: x86_64
-          profile: pixel_6
+          profile: pixel_3a
           force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
             echo "=== Emulator boot validation ==="
-            adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
+            adb wait-for-device
+            adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
             adb shell getprop sys.boot_completed
 
             echo "=== Install Expo Go ==="
@@ -114,20 +116,18 @@ jobs:
 
       - name: Setup iOS simulator with Expo Go
         run: |
-          echo "=== List available device types and runtimes ==="
-          xcrun simctl list devicetypes | grep iPhone
-          xcrun simctl list runtimes | grep iOS
-
-          echo "=== Find or boot simulator (iOS 18.4) ==="
-          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone 16 Pro (.*) (Shutdown)" | grep "18.4" | head -1 | grep -oE '\([A-F0-9-]{36}\)' | tr -d '()')
+          echo "=== Find best available iPhone simulator ==="
+          # Try iPhone 15 Pro (most common on macos-13)
+          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone 15 Pro" | head -1 | grep -oE '\([A-F0-9-]{36}\)' | tr -d '()')
 
           if [ -z "$SIMULATOR_ID" ]; then
-            echo "No existing simulator found, using first available iPhone..."
-            SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone 16 Pro" | head -1 | grep -oE '\([A-F0-9-]{36}\)' | tr -d '()')
+            # Fallback: any iPhone 14/15
+            SIMULATOR_ID=$(xcrun simctl list devices available | grep -E "iPhone 1[45]" | head -1 | grep -oE '\([A-F0-9-]{36}\)' | tr -d '()')
           fi
 
           if [ -z "$SIMULATOR_ID" ]; then
-            echo "ERROR: No iPhone 16 Pro simulators available"
+            echo "ERROR: No suitable iPhone simulator found"
+            xcrun simctl list devices available
             exit 1
           fi
 
