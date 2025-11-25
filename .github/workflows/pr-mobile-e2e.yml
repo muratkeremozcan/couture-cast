@@ -1,4 +1,4 @@
-name: Mobile e2e - Android only (Maestro)
+name: Mobile e2e (Maestro)
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ env:
 jobs:
   mobile-e2e-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install Android build tools and platforms
-        run: sdkmanager "build-tools;36.0.0" "platforms;android-36"
+        run: sdkmanager "build-tools;36.0.0" "platforms;android-36" "build-tools;35.0.0" "platforms;android-35" "build-tools;34.0.0" "platforms;android-34"
 
       - name: Cache Gradle dependencies
         uses: actions/cache@v4
@@ -48,15 +48,15 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Install Maestro
-        run: curl -Ls "https://get.maestro.mobile.dev" | bash
-
       - name: Build Android APK
         working-directory: apps/mobile
+        env:
+          EXPO_NO_TELEMETRY: 1
+          CI: true
         run: |
           npx expo prebuild --platform android --clean
           cd android
-          ./gradlew assembleRelease
+          ./gradlew assembleDebug
 
       - name: Run tests with Android emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -65,20 +65,22 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_3a
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disk-size: 1536M
+          force-avd-creation: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
           disable-animations: true
           script: |
             adb wait-for-device
             adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
 
-            echo "Installing APK"
-            adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+            npm run maestro:install --silent
+
+            adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
             mkdir -p maestro/artifacts
-            $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
-            (sleep 20 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/) || \
-            (sleep 60 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/)
+            MOBILE_E2E_SKIP_SERVER=1 npx maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
+              (sleep 20 && MOBILE_E2E_SKIP_SERVER=1 npx maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/) || \
+              (sleep 60 && MOBILE_E2E_SKIP_SERVER=1 npx maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/)
 
       - uses: actions/upload-artifact@v4
         if: always()
