@@ -28,7 +28,7 @@
     "mobile:sim:ios": "bash ./scripts/start-ios-simulator.sh",
     "mobile:sim:android": "bash ./scripts/start-android-emulator.sh",
     "mobile:device": "open -a \"Android Emulator\" || open -a Simulator || echo \"Launch your emulator manually\"",
-    "start:all": "npm-run-all2 --parallel start:api start:web",
+    "start:all": "npm-run-all2 db:reset && npm-run-all2 --parallel start:api start:web",
     "test:pw-local": "cross-env TEST_ENV=local npx playwright test",
     "test:pw-dev": "cross-env TEST_ENV=dev npx playwright test",
     "test:pw-stage": "cross-env TEST_ENV=stage npx playwright test",
@@ -42,7 +42,10 @@
     "validate": "npm-run-all --aggregate-output --parallel typecheck lint test",
     "clean": "rimraf \"apps/**/dist\" \"packages/**/dist\" \"**/tsconfig.tsbuildinfo\"",
     "clean:install": "npx rimraf node_modules \"apps/**/node_modules\" \"packages/**/node_modules\" && npm install --no-progress",
-    "prepare": "husky"
+    "prepare": "husky",
+    "db:migrate": "npm --prefix packages/db run db:migrate",
+    "db:seed": "npm --prefix packages/db run db:seed",
+    "db:reset": "npm --prefix packages/db run db:reset"
   },
   "devDependencies": {
     "@couture/eslint-config": "workspace:*",
@@ -70,6 +73,7 @@
     "npm-run-all2": "^7.0.2",
     "picomatch": "^4.0.2",
     "prettier": "3.6.2",
+    "prisma": "^6.19.0",
     "rimraf": "5.0.10",
     "tsx": "^4.20.6",
     "turbo": "2.6.1",
@@ -83,5 +87,8 @@
     "*.{json,md}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0"
   }
 }
