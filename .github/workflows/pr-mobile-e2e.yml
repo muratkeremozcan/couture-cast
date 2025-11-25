@@ -17,10 +17,30 @@ env:
 jobs:
   mobile-e2e-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'true'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools and platforms
+        run: sdkmanager "build-tools;36.0.0" "platforms;android-36"
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
 
       - name: Enable KVM
         run: |
@@ -30,11 +50,6 @@ jobs:
 
       - name: Install Maestro
         run: curl -Ls "https://get.maestro.mobile.dev" | bash
-
-      - name: Setup Node
-        uses: ./.github/actions/setup-node-env
-        with:
-          use-npm-ci: 'true'
 
       - name: Build Android APK
         working-directory: apps/mobile
