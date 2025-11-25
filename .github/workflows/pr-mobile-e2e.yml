@@ -17,27 +17,13 @@ env:
 jobs:
   mobile-e2e-android:
     runs-on: macos-12
-    timeout-minutes: 45
+    timeout-minutes: 15
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/setup-node-env
-        with:
-          use-npm-ci: 'true'
-
-      - name: Install EAS CLI and Maestro
-        run: |
-          npm install -g eas-cli
-          curl -Ls "https://get.maestro.mobile.dev" | bash
-
-      - name: Build Android development client
-        working-directory: apps/mobile
-        run: |
-          npx expo prebuild --platform android --clean
-          cd android
-          ./gradlew assembleDebug
-          echo "APK_PATH=$(find app/build/outputs/apk/debug -name '*.apk' | head -1)" >> $GITHUB_ENV
+      - name: Install Maestro
+        run: curl -Ls "https://get.maestro.mobile.dev" | bash
 
       - name: Run tests with Android emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -53,8 +39,8 @@ jobs:
             adb wait-for-device
             adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
 
-            echo "Installing APK: $APK_PATH"
-            adb install -r "$APK_PATH"
+            echo "Installing pre-built APK"
+            adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
             mkdir -p maestro/artifacts
             $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
@@ -69,28 +55,13 @@ jobs:
 
   mobile-e2e-ios:
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 15
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/setup-node-env
-        with:
-          use-npm-ci: 'true'
-
       - name: Install Maestro
         run: curl -Ls "https://get.maestro.mobile.dev" | bash
-
-      - name: Select Xcode 16.1
-        run: sudo xcode-select -s /Applications/Xcode_16.1.app
-
-      - name: Build iOS development client
-        working-directory: apps/mobile
-        run: |
-          npx expo prebuild --platform ios --clean
-          cd ios
-          xcodebuild -workspace mobile.xcworkspace -scheme mobile -configuration Debug -sdk iphonesimulator -derivedDataPath build
-          echo "APP_PATH=$(find build/Build/Products/Debug-iphonesimulator -name '*.app' | head -1)" >> $GITHUB_ENV
 
       - name: Setup and run tests on iOS simulator
         run: |
@@ -111,8 +82,8 @@ jobs:
             sleep 2
           done
 
-          echo "Installing app: $APP_PATH"
-          xcrun simctl install "$SIMULATOR_ID" "$APP_PATH"
+          echo "Installing pre-built app"
+          xcrun simctl install "$SIMULATOR_ID" apps/mobile/ios/build/mobile.app
 
           mkdir -p maestro/artifacts
           $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
