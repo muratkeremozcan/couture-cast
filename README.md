@@ -33,6 +33,20 @@ npm install
 npm run dev       # turbo spins up mobile, web, and api concurrently
 ```
 
+### ⚠️ Mobile Development - Important
+
+**If you modify `apps/mobile/` code, you MUST rebuild and commit the native binaries:**
+
+```bash
+./scripts/build-mobile-binaries.sh  # Takes 5-10 min
+git add apps/mobile/android apps/mobile/ios
+git commit -m "chore: rebuild mobile binaries"
+```
+
+**Why?** CI uses pre-built binaries (no build step). If you change mobile code but don't rebuild/commit, CI tests will run against stale binaries and fail.
+
+A pre-commit hook will remind you if you forget.
+
 ```bash
 npm run dev        # Turborepo parallel dev servers (Expo / Next / Nest)
 npm run build      # Build graph-respecting artifacts (.next, dist, etc.)

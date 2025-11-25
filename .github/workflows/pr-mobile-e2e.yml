@@ -11,153 +11,96 @@ concurrency:
   group: mobile-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  MAESTRO_APP_ID: com.anonymous.mobile
+
 jobs:
   mobile-e2e-android:
-    runs-on: macos-13
-    timeout-minutes: 55
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     continue-on-error: true
-    env:
-      MOBILE_E2E_METRO_PORT: 8081
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/checkout@v4
 
-      - name: Setup Node environment
-        uses: ./.github/actions/setup-node-env
-        with:
-          use-npm-ci: 'true'
-
-      - name: Install Maestro CLI
+      - name: Enable KVM
         run: |
-          brew tap mobile-dev-inc/tap
-          brew install maestro
-          maestro --version
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
 
-      - name: Run Maestro with Android emulator
+      - name: Install Maestro
+        run: curl -Ls "https://get.maestro.mobile.dev" | bash
+
+      - name: Run tests with Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 30
           target: google_apis
           arch: x86_64
-          profile: pixel_6
-          avd-name: pixel_ci
-          force-avd-creation: true
-          emulator-options: -no-window -no-audio -gpu swiftshader_indirect -no-boot-anim -no-snapshot -no-metrics
+          profile: pixel_3a
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          emulator-boot-timeout: 1200
           script: |
-            echo "=== Emulator boot validation ==="
-            adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
-            adb shell getprop sys.boot_completed
+            adb wait-for-device
+            adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
 
-            echo "=== Downloading and installing Expo Go ==="
-            EXPO_VERSION="2.32.18"
-            curl -L -o /tmp/expo-go.apk "https://d1ahtucjixef4r.cloudfront.net/Exponent-${EXPO_VERSION}.apk"
-            adb install -r /tmp/expo-go.apk
-            adb shell pm list packages | grep expo
+            echo "Installing APK"
+            adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
-            echo "=== Starting Metro bundler in background ==="
-            cd apps/mobile
-            npx expo start --port $MOBILE_E2E_METRO_PORT --non-interactive &
-            METRO_PID=$!
-            sleep 10
+            mkdir -p maestro/artifacts
+            $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
+            (sleep 20 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/) || \
+            (sleep 60 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/)
 
-            echo "=== Running Maestro tests ==="
-            cd ../..
-            maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/report.xml || true
-
-            echo "=== Cleanup ==="
-            kill $METRO_PID || true
-
-      - name: Upload Maestro artifacts
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: maestro-android-artifacts
-          path: |
-            maestro/artifacts
-
-      - name: Summarize mobile e2e (Android)
-        if: always()
-        run: |
-          echo "## Mobile e2e (Android)" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Status: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Artifacts: maestro/artifacts" >> "$GITHUB_STEP_SUMMARY"
+          name: android-test-results
+          path: maestro/artifacts/
 
   mobile-e2e-ios:
-    runs-on: macos-latest
-    timeout-minutes: 55
+    runs-on: macos-12
+    timeout-minutes: 15
     continue-on-error: true
-    env:
-      MOBILE_E2E_METRO_PORT: 8081
-      MAESTRO_DRIVER_STARTUP_TIMEOUT: 120000
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/checkout@v4
 
-      - name: Setup Node environment
-        uses: ./.github/actions/setup-node-env
-        with:
-          use-npm-ci: 'true'
+      - name: Install Maestro
+        run: curl -Ls "https://get.maestro.mobile.dev" | bash
 
-      - name: Install Maestro CLI
+      - name: Run tests on iOS simulator
         run: |
-          brew tap mobile-dev-inc/tap
-          brew install maestro
-          maestro --version
+          SIMULATOR_ID=$(xcrun simctl list devices available iPhone -j | jq -r '.devices | to_entries[0].value[0].udid')
 
-      - name: Setup iOS simulator with Expo Go
-        run: |
-          echo "=== List available simulators ==="
-          xcrun simctl list devices available
+          if [ -z "$SIMULATOR_ID" ] || [ "$SIMULATOR_ID" = "null" ]; then
+            echo "No simulator via jq, using grep"
+            SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | grep -oE '\([A-F0-9-]{36}\)' | tr -d '()')
+          fi
 
-          echo "=== Boot iPhone 15 simulator ==="
-          SIMULATOR_ID=$(xcrun simctl create "iPhone 15 CI" "iPhone 15" "iOS17.2" || xcrun simctl list devices | grep "iPhone 15" | grep -v unavailable | head -1 | grep -oE '\([A-F0-9-]+\)' | tr -d '()')
-          xcrun simctl boot "$SIMULATOR_ID" || true
-          sleep 5
+          echo "Using simulator: $SIMULATOR_ID"
+          xcrun simctl boot "$SIMULATOR_ID"
 
-          echo "=== Download and install Expo Go ==="
-          EXPO_GO_URL="https://dpq5q02fu5f55.cloudfront.net/Exponent-2.32.18.tar.gz"
-          curl -L -o /tmp/expo-go.tar.gz "$EXPO_GO_URL"
-          tar -xzf /tmp/expo-go.tar.gz -C /tmp/
-          xcrun simctl install "$SIMULATOR_ID" /tmp/Exponent.app
+          for i in {1..30}; do
+            if xcrun simctl list devices booted | grep -q "$SIMULATOR_ID"; then
+              echo "Booted"
+              break
+            fi
+            sleep 2
+          done
 
-          echo "=== Verify Expo Go installation ==="
-          xcrun simctl listapps "$SIMULATOR_ID" | grep -i expo
+          echo "Installing app"
+          xcrun simctl install "$SIMULATOR_ID" apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/mobile.app
 
-          echo "=== Start Metro bundler in background ==="
-          cd apps/mobile
-          npx expo start --port $MOBILE_E2E_METRO_PORT --non-interactive &
-          METRO_PID=$!
-          echo "METRO_PID=$METRO_PID" >> $GITHUB_ENV
-          echo "SIMULATOR_ID=$SIMULATOR_ID" >> $GITHUB_ENV
-          sleep 10
+          mkdir -p maestro/artifacts
+          $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
+          (sleep 20 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/) || \
+          (sleep 60 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/)
 
-      - name: Run Maestro smoke (iOS)
-        run: |
-          maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/report.xml || true
-
-      - name: Cleanup
-        if: always()
-        run: |
-          kill $METRO_PID || true
           xcrun simctl shutdown "$SIMULATOR_ID" || true
 
-      - name: Upload Maestro artifacts
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: maestro-ios-artifacts
-          path: |
-            maestro/artifacts
-
-      - name: Summarize mobile e2e (iOS)
-        if: always()
-        run: |
-          echo "## Mobile e2e (iOS)" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Status: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Artifacts: maestro/artifacts" >> "$GITHUB_STEP_SUMMARY"
+          name: ios-test-results
+          path: maestro/artifacts/

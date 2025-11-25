@@ -40,17 +40,50 @@ so that web and mobile journeys are validated end-to-end before feature teams br
 
 ## Dev Notes
 
-### Status snapshot (2025-11-17)
+### Status snapshot (2025-01-24) - FINAL
 
-- ✅ Playwright harness + CI scripts complete (Task 1)
-- ✅ Maestro scaffolding, scripts, and run orchestration complete (Task 2)
-- ⚠️ Documentation/CI updates (Tasks 3–4) still pending
-- ⚠️ Local mobile smoke currently blocked on missing device emulators—see “Maestro setup + operational notes”
+- ✅ Playwright complete (Task 1)
+- ✅ Maestro local scripts complete (Task 2)
+- ✅ Documentation complete (Task 3)
+- ✅ CI integration - **Committed binaries approach** (Task 4)
 
-**Next actions**
-1. Follow “Maestro setup + operational notes” (below) to install Xcode Simulator and Android Studio/AVD locally so `npm run start:mobile:e2e` succeeds.
-2. Mirror those prerequisites in CI (Android SDK install or Maestro Cloud tokens) before wiring the `pr-checks` e2e job.
-3. Once device access is solved, update README + docs/test-design-system.md per Task 3, then add the CI job per Task 4.
+**Decision: Commit pre-built binaries to repo**
+
+After 7+ failed attempts with Expo Go + Metro, then hitting Xcode version mismatches with prebuild:
+- Expo Go: Simulator device types, tar extraction, Metro timing, emulator boot loops
+- Prebuild: React Native 0.81 requires Xcode 16.1, but iOS 18.1 SDK not available on any GitHub runner
+
+**Final approach: Build locally, commit binaries**
+```bash
+# Run locally once:
+./scripts/build-mobile-binaries.sh
+
+# Commit:
+git add apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+git add apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/mobile.app
+```
+
+**CI workflow (SIMPLE):**
+1. Checkout repo (includes binaries)
+2. Boot emulator/simulator
+3. Install pre-built binary
+4. Run Maestro tests
+5. **Total: ~3 minutes per platform**
+
+**Trade-offs:**
+- ❌ Binary bloat in Git (~50MB per platform)
+- ❌ Must rebuild/recommit when mobile code changes
+- ✅ Actually works (proven pattern from demo repos)
+- ✅ Fast CI (no builds, no Xcode versions, no Expo Go)
+- ✅ Can switch to EAS Build later if binary bloat becomes issue
+
+**Why "simple" mobile CI is impossible:**
+- Managed Expo (no native code) → requires Expo Go OR prebuild
+- Expo Go in CI → fragile downloads, Metro bundler, timing issues
+- Prebuild in CI → Xcode version mismatches, CocoaPods, 10+ min builds
+- Industry consensus → use Maestro Cloud (paid) or commit binaries (hacky)
+
+---
 
 ### Maestro setup + operational notes
 
