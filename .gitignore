@@ -11,7 +11,6 @@ build/
 .next
 coverage/
 apps/**/dist
-apps/**/build
 packages/**/dist
 packages/**/build
 tsconfig.tsbuildinfo
