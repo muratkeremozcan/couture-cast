@@ -53,6 +53,11 @@ Tried 10+ approaches:
 
 **Final:** `expo prebuild` + `gradlew assembleRelease` in CI (ubuntu-latest, ~8-10 min), iOS tested locally
 
+### CI update (2025-11-25)
+- Current Android CI path: `expo prebuild --platform android` + `./gradlew assembleDebug`, then emulator-runner (api 30, google_apis, x86_64, pixel_3a, no accel/snapshot) and Maestro smoke with retries.
+- New Architecture must remain enabled (Reanimated/Worklets assert on build).
+- Cold runs are ~18–20m build + ~15–18m emulator/Maestro (~35m total); expect faster once caches warm.
+
 ---
 
 ### Maestro setup + operational notes

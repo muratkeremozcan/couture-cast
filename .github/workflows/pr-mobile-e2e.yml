@@ -1,10 +1,9 @@
-name: Mobile e2e (Maestro)
+name: Mobile e2e (Maestro) – manual only
 
+# NOTE: Mobile E2E is intentionally disabled for PR/main because GitHub-hosted emulators
+# are slow/flaky (30–40m cold, frequent boot failures). Run manually via workflow_dispatch
+# or on a self-hosted runner/device cloud if needed.
 on:
-  pull_request:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 concurrency:

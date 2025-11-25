@@ -35,7 +35,7 @@ npm run dev       # turbo spins up mobile, web, and api concurrently
 
 ### Mobile Testing
 
-**CI**: Android E2E tests run automatically (builds release APK in CI with `expo prebuild` + Gradle)
+**CI**: Mobile e2e is disabled on GitHub-hosted runners due to emulator instability and long runtimes. Use self-hosted/device cloud or trigger the manual workflow if needed.
 
 **Local**: iOS + Android testing supported (see `npm run test:mobile:e2e` and docs/sprint-artifacts/0-13-scaffold-cross-surface-e2e-automation.md)
 
@@ -74,8 +74,6 @@ npm run typecheck:clear-cache
 | `npm run maestro:install`          | Installs the Maestro CLI (brew/curl on macOS; npx fallback on CI).                         |
 | `npm run test:mobile:e2e`          | Starts Expo (if needed) and runs the Maestro smoke flow against the dev server it spawns.  |
 | `npm run test:mobile:e2e:ios`      | Boots the default iOS simulator and runs the Maestro smoke flow against Expo dev server.   |
-| `npm run test:mobile:e2e:attached` | Reuses your already-running Expo server; skips starting a new one.                         |
-| `npm run test:mobile:e2e:ci`       | CI-friendly Maestro run (JUnit output to `maestro/artifacts`).                             |
 | `npm run validate`                 | Runs typecheck, lint (workspace + root), and tests in parallel—reference flow.             |
 | `npm run clean`                    | Cleans each workspace’s build outputs.                                                     |
 | `npm run clean:install`            | Nukes every `node_modules` (root/apps/packages) and performs a fresh `npm install`.        |
@@ -103,6 +101,17 @@ npm run typecheck:clear-cache
 - ESLint, Prettier, and `lint-staged` configs match the reference repo’s rules (no-only-tests, consistent type imports, formatting).
 - `docs/epics.md` Epic 0 stories describe these guardrails explicitly so all Sprint 0 tasks stay tied to product strategy.
 - CI currently executes: install → typecheck → lint (workspace + root) → build → tests. Burn-in/Selective runners plug into the same workflow after CC-0.6.
+
+### CI at a glance
+
+| Workflow | What it runs | Notes |
+| --- | --- | --- |
+| `.github/workflows/pr-checks.yml` | Typecheck → Lint → Build → Tests (workspace graph) | Required on PRs; matches Node 24 baseline. |
+| `.github/workflows/pr-pw-e2e.yml` | Playwright smoke (Chromium) with HTML/trace artifacts | Web-only e2e gate; uses webServer hook on port 3005. |
+| `.github/workflows/pr-mobile-e2e.yml` | Manual-only Maestro Android smoke (build + emulator) | Not run on PRs: GitHub-hosted Android emulators are slow/flaky (30–40m, boot failures). Trigger via `workflow_dispatch` or run locally/self-hosted. |
+
+**Playwright coverage:** web landing smoke with API health ping, hero/nav assertions, axe-core check, traces/artifacts uploaded in CI.  
+**Mobile e2e:** Maestro sanity (Expo tabs) is local-only; CI disabled due to GitHub-hosted emulator instability and long runtimes. Run via `npm run test:mobile:e2e` on your machine or on a self-hosted/device cloud runner if needed.
 
 ## Helpful references
 
