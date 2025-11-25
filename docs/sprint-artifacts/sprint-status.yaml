@@ -44,8 +44,8 @@ development_status:
   # All 12 stories must complete before Epic 1 begins
   epic-0: backlog
   0-1-initialize-turborepo-monorepo: done
-  0-13-scaffold-cross-surface-e2e-automation: ready-for-dev
-  0-2-configure-prisma-schema-migrations-and-seed-data: drafted
+  0-13-scaffold-cross-surface-e2e-automation: done
+  0-2-configure-prisma-schema-migrations-and-seed-data: ready-for-dev
   0-3-set-up-supabase-projects-dev-staging-prod: drafted
   0-4-configure-redis-upstash-and-bullmq-queues: drafted
   0-5-initialize-socketio-gateway-and-expo-push-api: drafted

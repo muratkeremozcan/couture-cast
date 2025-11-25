@@ -86,6 +86,7 @@ The 45/35/20 split keeps most validation at deterministic layers while reserving
 - **Maestro (mobile sanity only)**: minimal launch check via Expo Go (dev URL load + screenshot). Env: `MOBILE_E2E_APP_URL` (default `exp://127.0.0.1:8081/--/`), `MOBILE_E2E_HEALTH_URL` if overriding. Treat Maestro as a lightweight availability check, not deep UX validation.
 - **Artifacts**: Playwright HTML/trace under `playwright/playwright-report` and `test-results/`; Maestro screenshots/logs under `maestro/artifacts`. Always upload on CI failure.
 - **Tagging**: `@p0` for smoke (CI gating), `@p1` for broader regression. Keep @p0 limited to critical journeys and quick to run; push deeper cases to @p1 or lower.
+- **Mobile CI posture (2025-11-25)**: Android Maestro smoke is **local-only**. GitHub-hosted runners exceeded 30–40 minutes (prebuild + Gradle + emulator boot) with frequent boot failures; Reanimated/Worklets require New Architecture, increasing build time. To run in CI, use self-hosted runners with pre-provisioned Android images or a paid device cloud (e.g., Maestro Cloud). PR CI keeps web Playwright smoke only; mobile sanity must be executed locally before merge.
 
 ---
 

@@ -1,10 +1,9 @@
-name: Mobile e2e (Maestro)
+name: Mobile e2e (Maestro) – manual only
 
+# NOTE: Mobile E2E is intentionally disabled for PR/main because GitHub-hosted emulators
+# are slow/flaky (30–40m cold, frequent boot failures). Run manually via workflow_dispatch
+# or on a self-hosted runner/device cloud if needed.
 on:
-  pull_request:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 concurrency:
@@ -17,10 +16,30 @@ env:
 jobs:
   mobile-e2e-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'true'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools and platforms
+        run: sdkmanager "build-tools;36.0.0" "platforms;android-36" "build-tools;35.0.0" "platforms;android-35" "build-tools;34.0.0" "platforms;android-34" "platforms;android-30" "system-images;android-30;google_apis;x86_64"
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
 
       - name: Enable KVM
         run: |
@@ -28,8 +47,15 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Install Maestro
-        run: curl -Ls "https://get.maestro.mobile.dev" | bash
+      - name: Build Android APK
+        working-directory: apps/mobile
+        env:
+          EXPO_NO_TELEMETRY: 1
+          CI: true
+        run: |
+          npx expo prebuild --platform android --clean
+          cd android
+          ./gradlew assembleDebug
 
       - name: Run tests with Android emulator
         uses: reactivecircus/android-emulator-runner@v2
@@ -38,69 +64,27 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_3a
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          ram-size: 1536M
+          disk-size: 1024M
+          force-avd-creation: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot -accel off
+          emulator-boot-timeout: 1800
           disable-animations: true
           script: |
             adb wait-for-device
             adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
 
-            echo "Installing APK"
+            npm run maestro:install --silent
+
             adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
             mkdir -p maestro/artifacts
-            $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
-            (sleep 20 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/) || \
-            (sleep 60 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/)
+            MOBILE_E2E_SKIP_SERVER=1 npx maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
+              (sleep 20 && MOBILE_E2E_SKIP_SERVER=1 npx maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/) || \
+              (sleep 60 && MOBILE_E2E_SKIP_SERVER=1 npx maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/)
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: android-test-results
-          path: maestro/artifacts/
-
-  mobile-e2e-ios:
-    runs-on: macos-12
-    timeout-minutes: 15
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Maestro
-        run: curl -Ls "https://get.maestro.mobile.dev" | bash
-
-      - name: Run tests on iOS simulator
-        run: |
-          SIMULATOR_ID=$(xcrun simctl list devices available iPhone -j | jq -r '.devices | to_entries[0].value[0].udid')
-
-          if [ -z "$SIMULATOR_ID" ] || [ "$SIMULATOR_ID" = "null" ]; then
-            echo "No simulator via jq, using grep"
-            SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | grep -oE '\([A-F0-9-]{36}\)' | tr -d '()')
-          fi
-
-          echo "Using simulator: $SIMULATOR_ID"
-          xcrun simctl boot "$SIMULATOR_ID"
-
-          for i in {1..30}; do
-            if xcrun simctl list devices booted | grep -q "$SIMULATOR_ID"; then
-              echo "Booted"
-              break
-            fi
-            sleep 2
-          done
-
-          echo "Installing app"
-          xcrun simctl install "$SIMULATOR_ID" apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/mobile.app
-
-          mkdir -p maestro/artifacts
-          $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
-          (sleep 20 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/) || \
-          (sleep 60 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/)
-
-          xcrun simctl shutdown "$SIMULATOR_ID" || true
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ios-test-results
           path: maestro/artifacts/
