@@ -7,9 +7,10 @@
   "scripts": {
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
-    "db:reset": "prisma migrate reset --force --skip-generate --skip-seed && prisma db seed",
+    "db:reset": "prisma migrate reset --force --skip-seed && prisma db seed",
     "db:studio": "prisma studio",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@faker-js/faker": "^10.1.0",

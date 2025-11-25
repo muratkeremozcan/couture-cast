@@ -7,7 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum ConsentStatus {
@@ -178,7 +177,7 @@ model LookbookPost {
   palette_insight    PaletteInsights?  @relation("LookbookPalette", fields: [palette_insight_id], references: [id])
   palette_insight_id String?
   created_at         DateTime          @default(now())
-  updated_at         DateTime          @default(now())
+  updated_at         DateTime          @updatedAt
   engagement_events  EngagementEvent[]
   moderation_events  ModerationEvent[]
 

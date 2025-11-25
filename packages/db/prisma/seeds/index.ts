@@ -1,9 +1,9 @@
 import { PrismaClient } from '@prisma/client'
 
-import { seedRituals } from './rituals'
-import { seedUsers } from './users'
-import { seedWardrobe } from './wardrobe'
-import { seedWeather } from './weather'
+import { seedRituals } from './rituals.js'
+import { seedUsers } from './users.js'
+import { seedWardrobe } from './wardrobe.js'
+import { seedWeather } from './weather.js'
 
 const prisma = new PrismaClient()
 

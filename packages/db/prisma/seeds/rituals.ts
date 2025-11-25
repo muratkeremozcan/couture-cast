@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 
-import type { SeededGarment } from './wardrobe'
-import type { SeededWeather } from './weather'
+import type { SeededGarment } from './wardrobe.js'
+import type { SeededWeather } from './weather.js'
 
 export async function seedRituals(
   prisma: PrismaClient,
@@ -13,6 +13,9 @@ export async function seedRituals(
 
   for (let i = 0; i < 20; i++) {
     const user = teens[i % teens.length]
+    if (!user) {
+      continue
+    }
     const segmentId = segmentPool[i % segmentPool.length]
     const garmentSliceStart = (i * 2) % garments.length
     const garmentSelection = garments.slice(garmentSliceStart, garmentSliceStart + 3)
@@ -41,6 +44,9 @@ export async function seedRituals(
   const paletteInsights = await prisma.paletteInsights.findMany({ take: 5 })
   for (const [idx, palette] of paletteInsights.entries()) {
     const ownerId = palette.user_id
+    if (!ownerId) {
+      continue
+    }
     await prisma.lookbookPost.upsert({
       where: { id: `lookbook-${idx + 1}` },
       update: {
@@ -64,6 +70,9 @@ export async function seedRituals(
   const engagementPosts = await prisma.lookbookPost.findMany({ take: 3 })
   for (const [idx, post] of engagementPosts.entries()) {
     const user = teens[idx % teens.length]
+    if (!user) {
+      continue
+    }
     await prisma.engagementEvent.upsert({
       where: { id: `engagement-${idx + 1}` },
       update: {

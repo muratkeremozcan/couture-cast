@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import type { PrismaClient } from '@prisma/client'
 
 export type SeededWeather = { snapshotIds: string[]; segmentIds: string[] }
 
@@ -74,14 +74,14 @@ export async function seedWeather(prisma: PrismaClient): Promise<SeededWeather> 
         location: seed.location,
         temperature: seed.baseTemp,
         condition: seed.condition,
-        alerts: seed.alert ? [{ type: seed.alert }] : null,
+        alerts: seed.alert ? [{ type: seed.alert }] : undefined,
       },
       create: {
         id: seed.id,
         location: seed.location,
         temperature: seed.baseTemp,
         condition: seed.condition,
-        alerts: seed.alert ? [{ type: seed.alert }] : null,
+        alerts: seed.alert ? [{ type: seed.alert }] : undefined,
       },
     })
 

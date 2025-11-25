@@ -4,12 +4,24 @@ import path from 'node:path'
 export default async function globalTeardown() {
   const env = { ...process.env }
   // Allow local Postgres path if available (non-fatal if missing)
-  env.PATH = ['/opt/homebrew/opt/postgresql@15/bin', env.PATH]
-    .filter(Boolean)
-    .join(path.delimiter)
+  const postgresPaths = [process.env.POSTGRES_BIN_PATH, '/opt/homebrew/opt/postgresql@15/bin']
+  env.PATH = [...postgresPaths, env.PATH].filter(Boolean).join(path.delimiter)
 
-  execSync('npm run db:reset', {
-    stdio: 'inherit',
-    env,
-  })
+  if (!env.DATABASE_URL) {
+    console.warn('Skipping db:reset in global teardown because DATABASE_URL is not set')
+    return
+  }
+
+  try {
+    execSync('npm run db:reset', {
+      stdio: 'inherit',
+      env,
+    })
+  } catch (error) {
+    console.error(
+      'Global teardown failed: Unable to reset the database. Check DATABASE_URL and db:reset script.'
+    )
+    console.error('Error details:', error)
+    throw error
+  }
 }

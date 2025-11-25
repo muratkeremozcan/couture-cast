@@ -127,40 +127,13 @@ export async function seedUsers(prisma: PrismaClient): Promise<SeededUsers> {
   }
 
   const consentPairs = [
-    {
-      guardian_id: createdGuardians[0]?.id,
-      teen_id: createdTeens[0]?.id,
-      status: ConsentStatus.granted,
-    },
-    {
-      guardian_id: createdGuardians[1]?.id,
-      teen_id: createdTeens[1]?.id,
-      status: ConsentStatus.granted,
-    },
-    {
-      guardian_id: createdGuardians[1]?.id,
-      teen_id: createdTeens[2]?.id,
-      status: ConsentStatus.granted,
-    },
-    {
-      guardian_id: createdGuardians[2]?.id,
-      teen_id: createdTeens[2]?.id,
-      status: ConsentStatus.granted,
-    },
-    {
-      guardian_id: createdGuardians[2]?.id,
-      teen_id: createdTeens[3]?.id,
-      status: ConsentStatus.granted,
-    },
-    {
-      guardian_id: createdGuardians[2]?.id,
-      teen_id: createdTeens[4]?.id,
-      status: ConsentStatus.granted,
-    },
-  ].filter(
-    (pair): pair is { guardian_id: string; teen_id: string; status: ConsentStatus } =>
-      Boolean(pair.guardian_id && pair.teen_id)
-  )
+    { guardian_id: createdGuardians[0]?.id, teen_id: createdTeens[0]?.id },
+    { guardian_id: createdGuardians[1]?.id, teen_id: createdTeens[1]?.id },
+    { guardian_id: createdGuardians[1]?.id, teen_id: createdTeens[2]?.id },
+    { guardian_id: createdGuardians[2]?.id, teen_id: createdTeens[2]?.id },
+    { guardian_id: createdGuardians[2]?.id, teen_id: createdTeens[3]?.id },
+    { guardian_id: createdGuardians[2]?.id, teen_id: createdTeens[4]?.id },
+  ].filter((pair): pair is { guardian_id: string; teen_id: string } => Boolean(pair.guardian_id && pair.teen_id))
 
   for (const consent of consentPairs) {
     await prisma.guardianConsent.upsert({
@@ -171,13 +144,13 @@ export async function seedUsers(prisma: PrismaClient): Promise<SeededUsers> {
         },
       },
       update: {
-        status: consent.status,
+        status: ConsentStatus.granted,
         consent_granted_at: new Date(),
       },
       create: {
         guardian_id: consent.guardian_id,
         teen_id: consent.teen_id,
-        status: consent.status,
+        status: ConsentStatus.granted,
         ip_address: faker.internet.ipv4(),
       },
     })

@@ -28,7 +28,7 @@
     "mobile:sim:ios": "bash ./scripts/start-ios-simulator.sh",
     "mobile:sim:android": "bash ./scripts/start-android-emulator.sh",
     "mobile:device": "open -a \"Android Emulator\" || open -a Simulator || echo \"Launch your emulator manually\"",
-    "start:all": "npm-run-all2 db:reset && npm-run-all2 --parallel start:api start:web",
+    "start:all": "npm-run-all2 --sequential db:reset && npm-run-all2 --parallel start:api start:web",
     "test:pw-local": "cross-env TEST_ENV=local npx playwright test",
     "test:pw-dev": "cross-env TEST_ENV=dev npx playwright test",
     "test:pw-stage": "cross-env TEST_ENV=stage npx playwright test",
@@ -43,9 +43,9 @@
     "clean": "rimraf \"apps/**/dist\" \"packages/**/dist\" \"**/tsconfig.tsbuildinfo\"",
     "clean:install": "npx rimraf node_modules \"apps/**/node_modules\" \"packages/**/node_modules\" && npm install --no-progress",
     "prepare": "husky",
-    "db:migrate": "npm --prefix packages/db run db:migrate",
-    "db:seed": "npm --prefix packages/db run db:seed",
-    "db:reset": "npm --prefix packages/db run db:reset"
+    "db:migrate": "npm run db:migrate -w packages/db",
+    "db:seed": "npm run db:seed -w packages/db",
+    "db:reset": "npm run db:reset -w packages/db"
   },
   "devDependencies": {
     "@couture/eslint-config": "workspace:*",

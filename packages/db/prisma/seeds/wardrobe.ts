@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import type { PrismaClient } from '@prisma/client'
 
 export type SeededGarment = { id: string; userId: string }
 
@@ -25,10 +25,13 @@ export async function seedWardrobe(
 
   for (const teen of teens) {
     for (let i = 0; i < 10; i++) {
+      if (!teen.id) {
+        continue
+      }
       const id = `${teen.id}-garment-${i + 1}`
-      const category = categories[(i + garments.length) % categories.length]
-      const material = materials[(i + 2) % materials.length]
-      const comfort = comfortRanges[(i + 3) % comfortRanges.length]
+      const category = categories[(i + garments.length) % categories.length] ?? 'category'
+      const material = materials[(i + 2) % materials.length] ?? 'material'
+      const comfort = comfortRanges[(i + 3) % comfortRanges.length] ?? 'comfort'
       const palette = [
         '#111111',
         '#C9A14A',
@@ -51,7 +54,7 @@ export async function seedWardrobe(
         },
         create: {
           id,
-          user_id: teen.id,
+          user_id: teen.id!,
           category,
           material,
           comfort_range: comfort,
@@ -60,13 +63,16 @@ export async function seedWardrobe(
         },
       })
 
-      garments.push({ id, userId: teen.id })
+      garments.push({ id, userId: teen.id! })
     }
   }
 
   const paletteTargets = garments.slice(0, 25)
   for (const [idx, garment] of paletteTargets.entries()) {
     const insightId = `${garment.id}-palette`
+    if (!garment.userId) {
+      continue
+    }
     await prisma.paletteInsights.upsert({
       where: { garment_item_id: garment.id },
       update: {
@@ -81,7 +87,7 @@ export async function seedWardrobe(
         user_id: garment.userId,
         undertone: idx % 2 === 0 ? 'cool' : 'warm',
         hex_codes: ['#C9A14A', '#0D6F62', '#1F4E79'],
-        confidence_score: 0.7,
+        confidence_score: 0.68 + idx * 0.01,
       },
     })
   }
