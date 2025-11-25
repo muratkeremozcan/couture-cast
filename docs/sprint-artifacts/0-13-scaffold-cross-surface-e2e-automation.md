@@ -42,46 +42,16 @@ so that web and mobile journeys are validated end-to-end before feature teams br
 
 ### Status snapshot (2025-01-24) - FINAL
 
-- ✅ Playwright complete (Task 1)
-- ✅ Maestro local scripts complete (Task 2)
-- ✅ Documentation complete (Task 3)
-- ✅ CI integration - **Committed binaries approach** (Task 4)
+- ✅ Tasks 1-3 complete
+- ✅ Task 4: Android CI only (iOS local)
 
-**Decision: Commit pre-built binaries to repo**
+**Decision: Android builds in CI, iOS local only**
 
-After 7+ failed attempts with Expo Go + Metro, then hitting Xcode version mismatches with prebuild:
-- Expo Go: Simulator device types, tar extraction, Metro timing, emulator boot loops
-- Prebuild: React Native 0.81 requires Xcode 16.1, but iOS 18.1 SDK not available on any GitHub runner
+Tried 10+ approaches:
+- Expo Go + Metro: Failed (simulator/emulator issues)
+- Commit binaries: Failed (158MB APK, 189MB .app > GitHub 100MB limit)
 
-**Final approach: Build locally, commit binaries**
-```bash
-# Run locally once:
-./scripts/build-mobile-binaries.sh
-
-# Commit:
-git add apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-git add apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/mobile.app
-```
-
-**CI workflow (SIMPLE):**
-1. Checkout repo (includes binaries)
-2. Boot emulator/simulator
-3. Install pre-built binary
-4. Run Maestro tests
-5. **Total: ~3 minutes per platform**
-
-**Trade-offs:**
-- ❌ Binary bloat in Git (~50MB per platform)
-- ❌ Must rebuild/recommit when mobile code changes
-- ✅ Actually works (proven pattern from demo repos)
-- ✅ Fast CI (no builds, no Xcode versions, no Expo Go)
-- ✅ Can switch to EAS Build later if binary bloat becomes issue
-
-**Why "simple" mobile CI is impossible:**
-- Managed Expo (no native code) → requires Expo Go OR prebuild
-- Expo Go in CI → fragile downloads, Metro bundler, timing issues
-- Prebuild in CI → Xcode version mismatches, CocoaPods, 10+ min builds
-- Industry consensus → use Maestro Cloud (paid) or commit binaries (hacky)
+**Final:** `expo prebuild` + `gradlew assembleRelease` in CI (ubuntu-latest, ~8-10 min), iOS tested locally
 
 ---
 

@@ -33,19 +33,11 @@ npm install
 npm run dev       # turbo spins up mobile, web, and api concurrently
 ```
 
-### ⚠️ Mobile Development - Important
+### Mobile Testing
 
-**If you modify `apps/mobile/` code, you MUST rebuild and commit the native binaries:**
+**CI**: Android E2E tests run automatically (builds release APK in CI with `expo prebuild` + Gradle)
 
-```bash
-./scripts/build-mobile-binaries.sh  # Takes 5-10 min
-git add apps/mobile/android apps/mobile/ios
-git commit -m "chore: rebuild mobile binaries"
-```
-
-**Why?** CI uses pre-built binaries (no build step). If you change mobile code but don't rebuild/commit, CI tests will run against stale binaries and fail.
-
-A pre-commit hook will remind you if you forget.
+**Local**: iOS + Android testing supported (see `npm run test:mobile:e2e` and docs/sprint-artifacts/0-13-scaffold-cross-surface-e2e-automation.md)
 
 ```bash
 npm run dev        # Turborepo parallel dev servers (Expo / Next / Nest)

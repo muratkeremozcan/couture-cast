@@ -37,6 +37,5 @@ yarn-error.*
 *.tsbuildinfo
 
 # generated native folders
-# Commented out to allow CI binaries to be committed
-# /ios
-# /android
+/ios
+/android
