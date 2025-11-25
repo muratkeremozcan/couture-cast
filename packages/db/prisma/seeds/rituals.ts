@@ -39,7 +39,9 @@ export async function seedRituals(
         reasoning_badges: [{ label: 'layered' }, { label: 'weather-aware' }],
       },
     })
-  }).filter((promise): promise is ReturnType<typeof prisma.outfitRecommendation.upsert> => Boolean(promise))
+  }).filter((promise): promise is ReturnType<typeof prisma.outfitRecommendation.upsert> =>
+    Boolean(promise)
+  )
 
   await Promise.all(outfitPromises)
 
