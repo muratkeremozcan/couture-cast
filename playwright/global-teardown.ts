@@ -4,11 +4,14 @@ import path from 'node:path'
 export default async function globalTeardown() {
   const env = { ...process.env }
   // Allow local Postgres path if available (non-fatal if missing)
-  const postgresPaths = [process.env.POSTGRES_BIN_PATH, '/opt/homebrew/opt/postgresql@15/bin']
+  const postgresPaths = [
+    process.env.POSTGRES_BIN_PATH,
+    '/opt/homebrew/opt/postgresql@15/bin',
+  ]
   env.PATH = [...postgresPaths, env.PATH].filter(Boolean).join(path.delimiter)
 
-  if (!env.DATABASE_URL) {
-    console.warn('Skipping db:reset in global teardown because DATABASE_URL is not set')
+  if (env.CI || !env.DATABASE_URL) {
+    console.warn('Skipping db:reset in global teardown (CI or DATABASE_URL missing)')
     return
   }
 

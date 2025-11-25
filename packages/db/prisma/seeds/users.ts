@@ -133,7 +133,9 @@ export async function seedUsers(prisma: PrismaClient): Promise<SeededUsers> {
     { guardian_id: createdGuardians[2]?.id, teen_id: createdTeens[2]?.id },
     { guardian_id: createdGuardians[2]?.id, teen_id: createdTeens[3]?.id },
     { guardian_id: createdGuardians[2]?.id, teen_id: createdTeens[4]?.id },
-  ].filter((pair): pair is { guardian_id: string; teen_id: string } => Boolean(pair.guardian_id && pair.teen_id))
+  ].filter((pair): pair is { guardian_id: string; teen_id: string } =>
+    Boolean(pair.guardian_id && pair.teen_id)
+  )
 
   for (const consent of consentPairs) {
     await prisma.guardianConsent.upsert({
