@@ -64,12 +64,9 @@ export async function seedWeather(prisma: PrismaClient): Promise<SeededWeather> 
     },
   ]
 
-  const snapshotIds: string[] = []
-  const segmentIds: string[] = []
-
   const segmentOffsets = [0, 6]
 
-  await Promise.all(
+  const results = await Promise.all(
     weatherSeeds.map(async (seed) => {
       const snapshot = await prisma.weatherSnapshot.upsert({
         where: { id: seed.id },
@@ -87,8 +84,6 @@ export async function seedWeather(prisma: PrismaClient): Promise<SeededWeather> 
           alerts: seed.alert ? [{ type: seed.alert }] : undefined,
         },
       })
-
-      snapshotIds.push(snapshot.id)
 
       const segments = await Promise.all(
         segmentOffsets.map((offset) => {
@@ -114,9 +109,12 @@ export async function seedWeather(prisma: PrismaClient): Promise<SeededWeather> 
         })
       )
 
-      segmentIds.push(...segments)
+      return { snapshotId: snapshot.id, segmentIds: segments }
     })
   )
+
+  const snapshotIds = results.map((r) => r.snapshotId)
+  const segmentIds = results.flatMap((r) => r.segmentIds)
 
   return { snapshotIds, segmentIds }
 }

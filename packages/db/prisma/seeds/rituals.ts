@@ -46,30 +46,34 @@ export async function seedRituals(
   await Promise.all(outfitPromises)
 
   const paletteInsights = await prisma.paletteInsights.findMany({ take: 5 })
-  for (const [idx, palette] of paletteInsights.entries()) {
-    const ownerId = palette.user_id
-    if (!ownerId) {
-      continue
-    }
-    await prisma.lookbookPost.upsert({
-      where: { id: `lookbook-${idx + 1}` },
-      update: {
-        user: { connect: { id: ownerId } },
-        palette_insight: { connect: { id: palette.id } },
-        image_urls: [`https://picsum.photos/seed/lookbook-${idx + 1}/800/600`],
-        climate_band: idx % 2 === 0 ? 'temperate' : 'cold',
-      },
-      create: {
-        id: `lookbook-${idx + 1}`,
-        user_id: ownerId,
-        palette_insight_id: palette.id,
-        image_urls: [`https://picsum.photos/seed/lookbook-${idx + 1}/800/600`],
-        caption: `Look ${idx + 1} — weather-ready layers`,
-        locale: 'en-US',
-        climate_band: idx % 2 === 0 ? 'temperate' : 'cold',
-      },
+  const lookbookPromises = paletteInsights
+    .map((palette, idx) => {
+      const ownerId = palette.user_id
+      if (!ownerId) {
+        return null
+      }
+      return prisma.lookbookPost.upsert({
+        where: { id: `lookbook-${idx + 1}` },
+        update: {
+          user: { connect: { id: ownerId } },
+          palette_insight: { connect: { id: palette.id } },
+          image_urls: [`https://picsum.photos/seed/lookbook-${idx + 1}/800/600`],
+          climate_band: idx % 2 === 0 ? 'temperate' : 'cold',
+        },
+        create: {
+          id: `lookbook-${idx + 1}`,
+          user_id: ownerId,
+          palette_insight_id: palette.id,
+          image_urls: [`https://picsum.photos/seed/lookbook-${idx + 1}/800/600`],
+          caption: `Look ${idx + 1} — weather-ready layers`,
+          locale: 'en-US',
+          climate_band: idx % 2 === 0 ? 'temperate' : 'cold',
+        },
+      })
     })
-  }
+    .filter(Boolean) as Promise<unknown>[]
+
+  await Promise.all(lookbookPromises)
 
   const engagementPosts = await prisma.lookbookPost.findMany({ take: 3 })
   for (const [idx, post] of engagementPosts.entries()) {
@@ -93,21 +97,23 @@ export async function seedRituals(
     })
   }
 
-  for (const [idx, user] of teens.entries()) {
-    await prisma.auditLog.upsert({
-      where: { id: `audit-${idx + 1}` },
-      update: {
-        event_type: 'seed_ran',
-        event_data: { seed: 'prisma', iteration: idx + 1 },
-        ip_address: `10.0.0.${idx + 10}`,
-      },
-      create: {
-        id: `audit-${idx + 1}`,
-        user_id: user.id,
-        event_type: 'seed_ran',
-        event_data: { seed: 'prisma', iteration: idx + 1 },
-        ip_address: `10.0.0.${idx + 10}`,
-      },
-    })
-  }
+  await Promise.all(
+    teens.map((user, idx) =>
+      prisma.auditLog.upsert({
+        where: { id: `audit-${idx + 1}` },
+        update: {
+          event_type: 'seed_ran',
+          event_data: { seed: 'prisma', iteration: idx + 1 },
+          ip_address: `10.0.0.${idx + 10}`,
+        },
+        create: {
+          id: `audit-${idx + 1}`,
+          user_id: user.id,
+          event_type: 'seed_ran',
+          event_data: { seed: 'prisma', iteration: idx + 1 },
+          ip_address: `10.0.0.${idx + 10}`,
+        },
+      })
+    )
+  )
 }

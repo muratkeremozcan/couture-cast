@@ -44,7 +44,7 @@ export async function seedWardrobe(
         '#1F4E79',
       ].slice(0, 3)
 
-      garments.push({ id, userId: teen.id! })
+      garments.push({ id, userId: teen.id })
       garmentUpserts.push(
         prisma.garmentItem.upsert({
           where: { id },
@@ -57,7 +57,7 @@ export async function seedWardrobe(
           },
           create: {
             id,
-            user_id: teen.id!,
+            user_id: teen.id,
             category,
             material,
             comfort_range: comfort,

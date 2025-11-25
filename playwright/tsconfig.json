@@ -5,6 +5,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
+    "baseUrl": ".",
     "paths": {
       "@support/*": ["./support/*"]
     }
