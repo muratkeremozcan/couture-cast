@@ -17,7 +17,7 @@ env:
 jobs:
   mobile-e2e-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install Android build tools and platforms
-        run: sdkmanager "build-tools;36.0.0" "platforms;android-36" "build-tools;35.0.0" "platforms;android-35" "build-tools;34.0.0" "platforms;android-34"
+        run: sdkmanager "build-tools;36.0.0" "platforms;android-36" "build-tools;35.0.0" "platforms;android-35" "build-tools;34.0.0" "platforms;android-34" "platforms;android-30" "system-images;android-30;google_apis;x86_64"
 
       - name: Cache Gradle dependencies
         uses: actions/cache@v4
@@ -65,9 +65,11 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_3a
-          disk-size: 1536M
+          ram-size: 1536M
+          disk-size: 1024M
           force-avd-creation: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot -accel off
+          emulator-boot-timeout: 1800
           disable-animations: true
           script: |
             adb wait-for-device
