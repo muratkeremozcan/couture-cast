@@ -7,6 +7,7 @@ export async function seedWardrobe(
   teens: { id: string; email: string }[]
 ): Promise<SeededGarment[]> {
   const garments: SeededGarment[] = []
+  const garmentUpserts: Promise<unknown>[] = []
 
   const categories = [
     'jacket',
@@ -43,54 +44,61 @@ export async function seedWardrobe(
         '#1F4E79',
       ].slice(0, 3)
 
-      await prisma.garmentItem.upsert({
-        where: { id },
-        update: {
-          category,
-          material,
-          comfort_range: comfort,
-          color_palette: palette,
-          image_url: `https://picsum.photos/seed/${id}/640/640`,
-        },
-        create: {
-          id,
-          user_id: teen.id!,
-          category,
-          material,
-          comfort_range: comfort,
-          color_palette: palette,
-          image_url: `https://picsum.photos/seed/${id}/640/640`,
-        },
-      })
-
       garments.push({ id, userId: teen.id! })
+      garmentUpserts.push(
+        prisma.garmentItem.upsert({
+          where: { id },
+          update: {
+            category,
+            material,
+            comfort_range: comfort,
+            color_palette: palette,
+            image_url: `https://picsum.photos/seed/${id}/640/640`,
+          },
+          create: {
+            id,
+            user_id: teen.id!,
+            category,
+            material,
+            comfort_range: comfort,
+            color_palette: palette,
+            image_url: `https://picsum.photos/seed/${id}/640/640`,
+          },
+        })
+      )
     }
   }
+
+  await Promise.all(garmentUpserts)
 
   const paletteTargets = garments.slice(0, 25)
-  for (const [idx, garment] of paletteTargets.entries()) {
-    const insightId = `${garment.id}-palette`
+  const palettePromises = paletteTargets.flatMap((garment, idx) => {
     if (!garment.userId) {
-      continue
+      return [] as const
     }
-    await prisma.paletteInsights.upsert({
-      where: { garment_item_id: garment.id },
-      update: {
-        undertone: idx % 2 === 0 ? 'cool' : 'warm',
-        hex_codes: ['#C9A14A', '#0D6F62', '#1F4E79'],
-        confidence_score: 0.68 + idx * 0.01,
-        user: { connect: { id: garment.userId } },
-      },
-      create: {
-        id: insightId,
-        garment_item_id: garment.id,
-        user_id: garment.userId,
-        undertone: idx % 2 === 0 ? 'cool' : 'warm',
-        hex_codes: ['#C9A14A', '#0D6F62', '#1F4E79'],
-        confidence_score: 0.68 + idx * 0.01,
-      },
-    })
-  }
+    const insightId = `${garment.id}-palette`
+    return [
+      prisma.paletteInsights.upsert({
+        where: { garment_item_id: garment.id },
+        update: {
+          undertone: idx % 2 === 0 ? 'cool' : 'warm',
+          hex_codes: ['#C9A14A', '#0D6F62', '#1F4E79'],
+          confidence_score: 0.68 + idx * 0.01,
+          user: { connect: { id: garment.userId } },
+        },
+        create: {
+          id: insightId,
+          garment_item_id: garment.id,
+          user_id: garment.userId,
+          undertone: idx % 2 === 0 ? 'cool' : 'warm',
+          hex_codes: ['#C9A14A', '#0D6F62', '#1F4E79'],
+          confidence_score: 0.68 + idx * 0.01,
+        },
+      }),
+    ]
+  })
+
+  await Promise.all(palettePromises)
 
   return garments
 }

@@ -8,7 +8,10 @@ export default async function globalTeardown() {
     process.env.POSTGRES_BIN_PATH,
     '/opt/homebrew/opt/postgresql@15/bin',
   ]
-  env.PATH = [...postgresPaths, env.PATH].filter(Boolean).join(path.delimiter)
+  const existingPath = env.PATH || ''
+  env.PATH = [...postgresPaths.filter(Boolean), existingPath]
+    .filter(Boolean)
+    .join(path.delimiter)
 
   if (env.CI || !env.DATABASE_URL) {
     console.warn('Skipping db:reset in global teardown (CI or DATABASE_URL missing)')

@@ -101,6 +101,8 @@ model ForecastSegment {
   condition           String
   created_at          DateTime               @default(now())
   outfits             OutfitRecommendation[]
+
+  @@index([weather_snapshot_id])
 }
 
 /// RLS: user-scoped comfort settings enforced by user_id

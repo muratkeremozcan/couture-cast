@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import type { PrismaClient } from '@prisma/client'
 
 import type { SeededGarment } from './wardrobe.js'
 import type { SeededWeather } from './weather.js'
@@ -11,17 +11,17 @@ export async function seedRituals(
 ): Promise<void> {
   const segmentPool = weather.segmentIds
 
-  for (let i = 0; i < 20; i++) {
+  const outfitPromises = Array.from({ length: 20 }, (_, i) => {
     const user = teens[i % teens.length]
     if (!user) {
-      continue
+      return null
     }
     const segmentId = segmentPool[i % segmentPool.length]
     const garmentSliceStart = (i * 2) % garments.length
     const garmentSelection = garments.slice(garmentSliceStart, garmentSliceStart + 3)
     const garmentIds = garmentSelection.map((g) => g.id)
 
-    await prisma.outfitRecommendation.upsert({
+    return prisma.outfitRecommendation.upsert({
       where: { id: `outfit-${i + 1}` },
       update: {
         scenario: i % 3 === 0 ? 'morning' : i % 3 === 1 ? 'midday' : 'evening',
@@ -39,7 +39,9 @@ export async function seedRituals(
         reasoning_badges: [{ label: 'layered' }, { label: 'weather-aware' }],
       },
     })
-  }
+  }).filter((promise): promise is ReturnType<typeof prisma.outfitRecommendation.upsert> => Boolean(promise))
+
+  await Promise.all(outfitPromises)
 
   const paletteInsights = await prisma.paletteInsights.findMany({ take: 5 })
   for (const [idx, palette] of paletteInsights.entries()) {

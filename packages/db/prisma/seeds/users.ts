@@ -40,91 +40,99 @@ export async function seedUsers(prisma: PrismaClient): Promise<SeededUsers> {
     { id: 'teen-5', email: 'teen5@example.com', displayName: 'Quinn Morales', age: 17 },
   ]
 
-  const createdGuardians = [] as { id: string; email: string }[]
-  for (const guardian of guardians) {
-    const user = await prisma.user.upsert({
-      where: { email: guardian.email },
-      update: { email: guardian.email },
-      create: {
-        id: guardian.id,
-        email: guardian.email,
-      },
+  const createdGuardians = await Promise.all(
+    guardians.map(async (guardian) => {
+      const user = await prisma.user.upsert({
+        where: { email: guardian.email },
+        update: { email: guardian.email },
+        create: {
+          id: guardian.id,
+          email: guardian.email,
+        },
+      })
+
+      await Promise.all([
+        prisma.userProfile.upsert({
+          where: { user_id: user.id },
+          update: {
+            display_name: guardian.displayName,
+            preferences: { feature_flags: FEATURE_FLAGS, role: 'guardian' },
+          },
+          create: {
+            user_id: user.id,
+            display_name: guardian.displayName,
+            birthdate: faker.date.birthdate({ min: 35, max: 48, mode: 'age' }),
+            preferences: { feature_flags: FEATURE_FLAGS, role: 'guardian' },
+          },
+        }),
+        prisma.comfortPreferences.upsert({
+          where: { user_id: user.id },
+          update: {
+            runs_cold_warm: ComfortRun.neutral,
+            wind_tolerance: WindTolerance.medium,
+            precip_preparedness: PrecipPreparedness.medium,
+          },
+          create: {
+            user_id: user.id,
+            runs_cold_warm: ComfortRun.neutral,
+            wind_tolerance: WindTolerance.medium,
+            precip_preparedness: PrecipPreparedness.medium,
+          },
+        }),
+      ])
+
+      return { id: user.id, email: user.email }
     })
+  )
 
-    await prisma.userProfile.upsert({
-      where: { user_id: user.id },
-      update: {
-        display_name: guardian.displayName,
-        preferences: { feature_flags: FEATURE_FLAGS, role: 'guardian' },
-      },
-      create: {
-        user_id: user.id,
-        display_name: guardian.displayName,
-        birthdate: faker.date.birthdate({ min: 35, max: 48, mode: 'age' }),
-        preferences: { feature_flags: FEATURE_FLAGS, role: 'guardian' },
-      },
+  const createdTeens = await Promise.all(
+    teens.map(async (teen) => {
+      const user = await prisma.user.upsert({
+        where: { email: teen.email },
+        update: { email: teen.email },
+        create: {
+          id: teen.id,
+          email: teen.email,
+        },
+      })
+
+      await Promise.all([
+        prisma.userProfile.upsert({
+          where: { user_id: user.id },
+          update: {
+            display_name: teen.displayName,
+            preferences: { feature_flags: FEATURE_FLAGS, role: 'teen' },
+          },
+          create: {
+            user_id: user.id,
+            display_name: teen.displayName,
+            birthdate: faker.date.birthdate({
+              min: teen.age,
+              max: teen.age,
+              mode: 'age',
+            }),
+            preferences: { feature_flags: FEATURE_FLAGS, role: 'teen' },
+          },
+        }),
+        prisma.comfortPreferences.upsert({
+          where: { user_id: user.id },
+          update: {
+            runs_cold_warm: ComfortRun.warm,
+            wind_tolerance: WindTolerance.medium,
+            precip_preparedness: PrecipPreparedness.medium,
+          },
+          create: {
+            user_id: user.id,
+            runs_cold_warm: ComfortRun.warm,
+            wind_tolerance: WindTolerance.medium,
+            precip_preparedness: PrecipPreparedness.medium,
+          },
+        }),
+      ])
+
+      return { id: user.id, email: user.email }
     })
-
-    await prisma.comfortPreferences.upsert({
-      where: { user_id: user.id },
-      update: {
-        runs_cold_warm: ComfortRun.neutral,
-        wind_tolerance: WindTolerance.medium,
-        precip_preparedness: PrecipPreparedness.medium,
-      },
-      create: {
-        user_id: user.id,
-        runs_cold_warm: ComfortRun.neutral,
-        wind_tolerance: WindTolerance.medium,
-        precip_preparedness: PrecipPreparedness.medium,
-      },
-    })
-
-    createdGuardians.push({ id: user.id, email: user.email })
-  }
-
-  const createdTeens = [] as { id: string; email: string }[]
-  for (const teen of teens) {
-    const user = await prisma.user.upsert({
-      where: { email: teen.email },
-      update: { email: teen.email },
-      create: {
-        id: teen.id,
-        email: teen.email,
-      },
-    })
-
-    await prisma.userProfile.upsert({
-      where: { user_id: user.id },
-      update: {
-        display_name: teen.displayName,
-        preferences: { feature_flags: FEATURE_FLAGS, role: 'teen' },
-      },
-      create: {
-        user_id: user.id,
-        display_name: teen.displayName,
-        birthdate: faker.date.birthdate({ min: teen.age, max: teen.age, mode: 'age' }),
-        preferences: { feature_flags: FEATURE_FLAGS, role: 'teen' },
-      },
-    })
-
-    await prisma.comfortPreferences.upsert({
-      where: { user_id: user.id },
-      update: {
-        runs_cold_warm: ComfortRun.warm,
-        wind_tolerance: WindTolerance.medium,
-        precip_preparedness: PrecipPreparedness.medium,
-      },
-      create: {
-        user_id: user.id,
-        runs_cold_warm: ComfortRun.warm,
-        wind_tolerance: WindTolerance.medium,
-        precip_preparedness: PrecipPreparedness.medium,
-      },
-    })
-
-    createdTeens.push({ id: user.id, email: user.email })
-  }
+  )
 
   const consentPairs = [
     { guardian_id: createdGuardians[0]?.id, teen_id: createdTeens[0]?.id },

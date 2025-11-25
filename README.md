@@ -85,10 +85,6 @@ npm run typecheck:clear-cache
 
 ### Database (Prisma)
 
-- `npm run db:migrate` – runs Prisma migrate (packages/db)
-- `npm run db:seed` – runs Prisma seed (packages/db)
-- `npm run db:reset` – resets DB (migrate reset + seed)
-
 Environment for DB scripts:
 
 - set `DATABASE_URL` (e.g., `postgresql://murat@localhost:5432/couture_cast?schema=public`)

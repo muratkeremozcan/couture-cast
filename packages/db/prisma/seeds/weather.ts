@@ -67,48 +67,56 @@ export async function seedWeather(prisma: PrismaClient): Promise<SeededWeather> 
   const snapshotIds: string[] = []
   const segmentIds: string[] = []
 
-  for (const seed of weatherSeeds) {
-    const snapshot = await prisma.weatherSnapshot.upsert({
-      where: { id: seed.id },
-      update: {
-        location: seed.location,
-        temperature: seed.baseTemp,
-        condition: seed.condition,
-        alerts: seed.alert ? [{ type: seed.alert }] : undefined,
-      },
-      create: {
-        id: seed.id,
-        location: seed.location,
-        temperature: seed.baseTemp,
-        condition: seed.condition,
-        alerts: seed.alert ? [{ type: seed.alert }] : undefined,
-      },
-    })
+  const segmentOffsets = [0, 6]
 
-    snapshotIds.push(snapshot.id)
-
-    const segmentOffsets = [0, 6]
-    for (const offset of segmentOffsets) {
-      const segmentId = `${seed.id}-seg-${offset}`
-      await prisma.forecastSegment.upsert({
-        where: { id: segmentId },
+  await Promise.all(
+    weatherSeeds.map(async (seed) => {
+      const snapshot = await prisma.weatherSnapshot.upsert({
+        where: { id: seed.id },
         update: {
-          hour_offset: offset,
-          temperature: seed.baseTemp + offset * 0.5,
-          condition: offset === 0 ? seed.condition : `${seed.condition}-later`,
-          weather_snapshot: { connect: { id: snapshot.id } },
+          location: seed.location,
+          temperature: seed.baseTemp,
+          condition: seed.condition,
+          alerts: seed.alert ? [{ type: seed.alert }] : undefined,
         },
         create: {
-          id: segmentId,
-          hour_offset: offset,
-          temperature: seed.baseTemp + offset * 0.5,
-          condition: offset === 0 ? seed.condition : `${seed.condition}-later`,
-          weather_snapshot_id: snapshot.id,
+          id: seed.id,
+          location: seed.location,
+          temperature: seed.baseTemp,
+          condition: seed.condition,
+          alerts: seed.alert ? [{ type: seed.alert }] : undefined,
         },
       })
-      segmentIds.push(segmentId)
-    }
-  }
+
+      snapshotIds.push(snapshot.id)
+
+      const segments = await Promise.all(
+        segmentOffsets.map((offset) => {
+          const segmentId = `${seed.id}-seg-${offset}`
+          return prisma.forecastSegment
+            .upsert({
+              where: { id: segmentId },
+              update: {
+                hour_offset: offset,
+                temperature: seed.baseTemp + offset * 0.5,
+                condition: offset === 0 ? seed.condition : `${seed.condition}-later`,
+                weather_snapshot: { connect: { id: snapshot.id } },
+              },
+              create: {
+                id: segmentId,
+                hour_offset: offset,
+                temperature: seed.baseTemp + offset * 0.5,
+                condition: offset === 0 ? seed.condition : `${seed.condition}-later`,
+                weather_snapshot_id: snapshot.id,
+              },
+            })
+            .then(() => segmentId)
+        })
+      )
+
+      segmentIds.push(...segments)
+    })
+  )
 
   return { snapshotIds, segmentIds }
 }

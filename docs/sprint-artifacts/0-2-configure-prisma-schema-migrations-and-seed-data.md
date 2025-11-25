@@ -68,7 +68,7 @@ so that all apps use consistent data models and database changes are trackable.
     {
       "db:migrate": "prisma migrate dev",
       "db:seed": "prisma db seed",
-      "db:reset": "prisma migrate reset --force --skip-generate --skip-seed && prisma db seed",
+      "db:reset": "prisma migrate reset --force --skip-seed && prisma db seed",
       "db:studio": "prisma studio",
       "db:generate": "prisma generate"
     }
