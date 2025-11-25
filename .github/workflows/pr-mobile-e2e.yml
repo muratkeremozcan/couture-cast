@@ -15,17 +15,21 @@ env:
   MAESTRO_APP_ID: com.anonymous.mobile
 
 jobs:
-  mobile-e2e-android:
+  mobile-e2e:
     runs-on: macos-12
-    timeout-minutes: 15
+    timeout-minutes: 20
     continue-on-error: true
+    strategy:
+      matrix:
+        platform: [android, ios]
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Maestro
         run: curl -Ls "https://get.maestro.mobile.dev" | bash
 
-      - name: Run tests with Android emulator
+      - name: Run Android tests
+        if: matrix.platform == 'android'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
@@ -39,7 +43,7 @@ jobs:
             adb wait-for-device
             adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
 
-            echo "Installing pre-built APK"
+            echo "Installing APK"
             adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
             mkdir -p maestro/artifacts
@@ -47,28 +51,15 @@ jobs:
             (sleep 20 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/) || \
             (sleep 60 && $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/)
 
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: android-test-results
-          path: maestro/artifacts/
-
-  mobile-e2e-ios:
-    runs-on: macos-15
-    timeout-minutes: 15
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Maestro
-        run: curl -Ls "https://get.maestro.mobile.dev" | bash
-
-      - name: Setup and run tests on iOS simulator
+      - name: Run iOS tests
+        if: matrix.platform == 'ios'
         run: |
-          SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone 15 Pro" | head -1 | grep -oE '\([A-F0-9-]{36}\)' | tr -d '()')
+          # Use any available iPhone
+          SIMULATOR_ID=$(xcrun simctl list devices available iPhone -j | jq -r '.devices | to_entries[0].value[0].udid')
 
-          if [ -z "$SIMULATOR_ID" ]; then
-            SIMULATOR_ID=$(xcrun simctl list devices available | grep -E "iPhone 1[45]" | head -1 | grep -oE '\([A-F0-9-]{36}\)' | tr -d '()')
+          if [ -z "$SIMULATOR_ID" ] || [ "$SIMULATOR_ID" = "null" ]; then
+            echo "No simulator found via jq, trying grep fallback"
+            SIMULATOR_ID=$(xcrun simctl list devices available | grep "iPhone" | head -1 | grep -oE '\([A-F0-9-]{36}\)' | tr -d '()')
           fi
 
           echo "Using simulator: $SIMULATOR_ID"
@@ -82,8 +73,8 @@ jobs:
             sleep 2
           done
 
-          echo "Installing pre-built app"
-          xcrun simctl install "$SIMULATOR_ID" apps/mobile/ios/build/mobile.app
+          echo "Installing app"
+          xcrun simctl install "$SIMULATOR_ID" apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/mobile.app
 
           mkdir -p maestro/artifacts
           $HOME/.maestro/bin/maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
@@ -95,5 +86,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ios-test-results
+          name: ${{ matrix.platform }}-test-results
           path: maestro/artifacts/
