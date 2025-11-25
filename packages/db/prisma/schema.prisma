@@ -1,0 +1,229 @@
+// Prisma schema for CoutureCast
+// Follows architecture Data Architecture and RLS requirements
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ConsentStatus {
+  pending
+  granted
+  revoked
+}
+
+enum ComfortRun {
+  cold
+  neutral
+  warm
+}
+
+enum WindTolerance {
+  low
+  medium
+  high
+}
+
+enum PrecipPreparedness {
+  low
+  medium
+  high
+}
+
+model User {
+  id                 String                 @id @default(cuid())
+  email              String                 @unique
+  created_at         DateTime               @default(now())
+  updated_at         DateTime               @updatedAt
+  profile            UserProfile?
+  comfort_profile    ComfortPreferences?
+  garments           GarmentItem[]
+  palette_insights   PaletteInsights[]
+  outfits            OutfitRecommendation[]
+  lookbook_posts     LookbookPost[]
+  engagement         EngagementEvent[]
+  audit_logs         AuditLog[]
+  guardian_roles     GuardianConsent[]      @relation("GuardianRole")
+  teen_roles         GuardianConsent[]      @relation("TeenRole")
+  moderation_flags   ModerationEvent[]      @relation("FlaggedByRelation")
+  moderation_reviews ModerationEvent[]      @relation("ReviewedByRelation")
+}
+
+/// RLS: user-scoped profile data keyed by user_id
+model UserProfile {
+  id           String    @id @default(cuid())
+  user         User      @relation(fields: [user_id], references: [id])
+  user_id      String    @unique
+  display_name String?
+  birthdate    DateTime?
+  preferences  Json?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+}
+
+model GuardianConsent {
+  id                 String        @id @default(cuid())
+  guardian           User          @relation("GuardianRole", fields: [guardian_id], references: [id])
+  guardian_id        String
+  teen               User          @relation("TeenRole", fields: [teen_id], references: [id])
+  teen_id            String
+  consent_granted_at DateTime      @default(now())
+  ip_address         String?
+  status             ConsentStatus @default(pending)
+  created_at         DateTime      @default(now())
+
+  @@unique([guardian_id, teen_id])
+  @@index([guardian_id])
+  @@index([teen_id])
+}
+
+model WeatherSnapshot {
+  id          String            @id @default(cuid())
+  location    String
+  temperature Float
+  condition   String
+  alerts      Json?
+  fetched_at  DateTime          @default(now())
+  created_at  DateTime          @default(now())
+  segments    ForecastSegment[]
+}
+
+model ForecastSegment {
+  id                  String                 @id @default(cuid())
+  weather_snapshot    WeatherSnapshot        @relation(fields: [weather_snapshot_id], references: [id])
+  weather_snapshot_id String
+  hour_offset         Int
+  temperature         Float
+  condition           String
+  created_at          DateTime               @default(now())
+  outfits             OutfitRecommendation[]
+
+  @@index([weather_snapshot_id])
+}
+
+/// RLS: user-scoped comfort settings enforced by user_id
+model ComfortPreferences {
+  id                  String             @id @default(cuid())
+  user                User               @relation(fields: [user_id], references: [id])
+  user_id             String             @unique
+  runs_cold_warm      ComfortRun         @default(neutral)
+  wind_tolerance      WindTolerance      @default(medium)
+  precip_preparedness PrecipPreparedness @default(medium)
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
+}
+
+/// RLS: wardrobe items must filter by user_id for tenant isolation
+model GarmentItem {
+  id                String            @id @default(cuid())
+  user              User              @relation(fields: [user_id], references: [id])
+  user_id           String
+  image_url         String?
+  category          String
+  material          String?
+  comfort_range     String?
+  color_palette     Json?
+  created_at        DateTime          @default(now())
+  updated_at        DateTime          @updatedAt
+  palette           PaletteInsights?  @relation("GarmentPalette")
+  moderation_events ModerationEvent[]
+
+  @@index([user_id])
+}
+
+/// RLS: palette insights derived from garments, scoped to user_id
+model PaletteInsights {
+  id               String         @id @default(cuid())
+  garment          GarmentItem    @relation("GarmentPalette", fields: [garment_item_id], references: [id])
+  garment_item_id  String         @unique
+  user             User           @relation(fields: [user_id], references: [id])
+  user_id          String
+  undertone        String?
+  hex_codes        Json?
+  confidence_score Float?
+  created_at       DateTime       @default(now())
+  updated_at       DateTime       @updatedAt
+  lookbook_posts   LookbookPost[] @relation("LookbookPalette")
+
+  @@index([user_id])
+}
+
+/// RLS: outfit recommendations are cached per user + forecast segment
+model OutfitRecommendation {
+  id                  String           @id @default(cuid())
+  user                User             @relation(fields: [user_id], references: [id])
+  user_id             String
+  forecast_segment    ForecastSegment? @relation(fields: [forecast_segment_id], references: [id])
+  forecast_segment_id String?
+  scenario            String
+  garment_ids         Json?
+  reasoning_badges    Json?
+  created_at          DateTime         @default(now())
+  updated_at          DateTime         @updatedAt
+
+  @@index([user_id])
+}
+
+/// RLS: lookbook posts tie to user_id and optional palette insight
+model LookbookPost {
+  id                 String            @id @default(cuid())
+  user               User              @relation(fields: [user_id], references: [id])
+  user_id            String
+  image_urls         Json?
+  caption            String?
+  locale             String?
+  climate_band       String?
+  palette_insight    PaletteInsights?  @relation("LookbookPalette", fields: [palette_insight_id], references: [id])
+  palette_insight_id String?
+  created_at         DateTime          @default(now())
+  updated_at         DateTime          @updatedAt
+  engagement_events  EngagementEvent[]
+  moderation_events  ModerationEvent[]
+
+  @@index([user_id])
+}
+
+/// RLS: engagement events filter by user_id for row-level policies
+model EngagementEvent {
+  id         String       @id @default(cuid())
+  user       User         @relation(fields: [user_id], references: [id])
+  user_id    String
+  post       LookbookPost @relation(fields: [post_id], references: [id])
+  post_id    String
+  event_type String
+  created_at DateTime     @default(now())
+
+  @@index([user_id])
+}
+
+model ModerationEvent {
+  id              String        @id @default(cuid())
+  post            LookbookPost? @relation(fields: [post_id], references: [id])
+  post_id         String?
+  garment         GarmentItem?  @relation(fields: [garment_item_id], references: [id])
+  garment_item_id String?
+  flagged_by      User?         @relation("FlaggedByRelation", fields: [flagged_by_id], references: [id])
+  flagged_by_id   String?
+  reviewed_by     User?         @relation("ReviewedByRelation", fields: [reviewed_by_id], references: [id])
+  reviewed_by_id  String?
+  action          String?
+  reason          String?
+  created_at      DateTime      @default(now())
+}
+
+/// RLS: immutable audit trail entries scoped by user_id
+model AuditLog {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [user_id], references: [id])
+  user_id    String
+  event_type String
+  event_data Json?
+  timestamp  DateTime @default(now())
+  ip_address String?
+
+  @@index([user_id])
+}

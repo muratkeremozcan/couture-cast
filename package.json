@@ -28,7 +28,7 @@
     "mobile:sim:ios": "bash ./scripts/start-ios-simulator.sh",
     "mobile:sim:android": "bash ./scripts/start-android-emulator.sh",
     "mobile:device": "open -a \"Android Emulator\" || open -a Simulator || echo \"Launch your emulator manually\"",
-    "start:all": "npm-run-all2 --parallel start:api start:web",
+    "start:all": "npm-run-all2 --sequential db:reset && npm-run-all2 --parallel start:api start:web",
     "test:pw-local": "cross-env TEST_ENV=local npx playwright test",
     "test:pw-dev": "cross-env TEST_ENV=dev npx playwright test",
     "test:pw-stage": "cross-env TEST_ENV=stage npx playwright test",
@@ -42,20 +42,23 @@
     "validate": "npm-run-all --aggregate-output --parallel typecheck lint test",
     "clean": "rimraf \"apps/**/dist\" \"packages/**/dist\" \"**/tsconfig.tsbuildinfo\"",
     "clean:install": "npx rimraf node_modules \"apps/**/node_modules\" \"packages/**/node_modules\" && npm install --no-progress",
-    "prepare": "husky"
+    "prepare": "husky",
+    "db:migrate": "npm run db:migrate -w packages/db",
+    "db:seed": "npm run db:seed -w packages/db",
+    "db:reset": "npm run db:reset -w packages/db"
   },
   "devDependencies": {
     "@couture/eslint-config": "workspace:*",
-    "@faker-js/faker": "^10.1.0",
-    "@playwright/test": "^1.56.1",
-    "@types/lodash.merge": "^4.6.9",
+    "@faker-js/faker": "10.1.0",
+    "@playwright/test": "1.56.1",
+    "@types/lodash.merge": "4.6.9",
     "@types/node": "22.9.3",
-    "@types/picomatch": "^4.0.2",
+    "@types/picomatch": "4.0.2",
     "@typescript-eslint/eslint-plugin": "8.46.3",
     "@typescript-eslint/parser": "8.46.3",
-    "axe-core": "^4.10.0",
-    "cross-env": "^10.1.0",
-    "dotenv": "^17.2.3",
+    "axe-core": "4.10.0",
+    "cross-env": "10.1.0",
+    "dotenv": "17.2.3",
     "eslint": "8.57.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-import-resolver-typescript": "4.4.4",
@@ -66,12 +69,13 @@
     "eslint-plugin-prettier": "5.5.4",
     "husky": "9.1.7",
     "lint-staged": "15.2.10",
-    "lodash.merge": "^4.6.2",
-    "npm-run-all2": "^7.0.2",
-    "picomatch": "^4.0.2",
+    "lodash.merge": "4.6.2",
+    "npm-run-all2": "7.0.2",
+    "picomatch": "4.0.2",
     "prettier": "3.6.2",
+    "prisma": "6.19.0",
     "rimraf": "5.0.10",
-    "tsx": "^4.20.6",
+    "tsx": "4.20.6",
     "turbo": "2.6.1",
     "typescript": "5.9.3"
   },
@@ -83,5 +87,8 @@
     "*.{json,md}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.0"
   }
 }

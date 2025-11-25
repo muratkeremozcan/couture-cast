@@ -6,6 +6,7 @@ const rootDir = path.resolve(__dirname, '..')
 const testsDir = path.join(rootDir, 'tests')
 const artifactsDir = path.join(rootDir, 'artifacts')
 const reportDir = path.join(rootDir, 'playwright-report')
+const globalTeardown = path.join(rootDir, 'global-teardown.ts')
 
 export const baseConfig: PlaywrightTestConfig = defineConfig({
   testDir: testsDir,
@@ -19,6 +20,7 @@ export const baseConfig: PlaywrightTestConfig = defineConfig({
   },
   outputDir: artifactsDir,
   reporter: [['list'], ['html', { outputFolder: reportDir, open: 'never' }]],
+  globalTeardown,
   use: {
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

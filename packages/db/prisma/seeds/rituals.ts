@@ -1,0 +1,119 @@
+import type { PrismaClient } from '@prisma/client'
+
+import type { SeededGarment } from './wardrobe.js'
+import type { SeededWeather } from './weather.js'
+
+export async function seedRituals(
+  prisma: PrismaClient,
+  teens: { id: string; email: string }[],
+  garments: SeededGarment[],
+  weather: SeededWeather
+): Promise<void> {
+  const segmentPool = weather.segmentIds
+
+  const outfitPromises = Array.from({ length: 20 }, (_, i) => {
+    const user = teens[i % teens.length]
+    if (!user) {
+      return null
+    }
+    const segmentId = segmentPool[i % segmentPool.length]
+    const garmentSliceStart = (i * 2) % garments.length
+    const garmentSelection = garments.slice(garmentSliceStart, garmentSliceStart + 3)
+    const garmentIds = garmentSelection.map((g) => g.id)
+
+    return prisma.outfitRecommendation.upsert({
+      where: { id: `outfit-${i + 1}` },
+      update: {
+        scenario: i % 3 === 0 ? 'morning' : i % 3 === 1 ? 'midday' : 'evening',
+        garment_ids: garmentIds,
+        reasoning_badges: [{ label: 'layered' }, { label: 'weather-aware' }],
+        forecast_segment: segmentId ? { connect: { id: segmentId } } : undefined,
+        user: { connect: { id: user.id } },
+      },
+      create: {
+        id: `outfit-${i + 1}`,
+        user_id: user.id,
+        forecast_segment_id: segmentId,
+        scenario: i % 3 === 0 ? 'morning' : i % 3 === 1 ? 'midday' : 'evening',
+        garment_ids: garmentIds,
+        reasoning_badges: [{ label: 'layered' }, { label: 'weather-aware' }],
+      },
+    })
+  }).filter((promise): promise is ReturnType<typeof prisma.outfitRecommendation.upsert> =>
+    Boolean(promise)
+  )
+
+  await Promise.all(outfitPromises)
+
+  const paletteInsights = await prisma.paletteInsights.findMany({ take: 5 })
+  const lookbookPromises = paletteInsights
+    .map((palette, idx) => {
+      const ownerId = palette.user_id
+      if (!ownerId) {
+        return null
+      }
+      return prisma.lookbookPost.upsert({
+        where: { id: `lookbook-${idx + 1}` },
+        update: {
+          user: { connect: { id: ownerId } },
+          palette_insight: { connect: { id: palette.id } },
+          image_urls: [`https://picsum.photos/seed/lookbook-${idx + 1}/800/600`],
+          climate_band: idx % 2 === 0 ? 'temperate' : 'cold',
+        },
+        create: {
+          id: `lookbook-${idx + 1}`,
+          user_id: ownerId,
+          palette_insight_id: palette.id,
+          image_urls: [`https://picsum.photos/seed/lookbook-${idx + 1}/800/600`],
+          caption: `Look ${idx + 1} — weather-ready layers`,
+          locale: 'en-US',
+          climate_band: idx % 2 === 0 ? 'temperate' : 'cold',
+        },
+      })
+    })
+    .filter(Boolean) as Promise<unknown>[]
+
+  await Promise.all(lookbookPromises)
+
+  const engagementPosts = await prisma.lookbookPost.findMany({ take: 3 })
+  for (const [idx, post] of engagementPosts.entries()) {
+    const user = teens[idx % teens.length]
+    if (!user) {
+      continue
+    }
+    await prisma.engagementEvent.upsert({
+      where: { id: `engagement-${idx + 1}` },
+      update: {
+        event_type: 'applaud',
+        post: { connect: { id: post.id } },
+        user: { connect: { id: user.id } },
+      },
+      create: {
+        id: `engagement-${idx + 1}`,
+        user_id: user.id,
+        post_id: post.id,
+        event_type: 'applaud',
+      },
+    })
+  }
+
+  await Promise.all(
+    teens.map((user, idx) =>
+      prisma.auditLog.upsert({
+        where: { id: `audit-${idx + 1}` },
+        update: {
+          event_type: 'seed_ran',
+          event_data: { seed: 'prisma', iteration: idx + 1 },
+          ip_address: `10.0.0.${idx + 10}`,
+        },
+        create: {
+          id: `audit-${idx + 1}`,
+          user_id: user.id,
+          event_type: 'seed_ran',
+          event_data: { seed: 'prisma', iteration: idx + 1 },
+          ip_address: `10.0.0.${idx + 10}`,
+        },
+      })
+    )
+  )
+}

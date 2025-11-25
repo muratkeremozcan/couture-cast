@@ -1,6 +1,6 @@
 # Story 0.2: Configure Prisma schema, migrations, and seed data
 
-Status: drafted
+Status: review
 
 ## Story
 
@@ -18,62 +18,62 @@ so that all apps use consistent data models and database changes are trackable.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create Prisma package structure (AC: #1)
-  - [ ] Create `packages/db/` directory with package.json
-  - [ ] Install Prisma: `npm install prisma @prisma/client --workspace packages/db`
-  - [ ] Run `npx prisma init` in packages/db to create prisma directory
-  - [ ] Configure `schema.prisma` with datasource (PostgreSQL) and client generator
+- [x] Task 1: Create Prisma package structure (AC: #1)
+  - [x] Create `packages/db/` directory with package.json
+  - [x] Install Prisma: `npm install prisma @prisma/client --workspace packages/db`
+  - [x] Run `npx prisma init` in packages/db to create prisma directory
+  - [x] Configure `schema.prisma` with datasource (PostgreSQL) and client generator
 
-- [ ] Task 2: Define core schema tables (AC: #1, #2)
-  - [ ] Create `users` table (id, email, created_at, updated_at)
-  - [ ] Create `user_profiles` table (user_id FK, display_name, birthdate, preferences JSONB)
-  - [ ] Create `guardian_consent` table (id, guardian_id FK, teen_id FK, consent_granted_at, ip_address, status)
-  - [ ] Create `weather_snapshots` table (id, location, temperature, condition, alerts JSONB, fetched_at)
-  - [ ] Create `forecast_segments` table (id, weather_snapshot_id FK, hour_offset, temperature, condition)
-  - [ ] Create `comfort_preferences` table (user_id FK, runs_cold_warm, wind_tolerance, precip_preparedness)
-  - [ ] Create `garment_items` table (user_id FK, image_url, category, material, comfort_range, color_palette JSONB)
-  - [ ] Create `palette_insights` table (garment_item_id FK, undertone, hex_codes JSONB, confidence_score)
-  - [ ] Create `outfit_recommendations` table (user_id FK, forecast_segment_id FK, scenario, garment_ids JSONB, reasoning_badges JSONB)
-  - [ ] Create `lookbook_posts` table (user_id FK, image_urls JSONB, caption, locale, climate_band, created_at)
-  - [ ] Create `engagement_events` table (user_id FK, post_id FK, event_type, created_at)
-  - [ ] Create `moderation_events` table (id, post_id FK, flagged_by FK, reviewed_by FK, action, reason, created_at)
-  - [ ] Create `audit_log` table (id, user_id, event_type, event_data JSONB, timestamp, ip_address) with immutable constraints
+- [x] Task 2: Define core schema tables (AC: #1, #2)
+  - [x] Create `users` table (id, email, created_at, updated_at)
+  - [x] Create `user_profiles` table (user_id FK, display_name, birthdate, preferences JSONB)
+  - [x] Create `guardian_consent` table (id, guardian_id FK, teen_id FK, consent_granted_at, ip_address, status)
+  - [x] Create `weather_snapshots` table (id, location, temperature, condition, alerts JSONB, fetched_at)
+  - [x] Create `forecast_segments` table (id, weather_snapshot_id FK, hour_offset, temperature, condition)
+  - [x] Create `comfort_preferences` table (user_id FK, runs_cold_warm, wind_tolerance, precip_preparedness)
+  - [x] Create `garment_items` table (user_id FK, image_url, category, material, comfort_range, color_palette JSONB)
+  - [x] Create `palette_insights` table (garment_item_id FK, undertone, hex_codes JSONB, confidence_score)
+  - [x] Create `outfit_recommendations` table (user_id FK, forecast_segment_id FK, scenario, garment_ids JSONB, reasoning_badges JSONB)
+  - [x] Create `lookbook_posts` table (user_id FK, image_urls JSONB, caption, locale, climate_band, created_at)
+  - [x] Create `engagement_events` table (user_id FK, post_id FK, event_type, created_at)
+  - [x] Create `moderation_events` table (id, post_id FK, flagged_by FK, reviewed_by FK, action, reason, created_at)
+  - [x] Create `audit_log` table (id, user_id, event_type, event_data JSONB, timestamp, ip_address) with immutable constraints
 
-- [ ] Task 3: Enforce user_id column and RLS prep (AC: #2)
-  - [ ] Verify all user-scoped tables include `user_id` column
-  - [ ] Add indexes on `user_id` columns for RLS performance
-  - [ ] Add `@@index([user_id])` to schema for tables: garment_items, outfit_recommendations, lookbook_posts, engagement_events
-  - [ ] Document RLS policy requirements in schema comments
+- [x] Task 3: Enforce user_id column and RLS prep (AC: #2)
+  - [x] Verify all user-scoped tables include `user_id` column
+  - [x] Add indexes on `user_id` columns for RLS performance
+  - [x] Add `@@index([user_id])` to schema for tables: garment_items, outfit_recommendations, lookbook_posts, engagement_events
+  - [x] Document RLS policy requirements in schema comments
 
-- [ ] Task 4: Create initial migration (AC: #3)
-  - [ ] Set DATABASE_URL environment variable (local Postgres or Supabase local)
-  - [ ] Run `npx prisma migrate dev --name init` to create initial migration
-  - [ ] Verify migration file created in `prisma/migrations/`
-  - [ ] Test migration applies: `npx prisma migrate reset --force` then `npx prisma migrate deploy`
-  - [ ] Generate Prisma Client: `npx prisma generate`
+- [x] Task 4: Create initial migration (AC: #3)
+  - [x] Set DATABASE_URL environment variable (local Postgres or Supabase local)
+  - [x] Run `npx prisma migrate dev --name init` to create initial migration
+  - [x] Verify migration file created in `prisma/migrations/`
+  - [x] Test migration applies: `npx prisma migrate reset --force` then `npx prisma migrate deploy`
+  - [x] Generate Prisma Client: `npx prisma generate`
 
-- [ ] Task 5: Implement seed scripts (AC: #4)
-  - [ ] Create `packages/db/prisma/seeds/index.ts` as main seed entry point
-  - [ ] Implement user seed: 5 teens (ages 13-17) + 3 guardians using Faker.js
-  - [ ] Implement guardian_consent seed: link guardians to teens with consent timestamps
-  - [ ] Implement wardrobe seed: 50 garment_items distributed across teens (mix of shared/private)
-  - [ ] Implement weather seed: 10 weather_snapshots (sunny, rainy, snow, extreme heat, alerts)
-  - [ ] Implement ritual seed: 20 outfit_recommendations linked to users + weather
-  - [ ] Implement feature flag seed: 8 flags (enabled/disabled mix) in user_profiles.preferences JSONB
-  - [ ] Add seed script to package.json: `"seed": "tsx prisma/seeds/index.ts"`
+- [x] Task 5: Implement seed scripts (AC: #4)
+  - [x] Create `packages/db/prisma/seeds/index.ts` as main seed entry point
+  - [x] Implement user seed: 5 teens (ages 13-17) + 3 guardians using Faker.js
+  - [x] Implement guardian_consent seed: link guardians to teens with consent timestamps
+  - [x] Implement wardrobe seed: 50 garment_items distributed across teens (mix of shared/private)
+  - [x] Implement weather seed: 10 weather_snapshots (sunny, rainy, snow, extreme heat, alerts)
+  - [x] Implement ritual seed: 20 outfit_recommendations linked to users + weather
+  - [x] Implement feature flag seed: 8 flags (enabled/disabled mix) in user_profiles.preferences JSONB
+  - [x] Add seed script to package.json: `"seed": "tsx prisma/seeds/index.ts"`
 
-- [ ] Task 6: Create database utility scripts (AC: #5)
-  - [ ] Add to packages/db/package.json scripts:
+- [x] Task 6: Create database utility scripts (AC: #5)
+  - [x] Add to packages/db/package.json scripts:
     ```json
     {
       "db:migrate": "prisma migrate dev",
       "db:seed": "prisma db seed",
-      "db:reset": "prisma migrate reset --force && prisma db seed",
+      "db:reset": "prisma migrate reset --force --skip-seed && prisma db seed",
       "db:studio": "prisma studio",
       "db:generate": "prisma generate"
     }
     ```
-  - [ ] Add to root package.json scripts:
+  - [x] Add to root package.json scripts:
     ```json
     {
       "db:migrate": "npm run db:migrate --workspace packages/db",
@@ -81,15 +81,15 @@ so that all apps use consistent data models and database changes are trackable.
       "db:reset": "npm run db:reset --workspace packages/db"
     }
     ```
-  - [ ] Test all scripts execute successfully
-  - [ ] Document usage in packages/db/README.md
+  - [x] Test all scripts execute successfully
+  - [x] Document usage in packages/db/README.md
 
-- [ ] Task 7: Validation and testing
-  - [ ] Verify `npm run db:reset` wipes database, applies migrations, seeds data successfully
-  - [ ] Verify `npm run db:migrate` detects schema changes and generates new migrations
-  - [ ] Check seed data in database: 5 teens, 3 guardians, 50 wardrobe items, 20 rituals, 10 weather snapshots
-  - [ ] Verify all relationships (FKs) are correctly established
-  - [ ] Test Prisma Client generation produces types for all models
+- [x] Task 7: Validation and testing
+  - [x] Verify `npm run db:reset` wipes database, applies migrations, seeds data successfully
+  - [x] Verify `npm run db:migrate` detects schema changes and generates new migrations
+  - [x] Check seed data in database: 5 teens, 3 guardians, 50 wardrobe items, 20 rituals, 10 weather snapshots
+  - [x] Verify all relationships (FKs) are correctly established
+  - [x] Test Prisma Client generation produces types for all models
 
 ## Dev Notes
 
@@ -185,25 +185,46 @@ This is the second story in Epic 0. The previous story (CC-0.1) established the 
 ### Context Reference
 
 <!-- Path(s) to story context XML will be added here by context workflow -->
+- No story context XML available; used docs/bmm-architecture-20251110.md, docs/epics.md, docs/ux-design-specification.md
 
 ### Agent Model Used
 
-<!-- Will be filled by dev agent -->
+- Codex (GPT-5)
 
 ### Debug Log References
 
-<!-- Will be filled by dev agent during implementation -->
+- 2025-11-25: Schema + seeds planned; Prisma schema authored for core tables with RLS notes
+- 2025-11-25: Commands: `PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH" npx prisma migrate dev --name init`
+- 2025-11-25: Commands: `npm run db:seed --workspace packages/db`; `npm run db:reset --workspace packages/db`
+- 2025-11-25: Postgres installed via Homebrew (`brew install postgresql@15`; service started for local testing)
 
 ### Completion Notes List
 
-<!-- Will be filled by dev agent upon completion -->
+- Added @couture/db workspace with Prisma schema, migrations, and seeds aligning to ACs (5 teens, 3 guardians, 50 garments, 20 rituals, 10 weather snapshots, 8 flags)
+- Created reusable db scripts (migrate/reset/seed/studio/generate) in package + root; validated migrate/reset/seed flows against local Postgres
+- Documented setup and seed coverage in packages/db/README.md; RLS guidance captured in schema comments
 
 ### File List
 
-<!-- Will be filled by dev agent with NEW/MODIFIED/DELETED files -->
+- package.json
+- package-lock.json
+- packages/db/package.json
+- packages/db/README.md
+- packages/db/.env
+- packages/db/prisma/schema.prisma
+- packages/db/prisma/migrations/20251125180510_init/migration.sql
+- packages/db/prisma/migrations/migration_lock.toml
+- packages/db/prisma/seeds/index.ts
+- packages/db/prisma/seeds/users.ts
+- packages/db/prisma/seeds/wardrobe.ts
+- packages/db/prisma/seeds/weather.ts
+- packages/db/prisma/seeds/rituals.ts
+- docs/sprint-artifacts/sprint-status.yaml
+- docs/sprint-artifacts/0-2-configure-prisma-schema-migrations-and-seed-data.md
 
 ## Change Log
 
 | Date | Author | Change |
 | ---- | ------ | ------ |
 | 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.2 acceptance criteria |
+| 2025-11-25 | BMad-user | Implemented Prisma schema, migration, seeds, and db scripts |

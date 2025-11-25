@@ -77,8 +77,25 @@ npm run typecheck:clear-cache
 | `npm run validate`              | Runs typecheck, lint (workspace + root), and tests in parallel—reference flow.             |
 | `npm run clean`                 | Cleans each workspace’s build outputs.                                                     |
 | `npm run clean:install`         | Nukes every `node_modules` (root/apps/packages) and performs a fresh `npm install`.        |
+| `npm run db:migrate`            | Runs Prisma migrate in `packages/db` (requires `DATABASE_URL`).                            |
+| `npm run db:seed`               | Runs Prisma seed in `packages/db` (requires `DATABASE_URL`).                               |
+| `npm run db:reset`              | Resets DB (migrate reset + seed) in `packages/db` (requires `DATABASE_URL`).               |
 
 > Pre-commit guardrails: `.husky/pre-commit` already runs `npm run lint` and `npm run lint:staged`. Extend that file if you need extra checks.
+
+### Database (Prisma)
+
+Environment for DB scripts:
+
+- set `DATABASE_URL` (e.g., `postgresql://murat@localhost:5432/couture_cast?schema=public`)
+- ensure Postgres is running (macOS: `brew services start postgresql@15`)
+- if needed locally, add `PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"` when running scripts
+
+Local E2E with clean DB:
+
+1. `PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH" DATABASE_URL=... npm run db:reset`
+2. `npm run test:pw-local`
+3. optional cleanup after tests: `npm run db:reset`
 
 ## E2E smoke (Playwright + Maestro)
 
