@@ -1,10 +1,17 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import { config as loadEnv } from 'dotenv'
 
-const envPath = path.resolve(process.cwd(), '.env')
-loadEnv({
-  path: envPath,
-})
+// Load environment file based on TEST_ENV (falls back to .env)
+const envSuffix = (process.env.TEST_ENV ?? process.env.NODE_ENV ?? 'local').toLowerCase()
+const envFiles = [`.env.${envSuffix}`, '.env']
+for (const file of envFiles) {
+  const envPath = path.resolve(process.cwd(), file)
+  if (fs.existsSync(envPath)) {
+    loadEnv({ path: envPath })
+    break
+  }
+}
 
 export type EnvironmentName = 'local' | 'dev' | 'stage' | 'prod'
 

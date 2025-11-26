@@ -80,6 +80,8 @@ npm run typecheck:clear-cache
 | `npm run db:migrate`            | Runs Prisma migrate in `packages/db` (requires `DATABASE_URL`).                            |
 | `npm run db:seed`               | Runs Prisma seed in `packages/db` (requires `DATABASE_URL`).                               |
 | `npm run db:reset`              | Resets DB (migrate reset + seed) in `packages/db` (requires `DATABASE_URL`).               |
+| `npm run supabase:start`        | Starts local Supabase stack (Postgres/auth/storage/Studio) via Docker.                     |
+| `npm run supabase:stop`         | Stops the local Supabase stack.                                                            |
 
 > Pre-commit guardrails: `.husky/pre-commit` already runs `npm run lint` and `npm run lint:staged`. Extend that file if you need extra checks.
 
@@ -96,6 +98,20 @@ Local E2E with clean DB:
 1. `PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH" DATABASE_URL=... npm run db:reset`
 2. `npm run test:pw-local`
 3. optional cleanup after tests: `npm run db:reset`
+
+### Supabase vs Prisma/db scripts (short version)
+
+- Supabase CLI (`npm run supabase:start/stop`) brings up the local stack (Postgres + auth + storage + Studio) via Docker.
+- Prisma and the `db:*` scripts still own schema/migrations/seeds; Supabase is just the Postgres host (local via CLI, cloud via project refs).
+- Env files: `.env.local` for local Supabase, `.env.dev`/`.env.prod` for cloud. Playwright auto-loads `.env.<TEST_ENV>` if present.
+
+### Common local flow (DX)
+
+1. Start app services: `npm run start:all` (API + web).
+2. Start local Supabase: `npm run supabase:start` (Docker; first run pulls images).
+3. Env: set `TEST_ENV=local` (Playwright uses `.env.local`) or copy `.env.local` → `.env`.
+4. Run tests: `npm run test:pw-local`.
+5. Schema changes: use Prisma (`db:migrate`/`db:seed`), then `supabase db push --local` to sync into the local Supabase DB. Push to dev cloud later via `supabase db push`.
 
 ## E2E smoke (Playwright + Maestro)
 
