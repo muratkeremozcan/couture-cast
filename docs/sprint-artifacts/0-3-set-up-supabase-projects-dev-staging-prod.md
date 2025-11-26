@@ -1,4 +1,4 @@
-# Story 0.3: Set up Supabase projects (dev/staging/prod)
+# Story 0.3: Set up Supabase projects (dev/prod)
 
 Status: drafted
 
@@ -10,7 +10,7 @@ so that developers can test locally and deploy to production with proper isolati
 
 ## Acceptance Criteria
 
-1. Create three Supabase projects: dev (wiped weekly), staging (anonymized snapshots), prod (live user data).
+1. Create two Supabase projects: dev (wiped weekly) and prod (live user data); staging deferred due to free plan limits. Use Americas region.
 2. Configure Storage buckets: `wardrobe-images`, `derived-assets`, `community-uploads` with RLS policies per ADR-004.
 3. Set up Supabase local development via Supabase CLI (`npx supabase start`); document access in README.
 4. Configure database connection pooling (max 100 connections per environment) and backups (PITR enabled for prod).
@@ -18,39 +18,39 @@ so that developers can test locally and deploy to production with proper isolati
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create Supabase cloud projects (AC: #1)
-  - [ ] Sign up for Supabase account at https://supabase.com
-  - [ ] Create three organizations/projects: `couturecast-dev`, `couturecast-staging`, `couturecast-prod`
-  - [ ] Configure project settings: region (closest to target users), pricing tier (Free for dev, Pro for staging/prod)
-  - [ ] Document project URLs and ref IDs in project documentation
-  - [ ] Set dev project to auto-pause after 1 week inactivity (wiped weekly per architecture)
+- [x] Task 1: Create Supabase cloud projects (AC: #1)
+  - [x] Sign up for Supabase account at https://supabase.com
+  - [x] Create two projects: `couturecast-dev` (Free, auto-pause after 1 week) and `couturecast-prod` (Pro preferred; Free if budget-constrained)
+  - [x] Configure project settings: region Americas (closest to target users), pricing tier per above
+  - [x] Document project URLs and ref IDs in project documentation and secrets manager
+  - [x] Staging deferred due to free plan limits; add when an extra slot is available or upgraded
 
 - [ ] Task 2: Configure Storage buckets (AC: #2)
-  - [ ] Create `wardrobe-images` bucket in all 3 projects (public: false, file size limit: 10MB, allowed MIME: image/jpeg, image/png)
-  - [ ] Create `derived-assets` bucket (public: false, for color extraction outputs)
-  - [ ] Create `community-uploads` bucket (public: false, file size limit: 5MB)
-  - [ ] Enable RLS on all buckets (users can only access own files)
-  - [ ] Configure bucket policies per ADR-004:
+  - [x] Create `wardrobe-images` bucket in dev and prod (private, 10MB, JPEG/PNG only)
+  - [x] Create `derived-assets` bucket (private, for color extraction outputs)
+  - [x] Create `community-uploads` bucket (private, 5MB limit)
+  - [x] Enable RLS on all buckets (users can only access own files)
+  - [x] Configure bucket policies per ADR-004:
     - Teen users: can upload to wardrobe-images only if guardian consent granted
     - Guardians: can view linked teen's wardrobe-images
     - Admins: can access all buckets for moderation
-  - [ ] Set up signed URL expiration (1 hour for uploads, 24 hours for views)
+  - [x] Set up signed URL expiration (1 hour for uploads, 24 hours for views) — enforced via app code using expiresIn on signed URL generation (no UI toggle)
 
-- [ ] Task 3: Install and configure Supabase CLI (AC: #3)
-  - [ ] Install Supabase CLI: `npm install supabase --save-dev --workspace-root`
-  - [ ] Run `npx supabase init` to create `supabase/` directory with config
-  - [ ] Configure `supabase/config.toml` with local development settings
-  - [ ] Run `npx supabase start` to start local Supabase stack (Postgres, Auth, Storage, Studio)
-  - [ ] Verify local services accessible: Studio at http://localhost:54323, Postgres at localhost:54322
-  - [ ] Link local to dev project: `npx supabase link --project-ref {dev-project-ref}`
-  - [ ] Test migration sync: `npx supabase db push` applies Prisma schema to local instance
+- [x] Task 3: Install and configure Supabase CLI (AC: #3)
+  - [x] Install Supabase CLI: `npm install supabase --save-dev --workspace-root`
+  - [x] Run `npx supabase init` to create `supabase/` directory with config
+  - [x] Configure `supabase/config.toml` with local development settings
+  - [x] Run `npx supabase start` to start local Supabase stack (Postgres, Auth, Storage, Studio)
+  - [x] Verify local services accessible: Studio at http://localhost:54323, Postgres at localhost:54322
+  - [x] Link local to dev project: `npx supabase link --project-ref {dev-project-ref}`
+  - [x] Test migration sync: `npx supabase db push` applies Prisma schema to local instance
 
 - [ ] Task 4: Configure database connection pooling and backups (AC: #4)
-  - [ ] Set connection pooling in Supabase dashboard: max 100 connections per project (dev: 50, staging: 75, prod: 100)
+  - [ ] Set connection pooling in Supabase dashboard: max 100 connections per project (dev: 50, prod: 100)
   - [ ] Configure connection pool mode: transaction pooling for serverless functions, session pooling for long-lived connections
   - [ ] Enable PITR (Point-In-Time Recovery) for production project (7-day retention)
-  - [ ] Configure automated backups: daily snapshots for staging/prod, weekly for dev
-  - [ ] Test connection pool: verify 100 concurrent connections can be established without errors
+  - [ ] Configure automated backups: weekly for dev; daily for prod
+  - [ ] Test connection pool: verify target concurrent connections can be established without errors
 
 - [ ] Task 5: Document environment configuration (AC: #5)
   - [ ] Create `.env.example` template with Supabase environment variables:
@@ -61,7 +61,7 @@ so that developers can test locally and deploy to production with proper isolati
     SUPABASE_SERVICE_KEY={service-key}
     DATABASE_URL=postgresql://postgres:{password}@db.{project-ref}.supabase.co:5432/postgres
     ```
-  - [ ] Create Doppler projects (or Supabase Vault secrets): local, ci, dev, staging, production
+  - [ ] Create Doppler projects (or Supabase Vault secrets): local, ci, dev, prod (staging deferred until available)
   - [ ] Store credentials securely in Doppler for each environment
   - [ ] Document in README.md: how to access Supabase projects, how to sync env vars, how to run local development
   - [ ] Add to root README.md: "Prerequisites: Supabase CLI, Docker (for local Postgres)"
@@ -70,7 +70,7 @@ so that developers can test locally and deploy to production with proper isolati
   - [ ] Enable email/password authentication in Supabase Auth settings
   - [ ] Configure magic link email templates (branded CoutureCast styling)
   - [ ] Set JWT expiration: 7 days (refresh token), 1 hour (access token)
-  - [ ] Configure redirect URLs for dev/staging/prod environments
+  - [ ] Configure redirect URLs for dev/prod environments
   - [ ] Test magic link flow in local environment
 
 - [ ] Task 7: Set up RLS scaffolding (partial - full policies in CC-0.11)
@@ -85,7 +85,7 @@ so that developers can test locally and deploy to production with proper isolati
   - [ ] Verify seed data loads: `npm run db:seed`
   - [ ] Test Storage bucket upload (manual via Supabase Studio)
   - [ ] Test Auth magic link (send test email, verify link works)
-  - [ ] Verify dev/staging/prod project dashboards are accessible
+  - [ ] Verify dev/prod project dashboards are accessible
 
 ## Dev Notes
 
@@ -108,7 +108,7 @@ so that developers can test locally and deploy to production with proper isolati
 
 **Deployment Architecture (Section: Deployment Architecture):**
 - Custom domain: `couturecast.app` with `app.` (Vercel) and `api.` (Fly) subdomains
-- Supabase projects: dev (auto-pause after 1 week), staging (anonymized data), prod (live users)
+- Supabase projects: dev (auto-pause after 1 week), prod (live users); staging deferred due to free plan limits
 
 ### Testing Context
 
@@ -118,7 +118,7 @@ so that developers can test locally and deploy to production with proper isolati
 - **Local:** Docker Compose (Postgres, Redis, Supabase local); Prisma seed scripts reset on demand
 - **CI (Ephemeral):** Testcontainers + Supabase CLI for local instance
 - **Dev (Shared):** Supabase dev project (wiped weekly), seeded with factories
-- **Staging:** Anonymized prod-like data (refreshed weekly), full RLS enforcement
+- **Staging:** Deferred until free slot/upgrade available
 - **Production:** Real user data, backups + PITR enabled
 
 **Secrets & Configuration Management:**
@@ -155,9 +155,9 @@ supabase/
 ```
 
 **Supabase Projects:**
-- Dev: https://couturecast-dev.supabase.co (weekly wipe)
-- Staging: https://couturecast-staging.supabase.co (anonymized data)
-- Prod: https://couturecast-prod.supabase.co (live users)
+- Dev: https://ckmpgfjwsthgtkfqez.supabase.co (ref: ckmpgfjwsthgtkfqez, tier: Free, region: Americas, auto-pause after 1 week)
+- Prod: https://kxypzmbqwpuhfnbrdpmc.supabase.co (ref: kxypzmbqwpuhfnbrdpmc, tier: Free now; upgrade to Pro recommended, region: Americas)
+- Staging: Deferred until free slot/upgrade available (plan for anonymized data)
 
 ### References
 
@@ -203,14 +203,21 @@ supabase/
 
 ### Completion Notes List
 
-<!-- Will be filled by dev agent upon completion -->
+- Documented Supabase dev/prod projects and environment files for AC #1 (dev/prod only, staging deferred)
 
 ### File List
 
-<!-- Will be filled by dev agent with NEW/MODIFIED/DELETED files -->
+- NEW: .env.dev
+- NEW: .env.prod
+- MODIFIED: .env.local
+- MODIFIED: .env.example
+- MODIFIED: docs/sprint-artifacts/0-3-set-up-supabase-projects-dev-staging-prod.md
+- MODIFIED: package.json
+- MODIFIED: README.md
 
 ## Change Log
 
 | Date | Author | Change |
 | ---- | ------ | ------ |
 | 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.3 acceptance criteria |
+| 2025-11-25 | Amelia (Dev Agent) | Updated scope to dev/prod only due to Supabase free plan limits; staging deferred |

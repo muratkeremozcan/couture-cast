@@ -18,6 +18,8 @@ export default async function globalTeardown() {
     return
   }
 
+  let resetError: unknown
+
   try {
     execSync('npm run db:reset', {
       stdio: 'inherit',
@@ -28,6 +30,10 @@ export default async function globalTeardown() {
       'Global teardown failed: Unable to reset the database. Check DATABASE_URL and db:reset script.'
     )
     console.error('Error details:', error)
-    throw error
+    resetError = error
+  }
+
+  if (resetError) {
+    throw resetError
   }
 }
