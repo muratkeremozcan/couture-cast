@@ -1,6 +1,6 @@
 # Story 0.3: Set up Supabase projects (dev/prod)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -221,3 +221,4 @@ supabase/
 | ---- | ------ | ------ |
 | 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.3 acceptance criteria |
 | 2025-11-25 | Amelia (Dev Agent) | Updated scope to dev/prod only due to Supabase free plan limits; staging deferred |
+| 2025-11-29 | Amelia (Dev Agent) | Completed Supabase setup, auth, buckets, and env scaffolding; marked story done |
