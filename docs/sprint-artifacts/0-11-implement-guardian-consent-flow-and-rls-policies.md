@@ -80,6 +80,7 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
   - [ ] Add invitation UI in mobile and web apps
 
 - [ ] Task 4: Implement RLS policies in Supabase (AC: #3)
+  - [ ] Prerequisite: deploy Prisma schema to Supabase dev/prod (once available from Story 0.2) so tables exist for RLS
   - [ ] Create RLS policy for `wardrobe_items` table:
     ```sql
     -- Teen can access own wardrobe
