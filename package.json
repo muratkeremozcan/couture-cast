@@ -73,6 +73,7 @@
     "lint-staged": "15.2.10",
     "lodash.merge": "4.6.2",
     "npm-run-all2": "7.0.2",
+    "pg": "^8.16.3",
     "picomatch": "4.0.2",
     "prettier": "3.6.2",
     "prisma": "6.19.0",
