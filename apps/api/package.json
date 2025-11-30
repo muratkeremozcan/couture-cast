@@ -13,17 +13,24 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
-    "test:integration": "vitest run integration/**/*.spec.ts"
+    "test:integration": "vitest run integration/**/*.spec.ts",
+    "start:workers": "tsx src/workers/bootstrap.ts",
+    "start:workers:prod": "node dist/workers/bootstrap.js"
   },
   "dependencies": {
     "@nestjs/common": "11.1.9",
     "@nestjs/core": "11.1.9",
     "@nestjs/platform-express": "11.1.9",
+    "@nestjs/schedule": "^6.0.1",
+    "bullmq": "^5.65.0",
+    "ioredis": "^5.8.2",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.2"
+    "rxjs": "7.8.2",
+    "testcontainers": "^11.9.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "2.1.4",

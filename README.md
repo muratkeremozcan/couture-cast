@@ -105,6 +105,14 @@ Local E2E with clean DB:
 - Prisma and the `db:*` scripts still own schema/migrations/seeds; Supabase is just the Postgres host (local via CLI, cloud via project refs).
 - Env files: `.env.local` for local Supabase, `.env.dev`/`.env.prod` for cloud. Playwright auto-loads `.env.<TEST_ENV>` if present.
 
+### Queues & cache (BullMQ/Redis)
+
+- Upstash: managed Redis for dev/prod; we use it to back BullMQ queues and the cache without running our own Redis in cloud environments.
+- Why: Offload slow/CPU-bound or rate-limited work (weather ingest, alert fan-out, color extraction, moderation) from HTTP requests; retry with backoff; keep a dead-letter trail.
+- Components: BullMQ queues/workers using Redis; DLQ persisted to Postgres (`job_failures`); Redis cache for short-lived personalization payloads.
+- Local: `docker-compose up redis` then `npm run start:workers` (apps/api) to run workers. Redis defaults to `redis://localhost:6379` (see `.env.example`).
+- Cloud: Upstash Redis for dev/prod (`REDIS_URL`, `REDIS_TLS=true`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`); store real tokens in gitignored envs/Doppler.
+
 ### Common local flow (DX)
 
 1. Start app services: `npm run start:all` (API + web).
