@@ -200,6 +200,17 @@ model EngagementEvent {
   @@index([user_id])
 }
 
+model JobFailure {
+  id           String   @id @default(cuid())
+  queue_name   String
+  job_id       String
+  job_data     Json?
+  error_message String
+  failed_at    DateTime @default(now())
+  attempts     Int
+  created_at   DateTime @default(now())
+}
+
 model ModerationEvent {
   id              String        @id @default(cuid())
   post            LookbookPost? @relation(fields: [post_id], references: [id])
