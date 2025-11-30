@@ -25,10 +25,12 @@
     "@nestjs/common": "11.1.9",
     "@nestjs/core": "11.1.9",
     "@nestjs/platform-express": "11.1.9",
+    "@nestjs/schedule": "^6.0.1",
     "bullmq": "^5.65.0",
     "ioredis": "^5.8.2",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.2"
+    "rxjs": "7.8.2",
+    "testcontainers": "^11.9.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "2.1.4",
