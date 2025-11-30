@@ -1,5 +1,9 @@
 import { Controller, Get, Query, HttpException, HttpStatus } from '@nestjs/common'
-import type { AdminService } from './admin.service'
+import { AdminService } from './admin.service'
+
+// Touch the import to avoid it being treated as type-only
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const __adminServiceRef = AdminService
 
 @Controller('api/v1/admin')
 export class AdminController {

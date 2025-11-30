@@ -1,6 +1,6 @@
 # Story 0.4: Configure Redis (Upstash) and BullMQ queues
 
-Status: review
+Status: done
 
 ## Story
 
@@ -225,6 +225,8 @@ packages/db/prisma/schema.prisma  # Add job_failures table
 - Pending: Upstash creation, CI testcontainers wiring, DLQ retention job, admin failed-jobs endpoint, cache invalidation triggers, load/concurrency tests
 - Split migrations: `job_failures` table isolated; separate migration for `ForecastSegment` index to keep history clean
 - CI: added Testcontainers Redis setup hooks for Vitest (starts/stops redis:7-alpine, sets REDIS_URL)
+- Admin: failed-jobs endpoint with retry; daily prune of job_failures older than 30 days
+- start:api now runs prisma generate (db:generate) before boot to avoid missing client in CI
 
 ### File List
 

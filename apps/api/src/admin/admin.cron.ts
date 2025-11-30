@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
-import type { AdminService } from './admin.service'
+
+import { AdminService } from './admin.service'
+// Keep runtime reference so import isn't treated as type-only
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const __adminServiceRef = AdminService
 
 @Injectable()
 export class AdminCron {
