@@ -223,6 +223,7 @@ packages/db/prisma/schema.prisma  # Add job_failures table
 - Added Prisma migration for job_failures; seeds/migrations applied locally
 - Added Redis cache service with TTL helpers; invalidation hooks and admin/DLQ endpoints deferred
 - Pending: Upstash creation, CI testcontainers wiring, DLQ retention job, admin failed-jobs endpoint, cache invalidation triggers, load/concurrency tests
+- Split migrations: `job_failures` table isolated; separate migration for `ForecastSegment` index to keep history clean
 
 ### File List
 

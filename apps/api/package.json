@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:integration": "vitest run integration/**/*.spec.ts",
-    "start:workers": "ts-node src/workers/bootstrap.ts"
+    "start:workers": "tsx src/workers/bootstrap.ts",
+    "start:workers:prod": "node dist/workers/bootstrap.js"
   },
   "dependencies": {
     "@nestjs/common": "11.1.9",

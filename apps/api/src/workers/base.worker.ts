@@ -1,9 +1,7 @@
 import { Worker } from 'bullmq'
 import type { WorkerOptions, JobsOptions, Job } from 'bullmq'
-import { PrismaClient } from '@prisma/client'
 import { getRedisConfig, redisOptionsFromConfig } from '../config/redis'
-
-const prisma = new PrismaClient()
+import { getPrismaClient } from './prisma'
 
 export type WorkerFactory = (queueName: string, opts: WorkerOptions) => Worker
 
@@ -12,6 +10,7 @@ export function createWorker(
   processor: (job: Job) => Promise<void>,
   options: WorkerOptions
 ) {
+  const prisma = getPrismaClient()
   const worker = new Worker(queueName, processor, options)
 
   worker.on('failed', (job, err) => {

@@ -209,6 +209,10 @@ model JobFailure {
   failed_at    DateTime @default(now())
   attempts     Int
   created_at   DateTime @default(now())
+
+  @@index([queue_name])
+  @@index([failed_at])
+  @@index([job_id, queue_name])
 }
 
 model ModerationEvent {

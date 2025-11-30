@@ -2,16 +2,28 @@ import Redis from 'ioredis'
 import { getRedisConfig, redisOptionsFromConfig } from '../config/redis'
 
 export class CacheService {
-  private client: Redis
+  private static client: Redis | null = null
 
-  constructor() {
-    const redisConfig = getRedisConfig()
-    this.client = new Redis(redisOptionsFromConfig(redisConfig))
+  private get client(): Redis {
+    if (!CacheService.client) {
+      const redisConfig = getRedisConfig()
+      CacheService.client = new Redis(
+        redisConfig.url,
+        redisOptionsFromConfig(redisConfig)
+      )
+    }
+    return CacheService.client
   }
 
   async get<T>(key: string): Promise<T | null> {
     const value = await this.client.get(key)
-    return value ? (JSON.parse(value) as T) : null
+    if (!value) return null
+    try {
+      return JSON.parse(value) as T
+    } catch (err) {
+      console.error(`Failed to parse cached value for key "${key}":`, err)
+      return null
+    }
   }
 
   async set<T>(key: string, value: T, ttlSeconds = 60): Promise<void> {
@@ -28,6 +40,9 @@ export class CacheService {
   }
 
   async disconnect(): Promise<void> {
-    await this.client.quit()
+    if (CacheService.client) {
+      await CacheService.client.quit()
+      CacheService.client = null
+    }
   }
 }

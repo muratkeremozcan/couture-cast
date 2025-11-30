@@ -16,15 +16,6 @@ export function redisOptionsFromConfig(config: RedisConfig): RedisOptions {
     maxRetriesPerRequest: null,
   }
 
-  if (config.url.startsWith('redis://')) {
-    const [, hostPort] = config.url.split('redis://')
-    if (hostPort) {
-      const [host, port] = hostPort.split(':')
-      options.host = host
-      options.port = port ? Number(port) : 6379
-    }
-  }
-
   if (config.tls) {
     options.tls = {}
   }

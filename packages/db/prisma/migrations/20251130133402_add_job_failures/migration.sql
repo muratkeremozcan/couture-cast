@@ -11,6 +11,3 @@ CREATE TABLE "JobFailure" (
 
     CONSTRAINT "JobFailure_pkey" PRIMARY KEY ("id")
 );
-
--- CreateIndex
-CREATE INDEX "ForecastSegment_weather_snapshot_id_idx" ON "ForecastSegment"("weather_snapshot_id");
