@@ -61,6 +61,7 @@ export class ConnectionManager {
       0
 
     if (attempt > this.maxRetries) {
+      this.retryCounts.delete(socket.id)
       this.logger.warn({ ...context, attempt, activatePolling: true }, 'socket_fallback')
       return { shouldRetry: false, attempt, activatePolling: true }
     }

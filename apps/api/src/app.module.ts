@@ -8,7 +8,8 @@ import { AdminService } from './admin/admin.service'
 import { AdminCron } from './admin/admin.cron'
 import { GatewayModule } from './modules/gateway/gateway.module'
 
-const websocketModules = process.env.NODE_ENV === 'test' ? [] : [GatewayModule]
+// Disable websockets by setting DISABLE_WEBSOCKETS=true (e.g., in specific tests)
+const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [GatewayModule]
 
 @Module({
   imports: [ScheduleModule.forRoot(), ...websocketModules],

@@ -31,6 +31,8 @@ describe('ConnectionManager', () => {
     const logger = pino({ level: 'silent' })
     const manager = new ConnectionManager(logger)
     const socket = baseSocket()
+    const retryCounts = (manager as unknown as { retryCounts: Map<string, number> })
+      .retryCounts
 
     manager.handleConnect(socket as Socket)
 
@@ -48,17 +50,19 @@ describe('ConnectionManager', () => {
     expect(attempt5).toMatchObject({ shouldRetry: true, delayMs: 9000, attempt: 5 })
     expect(attempt6.shouldRetry).toBe(false)
     expect(attempt6.activatePolling).toBe(true)
+    expect(retryCounts.has(socket.id)).toBe(false)
   })
 
   it('resets retry count on reconnect and logs structured fields', () => {
     const logger = pino({ level: 'silent' })
+    const infoSpy = vi.spyOn(logger, 'info')
     const manager = new ConnectionManager(logger)
     const socket = baseSocket()
 
     manager.handleDisconnect(socket as Socket)
     manager.handleConnect(socket as Socket)
 
-    expect(logger.info).toHaveBeenCalledWith(
+    expect(infoSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         requestId: 'req-abc',
         userId: 'user-42',
@@ -72,6 +76,7 @@ describe('ConnectionManager', () => {
 describe('EventsGateway lifecycle', () => {
   it('emits retry metadata and fallback events on disconnects', () => {
     const logger = pino({ level: 'silent' })
+    const warnSpy = vi.spyOn(logger, 'warn')
     const manager = new ConnectionManager(logger)
     const gateway = new EventsGateway(manager, logger)
     const socket = baseSocket()
@@ -99,5 +104,6 @@ describe('EventsGateway lifecycle', () => {
     expect(socket.emit).toHaveBeenCalledWith('connection:retry', fourth?.payload)
     expect(socket.emit).toHaveBeenCalledWith('connection:retry', fifth?.payload)
     expect(socket.emit).toHaveBeenCalledWith('connection:fallback', sixth?.payload)
+    expect(warnSpy).toHaveBeenCalled()
   })
 })

@@ -53,7 +53,7 @@ export default function RootLayout() {
 function RootLayoutNav() {
   /* eslint-disable @typescript-eslint/no-unsafe-assignment */
   const colorScheme = useColorScheme()
-  const theme: typeof DarkTheme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
+  const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
   return (
     <ThemeProvider value={theme}>
       <Stack>

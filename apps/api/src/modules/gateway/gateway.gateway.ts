@@ -110,8 +110,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   handleConnection(socket: Socket) {
-    const context = this.connectionManager.handleConnect(socket)
-    this.logger.info({ ...context, event: 'connect' }, 'socket_connected')
+    this.connectionManager.handleConnect(socket)
   }
 
   handleDisconnect(socket: Socket) {
