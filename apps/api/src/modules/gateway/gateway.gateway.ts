@@ -1,11 +1,17 @@
-import type { Server, Socket, ExtendedError } from 'socket.io'
+import { Inject } from '@nestjs/common'
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets'
+import type { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets'
+import type { Logger } from 'pino'
+import pino from 'pino'
+import type { Server, Socket, ExtendedError } from 'socket.io'
+// Value import required so Nest can reflect the provider token
+import { ConnectionManager, type DisconnectResult } from './connection-manager.service'
 
 /**
  * Namespaces map to ADR-007 surface areas:
- * - lookbook → new posts
- * - ritual → ritual updates
- * - alert → weather alerts
+ * - lookbook -> new posts
+ * - ritual -> ritual updates
+ * - alert -> weather alerts
  */
 export const namespacePattern = /^\/(lookbook|ritual|alert)$/
 
@@ -16,6 +22,8 @@ type BuildGatewayOptionsArgs = {
 type MiddlewareFn = Parameters<Server['use']>[0]
 type ServerLike = { use: (fn: MiddlewareFn) => void }
 type TokenSocket = Omit<Socket, 'data'> & { data: Record<string, unknown> }
+
+export const GATEWAY_LOGGER = Symbol('GATEWAY_LOGGER')
 
 function parseCorsOrigin(origin?: string | string[]) {
   if (!origin) return true
@@ -75,12 +83,52 @@ export function createAuthMiddleware() {
   }
 }
 
+function emitDisconnectResult(socket: Socket, result: DisconnectResult) {
+  if (result.shouldRetry) {
+    const payload = { delayMs: result.delayMs, attempt: result.attempt }
+    socket.emit('connection:retry', payload)
+    return { event: 'connection:retry', payload }
+  }
+
+  const payload = { activatePolling: result.activatePolling, attempt: result.attempt }
+  socket.emit('connection:fallback', payload)
+  return { event: 'connection:fallback', payload }
+}
+
 @WebSocketGateway(buildGatewayOptions())
-export class EventsGateway {
+export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  constructor(
+    @Inject(ConnectionManager) private readonly connectionManager: ConnectionManager,
+    @Inject(GATEWAY_LOGGER) private readonly logger: Logger
+  ) {}
+
   @WebSocketServer()
   server!: Server
 
   afterInit(server: ServerLike) {
     server.use(createAuthMiddleware())
   }
+
+  handleConnection(socket: Socket) {
+    const context = this.connectionManager.handleConnect(socket)
+    this.logger.info({ ...context, event: 'connect' }, 'socket_connected')
+  }
+
+  handleDisconnect(socket: Socket) {
+    const result = this.connectionManager.handleDisconnect(socket)
+    this.logger.warn(
+      { attempt: result.attempt, namespace: socket.nsp?.name },
+      'socket_disconnected'
+    )
+    return emitDisconnectResult(socket, result)
+  }
+}
+
+export const gatewayLoggerProvider = {
+  provide: GATEWAY_LOGGER,
+  useFactory: () =>
+    pino({
+      name: 'gateway',
+      level: process.env.LOG_LEVEL ?? 'info',
+    }),
 }

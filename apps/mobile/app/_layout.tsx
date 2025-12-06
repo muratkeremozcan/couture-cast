@@ -6,7 +6,7 @@ import * as SplashScreen from 'expo-splash-screen'
 import { useEffect } from 'react'
 import 'react-native-reanimated'
 
-import { useColorScheme } from '@/components/use-color-scheme'
+import { useColorScheme } from 'react-native'
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -22,15 +22,20 @@ export const unstable_settings = {
 void SplashScreen.preventAutoHideAsync()
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
+  type FontLoadTuple = readonly [boolean, Error | null]
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+  // Expo's types return an untyped tuple; narrow locally to satisfy type-aware linting.
+  const fontLoadResult = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
-  })
+  }) as unknown as FontLoadTuple
+  const [loaded, fontError]: FontLoadTuple = fontLoadResult
+  /* eslint-enable @typescript-eslint/no-unsafe-assignment */
 
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
-    if (error) throw error
-  }, [error])
+    if (fontError) throw fontError
+  }, [fontError])
 
   useEffect(() => {
     if (loaded) {
@@ -46,14 +51,16 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment */
   const colorScheme = useColorScheme()
-
+  const theme: typeof DarkTheme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={theme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   )
+  /* eslint-enable @typescript-eslint/no-unsafe-assignment */
 }

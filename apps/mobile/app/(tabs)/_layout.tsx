@@ -1,10 +1,9 @@
 import React from 'react'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { Link, Tabs } from 'expo-router'
-import { Pressable } from 'react-native'
+import { Pressable, useColorScheme } from 'react-native'
 
 import Colors from '@/constants/colors'
-import { useColorScheme } from '@/components/use-color-scheme'
 import { useClientOnlyValue } from '@/components/use-client-only-value'
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
@@ -17,11 +16,12 @@ function TabBarIcon(props: {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme()
+  const palette = colorScheme === 'dark' ? Colors.dark : Colors.light
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: palette.tint,
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
         headerShown: useClientOnlyValue(false, true),
@@ -31,7 +31,9 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          tabBarIcon: ({ color }: { color: string }) => (
+            <TabBarIcon name="code" color={color} />
+          ),
           headerRight: () => (
             <Link href="/modal" asChild>
               <Pressable>
@@ -39,7 +41,7 @@ export default function TabLayout() {
                   <FontAwesome
                     name="info-circle"
                     size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
+                    color={palette.text}
                     style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
                   />
                 )}
@@ -52,7 +54,9 @@ export default function TabLayout() {
         name="two"
         options={{
           title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          tabBarIcon: ({ color }: { color: string }) => (
+            <TabBarIcon name="code" color={color} />
+          ),
         }}
       />
     </Tabs>

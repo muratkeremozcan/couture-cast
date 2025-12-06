@@ -28,7 +28,7 @@ test.describe('Web smoke', () => {
 
     await page.addScriptTag({ path: require.resolve('axe-core') })
 
-    const accessibilityScan = (await page.evaluate(async () => {
+    const accessibilityScan = await page.evaluate<AxeResults>(async () => {
       const axeInstance = (window as typeof window & { axe: typeof axe }).axe
       return axeInstance.run(document.body, {
         runOnly: {
@@ -36,7 +36,7 @@ test.describe('Web smoke', () => {
           values: ['wcag2a', 'wcag2aa'],
         },
       })
-    })) as AxeResults
+    })
 
     expect(accessibilityScan.violations, 'axe accessibility violations').toEqual([])
   })

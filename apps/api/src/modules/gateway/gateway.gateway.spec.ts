@@ -1,6 +1,8 @@
+import pino from 'pino'
 import { describe, expect, it, vi } from 'vitest'
 import type { Server, Socket } from 'socket.io'
 
+import { ConnectionManager } from './connection-manager.service'
 import {
   EventsGateway,
   buildGatewayOptions,
@@ -66,13 +68,16 @@ describe('auth middleware', () => {
 
 describe('EventsGateway', () => {
   it('registers auth middleware on init', () => {
-    const gateway = new EventsGateway()
+    const logger = pino({ level: 'silent' })
+    const manager = new ConnectionManager(logger)
+    const gateway = new EventsGateway(manager, logger)
     const middlewareCalls: Parameters<Server['use']>[0][] = []
     const server = {
       use(fn: Parameters<Server['use']>[0]) {
         middlewareCalls.push(fn)
+        return this as unknown as Server
       },
-    }
+    } as unknown as Server
 
     gateway.afterInit(server)
 

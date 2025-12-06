@@ -22,6 +22,8 @@ module.exports = {
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
+    'plugin:@typescript-eslint/recommended-requiring-type-checking',
+    'plugin:@typescript-eslint/stylistic',
     'plugin:import/typescript',
     'plugin:import/recommended',
     'plugin:prettier/recommended',
@@ -30,6 +32,7 @@ module.exports = {
   rules: {
     '@typescript-eslint/consistent-type-imports': 'error',
     '@typescript-eslint/consistent-type-exports': 'error',
+    '@typescript-eslint/consistent-type-definitions': 'off',
     '@typescript-eslint/await-thenable': 'error',
     '@typescript-eslint/no-floating-promises': 'error',
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],

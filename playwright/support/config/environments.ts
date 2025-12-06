@@ -109,19 +109,23 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
   },
 }
 
+function isEnvironmentName(value: string): value is EnvironmentName {
+  return (value as EnvironmentName) in environmentConfigs
+}
+
 export function resolveEnvironmentConfig(value?: string): EnvironmentConfig {
   const fallback = (process.env.TEST_ENV ?? 'local').toLowerCase()
-  const normalized = (value ?? fallback) as EnvironmentName
+  const normalized = (value ?? fallback).toLowerCase()
 
-  if (!(normalized in environmentConfigs)) {
+  if (!isEnvironmentName(normalized)) {
     const supported = Object.keys(environmentConfigs).join(', ')
     throw new Error(`Unknown TEST_ENV "${value}". Supported options: ${supported}`)
   }
 
-  const config = environmentConfigs[normalized as EnvironmentName]
+  const config = environmentConfigs[normalized]
 
   return {
-    name: normalized as EnvironmentName,
+    name: normalized,
     ...config,
   }
 }

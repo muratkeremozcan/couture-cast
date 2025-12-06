@@ -26,6 +26,14 @@ so that users receive weather alerts and community updates instantly via Socket.
   - [x] Set up CORS and authentication middleware for Socket.io connections
   - [x] Document namespace purposes in code comments
 
+- [x] Task 2: Implement connection lifecycle (AC: #2)
+  - [x] Create `ConnectionManager` service to handle client connections
+  - [x] Implement `@OnConnect` and `@OnDisconnect` handlers
+  - [x] Add reconnection logic with exponential backoff (1s, 3s, 9s intervals)
+  - [x] Set max retry limit to 5 attempts
+  - [x] Log connection events to Pino logger with structured format (requestId, userId, namespace)
+  - [x] Create integration test for connection lifecycle in `apps/api/src/modules/gateway/gateway.test.ts`
+
 - [ ] Task 2: Implement connection lifecycle (AC: #2)
   - [ ] Create `ConnectionManager` service to handle client connections
   - [ ] Implement `@OnConnect` and `@OnDisconnect` handlers
@@ -274,15 +282,20 @@ packages/api-client/src/types/
 
 - 2025-12-06: `npm test --workspaces --if-present` (vitest) — added gateway TDD coverage for Socket.io options/auth middleware
 - 2025-12-06: `npm run lint:fix` → lint clean; `npm run typecheck` → tsc clean (gateway spec/types)
+- 2025-12-06: `npm test --workspaces --if-present` (vitest) — connection lifecycle retries/fallback integration
+- 2025-12-06: `npm run lint -- --max-warnings=0`; `npm run typecheck` — clean after connection manager + gateway lifecycle
 
 ### Completion Notes List
 
 - Task 1: Scaffolded gateway module with ADR-007 namespaces, CORS + auth middleware, and coverage for options/auth wiring
+- Task 2: Added ConnectionManager with backoff (1s/3s/9s, max 5), Pino-structured logging, connect/disconnect handlers, retry/fallback emits, and integration coverage
 
 ### File List
 
 - apps/api/package.json
 - apps/api/src/app.module.ts
+- apps/api/src/modules/gateway/connection-manager.service.ts
+- apps/api/src/modules/gateway/gateway.test.ts
 - apps/api/src/modules/gateway/gateway.gateway.spec.ts
 - apps/api/src/modules/gateway/gateway.gateway.ts
 - apps/api/src/modules/gateway/gateway.module.ts
@@ -294,5 +307,6 @@ packages/api-client/src/types/
 
 | Date | Author | Change |
 | ---- | ------ | ------ |
+| 2025-12-06 | Amelia (Dev Agent) | Task 2: connection lifecycle (ConnectionManager, backoff, retry/fallback emits, Pino logging, integration tests) |
 | 2025-12-06 | Amelia (Dev Agent) | Task 1: gateway module scaffolding with ADR-007 namespaces, CORS/auth middleware, and vitest coverage |
 | 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.5 acceptance criteria |

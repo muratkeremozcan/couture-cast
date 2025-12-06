@@ -35,10 +35,10 @@ type NetworkFixture = {
 
 export const test = base.extend<NetworkFixture>({
   network: async ({ page }, use) => {
-    const registeredRoutes: Array<{
+    const registeredRoutes: {
       matcher: RouteMatcher
       handler: Parameters<typeof page.route>[1]
-    }> = []
+    }[] = []
 
     const methodsMatch = (incoming: string, filter?: HttpMethod) => {
       if (!filter) {

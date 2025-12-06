@@ -22,6 +22,7 @@
     "noFallthroughCasesInSwitch": false
   },
   "extends": "../../tsconfig.json",
+  "include": ["src/**/*.ts"],
   "ts-node": {
     "esm": true
   }

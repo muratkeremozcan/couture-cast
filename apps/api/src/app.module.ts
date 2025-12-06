@@ -8,8 +8,10 @@ import { AdminService } from './admin/admin.service'
 import { AdminCron } from './admin/admin.cron'
 import { GatewayModule } from './modules/gateway/gateway.module'
 
+const websocketModules = process.env.NODE_ENV === 'test' ? [] : [GatewayModule]
+
 @Module({
-  imports: [ScheduleModule.forRoot(), GatewayModule],
+  imports: [ScheduleModule.forRoot(), ...websocketModules],
   controllers: [AppController, HealthController, AdminController],
   providers: [AppService, AdminService, AdminCron],
 })
