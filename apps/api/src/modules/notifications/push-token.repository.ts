@@ -3,14 +3,30 @@ import { PrismaClient, type PushToken } from '@prisma/client'
 
 @Injectable()
 export class PushTokenRepository {
-  private readonly prisma = new PrismaClient()
+  constructor(private readonly prisma: PrismaClient) {}
 
   async saveToken(userId: string, token: string, platform?: string): Promise<PushToken> {
+    const normalizedUserId = userId.trim()
+    const normalizedToken = token.trim()
+
+    if (!normalizedUserId) throw new Error('userId is required')
+    if (!normalizedToken) throw new Error('token is required')
+
+    const normalizedPlatform = this.normalizePlatform(platform)
     const now = new Date()
     const record = await this.prisma.pushToken.upsert({
-      where: { token },
-      update: { user_id: userId, platform, last_used_at: now },
-      create: { user_id: userId, token, platform, last_used_at: now },
+      where: { token: normalizedToken },
+      update: {
+        user_id: normalizedUserId,
+        platform: normalizedPlatform,
+        last_used_at: now,
+      },
+      create: {
+        user_id: normalizedUserId,
+        token: normalizedToken,
+        platform: normalizedPlatform,
+        last_used_at: now,
+      },
     })
     return record
   }
@@ -21,5 +37,10 @@ export class PushTokenRepository {
       where: { user_id: { in: userIds } },
     })
     return records
+  }
+
+  private normalizePlatform(platform?: string): string | null {
+    const value = platform?.trim()
+    return value && value.length > 0 ? value : null
   }
 }

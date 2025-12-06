@@ -55,7 +55,7 @@ describe('PushNotificationService', () => {
 
     await expect(
       service.registerPushToken('user-1', 'not-an-expo-token', 'ios')
-    ).rejects.toThrow('Invalid Expo push token')
+    ).rejects.toThrow(/Invalid Expo push token/)
 
     expect(repo.tokens.size).toBe(0)
   })

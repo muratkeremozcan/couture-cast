@@ -1,10 +1,11 @@
-import { Inject, Injectable, Optional } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { Expo, type ExpoPushMessage, type ExpoPushTicket } from 'expo-server-sdk'
 
 import { PushTokenRepository } from './push-token.repository'
 
 type ExpoClient = Pick<Expo, 'sendPushNotificationsAsync'>
 export const EXPO_CLIENT = Symbol('EXPO_CLIENT')
+const EXPO_BATCH_SIZE = 100 // Expo docs: max 100 push tickets per request
 
 export type NotificationDispatchResult = {
   tickets: ExpoPushTicket[]
@@ -18,14 +19,16 @@ export class PushNotificationService {
 
   constructor(
     private readonly pushTokenRepository: PushTokenRepository,
-    @Optional() @Inject(EXPO_CLIENT) expoClient?: ExpoClient
+    @Inject(EXPO_CLIENT) expoClient: ExpoClient
   ) {
-    this.expo = expoClient ?? new Expo({ accessToken: process.env.EXPO_ACCESS_TOKEN })
+    this.expo = expoClient
   }
 
   async registerPushToken(userId: string, token: string, platform?: string) {
     if (!Expo.isExpoPushToken(token)) {
-      throw new Error('Invalid Expo push token')
+      throw new Error(
+        'Invalid Expo push token: expected format ExpoPushToken[xxxxxxxxxxxxxxxxxxxxxx]. See https://docs.expo.dev/push-notifications/overview/.'
+      )
     }
 
     const saved = await this.pushTokenRepository.saveToken(userId, token, platform)
@@ -36,8 +39,8 @@ export class PushNotificationService {
     messages: ExpoPushMessage[]
   ): Promise<NotificationDispatchResult> {
     const batches: ExpoPushMessage[][] = []
-    for (let i = 0; i < messages.length; i += 100) {
-      batches.push(messages.slice(i, i + 100))
+    for (let i = 0; i < messages.length; i += EXPO_BATCH_SIZE) {
+      batches.push(messages.slice(i, i + EXPO_BATCH_SIZE))
     }
 
     const invalidTokens: string[] = []
