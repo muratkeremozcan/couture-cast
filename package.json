@@ -54,6 +54,7 @@
     "@couture/eslint-config": "workspace:*",
     "@faker-js/faker": "10.1.0",
     "@playwright/test": "1.56.1",
+    "@seontechnologies/playwright-utils": "^3.10.1",
     "@types/lodash.merge": "4.6.9",
     "@types/node": "22.9.3",
     "@types/picomatch": "4.0.2",
