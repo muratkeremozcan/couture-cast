@@ -27,11 +27,8 @@ const mockPushTokens: PushToken[] = [
 const createRepository = () => {
   const findMany = vi.fn().mockResolvedValue(mockPushTokens)
   const upsert = vi.fn().mockResolvedValue(mockPushTokens[0])
-  const prisma = { pushToken: { findMany, upsert } } satisfies Pick<
-    PrismaClient,
-    'pushToken'
-  >
-  return { repo: new PushTokenRepository(prisma as PrismaClient), findMany, upsert }
+  const prisma = { pushToken: { findMany, upsert } } as unknown as PrismaClient
+  return { repo: new PushTokenRepository(prisma), findMany, upsert }
 }
 
 describe('PushTokenRepository', () => {
