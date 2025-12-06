@@ -1,6 +1,6 @@
 # Story 0.5: Initialize Socket.io gateway and Expo Push API
 
-Status: drafted
+Status: in-progress
 
 ## Story
 
@@ -18,13 +18,13 @@ so that users receive weather alerts and community updates instantly via Socket.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Configure Socket.io server in NestJS (AC: #1)
-  - [ ] Install Socket.io dependencies: `npm install @nestjs/platform-socket.io socket.io --workspace apps/api`
-  - [ ] Create `apps/api/src/modules/gateway/` directory structure
-  - [ ] Implement `GatewayModule` with Socket.io server configuration
-  - [ ] Configure namespace strategy per ADR-007: `lookbook:new`, `ritual:update`, `alert:weather`
-  - [ ] Set up CORS and authentication middleware for Socket.io connections
-  - [ ] Document namespace purposes in code comments
+- [x] Task 1: Configure Socket.io server in NestJS (AC: #1)
+  - [x] Install Socket.io dependencies: `npm install @nestjs/platform-socket.io socket.io --workspace apps/api`
+  - [x] Create `apps/api/src/modules/gateway/` directory structure
+  - [x] Implement `GatewayModule` with Socket.io server configuration
+  - [x] Configure namespace strategy per ADR-007: `lookbook:new`, `ritual:update`, `alert:weather`
+  - [x] Set up CORS and authentication middleware for Socket.io connections
+  - [x] Document namespace purposes in code comments
 
 - [ ] Task 2: Implement connection lifecycle (AC: #2)
   - [ ] Create `ConnectionManager` service to handle client connections
@@ -272,18 +272,27 @@ packages/api-client/src/types/
 
 ### Debug Log References
 
-<!-- Will be filled by dev agent during implementation -->
+- 2025-12-06: `npm test --workspaces --if-present` (vitest) — added gateway TDD coverage for Socket.io options/auth middleware
+- 2025-12-06: `npm run lint:fix` → lint clean; `npm run typecheck` → tsc clean (gateway spec/types)
 
 ### Completion Notes List
 
-<!-- Will be filled by dev agent upon completion -->
+- Task 1: Scaffolded gateway module with ADR-007 namespaces, CORS + auth middleware, and coverage for options/auth wiring
 
 ### File List
 
-<!-- Will be filled by dev agent with NEW/MODIFIED/DELETED files -->
+- apps/api/package.json
+- apps/api/src/app.module.ts
+- apps/api/src/modules/gateway/gateway.gateway.spec.ts
+- apps/api/src/modules/gateway/gateway.gateway.ts
+- apps/api/src/modules/gateway/gateway.module.ts
+- docs/sprint-artifacts/0-5-initialize-socketio-gateway-and-expo-push-api.md
+- docs/sprint-artifacts/sprint-status.yaml
+- package-lock.json
 
 ## Change Log
 
 | Date | Author | Change |
 | ---- | ------ | ------ |
+| 2025-12-06 | Amelia (Dev Agent) | Task 1: gateway module scaffolding with ADR-007 namespaces, CORS/auth middleware, and vitest coverage |
 | 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.5 acceptance criteria |

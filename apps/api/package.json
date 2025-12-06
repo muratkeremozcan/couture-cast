@@ -25,11 +25,14 @@
     "@nestjs/common": "11.1.9",
     "@nestjs/core": "11.1.9",
     "@nestjs/platform-express": "11.1.9",
+    "@nestjs/platform-socket.io": "^11.1.9",
     "@nestjs/schedule": "^6.0.1",
+    "@nestjs/websockets": "^11.1.9",
     "bullmq": "^5.65.0",
     "ioredis": "^5.8.2",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
+    "socket.io": "^4.8.1",
     "testcontainers": "^11.9.0"
   },
   "devDependencies": {

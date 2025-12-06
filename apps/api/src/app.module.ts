@@ -6,9 +6,10 @@ import { HealthController } from './controllers/health.controller'
 import { AdminController } from './admin/admin.controller'
 import { AdminService } from './admin/admin.service'
 import { AdminCron } from './admin/admin.cron'
+import { GatewayModule } from './modules/gateway/gateway.module'
 
 @Module({
-  imports: [ScheduleModule.forRoot()],
+  imports: [ScheduleModule.forRoot(), GatewayModule],
   controllers: [AppController, HealthController, AdminController],
   providers: [AppService, AdminService, AdminCron],
 })
