@@ -3,7 +3,7 @@ import { PrismaClient, type PushToken } from '@prisma/client'
 
 @Injectable()
 export class PushTokenRepository {
-  constructor(private readonly prisma: PrismaClient = new PrismaClient()) {}
+  private readonly prisma = new PrismaClient()
 
   async saveToken(userId: string, token: string, platform?: string): Promise<PushToken> {
     const now = new Date()

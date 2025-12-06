@@ -67,6 +67,7 @@ so that users receive weather alerts and community updates instantly via Socket.
   - [x] Unit tests for `ConnectionManager`: connect, disconnect, retry logic
   - [x] Unit tests for `PushNotificationService`: token registration, batch dispatch, error handling
   - [x] Integration test for Socket.io gateway: namespace routing, authentication
+  - [ ] Incorporate @seontechnologies/playwright-utils to our e2e tests so far, and keep using it in the future.
   - [ ] Integration test for fallback mechanism: disconnect → polling → reconnect
   - [ ] Mock Expo Push API responses in tests
 

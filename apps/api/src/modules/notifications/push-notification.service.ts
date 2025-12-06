@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable, Optional } from '@nestjs/common'
 import { Expo, type ExpoPushMessage, type ExpoPushTicket } from 'expo-server-sdk'
 
 import { PushTokenRepository } from './push-token.repository'
 
 type ExpoClient = Pick<Expo, 'sendPushNotificationsAsync'>
+export const EXPO_CLIENT = Symbol('EXPO_CLIENT')
 
 export type NotificationDispatchResult = {
   tickets: ExpoPushTicket[]
@@ -17,7 +18,7 @@ export class PushNotificationService {
 
   constructor(
     private readonly pushTokenRepository: PushTokenRepository,
-    expoClient?: ExpoClient
+    @Optional() @Inject(EXPO_CLIENT) expoClient?: ExpoClient
   ) {
     this.expo = expoClient ?? new Expo({ accessToken: process.env.EXPO_ACCESS_TOKEN })
   }
