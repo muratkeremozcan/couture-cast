@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process'
 import path from 'node:path'
 
-export default async function globalTeardown() {
+export default function globalTeardown() {
   const env = { ...process.env }
   // Allow local Postgres path if available (non-fatal if missing)
   const postgresPaths = [
@@ -34,6 +34,17 @@ export default async function globalTeardown() {
   }
 
   if (resetError) {
-    throw resetError
+    if (resetError instanceof Error) {
+      throw resetError
+    }
+    const serialized = (() => {
+      try {
+        return JSON.stringify(resetError)
+      } catch {
+        if (typeof resetError === 'string') return resetError
+        return '[unserializable error]'
+      }
+    })()
+    throw new Error(`Global teardown failed: ${serialized}`)
   }
 }
