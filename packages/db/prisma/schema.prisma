@@ -51,6 +51,7 @@ model User {
   teen_roles         GuardianConsent[]      @relation("TeenRole")
   moderation_flags   ModerationEvent[]      @relation("FlaggedByRelation")
   moderation_reviews ModerationEvent[]      @relation("ReviewedByRelation")
+  push_tokens        PushToken[]
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -196,6 +197,19 @@ model EngagementEvent {
   post_id    String
   event_type String
   created_at DateTime     @default(now())
+
+  @@index([user_id])
+}
+
+model PushToken {
+  id           String    @id @default(cuid())
+  user         User      @relation(fields: [user_id], references: [id])
+  user_id      String
+  token        String    @unique
+  platform     String?
+  last_used_at DateTime  @default(now())
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
 
   @@index([user_id])
 }

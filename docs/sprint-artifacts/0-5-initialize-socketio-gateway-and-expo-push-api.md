@@ -34,22 +34,14 @@ so that users receive weather alerts and community updates instantly via Socket.
   - [x] Log connection events to Pino logger with structured format (requestId, userId, namespace)
   - [x] Create integration test for connection lifecycle in `apps/api/src/modules/gateway/gateway.test.ts`
 
-- [ ] Task 2: Implement connection lifecycle (AC: #2)
-  - [ ] Create `ConnectionManager` service to handle client connections
-  - [ ] Implement `@OnConnect` and `@OnDisconnect` handlers
-  - [ ] Add reconnection logic with exponential backoff (1s, 3s, 9s intervals)
-  - [ ] Set max retry limit to 5 attempts
-  - [ ] Log connection events to Pino logger with structured format (requestId, userId, namespace)
-  - [ ] Create integration test for connection lifecycle in `apps/api/src/modules/gateway/gateway.test.ts`
-
-- [ ] Task 3: Set up Expo Push API (AC: #3)
-  - [ ] Install Expo SDK: `npm install expo-server-sdk --workspace apps/api`
-  - [ ] Create `apps/api/src/modules/notifications/` directory
-  - [ ] Implement `PushNotificationService` with Expo Push token registration
-  - [ ] Add batch notification dispatch method (handle up to 100 notifications per batch per Expo limits)
-  - [ ] Configure Expo Access Token in environment variables (EXPO_ACCESS_TOKEN)
-  - [ ] Implement error handling for invalid push tokens and rate limits
-  - [ ] Create `PushTokenRepository` to store user push tokens in Postgres
+- [x] Task 3: Set up Expo Push API (AC: #3)
+  - [x] Install Expo SDK: `npm install expo-server-sdk --workspace apps/api`
+  - [x] Create `apps/api/src/modules/notifications/` directory
+  - [x] Implement `PushNotificationService` with Expo Push token registration
+  - [x] Add batch notification dispatch method (handle up to 100 notifications per batch per Expo limits)
+  - [x] Configure Expo Access Token in environment variables (EXPO_ACCESS_TOKEN)
+  - [x] Implement error handling for invalid push tokens and rate limits
+  - [x] Create `PushTokenRepository` to store user push tokens in Postgres
 
 - [ ] Task 4: Create shared payload schema (AC: #4)
   - [ ] Create `packages/api-client/src/types/socket-events.ts` for event type definitions
@@ -72,9 +64,10 @@ so that users receive weather alerts and community updates instantly via Socket.
   - [ ] Test disconnect/reconnect scenarios in E2E tests
 
 - [ ] Task 6: Create unit and integration tests
-  - [ ] Unit tests for `ConnectionManager`: connect, disconnect, retry logic
-  - [ ] Unit tests for `PushNotificationService`: token registration, batch dispatch, error handling
-  - [ ] Integration test for Socket.io gateway: namespace routing, authentication
+  - [x] Unit tests for `ConnectionManager`: connect, disconnect, retry logic
+  - [x] Unit tests for `PushNotificationService`: token registration, batch dispatch, error handling
+  - [x] Integration test for Socket.io gateway: namespace routing, authentication
+  - [ ] Incorporate @seontechnologies/playwright-utils to our e2e tests so far, and keep using it in the future.
   - [ ] Integration test for fallback mechanism: disconnect → polling → reconnect
   - [ ] Mock Expo Push API responses in tests
 
@@ -284,11 +277,14 @@ packages/api-client/src/types/
 - 2025-12-06: `npm run lint:fix` → lint clean; `npm run typecheck` → tsc clean (gateway spec/types)
 - 2025-12-06: `npm test --workspaces --if-present` (vitest) — connection lifecycle retries/fallback integration
 - 2025-12-06: `npm run lint -- --max-warnings=0`; `npm run typecheck` — clean after connection manager + gateway lifecycle
+- 2025-12-06: `npm run test --workspaces --if-present` (vitest) — push notification batching, invalid token handling, repo registration
 
 ### Completion Notes List
 
 - Task 1: Scaffolded gateway module with ADR-007 namespaces, CORS + auth middleware, and coverage for options/auth wiring
 - Task 2: Added ConnectionManager with backoff (1s/3s/9s, max 5), Pino-structured logging, connect/disconnect handlers, retry/fallback emits, and integration coverage
+- Task 3: Added Expo push notifications module with token registration, Prisma-backed token repository, 100-message batching with error handling, and unit coverage
+- Secrets: EXPO_ACCESS_TOKEN requirement documented; generation/rotation deferred to story 0-8 environment management
 
 ### File List
 
@@ -299,14 +295,21 @@ packages/api-client/src/types/
 - apps/api/src/modules/gateway/gateway.gateway.spec.ts
 - apps/api/src/modules/gateway/gateway.gateway.ts
 - apps/api/src/modules/gateway/gateway.module.ts
+- apps/api/src/modules/notifications/notifications.module.ts
+- apps/api/src/modules/notifications/notifications.test.ts
+- apps/api/src/modules/notifications/push-notification.service.ts
+- apps/api/src/modules/notifications/push-token.repository.ts
+- apps/api/vitest.config.ts
 - docs/sprint-artifacts/0-5-initialize-socketio-gateway-and-expo-push-api.md
 - docs/sprint-artifacts/sprint-status.yaml
 - package-lock.json
+- packages/db/prisma/schema.prisma
 
 ## Change Log
 
 | Date | Author | Change |
 | ---- | ------ | ------ |
+| 2025-12-06 | Amelia (Dev Agent) | Task 3: Expo push service + Prisma token repository + batching tests |
 | 2025-12-06 | Amelia (Dev Agent) | Task 2: connection lifecycle (ConnectionManager, backoff, retry/fallback emits, Pino logging, integration tests) |
 | 2025-12-06 | Amelia (Dev Agent) | Task 1: gateway module scaffolding with ADR-007 namespaces, CORS/auth middleware, and vitest coverage |
 | 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.5 acceptance criteria |

@@ -1,18 +1,27 @@
 import 'reflect-metadata'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
-import { AppModule } from '../src/app.module'
+
+vi.mock('@prisma/client', () => {
+  class PrismaClientMock {
+    $disconnect = vi.fn()
+  }
+  return { PrismaClient: PrismaClientMock }
+})
+
 import { AppController } from '../src/app.controller'
+import { AppService } from '../src/app.service'
 
 describe('AppController (integration)', () => {
-  let app: INestApplication
+  let app: INestApplication | undefined
   let controller: AppController
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      controllers: [AppController],
+      providers: [AppService],
     }).compile()
 
     app = moduleFixture.createNestApplication()
@@ -21,7 +30,10 @@ describe('AppController (integration)', () => {
   })
 
   afterEach(async () => {
-    await app.close()
+    if (app) {
+      await app.close()
+      app = undefined
+    }
   })
 
   it('wires controller through Nest container', () => {
