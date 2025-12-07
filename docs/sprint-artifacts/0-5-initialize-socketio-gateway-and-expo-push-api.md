@@ -1,6 +1,6 @@
 # Story 0.5: Initialize Socket.io gateway and Expo Push API
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -59,10 +59,10 @@ so that users receive weather alerts and community updates instantly via Socket.
   - [x] Implement Socket.io disconnect detection in client
   - [x] Add automatic polling activation (30-second interval) on disconnect
   - [x] Create REST endpoints for polling: `GET /api/v1/events/poll?since=<timestamp>`
-  - [x] Implement reconnection detection and automatic switch back to Socket.io stream
-  - [x] Add telemetry events for fallback activation/deactivation
-  - [x] Incorporate @seontechnologies/playwright-utils to our e2e tests so far (already installed), and keep using it in the future.
-  - [ ] Test disconnect/reconnect scenarios in E2E tests
+- [x] Implement reconnection detection and automatic switch back to Socket.io stream
+- [x] Add telemetry events for fallback activation/deactivation
+- [x] Incorporate @seontechnologies/playwright-utils to our e2e tests so far (already installed), and keep using it in the future.
+- [x] Test disconnect/reconnect scenarios in E2E tests
 
 - [x] Task 6: Create unit and integration tests
   - [x] Unit tests for `ConnectionManager`: connect, disconnect, retry logic
@@ -288,10 +288,13 @@ packages/api-client/src/types/
 - Task 3: Added Expo push notifications module with token registration, Prisma-backed token repository, 100-message batching with error handling, and unit coverage
 - Task 4: Added shared socket event types/schemas (base + namespaces), published via @couture/api-client, and documented in docs/api-events.md
 - Task 5: Added poll endpoint + repository/service backing, web/mobile fallback polling controllers with telemetry hooks, shared PollingService, and service/controller tests
+- Task 5: Added shared Prisma module to reuse PrismaClient across modules; streamlined Husky pre-commit to run lint-staged/full lint:fix
 - Secrets: EXPO_ACCESS_TOKEN requirement documented; generation/rotation deferred to story 0-8 environment management
 
 ### File List
 
+- .husky/pre-commit
+- package.json
 - apps/api/package.json
 - apps/api/src/app.module.ts
 - apps/api/src/modules/gateway/connection-manager.service.ts
@@ -310,6 +313,7 @@ packages/api-client/src/types/
 - apps/api/src/modules/events/events.repository.ts
 - apps/api/src/modules/events/events.service.ts
 - apps/api/src/modules/events/events.service.spec.ts
+- apps/api/src/prisma/prisma.module.ts
 - apps/api/vitest.config.ts
 - docs/bmm-architecture-20251110.md
 - docs/sprint-artifacts/0-5-initialize-socketio-gateway-and-expo-push-api.md
@@ -322,11 +326,13 @@ packages/api-client/src/types/
 - packages/api-client/src/index.ts
 - packages/api-client/src/realtime/polling-service.ts
 - packages/api-client/src/types/socket-events.ts
+- playwright/tsconfig.json
 
 ## Change Log
 
 | Date | Author | Change |
 | ---- | ------ | ------ |
+| 2025-12-07 | Amelia (Dev Agent) | Shared Prisma module for API modules; Husky hook simplified to lint-staged/full lint:fix |
 | 2025-12-07 | Amelia (Dev Agent) | Task 5: poll endpoint + repo/service, shared PollingService, web/mobile fallback controllers, and tests |
 | 2025-12-06 | Amelia (Dev Agent) | Task 4: shared socket event types/schemas + docs/api-events.md |
 | 2025-12-06 | Amelia (Dev Agent) | Task 3: Expo push service + Prisma token repository + batching tests |
