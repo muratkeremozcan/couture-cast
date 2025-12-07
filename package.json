@@ -93,6 +93,9 @@
     ],
     "*.{json,md}": [
       "prettier --write"
+    ],
+    "*": [
+      "sh -c \"npm run lint:fix\""
     ]
   },
   "dependencies": {
