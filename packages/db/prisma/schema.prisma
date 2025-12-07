@@ -202,27 +202,40 @@ model EngagementEvent {
 }
 
 model PushToken {
-  id           String    @id @default(cuid())
-  user         User      @relation(fields: [user_id], references: [id])
+  id           String   @id @default(cuid())
+  user         User     @relation(fields: [user_id], references: [id])
   user_id      String
-  token        String    @unique
+  token        String   @unique
   platform     String?
-  last_used_at DateTime  @default(now())
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
+  last_used_at DateTime @default(now())
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
 
   @@index([user_id])
 }
 
+model EventEnvelope {
+  id         String   @id @default(cuid())
+  channel    String
+  payload    Json
+  user_id    String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([channel])
+  @@index([created_at])
+  @@index([user_id])
+}
+
 model JobFailure {
-  id           String   @id @default(cuid())
-  queue_name   String
-  job_id       String
-  job_data     Json?
+  id            String   @id @default(cuid())
+  queue_name    String
+  job_id        String
+  job_data      Json?
   error_message String
-  failed_at    DateTime @default(now())
-  attempts     Int
-  created_at   DateTime @default(now())
+  failed_at     DateTime @default(now())
+  attempts      Int
+  created_at    DateTime @default(now())
 
   @@index([queue_name])
   @@index([failed_at])

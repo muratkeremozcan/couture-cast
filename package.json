@@ -30,6 +30,7 @@
     "mobile:device": "open -a \"Android Emulator\" || open -a Simulator || echo \"Launch your emulator manually\"",
     "start:all": "cross-env DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres npm-run-all2 --sequential supabase:start db:reset && npm-run-all2 --parallel start:api start:web",
     "test:pw-local": "cross-env TEST_ENV=local npx playwright test",
+    "test:pw-local-ui": "cross-env TEST_ENV=local npx playwright test --ui",
     "test:pw-dev": "cross-env TEST_ENV=dev npx playwright test",
     "test:pw-stage": "cross-env TEST_ENV=stage npx playwright test",
     "test:pw-prod": "cross-env TEST_ENV=prod npx playwright test",
@@ -92,6 +93,9 @@
     ],
     "*.{json,md}": [
       "prettier --write"
+    ],
+    "*": [
+      "sh -c \"npm run lint:fix\""
     ]
   },
   "dependencies": {

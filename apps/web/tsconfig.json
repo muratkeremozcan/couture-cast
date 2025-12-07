@@ -8,6 +8,11 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@couture/api-client": ["../../packages/api-client/src/index.ts"],
+      "@couture/api-client/*": ["../../packages/api-client/src/*"]
+    },
     "plugins": [
       {
         "name": "next"

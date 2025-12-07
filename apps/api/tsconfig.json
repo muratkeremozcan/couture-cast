@@ -22,7 +22,13 @@
     "noFallthroughCasesInSwitch": false
   },
   "extends": "../../tsconfig.json",
-  "include": ["src/**/*.ts", "integration/**/*.ts", "test/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "integration/**/*.ts",
+    "test/**/*.ts",
+    "vitest.config.ts",
+    "src/modules/events/**/*.spec.ts"
+  ],
   "ts-node": {
     "esm": true
   }

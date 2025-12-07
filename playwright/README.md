@@ -16,6 +16,12 @@ Updated: 2025-11-17 — Initial Playwright framework scaffolding for Story 13 (a
 4. `npm run test:pw-local` (automatically sets `TEST_ENV=local`)
 5. Use the other helpers—`npm run test:pw-dev`, `npm run test:pw-stage`, `npm run test:pw-prod`—when remote deployments are ready, or run `TEST_ENV=<env> npm run test:pw` directly to target a custom environment.
 
+Recent additions:
+
+- Playwright-utils fixtures are now merged into `support/fixtures/merged-fixtures.ts` (adds `interceptNetworkCall`, `recurse`, `log`, `networkRecorder`, etc.).
+- New realtime fallback check: `npm run test:pw-local -- playwright/tests/realtime-fallback.spec.ts` covers disconnect → polling → reconnect (P1).
+- Live poll endpoint check: set `LIVE_POLL_BASE_URL=https://<api-host>` (or rely on local webServer auto-start) and run `npx playwright test playwright/tests/realtime-poll-live.spec.ts`; the spec uses the default config (starts API/web for TEST_ENV=local) and skips automatically if the endpoint is unreachable.
+
 ## Directory layout
 
 ```

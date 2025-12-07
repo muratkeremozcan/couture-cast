@@ -143,4 +143,31 @@ describe('PushNotificationService', () => {
     expect(result.invalidTokens).toContain('ExponentPushToken[invalid]')
     expect(result.rateLimitedTokens).toContain('ExponentPushToken[rate]')
   })
+
+  it('handles mixed ok and error tickets with receipts', async () => {
+    const sendPushNotificationsAsync = vi.fn().mockImplementation(
+      (batch: ExpoPushMessage[]): Promise<ExpoPushTicket[]> =>
+        Promise.resolve(
+          batch.map((message, index) =>
+            index === 0
+              ? { status: 'ok', id: 'ticket-ok', to: message.to }
+              : {
+                  status: 'error',
+                  message: 'Device not registered',
+                  details: { error: 'DeviceNotRegistered' },
+                  to: message.to,
+                }
+          )
+        )
+    )
+    const { service } = createService({ expo: { sendPushNotificationsAsync } })
+
+    const result = await service.sendBatchNotifications([
+      { to: 'ExponentPushToken[ok]', body: 'Hello', sound: 'default' },
+      { to: 'ExponentPushToken[invalid]', body: 'Hello', sound: 'default' },
+    ])
+
+    expect(result.invalidTokens).toContain('ExponentPushToken[invalid]')
+    expect(result.tickets).toHaveLength(2)
+  })
 })
