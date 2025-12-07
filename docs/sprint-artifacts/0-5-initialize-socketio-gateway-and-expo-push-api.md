@@ -43,16 +43,16 @@ so that users receive weather alerts and community updates instantly via Socket.
   - [x] Implement error handling for invalid push tokens and rate limits
   - [x] Create `PushTokenRepository` to store user push tokens in Postgres
 
-- [ ] Task 4: Create shared payload schema (AC: #4)
-  - [ ] Create `packages/api-client/src/types/socket-events.ts` for event type definitions
-  - [ ] Define base event interface: `{ version: string; timestamp: ISO8601; userId: string; data: T }`
-  - [ ] Create specific event types for each namespace:
+- [x] Task 4: Create shared payload schema (AC: #4)
+  - [x] Create `packages/api-client/src/types/socket-events.ts` for event type definitions
+  - [x] Define base event interface: `{ version: string; timestamp: ISO8601; userId: string; data: T }`
+  - [x] Create specific event types for each namespace:
     - `LookbookNewEvent` (lookbook:new)
     - `RitualUpdateEvent` (ritual:update)
     - `AlertWeatherEvent` (alert:weather)
-  - [ ] Add Zod schemas for runtime validation
-  - [ ] Export types to be consumed by mobile and web apps
-  - [ ] Document event schema in `docs/api-events.md`
+  - [x] Add Zod schemas for runtime validation
+  - [x] Export types to be consumed by mobile and web apps
+  - [x] Document event schema in `docs/api-events.md`
 
 - [ ] Task 5: Implement connection fallback mechanism (AC: #5)
   - [ ] Create `PollingService` in web and mobile apps for fallback mode
@@ -278,12 +278,14 @@ packages/api-client/src/types/
 - 2025-12-06: `npm test --workspaces --if-present` (vitest) — connection lifecycle retries/fallback integration
 - 2025-12-06: `npm run lint -- --max-warnings=0`; `npm run typecheck` — clean after connection manager + gateway lifecycle
 - 2025-12-06: `npm run test --workspaces --if-present` (vitest) — push notification batching, invalid token handling, repo registration
+- 2025-12-06: `npm run test --workspaces --if-present` (vitest) — socket event schemas + repo validation tests
 
 ### Completion Notes List
 
 - Task 1: Scaffolded gateway module with ADR-007 namespaces, CORS + auth middleware, and coverage for options/auth wiring
 - Task 2: Added ConnectionManager with backoff (1s/3s/9s, max 5), Pino-structured logging, connect/disconnect handlers, retry/fallback emits, and integration coverage
 - Task 3: Added Expo push notifications module with token registration, Prisma-backed token repository, 100-message batching with error handling, and unit coverage
+- Task 4: Added shared socket event types/schemas (base + namespaces), published via @couture/api-client, and documented in docs/api-events.md
 - Secrets: EXPO_ACCESS_TOKEN requirement documented; generation/rotation deferred to story 0-8 environment management
 
 ### File List
@@ -299,16 +301,23 @@ packages/api-client/src/types/
 - apps/api/src/modules/notifications/notifications.test.ts
 - apps/api/src/modules/notifications/push-notification.service.ts
 - apps/api/src/modules/notifications/push-token.repository.ts
+- apps/api/src/modules/notifications/push-token.repository.spec.ts
 - apps/api/vitest.config.ts
 - docs/sprint-artifacts/0-5-initialize-socketio-gateway-and-expo-push-api.md
 - docs/sprint-artifacts/sprint-status.yaml
+- docs/api-events.md
 - package-lock.json
 - packages/db/prisma/schema.prisma
+- packages/api-client/package.json
+- packages/api-client/tsconfig.json
+- packages/api-client/src/index.ts
+- packages/api-client/src/types/socket-events.ts
 
 ## Change Log
 
 | Date | Author | Change |
 | ---- | ------ | ------ |
+| 2025-12-06 | Amelia (Dev Agent) | Task 4: shared socket event types/schemas + docs/api-events.md |
 | 2025-12-06 | Amelia (Dev Agent) | Task 3: Expo push service + Prisma token repository + batching tests |
 | 2025-12-06 | Amelia (Dev Agent) | Task 2: connection lifecycle (ConnectionManager, backoff, retry/fallback emits, Pino logging, integration tests) |
 | 2025-12-06 | Amelia (Dev Agent) | Task 1: gateway module scaffolding with ADR-007 namespaces, CORS/auth middleware, and vitest coverage |
