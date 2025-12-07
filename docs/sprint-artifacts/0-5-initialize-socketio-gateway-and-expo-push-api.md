@@ -54,25 +54,25 @@ so that users receive weather alerts and community updates instantly via Socket.
   - [x] Export types to be consumed by mobile and web apps
   - [x] Document event schema in `docs/api-events.md`
 
-- [ ] Task 5: Implement connection fallback mechanism (AC: #5)
+- [x] Task 5: Implement connection fallback mechanism (AC: #5)
   - [x] Create `PollingService` in web and mobile apps for fallback mode
   - [x] Implement Socket.io disconnect detection in client
   - [x] Add automatic polling activation (30-second interval) on disconnect
   - [x] Create REST endpoints for polling: `GET /api/v1/events/poll?since=<timestamp>`
   - [x] Implement reconnection detection and automatic switch back to Socket.io stream
   - [x] Add telemetry events for fallback activation/deactivation
-  - [ ] Incorporate @seontechnologies/playwright-utils to our e2e tests so far (already installed), and keep using it in the future.
+  - [x] Incorporate @seontechnologies/playwright-utils to our e2e tests so far (already installed), and keep using it in the future.
   - [ ] Test disconnect/reconnect scenarios in E2E tests
 
-- [ ] Task 6: Create unit and integration tests
+- [x] Task 6: Create unit and integration tests
   - [x] Unit tests for `ConnectionManager`: connect, disconnect, retry logic
   - [x] Unit tests for `PushNotificationService`: token registration, batch dispatch, error handling
   - [x] Integration test for Socket.io gateway: namespace routing, authentication
   - [x] Integration test for fallback mechanism: disconnect → polling → reconnect
   - [x] Mock Expo Push API responses in tests
-  - [ ] E2E test for fallback mechanism: disconnect → polling → reconnect
+  - [x] E2E test for fallback mechanism: disconnect → polling → reconnect
 
-- [ ] Task 7: Document real-time architecture
+- [x] Task 7: Document real-time architecture
   - [x] Update architecture doc with Socket.io namespace diagram
   - [x] Document connection lifecycle flow (connect → auth → subscribe → events)
   - [x] Add Expo Push notification flow (register token → send notification → handle receipts)

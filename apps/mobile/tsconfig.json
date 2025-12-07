@@ -3,7 +3,6 @@
   "compilerOptions": {
     "strict": true,
     "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
     "paths": {
       "@/*": ["./*"],
       "@couture/api-client": ["../../packages/api-client/src/index.ts"],
