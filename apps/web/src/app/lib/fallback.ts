@@ -1,5 +1,5 @@
-import { PollingService } from '../../../../../packages/api-client/src/realtime/polling-service'
-import type { BaseEvent } from '../../../../../packages/api-client/src/types/socket-events'
+import { PollingService } from '@couture/api-client/realtime/polling-service'
+import type { BaseEvent } from '@couture/api-client/types/socket-events'
 type MinimalSocket = { on: (event: string, callback: () => void) => void }
 
 type Telemetry = (event: string, payload?: Record<string, unknown>) => void

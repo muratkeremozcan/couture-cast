@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common'
 import { EventsRepository } from './events.repository'
+import { Logger } from '@nestjs/common'
 
 @Injectable()
 export class EventsService {
+  private readonly logger = new Logger(EventsService.name)
+
   constructor(private readonly repo: EventsRepository) {}
 
   async poll(since?: Date) {
@@ -23,7 +26,7 @@ export class EventsService {
       }
     } catch (error) {
       // Gracefully degrade if storage is unavailable; clients can still poll without breaking.
-      console.error('poll events failed', error)
+      this.logger.error('poll events failed', error as Error)
       return { events: [], nextSince: null }
     }
   }

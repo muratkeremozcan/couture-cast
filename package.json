@@ -96,7 +96,6 @@
     ]
   },
   "dependencies": {
-    "@nestjs/common": "^11.1.9",
     "@prisma/client": "6.19.0"
   }
 }

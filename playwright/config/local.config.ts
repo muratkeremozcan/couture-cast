@@ -8,7 +8,7 @@ import { resolveEnvironmentConfig } from '../support/config/environments'
 const repoRoot = path.resolve(__dirname, '..', '..')
 const environment = resolveEnvironmentConfig('local')
 
-// IMPORTANT:the setup for logging to files needs to be uniform between test files
+// IMPORTANT: the setup for logging to files needs to be uniform between test files
 // best place to put it is in a config file
 const SILENT = process.env.SILENT === 'true'
 const DISABLE_FILE_LOGS = process.env.DISABLE_FILE_LOGS === 'true' || SILENT

@@ -1,18 +1,12 @@
 import { Module } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+import { PrismaModule } from '../../prisma/prisma.module'
 import { EventsController } from './events.controller'
 import { EventsRepository } from './events.repository'
 import { EventsService } from './events.service'
 
 @Module({
+  imports: [PrismaModule],
   controllers: [EventsController],
-  providers: [
-    EventsRepository,
-    EventsService,
-    {
-      provide: PrismaClient,
-      useValue: new PrismaClient(),
-    },
-  ],
+  providers: [EventsRepository, EventsService],
 })
 export class EventsModule {}

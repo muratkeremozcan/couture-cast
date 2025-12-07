@@ -7,8 +7,11 @@
     "noImplicitReturns": true,
     "declaration": false,
     "declarationMap": false,
+    "baseUrl": ".",
     "paths": {
-      "@support/*": ["./support/*"]
+      "@support/*": ["./support/*"],
+      "@couture/api-client": ["../packages/api-client/src/index.ts"],
+      "@couture/api-client/*": ["../packages/api-client/src/*"]
     }
   },
   "include": ["**/*.ts", "tests/**/*.ts", "config/**/*.ts", "support/**/*.ts"],
