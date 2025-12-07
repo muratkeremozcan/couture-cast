@@ -55,28 +55,29 @@ so that users receive weather alerts and community updates instantly via Socket.
   - [x] Document event schema in `docs/api-events.md`
 
 - [ ] Task 5: Implement connection fallback mechanism (AC: #5)
-  - [ ] Create `PollingService` in web and mobile apps for fallback mode
-  - [ ] Implement Socket.io disconnect detection in client
-  - [ ] Add automatic polling activation (30-second interval) on disconnect
-  - [ ] Create REST endpoints for polling: `GET /api/v1/events/poll?since=<timestamp>`
-  - [ ] Implement reconnection detection and automatic switch back to Socket.io stream
-  - [ ] Add telemetry events for fallback activation/deactivation
+  - [x] Create `PollingService` in web and mobile apps for fallback mode
+  - [x] Implement Socket.io disconnect detection in client
+  - [x] Add automatic polling activation (30-second interval) on disconnect
+  - [x] Create REST endpoints for polling: `GET /api/v1/events/poll?since=<timestamp>`
+  - [x] Implement reconnection detection and automatic switch back to Socket.io stream
+  - [x] Add telemetry events for fallback activation/deactivation
+  - [ ] Incorporate @seontechnologies/playwright-utils to our e2e tests so far (already installed), and keep using it in the future.
   - [ ] Test disconnect/reconnect scenarios in E2E tests
 
 - [ ] Task 6: Create unit and integration tests
   - [x] Unit tests for `ConnectionManager`: connect, disconnect, retry logic
   - [x] Unit tests for `PushNotificationService`: token registration, batch dispatch, error handling
   - [x] Integration test for Socket.io gateway: namespace routing, authentication
-  - [ ] Incorporate @seontechnologies/playwright-utils to our e2e tests so far, and keep using it in the future.
-  - [ ] Integration test for fallback mechanism: disconnect → polling → reconnect
-  - [ ] Mock Expo Push API responses in tests
+  - [x] Integration test for fallback mechanism: disconnect → polling → reconnect
+  - [x] Mock Expo Push API responses in tests
+  - [ ] E2E test for fallback mechanism: disconnect → polling → reconnect
 
 - [ ] Task 7: Document real-time architecture
-  - [ ] Update architecture doc with Socket.io namespace diagram
-  - [ ] Document connection lifecycle flow (connect → auth → subscribe → events)
-  - [ ] Add Expo Push notification flow (register token → send notification → handle receipts)
-  - [ ] Document fallback strategy and polling endpoint behavior
-  - [ ] Add troubleshooting guide for common Socket.io issues
+  - [x] Update architecture doc with Socket.io namespace diagram
+  - [x] Document connection lifecycle flow (connect → auth → subscribe → events)
+  - [x] Add Expo Push notification flow (register token → send notification → handle receipts)
+  - [x] Document fallback strategy and polling endpoint behavior
+  - [x] Add troubleshooting guide for common Socket.io issues
 
 ## Dev Notes
 
@@ -286,6 +287,7 @@ packages/api-client/src/types/
 - Task 2: Added ConnectionManager with backoff (1s/3s/9s, max 5), Pino-structured logging, connect/disconnect handlers, retry/fallback emits, and integration coverage
 - Task 3: Added Expo push notifications module with token registration, Prisma-backed token repository, 100-message batching with error handling, and unit coverage
 - Task 4: Added shared socket event types/schemas (base + namespaces), published via @couture/api-client, and documented in docs/api-events.md
+- Task 5: Added poll endpoint + repository/service backing, web/mobile fallback polling controllers with telemetry hooks, shared PollingService, and service/controller tests
 - Secrets: EXPO_ACCESS_TOKEN requirement documented; generation/rotation deferred to story 0-8 environment management
 
 ### File List
@@ -302,7 +304,14 @@ packages/api-client/src/types/
 - apps/api/src/modules/notifications/push-notification.service.ts
 - apps/api/src/modules/notifications/push-token.repository.ts
 - apps/api/src/modules/notifications/push-token.repository.spec.ts
+- apps/api/src/modules/events/events.controller.ts
+- apps/api/src/modules/events/events.controller.spec.ts
+- apps/api/src/modules/events/events.module.ts
+- apps/api/src/modules/events/events.repository.ts
+- apps/api/src/modules/events/events.service.ts
+- apps/api/src/modules/events/events.service.spec.ts
 - apps/api/vitest.config.ts
+- docs/bmm-architecture-20251110.md
 - docs/sprint-artifacts/0-5-initialize-socketio-gateway-and-expo-push-api.md
 - docs/sprint-artifacts/sprint-status.yaml
 - docs/api-events.md
@@ -311,12 +320,14 @@ packages/api-client/src/types/
 - packages/api-client/package.json
 - packages/api-client/tsconfig.json
 - packages/api-client/src/index.ts
+- packages/api-client/src/realtime/polling-service.ts
 - packages/api-client/src/types/socket-events.ts
 
 ## Change Log
 
 | Date | Author | Change |
 | ---- | ------ | ------ |
+| 2025-12-07 | Amelia (Dev Agent) | Task 5: poll endpoint + repo/service, shared PollingService, web/mobile fallback controllers, and tests |
 | 2025-12-06 | Amelia (Dev Agent) | Task 4: shared socket event types/schemas + docs/api-events.md |
 | 2025-12-06 | Amelia (Dev Agent) | Task 3: Expo push service + Prisma token repository + batching tests |
 | 2025-12-06 | Amelia (Dev Agent) | Task 2: connection lifecycle (ConnectionManager, backoff, retry/fallback emits, Pino logging, integration tests) |
