@@ -114,7 +114,6 @@ jobs:
       - name: Merge, upload, and comment
         uses: ./.github/actions/playwright-merge-report-comment
         with:
-          install-command: ${{ needs.vars.outputs.install_command }}
           burn-in-result: ${{ needs.burn-in.result || 'skipped' }}
           shards: '2'
           e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}
