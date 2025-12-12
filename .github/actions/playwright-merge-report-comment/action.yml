@@ -1,4 +1,7 @@
 name: Playwright merge report and comment
+
+# This composite assumes checkout has already run if caller needs repository content.
+# It handles merge/upload/comment in one step.
 description: 'Merge Playwright shard reports and optionally comment on PR'
 
 inputs:
