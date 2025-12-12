@@ -154,24 +154,12 @@ jobs:
 
             const burnInResult = '${{ needs.burn-in.result || 'skipped' }}';
             const e2eResult = '${{ needs.pw-e2e.result || 'unknown' }}';
-
-            // Find artifact download URL for playwright-report
-            const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-            });
-
-            const artifact = artifacts.artifacts.find(a => a.name === 'playwright-report');
-            let reportUrl = `${{ toJson(github.server_url) }}/${{ toJson(github.repository) }}/actions/runs/${{ github.run_id }}`;
-            if (artifact?.archive_download_url) {
-              reportUrl = artifact.archive_download_url;
-            }
+            const runUrl = `${{ toJson(github.server_url) }}/${{ toJson(github.repository) }}/actions/runs/${{ github.run_id }}`;
 
             const body = [
               `Playwright E2E: **${e2eResult.toUpperCase()}** (burn-in: ${burnInResult})`,
               '',
-              `- Artifact: [playwright-report](${reportUrl}) (merged HTML + traces)`,
+              `- Artifact: [playwright-report](${runUrl}) (open run → Artifacts → playwright-report for HTML + traces)`,
               '- Shards: 2 (fail-fast: false)',
             ].join('\n');
 
