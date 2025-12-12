@@ -47,7 +47,6 @@ Notes against ACs
   - E2E sharding: 2 shards with fail-fast=false (`pr-pw-e2e.yml`)
   - Timeouts: burn-in 30m; E2E job 15m; smoke/unit not split into separate stages (covered in `pr-checks` defaults)
   - [x] Add fail-fast: false to matrix strategies to allow all shards to complete
-  - [ ] Document shard configuration in `docs/ci-cd-pipeline.md`
 
 - [x] Task 3: Create merge reports job (AC: #1, #4)
   - [x] Add merge-reports job that runs after E2E shards complete (`pr-pw-e2e.yml`)
@@ -109,7 +108,6 @@ Notes against ACs
   - [x] Create `.github/workflows/rwf-burn-in.yml` reusable workflow:
     - [x] Detect changed test files
     - [x] Run changed tests 3x
-    - [ ] Report flaky tests
     - [x] Reference from playwright-utils pattern
 
 - [ ] Task 8: Add burn-in workflow (AC: #1)
@@ -123,9 +121,6 @@ Notes against ACs
 - [ ] Task 9: Add security scanning workflows
   - [x] Create `.github/workflows/gitleaks-check.yml` for secret detection:
     - [x] Run gitleaks (default config, verbose/redacted)
-    - [ ] Post findings as PR comment (currently artifact only)
-  - [ ] Add dependency scanning: `npm audit` in test workflow
-  - [ ] Add SAST scanning (optional: CodeQL or Semgrep)
 
 - [ ] Task 10: Document CI/CD architecture
   - [ ] Create `docs/ci-cd-pipeline.md` with pipeline diagram

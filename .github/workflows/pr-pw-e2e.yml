@@ -7,6 +7,10 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: write
+
 concurrency:
   group: playwright-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -64,17 +68,12 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Node environment
-        uses: ./.github/actions/setup-node-env
+        uses: ./.github/actions/install
         with:
-          use-npm-ci: 'true'
+          install-command: ${{ needs.vars.outputs.install_command }}
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
+        uses: ./.github/actions/setup-playwright-browsers
 
       - name: Build web app
         run: npm run build --workspace web

@@ -1,0 +1,23 @@
+name: Setup Playwright browsers
+description: Setup Playwright browsers for testing
+
+inputs:
+  browser-cache-bust:
+    description: 'Set to true to ignore existing browser cache'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Cache Playwright browsers
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ inputs.browser-cache-bust }}
+        restore-keys: |
+          playwright-${{ runner.os }}-
+
+    - name: Install Playwright browsers (chromium)
+      shell: bash
+      run: npx playwright install chromium

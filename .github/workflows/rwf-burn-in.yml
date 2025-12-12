@@ -50,15 +50,15 @@ jobs:
             echo "Changed specs:"; echo "$CHANGED"
           fi
 
-      - name: Setup Node environment
+      - name: Setup Node and install deps
         if: steps.detect-changed.outputs.changed == 'true'
-        uses: ./.github/actions/setup-node-env
+        uses: ./.github/actions/install
         with:
-          use-npm-ci: 'true'
-
-      - name: Install Playwright browsers (chromium)
+          install-command: ${{ inputs.install-command }}
+        
+      - name: Setup Playwright browsers
         if: steps.detect-changed.outputs.changed == 'true'
-        run: npx playwright install chromium
+        uses: ./.github/actions/setup-playwright-browsers
 
       - name: Prepare base branch for diff
         if: steps.detect-changed.outputs.changed == 'true'
