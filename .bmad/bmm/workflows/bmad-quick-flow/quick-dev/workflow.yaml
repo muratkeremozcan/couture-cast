@@ -25,4 +25,8 @@ create_tech_spec_workflow: "{project-root}/.bmad/bmm/workflows/bmad-quick-flow/c
 party_mode_exec: "{project-root}/.bmad/core/workflows/party-mode/workflow.md"
 advanced_elicitation: "{project-root}/.bmad/core/tasks/advanced-elicitation.xml"
 
+# Routing resources (lazy-loaded)
+project_levels: "{project-root}/.bmad/bmm/workflows/workflow-status/project-levels.yaml"
+workflow_init: "{project-root}/.bmad/bmm/workflows/workflow-status/init/workflow.yaml"
+
 standalone: true

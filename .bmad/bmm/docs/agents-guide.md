@@ -76,8 +76,7 @@ The BMad Method Module (BMM) provides a comprehensive team of specialized AI age
 - `create-prd` - Create PRD for Level 2-4 projects (creates FRs/NFRs only)
 - `tech-spec` - Quick spec for Level 0-1 projects
 - `create-epics-and-stories` - Break PRD into implementable pieces (runs AFTER architecture)
-- `validate-prd` - Validate PRD completeness
-- `validate-tech-spec` - Validate Technical Specification
+- `implementation-readiness` - Validate PRD + Architecture + Epics + UX (optional)
 - `correct-course` - Handle mid-project changes
 - `workflow-init` - Initialize workflow tracking
 
@@ -145,8 +144,7 @@ The BMad Method Module (BMM) provides a comprehensive team of specialized AI age
 
 - `workflow-status` - Check what to do next
 - `create-architecture` - Produce a Scale Adaptive Architecture
-- `validate-architecture` - Validate architecture document
-- `implementation-readiness` - Validate readiness for Phase 4
+- `implementation-readiness` - Validate PRD + Architecture + Epics + UX (optional)
 
 **Communication Style:** Comprehensive yet pragmatic. Uses architectural metaphors. Balances technical depth with accessibility. Connects decisions to business value.
 
@@ -182,13 +180,8 @@ The BMad Method Module (BMM) provides a comprehensive team of specialized AI age
 
 - `workflow-status` - Check what to do next
 - `sprint-planning` - Initialize `sprint-status.yaml` tracking
-- `epic-tech-context` - Optional epic-specific technical context
-- `validate-epic-tech-context` - Validate epic technical context
 - `create-story` - Draft next story from epic
 - `validate-create-story` - Independent story validation
-- `story-context` - Assemble dynamic technical context XML
-- `validate-story-context` - Validate story context
-- `story-ready-for-dev` - Mark story ready without context generation
 - `epic-retrospective` - Post-epic review
 - `correct-course` - Handle changes during implementation
 
@@ -230,7 +223,6 @@ The BMad Method Module (BMM) provides a comprehensive team of specialized AI age
   - Repository docs reference
   - MCP server best practices
   - Web search fallback
-- `story-done` - Mark story complete and advance queue
 
 **Communication Style:** Succinct and checklist-driven. Cites file paths and acceptance criteria IDs. Only asks questions when inputs are missing.
 
@@ -458,7 +450,6 @@ The BMad Method Module (BMM) provides a comprehensive team of specialized AI age
 
 - `workflow-status` - Check what to do next
 - `develop-story` - Execute Dev Story workflow, implementing tasks and tests
-- `story-done` - Mark story done after DoD complete
 - `code-review` - Perform thorough clean context QA code review on a story
 
 **Communication Style:** Direct and energetic. Execution-focused. Breaks down complex game challenges into actionable steps. Celebrates performance wins.
@@ -649,15 +640,11 @@ Some workflows are available to multiple agents:
 
 Many workflows have optional validation workflows that perform independent review:
 
-| Validation                   | Agent       | Validates                        |
-| ---------------------------- | ----------- | -------------------------------- |
-| `validate-prd`               | PM          | PRD completeness (FRs/NFRs only) |
-| `validate-tech-spec`         | PM          | Technical specification quality  |
-| `validate-architecture`      | Architect   | Architecture document            |
-| `validate-design`            | UX Designer | UX specification and artifacts   |
-| `validate-epic-tech-context` | SM          | Epic technical context           |
-| `validate-create-story`      | SM          | Story draft                      |
-| `validate-story-context`     | SM          | Story context XML                |
+| Validation                 | Agent       | Validates                                  |
+| -------------------------- | ----------- | ------------------------------------------ |
+| `implementation-readiness` | Architect   | PRD + Architecture + Epics + UX (optional) |
+| `validate-design`          | UX Designer | UX specification and artifacts             |
+| `validate-create-story`    | SM          | Story draft                                |
 
 **When to use validation:**
 
@@ -912,13 +899,10 @@ Load the customized agent and verify the changes are reflected in its behavior a
 **Story Development Cycle:**
 
 ```
-1. SM: *epic-tech-context (optional, once per epic)
-2. SM: *create-story
-3. SM: *story-context
-4. DEV: *develop-story
-5. DEV: *code-review
-6. DEV: *story-done
-7. Repeat steps 2-6 for next story
+1. SM: *create-story
+2. DEV: *develop-story
+3. DEV: *code-review
+4. Repeat steps 1-3 for next story
 ```
 
 **Testing Strategy:**
@@ -957,9 +941,8 @@ Agent analyzes project state → recommends next workflow
 
 ```
 Each phase has validation gates:
-- Phase 2 to 3: validate-prd, validate-tech-spec
-- Phase 3 to 4: implementation-readiness
-Run validation before advancing
+- Phase 3 to 4: implementation-readiness (validates PRD + Architecture + Epics + UX (optional))
+Run validation before advancing to implementation
 ```
 
 **Course correction:**
@@ -991,13 +974,13 @@ Quick reference for agent selection:
 | **PM**                  | 📋   | 2 (Planning)            | prd, tech-spec, epics-stories                 | Planning, requirements docs             |
 | **UX Designer**         | 🎨   | 2 (Planning)            | create-ux-design, validate-design             | UX-heavy projects, design               |
 | **Architect**           | 🏗️   | 3 (Solutioning)         | architecture, implementation-readiness        | Technical design, architecture          |
-| **SM**                  | 🏃   | 4 (Implementation)      | sprint-planning, create-story, story-context  | Story management, sprint coordination   |
-| **DEV**                 | 💻   | 4 (Implementation)      | develop-story, code-review, story-done        | Implementation, coding                  |
+| **SM**                  | 🏃   | 4 (Implementation)      | sprint-planning, create-story                 | Story management, sprint coordination   |
+| **DEV**                 | 💻   | 4 (Implementation)      | develop-story, code-review                    | Implementation, coding                  |
 | **TEA**                 | 🧪   | All Phases              | framework, atdd, automate, trace, ci          | Testing, quality assurance              |
 | **Paige (Tech Writer)** | 📚   | All Phases              | document-project, diagrams, validation        | Documentation, diagrams                 |
 | **Principal Engineer**  | ⚡   | Quick Flow (All phases) | create-tech-spec, quick-dev, code-review      | Rapid development, technical leadership |
 | **Game Designer**       | 🎲   | 1-2 (Games)             | brainstorm-game, gdd, narrative               | Game design, creative vision            |
-| **Game Developer**      | 🕹️   | 4 (Games)               | develop-story, story-done, code-review        | Game implementation                     |
+| **Game Developer**      | 🕹️   | 4 (Games)               | develop-story, code-review                    | Game implementation                     |
 | **Game Architect**      | 🏛️   | 3 (Games)               | architecture, implementation-readiness        | Game systems architecture               |
 | **BMad Master**         | 🧙   | Meta                    | party-mode, list tasks/workflows              | Orchestration, multi-agent              |
 
@@ -1087,10 +1070,8 @@ Quick reference for agent selection:
 
 - [ ] SM: `*sprint-planning` (once)
 - [ ] SM: `*create-story`
-- [ ] SM: `*story-context`
 - [ ] DEV: `*develop-story`
 - [ ] DEV: `*code-review`
-- [ ] DEV: `*story-done`
 
 **Testing Strategy:**
 
