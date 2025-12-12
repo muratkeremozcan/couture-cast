@@ -117,3 +117,5 @@ jobs:
           install-command: ${{ needs.vars.outputs.install_command }}
           burn-in-result: ${{ needs.burn-in.result || 'skipped' }}
           shards: '2'
+          e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
