@@ -147,6 +147,12 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            // Skip commenting on PRs from forks to avoid permissions issues
+            if (context.payload.pull_request && context.payload.pull_request.head.repo.full_name !== context.payload.pull_request.base.repo.full_name) {
+              core.info('Skipping PR comment for forked repository');
+              return;
+            }
+
             const runUrl = `${{ toJson(github.server_url) }}/${{ toJson(github.repository) }}/actions/runs/${{ github.run_id }}`;
             const burnInResult = '${{ needs.burn-in.result || 'skipped' }}';
             const e2eResult = '${{ needs.pw-e2e.result || 'unknown' }}';
