@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       skip_burn_in: ${{ steps.check_skip_label.outputs.skip_burn_in || 'false' }}
+      test_env: dev
+      test_command: npm run test:pw-local --
+      install_command: npm ci
     steps:
       - name: Check for skip_burn_in label (PRs only)
         id: check_skip_label
@@ -34,7 +37,7 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && needs.vars.outputs.skip_burn_in != 'true' }}
     uses: ./.github/workflows/rwf-burn-in.yml
     with:
-      base-ref: 'origin/main'
+      base-ref: 'main'
 
   pw-e2e:
     needs: [vars, burn-in]
@@ -49,8 +52,8 @@ jobs:
       always() && (
         github.event_name != 'pull_request' ||
         needs.vars.outputs.skip_burn_in == 'true' ||
-        needs.burn-in.outputs.runE2E == 'true' ||
-        needs.burn-in.result == 'skipped'
+        (needs.burn-in.result == 'success' && needs.burn-in.outputs.runE2E == 'true') ||
+        (needs.burn-in.result == 'skipped')
       )
     steps:
       - name: Checkout repository

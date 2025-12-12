@@ -28,5 +28,3 @@ test.describe('API smoke', () => {
     expect(bodyText).toContain('Hello World!')
   })
 })
-
-// test burn in
