@@ -140,3 +140,28 @@ jobs:
           echo "- Shards: 2" >> $GITHUB_STEP_SUMMARY
           echo "- Burn-in: ${{ needs.burn-in.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
           echo "- Report: see uploaded artifact 'playwright-report'" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment results on PR
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const runUrl = `${{ toJson(github.server_url) }}/${{ toJson(github.repository) }}/actions/runs/${{ github.run_id }}`;
+            const burnInResult = '${{ needs.burn-in.result || 'skipped' }}';
+            const e2eResult = '${{ needs.pw-e2e.result || 'unknown' }}';
+
+            const body = [
+              `Playwright E2E: **${e2eResult.toUpperCase()}** (burn-in: ${burnInResult})`,
+              `Run: ${runUrl}`,
+              '',
+              '- Artifacts: download `playwright-report` for the merged HTML + traces',
+              '- Shards: 2 (fail-fast: false)',
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
