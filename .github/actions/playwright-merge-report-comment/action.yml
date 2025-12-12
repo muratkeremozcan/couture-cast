@@ -1,4 +1,5 @@
 name: Playwright merge report and comment
+description: 'Merge Playwright shard reports and optionally comment on PR'
 
 inputs:
   blob-pattern:
