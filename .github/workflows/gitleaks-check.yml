@@ -16,10 +16,8 @@ jobs:
       - name: Run gitleaks scan
         id: gitleaks
         uses: gitleaks/gitleaks-action@v2
-        with:
-          verbose: true
-          redaction: true
-          args: --no-git --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload gitleaks report
         if: always()
