@@ -103,91 +103,14 @@ jobs:
     needs: pw-e2e
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node environment
-        uses: ./.github/actions/setup-node-env
+      - name: Merge, upload, and comment
+        uses: ./.github/actions/playwright-merge-report-comment
         with:
-          use-npm-ci: 'true'
-
-      - name: Download shard reports
-        uses: actions/download-artifact@v4
-        with:
-          path: all-blob-reports
-          pattern: blob-report-*
-          merge-multiple: true
-
-      - name: Merge Playwright reports
-        run: |
-          mkdir -p playwright-report/trace
-          cp -r all-blob-reports/*/trace/* playwright-report/trace || true
-          npx playwright merge-reports --reporter=html all-blob-reports
-
-      - name: Upload merged report
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report
-          retention-days: 5
-
-      - name: Generate summary
-        if: always()
-        run: |
-          echo "## Playwright E2E" >> $GITHUB_STEP_SUMMARY
-          echo "- Shards: 2" >> $GITHUB_STEP_SUMMARY
-          echo "- Burn-in: ${{ needs.burn-in.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Report: see uploaded artifact 'playwright-report'" >> $GITHUB_STEP_SUMMARY
-
-      - name: Comment results on PR
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            // Skip commenting on PRs from forks to avoid permissions issues
-            if (context.payload.pull_request && context.payload.pull_request.head.repo.full_name !== context.payload.pull_request.base.repo.full_name) {
-              core.info('Skipping PR comment for forked repository');
-              return;
-            }
-
-            const burnInResult = '${{ needs.burn-in.result || 'skipped' }}';
-            const e2eResult = '${{ needs.pw-e2e.result || 'unknown' }}';
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-
-            // Try to produce a pre-signed download URL for the merged report artifact
-            let reportUrl = runUrl;
-            try {
-              const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id: context.runId,
-              });
-              const artifact = artifacts.artifacts.find((a) => a.name === 'playwright-report');
-              if (artifact?.archive_download_url) {
-                const res = await fetch(artifact.archive_download_url, {
-                  method: 'GET',
-                  headers: { Authorization: `token ${process.env.GITHUB_TOKEN}` },
-                  redirect: 'manual',
-                });
-                const loc = res.headers.get('location');
-                if (loc) reportUrl = loc;
-              }
-            } catch (e) {
-              core.warning(`Could not resolve signed report URL: ${e.message}`);
-            }
-
-            const body = [
-              `Playwright E2E: **${e2eResult.toUpperCase()}** (burn-in: ${burnInResult})`,
-              '',
-              `- Artifact: [playwright-report](${reportUrl}) (merged HTML + traces)`,
-              '- Shards: 2 (fail-fast: false)',
-            ].join('\n');
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body,
-            });
+          install-command: ${{ needs.vars.outputs.install_command }}
+          burn-in-result: ${{ needs.burn-in.result || 'skipped' }}
+          shards: '2'
