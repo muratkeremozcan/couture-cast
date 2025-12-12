@@ -156,10 +156,32 @@ jobs:
             const e2eResult = '${{ needs.pw-e2e.result || 'unknown' }}';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
+            // Try to produce a pre-signed download URL for the merged report artifact
+            let reportUrl = runUrl;
+            try {
+              const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: context.runId,
+              });
+              const artifact = artifacts.artifacts.find((a) => a.name === 'playwright-report');
+              if (artifact?.archive_download_url) {
+                const res = await fetch(artifact.archive_download_url, {
+                  method: 'GET',
+                  headers: { Authorization: `token ${process.env.GITHUB_TOKEN}` },
+                  redirect: 'manual',
+                });
+                const loc = res.headers.get('location');
+                if (loc) reportUrl = loc;
+              }
+            } catch (e) {
+              core.warning(`Could not resolve signed report URL: ${e.message}`);
+            }
+
             const body = [
               `Playwright E2E: **${e2eResult.toUpperCase()}** (burn-in: ${burnInResult})`,
               '',
-              `- Artifact: [playwright-report](${runUrl}) (open run → Artifacts → playwright-report for HTML + traces)`,
+              `- Artifact: [playwright-report](${reportUrl}) (merged HTML + traces)`,
               '- Shards: 2 (fail-fast: false)',
             ].join('\n');
 
