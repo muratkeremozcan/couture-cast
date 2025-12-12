@@ -154,7 +154,7 @@ jobs:
 
             const burnInResult = '${{ needs.burn-in.result || 'skipped' }}';
             const e2eResult = '${{ needs.pw-e2e.result || 'unknown' }}';
-            const runUrl = `${{ toJson(github.server_url) }}/${{ toJson(github.repository) }}/actions/runs/${{ github.run_id }}`;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
 
             const body = [
               `Playwright E2E: **${e2eResult.toUpperCase()}** (burn-in: ${burnInResult})`,
