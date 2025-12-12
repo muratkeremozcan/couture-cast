@@ -7,14 +7,60 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: write
+
 concurrency:
   group: playwright-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  vars:
+    runs-on: ubuntu-latest
+    outputs:
+      skip_burn_in: ${{ steps.check_skip_label.outputs.skip_burn_in || 'false' }}
+      test_env: dev
+      test_command: npm run test:pw-local --
+      install_command: npm ci
+    steps:
+      - name: Check for skip_burn_in label (PRs only)
+        id: check_skip_label
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        run: |
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'skip_burn_in') }}" == "true" ]]; then
+            echo "skip_burn_in=true" >> $GITHUB_OUTPUT
+            echo "✅ Found skip_burn_in label; skipping burn-in."
+          else
+            echo "skip_burn_in=false" >> $GITHUB_OUTPUT
+            echo "No skip_burn_in label; running burn-in."
+          fi
+
+  burn-in:
+    needs: vars
+    if: ${{ github.event_name == 'pull_request' && needs.vars.outputs.skip_burn_in != 'true' }}
+    uses: ./.github/workflows/rwf-burn-in.yml
+    with:
+      base-ref: 'main'
+      test-directory: 'playwright/'
+      install-command: ${{ needs.vars.outputs.install_command }}
+
   pw-e2e:
+    needs: [vars, burn-in]
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2]
+        shardTotal: [2]
+    if: |
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.vars.outputs.skip_burn_in == 'true' ||
+        (needs.burn-in.result == 'success' && needs.burn-in.outputs.runE2E == 'true') ||
+        (needs.burn-in.result == 'skipped')
+      )
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,17 +68,12 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Node environment
-        uses: ./.github/actions/setup-node-env
+        uses: ./.github/actions/install
         with:
-          use-npm-ci: 'true'
+          install-command: ${{ needs.vars.outputs.install_command }}
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
+        uses: ./.github/actions/setup-playwright-browsers
 
       - name: Build web app
         run: npm run build --workspace web
@@ -41,14 +82,39 @@ jobs:
         run: npx playwright install chromium
 
       - name: Run Playwright local suite
-        run: npm run test:pw-local
+        run: npm run test:pw-local -- --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --reporter=blob
 
-      - name: Upload Playwright artifacts
-        if: ${{ !cancelled() }}
+      - name: Copy trace files to blob-report
+        if: always()
+        run: |
+          mkdir -p blob-report/trace
+          cp -r playwright/test-results/**/*.zip blob-report/trace || true
+
+      - name: Upload Playwright artifacts (shard)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-artifacts
+          name: blob-report-${{ matrix.shardIndex }}
           path: |
-            playwright/playwright-report/
-            playwright/test-results/
+            blob-report
           retention-days: 5
+
+  merge-reports:
+    needs: pw-e2e
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Merge, upload, and comment
+        uses: ./.github/actions/playwright-merge-report-comment
+        with:
+          burn-in-result: ${{ needs.burn-in.result || 'skipped' }}
+          shards: '2'
+          e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

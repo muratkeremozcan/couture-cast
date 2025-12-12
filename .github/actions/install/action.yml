@@ -1,0 +1,25 @@
+name: Install
+description: Install dependencies using npm ci or a custom command
+
+inputs:
+  install-command:
+    description: 'Command to install dependencies (default npm ci)'
+    required: false
+    default: 'npm ci'
+  node-version-file:
+    description: 'Path to .nvmrc or version file'
+    required: false
+    default: '.nvmrc'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+        cache: npm
+
+    - name: Install dependencies
+      shell: bash
+      run: ${{ inputs.install-command }}

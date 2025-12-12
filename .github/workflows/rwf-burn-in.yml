@@ -1,0 +1,119 @@
+name: Burn-in changed Playwright specs
+
+on:
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        description: Base ref to diff against
+        default: 'origin/main'
+      test-directory:
+        type: string
+        description: Directory containing Playwright tests and burn-in script
+        default: 'playwright/'
+      install-command:
+        type: string
+        description: Dependency install command
+        default: 'npm ci'
+    outputs:
+      runE2E:
+        description: Whether downstream E2E should run
+        value: ${{ jobs.burn-in.outputs.runE2E }}
+
+jobs:
+  burn-in:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      runE2E: ${{ steps.set-output.outputs.runE2E }}
+      status: ${{ steps.set-output.outputs.status }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Detect changed Playwright specs
+        id: detect-changed
+        run: |
+          git fetch origin "${{ inputs.base-ref }}" --quiet || true
+          git branch -f "${{ inputs.base-ref }}" "origin/${{ inputs.base-ref }}" || true
+
+          CHANGED=$(git diff "${{ inputs.base-ref }}"...HEAD --name-only | grep -E '^${{ inputs.test-directory }}.*\.(spec|test)\.(ts|tsx)$' || true)
+
+          if [[ -z "$CHANGED" ]]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changed Playwright specs. Skipping burn-in.";
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Changed specs:"; echo "$CHANGED"
+          fi
+
+      - name: Setup Node and install deps
+        if: steps.detect-changed.outputs.changed == 'true'
+        uses: ./.github/actions/install
+        with:
+          install-command: ${{ inputs.install-command }}
+        
+      - name: Setup Playwright browsers
+        if: steps.detect-changed.outputs.changed == 'true'
+        uses: ./.github/actions/setup-playwright-browsers
+
+      - name: Prepare base branch for diff
+        if: steps.detect-changed.outputs.changed == 'true'
+        run: |
+          git fetch origin "${{ inputs.base-ref }}" --quiet || true
+          # Align local ref to remote to avoid ambiguous ref errors
+          git branch -f "${{ inputs.base-ref }}" "origin/${{ inputs.base-ref }}" || true
+
+      - name: Run burn-in for changed specs
+        id: burn-in-step
+        working-directory: ${{ inputs.test-directory }}
+        if: steps.detect-changed.outputs.changed == 'true'
+        run: |
+          npm run test:pw:burn-in-changed -- --base-branch=${{ inputs.base-ref }}
+
+      - name: Comment on burn-in failure
+        if: ${{ github.event_name == 'pull_request' && steps.detect-changed.outputs.changed == 'true' && failure() }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = [
+              '🚨 Burn-in failed for changed Playwright specs.',
+              'Downstream E2E is blocked until burn-in is green.',
+              'Check burn-in logs for details.'
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Set downstream gating output
+        id: set-output
+        if: always()
+        run: |
+          if [[ "${{ steps.detect-changed.outputs.changed }}" != "true" ]]; then
+            echo "runE2E=true" >> "$GITHUB_OUTPUT"
+            echo "status=skipped" >> "$GITHUB_OUTPUT"
+            echo "✅ Burn-in skipped (no changed specs)";
+            exit 0
+          fi
+
+          RUN_E2E="true"
+          if [[ "${{ steps.burn-in-step.outcome }}" != "success" ]]; then
+            RUN_E2E="false"
+          fi
+
+          echo "runE2E=${RUN_E2E}" >> "$GITHUB_OUTPUT"
+          echo "status=${{ steps.burn-in-step.outcome }}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$RUN_E2E" == "true" ]]; then
+            echo "✅ Burn-in gate passed"
+          else
+            echo "❌ Burn-in gate blocked"
+          fi

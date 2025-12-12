@@ -1,0 +1,148 @@
+name: Playwright merge report and comment
+
+# IMPORTANT: Check out the repo before using this step in your workflow
+description: 'Merge Playwright shard reports and optionally comment on PR'
+
+inputs:
+  blob-pattern:
+    description: 'Artifact name pattern for blob reports'
+    required: false
+    default: 'blob-report-*'
+  blob-path:
+    description: 'Path to download blob reports'
+    required: false
+    default: 'all-blob-reports'
+  report-name:
+    description: 'Name for merged report artifact'
+    required: false
+    default: 'playwright-report'
+  report-path:
+    description: 'Path for merged report output'
+    required: false
+    default: 'playwright-report'
+  retention-days:
+    description: 'Artifact retention days'
+    required: false
+    default: '5'
+  burn-in-result:
+    description: 'Burn-in result string for summary/comment'
+    required: false
+    default: 'skipped'
+  e2e-result:
+    description: 'E2E result string for summary/comment'
+    required: false
+    default: 'unknown'
+  shards:
+    description: 'Shard count description for summary/comment'
+    required: false
+    default: '2'
+  comment-on-pr:
+    description: 'Whether to post a PR comment'
+    required: false
+    default: 'true'
+  github-token:
+    description: 'Token to use for GitHub API (pass GITHUB_TOKEN)'
+    required: false
+    default: ''
+
+outputs:
+  report-url:
+    description: 'Download URL for merged report artifact'
+    value: ${{ steps.resolve-url.outputs.report_url }}
+
+runs:
+  using: composite
+  steps:
+
+    - name: Download shard reports
+      uses: actions/download-artifact@v4
+      with:
+        path: ${{ inputs.blob-path }}
+        pattern: ${{ inputs.blob-pattern }}
+        merge-multiple: true
+
+    - name: Merge Playwright reports
+      shell: bash
+      run: |
+        mkdir -p "${{ inputs.report-path }}/trace"
+        cp -r "${{ inputs.blob-path }}"/*/trace/* "${{ inputs.report-path }}/trace" || true
+        npx playwright merge-reports --reporter=html "${{ inputs.blob-path }}"
+
+    - name: Upload merged report
+      id: upload-report
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.report-name }}
+        path: ${{ inputs.report-path }}
+        retention-days: ${{ inputs.retention-days }}
+
+    - name: Resolve report download URL
+      id: resolve-url
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token || github.token }}
+        script: |
+          const artifactName = '${{ inputs.report-name }}';
+          let reportUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          try {
+            const { data } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
+            const artifact = data.artifacts.find((a) => a.name === artifactName);
+            if (artifact?.archive_download_url) {
+              const res = await fetch(artifact.archive_download_url, {
+                method: 'GET',
+                headers: { Authorization: `token ${process.env.GITHUB_TOKEN}` },
+                redirect: 'manual',
+              });
+              const loc = res.headers.get('location');
+              if (loc) reportUrl = loc;
+            }
+          } catch (e) {
+            core.warning(`Could not resolve report URL: ${e.message}`);
+          }
+          core.setOutput('report_url', reportUrl);
+
+    - name: Generate summary
+      if: always()
+      shell: bash
+      env:
+        BURN_IN: ${{ inputs.burn-in-result }}
+        SHARDS: ${{ inputs.shards }}
+      run: |
+        echo "## Playwright E2E" >> $GITHUB_STEP_SUMMARY
+        echo "- Shards: ${SHARDS}" >> $GITHUB_STEP_SUMMARY
+        echo "- Burn-in: ${BURN_IN}" >> $GITHUB_STEP_SUMMARY
+        echo "- Report: see uploaded artifact 'playwright-report'" >> $GITHUB_STEP_SUMMARY
+
+    - name: Comment results on PR
+      if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' }}
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token || github.token }}
+        script: |
+          // Skip commenting on PRs from forks to avoid permissions issues
+          if (context.payload.pull_request && context.payload.pull_request.head.repo.full_name !== context.payload.pull_request.base.repo.full_name) {
+            core.info('Skipping PR comment for forked repository');
+            return;
+          }
+
+          const burnInResult = '${{ inputs.burn-in-result }}';
+          const e2eResult = '${{ inputs.e2e-result }}';
+          const reportUrl = '${{ steps.resolve-url.outputs.report_url }}';
+
+          const body = [
+            `Playwright E2E: **${e2eResult.toUpperCase()}** (burn-in: ${burnInResult})`,
+            '',
+            `- Artifact: [playwright-report](${reportUrl}) (merged HTML + traces)`,
+            `- Shards: ${{ inputs.shards }} (fail-fast: false)`,
+          ].join('\n');
+
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body,
+          });
