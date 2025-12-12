@@ -12,9 +12,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  vars:
+    runs-on: ubuntu-latest
+    outputs:
+      skip_burn_in: ${{ steps.check_skip_label.outputs.skip_burn_in || 'false' }}
+    steps:
+      - name: Check for skip_burn_in label (PRs only)
+        id: check_skip_label
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+        run: |
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'skip_burn_in') }}" == "true" ]]; then
+            echo "skip_burn_in=true" >> $GITHUB_OUTPUT
+            echo "✅ Found skip_burn_in label; skipping burn-in."
+          else
+            echo "skip_burn_in=false" >> $GITHUB_OUTPUT
+            echo "No skip_burn_in label; running burn-in."
+          fi
+
+  burn-in:
+    needs: vars
+    if: ${{ github.event_name == 'pull_request' && needs.vars.outputs.skip_burn_in != 'true' }}
+    uses: ./.github/workflows/rwf-burn-in.yml
+    with:
+      base-ref: 'origin/main'
+
   pw-e2e:
+    needs: [vars, burn-in]
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2]
+        shardTotal: [2]
+    if: |
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.vars.outputs.skip_burn_in == 'true' ||
+        needs.burn-in.outputs.runE2E == 'true' ||
+        needs.burn-in.result == 'skipped'
+      )
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,14 +78,60 @@ jobs:
         run: npx playwright install chromium
 
       - name: Run Playwright local suite
-        run: npm run test:pw-local
+        run: npm run test:pw-local -- --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --reporter=blob
 
-      - name: Upload Playwright artifacts
-        if: ${{ !cancelled() }}
+      - name: Copy trace files to blob-report
+        if: always()
+        run: |
+          mkdir -p blob-report/trace
+          cp -r playwright/test-results/**/*.zip blob-report/trace || true
+
+      - name: Upload Playwright artifacts (shard)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-artifacts
+          name: blob-report-${{ matrix.shardIndex }}
           path: |
-            playwright/playwright-report/
-            playwright/test-results/
+            blob-report
           retention-days: 5
+
+  merge-reports:
+    needs: pw-e2e
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'true'
+
+      - name: Download shard reports
+        uses: actions/download-artifact@v4
+        with:
+          path: all-blob-reports
+          pattern: blob-report-*
+          merge-multiple: true
+
+      - name: Merge Playwright reports
+        run: |
+          mkdir -p playwright-report/trace
+          cp -r all-blob-reports/*/trace/* playwright-report/trace || true
+          npx playwright merge-reports --reporter=html all-blob-reports
+
+      - name: Upload merged report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 5
+
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "## Playwright E2E" >> $GITHUB_STEP_SUMMARY
+          echo "- Shards: 2" >> $GITHUB_STEP_SUMMARY
+          echo "- Burn-in: ${{ needs.burn-in.result || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Report: see uploaded artifact 'playwright-report'" >> $GITHUB_STEP_SUMMARY

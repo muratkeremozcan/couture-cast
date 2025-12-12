@@ -1,0 +1,78 @@
+name: Burn-in changed Playwright specs
+
+on:
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        description: Base ref to diff against
+        default: 'origin/main'
+    outputs:
+      runE2E:
+        description: Whether downstream E2E should run
+        value: ${{ jobs.burn-in.outputs.runE2E }}
+
+jobs:
+  burn-in:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      runE2E: ${{ steps.set-output.outputs.runE2E }}
+      status: ${{ steps.set-output.outputs.status }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'true'
+
+      - name: Install Playwright browsers (chromium)
+        run: npx playwright install chromium
+
+      - name: Run burn-in for changed specs
+        id: burn-in-step
+        working-directory: playwright
+        run: |
+          npx tsx scripts/burn-in-changed.ts --base-branch=${{ inputs.base-ref }}
+
+      - name: Comment on burn-in failure
+        if: ${{ github.event_name == 'pull_request' && failure() }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = [
+              '🚨 Burn-in failed for changed Playwright specs.',
+              'Downstream E2E is blocked until burn-in is green.',
+              'Check burn-in logs for details.'
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Set downstream gating output
+        id: set-output
+        if: always()
+        run: |
+          RUN_E2E="true"
+          if [[ "${{ steps.burn-in-step.outcome }}" != "success" ]]; then
+            RUN_E2E="false"
+          fi
+
+          echo "runE2E=${RUN_E2E}" >> "$GITHUB_OUTPUT"
+          echo "status=${{ steps.burn-in-step.outcome }}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$RUN_E2E" == "true" ]]; then
+            echo "✅ Burn-in gate passed"
+          else
+            echo "❌ Burn-in gate blocked"
+          fi

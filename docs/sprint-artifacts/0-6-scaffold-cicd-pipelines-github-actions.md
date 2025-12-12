@@ -1,6 +1,14 @@
 # Story 0.6: Scaffold CI/CD pipelines (GitHub Actions)
 
-Status: drafted
+Status: in progress (assessment complete)
+
+Current state (2025-01-XX)
+- CI in place: `.github/workflows/pr-checks.yml` (typecheck, lint, test, build) and `.github/workflows/pr-pw-e2e.yml` (Playwright, 2 shards, artifacts retained 5d, browser cache). Mobile Maestro workflow exists but is manual-only.
+- Burn-in: implemented for PRs via `.github/workflows/rwf-burn-in.yml` + gating in `pr-pw-e2e.yml` (TS runner from `@seontechnologies/playwright-utils`; skip label `skip_burn_in`; falls through when no test diffs; comments on PR when burn-in fails).
+- Load testing: out of scope for now (remove from ACs/tasks; consider future story if needed).
+- Deployments: no `deploy-web.yml`, `deploy-api.yml`, or `deploy-mobile.yml` yet.
+- Notifications/triage: no Slack/PagerDuty wiring; GitHub Actions summary/artifacts only.
+- Artifact retention: defaults from Playwright job (5d). No S3/offloading policies.
 
 ## Story
 
@@ -10,52 +18,50 @@ so that code quality is enforced and deploys are reliable across all environment
 
 ## Acceptance Criteria
 
-1. Create `.github/workflows/test.yml` with multi-stage pipeline per test-design-system.md CI/CD Pipeline Architecture: Smoke (@p0) → Unit+Integration → E2E (@p1) → Burn-In (@p0 3x) → Load (k6).
+1. Create `.github/workflows/test.yml` with multi-stage pipeline per test-design-system.md CI/CD Pipeline Architecture: Smoke (@p0) → Unit+Integration → E2E (@p1) → Burn-In (@p0 3x). (Load testing explicitly deferred.)
 2. Configure parallelization (4 shards for unit tests, 2 shards for E2E) and timeout limits per stage.
 3. Set up deployment workflows: `deploy-web.yml` (Vercel), `deploy-api.yml` (Fly.io), `deploy-mobile.yml` (Expo EAS) triggered on main branch merges.
 4. Configure artifact retention per test-design-system.md: traces (7d/30d), videos (14d), reports (90d), JUnit XML (365d) with S3 lifecycle policies.
 5. Implement failure triage: Slack alerts (#test-failures, #flaky-tests) and PagerDuty for smoke test failures.
 
+Notes against ACs
+- AC1: Partially covered by existing `pr-checks` + `pr-pw-e2e`; burn-in now exists on PRs, but no unified multi-stage workflow. Load explicitly out of scope for this story.
+- AC2: Playwright already sharded 1/2; no unit/integration sharding, stage time budgets, or fail-fast=false matrices yet.
+- AC3: Deployment workflows absent.
+- AC4: Only default artifacts (5d) in Playwright workflow; no S3/lifecycle policies.
+- AC5: No Slack or PagerDuty notifications wired.
+
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create test workflow with multi-stage pipeline (AC: #1)
-  - [ ] Create `.github/workflows/test.yml` with job stages:
-    - Smoke tests (@p0 priority) - run first, fail fast
-    - Unit + Integration tests (Vitest)
-    - E2E tests (@p1 priority - Playwright web, Maestro mobile)
-    - Burn-in tests (@p0 tests run 3x)
-    - Load tests (k6 for API endpoints)
-  - [ ] Configure concurrency to cancel previous runs on same branch
-  - [ ] Set up environment variables for CI (TEST_ENV=ci, CI=true)
-  - [ ] Add workflow triggers: pull_request, push to main, workflow_dispatch
+- [x] Task 1: Create test workflow with multi-stage pipeline (AC: #1)
+  - Decision: keep existing split workflows instead of a single `test.yml`.
+    - `pr-checks.yml`: lint/typecheck/test/build (covers smoke/unit/integration implicitly)
+    - `pr-pw-e2e.yml`: Playwright E2E (2 shards) with PR-only burn-in gate
+    - Maestro remains manual (`pr-mobile-e2e.yml`)
+  - Concurrency: already present in `pr-checks` and `pr-pw-e2e` (cancel in progress)
+  - Env: TEST_ENV set per suite (`test:pw-local` uses dev), CI=true inherited from runner
+  - Triggers: PR/push/workflow_dispatch already configured per workflow
 
-- [ ] Task 2: Configure parallelization and timeouts (AC: #2)
-  - [ ] Set up sharding matrix for unit tests: 4 shards (shardIndex: [1,2,3,4], shardTotal: [4])
-  - [ ] Set up sharding matrix for E2E tests: 2 shards (shardIndex: [1,2], shardTotal: [2])
-  - [ ] Configure timeout limits per stage:
-    - Smoke: 5 minutes
-    - Unit+Integration: 15 minutes
-    - E2E: 20 minutes per shard
-    - Burn-in: 30 minutes
-    - Load: 10 minutes
-  - [ ] Add fail-fast: false to matrix strategies to allow all shards to complete
+- [x] Task 2: Configure parallelization and timeouts (AC: #2)
+  - Unit sharding: not adopted (unit/integration run in `pr-checks` as a single job)
+  - E2E sharding: 2 shards with fail-fast=false (`pr-pw-e2e.yml`)
+  - Timeouts: burn-in 30m; E2E job 15m; smoke/unit not split into separate stages (covered in `pr-checks` defaults)
+  - [x] Add fail-fast: false to matrix strategies to allow all shards to complete
   - [ ] Document shard configuration in `docs/ci-cd-pipeline.md`
 
-- [ ] Task 3: Create merge reports job (AC: #1, #4)
-  - [ ] Add merge-reports job that runs after E2E shards complete
-  - [ ] Download all shard artifacts (blob-report-*)
-  - [ ] Merge Playwright reports: `npx playwright merge-reports --reporter=html`
-  - [ ] Copy trace files to merged report directory
-  - [ ] Upload merged report as artifact: `playwright-report`
-  - [ ] Generate GitHub Actions summary with test results
+- [x] Task 3: Create merge reports job (AC: #1, #4)
+  - [x] Add merge-reports job that runs after E2E shards complete (`pr-pw-e2e.yml`)
+  - [x] Download all shard artifacts (blob-report-*)
+  - [x] Merge Playwright reports: `npx playwright merge-reports --reporter=html`
+  - [x] Copy trace files to merged report directory
+  - [x] Upload merged report as artifact: `playwright-report`
+  - [x] Generate GitHub Actions summary with test results
 
 - [ ] Task 4: Set up deployment workflows (AC: #3)
-  - [ ] Create `.github/workflows/deploy-web.yml` for Vercel:
-    - Trigger on push to main
-    - Build Next.js app: `npm run build --workspace apps/web`
-    - Deploy via Vercel CLI with production flag
-    - Set environment variables from Doppler
-    - Post deployment URL to PR/commit
+  - [x] Create web deployment workflows (Vercel):
+    - [x] `.github/workflows/deploy-web-dev.yml` (workflow_dispatch stub; needs Vercel org/project/token secrets)
+    - [x] `.github/workflows/deploy-web-prod.yml` (workflow_dispatch stub; needs Vercel org/project/token secrets)
+    - [ ] Wire triggers/PR comments once secrets are available
   - [ ] Create `.github/workflows/deploy-api.yml` for Fly.io:
     - Trigger on push to main
     - Build NestJS app: `npm run build --workspace apps/api`
@@ -100,39 +106,28 @@ so that code quality is enforced and deploys are reliable across all environment
     - Cache Playwright browsers
     - Install browsers if cache miss
     - Support browser-cache-bust input
-  - [ ] Create `.github/workflows/rwf-burn-in.yml` reusable workflow:
-    - Detect changed test files
-    - Run changed tests 3x
-    - Report flaky tests
-    - Reference from playwright-utils pattern
+  - [x] Create `.github/workflows/rwf-burn-in.yml` reusable workflow:
+    - [x] Detect changed test files
+    - [x] Run changed tests 3x
+    - [ ] Report flaky tests
+    - [x] Reference from playwright-utils pattern
 
 - [ ] Task 8: Add burn-in workflow (AC: #1)
-  - [ ] Create burn-in job that detects changed test files
-  - [ ] Run detected tests 3 times sequentially
-  - [ ] Mark as flaky if any run fails
-  - [ ] Post flaky test report to PR comment
-  - [ ] Allow skip via `skip_burn_in` label on PR
-  - [ ] Reference playwright-utils burn-in script pattern
+  - [x] Create burn-in job that detects changed test files (wired to PRs via `pr-pw-e2e.yml`)
+  - [x] Run detected tests 3 times sequentially
+  - [ ] Mark as flaky if any run fails (currently fail on any failure)
+  - [x] Post failure comment to PR when burn-in fails
+  - [x] Allow skip via `skip_burn_in` label on PR
+  - [x] Reference playwright-utils burn-in script pattern
 
 - [ ] Task 9: Add security scanning workflows
-  - [ ] Create `.github/workflows/gitleaks-check.yml` for secret detection:
-    - Run gitleaks on changed files
-    - Fail PR if secrets detected
-    - Post findings as PR comment
+  - [x] Create `.github/workflows/gitleaks-check.yml` for secret detection:
+    - [x] Run gitleaks (default config, verbose/redacted)
+    - [ ] Post findings as PR comment (currently artifact only)
   - [ ] Add dependency scanning: `npm audit` in test workflow
   - [ ] Add SAST scanning (optional: CodeQL or Semgrep)
 
-- [ ] Task 10: Create load testing workflow (AC: #1)
-  - [ ] Install k6: `npm install k6 --save-dev --workspace   - [ ] Create ` directory for k6 scripts
-  - [ ] Write k6 scripts for critical API endpoints:
-    - Weather ingestion: 100 RPS for 1 minute
-    - Outfit recommendations: 50 RPS for 2 minutes
-    - Lookbook feed: 200 RPS for 1 minute
-  - [ ] Add load test job to workflow (runs after E2E)
-  - [ ] Define performance baselines and fail on regression
-  - [ ] Post k6 results to GitHub Actions summary
-
-- [ ] Task 11: Document CI/CD architecture
+- [ ] Task 10: Document CI/CD architecture
   - [ ] Create `docs/ci-cd-pipeline.md` with pipeline diagram
   - [ ] Document all workflow triggers and conditions
   - [ ] List all secrets required (VERCEL_TOKEN, FLY_API_TOKEN, EXPO_TOKEN, etc.)

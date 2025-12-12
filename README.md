@@ -21,8 +21,9 @@ Thin Turborepo for Couture Cast apps and smoke tests. Keep it lean: shared lint 
 | `apps/api`               | NestJS 11 monolith wired to Vitest 4.                                             |
 | `maestro/`               | Minimal Maestro smoke flow for mobile sanity checks (URL load + screenshot).      |
 | `playwright/`            | Root-level Playwright smoke suite (fixtures + README) shared by web + API teams.  |
+| `playwright/scripts`     | Utility scripts for Playwright (burn-in variants).                                |
 | `packages/eslint-config` | Shared ESLint config consumed across workspaces.                                  |
-| `.github/workflows`      | GitHub Actions quality gates (PR checks today, burn-in soon).                     |
+| `.github/workflows`      | GitHub Actions quality gates (PR checks, Playwright E2E with burn-in, deploy stubs). |
 | `docs/`                  | Product brief, architecture, epics/stories—**source of truth** for what we build. |
 
 ## Getting started
@@ -71,6 +72,9 @@ npm run typecheck:clear-cache
 | `npm run test:pw-dev`           | Targets the dev deployment (`TEST_ENV=dev`).                                               |
 | `npm run test:pw-stage`         | Targets the stage deployment (`TEST_ENV=stage`).                                           |
 | `npm run test:pw-prod`          | Targets the prod deployment (`TEST_ENV=prod`).                                             |
+| `npm run test:pw:burn-in`       | Burn-in all specs locally (`PW_BURN_IN=true`, repeat-each=3, retries=0).                   |
+| `npm run test:pw:burn-in-changed-classic` | Playwright built-in `--only-changed` burn-in vs main (3x, retries=0) — can overrun.       |
+| `npm run test:pw:burn-in-changed` | Smart burn-in via `@seontechnologies/playwright-utils` (config-driven, respects skip/percentage). |
 | `npm run maestro:install`       | Installs the Maestro CLI (brew/curl on macOS; npx fallback on CI).                         |
 | `npm run test:mobile:e2e`       | Starts Expo (if needed) and runs the Maestro smoke flow against the dev server it spawns.  |
 | `npm run test:mobile:e2e:ios`   | Boots the default iOS simulator and runs the Maestro smoke flow against Expo dev server.   |
