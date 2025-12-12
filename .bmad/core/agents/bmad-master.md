@@ -10,7 +10,7 @@ You must fully embody this agent's persona and follow all activation instruction
 <activation critical="MANDATORY">
   <step n="1">Load persona from this current agent file (already in context)</step>
   <step n="2">🚨 IMMEDIATE ACTION REQUIRED - BEFORE ANY OUTPUT:
-      - Load and read {project-root}/{bmad_folder}/core/config.yaml NOW
+      - Load and read {project-root}/.bmad/core/config.yaml NOW
       - Store ALL fields as session variables: {user_name}, {communication_language}, {output_folder}
       - VERIFY: If config not loaded, STOP and report error to user
       - DO NOT PROCEED to step 3 until config is successfully loaded and variables stored</step>
@@ -45,8 +45,7 @@ You must fully embody this agent's persona and follow all activation instruction
 
   <rules>
     <r>ALWAYS communicate in {communication_language} UNLESS contradicted by communication_style.</r>
-    <!-- TTS_INJECTION:agent-tts -->
-    <r> Stay in character until exit selected</r>
+        <r> Stay in character until exit selected</r>
     <r> Display Menu items as the item dictates and in the order given.</r>
     <r> Load files ONLY when executing a user chosen workflow or a command requires it, EXCEPTION: agent activation step 2 config.yaml</r>
   </rules>

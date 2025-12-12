@@ -69,12 +69,6 @@ The methodology path (Quick Flow, BMad Method, or Enterprise Method) chosen for 
 
 **Quick Flow track only.** Comprehensive technical plan created upfront that serves as the primary planning document for small changes or features. Contains problem statement, solution approach, file-level changes, stack detection (brownfield), testing strategy, and developer resources.
 
-### Epic-Tech-Context (Epic Technical Context)
-
-**BMad Method/Enterprise tracks only.** Detailed technical planning document created during implementation (just-in-time) for each epic. Supplements PRD + Architecture with epic-specific implementation details, code-level design decisions, and integration points.
-
-**Key Difference:** Tech-spec (Quick Flow) is created upfront and is the only planning doc. Epic-tech-context (BMad Method/Enterprise) is created per epic during implementation and supplements PRD + Architecture.
-
 ### PRD (Product Requirements Document)
 
 **BMad Method/Enterprise tracks.** Product-level planning document containing vision, goals, Functional Requirements (FRs), Non-Functional Requirements (NFRs), success criteria, and UX considerations. Replaces tech-spec for larger projects that need product planning. **V6 Note:** PRD focuses on WHAT to build (requirements). Epic+Stories are created separately AFTER architecture via create-epics-and-stories workflow.
@@ -101,6 +95,10 @@ Game development equivalent of PRD, created by Game Designer agent for game proj
 
 ## Workflow and Phases
 
+### Phase 0: Documentation (Prerequisite)
+
+**Conditional phase for brownfield projects.** Creates comprehensive codebase documentation before planning. Only required if existing documentation is insufficient for AI agents.
+
 ### Phase 1: Analysis (Optional)
 
 Discovery and research phase including brainstorming, research workflows, and product brief creation. Optional for Quick Flow, recommended for BMad Method, required for Enterprise Method.
@@ -124,14 +122,6 @@ Sprint-based development through story-by-story iteration. Uses sprint-planning,
 ### Quick Spec Flow
 
 Fast-track workflow system for Quick Flow track projects that goes straight from idea to tech-spec to implementation, bypassing heavy planning. Designed for bug fixes, small features, and rapid prototyping.
-
-### Just-In-Time Design
-
-Pattern where epic-tech-context is created during implementation (Phase 4) right before working on each epic, rather than all upfront. Enables learning and adaptation.
-
-### Context Injection
-
-Dynamic technical guidance generated for each story via epic-tech-context and story-context workflows, providing exact expertise when needed without upfront over-planning.
 
 ---
 
@@ -201,7 +191,7 @@ backlog → drafted → ready-for-dev → in-progress → review → done
 
 - **backlog** - Story exists in epic but not yet drafted
 - **drafted** - Story file created by SM via create-story
-- **ready-for-dev** - Story has context, ready for DEV via story-context
+- **ready-for-dev** - Story drafted and reviewed, ready for DEV
 - **in-progress** - DEV is implementing via dev-story
 - **review** - Implementation complete, awaiting code-review
 - **done** - Completed with DoD met
@@ -209,11 +199,12 @@ backlog → drafted → ready-for-dev → in-progress → review → done
 ### Epic Status Progression
 
 ```
-backlog → contexted
+backlog → in-progress → done
 ```
 
-- **backlog** - Epic exists in planning docs but no context yet
-- **contexted** - Epic has technical context via epic-tech-context
+- **backlog** - Epic not yet started
+- **in-progress** - Epic actively being worked on
+- **done** - All stories in epic completed
 
 ### Retrospective
 
@@ -251,11 +242,7 @@ Markdown file containing story details: description, acceptance criteria, techni
 
 ### Story Context
 
-Technical guidance document created via story-context workflow that provides implementation-specific context, references existing patterns, suggests approaches, and injects expertise for the specific story.
-
-### Epic Context
-
-Technical planning document created via epic-tech-context workflow before drafting stories within an epic. Provides epic-level technical direction, architecture notes, and implementation strategy.
+Implementation guidance embedded within story files during the create-story workflow. Provides implementation-specific context, references existing patterns, suggests approaches, and helps maintain consistency with established codebase conventions.
 
 ### Sprint Planning
 
@@ -263,7 +250,7 @@ Workflow that initializes Phase 4 implementation by creating sprint-status.yaml,
 
 ### Gate Check
 
-Validation workflow (implementation-readiness) run before Phase 4 to ensure PRD, architecture, and UX documents are cohesive with no gaps or contradictions. Required for BMad Method and Enterprise Method tracks.
+Validation workflow (implementation-readiness) run before Phase 4 to ensure PRD + Architecture + Epics + UX (optional) are aligned with no gaps or contradictions. Required for BMad Method and Enterprise Method tracks.
 
 ### DoD (Definition of Done)
 
