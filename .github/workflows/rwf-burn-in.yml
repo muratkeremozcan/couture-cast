@@ -7,6 +7,14 @@ on:
         type: string
         description: Base ref to diff against
         default: 'origin/main'
+      test-directory:
+        type: string
+        description: Directory containing Playwright tests and burn-in script
+        default: 'playwright/'
+      install-command:
+        type: string
+        description: Dependency install command
+        default: 'npm ci'
     outputs:
       runE2E:
         description: Whether downstream E2E should run
@@ -34,11 +42,17 @@ jobs:
       - name: Install Playwright browsers (chromium)
         run: npx playwright install chromium
 
+      - name: Prepare base branch for diff
+        run: |
+          git fetch origin "${{ inputs.base-ref }}" --quiet || true
+          # Align local ref to remote to avoid ambiguous ref errors
+          git branch -f "${{ inputs.base-ref }}" "origin/${{ inputs.base-ref }}" || true
+
       - name: Run burn-in for changed specs
         id: burn-in-step
-        working-directory: playwright
+        working-directory: ${{ inputs.test-directory }}
         run: |
-          npx tsx scripts/burn-in-changed.ts --base-branch=${{ inputs.base-ref }}
+          npm run test:pw:burn-in-changed -- --base-branch=${{ inputs.base-ref }}
 
       - name: Comment on burn-in failure
         if: ${{ github.event_name == 'pull_request' && failure() }}

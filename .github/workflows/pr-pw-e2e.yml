@@ -38,6 +38,8 @@ jobs:
     uses: ./.github/workflows/rwf-burn-in.yml
     with:
       base-ref: 'main'
+      test-directory: 'playwright/'
+      install-command: ${{ needs.vars.outputs.install_command }}
 
   pw-e2e:
     needs: [vars, burn-in]
