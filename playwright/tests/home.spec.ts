@@ -11,7 +11,15 @@ test.describe('Web smoke', () => {
       metadata.healthEndpoint ??
       new URL('/api/health', metadata.baseUrl ?? 'http://localhost:3005').toString()
 
-    const healthResponse = await page.request.get(healthEndpoint)
+    const vercelBypassToken = process.env.VERCEL_PROTECTION_BYPASS?.trim()
+    const healthResponse = await page.request.get(healthEndpoint, {
+      headers: vercelBypassToken
+        ? {
+            'x-vercel-protection-bypass': vercelBypassToken,
+            'x-vercel-set-bypass-cookie': 'true',
+          }
+        : undefined,
+    })
     expect(healthResponse.ok()).toBeTruthy()
 
     const body = (await healthResponse.json()) as { status: string }

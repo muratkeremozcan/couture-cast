@@ -1,4 +1,4 @@
-name: Vercel Preview e2e
+name: Vercel Preview smoke
 
 on:
   deployment_status:

@@ -21,6 +21,9 @@ on:
         type: string
         description: "Optional override for base URL"
         required: false
+    secrets:
+      VERCEL_PROTECTION_BYPASS:
+        required: false
 
 jobs:
   e2e:
@@ -52,6 +55,7 @@ jobs:
           TEST_ENV: ${{ inputs.test_env }}
           EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.expected_sha.outputs.sha }}
+          VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
         run: |
           custom_base_url="${{ inputs.custom_base_url }}"
           if [ -n "$custom_base_url" ]; then
