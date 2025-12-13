@@ -108,7 +108,14 @@ Notes against ACs
   - [x] Create `.github/workflows/gitleaks-check.yml` for secret detection:
     - [x] Run gitleaks (default config, verbose/redacted)
 
-- [ ] Task 10: Document CI/CD architecture
+
+- [ ] Task 10: Add Vercel deployment smoke checks (AC: #3)
+  - [ ] Add `/api/health` endpoint that returns status + git SHA/branch from Vercel env vars.
+  - [ ] Add a playwright api e2e test for the health endpoint and SHA.
+  - [ ] Create GH workflow to wait for Vercel production deploy (main), curl `/api/health`, then run Playwright smoke with `TEST_ENV=dev` pointing to the deployed URL.
+  - [ ] Keep workflow opt-in for previews; run on main for now.
+
+- [ ] Task 11: Document CI/CD architecture
   - [ ] Create `docs/ci-cd-pipeline.md` with pipeline diagram
   - [ ] Document all workflow triggers and conditions
   - [ ] List all secrets required (VERCEL_TOKEN, FLY_API_TOKEN, EXPO_TOKEN, etc.)

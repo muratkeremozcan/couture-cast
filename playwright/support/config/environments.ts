@@ -13,7 +13,7 @@ for (const file of envFiles) {
   }
 }
 
-export type EnvironmentName = 'local' | 'dev' | 'stage' | 'preview' | 'prod'
+export type EnvironmentName = 'local' | 'dev' | 'prod'
 
 type Credentials = {
   email: string
@@ -60,55 +60,6 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
       defaultUser: {
         email: process.env.DEV_AUTH_USERNAME ?? 'dev.tester@couturecast.app',
         password: process.env.DEV_AUTH_PASSWORD ?? 'dev-password',
-      },
-    },
-    apiHeaders: supabaseServiceRoleKey
-      ? {
-          apikey: supabaseServiceRoleKey,
-          authorization: `Bearer ${supabaseServiceRoleKey}`,
-        }
-      : {},
-  },
-  stage: {
-    webBaseUrl:
-      process.env.PREVIEW_WEB_E2E_BASE_URL ??
-      process.env.STAGE_WEB_E2E_BASE_URL ??
-      process.env.PREVIEW_WEB_BASE_URL ??
-      process.env.STAGE_WEB_BASE_URL ??
-      'https://stage.couturecast.app',
-    apiBaseUrl:
-      process.env.PREVIEW_API_BASE_URL ??
-      process.env.STAGE_API_BASE_URL ??
-      'https://stage-api.couturecast.app',
-    credentials: {
-      defaultUser: {
-        email:
-          process.env.PREVIEW_AUTH_USERNAME ??
-          process.env.STAGE_AUTH_USERNAME ??
-          'stage.tester@couturecast.app',
-        password:
-          process.env.PREVIEW_AUTH_PASSWORD ??
-          process.env.STAGE_AUTH_PASSWORD ??
-          'stage-password',
-      },
-    },
-    apiHeaders: supabaseServiceRoleKey
-      ? {
-          apikey: supabaseServiceRoleKey,
-          authorization: `Bearer ${supabaseServiceRoleKey}`,
-        }
-      : {},
-  },
-  preview: {
-    webBaseUrl:
-      process.env.PREVIEW_WEB_E2E_BASE_URL ??
-      process.env.PREVIEW_WEB_BASE_URL ??
-      'https://preview.couturecast.app',
-    apiBaseUrl: process.env.PREVIEW_API_BASE_URL ?? 'https://preview-api.couturecast.app',
-    credentials: {
-      defaultUser: {
-        email: process.env.PREVIEW_AUTH_USERNAME ?? 'preview.tester@couturecast.app',
-        password: process.env.PREVIEW_AUTH_PASSWORD ?? 'preview-password',
       },
     },
     apiHeaders: supabaseServiceRoleKey
