@@ -1,13 +1,20 @@
 import { config as dotenvConfig } from 'dotenv'
 import path from 'node:path'
 import type { PlaywrightTestConfig } from '@playwright/test'
+import localConfig from './playwright/config/local.config'
+import devConfig from './playwright/config/dev.config'
+import previewConfig from './playwright/config/preview.config'
+import prodConfig from './playwright/config/prod.config'
 
 dotenvConfig({
   path: path.resolve(__dirname, '.env'),
 })
 
 const envConfigMap: Record<string, PlaywrightTestConfig> = {
-  local: require('./playwright/config/local.config').default,
+  local: localConfig,
+  dev: devConfig,
+  preview: previewConfig,
+  prod: prodConfig,
 }
 
 const desiredEnv = (process.env.TEST_ENV ?? 'local').toLowerCase()
