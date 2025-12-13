@@ -86,7 +86,7 @@ CoutureCast has achieved **exceptional planning maturity** for a Level 3 greenfi
 - 11 Architecture Decision Records (ADRs) mapped to implementation patterns
 - Novel pattern designs: Lookbook Prism Orchestrator, Silhouette Overlay & Color Pipeline
 - Clear project structure (Turborepo monorepo: apps/mobile, apps/web, apps/api, packages/*)
-- Deployment architecture defined (Vercel web, Fly.io API/workers, Expo EAS mobile)
+- Deployment architecture defined (Vercel web/API serverless, Expo EAS mobile)
 - **Strength:** Starter template initialization commands with version verification
 - **Minor Gap:** Some ADRs reference "chosen API" or "configured provider" without explicit selection
 
@@ -138,7 +138,7 @@ CoutureCast has achieved **exceptional planning maturity** for a Level 3 greenfi
 | ------------ | ---------- | --------------------------- | ------------- | ------ |
 | **Performance** | FCP <2s (4G), Alerts <60s | Vercel Edge Config + ISR, BullMQ throttling, Redis caching (15min TTL) | Test Design: Performance baselines (Ritual Page FCP <2s), k6 load scenarios, Playwright synthetic monitors | ✅ Aligned |
 | **Security** | AES-256 encryption, COPPA flows, immutable audit trail | Supabase Auth + RLS + pgcrypto, NestJS guards (role-based), Postgres audit_log (immutable writes) | Test Design: RLS policy coverage (95%+), audit log immutability tests, GDPR test scenarios, guardian consent edge cases | ✅ Aligned |
-| **Scalability** | 100k MAU launch, 5× growth capacity | Fly.io autoscaling, Upstash Redis, Vercel Edge, rate-limit monitoring | Test Design: Load profile modeling (500 peak users), resource utilization tests (DB connections, Redis memory, BullMQ concurrency) | ✅ Aligned |
+| **Scalability** | 100k MAU launch, 5× growth capacity | Vercel serverless autoscaling (web/API), Upstash Redis, Vercel Edge, rate-limit monitoring | Test Design: Load profile modeling (500 peak users), resource utilization tests (DB connections, Redis memory, BullMQ concurrency) | ✅ Aligned |
 | **Accessibility** | WCAG 2.2 AA compliance | React 19 semantic HTML, aria-labels, focus management | Test Design: Accessibility strategy (axe-core, keyboard navigation, screen reader testing), UX spec integration | ✅ Aligned |
 | **Localization** | EN/ES/FR launch-day support | i18next JSON catalogs, Next.js BFF serving, locale-aware formatting | Test Design: i18n edge cases (RTL languages, date/time formatting, pluralization rules), translation pipeline testing | ✅ Aligned |
 
@@ -179,7 +179,7 @@ CoutureCast has achieved **exceptional planning maturity** for a Level 3 greenfi
 | ADR-005: Personalization | NestJS module + BullMQ + Redis | CC-2.1, CC-2.2, CC-2.3 | **MISSING:** Redis connection setup, BullMQ queue initialization | ⚠️ Gap (see below) |
 | ADR-006: Moderation | NSFW model + console + audit | CC-6.5 | **MISSING:** TensorFlow model deployment, moderation console scaffold | ⚠️ Gap (see below) |
 | ADR-007: Real-time | Socket.io + Expo Push | CC-3.1, CC-6.1, CC-6.2 | **MISSING:** Socket.io gateway setup, Expo Push credentials | ⚠️ Gap (see below) |
-| ADR-008: Deployment | Vercel + Fly.io + Expo EAS | All stories | **MISSING:** CI/CD pipeline setup, env management, deployment scripts | ⚠️ Gap (see below) |
+| ADR-008: Deployment | Vercel (web/API) + Expo EAS | All stories | **MISSING:** CI/CD pipeline setup, env management, deployment scripts | ⚠️ Gap (see below) |
 | ADR-009: Search | Postgres FTS + trigram | CC-6.1, CC-6.3 | **MISSING:** Search index setup, materialized view creation | ⚠️ Gap (see below) |
 | ADR-010: Testing & CI | Turborepo + Vitest + Playwright + Maestro | All stories | **MISSING:** Test framework initialization, CI workflow configuration | ⚠️ Gap (see below) |
 | ADR-011: Edge Caching | Vercel Edge Config + PostHog | CC-3.1, CC-5.2 | **MISSING:** Edge Config setup, PostHog integration | ⚠️ Gap (see below) |

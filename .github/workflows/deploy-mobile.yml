@@ -1,0 +1,58 @@
+name: Deploy mobile (main)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy-mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Verify required secrets
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "EXPO_TOKEN is missing; set repo secret to enable EAS builds." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'true'
+
+      - name: Install EAS CLI
+        run: npm install --global eas-cli@latest
+
+      - name: Authenticate EAS
+        env:
+          EXPO_TOKEN: ${{ env.EXPO_TOKEN }}
+        run: eas whoami
+
+      - name: Build with EAS (all platforms)
+        env:
+          EXPO_TOKEN: ${{ env.EXPO_TOKEN }}
+          EAS_NO_VCS: 1
+        working-directory: apps/mobile
+        run: |
+          eas build --platform all --profile production --non-interactive --no-wait
+
+      - name: Summary
+        run: |
+          {
+            echo "## Deploy mobile (main)";
+            echo "- Trigger: \`${{ github.event_name }}\`";
+            echo "- Profile: production";
+          } >> "$GITHUB_STEP_SUMMARY"

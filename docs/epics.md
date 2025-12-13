@@ -91,7 +91,7 @@ As a platform team, we need automated testing and deployment pipelines so that c
 
 1. Create `.github/workflows/test.yml` with multi-stage pipeline per test-design-system.md CI/CD Pipeline Architecture: Smoke (@p0) → Unit+Integration → E2E (@p1) → Burn-In (@p0 3x) → Load (k6).
 2. Configure parallelization (4 shards for unit tests, 2 shards for E2E) and timeout limits per stage.
-3. Set up deployment workflows: `deploy-web.yml` (Vercel), `deploy-api.yml` (Fly.io), `deploy-mobile.yml` (Expo EAS) triggered on main branch merges.
+3. Set up deployment workflows: `deploy-web.yml` (Vercel web+API serverless), `deploy-mobile.yml` (Expo EAS) triggered on main branch merges.
 4. Configure artifact retention per test-design-system.md: traces (7d/30d), videos (14d), reports (90d), JUnit XML (365d) with S3 lifecycle policies.
 5. Implement failure triage: Slack alerts (#test-failures, #flaky-tests) and PagerDuty for smoke test failures.
    **Prerequisites:** CC-0.1 (monorepo), CC-0.2 (Prisma), CC-0.10 (test fixtures for CI).

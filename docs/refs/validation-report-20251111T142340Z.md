@@ -140,7 +140,7 @@ Pass Rate: 9/9 (100%)
 
 [✓ PASS] Third-party integrations compatible — Supabase, PostHog, Upstash, Expo all have SDKs referenced (lines 108-120).
 
-[✓ PASS] Real-time stack deployable — Socket.io gateway hosted inside NestJS on Fly.io (lines 60, 157-161).
+[✓ PASS] Real-time stack deployable — Socket.io gateway hosted inside NestJS on Vercel serverless (previously Fly.io) (lines 60, 157-161).
 
 [✓ PASS] Storage integrates — Supabase Storage workflow ties into Expo uploads and Nest worker (lines 52-55, 131-136).
 

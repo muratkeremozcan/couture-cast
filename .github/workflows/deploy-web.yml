@@ -1,0 +1,75 @@
+name: Deploy web (main)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy-web-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Verify required secrets
+        run: |
+          missing=()
+          [ -z "${{ secrets.VERCEL_TOKEN }}" ] && missing+=(VERCEL_TOKEN)
+          [ -z "${{ secrets.VERCEL_ORG_ID }}" ] && missing+=(VERCEL_ORG_ID)
+          [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ] && missing+=(VERCEL_PROJECT_ID)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "Vercel secrets missing: ${missing[*]}" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'true'
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment (prod)
+        env:
+          VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ env.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=production --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"
+
+      - name: Build web app
+        env:
+          VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ env.VERCEL_TOKEN }}
+        run: |
+          npm run build --workspace web
+          vercel build --prod --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"
+
+      - name: Deploy to Vercel (prod)
+        env:
+          VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ env.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID"
+
+      - name: Summary
+        run: |
+          {
+            echo "## Deploy web (main)";
+            echo "- Trigger: \`${{ github.event_name }}\`";
+            echo "- Scope: $VERCEL_ORG_ID";
+            echo "- Project: $VERCEL_PROJECT_ID";
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -35,7 +35,7 @@ workflow_status: "  # Phase 1: Analysis
 
   # Phase 2: Planning
   prd: docs/PRD.md
-  validate-prd: docs/refs/validation-report-20251105T145847.md
+  validate-prd: docs/refs/validation-report-20251111T142340Z.md
   create-design: docs/ux-design-specification.md
 
   # Phase 3: Solutioning

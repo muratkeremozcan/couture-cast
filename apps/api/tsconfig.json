@@ -25,6 +25,7 @@
   "include": [
     "src/**/*.ts",
     "integration/**/*.ts",
+    "api/**/*.ts",
     "test/**/*.ts",
     "vitest.config.ts",
     "src/modules/events/**/*.spec.ts"
