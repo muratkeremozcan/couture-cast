@@ -13,7 +13,7 @@ test.describe('Web health metadata', () => {
       metadata.healthEndpoint ?? new URL('/api/health', fallbackBaseUrl).toString()
 
     const healthUrl = new URL(healthEndpoint)
-    const vercelBypassToken = process.env.VERCEL_PROTECTION_BYPASS?.trim()
+    const vercelBypassToken = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim()
     const vercelBypassHeaders = vercelBypassToken
       ? {
           'x-vercel-protection-bypass': vercelBypassToken,
@@ -37,11 +37,11 @@ test.describe('Web health metadata', () => {
     if (status === 401) {
       if (!vercelBypassToken) {
         throw new Error(
-          'Health check returned 401 (Vercel Preview is protected). Set VERCEL_PROTECTION_BYPASS in CI to bypass.'
+          'Health check returned 401 (Vercel Preview is protected). Set VERCEL_AUTOMATION_BYPASS_SECRET in CI to bypass.'
         )
       }
       throw new Error(
-        'Health check returned 401 even with VERCEL_PROTECTION_BYPASS set. Verify the bypass token is valid.'
+        'Health check returned 401 even with VERCEL_AUTOMATION_BYPASS_SECRET set. Verify the bypass token is valid.'
       )
     }
 

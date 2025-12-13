@@ -126,9 +126,9 @@ Notes against ACs
   - [x] Document how to run workflows locally (act or manual)
 
 - [ ] Task 12: Run Playwright smoke against Vercel Preview deployments (PRs) (AC: #3)
-  - [x] Add `.github/workflows/vercel-preview-smoke.yml` triggered by `deployment_status` (Preview, success)
+  - [x] Add `.github/workflows/pr-pw-e2e-vercel-preview.yml` triggered by `deployment_status` (Preview, success)
   - [x] Pass Vercel Preview URL to Playwright via `custom_base_url` → `DEV_WEB_E2E_BASE_URL`
-  - [x] Support protected Preview deploys via `VERCEL_PROTECTION_BYPASS` (bypass headers for `/api/health`)
+  - [x] Support protected Preview deploys via `VERCEL_AUTOMATION_BYPASS_SECRET` (bypass headers for `/api/health`)
   - [ ] Vercel Dashboard: ensure Git integration has `deployment_status` events enabled (Project → Settings → Git)
   - [ ] Verify on a PR: Vercel Preview deploy completes → smoke workflow runs → `web-health-sha.spec.ts` passes
 
@@ -359,16 +359,18 @@ GPT-5.2 (Codex CLI)
 
 - ✅ AC3: Added deploy workflows for web/api/mobile with secret gating, health checks, and dispatch triggers; regression tests added for presence.
 - ✅ AC3: Added `deployment_status`-triggered smoke workflow for Vercel Preview deployments (PRs), reusing Playwright SHA health check.
-- ✅ Task 12: Added `VERCEL_PROTECTION_BYPASS` support so smoke tests can run against protected Preview deployments.
+- ✅ Task 12: Added `VERCEL_AUTOMATION_BYPASS_SECRET` support so smoke tests can run against protected Preview deployments.
 - ✅ AC3: Removed redundant GitHub Actions web deploy workflows; Vercel Git integration remains source of truth for deployments.
 
 ### File List
 
 - .prettierignore
+- .env.example
 - .github/workflows/deploy-web.yml (deleted)
 - .github/workflows/deploy-mobile.yml
 - .github/workflows/promote-web-to-prod.yml (deleted)
-- .github/workflows/vercel-preview-smoke.yml
+- .github/workflows/pr-pw-e2e-vercel-preview.yml
+- .github/workflows/vercel-preview-smoke.yml (deleted)
 - .github/workflows/vercel-preview-e2e.yml (deleted)
 - .github/workflows/rwf-e2e.yml
 - .husky/install.mjs
@@ -377,6 +379,7 @@ GPT-5.2 (Codex CLI)
 - apps/mobile/eas.json
 - apps/api/integration/deployment-workflows.spec.ts
 - playwright/config/dev.config.ts
+- playwright/tests/home.spec.ts
 - playwright/tests/web-health-sha.spec.ts
 - README.md
 - docs/ci-cd-pipeline.md
@@ -391,4 +394,4 @@ GPT-5.2 (Codex CLI)
 | 2025-12-13 | Amelia (Dev Agent) | Documented Vercel constraints (Hobby: `main` = Production), added Preview smoke checks, and aligned CI/CD documentation |
 | 2025-12-13 | Amelia (Dev Agent) | Added Vercel Preview deployment smoke workflow (deployment_status → Playwright) and clarified Preview-as-dev mapping |
 | 2025-12-13 | Amelia (Dev Agent) | Removed redundant GitHub Actions web deploy workflows; rely on Vercel Git deploys + Preview smoke checks |
-| 2025-12-13 | Amelia (Dev Agent) | Unblocked Preview smoke on protected deployments via `VERCEL_PROTECTION_BYPASS` and aligned workflow naming/docs |
+| 2025-12-13 | Amelia (Dev Agent) | Unblocked Preview smoke on protected deployments via `VERCEL_AUTOMATION_BYPASS_SECRET` and aligned workflow naming/docs |

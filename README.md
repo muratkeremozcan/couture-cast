@@ -149,12 +149,12 @@ Local E2E with clean DB:
 
 ### CI at a glance
 
-| Workflow                                     | What it runs                                          | Notes                                                                                                                                               |
-| -------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.github/workflows/pr-checks.yml`            | Typecheck → Lint → Build → Tests (workspace graph)    | Required on PRs; matches Node 24 baseline.                                                                                                          |
-| `.github/workflows/pr-pw-e2e.yml`            | Playwright smoke (Chromium) with HTML/trace artifacts | Web-only e2e gate; uses webServer hook on port 3005.                                                                                                |
-| `.github/workflows/vercel-preview-smoke.yml` | Playwright smoke against Vercel Preview               | Triggered by Vercel `deployment_status`; runs `npm run test:pw-dev` against the Preview URL via `DEV_WEB_E2E_BASE_URL`.                             |
-| `.github/workflows/pr-mobile-e2e.yml`        | Manual-only Maestro Android smoke (build + emulator)  | Not run on PRs: GitHub-hosted Android emulators are slow/flaky (30–40m, boot failures). Trigger via `workflow_dispatch` or run locally/self-hosted. |
+| Workflow                                         | What it runs                                          | Notes                                                                                                                                               |
+| ------------------------------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/pr-checks.yml`                | Typecheck → Lint → Build → Tests (workspace graph)    | Required on PRs; matches Node 24 baseline.                                                                                                          |
+| `.github/workflows/pr-pw-e2e.yml`                | Playwright smoke (Chromium) with HTML/trace artifacts | Web-only e2e gate; uses webServer hook on port 3005.                                                                                                |
+| `.github/workflows/pr-pw-e2e-vercel-preview.yml` | Playwright smoke against Vercel Preview               | Triggered by Vercel `deployment_status`; runs `npm run test:pw-dev` against the Preview URL via `DEV_WEB_E2E_BASE_URL`.                             |
+| `.github/workflows/pr-mobile-e2e.yml`            | Manual-only Maestro Android smoke (build + emulator)  | Not run on PRs: GitHub-hosted Android emulators are slow/flaky (30–40m, boot failures). Trigger via `workflow_dispatch` or run locally/self-hosted. |
 
 **Playwright coverage:** web landing smoke with API health ping, hero/nav assertions, axe-core check, traces/artifacts uploaded in CI.  
 **Mobile e2e:** Maestro sanity (Expo tabs) is local-only; CI disabled due to GitHub-hosted emulator instability and long runtimes. Run via `npm run test:mobile:e2e` on your machine or on a self-hosted/device cloud runner if needed.
@@ -162,11 +162,14 @@ Local E2E with clean DB:
 ### Vercel Preview = "dev" for `test:pw-dev`
 
 On our current Vercel setup (Hobby plan), `main` is the Production branch and PR branches get Preview deployments. In CI we treat Vercel
-Preview URLs as the "dev" target: `vercel-preview-smoke.yml` reads the Preview URL from the GitHub `deployment_status` event and sets
+Preview URLs as the "dev" target: `pr-pw-e2e-vercel-preview.yml` reads the Preview URL from the GitHub `deployment_status` event and sets
 `DEV_WEB_E2E_BASE_URL`, so `npm run test:pw-dev` runs against that Preview deployment.
 
-If your Preview deployments are protected (health check returns 401), set `VERCEL_PROTECTION_BYPASS` locally (in `.env.dev`) and in CI
-(GitHub repo secret). See `docs/ci-cd-pipeline.md`.
+If your Preview deployments are protected (health check returns 401), set `VERCEL_AUTOMATION_BYPASS_SECRET` locally (in `.env.dev`) and
+in CI (GitHub repo secret). See `docs/ci-cd-pipeline.md`.
+
+Local shortcut: set `VERCEL_WEB_PROJECT_SLUG` + `VERCEL_TEAM_SLUG` in `.env.dev` and `TEST_ENV=dev` will derive the stable per-branch
+Preview URL (`https://<project>-git-<branch>-<team>.vercel.app`) when `DEV_WEB_E2E_BASE_URL` is not set.
 
 ## Helpful references
 

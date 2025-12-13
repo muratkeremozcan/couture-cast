@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { resolveGitMetadata } from '../../../apps/web/git-metadata'
 import { config as loadEnv } from 'dotenv'
 
 // Load environment file based on TEST_ENV (falls back to .env)
@@ -32,6 +33,35 @@ export type EnvironmentConfig = {
 
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
 
+function slugifyVercelGitRef(value: string) {
+  const normalized = value
+    .replace(/^refs\/heads\//, '')
+    .trim()
+    .toLowerCase()
+  const slug = normalized
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '')
+  return slug || 'main'
+}
+
+function resolveLocalVercelPreviewUrl() {
+  const projectSlug = process.env.VERCEL_WEB_PROJECT_SLUG
+  const teamSlug = process.env.VERCEL_TEAM_SLUG
+  if (!projectSlug || !teamSlug) return undefined
+
+  const { gitBranch } = resolveGitMetadata()
+  const branch =
+    process.env.VERCEL_GIT_COMMIT_REF ??
+    process.env.GITHUB_HEAD_REF ??
+    process.env.GIT_BRANCH ??
+    gitBranch ??
+    'main'
+
+  const branchSlug = slugifyVercelGitRef(branch)
+  return `https://${projectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
+}
+
 const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'>> = {
   local: {
     webBaseUrl:
@@ -57,6 +87,7 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
       (process.env.VERCEL_BRANCH_URL
         ? `https://${process.env.VERCEL_BRANCH_URL}`
         : undefined) ??
+      resolveLocalVercelPreviewUrl() ??
       'https://dev.couturecast.app',
     apiBaseUrl:
       process.env.DEV_API_BASE_URL ??

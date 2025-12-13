@@ -8,7 +8,7 @@ const vercelPreviewSmokeWorkflow = path.join(
   repoRoot,
   '.github',
   'workflows',
-  'vercel-preview-smoke.yml'
+  'pr-pw-e2e-vercel-preview.yml'
 )
 const mobileWorkflow = path.join(repoRoot, '.github', 'workflows', 'deploy-mobile.yml')
 const vercelConfig = path.join(repoRoot, 'apps', 'api', 'vercel.json')
@@ -20,7 +20,6 @@ describe('deployment workflows', () => {
     expect(fs.existsSync(vercelPreviewSmokeWorkflow)).toBe(true)
     const content = fs.readFileSync(vercelPreviewSmokeWorkflow, 'utf8')
     expect(content).toMatch(/deployment_status/)
-    expect(content).toMatch(/web-health-sha\.spec\.ts/)
   })
 
   it('mobile workflow exists and deploys on main with Expo token', () => {

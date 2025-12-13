@@ -16,7 +16,7 @@ flowchart TD
   PR[Pull request] --> PRChecks[pr-checks.yml]
   PR --> PRE2E[pr-pw-e2e.yml]
   PR --> VercelPreview[Vercel Preview deploy]
-  VercelPreview --> PreviewSmoke[vercel-preview-smoke.yml (web-health-sha)]
+  VercelPreview --> PreviewSmoke[pr-pw-e2e-vercel-preview.yml (web-health-sha)]
   PRChecks --> Merge[Merge to main]
   PRE2E --> Merge
   Merge --> VercelProd[Vercel Production deploy (main)]
@@ -39,7 +39,7 @@ Playwright environment selection uses `TEST_ENV`:
 
 ### Vercel Preview smoke
 
-- `.github/workflows/vercel-preview-smoke.yml`: runs Playwright smoke against the Vercel Preview URL once Vercel reports a successful deployment status.
+- `.github/workflows/pr-pw-e2e-vercel-preview.yml`: runs Playwright smoke against the Vercel Preview URL once Vercel reports a successful deployment status.
 
 ### Deploy (mobile)
 
@@ -56,7 +56,7 @@ Playwright environment selection uses `TEST_ENV`:
 
 2. If Vercel Preview deployments are protected (health check returns 401):
    - Create a Protection Bypass token in Vercel (Project → Settings → Deployment Protection → Protection Bypass)
-   - Add it to GitHub repo secrets as `VERCEL_PROTECTION_BYPASS`
+   - Add it to GitHub repo secrets as `VERCEL_AUTOMATION_BYPASS_SECRET`
 
 `playwright/tests/web-health-sha.spec.ts` automatically adds the bypass headers when the secret is present.
 
@@ -65,12 +65,12 @@ Playwright environment selection uses `TEST_ENV`:
 GitHub repo secrets:
 
 - `EXPO_TOKEN` (mobile deploy)
-- `VERCEL_PROTECTION_BYPASS` (optional; only needed if Preview deployments are protected)
+- `VERCEL_AUTOMATION_BYPASS_SECRET` (optional; only needed if Preview deployments are protected)
 
 ## Troubleshooting
 
 - Preview smoke workflow never runs: confirm `deployment_status Events` is enabled in Vercel Git settings.
-- Health check returns 401: set `VERCEL_PROTECTION_BYPASS` or disable Preview protection in Vercel.
+- Health check returns 401: set `VERCEL_AUTOMATION_BYPASS_SECRET` or disable Preview protection in Vercel.
 - SHA mismatch: `/api/health.gitSha` must match the deployed commit (`VERCEL_GIT_COMMIT_SHA`).
 - Playwright hits the wrong base URL: set `DEV_WEB_E2E_BASE_URL` / `PROD_WEB_E2E_BASE_URL`.
 
