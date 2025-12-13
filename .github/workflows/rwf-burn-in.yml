@@ -74,6 +74,10 @@ jobs:
         run: |
           HUSKY=0 NEXT_DISABLE_ESLINT=1 NEXT_PRIVATE_SKIP_TYPE_CHECK=1 npm run build --workspace web
           npm run test:pw:burn-in-changed -- --base-branch=${{ inputs.base-ref }}
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          GITHUB_SHA: ${{ github.sha }}
+          TEST_ENV: local
 
       - name: Comment on burn-in failure
         if: ${{ github.event_name == 'pull_request' && steps.detect-changed.outputs.changed == 'true' && failure() }}
