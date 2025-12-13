@@ -38,7 +38,8 @@ so that credentials stay secure across environments and comply with security bes
     - `GRAFANA_OTLP_ENDPOINT`: Grafana OTLP endpoint URL
     - `EXPO_ACCESS_TOKEN`: Expo Push API token
     - `VERCEL_TOKEN`: Vercel deployment token
-    - `FLY_API_TOKEN`: Fly.io API token
+    - `VERCEL_ORG_ID`: Vercel org/team ID
+    - `VERCEL_PROJECT_ID_WEB`: Vercel project ID for web/API deploy
     - `SLACK_WEBHOOK_URL`: Slack incoming webhook
     - `PAGERDUTY_INTEGRATION_KEY`: PagerDuty service key
     - `JWT_SECRET`: JWT signing secret (32 bytes, generated via OpenSSL)

@@ -6,7 +6,7 @@ _Created on 2025-11-10 by BMad-user_
 
 ## Executive Summary
 
-CoutureCast runs on a Supabase-first platform where a NestJS decision layer powers weather intelligence, outfit personalization, moderation, and notifications, while Expo Router delivers the ritual across iOS/Android/watch and Next.js App Router handles the responsive web plus admin tooling. A Turborepo monorepo keeps shared Prisma models, design tokens, and automated tests aligned so multiple agents can ship features without collisions. Free-tier friendly services (Supabase, Upstash, PostHog, Vercel, Fly.io, Expo EAS) let us launch quickly yet scale smoothly once the app succeeds in the stores.
+CoutureCast runs on a Supabase-first platform where a NestJS decision layer powers weather intelligence, outfit personalization, moderation, and notifications, while Expo Router delivers the ritual across iOS/Android/watch and Next.js App Router handles the responsive web plus admin tooling. A Turborepo monorepo keeps shared Prisma models, design tokens, and automated tests aligned so multiple agents can ship features without collisions. Free-tier friendly services (Supabase, Upstash, PostHog, Vercel for web/API, Expo EAS) let us launch quickly yet scale smoothly once the app succeeds in the stores.
 
 ## Project Initialization
 
@@ -62,7 +62,7 @@ These commands establish TypeScript, ESLint, testing harnesses, and directory co
 | Personalization           | NestJS module + BullMQ + Redis cache                      | BullMQ 4.12.0 / Upstash Redis 1.29   | 2             | Deterministic rules + optional ML hook with caching                                 |
 | Moderation                | NSFW model + text filters + human console (Next.js admin) | TensorFlow.js 4.16.0                 | 6             | Meets 24h SLA, logs to Postgres audit trail                                         |
 | Real-time + notifications | Socket.io + Expo Push API                                 | Socket.io 4.7.2 / Expo SDK 51.0.3    | 1‑6           | Live ritual updates plus push alerts without extra vendors                          |
-| Deployment                | Vercel (web), Fly.io (API/workers), Expo EAS (apps)       | Vercel Platform 2025.10 / Fly Machines v2.3 / Expo EAS CLI 3.17 | All | Free-tier friendly, regional scaling ready                                          |
+| Deployment                | Vercel (web/API serverless), Expo EAS (apps)              | Vercel Platform 2025.10 / Expo EAS CLI 3.17 | All | Free-tier friendly, regional scaling ready                                          |
 | Search                    | PostgreSQL FTS + trigram (upgrade path to Typesense)      | pg_trgm 1.6                          | 3‑6           | No extra cost now, abstraction ready for Typesense                                  |
 | Background jobs           | BullMQ + Nest Cron decorators                             | BullMQ 4.12.0 / @nestjs/schedule 4.0 | 1‑6           | Unified queueing for weather, alerts, moderation                                    |
 | Analytics/flags           | PostHog + OpenTelemetry → Grafana Cloud                   | PostHog Cloud 1.83 / OTLP exporter 0.50 | All        | Product analytics, feature flags, observability in one stack                        |
@@ -85,7 +85,7 @@ couturecast/
 │  ├─ api-client/           # Generated OpenAPI SDK consumed by apps
 │  └─ testing/              # Playwright/Maestro fixtures + mock servers and seed utils
 ├─ infra/
-│  ├─ fly/                  # Fly.io app + process group configs
+│  ├─ vercel/               # Vercel configs (web/api projects)
 │  ├─ vercel/               # Edge Config, env templates
 │  └─ eas/                  # Expo EAS configs (ignored in git)
 ├─ tools/                   # Scripts/generators (migrate, seed, sync-i18n)
@@ -188,7 +188,7 @@ couturecast/
 ## Deployment Architecture
 
 - **Web:** Vercel (Hobby tier). Preview deployments per PR; promote to production on main merges.
-- **API + workers:** Fly.io using one app with two process groups (HTTP, worker). Auto-scaling based on CPU/queue depth; optional regional replicas once adoption grows.
+- **API + workers:** Vercel serverless (Nest adapter) for HTTP; background workers deferred until workload requires dedicated hosts.
 - **Mobile:** Expo EAS for build/signing, distributing via App/Play stores. OTA updates for minor UI copy or token tweaks.
 - **Networking:** Custom domain `couturecast.app` with `app.` (Vercel) and `api.` (Fly) subdomains; HSTS enforced. Socket.io + REST behind HTTPS only.
 
@@ -220,7 +220,7 @@ npm run test:e2e:mobile   # Maestro flows
 5. **ADR-005 Personalization Engine:** NestJS module + BullMQ + Redis caching with ML hook.
 6. **ADR-006 Moderation Pipeline:** Automated NSFW/text screening plus human console + audit logging.
 7. **ADR-007 Real-time + Notifications:** Socket.io + Expo Push + shared payload schema.
-8. **ADR-008 Deployment Targets:** Vercel (web), Fly.io (API/workers), Expo EAS (stores), Upstash Redis, PostHog analytics.
+8. **ADR-008 Deployment Targets:** Vercel (web/API serverless), Expo EAS (stores), Upstash Redis, PostHog analytics.
 9. **ADR-009 Search Strategy:** Postgres FTS now, Typesense-ready abstraction for scale.
 10. **ADR-010 Testing & CI:** Turborepo orchestrated Vitest unit suites plus Playwright/Maestro end-to-end checks gating every PR.
 11. **ADR-011 Edge Caching & Experiments:** Vercel Edge Config + PostHog experiments for premium/commercial trials.
