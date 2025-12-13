@@ -75,6 +75,7 @@ jobs:
           HUSKY=0 NEXT_DISABLE_ESLINT=1 NEXT_PRIVATE_SKIP_TYPE_CHECK=1 npm run build --workspace web
           npm run test:pw:burn-in-changed -- --base-branch=${{ inputs.base-ref }}
         env:
+          # Align health check SHA with the build produced in this workflow; use HEAD, not the PR merge ref
           EXPECTED_SHA: ${{ steps.git-sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.git-sha.outputs.sha }}
           TEST_ENV: local

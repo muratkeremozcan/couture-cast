@@ -49,9 +49,6 @@ jobs:
     needs: [vars, burn-in]
     timeout-minutes: 15
     runs-on: ubuntu-latest
-    env:
-      EXPECTED_SHA: ${{ steps.git_sha.outputs.sha }}
-      GITHUB_SHA: ${{ steps.git_sha.outputs.sha }}
     strategy:
       fail-fast: false
       matrix:
@@ -73,6 +70,13 @@ jobs:
       - name: Record git SHA
         id: git_sha
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Export expected SHA
+        # Align health check SHA with the build we just produced; using HEAD here
+        # avoids comparing against a merge/ref SHA that differs from the built app.
+        run: |
+          echo "EXPECTED_SHA=${{ steps.git_sha.outputs.sha }}" >> "$GITHUB_ENV"
+          echo "GITHUB_SHA=${{ steps.git_sha.outputs.sha }}" >> "$GITHUB_ENV"
 
       - name: Setup Node environment
         uses: ./.github/actions/install
