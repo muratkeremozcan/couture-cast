@@ -72,6 +72,7 @@ jobs:
         working-directory: ${{ inputs.test-directory }}
         if: steps.detect-changed.outputs.changed == 'true'
         run: |
+          HUSKY=0 NEXT_DISABLE_ESLINT=1 NEXT_PRIVATE_SKIP_TYPE_CHECK=1 npm run build --workspace web
           npm run test:pw:burn-in-changed -- --base-branch=${{ inputs.base-ref }}
 
       - name: Comment on burn-in failure

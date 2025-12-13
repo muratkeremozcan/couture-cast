@@ -37,6 +37,13 @@ test.describe('Web health metadata', () => {
     expect((payload.gitSha as string).length).toBeGreaterThan(0)
     expect(payload.gitSha).not.toBe('unknown')
     expect(typeof payload.gitBranch).toBe('string')
+    expect(typeof payload.environment).toBe('string')
+    expect((payload.environment as string).length).toBeGreaterThan(0)
+
+    if (payload.deployUrl !== undefined) {
+      expect(typeof payload.deployUrl).toBe('string')
+      expect((payload.deployUrl as string).length).toBeGreaterThan(0)
+    }
 
     const expectedSha = getExpectedSha()
     if (expectedSha) {

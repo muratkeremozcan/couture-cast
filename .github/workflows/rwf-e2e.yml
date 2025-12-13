@@ -41,13 +41,12 @@ jobs:
       - name: Setup Playwright browsers
         uses: ./.github/actions/setup-playwright-browsers
 
-      - name: Install Playwright chromium
-        run: npx playwright install chromium
-
       - name: Run Playwright
         env:
           TEST_ENV: ${{ inputs.test_env }}
           CUSTOM_BASE_URL: ${{ inputs.custom_base_url }}
+          EXPECTED_SHA: ${{ github.sha }}
+          GITHUB_SHA: ${{ github.sha }}
         run: ${{ inputs.test_command }}
 
       - name: Upload Playwright artifacts

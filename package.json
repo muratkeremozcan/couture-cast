@@ -21,7 +21,7 @@
     "format": "prettier --ignore-path .prettierignore --write \"**/*.{ts,tsx,js,json,md}\"",
     "lint:staged": "lint-staged",
     "test": "npm run --workspaces --if-present test",
-    "start:web": "npm run start --workspace web -- --hostname 127.0.0.1 --port 3005",
+    "start:web": "npm run build && npm run start --workspace web -- --hostname 127.0.0.1 --port 3005",
     "start:api": "npm run db:generate && cross-env PORT=4000 npm run start:dev --workspace api",
     "start:mobile:server": "bash ./scripts/start-mobile-server.sh",
     "start:mobile:e2e": "node ./scripts/mobile-e2e-all.mjs",

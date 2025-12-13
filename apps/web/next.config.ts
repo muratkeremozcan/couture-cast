@@ -1,22 +1,7 @@
 import type { NextConfig } from 'next'
-import { execSync } from 'node:child_process'
+import { resolveGitMetadata } from './git-metadata'
 
-function safeGit(cmd: string) {
-  try {
-    return execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-  } catch {
-    return undefined
-  }
-}
-
-const buildGitSha =
-  process.env.VERCEL_GIT_COMMIT_SHA ??
-  process.env.COMMIT_SHA ??
-  safeGit('git rev-parse HEAD')
-const buildGitBranch =
-  process.env.VERCEL_GIT_COMMIT_REF ??
-  process.env.GIT_BRANCH ??
-  safeGit('git rev-parse --abbrev-ref HEAD')
+const { gitSha: buildGitSha, gitBranch: buildGitBranch } = resolveGitMetadata()
 
 const nextConfig: NextConfig = {
   env: {
