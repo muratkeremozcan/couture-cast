@@ -14,7 +14,7 @@ Updated: 2025-11-17 — Initial Playwright framework scaffolding for Story 13 (a
 2. `cp .env.example .env` and add secrets (only `SUPABASE_SERVICE_ROLE_KEY` needed; all URLs/credentials are in code at `playwright/support/config/environments.ts`)
 3. `npx playwright install --with-deps`
 4. `npm run test:pw-local` (automatically sets `TEST_ENV=local`)
-5. Use the other helpers—`npm run test:pw-dev`, `npm run test:pw-stage`, `npm run test:pw-prod`—when remote deployments are ready, or run `TEST_ENV=<env> npm run test:pw` directly to target a custom environment.
+5. Use the other helpers—`npm run test:pw-dev` or `npm run test:pw-prod`—when remote deployments are ready, or run `TEST_ENV=<env> npm run test:pw` directly to target a custom environment.
 
 Recent additions:
 
@@ -56,7 +56,7 @@ playwright/
 ## Environment management
 
 - `support/config/environments.ts` centralizes environment metadata (web/API origins, auth defaults, headers).
-- `TEST_ENV` chooses between `local`, `dev`, `stage`, and `prod`; missing or invalid values throw early.
+- `TEST_ENV` chooses between `local`, `dev`, and `prod`; missing or invalid values throw early.
 - `.env` holds all environment URLs + credentials so helpers/fixtures remain stateless functional helpers.
 
 ## Reporting + artifacts

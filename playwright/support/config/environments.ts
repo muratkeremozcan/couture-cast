@@ -13,7 +13,7 @@ for (const file of envFiles) {
   }
 }
 
-export type EnvironmentName = 'local' | 'dev' | 'stage' | 'prod'
+export type EnvironmentName = 'local' | 'dev' | 'prod'
 
 type Credentials = {
   email: string
@@ -60,25 +60,6 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
       defaultUser: {
         email: process.env.DEV_AUTH_USERNAME ?? 'dev.tester@couturecast.app',
         password: process.env.DEV_AUTH_PASSWORD ?? 'dev-password',
-      },
-    },
-    apiHeaders: supabaseServiceRoleKey
-      ? {
-          apikey: supabaseServiceRoleKey,
-          authorization: `Bearer ${supabaseServiceRoleKey}`,
-        }
-      : {},
-  },
-  stage: {
-    webBaseUrl:
-      process.env.STAGE_WEB_E2E_BASE_URL ??
-      process.env.STAGE_WEB_BASE_URL ??
-      'https://stage.couturecast.app',
-    apiBaseUrl: process.env.STAGE_API_BASE_URL ?? 'https://stage-api.couturecast.app',
-    credentials: {
-      defaultUser: {
-        email: process.env.STAGE_AUTH_USERNAME ?? 'stage.tester@couturecast.app',
-        password: process.env.STAGE_AUTH_PASSWORD ?? 'stage-password',
       },
     },
     apiHeaders: supabaseServiceRoleKey

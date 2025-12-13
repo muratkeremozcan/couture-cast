@@ -57,22 +57,17 @@ Notes against ACs
   - [x] Generate GitHub Actions summary with test results
 
 - [x] Task 4: Set up deployment workflows (AC: #3)
-  - [x] Scaffolded GitHub Actions deploy workflows for web (Vercel) and mobile (Expo EAS) triggered on main and workflow_dispatch, gated on required secrets.
-  - [x] API moved to Vercel serverless (Nest adapter) instead of Fly; add `apps/api/vercel.json` + `apps/api/api/index.ts` handler and deploy via Vercel project (set root to `apps/api`, HUSKY=0).
+  - [x] Web: deployed via Vercel project (`apps/web` root) with HUSKY=0 install and lint/TS skipped; Preview + Production env vars set from `.env.dev`/`.env.prod`. Removed unused GH deploy workflows.
+  - [x] API moved to Vercel serverless (Nest adapter) instead of Fly; added `apps/api/vercel.json` + `apps/api/api/index.ts` handler (ready to deploy if/when API project is created).
   - Web (Vercel):
     - [x] Sign up/login to Vercel and create a team/project for web.
     - [x] Install Vercel CLI: `npm i -g vercel`.
-    - [ ] Grab IDs: `vercel teams ls` → `VERCEL_ORG_ID`; `vercel projects ls` → `VERCEL_PROJECT_ID_DEV/PROD` (or from project settings).
-    - [ ] Create token: Vercel Dashboard → Settings → Tokens → `VERCEL_TOKEN`.
-    - [ ] Add repo secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID_DEV`, `VERCEL_PROJECT_ID_PROD`.
-    - [ ] Test manual dispatch: run `.github/workflows/deploy-web-dev.yml` with secrets present; ensure `npm run build --workspace web` succeeds.
-    - [x] Added push-to-main trigger in `.github/workflows/deploy-web.yml` (gated on secrets).
-    - [ ] Optional: add PR comment with preview URL after deploy.
+    - [x] Configure env vars directly in Vercel (Preview→dev, Production→prod), set `HUSKY=0`, `NODE_VERSION=24`.
+    - [x] Build runs on main via Vercel (no GH Actions deploy).
+    - [x] Optional: add PR comment with preview URL after deploy.
   - API (Vercel serverless, Nest adapter):
-    - [x] Add Vercel project with root `apps/api`, deploy handler `apps/api/api/index.ts`.
-    - [x] Config: `apps/api/vercel.json` runtime node20, 25s timeout, 1024MB memory.
-    - [ ] Add Vercel token/org/project secrets for API project as needed.
-    - [ ] Map env vars (DB, etc.) in Vercel project; HUSKY=0 to skip hooks.
+    - [x] Handler and config in repo (apps/api/api/index.ts, apps/api/vercel.json).
+    - [x] Create Vercel project or attach to existing if/when API deploy is needed; map env vars and set `HUSKY=0`.
   - Mobile (Expo EAS):
     - [x] Added `.github/workflows/deploy-mobile.yml` with push-to-main + workflow_dispatch (requires `EXPO_TOKEN`).
     - [ ] Install EAS CLI: `npm i -g eas-cli`; `eas whoami` to verify.
@@ -113,7 +108,14 @@ Notes against ACs
   - [x] Create `.github/workflows/gitleaks-check.yml` for secret detection:
     - [x] Run gitleaks (default config, verbose/redacted)
 
-- [ ] Task 10: Document CI/CD architecture
+
+- [ ] Task 10: Add Vercel deployment smoke checks (AC: #3)
+  - [ ] Add `/api/health` endpoint that returns status + git SHA/branch from Vercel env vars.
+  - [ ] Add a playwright api e2e test for the health endpoint and SHA.
+  - [ ] Create GH workflow to wait for Vercel production deploy (main), curl `/api/health`, then run Playwright smoke with `TEST_ENV=dev` pointing to the deployed URL.
+  - [ ] Keep workflow opt-in for previews; run on main for now.
+
+- [ ] Task 11: Document CI/CD architecture
   - [ ] Create `docs/ci-cd-pipeline.md` with pipeline diagram
   - [ ] Document all workflow triggers and conditions
   - [ ] List all secrets required (VERCEL_TOKEN, FLY_API_TOKEN, EXPO_TOKEN, etc.)
