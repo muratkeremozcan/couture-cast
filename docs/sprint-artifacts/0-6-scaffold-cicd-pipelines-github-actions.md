@@ -113,6 +113,7 @@ Notes against ACs
   - [ ] Add `/api/health` endpoint that returns status + git SHA/branch from Vercel env vars.
   - [ ] Add a playwright api e2e test for the health endpoint and SHA.
   - [ ] Create GH workflow to wait for Vercel production deploy (main), curl `/api/health`, then run Playwright smoke with `TEST_ENV=dev` pointing to the deployed URL.
+  - [ ] SHA validation: on deployment events, compare `gitSha` from `/api/health` to `deployment.sha` (short) and fail if mismatched; on manual dispatch, allow an input `expected_sha` and downgrade to warning when absent/mismatched.
   - [ ] Keep workflow opt-in for previews; run on main for now.
 
 - [ ] Task 11: Document CI/CD architecture

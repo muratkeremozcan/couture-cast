@@ -1,0 +1,23 @@
+name: "Dev E2E (Playwright)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      custom_base_url:
+        description: "Optional override for dev base URL"
+        required: false
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run-dev-tests:
+    uses: ./.github/workflows/rwf-e2e.yml
+    with:
+      test_env: "dev"
+      test_command: "npm run test:pw-dev"
+      gh_ref: ${{ github.sha }}
+      custom_base_url: ${{ inputs.custom_base_url }}
+    secrets: inherit

@@ -1,0 +1,43 @@
+name: "Manual E2E Tests"
+run-name: E2E - ${{ inputs.test_env }} - Manual
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_env:
+        type: choice
+        description: "Test Environment"
+        required: true
+        options:
+          - dev
+          - prod
+      custom_base_url:
+        description: "Custom base URL (optional override)"
+        type: string
+        required: false
+
+# if this workflow is triggered back to back, cancel the older run, but allow different test environments to run parallel
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.test_env }}
+  cancel-in-progress: true
+
+jobs:
+  run-dev-tests:
+    if: inputs.test_env == 'dev'
+    uses: ./.github/workflows/rwf-e2e.yml
+    with:
+      test_env: ${{ inputs.test_env }}
+      test_command: "npm run test:pw-dev"
+      gh_ref: ${{ github.ref_name }}
+      custom_base_url: ${{ inputs.custom_base_url }}
+    secrets: inherit
+
+  run-prod-tests:
+    if: inputs.test_env == 'prod'
+    uses: ./.github/workflows/rwf-e2e.yml
+    with:
+      test_env: ${{ inputs.test_env }}
+      test_command: "npm run test:pw-prod"
+      gh_ref: ${{ github.ref_name }}
+      custom_base_url: ${{ inputs.custom_base_url }}
+    secrets: inherit
