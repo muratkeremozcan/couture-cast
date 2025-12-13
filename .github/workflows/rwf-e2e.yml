@@ -1,0 +1,60 @@
+name: "Reusable E2E (Playwright)"
+run-name: E2E - ${{ inputs.test_env }} - ${{ inputs.test_command }}
+
+on:
+  workflow_call:
+    inputs:
+      test_env:
+        type: string
+        description: "Test environment (local|dev|prod)"
+        required: true
+      test_command:
+        type: string
+        description: "Playwright command to run (e.g., npm run test:pw-dev)"
+        required: true
+      gh_ref:
+        type: string
+        description: "Ref to checkout"
+        required: false
+        default: ${{ github.sha }}
+      custom_base_url:
+        type: string
+        description: "Optional override for base URL"
+        required: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.gh_ref }}
+
+      - name: Setup Node + deps
+        uses: ./.github/actions/install
+
+      - name: Setup Playwright browsers
+        uses: ./.github/actions/setup-playwright-browsers
+
+      - name: Run Playwright
+        env:
+          TEST_ENV: ${{ inputs.test_env }}
+          CUSTOM_BASE_URL: ${{ inputs.custom_base_url }}
+          EXPECTED_SHA: ${{ github.sha }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: ${{ inputs.test_command }}
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pw-artifacts-${{ inputs.test_env }}
+          path: |
+            playwright/artifacts/**
+            playwright/playwright-report/**
+          retention-days: 5

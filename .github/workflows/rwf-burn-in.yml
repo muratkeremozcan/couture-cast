@@ -72,7 +72,18 @@ jobs:
         working-directory: ${{ inputs.test-directory }}
         if: steps.detect-changed.outputs.changed == 'true'
         run: |
+          HUSKY=0 NEXT_DISABLE_ESLINT=1 NEXT_PRIVATE_SKIP_TYPE_CHECK=1 npm run build --workspace web
           npm run test:pw:burn-in-changed -- --base-branch=${{ inputs.base-ref }}
+        env:
+          # Align health check SHA with the build produced in this workflow; use HEAD, not the PR merge ref
+          EXPECTED_SHA: ${{ steps.git-sha.outputs.sha }}
+          GITHUB_SHA: ${{ steps.git-sha.outputs.sha }}
+          TEST_ENV: local
+
+      - name: Record git SHA
+        id: git-sha
+        if: steps.detect-changed.outputs.changed == 'true'
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Comment on burn-in failure
         if: ${{ github.event_name == 'pull_request' && steps.detect-changed.outputs.changed == 'true' && failure() }}

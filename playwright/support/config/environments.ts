@@ -54,8 +54,20 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
     webBaseUrl:
       process.env.DEV_WEB_E2E_BASE_URL ??
       process.env.DEV_WEB_BASE_URL ??
+      (process.env.VERCEL_BRANCH_URL
+        ? `https://${process.env.VERCEL_BRANCH_URL}`
+        : undefined) ??
       'https://dev.couturecast.app',
-    apiBaseUrl: process.env.DEV_API_BASE_URL ?? 'https://dev-api.couturecast.app',
+    apiBaseUrl:
+      process.env.DEV_API_BASE_URL ??
+      process.env.VERCEL_API_BRANCH_URL ??
+      (process.env.VERCEL_BRANCH_URL
+        ? `https://${process.env.VERCEL_BRANCH_URL}`.replace(
+            /(^https?:\/\/)([^.]+)\.([^.]+\.vercel\.app)/,
+            (_match, proto, sub, rest) => `${proto}${sub}-api.${rest}`
+          )
+        : undefined) ??
+      'https://dev-api.couturecast.app',
     credentials: {
       defaultUser: {
         email: process.env.DEV_AUTH_USERNAME ?? 'dev.tester@couturecast.app',
