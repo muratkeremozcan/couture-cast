@@ -35,6 +35,11 @@ jobs:
         with:
           ref: ${{ inputs.gh_ref }}
 
+      - name: Resolve expected SHA
+        id: expected_sha
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Setup Node + deps
         uses: ./.github/actions/install
 
@@ -42,12 +47,22 @@ jobs:
         uses: ./.github/actions/setup-playwright-browsers
 
       - name: Run Playwright
+        shell: bash
         env:
           TEST_ENV: ${{ inputs.test_env }}
-          CUSTOM_BASE_URL: ${{ inputs.custom_base_url }}
-          EXPECTED_SHA: ${{ github.sha }}
-          GITHUB_SHA: ${{ github.sha }}
-        run: ${{ inputs.test_command }}
+          EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
+          GITHUB_SHA: ${{ steps.expected_sha.outputs.sha }}
+        run: |
+          custom_base_url="${{ inputs.custom_base_url }}"
+          if [ -n "$custom_base_url" ]; then
+            case "${{ inputs.test_env }}" in
+              local) export WEB_E2E_BASE_URL="$custom_base_url" ;;
+              dev) export DEV_WEB_E2E_BASE_URL="$custom_base_url" ;;
+              prod) export PROD_WEB_E2E_BASE_URL="$custom_base_url" ;;
+            esac
+          fi
+
+          ${{ inputs.test_command }}
 
       - name: Upload Playwright artifacts
         if: always()

@@ -5,6 +5,7 @@ import { resolveEnvironmentConfig } from '../support/config/environments'
 
 const environment = resolveEnvironmentConfig('dev')
 
+// NOTE: In CI, "dev" is typically a Vercel Preview deployment URL passed via `DEV_WEB_E2E_BASE_URL`.
 export default defineConfig(
   merge({}, baseConfig, {
     use: {

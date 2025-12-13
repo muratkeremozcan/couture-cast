@@ -4,20 +4,23 @@ import path from 'node:path'
 
 const repoRoot = path.resolve(__dirname, '../../..')
 
-const webWorkflow = path.join(repoRoot, '.github', 'workflows', 'deploy-web.yml')
+const vercelPreviewSmokeWorkflow = path.join(
+  repoRoot,
+  '.github',
+  'workflows',
+  'vercel-preview-smoke.yml'
+)
 const mobileWorkflow = path.join(repoRoot, '.github', 'workflows', 'deploy-mobile.yml')
 const vercelConfig = path.join(repoRoot, 'apps', 'api', 'vercel.json')
 const apiHandler = path.join(repoRoot, 'apps', 'api', 'api', 'index.ts')
 const rootPackageJson = path.join(repoRoot, 'package.json')
 
 describe('deployment workflows', () => {
-  it('web workflow exists and deploys on main with Vercel secrets', () => {
-    expect(fs.existsSync(webWorkflow)).toBe(true)
-    const content = fs.readFileSync(webWorkflow, 'utf8')
-    expect(content).toMatch(/branches:\s*(\[[^\]]*main[^\]]*\]|[\s\S]*?-+\s*main)/)
-    expect(content).toMatch(/VERCEL_TOKEN/)
-    expect(content).toMatch(/VERCEL_ORG_ID/)
-    expect(content).toMatch(/VERCEL_PROJECT_ID/)
+  it('vercel preview smoke workflow exists and triggers on deployment_status', () => {
+    expect(fs.existsSync(vercelPreviewSmokeWorkflow)).toBe(true)
+    const content = fs.readFileSync(vercelPreviewSmokeWorkflow, 'utf8')
+    expect(content).toMatch(/deployment_status/)
+    expect(content).toMatch(/web-health-sha\.spec\.ts/)
   })
 
   it('mobile workflow exists and deploys on main with Expo token', () => {

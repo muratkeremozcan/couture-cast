@@ -1,0 +1,30 @@
+name: Vercel Preview e2e
+
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: vercel-preview-smoke-${{ github.event.deployment.id }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    if: |
+      github.event.deployment_status.state == 'success' &&
+      (github.event.deployment.environment == 'Preview' || github.event.deployment.environment == 'preview') &&
+      (github.event.deployment_status.environment_url != '' || github.event.deployment_status.target_url != '') &&
+      contains(
+        github.event.deployment_status.environment_url || github.event.deployment_status.target_url,
+        'vercel.app'
+      )
+    uses: ./.github/workflows/rwf-e2e.yml
+    with:
+      test_env: dev
+      test_command: npm run test:pw-dev -- playwright/tests/web-health-sha.spec.ts
+      gh_ref: ${{ github.event.deployment.sha }}
+      custom_base_url: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+    secrets: inherit
