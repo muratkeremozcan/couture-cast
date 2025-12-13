@@ -10,6 +10,8 @@ node_modules
 coverage
 dist
 build
+playwright/artifacts
+playwright/playwright-report
 apps/**/dist
 apps/**/.next
 packages/**/dist
