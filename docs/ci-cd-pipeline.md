@@ -66,6 +66,7 @@ GitHub repo secrets:
 
 - `EXPO_TOKEN` (mobile deploy)
 - `VERCEL_AUTOMATION_BYPASS_SECRET` (optional; only needed if Preview deployments are protected)
+- `VERCEL_TOKEN`, `VERCEL_WEB_PROJECT_SLUG`, `VERCEL_TEAM_SLUG` (for local Vercel CLI preview resolution)
 
 ## Troubleshooting
 
@@ -73,7 +74,8 @@ GitHub repo secrets:
 - Health check returns 401: set `VERCEL_AUTOMATION_BYPASS_SECRET` or disable Preview protection in Vercel.
 - SHA mismatch: `/api/health.gitSha` must match the deployed commit (`VERCEL_GIT_COMMIT_SHA`).
 - Playwright hits the wrong base URL: set `DEV_WEB_E2E_BASE_URL` / `PROD_WEB_E2E_BASE_URL`, or run `npm run test:pw-dev-preview` to
-  auto-resolve the current branch's Preview URL (requires branch pushed + `gh` auth).
+  auto-resolve the current branch's Preview URL (requires branch pushed, `gh` auth, and Vercel CLI token). If Vercel uses a shortened or
+  custom preview hostname, set `VERCEL_BRANCH_ALIAS_URL=https://<your-preview>.vercel.app` to force it.
 
 ## Run locally
 

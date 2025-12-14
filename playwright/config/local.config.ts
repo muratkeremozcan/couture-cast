@@ -3,7 +3,7 @@ import merge from 'lodash.merge'
 import { defineConfig } from '@playwright/test'
 import { log } from '@seontechnologies/playwright-utils/log'
 import { baseConfig } from './base.config'
-import { resolveEnvironmentConfig } from '../support/config/environments'
+import { resolveEnvironmentConfig } from './environments'
 
 const repoRoot = path.resolve(__dirname, '..', '..')
 const environment = resolveEnvironmentConfig('local')

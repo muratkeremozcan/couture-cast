@@ -72,12 +72,12 @@ Notes against ACs
     - [x] Create Vercel project or attach to existing if/when API deploy is needed; map env vars and set `HUSKY=0`.
   - Mobile (Expo EAS):
     - [x] Added `.github/workflows/deploy-mobile.yml` with push-to-main + workflow_dispatch (requires `EXPO_TOKEN`).
-    - [ ] Install EAS CLI: `npm i -g eas-cli`; `eas whoami` to verify.
-    - [ ] Create token: `eas token:create` → `EXPO_TOKEN` secret.
+    - [x] Install EAS CLI: `npm i -g eas-cli`; `eas whoami` to verify.
+    - [x] Create token: Expo access token (UI: expo.dev → Account → Access Tokens) → use as `EXPO_TOKEN` secret.
     - [x] Configure `eas.json` profiles and app config (app.config.js/app.json); ensure proper bundle IDs. (Production profile scaffolded.)
-    - [ ] Add repo secret: `EXPO_TOKEN`; store creds (App Store / Play) only if you plan to submit.
+    - [x] Add repo secret: `EXPO_TOKEN` (token created via Expo UI); store store creds (App Store / Play) only if you plan to submit.
     - [x] Build command: `eas build --platform all --non-interactive` (wired in deploy workflow).
-    - [ ] Optional submit: `eas submit --platform all` (manual approval); add tagging step after successful build/submit.
+    - [ ] Optional submit: `eas submit --platform all --non-interactive` (manual approval outside CI); add tagging step after successful build/submit.
 
 - [x] Task 5: Configure artifact retention (AC: #4)
   - Decision: stick with default 5–7 day retention on GitHub Actions artifacts; no S3/offloading. Update later if longer retention is needed.
@@ -129,7 +129,9 @@ Notes against ACs
   - [x] Add `.github/workflows/pr-pw-e2e-vercel-preview.yml` triggered by `deployment_status` (Preview, success)
   - [x] Pass Vercel Preview URL to Playwright via `custom_base_url` → `DEV_WEB_E2E_BASE_URL`
   - [x] Support protected Preview deploys via `VERCEL_AUTOMATION_BYPASS_SECRET` (bypass headers for `/api/health`)
-  - [ ] Add local helper: `npm run test:pw-dev-preview` resolves current branch's Preview URL via `gh api` and runs Playwright against it
+  - [ ] Add local helper: `npm run test:pw-dev-preview` resolves current branch's Preview URL (GitHub deployments → Vercel CLI fallback →
+    manual alias env) and runs Playwright against it; provide `VERCEL_TOKEN`, `VERCEL_WEB_PROJECT_SLUG`, `VERCEL_TEAM_SLUG`, or set
+    `VERCEL_BRANCH_ALIAS_URL` when branch hostnames are shortened.
   - [ ] Vercel Dashboard: ensure Git integration has `deployment_status` events enabled (Project → Settings → Git)
   - [ ] Verify on a PR: Vercel Preview deploy completes → smoke workflow runs → `web-health-sha.spec.ts` passes
 

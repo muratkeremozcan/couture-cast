@@ -7,7 +7,22 @@
  * - gh CLI installed and authenticated (`gh auth status`)
  * - Branch pushed to GitHub so Vercel has created a Preview deployment
  */
+import fs from 'node:fs'
+import path from 'node:path'
 import { execFileSync, execSync } from 'node:child_process'
+import { setTimeout as delay } from 'node:timers/promises'
+import dotenv from 'dotenv'
+
+// Load env (prefer .env.<TEST_ENV>, then .env)
+const envSuffix = (process.env.TEST_ENV ?? 'dev').toLowerCase()
+const envFiles = [`.env.${envSuffix}`, '.env']
+for (const file of envFiles) {
+  const full = path.resolve(process.cwd(), file)
+  if (fs.existsSync(full)) {
+    dotenv.config({ path: full })
+    break
+  }
+}
 
 function logDebug(message) {
   if (process.env.DEBUG) {
@@ -22,10 +37,46 @@ function fail(message) {
 
 function runGit(command) {
   try {
-    return execSync(command, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    return execSync(command, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
   } catch {
     return undefined
   }
+}
+
+async function isReachable(url) {
+  const controller = new AbortController()
+  const timer = delay(3000, undefined, { signal: controller.signal }).catch(() => {})
+  try {
+    // Vercel often responds with redirects; HEAD can also be disallowed.
+    const res = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'manual',
+      signal: controller.signal,
+    })
+
+    // Treat redirects and auth-gated responses as "reachable".
+    if (res.ok) return true
+    if ([301, 302, 303, 307, 308].includes(res.status)) return true
+    if ([401, 403].includes(res.status)) return true
+    if (res.status === 405) return true // Method Not Allowed (HEAD disabled) still means the host exists.
+
+    return false
+  } catch {
+    return false
+  } finally {
+    controller.abort()
+    await timer
+  }
+}
+
+function env(name) {
+  const value = process.env[name]
+  if (!value) return undefined
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : undefined
 }
 
 function parseOrigin() {
@@ -49,7 +100,7 @@ function parseOrigin() {
 
 function runGh(args) {
   try {
-    const output = execFileSync('gh', ['api', ...args], {
+    const output = execFileSync('gh', ['api', '-X', 'GET', ...args], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     })
@@ -78,10 +129,10 @@ function ensureBranchExists(owner, repo, branch) {
 
 function getBranch() {
   const fromEnv =
-    process.env.GITHUB_HEAD_REF ??
-    process.env.VERCEL_GIT_COMMIT_REF ??
-    process.env.GIT_BRANCH ??
-    process.env.BRANCH
+    env('GITHUB_HEAD_REF') ??
+    env('VERCEL_GIT_COMMIT_REF') ??
+    env('GIT_BRANCH') ??
+    env('BRANCH')
   if (fromEnv) return fromEnv
 
   const fromGit = runGit('git rev-parse --abbrev-ref HEAD')
@@ -90,7 +141,91 @@ function getBranch() {
   fail('Could not determine current branch (git HEAD is detached?).')
 }
 
-function getLatestPreviewDeployment(owner, repo, branch) {
+function slugifyVercelGitRef(value) {
+  const normalized = value
+    .replace(/^refs\/heads\//, '')
+    .trim()
+    .toLowerCase()
+  const slug = normalized
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '')
+  return slug || 'main'
+}
+
+function getDeploymentStatuses(owner, repo, deploymentId) {
+  return runGh([
+    `/repos/${owner}/${repo}/deployments/${deploymentId}/statuses`,
+    `-F`,
+    `per_page=5`,
+  ])
+}
+
+function findSuccessUrlFromDeployment(owner, repo, deploymentId) {
+  const statuses = getDeploymentStatuses(owner, repo, deploymentId)
+  if (!Array.isArray(statuses) || statuses.length === 0) {
+    return undefined
+  }
+  const success = statuses.find((status) => status.state === 'success')
+  return success?.environment_url || success?.target_url
+}
+
+function findUrlFromDeployments(owner, repo, deployments) {
+  if (!Array.isArray(deployments)) return undefined
+  for (const deployment of deployments) {
+    const url = findSuccessUrlFromDeployment(owner, repo, deployment.id)
+    if (url) return url
+  }
+  return undefined
+}
+
+function runVercelDeployments(project, team, metaKey, metaValue, limit = 5) {
+  const args = ['vercel', 'deployments', project, '--json', '--limit', String(limit)]
+  if (team) {
+    args.push('--scope', team)
+  }
+  if (metaKey && metaValue) {
+    args.push('--meta', `${metaKey}=${metaValue}`)
+  }
+  try {
+    const output = execFileSync('npx', args, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: process.env,
+    })
+    return JSON.parse(output)
+  } catch (error) {
+    logDebug(`vercel deployments failed: ${error.stderr?.toString() ?? error.message}`)
+    return undefined
+  }
+}
+
+function findUrlFromVercel(project, team, branch) {
+  if (!project) return undefined
+  const branchSlug = slugifyVercelGitRef(branch)
+
+  // Prefer filtering by branch (GitHub ref) meta when available.
+  const byRef =
+    runVercelDeployments(project, team, 'githubCommitRef', branch, 5) ??
+    runVercelDeployments(project, team, 'githubCommitRef', branchSlug, 5)
+
+  const candidates = byRef && Array.isArray(byRef) ? byRef : []
+  if (candidates.length > 0) {
+    const url = candidates.find((d) => d?.url)?.url
+    if (url) return url.startsWith('http') ? url : `https://${url}`
+  }
+
+  // Fallback: any recent deployments; pick first with URL.
+  const any = runVercelDeployments(project, team, undefined, undefined, 5)
+  if (any && Array.isArray(any)) {
+    const url = any.find((d) => d?.url)?.url
+    if (url) return url.startsWith('http') ? url : `https://${url}`
+  }
+
+  return undefined
+}
+
+function getPreviewDeploymentsForBranch(owner, repo, branch) {
   const deployments = runGh([
     `/repos/${owner}/${repo}/deployments`,
     `-F`,
@@ -101,45 +236,114 @@ function getLatestPreviewDeployment(owner, repo, branch) {
     `per_page=10`,
   ])
 
-  if (!Array.isArray(deployments) || deployments.length === 0) {
-    fail(
-      `No Preview deployments found for branch "${branch}". Push a commit and wait for Vercel to create one.`
-    )
-  }
-
-  return deployments[0]
+  return Array.isArray(deployments) ? deployments : []
 }
 
-function getDeploymentUrl(owner, repo, deploymentId) {
-  const statuses = runGh([
-    `/repos/${owner}/${repo}/deployments/${deploymentId}/statuses`,
+function getAnyPreviewDeployments(owner, repo) {
+  const deployments = runGh([
+    `/repos/${owner}/${repo}/deployments`,
     `-F`,
-    `per_page=5`,
+    `environment=Preview`,
+    `-F`,
+    `per_page=20`,
   ])
 
-  if (!Array.isArray(statuses) || statuses.length === 0) {
-    fail('No deployment statuses found yet. Wait for Vercel to finish the deploy.')
-  }
-
-  const success = statuses.find((status) => status.state === 'success')
-  const url = success?.environment_url || success?.target_url
-  if (!url) {
-    fail('Deployment succeeded but no environment URL was returned.')
-  }
-
-  return url
+  return Array.isArray(deployments) ? deployments : []
 }
 
-function main() {
+async function main() {
+  const manual =
+    env('DEV_WEB_E2E_BASE_URL') ??
+    env('VERCEL_PREVIEW_URL') ??
+    env('VERCEL_BRANCH_ALIAS_URL')
+  if (manual) {
+    process.stdout.write(manual)
+    return
+  }
+
   const branch = getBranch()
   const { owner, repo } = parseOrigin()
 
   logDebug(`Resolving Preview URL for ${owner}/${repo}@${branch}`)
   ensureBranchExists(owner, repo, branch)
-  const deployment = getLatestPreviewDeployment(owner, repo, branch)
-  const url = getDeploymentUrl(owner, repo, deployment.id)
+
+  // Deterministic hostname attempt first (matches Vercel pattern).
+  const branchSlug = slugifyVercelGitRef(branch)
+  const projectSlug = env('VERCEL_WEB_PROJECT_SLUG')
+  const teamSlug = env('VERCEL_TEAM_SLUG')
+  if (projectSlug && teamSlug) {
+    const deterministic = `https://${projectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
+    logDebug(`Trying deterministic Preview hostname: ${deterministic}`)
+    if (await isReachable(deterministic)) {
+      process.stdout.write(deterministic)
+      return
+    }
+
+    // Some Vercel branch hostnames truncate the branch portion; try a shorter slug as a fallback guess.
+    const shortSlug = branchSlug.slice(0, 12)
+    if (shortSlug && shortSlug !== branchSlug) {
+      const shorter = `https://${projectSlug}-git-${shortSlug}-${teamSlug}.vercel.app`
+      logDebug(`Trying shortened deterministic hostname: ${shorter}`)
+      if (await isReachable(shorter)) {
+        process.stdout.write(shorter)
+        return
+      }
+    }
+  }
+
+  // First, try branch-scoped Preview deployments.
+  const branchDeployments = getPreviewDeploymentsForBranch(owner, repo, branch)
+  let url = findUrlFromDeployments(owner, repo, branchDeployments)
+
+  // If GH lacked URLs, try Vercel CLI directly.
+  if (!url) {
+    const vercelProject =
+      env('VERCEL_PROJECT') ?? env('VERCEL_PROJECT_NAME') ?? env('VERCEL_WEB_PROJECT_SLUG')
+    const vercelTeam = env('VERCEL_TEAM') ?? env('VERCEL_TEAM_ID') ?? env('VERCEL_TEAM_SLUG')
+    if (vercelProject && env('VERCEL_TOKEN')) {
+      logDebug(`Attempting Vercel CLI resolution for project "${vercelProject}"`)
+      const vercelUrl = findUrlFromVercel(vercelProject, vercelTeam, branch)
+      if (vercelUrl) {
+        process.stdout.write(vercelUrl)
+        return
+      }
+    }
+  }
+
+  const strict =
+    env('VERCEL_PREVIEW_STRICT') === '1' || env('VERCEL_PREVIEW_STRICT') === 'true'
+
+  // If we can see deployments for the branch but none of their statuses include a URL,
+  // you almost certainly want to provide an explicit alias rather than falling back to some other branch.
+  if (!url && strict) {
+    fail(
+      [
+        `Strict mode: no URL found in GitHub deployment statuses for branch "${branch}".`,
+        'Provide one of:',
+        '- VERCEL_BRANCH_ALIAS_URL=https://<your-preview>.vercel.app',
+        '- VERCEL_PREVIEW_URL=https://<your-preview>.vercel.app',
+        '- DEV_WEB_E2E_BASE_URL=https://<your-preview>.vercel.app',
+        'Or disable strict mode by unsetting VERCEL_PREVIEW_STRICT.',
+      ].join('\n')
+    )
+  }
+
+  // Fallback: any latest Preview deployment (e.g., when Vercel truncates branch names or ref differs)
+  if (!url) {
+    logDebug(
+      'No branch-scoped Preview with URL found; falling back to latest Preview deployment.'
+    )
+    const deployments = getAnyPreviewDeployments(owner, repo)
+    url = findUrlFromDeployments(owner, repo, deployments)
+  }
+
+  if (!url) {
+    fail(
+      `No Preview deployments found for branch "${branch}". Push a commit and wait for Vercel to create one.`
+    )
+  }
 
   process.stdout.write(url)
 }
 
-main()
+await main()

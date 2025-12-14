@@ -1,4 +1,4 @@
-import { test, expect } from '../support/fixtures/merged-fixtures'
+import { test, expect } from '../../support/fixtures/merged-fixtures'
 
 process.env.API_E2E_UI_MODE = 'true'
 
