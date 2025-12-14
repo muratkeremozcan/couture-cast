@@ -9,7 +9,7 @@
     "node": "20.x"
   },
   "scripts": {
-    "vercel:build": "cd .. && npm run db:generate && npm run build --workspace api",
+    "vercel:build": "cd .. && npx prisma@6.19.0 generate --schema packages/db/prisma/schema.prisma && npm run build --workspace api",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"integration/**/*.ts\"",
     "start": "nest start",
