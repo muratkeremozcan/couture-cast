@@ -1,4 +1,4 @@
-name: Vercel Preview smoke
+name: Vercel Preview e2e
 
 on:
   deployment_status:
@@ -8,26 +8,19 @@ permissions:
   id-token: write
 
 concurrency:
-  group: vercel-preview-smoke-${{ github.event.deployment.id }}
+  group: vercel-preview-dev-${{ github.event.deployment.id }}
   cancel-in-progress: true
 
 jobs:
-  smoke:
-    # Only run after Vercel reports a *successful* Preview deployment and provides its URL.
-    # (deployment_status fires for many states/environments; without this guard we'd run on failures/production too.)
+  pw-e2e:
     if: |
-      github.event.deployment_status.state == 'success' &&
-      (github.event.deployment.environment == 'Preview' || github.event.deployment.environment == 'preview') &&
-      (github.event.deployment_status.environment_url != '' || github.event.deployment_status.target_url != '') &&
-      contains(
-        github.event.deployment_status.environment_url || github.event.deployment_status.target_url,
-        'vercel.app'
-      )
+      github.event.deployment_status.state == 'success'
     uses: ./.github/workflows/rwf-e2e.yml
     # For Vercel, we treat the preview environment as a dev environment; main is production.
     with:
-      test_env: dev
-      test_command: npm run test:pw-dev-preview
+      test_env: dev # ignored
+      test_command: npm run test:pw-preview-dev
       gh_ref: ${{ github.event.deployment.sha }}
+      deployment_ref: ${{ github.event.deployment.ref }}
       custom_base_url: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
     secrets: inherit
