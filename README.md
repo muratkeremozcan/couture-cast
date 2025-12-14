@@ -168,8 +168,9 @@ Preview URLs as the "dev" target: `pr-pw-e2e-vercel-preview.yml` reads the Previ
 If your Preview deployments are protected (health check returns 401), set `VERCEL_AUTOMATION_BYPASS_SECRET` locally (in `.env.dev`) and
 in CI (GitHub repo secret). See `docs/ci-cd-pipeline.md`.
 
-Local shortcut: set `VERCEL_WEB_PROJECT_SLUG` + `VERCEL_TEAM_SLUG` in `.env.dev` and `TEST_ENV=dev` will derive the stable per-branch
-Preview URL (`https://<project>-git-<branch>-<team>.vercel.app`) when `DEV_WEB_E2E_BASE_URL` is not set.
+Local Preview helper: `npm run test:pw-dev-preview` will resolve the latest Vercel Preview URL for your current branch (via `gh api`) and
+run Playwright against it. Prereqs: branch is pushed to GitHub (so Vercel created a Preview), `gh` is installed/authenticated, and
+`VERCEL_AUTOMATION_BYPASS_SECRET` is set locally.
 
 ## Helpful references
 

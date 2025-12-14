@@ -33,6 +33,7 @@
     "test:pw-local-ui": "cross-env TEST_ENV=local npx playwright test --ui",
     "test:pw-dev": "cross-env TEST_ENV=dev npx playwright test",
     "test:pw-dev-ui": "cross-env TEST_ENV=dev npx playwright test --ui",
+    "test:pw-dev-preview": "DEV_WEB_E2E_BASE_URL=$(node ./scripts/resolve-vercel-preview-url.mjs) cross-env TEST_ENV=dev npx playwright test",
     "test:pw-prod": "cross-env TEST_ENV=prod npx playwright test",
     "test:pw-prod-ui": "cross-env TEST_ENV=prod npx playwright test --ui",
     "test:pw:burn-in": "PW_BURN_IN=true npx playwright test --repeat-each=3 --retries=0",

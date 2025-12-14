@@ -72,7 +72,8 @@ GitHub repo secrets:
 - Preview smoke workflow never runs: confirm `deployment_status Events` is enabled in Vercel Git settings.
 - Health check returns 401: set `VERCEL_AUTOMATION_BYPASS_SECRET` or disable Preview protection in Vercel.
 - SHA mismatch: `/api/health.gitSha` must match the deployed commit (`VERCEL_GIT_COMMIT_SHA`).
-- Playwright hits the wrong base URL: set `DEV_WEB_E2E_BASE_URL` / `PROD_WEB_E2E_BASE_URL`.
+- Playwright hits the wrong base URL: set `DEV_WEB_E2E_BASE_URL` / `PROD_WEB_E2E_BASE_URL`, or run `npm run test:pw-dev-preview` to
+  auto-resolve the current branch's Preview URL (requires branch pushed + `gh` auth).
 
 ## Run locally
 

@@ -129,6 +129,7 @@ Notes against ACs
   - [x] Add `.github/workflows/pr-pw-e2e-vercel-preview.yml` triggered by `deployment_status` (Preview, success)
   - [x] Pass Vercel Preview URL to Playwright via `custom_base_url` → `DEV_WEB_E2E_BASE_URL`
   - [x] Support protected Preview deploys via `VERCEL_AUTOMATION_BYPASS_SECRET` (bypass headers for `/api/health`)
+  - [ ] Add local helper: `npm run test:pw-dev-preview` resolves current branch's Preview URL via `gh api` and runs Playwright against it
   - [ ] Vercel Dashboard: ensure Git integration has `deployment_status` events enabled (Project → Settings → Git)
   - [ ] Verify on a PR: Vercel Preview deploy completes → smoke workflow runs → `web-health-sha.spec.ts` passes
 
