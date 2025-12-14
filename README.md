@@ -183,10 +183,11 @@ in CI (GitHub repo secret). See `docs/ci-cd-pipeline.md`.
 Local Preview helper: `npm run test:pw-dev-preview` resolves the Vercel Preview URL (GitHub deployments → Vercel CLI fallback → manual
 override) and runs Playwright against it.
 
-- Prereqs: branch is pushed, `gh` is authed, `VERCEL_AUTOMATION_BYPASS_SECRET` is set, and Vercel CLI can read deployments (`VERCEL_TOKEN`
-  - `VERCEL_WEB_PROJECT_SLUG=couture-cast-web`, `VERCEL_TEAM_SLUG=muratkeremozcans-projects`).
-- If your preview hostname is shortened/aliased, set `VERCEL_BRANCH_ALIAS_URL=https://<your-preview>.vercel.app` (or `DEV_WEB_E2E_BASE_URL`)
-  to force the URL.
+- Prereqs: branch is pushed, `gh` is authed, `VERCEL_AUTOMATION_BYPASS_SECRET` is set, and Vercel CLI can read deployments:
+  - `VERCEL_TOKEN`
+  - `VERCEL_WEB_PROJECT_SLUG=couture-cast-web`
+  - `VERCEL_TEAM_SLUG=muratkeremozcans-projects`
+- If your preview hostname is shortened/aliased, set `VERCEL_BRANCH_ALIAS_URL=https://<your-preview>.vercel.app` (or `DEV_WEB_E2E_BASE_URL`) to force the URL.
 
 ## Helpful references
 

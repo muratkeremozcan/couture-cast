@@ -48,7 +48,7 @@ function runGit(command) {
 
 async function isReachable(url) {
   const controller = new AbortController()
-  const timer = delay(3000, undefined, { signal: controller.signal }).catch(() => {})
+  const timeout = setTimeout(() => controller.abort(), 3000)
   try {
     // Vercel often responds with redirects; HEAD can also be disallowed.
     const res = await fetch(url, {
@@ -67,8 +67,8 @@ async function isReachable(url) {
   } catch {
     return false
   } finally {
+    clearTimeout(timeout)
     controller.abort()
-    await timer
   }
 }
 
