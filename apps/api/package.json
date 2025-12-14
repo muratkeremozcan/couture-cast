@@ -9,6 +9,7 @@
     "node": "20.x"
   },
   "scripts": {
+    "vercel:build": "cd .. && npm run db:generate && npm run build --workspace api",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"integration/**/*.ts\"",
     "start": "nest start",
@@ -39,7 +40,8 @@
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "socket.io": "^4.8.1",
-    "testcontainers": "^11.9.0"
+    "testcontainers": "^11.9.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "2.1.4",
