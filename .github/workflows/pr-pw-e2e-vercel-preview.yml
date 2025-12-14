@@ -21,5 +21,6 @@ jobs:
       test_env: dev # ignored
       test_command: npm run test:pw-preview-dev
       gh_ref: ${{ github.event.deployment.sha }}
+      deployment_ref: ${{ github.event.deployment.ref }}
       custom_base_url: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
     secrets: inherit

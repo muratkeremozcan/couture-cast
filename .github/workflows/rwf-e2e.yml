@@ -21,6 +21,10 @@ on:
         type: string
         description: "Optional override for base URL"
         required: false
+      deployment_ref:
+        type: string
+        description: "Git ref from deployment event (branch name)"
+        required: false
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET:
         required: false
@@ -65,6 +69,8 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_API_PROJECT_SLUG: ${{ secrets.VERCEL_API_PROJECT_SLUG }}
           VERCEL_TEAM_SLUG: ${{ secrets.VERCEL_TEAM_SLUG }}
+          # Pass deployment ref for branch-based URL resolution
+          VERCEL_GIT_COMMIT_REF: ${{ inputs.deployment_ref }}
         run: |
           custom_base_url="${{ inputs.custom_base_url }}"
           if [ -n "$custom_base_url" ]; then
@@ -74,67 +80,28 @@ jobs:
               prod) export PROD_WEB_E2E_BASE_URL="$custom_base_url" ;;
             esac
 
-            # Resolve API URL by querying Vercel API directly (web and API have different hashes)
+            # Resolve API URL using deterministic branch-based URL
             if [ -z "$DEV_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
               api_slug="${VERCEL_API_PROJECT_SLUG:-couture-cast-api}"
               team_slug="${VERCEL_TEAM_SLUG:-muratkeremozcans-projects}"
 
-              if [ -n "$VERCEL_TOKEN" ] && [ -n "$api_slug" ]; then
-                echo "Querying Vercel API for $api_slug deployments..."
+              # Get branch from deployment_ref (preferred) or GITHUB_REF (fallback)
+              branch_ref="${VERCEL_GIT_COMMIT_REF:-$GITHUB_REF}"
+              branch_slug=""
+              if [ -n "$branch_ref" ]; then
+                branch_slug=$(echo "$branch_ref" | sed -e 's#refs/heads/##' -e 's#refs/pull/##' -e 's#/merge##' | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]/-/g' -e 's/^-*//' -e 's/-*$//')
+              fi
 
-                # Get branch slug from GITHUB_REF
-                branch_slug=""
-                if [ -n "$GITHUB_REF" ]; then
-                  branch_slug=$(echo "$GITHUB_REF" | sed -e 's#refs/heads/##' -e 's#refs/pull/##' -e 's#/merge##' | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]/-/g' -e 's/^-*//' -e 's/-*$//')
-                fi
+              echo "Branch ref: $branch_ref -> slug: $branch_slug"
 
-                # Query Vercel API for API project deployments
-                api_url=""
-                scope_arg=""
-                if [ -n "$team_slug" ]; then
-                  scope_arg="--scope $team_slug"
-                fi
-
-                # Try to get deployments from Vercel API
-                deployments=$(npx vercel deployments "$api_slug" --json --limit 10 $scope_arg 2>/dev/null || echo "[]")
-
-                if [ "$deployments" != "[]" ] && [ -n "$deployments" ]; then
-                  # Extract first READY deployment URL
-                  api_url=$(echo "$deployments" | node -e "
-                    const data = JSON.parse(require('fs').readFileSync(0, 'utf8'));
-                    if (Array.isArray(data)) {
-                      const ready = data.find(d => d.url && (!d.state || d.state === 'READY'));
-                      if (ready?.url) {
-                        const url = ready.url.startsWith('http') ? ready.url : 'https://' + ready.url;
-                        console.log(url);
-                      }
-                    }
-                  " 2>/dev/null || true)
-                fi
-
-                # Fallback to deterministic branch URL if API query failed
-                if [ -z "$api_url" ] && [ -n "$branch_slug" ] && [ -n "$team_slug" ]; then
-                  echo "Falling back to deterministic branch URL..."
-                  api_url="https://${api_slug}-git-${branch_slug}-${team_slug}.vercel.app"
-                fi
-
-                # Verify the API URL returns JSON, not HTML
-                if [ -n "$api_url" ]; then
-                  echo "Testing API URL: $api_url"
-                  content_type=$(curl -s -o /dev/null -w "%{content_type}" --max-time 5 "${api_url}/api/health" 2>/dev/null || true)
-                  if [[ "$content_type" == *"text/html"* ]]; then
-                    echo "Warning: $api_url returns HTML, likely wrong endpoint"
-                    api_url=""
-                  fi
-                fi
-
-                if [ -n "$api_url" ]; then
-                  echo "Using API URL: $api_url"
-                  export DEV_API_BASE_URL="$api_url"
-                  export VERCEL_API_BASE_URL="$api_url"
-                else
-                  echo "Warning: Could not resolve API URL"
-                fi
+              # Build deterministic branch-based API URL
+              if [ -n "$branch_slug" ] && [ -n "$team_slug" ] && [ -n "$api_slug" ]; then
+                api_url="https://${api_slug}-git-${branch_slug}-${team_slug}.vercel.app"
+                echo "Using deterministic API URL: $api_url"
+                export DEV_API_BASE_URL="$api_url"
+                export VERCEL_API_BASE_URL="$api_url"
+              else
+                echo "Warning: Could not resolve API URL (missing branch_slug, team_slug, or api_slug)"
               fi
             fi
           fi
