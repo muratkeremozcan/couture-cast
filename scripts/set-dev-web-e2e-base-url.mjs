@@ -39,20 +39,15 @@ function main() {
   }
 
   function deriveApiFromWebHost(hostname, apiSlug, teamSlug) {
-    const teamEscaped = teamSlug.replace(/\./g, '\\.')
-    const gitPattern = new RegExp(`^(.+)-git-([^-]+)-${teamEscaped}$`, 'i')
-    const hashPattern = new RegExp(`^(.+)-([^-]+)-${teamEscaped}$`, 'i')
-    let m = hostname.match(gitPattern)
-    if (m) {
-      const branch = m[2]
+    const suffix = `${teamSlug}.vercel.app`
+    if (!hostname.endsWith(suffix)) return undefined
+    const prefix = hostname.slice(0, -(suffix.length + 1)) // remove "-<team>.vercel.app"
+    if (prefix.includes('-git-')) {
+      const branch = prefix.split('-git-').pop()
       return `https://${apiSlug}-git-${branch}-${teamSlug}.vercel.app`
     }
-    m = hostname.match(hashPattern)
-    if (m) {
-      const hashId = m[2]
-      return `https://${apiSlug}-${hashId}-${teamSlug}.vercel.app`
-    }
-    return undefined
+    const hashId = prefix.split('-').pop()
+    return `https://${apiSlug}-${hashId}-${teamSlug}.vercel.app`
   }
 
   // Derive API preview URL when Vercel slugs are provided (with sane defaults for CI).
@@ -75,12 +70,7 @@ function main() {
         apiPreviewUrl = `https://${apiProjectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
       } else {
         // Handle hashed or mismatched project slugs generically.
-        apiPreviewUrl =
-          deriveApiFromWebHost(parsed.hostname, apiProjectSlug, teamSlug) ??
-          parsed.hostname.replace(new RegExp(`^${webProjectSlug}`), apiProjectSlug).replace(/^\w+:\/\//, '')
-        if (apiPreviewUrl && !apiPreviewUrl.startsWith('http')) {
-          apiPreviewUrl = `https://${apiPreviewUrl}`
-        }
+        apiPreviewUrl = deriveApiFromWebHost(parsed.hostname, apiProjectSlug, teamSlug)
       }
     } catch {
       // ignore
