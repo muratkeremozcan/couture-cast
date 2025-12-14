@@ -45,14 +45,26 @@ function main() {
   if (!apiPreviewUrl && apiProjectSlug && teamSlug && webProjectSlug) {
     try {
       const parsed = new URL(url)
+      const teamEscaped = teamSlug.replace(/\./g, '\\.')
       const regex = new RegExp(
-        `^${webProjectSlug}-git-([^.]+)-${teamSlug.replace(/\./g, '\\.')}`,
+        `^${webProjectSlug}-git-([^.]+)-${teamEscaped}`,
         'i'
       )
       const match = parsed.hostname.match(regex)
       const branchSlug = match?.[1]
       if (branchSlug) {
         apiPreviewUrl = `https://${apiProjectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
+      } else {
+        // Handle hashed preview hostnames: <webSlug>-<id>-<team>.vercel.app → swap slug
+        const hashRegex = new RegExp(
+          `^${webProjectSlug}-([^.]+)-${teamEscaped}`,
+          'i'
+        )
+        const hashMatch = parsed.hostname.match(hashRegex)
+        const hashId = hashMatch?.[1]
+        if (hashId) {
+          apiPreviewUrl = `https://${apiProjectSlug}-${hashId}-${teamSlug}.vercel.app`
+        }
       }
     } catch {
       // ignore
