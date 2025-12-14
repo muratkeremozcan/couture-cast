@@ -35,8 +35,14 @@ describe('deployment workflows', () => {
   it('vercel config exists for unified web/api deploy', () => {
     expect(fs.existsSync(vercelConfig)).toBe(true)
     const content = fs.readFileSync(vercelConfig, 'utf8')
-    expect(content).toMatch(/"functions"/)
-    expect(content).toMatch(/api\/index\.ts/)
+    const json = JSON.parse(content) as {
+      version?: number
+      functions?: Record<string, { runtime?: string }>
+    }
+
+    expect(json.version).toBe(2)
+    expect(json.functions).toBeDefined()
+    expect(json.functions?.['api/index.ts']?.runtime).toBe('nodejs20.x')
   })
 
   it('api handler exists and prepare is CI-safe', () => {
