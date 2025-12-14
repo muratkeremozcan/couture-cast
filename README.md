@@ -140,6 +140,18 @@ Local E2E with clean DB:
 - Mobile smoke: `npm run start:mobile:e2e` (one-shot: boots simulator, starts Expo if needed, runs Maestro).  
   Overrides: `AVD_NAME`, `IOS_SIM_DEVICE`, `MOBILE_E2E_APP_URL`, `MOBILE_E2E_HEALTH_URL`, `MAESTRO_DEVICE`, `MAESTRO_CLOUD_*`.
 
+### Mobile build/deploy (Expo EAS)
+
+- Scripts (Android-only):
+  - `npm run mobile:build` → EAS build `--profile production --platform android`
+  - `npm run mobile:submit` → EAS submit `--platform android` (non-interactive; requires Play Console creds configured)
+- CI workflow: `.github/workflows/deploy-mobile.yml` is manual (`workflow_dispatch` only), Android-only. Requires `EXPO_TOKEN` secret.
+- Credentials:
+  - Expo access token: create in Expo UI (Account → Access Tokens) → set `EXPO_TOKEN` locally/CI.
+  - Android keystore already generated via `eas credentials:configure-build --platform android --profile production`.
+  - iOS disabled until Apple Developer enrollment and Apple credentials are set up. When ready for iOS: enroll in Apple Developer Program, run one interactive `eas build --profile production --platform ios` to create certs/profiles, then you can flip scripts/workflow back to `--platform all` for dual-platform builds.
+- After a build: download from the EAS dashboard or run `npm run mobile:submit` if Play Store creds are in place; otherwise upload manually to Play Console.
+
 ## Quality & CI alignment
 
 - `.nvmrc` pins Node 24, matching `actions/setup-node` in `.github/workflows/pr-checks.yml`.
