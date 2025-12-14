@@ -176,6 +176,7 @@ Notes against ACs
 - Playwright synthetic monitoring (cron job) hits ritual endpoints to ensure <2s load time
 - Telemetry fed into Grafana when breaches occur
 
+<!-- test -->
 ### Testing Context
 
 **Reference: playwright-utils CI/CD patterns**
