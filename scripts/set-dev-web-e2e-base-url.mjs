@@ -75,7 +75,12 @@ function main() {
         apiPreviewUrl = `https://${apiProjectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
       } else {
         // Handle hashed or mismatched project slugs generically.
-        apiPreviewUrl = deriveApiFromWebHost(parsed.hostname, apiProjectSlug, teamSlug)
+        apiPreviewUrl =
+          deriveApiFromWebHost(parsed.hostname, apiProjectSlug, teamSlug) ??
+          parsed.hostname.replace(new RegExp(`^${webProjectSlug}`), apiProjectSlug).replace(/^\w+:\/\//, '')
+        if (apiPreviewUrl && !apiPreviewUrl.startsWith('http')) {
+          apiPreviewUrl = `https://${apiPreviewUrl}`
+        }
       }
     } catch {
       // ignore
