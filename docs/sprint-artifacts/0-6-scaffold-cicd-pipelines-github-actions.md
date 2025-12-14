@@ -71,13 +71,13 @@ Notes against ACs
     - [x] Handler and config in repo (apps/api/api/index.ts, apps/api/vercel.json).
     - [x] Create Vercel project or attach to existing if/when API deploy is needed; map env vars and set `HUSKY=0`.
   - Mobile (Expo EAS):
-    - [x] Added `.github/workflows/deploy-mobile.yml` with push-to-main + workflow_dispatch (requires `EXPO_TOKEN`).
-    - [ ] Install EAS CLI: `npm i -g eas-cli`; `eas whoami` to verify.
-    - [ ] Create token: `eas token:create` → `EXPO_TOKEN` secret.
+    - [x] Added `.github/workflows/deploy-mobile.yml` with workflow_dispatch only (manual trigger; requires `EXPO_TOKEN`).
+    - [x] Install EAS CLI: `npm i -g eas-cli`; `eas whoami` to verify.
+    - [x] Create token: Expo access token (UI: expo.dev → Account → Access Tokens) → use as `EXPO_TOKEN` secret.
     - [x] Configure `eas.json` profiles and app config (app.config.js/app.json); ensure proper bundle IDs. (Production profile scaffolded.)
-    - [ ] Add repo secret: `EXPO_TOKEN`; store creds (App Store / Play) only if you plan to submit.
-    - [x] Build command: `eas build --platform all --non-interactive` (wired in deploy workflow).
-    - [ ] Optional submit: `eas submit --platform all` (manual approval); add tagging step after successful build/submit.
+    - [x] Add repo secret: `EXPO_TOKEN` (token created via Expo UI); store creds (App Store / Play) only if you plan to submit.
+    - [x] Build command: `eas build --platform android --non-interactive` (wired in deploy workflow; iOS disabled until Apple Developer enrollment).
+    - [x] Optional submit: `eas submit --platform android --non-interactive` (manual approval outside CI); add tagging step after successful build/submit.
 
 - [x] Task 5: Configure artifact retention (AC: #4)
   - Decision: stick with default 5–7 day retention on GitHub Actions artifacts; no S3/offloading. Update later if longer retention is needed.
@@ -125,12 +125,29 @@ Notes against ACs
   - [x] Add troubleshooting guide for common CI failures
   - [x] Document how to run workflows locally (act or manual)
 
-- [ ] Task 12: Run Playwright smoke against Vercel Preview deployments (PRs) (AC: #3)
+- [x] Task 12: Run Playwright smoke against Vercel Preview deployments (PRs) (AC: #3)
   - [x] Add `.github/workflows/pr-pw-e2e-vercel-preview.yml` triggered by `deployment_status` (Preview, success)
   - [x] Pass Vercel Preview URL to Playwright via `custom_base_url` → `DEV_WEB_E2E_BASE_URL`
   - [x] Support protected Preview deploys via `VERCEL_AUTOMATION_BYPASS_SECRET` (bypass headers for `/api/health`)
-  - [ ] Vercel Dashboard: ensure Git integration has `deployment_status` events enabled (Project → Settings → Git)
-  - [ ] Verify on a PR: Vercel Preview deploy completes → smoke workflow runs → `web-health-sha.spec.ts` passes
+  - [x] Add local helper: `npm run test:pw-dev-preview` resolves current branch's Preview URL (GitHub deployments → Vercel CLI fallback →
+    manual alias env) and runs Playwright against it; provide `VERCEL_TOKEN`, `VERCEL_WEB_PROJECT_SLUG`, `VERCEL_TEAM_SLUG`, or set
+    `VERCEL_BRANCH_ALIAS_URL` when branch hostnames are shortened.
+  - [x] Vercel Dashboard: ensure Git integration has `deployment_status` events enabled (Project → Settings → Git)
+  - [x] Verify on a PR: Vercel Preview deploy completes → smoke workflow runs → `web-health-sha.spec.ts` passes
+
+- [ ] Task 13: Prepare API deployment on Vercel (serverless Nest adapter)
+  - [x] Scaffold: `apps/api/vercel.json` + `apps/api/api/index.ts` handler committed.
+  - [ ] Create/attach Vercel project for `apps/api` (separate from web), project root = `apps/api`.
+    - Vercel Dashboard → New Project → Import `muratkeremozcan/couture-cast` → Framework preset: Other → Root directory: `apps/api` → Continue.
+    - If repo already linked, go to Project Settings → General → Framework preset: Other → Root directory: `apps/api`.
+  - [ ] Set Vercel env vars for API (Supabase keys, etc.), plus `HUSKY=0`, `NODE_VERSION=24`.
+    - Vercel Dashboard → Project → Settings → Environment Variables → add Preview/Production vars: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `REDIS_URL`, `REDIS_TLS`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `HUSKY=0`, `NODE_VERSION=24`.
+  - [ ] Choose deploy trigger: Vercel Git integration (default) or GH Actions workflow for API deploys.
+    - Default: keep Git integration on (auto Preview on PRs, Production on main).
+    - Optional: disable auto-deploy and add a GH Actions workflow that runs `vercel pull/build/deploy` for `apps/api`.
+  - [ ] Map API domain (if needed) once project is created; verify `/api/health` responds after deploy.
+    - Vercel Dashboard → Project → Settings → Domains → add `api.couturecast.app` (or subdomain), map to Production.
+    - After first deploy, open `<deployment-url>/api/health` and confirm 200 + git metadata.
 
 ## Dev Notes
 

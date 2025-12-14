@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { resolveGitMetadata } from '../../../apps/web/git-metadata'
+import { resolveGitMetadata } from '../../apps/web/git-metadata'
 import { config as loadEnv } from 'dotenv'
 
 // Load environment file based on TEST_ENV (falls back to .env)
@@ -31,7 +31,14 @@ export type EnvironmentConfig = {
   apiHeaders: Record<string, string>
 }
 
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+function env(name: string) {
+  const value = process.env[name]
+  if (value === undefined) return undefined
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
+
+const supabaseServiceRoleKey = env('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 function slugifyVercelGitRef(value: string) {
   const normalized = value
@@ -46,15 +53,15 @@ function slugifyVercelGitRef(value: string) {
 }
 
 function resolveLocalVercelPreviewUrl() {
-  const projectSlug = process.env.VERCEL_WEB_PROJECT_SLUG
-  const teamSlug = process.env.VERCEL_TEAM_SLUG
+  const projectSlug = env('VERCEL_WEB_PROJECT_SLUG')
+  const teamSlug = env('VERCEL_TEAM_SLUG')
   if (!projectSlug || !teamSlug) return undefined
 
   const { gitBranch } = resolveGitMetadata()
   const branch =
-    process.env.VERCEL_GIT_COMMIT_REF ??
-    process.env.GITHUB_HEAD_REF ??
-    process.env.GIT_BRANCH ??
+    env('VERCEL_GIT_COMMIT_REF') ??
+    env('GITHUB_HEAD_REF') ??
+    env('GIT_BRANCH') ??
     gitBranch ??
     'main'
 
@@ -64,9 +71,8 @@ function resolveLocalVercelPreviewUrl() {
 
 const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'>> = {
   local: {
-    webBaseUrl:
-      process.env.WEB_E2E_BASE_URL ?? process.env.WEB_BASE_URL ?? 'http://localhost:3005',
-    apiBaseUrl: process.env.API_BASE_URL ?? 'http://localhost:4000',
+    webBaseUrl: env('WEB_E2E_BASE_URL') ?? env('WEB_BASE_URL') ?? 'http://localhost:3005',
+    apiBaseUrl: env('API_BASE_URL') ?? 'http://localhost:4000',
     credentials: {
       defaultUser: {
         email: process.env.AUTH_USERNAME ?? 'tester@example.com',
@@ -82,18 +88,16 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
   },
   dev: {
     webBaseUrl:
-      process.env.DEV_WEB_E2E_BASE_URL ??
-      process.env.DEV_WEB_BASE_URL ??
-      (process.env.VERCEL_BRANCH_URL
-        ? `https://${process.env.VERCEL_BRANCH_URL}`
-        : undefined) ??
+      env('DEV_WEB_E2E_BASE_URL') ??
+      env('DEV_WEB_BASE_URL') ??
+      (env('VERCEL_BRANCH_URL') ? `https://${env('VERCEL_BRANCH_URL')}` : undefined) ??
       resolveLocalVercelPreviewUrl() ??
       'https://dev.couturecast.app',
     apiBaseUrl:
-      process.env.DEV_API_BASE_URL ??
-      process.env.VERCEL_API_BRANCH_URL ??
-      (process.env.VERCEL_BRANCH_URL
-        ? `https://${process.env.VERCEL_BRANCH_URL}`.replace(
+      env('DEV_API_BASE_URL') ??
+      env('VERCEL_API_BRANCH_URL') ??
+      (env('VERCEL_BRANCH_URL')
+        ? `https://${env('VERCEL_BRANCH_URL')}`.replace(
             /(^https?:\/\/)([^.]+)\.([^.]+\.vercel\.app)/,
             (_match, proto, sub, rest) => `${proto}${sub}-api.${rest}`
           )
@@ -114,10 +118,10 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
   },
   prod: {
     webBaseUrl:
-      process.env.PROD_WEB_E2E_BASE_URL ??
-      process.env.PROD_WEB_BASE_URL ??
+      env('PROD_WEB_E2E_BASE_URL') ??
+      env('PROD_WEB_BASE_URL') ??
       'https://app.couturecast.com',
-    apiBaseUrl: process.env.PROD_API_BASE_URL ?? 'https://api.couturecast.com',
+    apiBaseUrl: env('PROD_API_BASE_URL') ?? 'https://api.couturecast.com',
     credentials: {
       defaultUser: {
         email: process.env.PROD_AUTH_USERNAME ?? 'stylist@couturecast.com',
@@ -153,3 +157,5 @@ export function resolveEnvironmentConfig(value?: string): EnvironmentConfig {
     ...config,
   }
 }
+
+// test

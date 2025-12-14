@@ -1,7 +1,7 @@
 import merge from 'lodash.merge'
 import { defineConfig } from '@playwright/test'
 import { baseConfig } from './base.config'
-import { resolveEnvironmentConfig } from '../support/config/environments'
+import { resolveEnvironmentConfig } from './environments'
 
 const environment = resolveEnvironmentConfig('prod')
 

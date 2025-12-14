@@ -27,8 +27,7 @@ jobs:
     # For Vercel, we treat the preview environment as a dev environment; main is production.
     with:
       test_env: dev
-      # Keep this as smoke-only: `test:pw-dev` includes API tests that require a separately deployed dev API.
-      test_command: npm run test:pw-dev -- playwright/tests/web-health-sha.spec.ts
+      test_command: npm run test:pw-dev-preview
       gh_ref: ${{ github.event.deployment.sha }}
       custom_base_url: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
     secrets: inherit

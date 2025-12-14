@@ -1,0 +1,47 @@
+#!/usr/bin/env node
+// Cross-platform wrapper: resolves the dev Preview URL and runs the given command with DEV_WEB_E2E_BASE_URL and TEST_ENV=dev set.
+import { execFileSync } from 'node:child_process'
+import process from 'node:process'
+
+function fail(message) {
+  console.error(message)
+  process.exit(1)
+}
+
+function resolveUrl() {
+  try {
+    const output = execFileSync(process.execPath, ['./scripts/resolve-vercel-preview-url.mjs'], {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'inherit'],
+    })
+    const lines = output.trim().split(/\r?\n/)
+    return lines[lines.length - 1].trim()
+  } catch (error) {
+    fail(error?.message || 'Failed to resolve Preview URL')
+  }
+}
+
+function main() {
+  const command = process.argv.slice(2).join(' ')
+  if (!command) {
+    fail('Usage: node scripts/set-dev-web-e2e-base-url.mjs \"<command to run>\"')
+  }
+
+  const url = resolveUrl()
+  if (!url) {
+    fail('Failed to resolve Preview URL (empty output)')
+  }
+
+  const env = { ...process.env, DEV_WEB_E2E_BASE_URL: url, TEST_ENV: 'dev' }
+  try {
+    execFileSync(command.split(' ')[0], command.split(' ').slice(1), {
+      stdio: 'inherit',
+      env,
+      shell: true,
+    })
+  } catch (error) {
+    process.exit(error?.status ?? 1)
+  }
+}
+
+main()

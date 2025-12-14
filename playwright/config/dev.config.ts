@@ -1,7 +1,7 @@
 import merge from 'lodash.merge'
 import { defineConfig } from '@playwright/test'
 import { baseConfig } from './base.config'
-import { resolveEnvironmentConfig } from '../support/config/environments'
+import { resolveEnvironmentConfig } from './environments'
 
 const environment = resolveEnvironmentConfig('dev')
 
@@ -9,7 +9,7 @@ const environment = resolveEnvironmentConfig('dev')
 export default defineConfig(
   merge({}, baseConfig, {
     // Dev targets Vercel Preview for the web app. API endpoints are not deployed to a dev domain yet.
-    testIgnore: ['**/api-health.spec.ts', '**/realtime-poll-live.spec.ts'],
+    testIgnore: ['**/api/**'],
     use: {
       baseURL: environment.webBaseUrl,
       extraHTTPHeaders: environment.apiHeaders,

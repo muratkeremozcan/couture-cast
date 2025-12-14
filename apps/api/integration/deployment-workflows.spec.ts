@@ -22,11 +22,13 @@ describe('deployment workflows', () => {
     expect(content).toMatch(/deployment_status/)
   })
 
-  it('mobile workflow exists and deploys on main with Expo token', () => {
+  it('mobile workflow exists and deploys manually with Expo token (Android-only)', () => {
     expect(fs.existsSync(mobileWorkflow)).toBe(true)
     const content = fs.readFileSync(mobileWorkflow, 'utf8')
-    expect(content).toMatch(/branches:\s*(\[[^\]]*main[^\]]*\]|[\s\S]*?-+\s*main)/)
+    // Manual trigger only (workflow_dispatch); no push trigger.
+    expect(content).toMatch(/workflow_dispatch/)
     expect(content).toMatch(/EXPO_TOKEN/)
+    expect(content).toMatch(/platform android/)
     expect(content).toMatch(/eas build/)
   })
 

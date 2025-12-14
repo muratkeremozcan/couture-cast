@@ -43,7 +43,17 @@ Playwright environment selection uses `TEST_ENV`:
 
 ### Deploy (mobile)
 
-- `.github/workflows/deploy-mobile.yml`: EAS build on `main` (requires `EXPO_TOKEN`).
+- `.github/workflows/deploy-mobile.yml`: Manual dispatch only (no auto-run on main); EAS build for Android-only to avoid iOS Apple Developer enrollment (requires `EXPO_TOKEN`).
+- Local helper scripts (root):
+  - `npm run mobile:build` → `eas build --profile production --platform android` (uses `apps/mobile/eas.json`, `appVersionSource: local`)
+  - `npm run mobile:submit` → `eas submit --profile production --platform android --non-interactive`
+- Project linking & config:
+  - `apps/mobile/app.json`: name/slug `couture-cast`, owner `muratkerem` (linked to EAS project `@muratkerem/couture-cast`)
+  - `apps/mobile/eas.json`: production profile (autoIncrement, Android app-bundle, iOS m-medium), `appVersionSource: local`
+- Credentials:
+  - Android keystore generated once via `eas credentials:configure-build --platform android --profile production` (interactive)
+  - iOS disabled for now (would require paid Apple Developer enrollment and interactive first build to create certs/profiles)
+- EXPO_TOKEN: create via Expo UI (Account → Access Tokens), add as repo secret and export locally before running scripts
 
 ### Manual E2E
 
@@ -66,13 +76,16 @@ GitHub repo secrets:
 
 - `EXPO_TOKEN` (mobile deploy)
 - `VERCEL_AUTOMATION_BYPASS_SECRET` (optional; only needed if Preview deployments are protected)
+- `VERCEL_TOKEN`, `VERCEL_WEB_PROJECT_SLUG`, `VERCEL_TEAM_SLUG` (for local Vercel CLI preview resolution)
 
 ## Troubleshooting
 
 - Preview smoke workflow never runs: confirm `deployment_status Events` is enabled in Vercel Git settings.
 - Health check returns 401: set `VERCEL_AUTOMATION_BYPASS_SECRET` or disable Preview protection in Vercel.
 - SHA mismatch: `/api/health.gitSha` must match the deployed commit (`VERCEL_GIT_COMMIT_SHA`).
-- Playwright hits the wrong base URL: set `DEV_WEB_E2E_BASE_URL` / `PROD_WEB_E2E_BASE_URL`.
+- Playwright hits the wrong base URL: set `DEV_WEB_E2E_BASE_URL` / `PROD_WEB_E2E_BASE_URL`, or run `npm run test:pw-dev-preview` to
+  auto-resolve the current branch's Preview URL (requires branch pushed, `gh` auth, and Vercel CLI token). If Vercel uses a shortened or
+  custom preview hostname, set `VERCEL_BRANCH_ALIAS_URL=https://<your-preview>.vercel.app` to force it.
 
 ## Run locally
 
