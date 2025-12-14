@@ -13,75 +13,13 @@ concurrency:
 
 jobs:
   pw-e2e:
-    # Only run after Vercel reports a *successful* Preview deployment and provides its URL.
-    # (deployment_status fires for many states/environments; without this guard we'd run on failures/production too.)
     if: |
-      github.event.deployment_status.state == 'success' &&
-      (github.event.deployment.environment == 'Preview' || github.event.deployment.environment == 'preview') &&
-      (github.event.deployment_status.environment_url != '' || github.event.deployment_status.target_url != '')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.deployment.sha }}
-
-      - name: Resolve expected SHA
-        id: expected_sha
-        shell: bash
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Node + deps
-        uses: ./.github/actions/install
-
-      - name: Setup Playwright browsers
-        uses: ./.github/actions/setup-playwright-browsers
-
-      - name: Run Playwright (blob reporter)
-        env:
-          TEST_ENV: dev
-          EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
-          GITHUB_SHA: ${{ steps.expected_sha.outputs.sha }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          DEV_WEB_E2E_BASE_URL: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
-        run: |
-          npm run test:pw-preview-dev -- --reporter=blob
-
-      - name: Copy trace files to blob-report
-        if: always()
-        run: |
-          mkdir -p blob-report/trace
-          cp -r playwright/test-results/**/*.zip blob-report/trace || true
-
-      - name: Upload Playwright artifacts (blob)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: blob-report-1
-          path: |
-            blob-report
-          retention-days: 5
-
-  merge-reports:
-    needs: pw-e2e
-    if: always()
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-      actions: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Merge, upload, and comment
-        uses: ./.github/actions/playwright-merge-report-comment
-        with:
-          burn-in-result: skipped
-          shards: '1'
-          e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          deployment-url: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+      github.event.deployment_status.state == 'success'
+    uses: ./.github/workflows/rwf-e2e.yml
+    # For Vercel, we treat the preview environment as a dev environment; main is production.
+    with:
+      test_env: dev # ignored
+      test_command: npm run test:pw-preview-dev
+      gh_ref: ${{ github.event.deployment.sha }}
+      custom_base_url: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+    secrets: inherit
