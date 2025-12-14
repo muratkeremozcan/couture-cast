@@ -8,7 +8,7 @@ function fail(message) {
   process.exit(1)
 }
 
-function resolveUrl() {
+function resolveWebUrl() {
   const manual = process.env.DEV_WEB_E2E_BASE_URL || process.env.DEV_WEB_BASE_URL
   if (manual) return manual
   try {
@@ -27,64 +27,47 @@ function resolveUrl() {
   }
 }
 
+function resolveApiUrl() {
+  // Check for manual override first
+  const manual = process.env.DEV_API_BASE_URL || process.env.VERCEL_API_BASE_URL
+  if (manual) return manual
+
+  // Query Vercel API directly (web and API have different deployment hashes)
+  try {
+    const output = execFileSync(
+      process.execPath,
+      ['./scripts/resolve-api-preview-url.mjs'],
+      {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'inherit'],
+        env: process.env,
+      }
+    )
+    const lines = output.trim().split(/\r?\n/)
+    return lines[lines.length - 1].trim()
+  } catch (error) {
+    if (process.env.DEBUG) {
+      console.error(`API URL resolution failed: ${error?.message || 'unknown error'}`)
+    }
+    return undefined
+  }
+}
+
 function main() {
   const command = process.argv.slice(2).join(' ')
   if (!command) {
-    fail('Usage: node scripts/set-dev-web-e2e-base-url.mjs \"<command to run>\"')
+    fail('Usage: node scripts/set-dev-web-e2e-base-url.mjs "<command to run>"')
   }
 
-  const url = resolveUrl()
+  const url = resolveWebUrl()
   if (!url) {
     fail('Failed to resolve Preview URL (empty output)')
   }
 
-  // Derive API preview URL when Vercel slugs are provided (with sane defaults for CI).
-  let apiPreviewUrl = process.env.DEV_API_BASE_URL || process.env.VERCEL_API_BASE_URL
-  const apiProjectSlug = process.env.VERCEL_API_PROJECT_SLUG || 'couture-cast-api'
-  const teamSlug = process.env.VERCEL_TEAM_SLUG || 'muratkeremozcans-projects'
-
-  function deriveApiFromWebHost(hostname, apiSlug, team) {
-    const suffix = `${team}.vercel.app`
-    if (!hostname.endsWith(suffix)) return undefined
-    const prefix = hostname.slice(0, -(suffix.length + 1)) // strip "-<team>.vercel.app"
-    if (prefix.includes('-git-')) {
-      const branch = prefix.split('-git-').pop()
-      return `https://${apiSlug}-git-${branch}-${team}.vercel.app`
-    }
-    const hashId = prefix.includes('-') ? prefix.split('-').pop() : prefix
-    return `https://${apiSlug}-${hashId}-${team}.vercel.app`
-  }
-
-  if (!apiPreviewUrl && apiProjectSlug && teamSlug) {
-    try {
-      const parsed = new URL(url)
-      const ref = process.env.GITHUB_REF || process.env.GITHUB_HEAD_REF
-      const branchSlug = ref
-        ? ref
-            .replace(/^refs\/heads\//, '')
-            .replace(/^refs\/pull\//, '')
-            .replace(/\/merge$/, '')
-            .toLowerCase()
-            .replace(/[^a-z0-9]/g, '-')
-            .replace(/^-+/, '')
-            .replace(/-+$/, '')
-        : undefined
-
-      const branchHost = branchSlug
-        ? `https://${apiProjectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
-        : undefined
-
-      const hashHost = deriveApiFromWebHost(parsed.hostname, apiProjectSlug, teamSlug)
-
-      // Prefer branch-based host; fall back to hash-derived host.
-      const candidateOrder = [branchHost, hashHost].filter(Boolean)
-      for (const candidate of candidateOrder) {
-        apiPreviewUrl = candidate
-        break
-      }
-    } catch {
-      // ignore
-    }
+  // Resolve API preview URL by querying Vercel API (not deriving from web URL)
+  const apiPreviewUrl = resolveApiUrl()
+  if (process.env.DEBUG && apiPreviewUrl) {
+    console.error(`Resolved API URL: ${apiPreviewUrl}`)
   }
 
   const env = {
