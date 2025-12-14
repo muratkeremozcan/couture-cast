@@ -7,7 +7,7 @@
  * - gh CLI installed and authenticated (`gh auth status`)
  * - Branch pushed to GitHub so Vercel has created a Preview deployment
  */
-import { execSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 
 function logDebug(message) {
   if (process.env.DEBUG) {
@@ -34,12 +34,12 @@ function parseOrigin() {
     fail('Could not determine git remote origin.')
   }
 
-  const sshMatch = origin.match(/git@github\\.com:([^/]+)\\/([^/.]+)(?:\\.git)?/)
+  const sshMatch = origin.match(/git@github\.com:([^/]+)\/([^/.]+)(?:\.git)?/)
   if (sshMatch) {
     return { owner: sshMatch[1], repo: sshMatch[2] }
   }
 
-  const httpsMatch = origin.match(/https:\\/\\/github\\.com\\/([^/]+)\\/([^/.]+)(?:\\.git)?/)
+  const httpsMatch = origin.match(/https:\/\/github\.com\/([^/]+)\/([^/.]+)(?:\.git)?/)
   if (httpsMatch) {
     return { owner: httpsMatch[1], repo: httpsMatch[2] }
   }
@@ -49,7 +49,7 @@ function parseOrigin() {
 
 function runGh(args) {
   try {
-    const output = execSync(['gh', 'api', ...args], {
+    const output = execFileSync('gh', ['api', ...args], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     })
