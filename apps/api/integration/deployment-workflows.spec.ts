@@ -42,7 +42,7 @@ describe('deployment workflows', () => {
 
     expect(json.version).toBe(2)
     expect(json.functions).toBeDefined()
-    expect(json.functions?.['api/index.ts']?.runtime).toBe('nodejs20.x')
+    expect(json.functions?.['api/index.ts']?.runtime).toBe('vercel/node@20.x')
   })
 
   it('api handler exists and prepare is CI-safe', () => {
