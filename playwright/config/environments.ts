@@ -38,7 +38,18 @@ function env(name: string) {
   return trimmed.length > 0 ? trimmed : undefined
 }
 
+function firstDefined<T>(...values: (T | undefined)[]): T | undefined {
+  for (const value of values) {
+    if (value !== undefined) return value
+  }
+  return undefined
+}
+
 const supabaseServiceRoleKey = env('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const vercelBypassSecret = env('VERCEL_AUTOMATION_BYPASS_SECRET')
+const apiProjectSlug = env('VERCEL_API_PROJECT_SLUG') ?? 'couture-cast-api'
+const webProjectSlug = env('VERCEL_WEB_PROJECT_SLUG') ?? 'couture-cast-web'
+const defaultTeamSlug = env('VERCEL_TEAM_SLUG') ?? 'muratkeremozcans-projects'
 
 function slugifyVercelGitRef(value: string) {
   const normalized = value
@@ -53,8 +64,25 @@ function slugifyVercelGitRef(value: string) {
 }
 
 function resolveLocalVercelPreviewUrl() {
-  const projectSlug = env('VERCEL_WEB_PROJECT_SLUG')
-  const teamSlug = env('VERCEL_TEAM_SLUG')
+  const projectSlug = webProjectSlug
+  const teamSlug = defaultTeamSlug
+  if (!projectSlug || !teamSlug) return undefined
+
+  const { gitBranch } = resolveGitMetadata()
+  const branch =
+    env('VERCEL_GIT_COMMIT_REF') ??
+    env('GITHUB_HEAD_REF') ??
+    env('GIT_BRANCH') ??
+    gitBranch ??
+    'main'
+
+  const branchSlug = slugifyVercelGitRef(branch)
+  return `https://${projectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
+}
+
+function resolveLocalVercelApiPreviewUrl() {
+  const projectSlug = apiProjectSlug
+  const teamSlug = defaultTeamSlug
   if (!projectSlug || !teamSlug) return undefined
 
   const { gitBranch } = resolveGitMetadata()
@@ -86,36 +114,57 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
         }
       : {},
   },
-  dev: {
-    webBaseUrl:
-      env('DEV_WEB_E2E_BASE_URL') ??
-      env('DEV_WEB_BASE_URL') ??
-      (env('VERCEL_BRANCH_URL') ? `https://${env('VERCEL_BRANCH_URL')}` : undefined) ??
-      resolveLocalVercelPreviewUrl() ??
-      'https://dev.couturecast.app',
-    apiBaseUrl:
-      env('DEV_API_BASE_URL') ??
-      env('VERCEL_API_BRANCH_URL') ??
-      (env('VERCEL_BRANCH_URL')
+  dev: (() => {
+    const webBaseUrl = firstDefined(
+      env('DEV_WEB_E2E_BASE_URL'),
+      env('DEV_WEB_BASE_URL'),
+      env('VERCEL_BRANCH_URL') ? `https://${env('VERCEL_BRANCH_URL')}` : undefined,
+      resolveLocalVercelPreviewUrl(),
+      'https://dev.couturecast.app'
+    )
+
+    const apiBaseUrl = firstDefined(
+      env('DEV_API_BASE_URL'),
+      env('VERCEL_API_BASE_URL'),
+      env('VERCEL_API_BRANCH_URL'),
+      resolveLocalVercelApiPreviewUrl(),
+      env('VERCEL_BRANCH_URL')
         ? `https://${env('VERCEL_BRANCH_URL')}`.replace(
             /(^https?:\/\/)([^.]+)\.([^.]+\.vercel\.app)/,
             (_match, proto, sub, rest) => `${proto}${sub}-api.${rest}`
           )
-        : undefined) ??
-      'https://dev-api.couturecast.app',
-    credentials: {
-      defaultUser: {
-        email: process.env.DEV_AUTH_USERNAME ?? 'dev.tester@couturecast.app',
-        password: process.env.DEV_AUTH_PASSWORD ?? 'dev-password',
+        : undefined,
+      'https://dev-api.couturecast.app'
+    )
+
+    return {
+      webBaseUrl,
+      apiBaseUrl,
+      credentials: {
+        defaultUser: {
+          email: process.env.DEV_AUTH_USERNAME ?? 'dev.tester@couturecast.app',
+          password: process.env.DEV_AUTH_PASSWORD ?? 'dev-password',
+        },
       },
-    },
-    apiHeaders: supabaseServiceRoleKey
-      ? {
-          apikey: supabaseServiceRoleKey,
-          authorization: `Bearer ${supabaseServiceRoleKey}`,
-        }
-      : {},
-  },
+      apiHeaders:
+        supabaseServiceRoleKey || vercelBypassSecret
+          ? {
+              ...(supabaseServiceRoleKey
+                ? {
+                    apikey: supabaseServiceRoleKey,
+                    authorization: `Bearer ${supabaseServiceRoleKey}`,
+                  }
+                : {}),
+              ...(vercelBypassSecret
+                ? {
+                    'x-vercel-protection-bypass': vercelBypassSecret,
+                    'x-vercel-set-bypass-cookie': 'true',
+                  }
+                : {}),
+            }
+          : {},
+    }
+  })(),
   prod: {
     webBaseUrl:
       env('PROD_WEB_E2E_BASE_URL') ??

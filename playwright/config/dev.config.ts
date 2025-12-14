@@ -9,7 +9,7 @@ const environment = resolveEnvironmentConfig('dev')
 export default defineConfig(
   merge({}, baseConfig, {
     // Dev targets Vercel Preview for the web app. API endpoints are not deployed to a dev domain yet.
-    testIgnore: ['**/api/**'],
+    // testIgnore: ['**/api/**'],
     use: {
       baseURL: environment.webBaseUrl,
       extraHTTPHeaders: environment.apiHeaders,

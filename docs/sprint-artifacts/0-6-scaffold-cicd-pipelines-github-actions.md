@@ -140,9 +140,9 @@ Notes against ACs
   - [x] Create/attach Vercel project for `apps/api` (separate from web), project root = `apps/api`.
     - Vercel Dashboard → New Project → Import `muratkeremozcan/couture-cast` → Framework preset: Other → Root directory: `apps/api` → Continue.
     - If repo already linked, go to Project Settings → General → Framework preset: Other → Root directory: `apps/api`.
-  - [ ] Set Vercel env vars for API (Supabase keys, etc.), plus `HUSKY=0`, `NODE_VERSION=24`.
+  - [x] Set Vercel env vars for API (Supabase keys, etc.), plus `HUSKY=0`, `NODE_VERSION=24`.
     - Vercel Dashboard → Project → Settings → Environment Variables → add Preview/Production vars: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `REDIS_URL`, `REDIS_TLS`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `HUSKY=0`, `NODE_VERSION=24`.
-  - [ ] Choose deploy trigger: Vercel Git integration (default) or GH Actions workflow for API deploys.
+  - [x] Choose deploy trigger: Vercel Git integration (default) or GH Actions workflow for API deploys.
     - Default: keep Git integration on (auto Preview on PRs, Production on main).
     - Optional: disable auto-deploy and add a GH Actions workflow that runs `vercel pull/build/deploy` for `apps/api`.
   - [ ] Map API domain (if needed) once project is created; verify `/api/health` responds after deploy.

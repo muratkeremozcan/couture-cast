@@ -32,7 +32,41 @@ function main() {
     fail('Failed to resolve Preview URL (empty output)')
   }
 
-  const env = { ...process.env, DEV_WEB_E2E_BASE_URL: url, TEST_ENV: 'dev' }
+  // Derive API preview URL when Vercel slugs are provided.
+  let apiPreviewUrl = process.env.DEV_API_BASE_URL
+  const apiProjectSlug = process.env.VERCEL_API_PROJECT_SLUG
+  const teamSlug = process.env.VERCEL_TEAM_SLUG
+  const webProjectSlug = process.env.VERCEL_WEB_PROJECT_SLUG
+
+  if (!apiPreviewUrl && apiProjectSlug && teamSlug && webProjectSlug) {
+    try {
+      const parsed = new URL(url)
+      const regex = new RegExp(
+        `^${webProjectSlug}-git-([^.]+)-${teamSlug.replace('.', '\\.')}`,
+        'i'
+      )
+      const match = parsed.hostname.match(regex)
+      const branchSlug = match?.[1]
+      if (branchSlug) {
+        apiPreviewUrl = `https://${apiProjectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const env = {
+    ...process.env,
+    DEV_WEB_E2E_BASE_URL: url,
+    ...(apiPreviewUrl
+      ? {
+          DEV_API_BASE_URL: apiPreviewUrl,
+          VERCEL_API_BASE_URL: apiPreviewUrl,
+          VERCEL_API_BRANCH_URL: apiPreviewUrl,
+        }
+      : {}),
+    TEST_ENV: 'dev',
+  }
   try {
     execFileSync(command.split(' ')[0], command.split(' ').slice(1), {
       stdio: 'inherit',
