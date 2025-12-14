@@ -128,12 +128,6 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
       env('VERCEL_API_BASE_URL'),
       env('VERCEL_API_BRANCH_URL'),
       resolveLocalVercelApiPreviewUrl(),
-      env('VERCEL_BRANCH_URL')
-        ? `https://${env('VERCEL_BRANCH_URL')}`.replace(
-            /(^https?:\/\/)([^.]+)\.([^.]+\.vercel\.app)/,
-            (_match, proto, sub, rest) => `${proto}${sub}-api.${rest}`
-          )
-        : undefined,
       'https://dev-api.couturecast.app'
     )
 

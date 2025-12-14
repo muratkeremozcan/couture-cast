@@ -180,7 +180,7 @@ Preview URLs as the "dev" target: `pr-pw-e2e-vercel-preview.yml` reads the Previ
 If your Preview deployments are protected (health check returns 401), set `VERCEL_AUTOMATION_BYPASS_SECRET` locally (in `.env.dev`) and
 in CI (GitHub repo secret). See `docs/ci-cd-pipeline.md`.
 
-Local Preview helper: `npm run test:pw-dev-preview` resolves the Vercel Preview URL (GitHub deployments → Vercel CLI fallback → manual
+Local Preview helper: `npm run test:pw-preview-dev` resolves the Vercel Preview URL (GitHub deployments → Vercel CLI fallback → manual
 override) and runs Playwright against it.
 
 - Prereqs: branch is pushed, `gh` is authed, `VERCEL_AUTOMATION_BYPASS_SECRET` is set, and Vercel CLI can read deployments:

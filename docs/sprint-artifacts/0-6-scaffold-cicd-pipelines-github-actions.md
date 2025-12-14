@@ -1,8 +1,7 @@
 # Story 0.6: Scaffold CI/CD pipelines (GitHub Actions)
 
-Updated: 2025-12-13 — make Vercel Preview smoke CI-safe
 
-Status: in progress (assessment complete)
+Status: done
 
 Current state (2025-01-XX)
 - CI in place: `.github/workflows/pr-checks.yml` (typecheck, lint, test, build) and `.github/workflows/pr-pw-e2e.yml` (Playwright, 2 shards, artifacts retained 5d, browser cache). Mobile Maestro workflow exists but is manual-only.
@@ -129,7 +128,7 @@ Notes against ACs
   - [x] Add `.github/workflows/pr-pw-e2e-vercel-preview.yml` triggered by `deployment_status` (Preview, success)
   - [x] Pass Vercel Preview URL to Playwright via `custom_base_url` → `DEV_WEB_E2E_BASE_URL`
   - [x] Support protected Preview deploys via `VERCEL_AUTOMATION_BYPASS_SECRET` (bypass headers for `/api/health`)
-  - [x] Add local helper: `npm run test:pw-dev-preview` resolves current branch's Preview URL (GitHub deployments → Vercel CLI fallback →
+  - [x] Add local helper: `npm run test:pw-preview-dev` resolves current branch's Preview URL (GitHub deployments → Vercel CLI fallback →
     manual alias env) and runs Playwright against it; provide `VERCEL_TOKEN`, `VERCEL_WEB_PROJECT_SLUG`, `VERCEL_TEAM_SLUG`, or set
     `VERCEL_BRANCH_ALIAS_URL` when branch hostnames are shortened.
   - [x] Vercel Dashboard: ensure Git integration has `deployment_status` events enabled (Project → Settings → Git)
@@ -145,7 +144,7 @@ Notes against ACs
   - [x] Choose deploy trigger: Vercel Git integration (default) or GH Actions workflow for API deploys.
     - Default: keep Git integration on (auto Preview on PRs, Production on main).
     - Optional: disable auto-deploy and add a GH Actions workflow that runs `vercel pull/build/deploy` for `apps/api`.
-  - [ ] Map API domain (if needed) once project is created; verify `/api/health` responds after deploy.
+  - [x] Map API domain (if needed) once project is created; verify `/api/health` responds after deploy.
     - Vercel Dashboard → Project → Settings → Domains → add `api.couturecast.app` (or subdomain), map to Production.
     - After first deploy, open `<deployment-url>/api/health` and confirm 200 + git metadata.
 
@@ -176,7 +175,6 @@ Notes against ACs
 - Playwright synthetic monitoring (cron job) hits ritual endpoints to ensure <2s load time
 - Telemetry fed into Grafana when breaches occur
 
-<!-- test -->
 ### Testing Context
 
 **Reference: playwright-utils CI/CD patterns**

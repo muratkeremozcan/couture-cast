@@ -49,7 +49,7 @@ development_status:
   0-3-set-up-supabase-projects-dev-staging-prod: done
   0-4-configure-redis-upstash-and-bullmq-queues: done
   0-5-initialize-socketio-gateway-and-expo-push-api: done
-  0-6-scaffold-cicd-pipelines-github-actions: in-progress
+  0-6-scaffold-cicd-pipelines-github-actions: done
   0-7-configure-posthog-opentelemetry-and-grafana-cloud: drafted
   0-8-set-up-environment-management-doppler-and-secret-rotation: drafted
   0-9-initialize-openapi-spec-generation-and-api-client-sdk: drafted

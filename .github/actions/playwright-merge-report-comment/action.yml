@@ -44,6 +44,10 @@ inputs:
     description: 'Token to use for GitHub API (pass GITHUB_TOKEN)'
     required: false
     default: ''
+  deployment-url:
+    description: 'Preview/production deployment URL to include in summary/comment'
+    required: false
+    default: ''
 
 outputs:
   report-url:
@@ -111,11 +115,15 @@ runs:
       env:
         BURN_IN: ${{ inputs.burn-in-result }}
         SHARDS: ${{ inputs.shards }}
+        DEPLOY_URL: ${{ inputs.deployment-url }}
       run: |
         echo "## Playwright E2E" >> $GITHUB_STEP_SUMMARY
         echo "- Shards: ${SHARDS}" >> $GITHUB_STEP_SUMMARY
         echo "- Burn-in: ${BURN_IN}" >> $GITHUB_STEP_SUMMARY
         echo "- Report: see uploaded artifact 'playwright-report'" >> $GITHUB_STEP_SUMMARY
+        if [ -n "${DEPLOY_URL}" ]; then
+          echo "- Deployment: ${DEPLOY_URL}" >> $GITHUB_STEP_SUMMARY
+        fi
 
     - name: Comment results on PR
       if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' }}
@@ -132,13 +140,20 @@ runs:
           const burnInResult = '${{ inputs.burn-in-result }}';
           const e2eResult = '${{ inputs.e2e-result }}';
           const reportUrl = '${{ steps.resolve-url.outputs.report_url }}';
+          const deploymentUrl = '${{ inputs.deployment-url }}';
 
-          const body = [
+          const lines = [
             `Playwright E2E: **${e2eResult.toUpperCase()}** (burn-in: ${burnInResult})`,
             '',
             `- Artifact: [playwright-report](${reportUrl}) (merged HTML + traces)`,
             `- Shards: ${{ inputs.shards }} (fail-fast: false)`,
-          ].join('\n');
+          ];
+
+          if (deploymentUrl) {
+            lines.splice(2, 0, `- Deployment: ${deploymentUrl}`);
+          }
+
+          const body = lines.join('\n');
 
           await github.rest.issues.createComment({
             owner: context.repo.owner,

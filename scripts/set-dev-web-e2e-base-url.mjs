@@ -10,10 +10,14 @@ function fail(message) {
 
 function resolveUrl() {
   try {
-    const output = execFileSync(process.execPath, ['./scripts/resolve-vercel-preview-url.mjs'], {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'inherit'],
-    })
+    const output = execFileSync(
+      process.execPath,
+      ['./scripts/resolve-vercel-preview-url.mjs'],
+      {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'inherit'],
+      }
+    )
     const lines = output.trim().split(/\r?\n/)
     return lines[lines.length - 1].trim()
   } catch (error) {
@@ -42,7 +46,7 @@ function main() {
     try {
       const parsed = new URL(url)
       const regex = new RegExp(
-        `^${webProjectSlug}-git-([^.]+)-${teamSlug.replace('.', '\\.')}`,
+        `^${webProjectSlug}-git-([^.]+)-${teamSlug.replace(/\./g, '\\.')}`,
         'i'
       )
       const match = parsed.hostname.match(regex)
