@@ -85,6 +85,14 @@ jobs:
                 fi
               fi
 
+              # Fallback: derive from branch ref when host parsing fails.
+              if [ -z "$api_host" ] && [ -n "$GITHUB_REF" ]; then
+                branch_slug=$(echo "$GITHUB_REF" | sed -e 's#refs/heads/##' -e 's#refs/pull/##' -e 's#/merge##' | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]/-/g' -e 's/^-*//' -e 's/-*$//')
+                if [ -n "$branch_slug" ]; then
+                  api_host="${api_slug}-git-${branch_slug}-${team_slug}.vercel.app"
+                fi
+              fi
+
               if [ -n "$api_host" ]; then
                 export DEV_API_BASE_URL="https://${api_host}"
                 export VERCEL_API_BASE_URL="https://${api_host}"

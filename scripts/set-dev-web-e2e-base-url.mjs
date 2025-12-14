@@ -59,6 +59,24 @@ function main() {
     try {
       const parsed = new URL(url)
       apiPreviewUrl = deriveApiFromWebHost(parsed.hostname, apiProjectSlug, teamSlug)
+
+      // Fallback to branch-based host when host parsing fails.
+      if (!apiPreviewUrl) {
+        const ref = process.env.GITHUB_REF || process.env.GITHUB_HEAD_REF
+        if (ref) {
+          const branchSlug = ref
+            .replace(/^refs\/heads\//, '')
+            .replace(/^refs\/pull\//, '')
+            .replace(/\/merge$/, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, '-')
+            .replace(/^-+/, '')
+            .replace(/-+$/, '')
+          if (branchSlug) {
+            apiPreviewUrl = `https://${apiProjectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
+          }
+        }
+      }
     } catch {
       // ignore
     }
