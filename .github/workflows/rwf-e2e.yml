@@ -74,7 +74,31 @@ jobs:
               suffix="${team_slug}.vercel.app"
               api_host=""
 
-              if [[ "$host" == *"$suffix" ]]; then
+              reach() {
+                url="$1"
+                if [ -z "$url" ]; then return 1; fi
+                code=$(curl -I -s -o /dev/null -w "%{http_code}" --max-time 5 "$url" || true)
+                case "$code" in
+                  200|301|302|303|307|308|401|403|405) return 0 ;;
+                  *) return 1 ;;
+                esac
+              }
+
+              branch_slug=""
+              if [ -n "$GITHUB_REF" ]; then
+                branch_slug=$(echo "$GITHUB_REF" | sed -e 's#refs/heads/##' -e 's#refs/pull/##' -e 's#/merge##' | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]/-/g' -e 's/^-*//' -e 's/-*$//')
+              fi
+
+              # Try branch-based host first.
+              if [ -n "$branch_slug" ]; then
+                candidate="https://${api_slug}-git-${branch_slug}-${team_slug}.vercel.app"
+                if reach "$candidate"; then
+                  api_host=$(echo "$candidate" | sed -e 's#^https://##')
+                fi
+              fi
+
+              # If no reachable branch host, try deriving from web host/hash.
+              if [ -z "$api_host" ] && [[ "$host" == *"$suffix" ]]; then
                 prefix="${host%-$suffix}"
                 if [[ "$prefix" == *"-git-"* ]]; then
                   branch="${prefix##*-git-}"
@@ -83,13 +107,10 @@ jobs:
                   id="${prefix##*-}"
                   api_host="${api_slug}-${id}-${team_slug}.vercel.app"
                 fi
-              fi
 
-              # Fallback: derive from branch ref when host parsing fails.
-              if [ -z "$api_host" ] && [ -n "$GITHUB_REF" ]; then
-                branch_slug=$(echo "$GITHUB_REF" | sed -e 's#refs/heads/##' -e 's#refs/pull/##' -e 's#/merge##' | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]/-/g' -e 's/^-*//' -e 's/-*$//')
-                if [ -n "$branch_slug" ]; then
-                  api_host="${api_slug}-git-${branch_slug}-${team_slug}.vercel.app"
+                candidate="https://${api_host}"
+                if ! reach "$candidate"; then
+                  api_host=""
                 fi
               fi
 
