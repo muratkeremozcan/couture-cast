@@ -43,7 +43,17 @@ Playwright environment selection uses `TEST_ENV`:
 
 ### Deploy (mobile)
 
-- `.github/workflows/deploy-mobile.yml`: EAS build on `main` (requires `EXPO_TOKEN`).
+- `.github/workflows/deploy-mobile.yml`: Manual dispatch only (no auto-run on main); EAS build for Android-only to avoid iOS Apple Developer enrollment (requires `EXPO_TOKEN`).
+- Local helper scripts (root):
+  - `npm run mobile:build` → `eas build --profile production --platform android` (uses `apps/mobile/eas.json`, `appVersionSource: local`)
+  - `npm run mobile:submit` → `eas submit --profile production --platform android --non-interactive`
+- Project linking & config:
+  - `apps/mobile/app.json`: name/slug `couture-cast`, owner `muratkerem` (linked to EAS project `@muratkerem/couture-cast`)
+  - `apps/mobile/eas.json`: production profile (autoIncrement, Android app-bundle, iOS m-medium), `appVersionSource: local`
+- Credentials:
+  - Android keystore generated once via `eas credentials:configure-build --platform android --profile production` (interactive)
+  - iOS disabled for now (would require paid Apple Developer enrollment and interactive first build to create certs/profiles)
+- EXPO_TOKEN: create via Expo UI (Account → Access Tokens), add as repo secret and export locally before running scripts
 
 ### Manual E2E
 

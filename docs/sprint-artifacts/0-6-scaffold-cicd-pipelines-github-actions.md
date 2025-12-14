@@ -71,13 +71,13 @@ Notes against ACs
     - [x] Handler and config in repo (apps/api/api/index.ts, apps/api/vercel.json).
     - [x] Create Vercel project or attach to existing if/when API deploy is needed; map env vars and set `HUSKY=0`.
   - Mobile (Expo EAS):
-    - [x] Added `.github/workflows/deploy-mobile.yml` with push-to-main + workflow_dispatch (requires `EXPO_TOKEN`).
+    - [x] Added `.github/workflows/deploy-mobile.yml` with workflow_dispatch only (manual trigger; requires `EXPO_TOKEN`).
     - [x] Install EAS CLI: `npm i -g eas-cli`; `eas whoami` to verify.
     - [x] Create token: Expo access token (UI: expo.dev → Account → Access Tokens) → use as `EXPO_TOKEN` secret.
     - [x] Configure `eas.json` profiles and app config (app.config.js/app.json); ensure proper bundle IDs. (Production profile scaffolded.)
-    - [x] Add repo secret: `EXPO_TOKEN` (token created via Expo UI); store store creds (App Store / Play) only if you plan to submit.
-    - [x] Build command: `eas build --platform all --non-interactive` (wired in deploy workflow).
-    - [ ] Optional submit: `eas submit --platform all --non-interactive` (manual approval outside CI); add tagging step after successful build/submit.
+    - [x] Add repo secret: `EXPO_TOKEN` (token created via Expo UI); store creds (App Store / Play) only if you plan to submit.
+    - [x] Build command: `eas build --platform android --non-interactive` (wired in deploy workflow; iOS disabled until Apple Developer enrollment).
+    - [x] Optional submit: `eas submit --platform android --non-interactive` (manual approval outside CI); add tagging step after successful build/submit.
 
 - [x] Task 5: Configure artifact retention (AC: #4)
   - Decision: stick with default 5–7 day retention on GitHub Actions artifacts; no S3/offloading. Update later if longer retention is needed.

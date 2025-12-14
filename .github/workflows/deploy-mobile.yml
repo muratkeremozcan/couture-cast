@@ -2,9 +2,6 @@ name: Deploy mobile (main)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 concurrency:
   group: deploy-mobile-${{ github.ref }}
@@ -41,13 +38,13 @@ jobs:
           EXPO_TOKEN: ${{ env.EXPO_TOKEN }}
         run: eas whoami
 
-      - name: Build with EAS (all platforms)
+      - name: Build with EAS (Android only)
         env:
           EXPO_TOKEN: ${{ env.EXPO_TOKEN }}
           EAS_NO_VCS: 1
         working-directory: apps/mobile
         run: |
-          eas build --platform all --profile production --non-interactive --no-wait
+          eas build --platform android --profile production --non-interactive --no-wait
 
       - name: Summary
         run: |
@@ -55,4 +52,5 @@ jobs:
             echo "## Deploy mobile (main)";
             echo "- Trigger: \`${{ github.event_name }}\`";
             echo "- Profile: production";
+            echo "- Platform: android (iOS disabled until Apple Developer enrollment/credentials are available)";
           } >> "$GITHUB_STEP_SUMMARY"
