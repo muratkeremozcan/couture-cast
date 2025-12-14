@@ -21,10 +21,6 @@ on:
         type: string
         description: "Optional override for base URL"
         required: false
-      deployment_ref:
-        type: string
-        description: "Deployment ref (branch) for preview URL derivation"
-        required: false
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET:
         required: false
@@ -68,16 +64,14 @@ jobs:
               dev) export DEV_WEB_E2E_BASE_URL="$custom_base_url" ;;
               prod) export PROD_WEB_E2E_BASE_URL="$custom_base_url" ;;
             esac
-          fi
 
-          # Derive API preview URL from deployment ref if not already provided.
-          if [ -z "$DEV_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
-            ref="${{ inputs.deployment_ref }}"
-            slug=$(echo "${ref#refs/heads/}" | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]/-/g' -e 's/^-*//' -e 's/-*$//')
-            if [ -n "$slug" ]; then
+            # Derive API base from the same host when not provided.
+            if [ -z "$DEV_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
+              web_slug="${VERCEL_WEB_PROJECT_SLUG:-couture-cast-web}"
               api_slug="${VERCEL_API_PROJECT_SLUG:-couture-cast-api}"
-              team_slug="${VERCEL_TEAM_SLUG:-muratkeremozcans-projects}"
-              export DEV_API_BASE_URL="https://${api_slug}-git-${slug}-${team_slug}.vercel.app"
+              api_url="${custom_base_url/${web_slug}-/${api_slug}-}"
+              export DEV_API_BASE_URL="$api_url"
+              export VERCEL_API_BASE_URL="$api_url"
             fi
           fi
 
