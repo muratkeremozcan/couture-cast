@@ -137,7 +137,7 @@ Notes against ACs
 
 - [ ] Task 13: Prepare API deployment on Vercel (serverless Nest adapter)
   - [x] Scaffold: `apps/api/vercel.json` + `apps/api/api/index.ts` handler committed.
-  - [ ] Create/attach Vercel project for `apps/api` (separate from web), project root = `apps/api`.
+  - [x] Create/attach Vercel project for `apps/api` (separate from web), project root = `apps/api`.
     - Vercel Dashboard → New Project → Import `muratkeremozcan/couture-cast` → Framework preset: Other → Root directory: `apps/api` → Continue.
     - If repo already linked, go to Project Settings → General → Framework preset: Other → Root directory: `apps/api`.
   - [ ] Set Vercel env vars for API (Supabase keys, etc.), plus `HUSKY=0`, `NODE_VERSION=24`.
