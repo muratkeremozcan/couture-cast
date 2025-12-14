@@ -67,11 +67,26 @@ jobs:
 
             # Derive API base from the same host when not provided.
             if [ -z "$DEV_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
-              web_slug="${VERCEL_WEB_PROJECT_SLUG:-couture-cast-web}"
               api_slug="${VERCEL_API_PROJECT_SLUG:-couture-cast-api}"
-              api_url="${custom_base_url/${web_slug}-/${api_slug}-}"
-              export DEV_API_BASE_URL="$api_url"
-              export VERCEL_API_BASE_URL="$api_url"
+              team_slug="${VERCEL_TEAM_SLUG:-muratkeremozcans-projects}"
+
+              host=$(echo "$custom_base_url" | sed -e 's#^https\?://##' -e 's#/.*$##')
+              escape_team=$(echo "$team_slug" | sed 's/\./\\./g')
+
+              if [[ "$host" =~ ^(.+)-git-([^-]+)-${escape_team}$ ]]; then
+                branch="${BASH_REMATCH[2]}"
+                api_host="${api_slug}-git-${branch}-${team_slug}.vercel.app"
+              elif [[ "$host" =~ ^(.+)-([^-]+)-${escape_team}$ ]]; then
+                hashid="${BASH_REMATCH[2]}"
+                api_host="${api_slug}-${hashid}-${team_slug}.vercel.app"
+              else
+                api_host=""
+              fi
+
+              if [ -n "$api_host" ]; then
+                export DEV_API_BASE_URL="https://${api_host}"
+                export VERCEL_API_BASE_URL="https://${api_host}"
+              fi
             fi
           fi
 

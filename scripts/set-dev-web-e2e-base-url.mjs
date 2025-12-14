@@ -38,6 +38,23 @@ function main() {
     fail('Failed to resolve Preview URL (empty output)')
   }
 
+  function deriveApiFromWebHost(hostname, apiSlug, teamSlug) {
+    const teamEscaped = teamSlug.replace(/\./g, '\\.')
+    const gitPattern = new RegExp(`^(.+)-git-([^-]+)-${teamEscaped}$`, 'i')
+    const hashPattern = new RegExp(`^(.+)-([^-]+)-${teamEscaped}$`, 'i')
+    let m = hostname.match(gitPattern)
+    if (m) {
+      const branch = m[2]
+      return `https://${apiSlug}-git-${branch}-${teamSlug}.vercel.app`
+    }
+    m = hostname.match(hashPattern)
+    if (m) {
+      const hashId = m[2]
+      return `https://${apiSlug}-${hashId}-${teamSlug}.vercel.app`
+    }
+    return undefined
+  }
+
   // Derive API preview URL when Vercel slugs are provided (with sane defaults for CI).
   let apiPreviewUrl = process.env.DEV_API_BASE_URL || process.env.VERCEL_API_BASE_URL
   const apiProjectSlug = process.env.VERCEL_API_PROJECT_SLUG || 'couture-cast-api'
@@ -57,25 +74,8 @@ function main() {
       if (branchSlug) {
         apiPreviewUrl = `https://${apiProjectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
       } else {
-        // Handle hashed preview hostnames: <webSlug>-<id>-<team>.vercel.app → swap slug
-        const hashRegex = new RegExp(
-          `^${webProjectSlug}-([^.]+)-${teamEscaped}`,
-          'i'
-        )
-        const hashMatch = parsed.hostname.match(hashRegex)
-        const hashId = hashMatch?.[1]
-        if (hashId) {
-          apiPreviewUrl = `https://${apiProjectSlug}-${hashId}-${teamSlug}.vercel.app`
-        } else {
-          // Last-resort swap: replace leading web slug with api slug on same host
-          if (parsed.hostname.startsWith(`${webProjectSlug}-`)) {
-            apiPreviewUrl = parsed.hostname.replace(
-              new RegExp(`^${webProjectSlug}`),
-              apiProjectSlug
-            )
-            apiPreviewUrl = `https://${apiPreviewUrl}`
-          }
-        }
+        // Handle hashed or mismatched project slugs generically.
+        apiPreviewUrl = deriveApiFromWebHost(parsed.hostname, apiProjectSlug, teamSlug)
       }
     } catch {
       // ignore
