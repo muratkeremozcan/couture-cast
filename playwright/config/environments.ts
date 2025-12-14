@@ -38,11 +38,11 @@ function env(name: string) {
   return trimmed.length > 0 ? trimmed : undefined
 }
 
-function firstDefined<T>(...values: (T | undefined)[]): T | undefined {
+function firstDefined<T>(...values: (T | undefined)[]): T {
   for (const value of values) {
     if (value !== undefined) return value
   }
-  return undefined
+  throw new Error('No defined value found')
 }
 
 const supabaseServiceRoleKey = env('SUPABASE_SERVICE_ROLE_KEY') ?? ''
