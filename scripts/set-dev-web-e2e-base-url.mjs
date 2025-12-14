@@ -9,6 +9,8 @@ function fail(message) {
 }
 
 function resolveUrl() {
+  const manual = process.env.DEV_WEB_E2E_BASE_URL || process.env.DEV_WEB_BASE_URL
+  if (manual) return manual
   try {
     const output = execFileSync(
       process.execPath,
@@ -37,7 +39,7 @@ function main() {
   }
 
   // Derive API preview URL when Vercel slugs are provided.
-  let apiPreviewUrl = process.env.DEV_API_BASE_URL
+  let apiPreviewUrl = process.env.DEV_API_BASE_URL || process.env.VERCEL_API_BASE_URL
   const apiProjectSlug = process.env.VERCEL_API_PROJECT_SLUG
   const teamSlug = process.env.VERCEL_TEAM_SLUG
   const webProjectSlug = process.env.VERCEL_WEB_PROJECT_SLUG
