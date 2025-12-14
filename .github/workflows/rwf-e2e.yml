@@ -59,6 +59,42 @@ jobs:
       - name: Setup Playwright browsers
         uses: ./.github/actions/setup-playwright-browsers
 
+      - name: Resolve branch name from SHA
+        id: resolve_branch
+        if: inputs.custom_base_url != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # deployment_ref might be a SHA, not a branch name
+          # Query GitHub API to find which branch has this commit as HEAD
+          sha="${{ inputs.gh_ref }}"
+          deployment_ref="${{ inputs.deployment_ref }}"
+
+          branch_name=""
+
+          # If deployment_ref looks like a branch name (not a 40-char hex), use it directly
+          if [[ "$deployment_ref" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "deployment_ref is a SHA, querying GitHub for branch name..."
+            # Query GitHub API for branches where this SHA is HEAD
+            branch_name=$(gh api "/repos/${{ github.repository }}/commits/${sha}/branches-where-head" --jq '.[0].name' 2>/dev/null || true)
+
+            # Fallback: check if this is a PR and get head ref
+            if [ -z "$branch_name" ]; then
+              # Try to find PR associated with this SHA
+              pr_branch=$(gh api "/repos/${{ github.repository }}/commits/${sha}/pulls" --jq '.[0].head.ref' 2>/dev/null || true)
+              if [ -n "$pr_branch" ]; then
+                branch_name="$pr_branch"
+              fi
+            fi
+          else
+            # deployment_ref is already a branch name
+            branch_name="$deployment_ref"
+          fi
+
+          echo "Resolved branch name: $branch_name"
+          echo "branch=$branch_name" >> "$GITHUB_OUTPUT"
+
       - name: Run Playwright
         shell: bash
         env:
@@ -69,8 +105,8 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_API_PROJECT_SLUG: ${{ secrets.VERCEL_API_PROJECT_SLUG }}
           VERCEL_TEAM_SLUG: ${{ secrets.VERCEL_TEAM_SLUG }}
-          # Pass deployment ref for branch-based URL resolution
-          VERCEL_GIT_COMMIT_REF: ${{ inputs.deployment_ref }}
+          # Pass resolved branch name for URL construction
+          VERCEL_GIT_COMMIT_REF: ${{ steps.resolve_branch.outputs.branch }}
         run: |
           custom_base_url="${{ inputs.custom_base_url }}"
           if [ -n "$custom_base_url" ]; then
@@ -85,8 +121,8 @@ jobs:
               api_slug="${VERCEL_API_PROJECT_SLUG:-couture-cast-api}"
               team_slug="${VERCEL_TEAM_SLUG:-muratkeremozcans-projects}"
 
-              # Get branch from deployment_ref (preferred) or GITHUB_REF (fallback)
-              branch_ref="${VERCEL_GIT_COMMIT_REF:-$GITHUB_REF}"
+              # Get branch from resolved branch name
+              branch_ref="${VERCEL_GIT_COMMIT_REF}"
               branch_slug=""
               if [ -n "$branch_ref" ]; then
                 branch_slug=$(echo "$branch_ref" | sed -e 's#refs/heads/##' -e 's#refs/pull/##' -e 's#/merge##' | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]/-/g' -e 's/^-*//' -e 's/-*$//')
