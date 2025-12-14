@@ -38,11 +38,11 @@ function main() {
     fail('Failed to resolve Preview URL (empty output)')
   }
 
-  // Derive API preview URL when Vercel slugs are provided.
+  // Derive API preview URL when Vercel slugs are provided (with sane defaults for CI).
   let apiPreviewUrl = process.env.DEV_API_BASE_URL || process.env.VERCEL_API_BASE_URL
-  const apiProjectSlug = process.env.VERCEL_API_PROJECT_SLUG
-  const teamSlug = process.env.VERCEL_TEAM_SLUG
-  const webProjectSlug = process.env.VERCEL_WEB_PROJECT_SLUG
+  const apiProjectSlug = process.env.VERCEL_API_PROJECT_SLUG || 'couture-cast-api'
+  const teamSlug = process.env.VERCEL_TEAM_SLUG || 'muratkeremozcans-projects'
+  const webProjectSlug = process.env.VERCEL_WEB_PROJECT_SLUG || 'couture-cast-web'
 
   if (!apiPreviewUrl && apiProjectSlug && teamSlug && webProjectSlug) {
     try {
@@ -66,6 +66,15 @@ function main() {
         const hashId = hashMatch?.[1]
         if (hashId) {
           apiPreviewUrl = `https://${apiProjectSlug}-${hashId}-${teamSlug}.vercel.app`
+        } else {
+          // Last-resort swap: replace leading web slug with api slug on same host
+          if (parsed.hostname.startsWith(`${webProjectSlug}-`)) {
+            apiPreviewUrl = parsed.hostname.replace(
+              new RegExp(`^${webProjectSlug}`),
+              apiProjectSlug
+            )
+            apiPreviewUrl = `https://${apiPreviewUrl}`
+          }
         }
       }
     } catch {
