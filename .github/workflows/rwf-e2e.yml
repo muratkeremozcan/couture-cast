@@ -82,7 +82,7 @@ jobs:
                 else
                   id="${prefix##*-}"
                   api_host="${api_slug}-${id}-${team_slug}.vercel.app"
-                }
+                fi
               fi
 
               if [ -n "$api_host" ]; then
