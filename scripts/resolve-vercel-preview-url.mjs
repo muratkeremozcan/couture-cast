@@ -294,19 +294,42 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
     return undefined
   }
 
-  // Find first deployment with a URL
+  // Find first deployment and prefer git-branch alias URL over canonical URL
+  // Git-branch aliases auto-update to latest deployment, canonical URLs are locked to specific deployments
   for (const deployment of deployments) {
-    if (deployment?.url) {
-      const url = deployment.url.startsWith('http')
-        ? deployment.url
-        : `https://${deployment.url}`
-      logDebug(`Found deployment URL: ${url}`)
-      logDebug(`  State: ${deployment.state || 'unknown'}`)
-      logDebug(`  Created: ${deployment.created || 'unknown'}`)
-      logDebug(`  Git ref: ${deployment.meta?.githubCommitRef || 'unknown'}`)
-      logDebug(`  Git SHA: ${deployment.meta?.githubCommitSha || 'unknown'}`)
-      return url
+    if (!deployment?.url) continue
+
+    logDebug(`Checking deployment: ${deployment.url}`)
+    logDebug(`  State: ${deployment.state || 'unknown'}`)
+    logDebug(`  Created: ${deployment.created || 'unknown'}`)
+    logDebug(`  Git ref: ${deployment.meta?.githubCommitRef || 'unknown'}`)
+    logDebug(`  Git SHA: ${deployment.meta?.githubCommitSha || 'unknown'}`)
+
+    // Check if deployment has alias URLs (git-branch aliases)
+    if (
+      deployment.alias &&
+      Array.isArray(deployment.alias) &&
+      deployment.alias.length > 0
+    ) {
+      // Look for git-branch alias (contains "-git-")
+      const gitBranchAlias = deployment.alias.find(
+        (alias) => alias && alias.includes('-git-')
+      )
+      if (gitBranchAlias) {
+        const url = gitBranchAlias.startsWith('http')
+          ? gitBranchAlias
+          : `https://${gitBranchAlias}`
+        logDebug(`✓ Using git-branch alias URL (auto-updates): ${url}`)
+        return url
+      }
     }
+
+    // Fallback to canonical URL (locked to this specific deployment)
+    const url = deployment.url.startsWith('http')
+      ? deployment.url
+      : `https://${deployment.url}`
+    logDebug(`Using canonical URL (locked to this deployment): ${url}`)
+    return url
   }
 
   return undefined
