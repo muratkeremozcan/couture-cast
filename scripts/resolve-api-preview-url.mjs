@@ -1,23 +1,15 @@
 #!/usr/bin/env node
-/**
- * Resolve the latest Vercel Preview deployment URL for the API project.
- * Prints the URL to stdout; all other messages go to stderr.
- *
- * This queries Vercel API directly instead of deriving from web URL,
- * because web and API deployments have different hashes.
- */
 import fs from 'node:fs'
 import path from 'node:path'
-import { execFileSync, execSync } from 'node:child_process'
-import dotenv from 'dotenv'
+import process from 'node:process'
+import { config as loadEnv } from 'dotenv'
 
-// Load env (prefer .env.<TEST_ENV>, then .env)
 const envSuffix = (process.env.TEST_ENV ?? 'dev').toLowerCase()
 const envFiles = [`.env.${envSuffix}`, '.env']
 for (const file of envFiles) {
   const full = path.resolve(process.cwd(), file)
   if (fs.existsSync(full)) {
-    dotenv.config({ path: full })
+    loadEnv({ path: full })
     break
   }
 }
@@ -40,46 +32,9 @@ function env(name) {
   return trimmed.length > 0 ? trimmed : undefined
 }
 
-function runGit(command) {
-  try {
-    return execSync(command, {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim()
-  } catch {
-    return undefined
-  }
-}
-
-function getBranch() {
-  const fromEnv =
-    env('GITHUB_HEAD_REF') ??
-    env('VERCEL_GIT_COMMIT_REF') ??
-    env('GIT_BRANCH') ??
-    env('BRANCH')
-  if (fromEnv) return fromEnv
-
-  // Try GITHUB_REF (refs/heads/branch-name or refs/pull/123/merge)
-  const ghRef = env('GITHUB_REF')
-  if (ghRef) {
-    const match = ghRef.match(/^refs\/heads\/(.+)$/)
-    if (match) return match[1]
-    // For PRs, try to get the head ref
-    const prMatch = ghRef.match(/^refs\/pull\/(\d+)/)
-    if (prMatch && env('GITHUB_HEAD_REF')) {
-      return env('GITHUB_HEAD_REF')
-    }
-  }
-
-  const fromGit = runGit('git rev-parse --abbrev-ref HEAD')
-  if (fromGit && fromGit !== 'HEAD') return fromGit
-
-  return undefined
-}
-
-function slugifyBranch(value) {
-  if (!value) return undefined
-  const normalized = value
+function slugifyBranch(branch) {
+  if (!branch) return undefined
+  const normalized = branch
     .replace(/^refs\/heads\//, '')
     .replace(/^refs\/pull\//, '')
     .replace(/\/merge$/, '')
@@ -92,142 +47,71 @@ function slugifyBranch(value) {
   return slug || undefined
 }
 
-function runVercelDeployments(project, team, metaKey, metaValue, limit = 10) {
-  const args = ['vercel', 'deployments', project, '--json', '--limit', String(limit)]
-  if (team) {
-    args.push('--scope', team)
+async function fetchJson(url) {
+  const token = env('VERCEL_TOKEN')
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
   }
-  if (metaKey && metaValue) {
-    args.push('--meta', `${metaKey}=${metaValue}`)
+  logDebug(`Fetching Vercel API: ${url}`)
+  const response = await fetch(url, { headers })
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    logDebug(`Vercel API error: ${response.status} ${response.statusText}`)
+    throw new Error(
+      `Vercel API request failed (${url}): ${response.status} ${response.statusText} ${body}`
+    )
   }
-  try {
-    logDebug(`Running: npx ${args.join(' ')}`)
-    const output = execFileSync('npx', args, {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: process.env,
-    })
-    return JSON.parse(output)
-  } catch (error) {
-    logDebug(`vercel deployments failed: ${error.stderr?.toString() ?? error.message}`)
-    return undefined
-  }
+  return response.json()
 }
 
-async function isApiEndpoint(url) {
-  // Verify this is actually an API endpoint (returns JSON, not HTML)
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 5000)
-  try {
-    const testUrl = `${url}/api/health`
-    logDebug(`Verifying API endpoint: ${testUrl}`)
-    const res = await fetch(testUrl, {
-      method: 'GET',
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-      },
-    })
-
-    const contentType = res.headers.get('content-type') || ''
-    // If it returns JSON or is at least not HTML, it's likely the API
-    if (contentType.includes('application/json')) {
-      logDebug(`Verified: ${url} returns JSON`)
-      return true
-    }
-
-    // Also accept if the root returns JSON
-    const rootRes = await fetch(url, {
-      method: 'GET',
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-      },
-    })
-    const rootContentType = rootRes.headers.get('content-type') || ''
-    if (rootContentType.includes('application/json')) {
-      logDebug(`Verified: ${url} root returns JSON`)
-      return true
-    }
-
-    // If we get HTML, this is probably the web app, not the API
-    if (contentType.includes('text/html') || rootContentType.includes('text/html')) {
-      logDebug(`Warning: ${url} returns HTML, likely not the API`)
-      return false
-    }
-
-    // Accept other responses (might be API returning different content type)
-    return true
-  } catch (error) {
-    logDebug(`API verification failed for ${url}: ${error.message}`)
-    // If fetch fails, still return the URL - might be a network issue
-    return true
-  } finally {
-    clearTimeout(timeout)
-    controller.abort()
-  }
+async function resolveTeamId(teamSlug) {
+  if (!teamSlug) return undefined
+  const url = `https://api.vercel.com/v1/teams/${teamSlug}`
+  const result = await fetchJson(url)
+  return result?.id
 }
 
-async function findApiUrlFromVercel(project, team, branch) {
-  if (!project) return undefined
+async function resolveProjectId(projectSlug, teamId) {
+  const baseUrl = `https://api.vercel.com/v9/projects/${projectSlug}`
+  const url = new URL(baseUrl)
+  if (teamId) {
+    url.searchParams.set('teamId', teamId)
+  }
+  const result = await fetchJson(url.toString())
+  return result?.id
+}
 
+async function findDeploymentUrl(projectId, teamId, branch) {
+  const searchParams = new URLSearchParams({
+    projectId,
+    state: 'READY',
+    limit: '20',
+  })
+  if (teamId) searchParams.set('teamId', teamId)
   const branchSlug = slugifyBranch(branch)
-  logDebug(
-    `Looking for API deployment: project=${project}, team=${team}, branch=${branch}, slug=${branchSlug}`
-  )
-
-  // Try filtering by branch metadata
-  const candidates = []
-
-  if (branch) {
-    const byRef = runVercelDeployments(project, team, 'githubCommitRef', branch, 10)
-    if (byRef && Array.isArray(byRef)) {
-      candidates.push(...byRef)
-    }
-
-    if (branchSlug && branchSlug !== branch) {
-      const bySlug = runVercelDeployments(
-        project,
-        team,
-        'githubCommitRef',
-        branchSlug,
-        10
-      )
-      if (bySlug && Array.isArray(bySlug)) {
-        candidates.push(...bySlug)
-      }
-    }
-  }
-
-  // Also try without metadata filter as fallback
-  if (candidates.length === 0) {
-    const any = runVercelDeployments(project, team, undefined, undefined, 10)
-    if (any && Array.isArray(any)) {
-      candidates.push(...any)
-    }
-  }
-
-  // Find first deployment with a URL and state=READY
-  for (const deployment of candidates) {
+  if (branch) searchParams.set('meta', `githubCommitRef=${branch}`)
+  const url = `https://api.vercel.com/v6/deployments?${searchParams.toString()}`
+  const result = await fetchJson(url)
+  const deployments = result?.deployments ?? []
+  for (const deployment of deployments) {
     if (!deployment?.url) continue
     if (deployment.state && deployment.state !== 'READY') continue
-
-    const url = deployment.url.startsWith('http')
+    const metaRef = deployment.meta?.githubCommitRef
+    if (branch && metaRef && metaRef !== branch && metaRef !== branchSlug) continue
+    return deployment.url.startsWith('https://')
       ? deployment.url
       : `https://${deployment.url}`
-    logDebug(`Candidate API URL: ${url} (state: ${deployment.state || 'unknown'})`)
-
-    // Verify it's actually an API endpoint
-    if (await isApiEndpoint(url)) {
-      return url
-    }
   }
-
   return undefined
 }
 
+function deterministicUrl(projectSlug, branchSlug, teamSlug) {
+  if (!projectSlug || !branchSlug || !teamSlug) return undefined
+  return `https://${projectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
+}
+
 async function main() {
-  // Check for manual override first
   const manual = env('DEV_API_BASE_URL') ?? env('VERCEL_API_BASE_URL')
   if (manual) {
     logDebug(`Using manual API URL: ${manual}`)
@@ -235,38 +119,45 @@ async function main() {
     return
   }
 
-  const apiProject = env('VERCEL_API_PROJECT_SLUG')
-  const team = env('VERCEL_TEAM_SLUG')
+  const token = env('VERCEL_TOKEN')
+  const projectSlug = env('VERCEL_API_PROJECT_SLUG')
+  const teamSlug = env('VERCEL_TEAM_SLUG')
 
-  if (!apiProject) {
-    fail('VERCEL_API_PROJECT_SLUG is required')
+  if (!token) fail('VERCEL_TOKEN is required to query Vercel API')
+  if (!projectSlug) fail('VERCEL_API_PROJECT_SLUG is required')
+
+  const branch =
+    env('GITHUB_HEAD_REF') ??
+    env('VERCEL_GIT_COMMIT_REF') ??
+    env('GIT_BRANCH') ??
+    env('BRANCH')
+  const branchSlug = slugifyBranch(branch) ?? 'main'
+
+  logDebug(`Resolving API URL for project: ${projectSlug}, branch: ${branch}`)
+
+  const teamId = await resolveTeamId(teamSlug)
+  logDebug(`Team ID: ${teamId}`)
+
+  const projectId = await resolveProjectId(projectSlug, teamId)
+  if (!projectId) fail(`Unable to resolve project ID for ${projectSlug}`)
+  logDebug(`Project ID: ${projectId}`)
+
+  const deploymentUrl = await findDeploymentUrl(projectId, teamId, branch)
+  if (deploymentUrl) {
+    logDebug(`Found deployment URL: ${deploymentUrl}`)
+    process.stdout.write(deploymentUrl)
+    return
   }
 
-  if (!env('VERCEL_TOKEN')) {
-    fail('VERCEL_TOKEN is required to query Vercel API')
+  logDebug('No deployment found via API, trying deterministic URL')
+  const fallback = deterministicUrl(projectSlug, branchSlug, teamSlug)
+  if (fallback) {
+    logDebug(`Using fallback deterministic URL: ${fallback}`)
+    process.stdout.write(fallback)
+    return
   }
 
-  const branch = getBranch()
-  logDebug(`Resolving API Preview URL for branch: ${branch || '(unknown)'}`)
-
-  // Try to find the API deployment URL
-  const url = await findApiUrlFromVercel(apiProject, team, branch)
-
-  if (!url) {
-    // Fall back to deterministic branch URL pattern
-    const branchSlug = slugifyBranch(branch)
-    if (branchSlug && team) {
-      const deterministic = `https://${apiProject}-git-${branchSlug}-${team}.vercel.app`
-      logDebug(`Falling back to deterministic URL: ${deterministic}`)
-      if (await isApiEndpoint(deterministic)) {
-        process.stdout.write(deterministic)
-        return
-      }
-    }
-    fail(`No API deployment found for project "${apiProject}"`)
-  }
-
-  process.stdout.write(url)
+  fail(`Could not resolve preview URL for ${projectSlug}`)
 }
 
 await main()

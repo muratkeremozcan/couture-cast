@@ -61,7 +61,7 @@ jobs:
 
       - name: Resolve branch name from SHA
         id: resolve_branch
-        if: inputs.custom_base_url != ''
+        if: inputs.deployment_ref != ''
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -101,12 +101,16 @@ jobs:
           TEST_ENV: ${{ inputs.test_env }}
           EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.expected_sha.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_WEB_PROJECT_SLUG: ${{ secrets.VERCEL_WEB_PROJECT_SLUG }}
           VERCEL_API_PROJECT_SLUG: ${{ secrets.VERCEL_API_PROJECT_SLUG }}
           VERCEL_TEAM_SLUG: ${{ secrets.VERCEL_TEAM_SLUG }}
           # Pass resolved branch name for URL construction
           VERCEL_GIT_COMMIT_REF: ${{ steps.resolve_branch.outputs.branch }}
+          # Enable debug logging for URL resolution scripts
+          DEBUG: true
         run: |
           custom_base_url="${{ inputs.custom_base_url }}"
           if [ -n "$custom_base_url" ]; then
@@ -116,32 +120,22 @@ jobs:
               prod) export PROD_WEB_E2E_BASE_URL="$custom_base_url" ;;
             esac
 
-            # Resolve API URL using deterministic branch-based URL
+            # Resolve API URL using Vercel REST API
             if [ -z "$DEV_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
-              api_slug="${VERCEL_API_PROJECT_SLUG:-couture-cast-api}"
-              team_slug="${VERCEL_TEAM_SLUG:-muratkeremozcans-projects}"
-
-              # Get branch from resolved branch name
-              branch_ref="${VERCEL_GIT_COMMIT_REF}"
-              branch_slug=""
-              if [ -n "$branch_ref" ]; then
-                branch_slug=$(echo "$branch_ref" | sed -e 's#refs/heads/##' -e 's#refs/pull/##' -e 's#/merge##' | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]/-/g' -e 's/^-*//' -e 's/-*$//')
-              fi
-
-              echo "Branch ref: $branch_ref -> slug: $branch_slug"
-
-              # Build deterministic branch-based API URL
-              if [ -n "$branch_slug" ] && [ -n "$team_slug" ] && [ -n "$api_slug" ]; then
-                api_url="https://${api_slug}-git-${branch_slug}-${team_slug}.vercel.app"
-                echo "Using deterministic API URL: $api_url"
+              echo "Resolving API preview URL via Vercel REST API..."
+              api_url=$(node scripts/resolve-api-preview-url.mjs 2>&1)
+              if [ $? -eq 0 ] && [ -n "$api_url" ]; then
+                echo "Resolved API URL: $api_url"
                 export DEV_API_BASE_URL="$api_url"
                 export VERCEL_API_BASE_URL="$api_url"
               else
-                echo "Warning: Could not resolve API URL (missing branch_slug, team_slug, or api_slug)"
+                echo "Warning: Could not resolve API URL from Vercel API"
+                echo "Error output: $api_url"
               fi
             fi
           fi
 
+          # DEBUG env var already set at workflow level
           ${{ inputs.test_command }}
 
       - name: Upload Playwright artifacts

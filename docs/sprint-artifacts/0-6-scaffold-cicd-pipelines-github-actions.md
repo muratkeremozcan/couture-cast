@@ -5,7 +5,7 @@ Status: done
 
 Current state (2025-01-XX)
 - CI in place: `.github/workflows/pr-checks.yml` (typecheck, lint, test, build) and `.github/workflows/pr-pw-e2e.yml` (Playwright, 2 shards, artifacts retained 5d, browser cache). Mobile Maestro workflow exists but is manual-only.
-- Burn-in: implemented for PRs via `.github/workflows/rwf-burn-in.yml` + gating in `pr-pw-e2e.yml` (TS runner from `@seontechnologies/playwright-utils`; skip label `skip_burn_in`; falls through when no test diffs; comments on PR when burn-in fails).
+- Burn-in: implemented for PRs via `.github/workflows/rwf-burn-in.yml` + gating in `pr-pw-e2e.yml` (TS runner from `@seontechnologies/playwright-utils`; skip label `SKIP_BURN_IN`; falls through when no test diffs; comments on PR when burn-in fails).
 - Load testing: out of scope for now (remove from ACs/tasks; consider future story if needed).
 - Deployments: web/mobile workflows exist; API now targeted to Vercel serverless (Nest) instead of Fly.
 - Notifications/triage: no Slack/PagerDuty wiring; GitHub Actions summary/artifacts only.
@@ -102,7 +102,7 @@ Notes against ACs
   - [x] Create burn-in job that detects changed test files (wired to PRs via `pr-pw-e2e.yml`)
   - [x] Run detected tests 3 times sequentially
   - [x] Post failure comment to PR when burn-in fails
-  - [x] Allow skip via `skip_burn_in` label on PR
+  - [x] Allow skip via `SKIP_BURN_IN` label on PR
   - [x] Reference playwright-utils burn-in script pattern
 
 - [x] Task 9: Add security scanning workflows
@@ -188,7 +188,7 @@ jobs:
   burn-in:
     # Detect changed test files and run 3x
     needs: vars
-    if: ${{ github.event_name == 'pull_request' && needs.vars.outputs.skip_burn_in != 'true' }}
+    if: ${{ github.event_name == 'pull_request' && needs.vars.outputs.SKIP_BURN_IN != 'true' }}
 
   e2e-test:
     # Run E2E tests in parallel shards
@@ -246,7 +246,7 @@ e2e-test:
   needs: [vars, burn-in]
   if: |
     always() &&
-    (needs.vars.outputs.skip_burn_in == 'true' ||
+    (needs.vars.outputs.SKIP_BURN_IN == 'true' ||
      (needs.burn-in.result == 'success' && needs.burn-in.outputs.runE2E == 'true') ||
      (needs.burn-in.result == 'skipped'))
 ```

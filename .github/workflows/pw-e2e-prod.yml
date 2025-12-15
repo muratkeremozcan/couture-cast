@@ -9,21 +9,27 @@ name: "Prod E2E (Playwright)"
 
 on:
   deployment_status:
-    environments:
-      - Production
+    types: [success]
   workflow_dispatch:
+    inputs:
+      skip_wait:
+        description: "Skip deployment wait (assumes already deployed)"
+        type: boolean
+        default: false
+        required: false
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.deployment.id || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   wait-for-prod-deployment:
-    uses: ./.github/workflows/wait-for-deployment.yml
+    if: ${{ (github.event_name == 'deployment_status' && github.event.deployment_status.environment == 'Production' && github.event.deployment_status.state == 'success' && (github.event.deployment_status.deployment.ref == 'main' || github.event.deployment_status.deployment.ref == 'refs/heads/main')) || (github.event_name == 'workflow_dispatch' && !inputs.skip_wait) }}
+    uses: ./.github/workflows/rwf-wait-for-deployment.yml
     with:
       environment: Production
       health_url: https://couture-cast-web.vercel.app/api/health
@@ -34,8 +40,8 @@ jobs:
 
   run-prod-tests:
     needs: wait-for-prod-deployment
-    # Run if wait step succeeded or was skipped (manual dispatch); do not run if cancelled/failed
-    if: ${{ always() && (needs.wait-for-prod-deployment.result == 'success' || needs.wait-for-prod-deployment.result == 'skipped') }}
+    if: ${{ always() && (needs.wait-for-prod-deployment.result == 'success' || needs.wait-for-prod-deployment.result == 'skipped') && ((github.event_name == 'deployment_status' && github.event.deployment_status.environment == 'Production' && github.event.deployment_status.state == 'success' && (github.event.deployment_status.deployment.ref == 'main' || github.event.deployment_status.deployment.ref == 'refs/heads/main')) || github.event_name == 'workflow_dispatch') }}
+    # Run if wait step succeeded or was skipped; do not run if wait was cancelled/failed
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: "prod"
