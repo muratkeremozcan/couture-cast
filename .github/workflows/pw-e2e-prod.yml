@@ -8,8 +8,7 @@ name: "Prod E2E (Playwright)"
 # Secondary gate (optional): poll /api/v1/events/poll for 200 (same retry window). Then run prod Playwright.
 
 on:
-  deployment_status:
-    types: [success]
+  deployment:
   workflow_dispatch:
     inputs:
       skip_wait:

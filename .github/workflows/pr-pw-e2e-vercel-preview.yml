@@ -1,10 +1,9 @@
 name: Vercel Preview e2e
 
 on:
-  deployment_status:
-    types: [success]
+  deployment:
   pull_request:
-    types: [labeled]
+    types: [labeled, synchronize]
 
 permissions:
   contents: read
@@ -15,16 +14,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  wait-for-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Wait for Vercel deployment
+        run: |
+          echo "Waiting 60s for Vercel to build and deploy..."
+          sleep 120
+
   pw-e2e:
+    needs: wait-for-deploy
     if: |
-      (github.event_name == 'pull_request' && github.event.label.name == 'PREVIEW') ||
-      (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success')
+      github.event_name == 'deployment' ||
+      (github.event_name == 'pull_request' && (github.event.action == 'synchronize' || github.event.label.name == 'PREVIEW'))
     uses: ./.github/workflows/rwf-e2e.yml
-    # For Vercel, we treat the preview environment as a dev environment; main is production.
     with:
-      test_env: dev # ignored
+      test_env: dev
       test_command: npm run test:pw-preview-dev
-      gh_ref: ${{ github.event.deployment.sha || github.event.pull_request.head.sha }}
-      deployment_ref: ${{ github.event.deployment.ref || github.event.pull_request.head.ref }}
-      custom_base_url: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url || '' }}
+      gh_ref: ${{ github.sha }}
+      deployment_ref: ${{ github.head_ref || github.ref_name }}
+      custom_base_url: ""
     secrets: inherit
