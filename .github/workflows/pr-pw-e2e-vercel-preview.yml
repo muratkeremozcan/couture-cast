@@ -1,30 +1,72 @@
 name: Vercel Preview e2e
 
 on:
-  deployment_status:
-    types: [success]
   pull_request:
-    types: [labeled]
+    types: [labeled, synchronize]
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: vercel-preview-dev-${{ github.event.pull_request.number || github.event.deployment.id }}
+  group: vercel-preview-dev-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  pw-e2e:
+  resolve-url:
     if: |
-      (github.event_name == 'pull_request' && github.event.label.name == 'PREVIEW') ||
-      (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success')
-    uses: ./.github/workflows/rwf-e2e.yml
-    # For Vercel, we treat the preview environment as a dev environment; main is production.
+      github.event.action == 'synchronize' || github.event.label.name == 'PREVIEW'
+    runs-on: ubuntu-latest
+    outputs:
+      health_url: ${{ steps.resolve.outputs.health_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Resolve preview health URL
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_WEB_PROJECT_SLUG: couture-cast-web
+          VERCEL_TEAM_SLUG: muratkeremozcans-projects
+          VERCEL_GIT_COMMIT_REF: ${{ github.head_ref }}
+          DEBUG: true
+        run: |
+          echo "Resolving preview URL for branch: $VERCEL_GIT_COMMIT_REF"
+          web_url=$(node scripts/resolve-vercel-preview-url.mjs)
+          if [ -z "$web_url" ] || [[ "$web_url" != https://* ]]; then
+            echo "Failed to resolve web URL"
+            exit 1
+          fi
+
+          health_url="${web_url}/api/health"
+          echo "Resolved health URL: $health_url"
+          echo "health_url=$health_url" >> "$GITHUB_OUTPUT"
+
+  wait:
+    needs: resolve-url
+    uses: ./.github/workflows/vercel-wait-for-deployment.yml
     with:
-      test_env: dev # ignored
+      health_url: ${{ needs.resolve-url.outputs.health_url }}
+      expected_sha: ${{ github.event.pull_request.head.sha }}
+      retries: 20
+      sleep_seconds: 30
+    secrets:
+      vercel_bypass_secret: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+  pw-e2e:
+    needs: wait
+    uses: ./.github/workflows/rwf-e2e.yml
+    with:
+      test_env: dev
       test_command: npm run test:pw-preview-dev
-      gh_ref: ${{ github.event.deployment.sha || github.event.pull_request.head.sha }}
-      deployment_ref: ${{ github.event.deployment.ref || github.event.pull_request.head.ref }}
-      custom_base_url: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url || '' }}
+      gh_ref: ${{ github.event.pull_request.head.sha }}
+      deployment_ref: ${{ github.head_ref }}
+      custom_base_url: ''
     secrets: inherit

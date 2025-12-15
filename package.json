@@ -1,6 +1,7 @@
 {
   "name": "couture-cast",
   "private": true,
+  "license": "UNLICENSED",
   "version": "0.1.0",
   "description": "Couture Cast monorepo",
   "packageManager": "npm@10.8.1",

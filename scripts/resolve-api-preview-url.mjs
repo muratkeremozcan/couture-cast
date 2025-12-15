@@ -2,16 +2,21 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
-import { config as loadEnv } from 'dotenv'
 
-const envSuffix = (process.env.TEST_ENV ?? 'dev').toLowerCase()
-const envFiles = [`.env.${envSuffix}`, '.env']
-for (const file of envFiles) {
-  const full = path.resolve(process.cwd(), file)
-  if (fs.existsSync(full)) {
-    loadEnv({ path: full })
-    break
+// Load env (optional for local dev) - CI passes env vars directly
+try {
+  const { config } = await import('dotenv')
+  const envSuffix = (process.env.TEST_ENV ?? 'dev').toLowerCase()
+  const envFiles = [`.env.${envSuffix}`, '.env']
+  for (const file of envFiles) {
+    const full = path.resolve(process.cwd(), file)
+    if (fs.existsSync(full)) {
+      config({ path: full })
+      break
+    }
   }
+} catch {
+  // dotenv not available (CI) - env vars passed via workflow
 }
 
 function logDebug(message) {

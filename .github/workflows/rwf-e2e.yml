@@ -104,9 +104,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_WEB_PROJECT_SLUG: ${{ secrets.VERCEL_WEB_PROJECT_SLUG }}
-          VERCEL_API_PROJECT_SLUG: ${{ secrets.VERCEL_API_PROJECT_SLUG }}
-          VERCEL_TEAM_SLUG: ${{ secrets.VERCEL_TEAM_SLUG }}
+          VERCEL_WEB_PROJECT_SLUG: couture-cast-web
+          VERCEL_API_PROJECT_SLUG: couture-cast-api
+          VERCEL_TEAM_SLUG: muratkeremozcans-projects
           # Pass resolved branch name for URL construction
           VERCEL_GIT_COMMIT_REF: ${{ steps.resolve_branch.outputs.branch }}
           # Enable debug logging for URL resolution scripts

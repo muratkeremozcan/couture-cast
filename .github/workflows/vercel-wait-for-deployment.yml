@@ -1,7 +1,7 @@
-name: "Wait for deployment"
+name: "Wait for Vercel deployment"
 
-# Generic reusable workflow: polls a health endpoint until SHA matches expected
-# Works with any deployment platform (Vercel, Netlify, Railway, etc.)
+# Vercel-specific wrapper: handles authentication bypass for protected previews
+# Keeps the generic rwf-wait-for-deployment.yml clean and platform-agnostic
 
 on:
   workflow_call:
@@ -10,10 +10,6 @@ on:
         description: "Health endpoint URL to poll (must return JSON with .status and .gitSha)"
         type: string
         required: true
-      secondary_url:
-        description: "Optional secondary endpoint URL to poll for 200"
-        type: string
-        required: false
       expected_sha:
         description: "Commit SHA to match (first 7 chars)"
         type: string
@@ -28,6 +24,10 @@ on:
         type: number
         required: false
         default: 30
+    secrets:
+      vercel_bypass_secret:
+        description: "Vercel authentication bypass secret for protected deployments"
+        required: true
 
 jobs:
   wait:
@@ -36,24 +36,36 @@ jobs:
     outputs:
       observed_sha: ${{ steps.health_check.outputs.observed_sha }}
     steps:
-      - name: Wait for health + SHA
+      - name: Wait for health + SHA with Vercel bypass
         id: health_check
         env:
           HEALTH_URL: ${{ inputs.health_url }}
           EXPECTED_SHA: ${{ inputs.expected_sha }}
           RETRIES: ${{ inputs.retries }}
           SLEEP_SECONDS: ${{ inputs.sleep_seconds }}
+          VERCEL_BYPASS_SECRET: ${{ secrets.vercel_bypass_secret }}
         run: |
-          echo "Waiting for deployment at ${HEALTH_URL}"
+          # Use HTTP header for bypass (more reliable than query params per Vercel community reports)
+          echo "Waiting for deployment at ${HEALTH_URL} (with Vercel bypass header)"
           EXPECTED_SHORT="${EXPECTED_SHA:0:7}"
 
           MATCHED=false
 
           for i in $(seq 1 "${RETRIES}"); do
-            RESPONSE=$(curl -s -f "${HEALTH_URL}" || true)
+            RESPONSE=$(curl -s -f -H "x-vercel-protection-bypass: ${VERCEL_BYPASS_SECRET}" "${HEALTH_URL}" || true)
 
             if [ -z "${RESPONSE}" ]; then
               echo "⏳ Waiting for health... (attempt ${i}/${RETRIES})"
+              sleep "${SLEEP_SECONDS}"
+              continue
+            fi
+
+            # Debug: Check if response is JSON
+            if ! echo "${RESPONSE}" | jq empty 2>/dev/null; then
+              echo "⏳ Response is not valid JSON (attempt ${i}/${RETRIES})"
+              echo "First 200 chars of response:"
+              echo "${RESPONSE}" | head -c 200
+              echo ""
               sleep "${SLEEP_SECONDS}"
               continue
             fi
@@ -87,12 +99,12 @@ jobs:
           done
 
           # Final verification
-          if ! curl -f "${HEALTH_URL}" > /dev/null; then
+          if ! curl -f -H "x-vercel-protection-bypass: ${VERCEL_BYPASS_SECRET}" "${HEALTH_URL}" > /dev/null; then
             echo "❌ Deployment failed to become healthy after waiting."
             exit 1
           fi
 
-          FINAL_SHA=$(curl -s -f "${HEALTH_URL}" | jq -r '.gitSha // "unknown"')
+          FINAL_SHA=$(curl -s -f -H "x-vercel-protection-bypass: ${VERCEL_BYPASS_SECRET}" "${HEALTH_URL}" | jq -r '.gitSha // "unknown"')
           echo "observed_sha=${FINAL_SHA}" >> "$GITHUB_OUTPUT"
 
           if [ "${MATCHED}" = "false" ]; then
@@ -105,32 +117,4 @@ jobs:
               echo "❌ Deployed SHA (${FINAL_SHA}) doesn't match expected (${EXPECTED_SHA}) after waiting."
               exit 1
             fi
-          fi
-
-      - name: Poll secondary endpoint (optional)
-        if: ${{ inputs.secondary_url != '' }}
-        env:
-          SECONDARY_URL: ${{ inputs.secondary_url }}
-          RETRIES: ${{ inputs.retries }}
-          SLEEP_SECONDS: ${{ inputs.sleep_seconds }}
-        run: |
-          echo "Waiting for secondary endpoint at ${SECONDARY_URL}"
-
-          for i in $(seq 1 "${RETRIES}"); do
-            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${SECONDARY_URL}" || true)
-
-            if [ "${STATUS_CODE}" = "200" ]; then
-              echo "✅ Secondary endpoint responded with 200"
-              SECONDARY_OK=true
-              break
-            fi
-
-            echo "⏳ Secondary endpoint not ready (status=${STATUS_CODE})... (attempt ${i}/${RETRIES})"
-            sleep "${SLEEP_SECONDS}"
-          done
-
-          if [ "${SECONDARY_OK}" != "true" ]; then
-            FINAL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${SECONDARY_URL}" || true)
-            echo "❌ Secondary endpoint failed to return 200 after waiting (status=${FINAL_STATUS})."
-            exit 1
           fi

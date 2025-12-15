@@ -11,17 +11,21 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync, execSync } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
-import dotenv from 'dotenv'
 
-// Load env (prefer .env.<TEST_ENV>, then .env)
-const envSuffix = (process.env.TEST_ENV ?? 'dev').toLowerCase()
-const envFiles = [`.env.${envSuffix}`, '.env']
-for (const file of envFiles) {
-  const full = path.resolve(process.cwd(), file)
-  if (fs.existsSync(full)) {
-    dotenv.config({ path: full })
-    break
+// Load env (prefer .env.<TEST_ENV>, then .env) - optional for local dev
+try {
+  const { default: dotenv } = await import('dotenv')
+  const envSuffix = (process.env.TEST_ENV ?? 'dev').toLowerCase()
+  const envFiles = [`.env.${envSuffix}`, '.env']
+  for (const file of envFiles) {
+    const full = path.resolve(process.cwd(), file)
+    if (fs.existsSync(full)) {
+      dotenv.config({ path: full })
+      break
+    }
   }
+} catch {
+  // dotenv not available (CI) - env vars passed directly via workflow
 }
 
 function logDebug(message) {
@@ -234,13 +238,15 @@ async function fetchVercelDeployments(projectId, teamId, branch, limit = 10) {
 
   const params = {
     projectId,
-    state: 'READY',
+    // Don't filter by state=READY - get ALL deployments including building ones
+    // We'll wait for the deployment to become ready during polling
     limit: String(limit),
   }
   if (teamId) params.teamId = teamId
   if (branch) params['meta-githubCommitRef'] = branch
 
   const data = await fetchVercelApi('/v6/deployments', params)
+  // Deployments are returned newest-first by default
   return data?.deployments ?? []
 }
 
@@ -290,15 +296,42 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
     return undefined
   }
 
-  // Find first deployment with a URL
+  // Find first deployment and prefer git-branch alias URL over canonical URL
+  // Git-branch aliases auto-update to latest deployment, canonical URLs are locked to specific deployments
   for (const deployment of deployments) {
-    if (deployment?.url) {
-      const url = deployment.url.startsWith('http')
-        ? deployment.url
-        : `https://${deployment.url}`
-      logDebug(`Found deployment URL: ${url}`)
-      return url
+    if (!deployment?.url) continue
+
+    logDebug(`Checking deployment: ${deployment.url}`)
+    logDebug(`  State: ${deployment.state || 'unknown'}`)
+    logDebug(`  Created: ${deployment.created || 'unknown'}`)
+    logDebug(`  Git ref: ${deployment.meta?.githubCommitRef || 'unknown'}`)
+    logDebug(`  Git SHA: ${deployment.meta?.githubCommitSha || 'unknown'}`)
+
+    // Check if deployment has alias URLs (git-branch aliases)
+    if (
+      deployment.alias &&
+      Array.isArray(deployment.alias) &&
+      deployment.alias.length > 0
+    ) {
+      // Look for git-branch alias (contains "-git-")
+      const gitBranchAlias = deployment.alias.find(
+        (alias) => alias && alias.includes('-git-')
+      )
+      if (gitBranchAlias) {
+        const url = gitBranchAlias.startsWith('http')
+          ? gitBranchAlias
+          : `https://${gitBranchAlias}`
+        logDebug(`✓ Using git-branch alias URL (auto-updates): ${url}`)
+        return url
+      }
     }
+
+    // Fallback to canonical URL (locked to this specific deployment)
+    const url = deployment.url.startsWith('http')
+      ? deployment.url
+      : `https://${deployment.url}`
+    logDebug(`Using canonical URL (locked to this deployment): ${url}`)
+    return url
   }
 
   return undefined
@@ -347,27 +380,31 @@ async function main() {
   ensureBranchExists(owner, repo, branch)
 
   // Deterministic hostname attempt first (matches Vercel pattern).
+  // These git-branch URLs are aliases that Vercel updates to point to the latest deployment
   const branchSlug = slugifyVercelGitRef(branch)
   const projectSlug = env('VERCEL_WEB_PROJECT_SLUG')
   const teamSlug = env('VERCEL_TEAM_SLUG')
   if (projectSlug && teamSlug) {
-    const deterministic = `https://${projectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
-    logDebug(`Trying deterministic Preview hostname: ${deterministic}`)
-    if (await isReachable(deterministic)) {
-      process.stdout.write(deterministic)
-      return
-    }
+    // Try progressively shorter slugs (Vercel truncates long branch names)
+    // Example: "chore/test-preview-prod-deploys" -> "chore-test-preview-prod-deploys" -> "chore-tes" (9 chars)
+    const slugLengths = [branchSlug.length, 15, 12, 10, 9, 8, 7]
+    for (const len of slugLengths) {
+      const trySlug = branchSlug.slice(0, len)
+      if (trySlug.length < 3) break // Too short to be meaningful
 
-    // Some Vercel branch hostnames truncate the branch portion; try a shorter slug as a fallback guess.
-    const shortSlug = branchSlug.slice(0, 12)
-    if (shortSlug && shortSlug !== branchSlug) {
-      const shorter = `https://${projectSlug}-git-${shortSlug}-${teamSlug}.vercel.app`
-      logDebug(`Trying shortened deterministic hostname: ${shorter}`)
-      if (await isReachable(shorter)) {
-        process.stdout.write(shorter)
+      const tryUrl = `https://${projectSlug}-git-${trySlug}-${teamSlug}.vercel.app`
+      logDebug(`Trying git-branch alias (${trySlug.length} chars): ${tryUrl}`)
+
+      if (await isReachable(tryUrl)) {
+        logDebug(
+          `✓ Found reachable git-branch alias URL (auto-updates to latest deployment)`
+        )
+        process.stdout.write(tryUrl)
         return
       }
     }
+
+    logDebug(`No git-branch alias URLs reachable, falling back to Vercel API`)
   }
 
   // First, try branch-scoped Preview deployments.
