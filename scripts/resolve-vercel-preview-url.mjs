@@ -11,17 +11,21 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync, execSync } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
-import dotenv from 'dotenv'
 
-// Load env (prefer .env.<TEST_ENV>, then .env)
-const envSuffix = (process.env.TEST_ENV ?? 'dev').toLowerCase()
-const envFiles = [`.env.${envSuffix}`, '.env']
-for (const file of envFiles) {
-  const full = path.resolve(process.cwd(), file)
-  if (fs.existsSync(full)) {
-    dotenv.config({ path: full })
-    break
+// Load env (prefer .env.<TEST_ENV>, then .env) - optional for local dev
+try {
+  const { default: dotenv } = await import('dotenv')
+  const envSuffix = (process.env.TEST_ENV ?? 'dev').toLowerCase()
+  const envFiles = [`.env.${envSuffix}`, '.env']
+  for (const file of envFiles) {
+    const full = path.resolve(process.cwd(), file)
+    if (fs.existsSync(full)) {
+      dotenv.config({ path: full })
+      break
+    }
   }
+} catch {
+  // dotenv not available (CI) - env vars passed directly via workflow
 }
 
 function logDebug(message) {
