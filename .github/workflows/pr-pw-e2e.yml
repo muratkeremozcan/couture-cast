@@ -19,26 +19,26 @@ jobs:
   vars:
     runs-on: ubuntu-latest
     outputs:
-      skip_burn_in: ${{ steps.check_skip_label.outputs.skip_burn_in || 'false' }}
+      SKIP_BURN_IN: ${{ steps.check_skip_label.outputs.SKIP_BURN_IN || 'false' }}
       test_env: dev
       test_command: npm run test:pw-local --
       install_command: npm ci
     steps:
-      - name: Check for skip_burn_in label (PRs only)
+      - name: Check for SKIP_BURN_IN label (PRs only)
         id: check_skip_label
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
         run: |
-          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'skip_burn_in') }}" == "true" ]]; then
-            echo "skip_burn_in=true" >> $GITHUB_OUTPUT
-            echo "✅ Found skip_burn_in label; skipping burn-in."
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'SKIP_BURN_IN') }}" == "true" ]]; then
+            echo "SKIP_BURN_IN=true" >> $GITHUB_OUTPUT
+            echo "✅ Found SKIP_BURN_IN label; skipping burn-in."
           else
-            echo "skip_burn_in=false" >> $GITHUB_OUTPUT
-            echo "No skip_burn_in label; running burn-in."
+            echo "SKIP_BURN_IN=false" >> $GITHUB_OUTPUT
+            echo "No SKIP_BURN_IN label; running burn-in."
           fi
 
   burn-in:
     needs: vars
-    if: ${{ github.event_name == 'pull_request' && needs.vars.outputs.skip_burn_in != 'true' }}
+    if: ${{ github.event_name == 'pull_request' && needs.vars.outputs.SKIP_BURN_IN != 'true' }}
     uses: ./.github/workflows/rwf-burn-in.yml
     with:
       base-ref: 'main'
@@ -57,7 +57,7 @@ jobs:
     if: |
       always() && (
         github.event_name != 'pull_request' ||
-        needs.vars.outputs.skip_burn_in == 'true' ||
+        needs.vars.outputs.SKIP_BURN_IN == 'true' ||
         (needs.burn-in.result == 'success' && needs.burn-in.outputs.runE2E == 'true') ||
         (needs.burn-in.result == 'skipped')
       )

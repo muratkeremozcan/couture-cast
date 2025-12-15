@@ -17,10 +17,8 @@ concurrency:
 jobs:
   pw-e2e:
     if: |
-      (github.event_name == 'pull_request' && github.event.label.name == 'preview-ready') ||
-      (github.event_name == 'deployment_status' &&
-       github.event.deployment_status.state == 'success' &&
-       github.event.deployment_status.environment == 'Preview')
+      (github.event_name == 'pull_request' && github.event.label.name == 'PREVIEW') ||
+      (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success' && github.event.deployment_status.environment == 'Preview')
     uses: ./.github/workflows/rwf-e2e.yml
     # For Vercel, we treat the preview environment as a dev environment; main is production.
     with:

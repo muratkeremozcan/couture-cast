@@ -9,6 +9,7 @@ name: "Prod E2E (Playwright)"
 
 on:
   deployment_status:
+    types: [success]
   workflow_dispatch:
     inputs:
       skip_wait:
