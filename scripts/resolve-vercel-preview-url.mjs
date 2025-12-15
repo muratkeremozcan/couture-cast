@@ -238,13 +238,15 @@ async function fetchVercelDeployments(projectId, teamId, branch, limit = 10) {
 
   const params = {
     projectId,
-    state: 'READY',
+    // Don't filter by state=READY - get ALL deployments including building ones
+    // We'll wait for the deployment to become ready during polling
     limit: String(limit),
   }
   if (teamId) params.teamId = teamId
   if (branch) params['meta-githubCommitRef'] = branch
 
   const data = await fetchVercelApi('/v6/deployments', params)
+  // Deployments are returned newest-first by default
   return data?.deployments ?? []
 }
 
