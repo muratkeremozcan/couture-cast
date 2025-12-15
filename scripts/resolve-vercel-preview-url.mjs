@@ -179,47 +179,126 @@ function findUrlFromDeployments(owner, repo, deployments) {
   return undefined
 }
 
-function runVercelDeployments(project, team, metaKey, metaValue, limit = 5) {
-  const args = ['vercel', 'deployments', project, '--json', '--limit', String(limit)]
-  if (team) {
-    args.push('--scope', team)
+async function fetchVercelApi(path, params = {}) {
+  const token = env('VERCEL_TOKEN')
+  if (!token) {
+    logDebug('VERCEL_TOKEN not set, skipping Vercel API query')
+    return undefined
   }
-  if (metaKey && metaValue) {
-    args.push('--meta', `${metaKey}=${metaValue}`)
+
+  const url = new URL(`https://api.vercel.com${path}`)
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      url.searchParams.set(key, String(value))
+    }
   }
+
   try {
-    const output = execFileSync('npx', args, {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: process.env,
+    logDebug(`Fetching Vercel API: ${url.pathname}${url.search}`)
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     })
-    return JSON.parse(output)
+
+    if (!response.ok) {
+      logDebug(`Vercel API error: ${response.status} ${response.statusText}`)
+      return undefined
+    }
+
+    return await response.json()
   } catch (error) {
-    logDebug(`vercel deployments failed: ${error.stderr?.toString() ?? error.message}`)
+    logDebug(`Vercel API fetch failed: ${error.message}`)
     return undefined
   }
 }
 
-function findUrlFromVercel(project, team, branch) {
-  if (!project) return undefined
-  const branchSlug = slugifyVercelGitRef(branch)
+async function getVercelTeamId(teamSlug) {
+  if (!teamSlug) return undefined
 
-  // Prefer filtering by branch (GitHub ref) meta when available.
-  const byRef =
-    runVercelDeployments(project, team, 'githubCommitRef', branch, 5) ??
-    runVercelDeployments(project, team, 'githubCommitRef', branchSlug, 5)
+  // Try to get team info - the slug can be used in the URL path
+  const data = await fetchVercelApi(`/v2/teams/${teamSlug}`)
+  return data?.id
+}
 
-  const candidates = byRef && Array.isArray(byRef) ? byRef : []
-  if (candidates.length > 0) {
-    const url = candidates.find((d) => d?.url)?.url
-    if (url) return url.startsWith('http') ? url : `https://${url}`
+async function getVercelProjectId(projectSlug, teamId) {
+  const params = {}
+  if (teamId) params.teamId = teamId
+
+  const data = await fetchVercelApi(`/v9/projects/${projectSlug}`, params)
+  return data?.id
+}
+
+async function fetchVercelDeployments(projectId, teamId, branch, limit = 10) {
+  if (!projectId) return []
+
+  const params = {
+    projectId,
+    state: 'READY',
+    limit: String(limit),
+  }
+  if (teamId) params.teamId = teamId
+  if (branch) params['meta-githubCommitRef'] = branch
+
+  const data = await fetchVercelApi('/v6/deployments', params)
+  return data?.deployments ?? []
+}
+
+async function findUrlFromVercel(projectSlug, teamSlug, branch) {
+  if (!projectSlug) return undefined
+
+  logDebug(
+    `Querying Vercel API for project: ${projectSlug}, team: ${teamSlug}, branch: ${branch}`
+  )
+
+  // Resolve team slug to ID
+  const teamId = teamSlug ? await getVercelTeamId(teamSlug) : undefined
+  if (teamSlug && !teamId) {
+    logDebug(`Could not resolve team ID for "${teamSlug}"`)
+    // Continue without team ID - might still work for personal accounts
+  } else if (teamId) {
+    logDebug(`Team ID: ${teamId}`)
   }
 
-  // Fallback: any recent deployments; pick first with URL.
-  const any = runVercelDeployments(project, team, undefined, undefined, 5)
-  if (any && Array.isArray(any)) {
-    const url = any.find((d) => d?.url)?.url
-    if (url) return url.startsWith('http') ? url : `https://${url}`
+  const projectId = await getVercelProjectId(projectSlug, teamId)
+  if (!projectId) {
+    logDebug(`Could not resolve project ID for ${projectSlug}`)
+    return undefined
+  }
+
+  logDebug(`Project ID: ${projectId}`)
+
+  const branchSlug = slugifyVercelGitRef(branch)
+
+  // Try with original branch name first
+  let deployments = await fetchVercelDeployments(projectId, teamId, branch, 10)
+
+  // Try with slugified branch name if original didn't work
+  if (deployments.length === 0 && branchSlug && branchSlug !== branch) {
+    logDebug(`No deployments for "${branch}", trying "${branchSlug}"`)
+    deployments = await fetchVercelDeployments(projectId, teamId, branchSlug, 10)
+  }
+
+  // Try without branch filter as fallback
+  if (deployments.length === 0) {
+    logDebug('No branch-specific deployments, fetching any recent deployments')
+    deployments = await fetchVercelDeployments(projectId, teamId, undefined, 10)
+  }
+
+  if (deployments.length === 0) {
+    logDebug('No deployments found')
+    return undefined
+  }
+
+  // Find first deployment with a URL
+  for (const deployment of deployments) {
+    if (deployment?.url) {
+      const url = deployment.url.startsWith('http')
+        ? deployment.url
+        : `https://${deployment.url}`
+      logDebug(`Found deployment URL: ${url}`)
+      return url
+    }
   }
 
   return undefined
@@ -295,14 +374,17 @@ async function main() {
   const branchDeployments = getPreviewDeploymentsForBranch(owner, repo, branch)
   let url = findUrlFromDeployments(owner, repo, branchDeployments)
 
-  // If GH lacked URLs, try Vercel CLI directly.
+  // If GH lacked URLs, try Vercel API directly.
   if (!url) {
     const vercelProject =
-      env('VERCEL_PROJECT') ?? env('VERCEL_PROJECT_NAME') ?? env('VERCEL_WEB_PROJECT_SLUG')
-    const vercelTeam = env('VERCEL_TEAM') ?? env('VERCEL_TEAM_ID') ?? env('VERCEL_TEAM_SLUG')
+      env('VERCEL_PROJECT') ??
+      env('VERCEL_PROJECT_NAME') ??
+      env('VERCEL_WEB_PROJECT_SLUG')
+    const vercelTeam =
+      env('VERCEL_TEAM') ?? env('VERCEL_TEAM_ID') ?? env('VERCEL_TEAM_SLUG')
     if (vercelProject && env('VERCEL_TOKEN')) {
-      logDebug(`Attempting Vercel CLI resolution for project "${vercelProject}"`)
-      const vercelUrl = findUrlFromVercel(vercelProject, vercelTeam, branch)
+      logDebug(`Attempting Vercel API resolution for project "${vercelProject}"`)
+      const vercelUrl = await findUrlFromVercel(vercelProject, vercelTeam, branch)
       if (vercelUrl) {
         process.stdout.write(vercelUrl)
         return

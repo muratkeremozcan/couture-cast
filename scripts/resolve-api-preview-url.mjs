@@ -50,7 +50,9 @@ async function fetchJson(url) {
   const response = await fetch(url, { headers })
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    throw new Error(`Vercel API request failed (${url}): ${response.status} ${response.statusText} ${body}`)
+    throw new Error(
+      `Vercel API request failed (${url}): ${response.status} ${response.statusText} ${body}`
+    )
   }
   return response.json()
 }
@@ -89,7 +91,9 @@ async function findDeploymentUrl(projectId, teamId, branch) {
     if (deployment.state && deployment.state !== 'READY') continue
     const metaRef = deployment.meta?.githubCommitRef
     if (branch && metaRef && metaRef !== branch && metaRef !== branchSlug) continue
-    return deployment.url.startsWith('https://') ? deployment.url : `https://${deployment.url}`
+    return deployment.url.startsWith('https://')
+      ? deployment.url
+      : `https://${deployment.url}`
   }
   return undefined
 }
@@ -113,7 +117,11 @@ async function main() {
   if (!token) fail('VERCEL_TOKEN is required to query Vercel API')
   if (!projectSlug) fail('VERCEL_API_PROJECT_SLUG is required')
 
-  const branch = env('GITHUB_HEAD_REF') ?? env('VERCEL_GIT_COMMIT_REF') ?? env('GIT_BRANCH') ?? env('BRANCH')
+  const branch =
+    env('GITHUB_HEAD_REF') ??
+    env('VERCEL_GIT_COMMIT_REF') ??
+    env('GIT_BRANCH') ??
+    env('BRANCH')
   const branchSlug = slugifyBranch(branch) ?? 'main'
 
   const teamId = await resolveTeamId(teamSlug)

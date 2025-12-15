@@ -180,14 +180,59 @@ Preview URLs as the "dev" target: `pr-pw-e2e-vercel-preview.yml` reads the Previ
 If your Preview deployments are protected (health check returns 401), set `VERCEL_AUTOMATION_BYPASS_SECRET` locally (in `.env.dev`) and
 in CI (GitHub repo secret). See `docs/ci-cd-pipeline.md`.
 
-Local Preview helper: `npm run test:pw-preview-dev` resolves the Vercel Preview URL (GitHub deployments → Vercel CLI fallback → manual
-override) and runs Playwright against it.
+#### Local Preview testing
 
-- Prereqs: branch is pushed, `gh` is authed, `VERCEL_AUTOMATION_BYPASS_SECRET` is set, and Vercel CLI can read deployments:
-  - `VERCEL_TOKEN`
-  - `VERCEL_WEB_PROJECT_SLUG=couture-cast-web`
-  - `VERCEL_TEAM_SLUG=muratkeremozcans-projects`
-- If your preview hostname is shortened/aliased, set `VERCEL_BRANCH_ALIAS_URL=https://<your-preview>.vercel.app` (or `DEV_WEB_E2E_BASE_URL`) to force the URL.
+`npm run test:pw-preview-dev` automatically resolves Preview URLs and runs Playwright against them. The resolution chain:
+
+1. **Manual override** (highest priority): Set `DEV_WEB_E2E_BASE_URL` and/or `DEV_API_BASE_URL` in `.env.dev`
+2. **Vercel REST API**: Queries Vercel deployments API for your branch's latest READY deployment
+3. **GitHub Deployments API**: Queries GitHub for deployment URLs (fallback if Vercel API fails)
+4. **Deterministic URL**: Constructs `https://{project}-git-{branch-slug}-{team}.vercel.app` as last resort
+
+**Prerequisites for automatic resolution:**
+
+- Branch is pushed to GitHub (Vercel needs to create deployments)
+- `gh` CLI installed and authenticated (`gh auth status`)
+- `.env.dev` with Vercel access:
+  ```bash
+  VERCEL_TOKEN=your_token_here                          # Team token from Vercel dashboard
+  VERCEL_WEB_PROJECT_SLUG=couture-cast-web              # Web app project
+  VERCEL_API_PROJECT_SLUG=couture-cast-api              # API project (separate deployment)
+  VERCEL_TEAM_SLUG=muratkeremozcans-projects            # Team slug
+  VERCEL_AUTOMATION_BYPASS_SECRET=your_bypass_secret    # For protected previews
+  ```
+
+**Note:** Web and API have separate Vercel projects with different deployment URLs (different hashes). The scripts query both projects independently via REST API.
+
+**Manual override (when auto-resolution fails):**
+
+```bash
+# Find your Preview URLs in Vercel dashboard → Deployments, then:
+echo 'DEV_WEB_E2E_BASE_URL=https://couture-cast-web-git-...' >> .env.dev
+echo 'DEV_API_BASE_URL=https://couture-cast-api-git-...' >> .env.dev
+npm run test:pw-preview-dev
+```
+
+**Troubleshooting preview URL resolution:**
+
+| Problem                                  | Solution                                                                                                                                                                          |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **"No deployment found"**                | Push your branch first! Vercel only creates deployments for pushed branches. `git push` then wait ~30s for Vercel to build.                                                       |
+| **404 / DEPLOYMENT_NOT_FOUND**           | The resolved URL points to an old/deleted deployment. Check Vercel dashboard → find your branch → copy the actual Preview URL → set `DEV_WEB_E2E_BASE_URL` manually.              |
+| **403 Forbidden from Vercel API**        | `VERCEL_TOKEN` doesn't have team access. Create a new token in Vercel dashboard → Team Settings → Tokens (not personal tokens).                                                   |
+| **ENOTFOUND / DNS errors**               | URL is wrong or deployment doesn't exist. Verify the URL in your browser first. Check branch name matches (slugified: `test/foo` → `test-foo`).                                   |
+| **"Could not resolve team ID"**          | `VERCEL_TEAM_SLUG` is wrong or token lacks access. Verify slug matches your Vercel team URL: `vercel.com/teams/<this-slug>`.                                                      |
+| **Tests run but hit wrong deployment**   | Scripts might be using cached/fallback URLs. Run with `DEBUG=true node scripts/resolve-vercel-preview-url.mjs` to see what's happening. If it returns garbage, set URLs manually. |
+| **"Unknown option: --json" (old error)** | You're running old script version. Pull latest changes: `git pull origin main`.                                                                                                   |
+
+**Quick bypass (when you just want to run tests):**
+
+```bash
+# Open Vercel dashboard, find your Preview URLs, then:
+DEV_WEB_E2E_BASE_URL=https://your-web-url.vercel.app \
+DEV_API_BASE_URL=https://your-api-url.vercel.app \
+npm run test:pw-dev
+```
 
 ## Helpful references
 
