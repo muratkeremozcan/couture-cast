@@ -1,23 +1,17 @@
 name: "Wait for deployment"
 
-# Primary loop: curl health; if empty -> retry; if status!=ok -> retry; if gitSha unknown -> retry;
-# if short SHA matches expected -> succeed; else log mismatch and retry (hard fail on timeout/mismatch).
-# Secondary (optional): poll secondary_url for HTTP 200 with same retry window. Exposed as reusable
-# workflow for UI/API combos.
+# Generic reusable workflow: polls a health endpoint until SHA matches expected
+# Works with any deployment platform (Vercel, Netlify, Railway, etc.)
 
 on:
   workflow_call:
     inputs:
-      environment:
-        description: "Deployment environment name to require"
-        type: string
-        required: true
       health_url:
-        description: "Primary health endpoint URL to poll (required)"
+        description: "Health endpoint URL to poll (must return JSON with .status and .gitSha)"
         type: string
         required: true
       secondary_url:
-        description: "Optional secondary endpoint URL to poll for 200 (leave empty to skip)"
+        description: "Optional secondary endpoint URL to poll for 200"
         type: string
         required: false
       expected_sha:
@@ -25,26 +19,24 @@ on:
         type: string
         required: true
       retries:
-        description: "Max attempts"
+        description: "Max polling attempts"
         type: number
         required: false
         default: 20
       sleep_seconds:
-        description: "Delay between attempts"
+        description: "Delay between attempts (seconds)"
         type: number
         required: false
         default: 30
 
 jobs:
   wait:
-    # Only run for matching successful deployment_status events
-    if: ${{ github.event_name == 'deployment_status' && github.event.deployment_status.environment == inputs.environment && github.event.deployment_status.state == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
       observed_sha: ${{ steps.health_check.outputs.observed_sha }}
     steps:
-      - name: Wait for web health + SHA
+      - name: Wait for health + SHA
         id: health_check
         env:
           HEALTH_URL: ${{ inputs.health_url }}
@@ -94,7 +86,7 @@ jobs:
             sleep "${SLEEP_SECONDS}"
           done
 
-          # Final health verification
+          # Final verification
           if ! curl -f "${HEALTH_URL}" > /dev/null; then
             echo "❌ Deployment failed to become healthy after waiting."
             exit 1
@@ -115,7 +107,7 @@ jobs:
             fi
           fi
 
-      - name: Wait for secondary endpoint to return 200 (optional)
+      - name: Poll secondary endpoint (optional)
         if: ${{ inputs.secondary_url != '' }}
         env:
           SECONDARY_URL: ${{ inputs.secondary_url }}

@@ -1,7 +1,6 @@
 name: Vercel Preview e2e
 
 on:
-  deployment:
   pull_request:
     types: [labeled, synchronize]
 
@@ -10,28 +9,60 @@ permissions:
   id-token: write
 
 concurrency:
-  group: vercel-preview-dev-${{ github.event.pull_request.number || github.event.deployment.id }}
+  group: vercel-preview-dev-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  wait-for-deploy:
+  resolve-url:
+    if: |
+      github.event.action == 'synchronize' || github.event.label.name == 'PREVIEW'
     runs-on: ubuntu-latest
+    outputs:
+      health_url: ${{ steps.resolve.outputs.health_url }}
     steps:
-      - name: Wait for Vercel deployment
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Resolve preview health URL
+        id: resolve
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_WEB_PROJECT_SLUG: ${{ secrets.VERCEL_WEB_PROJECT_SLUG }}
+          VERCEL_TEAM_SLUG: ${{ secrets.VERCEL_TEAM_SLUG }}
+          VERCEL_GIT_COMMIT_REF: ${{ github.head_ref }}
+          DEBUG: true
         run: |
-          echo "Waiting 60s for Vercel to build and deploy..."
-          sleep 60
+          echo "Resolving preview URL for branch: $VERCEL_GIT_COMMIT_REF"
+          web_url=$(node scripts/resolve-vercel-preview-url.mjs)
+          if [ -z "$web_url" ] || [[ "$web_url" != https://* ]]; then
+            echo "Failed to resolve web URL"
+            exit 1
+          fi
+          health_url="${web_url}/api/health"
+          echo "Resolved health URL: $health_url"
+          echo "health_url=$health_url" >> "$GITHUB_OUTPUT"
+
+  wait:
+    needs: resolve-url
+    uses: ./.github/workflows/rwf-wait-for-deployment.yml
+    with:
+      health_url: ${{ needs.resolve-url.outputs.health_url }}
+      expected_sha: ${{ github.event.pull_request.head.sha }}
+      retries: 20
+      sleep_seconds: 30
 
   pw-e2e:
-    needs: wait-for-deploy
-    if: |
-      github.event_name == 'deployment' ||
-      (github.event_name == 'pull_request' && (github.event.action == 'synchronize' || github.event.label.name == 'PREVIEW'))
+    needs: wait
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: dev
       test_command: npm run test:pw-preview-dev
-      gh_ref: ${{ github.sha }}
-      deployment_ref: ${{ github.head_ref || github.ref_name }}
-      custom_base_url: ""
+      gh_ref: ${{ github.event.pull_request.head.sha }}
+      deployment_ref: ${{ github.head_ref }}
+      custom_base_url: ''
     secrets: inherit
