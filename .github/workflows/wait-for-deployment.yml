@@ -1,8 +1,9 @@
 name: "Wait for deployment"
 
 # Primary loop: curl health; if empty -> retry; if status!=ok -> retry; if gitSha unknown -> retry;
-# if short SHA matches expected -> succeed; else log mismatch and retry. Secondary (optional): poll
-# secondary_url for HTTP 200 with same retry window. Exposed as reusable workflow for UI/API combos.
+# if short SHA matches expected -> succeed; else log mismatch and retry (hard fail on timeout/mismatch).
+# Secondary (optional): poll secondary_url for HTTP 200 with same retry window. Exposed as reusable
+# workflow for UI/API combos.
 
 on:
   workflow_call:
@@ -36,7 +37,8 @@ on:
 
 jobs:
   wait:
-    if: ${{ github.event_name == 'deployment_status' && github.event.deployment_status.environment == inputs.environment && github.event.deployment_status.state == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
+    # Run when called directly, manually dispatched, or on matching successful deployment_status
+    if: ${{ github.event_name == 'workflow_call' || github.event_name == 'workflow_dispatch' || (github.event_name == 'deployment_status' && github.event.deployment_status.environment == inputs.environment && github.event.deployment_status.state == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -52,6 +54,8 @@ jobs:
         run: |
           echo "Waiting for deployment at ${HEALTH_URL}"
           EXPECTED_SHORT="${EXPECTED_SHA:0:7}"
+
+          MATCHED=false
 
           for i in $(seq 1 "${RETRIES}"); do
             RESPONSE=$(curl -s -f "${HEALTH_URL}" || true)
@@ -80,7 +84,7 @@ jobs:
 
             if [ "${DEPLOYED_SHORT}" = "${EXPECTED_SHORT}" ]; then
               echo "✅ Deployment healthy with expected SHA: ${DEPLOYED_SHORT}"
-              echo "observed_sha=${DEPLOYED_SHA}" >> "$GITHUB_OUTPUT"
+              MATCHED=true
               break
             fi
 
@@ -99,8 +103,16 @@ jobs:
           FINAL_SHA=$(curl -s -f "${HEALTH_URL}" | jq -r '.gitSha // "unknown"')
           echo "observed_sha=${FINAL_SHA}" >> "$GITHUB_OUTPUT"
 
-          if [ "${FINAL_SHA}" != "unknown" ] && [ "${FINAL_SHA:0:7}" != "${EXPECTED_SHORT}" ]; then
-            echo "⚠️  Warning: Deployed SHA (${FINAL_SHA}) doesn't match expected (${EXPECTED_SHA}). Tests will still run."
+          if [ "${MATCHED}" = "false" ]; then
+            if [ "${FINAL_SHA}" = "unknown" ]; then
+              echo "❌ Deployment never reported gitSha; refusing to continue without SHA match."
+              exit 1
+            fi
+
+            if [ "${FINAL_SHA:0:7}" != "${EXPECTED_SHORT}" ]; then
+              echo "❌ Deployed SHA (${FINAL_SHA}) doesn't match expected (${EXPECTED_SHA}) after waiting."
+              exit 1
+            fi
           fi
 
       - name: Wait for secondary endpoint to return 200 (optional)
@@ -117,6 +129,7 @@ jobs:
 
             if [ "${STATUS_CODE}" = "200" ]; then
               echo "✅ Secondary endpoint responded with 200"
+              SECONDARY_OK=true
               break
             fi
 
@@ -124,8 +137,8 @@ jobs:
             sleep "${SLEEP_SECONDS}"
           done
 
-          FINAL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${SECONDARY_URL}" || true)
-          if [ "${FINAL_STATUS}" != "200" ]; then
+          if [ "${SECONDARY_OK}" != "true" ]; then
+            FINAL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${SECONDARY_URL}" || true)
             echo "❌ Secondary endpoint failed to return 200 after waiting (status=${FINAL_STATUS})."
             exit 1
           fi

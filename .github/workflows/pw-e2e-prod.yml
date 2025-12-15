@@ -9,6 +9,8 @@ name: "Prod E2E (Playwright)"
 
 on:
   deployment_status:
+    environments:
+      - Production
   workflow_dispatch:
 
 concurrency:
@@ -28,12 +30,11 @@ jobs:
 
   run-prod-tests:
     needs: wait-for-prod-deployment
-    # Run if wait step succeeded or was skipped (manual dispatch)
+    # Run if wait step succeeded or was skipped (manual dispatch); do not run if cancelled/failed
     if: ${{ always() && (needs.wait-for-prod-deployment.result == 'success' || needs.wait-for-prod-deployment.result == 'skipped') }}
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: "prod"
       test_command: "npm run test:pw-prod"
       gh_ref: ${{ github.sha }}
-      scheduled: false
     secrets: inherit
