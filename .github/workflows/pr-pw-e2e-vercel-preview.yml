@@ -33,8 +33,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_WEB_PROJECT_SLUG: ${{ secrets.VERCEL_WEB_PROJECT_SLUG }}
-          VERCEL_TEAM_SLUG: ${{ secrets.VERCEL_TEAM_SLUG }}
+          VERCEL_WEB_PROJECT_SLUG: couture-cast-web
+          VERCEL_TEAM_SLUG: muratkeremozcans-projects
           VERCEL_GIT_COMMIT_REF: ${{ github.head_ref }}
           DEBUG: true
         run: |
