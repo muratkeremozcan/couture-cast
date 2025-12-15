@@ -21,7 +21,9 @@ describe('deployment workflows', () => {
     const content = fs.readFileSync(vercelPreviewSmokeWorkflow, 'utf8')
     expect(content).toMatch(/on:\s*\n\s*pull_request:/)
     expect(content).toMatch(/Resolve preview health URL/)
-    expect(content).toMatch(/uses: \.\/\.github\/workflows\/rwf-wait-for-deployment.yml/)
+    expect(content).toMatch(
+      /uses: \.\/\.github\/workflows\/vercel-wait-for-deployment.yml/
+    )
   })
 
   it('mobile workflow exists and deploys manually with Expo token (Android-only)', () => {

@@ -355,27 +355,27 @@ async function main() {
   ensureBranchExists(owner, repo, branch)
 
   // Deterministic hostname attempt first (matches Vercel pattern).
+  // These git-branch URLs are aliases that Vercel updates to point to the latest deployment
   const branchSlug = slugifyVercelGitRef(branch)
   const projectSlug = env('VERCEL_WEB_PROJECT_SLUG')
   const teamSlug = env('VERCEL_TEAM_SLUG')
   if (projectSlug && teamSlug) {
-    const deterministic = `https://${projectSlug}-git-${branchSlug}-${teamSlug}.vercel.app`
-    logDebug(`Trying deterministic Preview hostname: ${deterministic}`)
-    if (await isReachable(deterministic)) {
-      process.stdout.write(deterministic)
-      return
-    }
-
-    // Some Vercel branch hostnames truncate the branch portion; try a shorter slug as a fallback guess.
-    const shortSlug = branchSlug.slice(0, 12)
-    if (shortSlug && shortSlug !== branchSlug) {
-      const shorter = `https://${projectSlug}-git-${shortSlug}-${teamSlug}.vercel.app`
-      logDebug(`Trying shortened deterministic hostname: ${shorter}`)
-      if (await isReachable(shorter)) {
-        process.stdout.write(shorter)
+    // Try progressively shorter slugs (Vercel truncates long branch names)
+    const slugLengths = [branchSlug.length, 12, 10]
+    for (const len of slugLengths) {
+      const trySlug = branchSlug.slice(0, len)
+      const tryUrl = `https://${projectSlug}-git-${trySlug}-${teamSlug}.vercel.app`
+      logDebug(`Trying deterministic Preview hostname: ${tryUrl}`)
+      if (await isReachable(tryUrl)) {
+        logDebug(
+          `✓ Git-branch alias URL is reachable, using it (auto-updates to latest deployment)`
+        )
+        process.stdout.write(tryUrl)
         return
       }
     }
+
+    logDebug(`Git-branch alias URLs not reachable yet, falling back to API`)
   }
 
   // First, try branch-scoped Preview deployments.
