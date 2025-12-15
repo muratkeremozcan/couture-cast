@@ -61,7 +61,7 @@ jobs:
 
       - name: Resolve branch name from SHA
         id: resolve_branch
-        if: inputs.custom_base_url != ''
+        if: inputs.deployment_ref != ''
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -101,8 +101,10 @@ jobs:
           TEST_ENV: ${{ inputs.test_env }}
           EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.expected_sha.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_WEB_PROJECT_SLUG: ${{ secrets.VERCEL_WEB_PROJECT_SLUG }}
           VERCEL_API_PROJECT_SLUG: ${{ secrets.VERCEL_API_PROJECT_SLUG }}
           VERCEL_TEAM_SLUG: ${{ secrets.VERCEL_TEAM_SLUG }}
           # Pass resolved branch name for URL construction
