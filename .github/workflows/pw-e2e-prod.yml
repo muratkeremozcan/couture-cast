@@ -1,0 +1,85 @@
+name: "Prod E2E (Playwright)"
+
+on:
+  deployment_status:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wait-for-prod-deployment:
+    # Only wait when a successful Production deployment status is received (skipped on manual dispatch)
+    if: ${{ github.event_name == 'deployment_status' && github.event.deployment_status.environment == 'Production' && github.event.deployment_status.state == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Wait for web production deployment to be healthy and on expected commit
+        env:
+          HEALTH_URL: https://couture-cast-web.vercel.app/api/health
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          echo "Waiting for couture-cast web production deployment..."
+          echo "Expected commit SHA: ${EXPECTED_SHA}"
+
+          EXPECTED_SHORT="${EXPECTED_SHA:0:7}"
+
+          for i in {1..20}; do
+            RESPONSE=$(curl -s -f "${HEALTH_URL}" || true)
+
+            if [ -z "${RESPONSE}" ]; then
+              echo "⏳ Waiting for health... (attempt ${i}/20)"
+              sleep 30
+              continue
+            fi
+
+            STATUS=$(echo "${RESPONSE}" | jq -r '.status // "unknown"')
+            DEPLOYED_SHA=$(echo "${RESPONSE}" | jq -r '.gitSha // "unknown"')
+            DEPLOYED_SHORT="${DEPLOYED_SHA:0:7}"
+
+            if [ "${STATUS}" != "ok" ]; then
+              echo "⏳ Health endpoint not ready (status=${STATUS})... (attempt ${i}/20)"
+              sleep 30
+              continue
+            fi
+
+            if [ "${DEPLOYED_SHA}" = "unknown" ]; then
+              echo "⚠️  Version endpoint returned unknown commit; proceeding after health is OK."
+              break
+            fi
+
+            if [ "${DEPLOYED_SHORT}" = "${EXPECTED_SHORT}" ]; then
+              echo "✅ Deployment healthy with expected SHA: ${DEPLOYED_SHORT}"
+              break
+            fi
+
+            echo "⏳ Waiting for correct deployment... (attempt ${i}/20)"
+            echo "   Expected SHA: ${EXPECTED_SHORT}"
+            echo "   Deployed SHA: ${DEPLOYED_SHORT}"
+            sleep 30
+          done
+
+          # Final health verification
+          if ! curl -f "${HEALTH_URL}" > /dev/null; then
+            echo "❌ Web production deployment failed to become healthy after waiting."
+            exit 1
+          fi
+
+          # Warn (non-blocking) if the SHA still mismatches
+          FINAL_SHA=$(curl -s -f "${HEALTH_URL}" | jq -r '.gitSha // "unknown"')
+          if [ "${FINAL_SHA}" != "unknown" ] && [ "${FINAL_SHA:0:7}" != "${EXPECTED_SHORT}" ]; then
+            echo "⚠️  Warning: Deployed SHA (${FINAL_SHA}) doesn't match expected (${EXPECTED_SHA}). Tests will still run."
+          fi
+
+  run-prod-tests:
+    needs: wait-for-prod-deployment
+    # Run if wait step succeeded or was skipped (manual dispatch)
+    if: ${{ always() && (needs.wait-for-prod-deployment.result == 'success' || needs.wait-for-prod-deployment.result == 'skipped') }}
+    uses: ./.github/workflows/rwf-e2e.yml
+    with:
+      test_env: "prod"
+      test_command: "npm run test:pw-prod"
+      gh_ref: ${{ github.sha }}
+      scheduled: false
+    secrets: inherit
