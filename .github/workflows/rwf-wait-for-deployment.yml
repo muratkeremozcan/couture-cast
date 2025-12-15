@@ -1,0 +1,144 @@
+name: "Wait for deployment"
+
+# Primary loop: curl health; if empty -> retry; if status!=ok -> retry; if gitSha unknown -> retry;
+# if short SHA matches expected -> succeed; else log mismatch and retry (hard fail on timeout/mismatch).
+# Secondary (optional): poll secondary_url for HTTP 200 with same retry window. Exposed as reusable
+# workflow for UI/API combos.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Deployment environment name to require"
+        type: string
+        required: true
+      health_url:
+        description: "Primary health endpoint URL to poll (required)"
+        type: string
+        required: true
+      secondary_url:
+        description: "Optional secondary endpoint URL to poll for 200 (leave empty to skip)"
+        type: string
+        required: false
+      expected_sha:
+        description: "Commit SHA to match (first 7 chars)"
+        type: string
+        required: true
+      retries:
+        description: "Max attempts"
+        type: number
+        required: false
+        default: 20
+      sleep_seconds:
+        description: "Delay between attempts"
+        type: number
+        required: false
+        default: 30
+
+jobs:
+  wait:
+    # Only run for matching successful deployment_status events
+    if: ${{ github.event_name == 'deployment_status' && github.event.deployment_status.environment == inputs.environment && github.event.deployment_status.state == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      observed_sha: ${{ steps.health_check.outputs.observed_sha }}
+    steps:
+      - name: Wait for web health + SHA
+        id: health_check
+        env:
+          HEALTH_URL: ${{ inputs.health_url }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          RETRIES: ${{ inputs.retries }}
+          SLEEP_SECONDS: ${{ inputs.sleep_seconds }}
+        run: |
+          echo "Waiting for deployment at ${HEALTH_URL}"
+          EXPECTED_SHORT="${EXPECTED_SHA:0:7}"
+
+          MATCHED=false
+
+          for i in $(seq 1 "${RETRIES}"); do
+            RESPONSE=$(curl -s -f "${HEALTH_URL}" || true)
+
+            if [ -z "${RESPONSE}" ]; then
+              echo "⏳ Waiting for health... (attempt ${i}/${RETRIES})"
+              sleep "${SLEEP_SECONDS}"
+              continue
+            fi
+
+            STATUS=$(echo "${RESPONSE}" | jq -r '.status // "unknown"')
+            DEPLOYED_SHA=$(echo "${RESPONSE}" | jq -r '.gitSha // "unknown"')
+            DEPLOYED_SHORT="${DEPLOYED_SHA:0:7}"
+
+            if [ "${STATUS}" != "ok" ]; then
+              echo "⏳ Health endpoint not ready (status=${STATUS})... (attempt ${i}/${RETRIES})"
+              sleep "${SLEEP_SECONDS}"
+              continue
+            fi
+
+            if [ "${DEPLOYED_SHA}" = "unknown" ]; then
+              echo "⏳ Health OK but gitSha unknown... retrying (attempt ${i}/${RETRIES})"
+              sleep "${SLEEP_SECONDS}"
+              continue
+            fi
+
+            if [ "${DEPLOYED_SHORT}" = "${EXPECTED_SHORT}" ]; then
+              echo "✅ Deployment healthy with expected SHA: ${DEPLOYED_SHORT}"
+              MATCHED=true
+              break
+            fi
+
+            echo "⏳ Health OK but waiting for correct deployment... (attempt ${i}/${RETRIES})"
+            echo "   Expected SHA: ${EXPECTED_SHORT}"
+            echo "   Deployed SHA: ${DEPLOYED_SHORT}"
+            sleep "${SLEEP_SECONDS}"
+          done
+
+          # Final health verification
+          if ! curl -f "${HEALTH_URL}" > /dev/null; then
+            echo "❌ Deployment failed to become healthy after waiting."
+            exit 1
+          fi
+
+          FINAL_SHA=$(curl -s -f "${HEALTH_URL}" | jq -r '.gitSha // "unknown"')
+          echo "observed_sha=${FINAL_SHA}" >> "$GITHUB_OUTPUT"
+
+          if [ "${MATCHED}" = "false" ]; then
+            if [ "${FINAL_SHA}" = "unknown" ]; then
+              echo "❌ Deployment never reported gitSha; refusing to continue without SHA match."
+              exit 1
+            fi
+
+            if [ "${FINAL_SHA:0:7}" != "${EXPECTED_SHORT}" ]; then
+              echo "❌ Deployed SHA (${FINAL_SHA}) doesn't match expected (${EXPECTED_SHA}) after waiting."
+              exit 1
+            fi
+          fi
+
+      - name: Wait for secondary endpoint to return 200 (optional)
+        if: ${{ inputs.secondary_url != '' }}
+        env:
+          SECONDARY_URL: ${{ inputs.secondary_url }}
+          RETRIES: ${{ inputs.retries }}
+          SLEEP_SECONDS: ${{ inputs.sleep_seconds }}
+        run: |
+          echo "Waiting for secondary endpoint at ${SECONDARY_URL}"
+
+          for i in $(seq 1 "${RETRIES}"); do
+            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${SECONDARY_URL}" || true)
+
+            if [ "${STATUS_CODE}" = "200" ]; then
+              echo "✅ Secondary endpoint responded with 200"
+              SECONDARY_OK=true
+              break
+            fi
+
+            echo "⏳ Secondary endpoint not ready (status=${STATUS_CODE})... (attempt ${i}/${RETRIES})"
+            sleep "${SLEEP_SECONDS}"
+          done
+
+          if [ "${SECONDARY_OK}" != "true" ]; then
+            FINAL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${SECONDARY_URL}" || true)
+            echo "❌ Secondary endpoint failed to return 200 after waiting (status=${FINAL_STATUS})."
+            exit 1
+          fi
