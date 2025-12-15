@@ -14,6 +14,12 @@ for (const file of envFiles) {
   }
 }
 
+function logDebug(message) {
+  if (process.env.DEBUG) {
+    console.error(message)
+  }
+}
+
 function fail(message) {
   console.error(message)
   process.exit(1)
@@ -47,9 +53,11 @@ async function fetchJson(url) {
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
   }
+  logDebug(`Fetching Vercel API: ${url}`)
   const response = await fetch(url, { headers })
   if (!response.ok) {
     const body = await response.text().catch(() => '')
+    logDebug(`Vercel API error: ${response.status} ${response.statusText}`)
     throw new Error(
       `Vercel API request failed (${url}): ${response.status} ${response.statusText} ${body}`
     )
@@ -106,6 +114,7 @@ function deterministicUrl(projectSlug, branchSlug, teamSlug) {
 async function main() {
   const manual = env('DEV_API_BASE_URL') ?? env('VERCEL_API_BASE_URL')
   if (manual) {
+    logDebug(`Using manual API URL: ${manual}`)
     process.stdout.write(manual)
     return
   }
@@ -124,18 +133,26 @@ async function main() {
     env('BRANCH')
   const branchSlug = slugifyBranch(branch) ?? 'main'
 
+  logDebug(`Resolving API URL for project: ${projectSlug}, branch: ${branch}`)
+
   const teamId = await resolveTeamId(teamSlug)
+  logDebug(`Team ID: ${teamId}`)
+
   const projectId = await resolveProjectId(projectSlug, teamId)
   if (!projectId) fail(`Unable to resolve project ID for ${projectSlug}`)
+  logDebug(`Project ID: ${projectId}`)
 
   const deploymentUrl = await findDeploymentUrl(projectId, teamId, branch)
   if (deploymentUrl) {
+    logDebug(`Found deployment URL: ${deploymentUrl}`)
     process.stdout.write(deploymentUrl)
     return
   }
 
+  logDebug('No deployment found via API, trying deterministic URL')
   const fallback = deterministicUrl(projectSlug, branchSlug, teamSlug)
   if (fallback) {
+    logDebug(`Using fallback deterministic URL: ${fallback}`)
     process.stdout.write(fallback)
     return
   }

@@ -133,6 +133,7 @@ jobs:
             fi
           fi
 
+          # DEBUG env var already set at workflow level
           ${{ inputs.test_command }}
 
       - name: Upload Playwright artifacts
