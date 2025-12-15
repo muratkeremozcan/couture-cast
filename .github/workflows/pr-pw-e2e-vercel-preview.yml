@@ -36,7 +36,6 @@ jobs:
           VERCEL_WEB_PROJECT_SLUG: couture-cast-web
           VERCEL_TEAM_SLUG: muratkeremozcans-projects
           VERCEL_GIT_COMMIT_REF: ${{ github.head_ref }}
-          VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           DEBUG: true
         run: |
           echo "Resolving preview URL for branch: $VERCEL_GIT_COMMIT_REF"
@@ -46,19 +45,20 @@ jobs:
             exit 1
           fi
 
-          # Append Vercel bypass token for protected previews
-          health_url="${web_url}/api/health?x-vercel-set-bypass-cookie=true&x-vercel-protection-bypass=${VERCEL_BYPASS_SECRET}"
-          echo "Resolved health URL: ${web_url}/api/health (with bypass token)"
+          health_url="${web_url}/api/health"
+          echo "Resolved health URL: $health_url"
           echo "health_url=$health_url" >> "$GITHUB_OUTPUT"
 
   wait:
     needs: resolve-url
-    uses: ./.github/workflows/rwf-wait-for-deployment.yml
+    uses: ./.github/workflows/vercel-wait-for-deployment.yml
     with:
       health_url: ${{ needs.resolve-url.outputs.health_url }}
       expected_sha: ${{ github.event.pull_request.head.sha }}
       retries: 20
       sleep_seconds: 30
+    secrets:
+      vercel_bypass_secret: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
   pw-e2e:
     needs: wait
