@@ -16,10 +16,11 @@ const apiHandler = path.join(repoRoot, 'apps', 'api', 'api', 'index.ts')
 const rootPackageJson = path.join(repoRoot, 'package.json')
 
 describe('deployment workflows', () => {
-  it('vercel preview smoke workflow exists and triggers on deployment_status', () => {
+  it('vercel preview smoke workflow exists and triggers on deployment / pull_request events', () => {
     expect(fs.existsSync(vercelPreviewSmokeWorkflow)).toBe(true)
     const content = fs.readFileSync(vercelPreviewSmokeWorkflow, 'utf8')
-    expect(content).toMatch(/deployment_status/)
+    expect(content).toMatch(/on:\s*\n\s*deployment:/)
+    expect(content).toMatch(/pull_request:/)
   })
 
   it('mobile workflow exists and deploys manually with Expo token (Android-only)', () => {

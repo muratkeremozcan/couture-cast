@@ -16,12 +16,11 @@ concurrency:
 jobs:
   wait-for-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
     steps:
       - name: Wait for Vercel deployment
         run: |
           echo "Waiting 60s for Vercel to build and deploy..."
-          sleep 120
+          sleep 60
 
   pw-e2e:
     needs: wait-for-deploy
