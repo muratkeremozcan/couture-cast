@@ -361,21 +361,25 @@ async function main() {
   const teamSlug = env('VERCEL_TEAM_SLUG')
   if (projectSlug && teamSlug) {
     // Try progressively shorter slugs (Vercel truncates long branch names)
-    const slugLengths = [branchSlug.length, 12, 10]
+    // Example: "chore/test-preview-prod-deploys" -> "chore-test-preview-prod-deploys" -> "chore-tes" (9 chars)
+    const slugLengths = [branchSlug.length, 15, 12, 10, 9, 8, 7]
     for (const len of slugLengths) {
       const trySlug = branchSlug.slice(0, len)
+      if (trySlug.length < 3) break // Too short to be meaningful
+
       const tryUrl = `https://${projectSlug}-git-${trySlug}-${teamSlug}.vercel.app`
-      logDebug(`Trying deterministic Preview hostname: ${tryUrl}`)
+      logDebug(`Trying git-branch alias (${trySlug.length} chars): ${tryUrl}`)
+
       if (await isReachable(tryUrl)) {
         logDebug(
-          `✓ Git-branch alias URL is reachable, using it (auto-updates to latest deployment)`
+          `✓ Found reachable git-branch alias URL (auto-updates to latest deployment)`
         )
         process.stdout.write(tryUrl)
         return
       }
     }
 
-    logDebug(`Git-branch alias URLs not reachable yet, falling back to API`)
+    logDebug(`No git-branch alias URLs reachable, falling back to Vercel API`)
   }
 
   // First, try branch-scoped Preview deployments.
