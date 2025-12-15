@@ -31,6 +31,7 @@ jobs:
       - name: Resolve preview health URL
         id: resolve
         env:
+          GH_TOKEN: ${{ github.token }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_WEB_PROJECT_SLUG: ${{ secrets.VERCEL_WEB_PROJECT_SLUG }}
           VERCEL_TEAM_SLUG: ${{ secrets.VERCEL_TEAM_SLUG }}
