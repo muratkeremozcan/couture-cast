@@ -163,8 +163,12 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
     webBaseUrl:
       env('PROD_WEB_E2E_BASE_URL') ??
       env('PROD_WEB_BASE_URL') ??
-      'https://app.couturecast.com',
-    apiBaseUrl: env('PROD_API_BASE_URL') ?? 'https://api.couturecast.com',
+      // Fixed Vercel production domain
+      'https://couture-cast-web.vercel.app',
+    apiBaseUrl:
+      env('PROD_API_BASE_URL') ??
+      // Fixed Vercel production API domain
+      'https://couture-cast-api.vercel.app',
     credentials: {
       defaultUser: {
         email: process.env.PROD_AUTH_USERNAME ?? 'stylist@couturecast.com',

@@ -1,0 +1,40 @@
+name: "Prod E2E (Playwright)"
+
+# Web wait loop (10m max):
+# - curl the health endpoint; if no response, sleep and retry.
+# - parse .status and .gitSha; if status != ok, sleep and retry.
+# - if gitSha is unknown, sleep and retry.
+# - if short SHA matches expected, succeed; otherwise log mismatch, sleep, and retry.
+# Secondary gate (optional): poll /api/v1/events/poll for 200 (same retry window). Then run prod Playwright.
+
+on:
+  deployment_status:
+    environments:
+      - Production
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wait-for-prod-deployment:
+    uses: ./.github/workflows/wait-for-deployment.yml
+    with:
+      environment: Production
+      health_url: https://couture-cast-web.vercel.app/api/health
+      secondary_url: https://couture-cast-api.vercel.app/api/v1/events/poll
+      expected_sha: ${{ github.sha }}
+      retries: 20
+      sleep_seconds: 30
+
+  run-prod-tests:
+    needs: wait-for-prod-deployment
+    # Run if wait step succeeded or was skipped (manual dispatch); do not run if cancelled/failed
+    if: ${{ always() && (needs.wait-for-prod-deployment.result == 'success' || needs.wait-for-prod-deployment.result == 'skipped') }}
+    uses: ./.github/workflows/rwf-e2e.yml
+    with:
+      test_env: "prod"
+      test_command: "npm run test:pw-prod"
+      gh_ref: ${{ github.sha }}
+    secrets: inherit
