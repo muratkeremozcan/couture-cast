@@ -45,23 +45,27 @@ jobs:
           SLEEP_SECONDS: ${{ inputs.sleep_seconds }}
           VERCEL_BYPASS_SECRET: ${{ secrets.vercel_bypass_secret }}
         run: |
-          # Add Vercel bypass token to URL within this job (never crosses job boundary)
-          if [[ "${HEALTH_URL}" == *"?"* ]]; then
-            CHECK_URL="${HEALTH_URL}&x-vercel-set-bypass-cookie=true&x-vercel-protection-bypass=${VERCEL_BYPASS_SECRET}"
-          else
-            CHECK_URL="${HEALTH_URL}?x-vercel-set-bypass-cookie=true&x-vercel-protection-bypass=${VERCEL_BYPASS_SECRET}"
-          fi
-
-          echo "Waiting for deployment at ${HEALTH_URL} (with Vercel bypass)"
+          # Use HTTP header for bypass (more reliable than query params per Vercel community reports)
+          echo "Waiting for deployment at ${HEALTH_URL} (with Vercel bypass header)"
           EXPECTED_SHORT="${EXPECTED_SHA:0:7}"
 
           MATCHED=false
 
           for i in $(seq 1 "${RETRIES}"); do
-            RESPONSE=$(curl -s -f "${CHECK_URL}" || true)
+            RESPONSE=$(curl -s -f -H "x-vercel-protection-bypass: ${VERCEL_BYPASS_SECRET}" "${HEALTH_URL}" || true)
 
             if [ -z "${RESPONSE}" ]; then
               echo "⏳ Waiting for health... (attempt ${i}/${RETRIES})"
+              sleep "${SLEEP_SECONDS}"
+              continue
+            fi
+
+            # Debug: Check if response is JSON
+            if ! echo "${RESPONSE}" | jq empty 2>/dev/null; then
+              echo "⏳ Response is not valid JSON (attempt ${i}/${RETRIES})"
+              echo "First 200 chars of response:"
+              echo "${RESPONSE}" | head -c 200
+              echo ""
               sleep "${SLEEP_SECONDS}"
               continue
             fi
@@ -95,12 +99,12 @@ jobs:
           done
 
           # Final verification
-          if ! curl -f "${CHECK_URL}" > /dev/null; then
+          if ! curl -f -H "x-vercel-protection-bypass: ${VERCEL_BYPASS_SECRET}" "${HEALTH_URL}" > /dev/null; then
             echo "❌ Deployment failed to become healthy after waiting."
             exit 1
           fi
 
-          FINAL_SHA=$(curl -s -f "${CHECK_URL}" | jq -r '.gitSha // "unknown"')
+          FINAL_SHA=$(curl -s -f -H "x-vercel-protection-bypass: ${VERCEL_BYPASS_SECRET}" "${HEALTH_URL}" | jq -r '.gitSha // "unknown"')
           echo "observed_sha=${FINAL_SHA}" >> "$GITHUB_OUTPUT"
 
           if [ "${MATCHED}" = "false" ]; then

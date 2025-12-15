@@ -301,6 +301,10 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
         ? deployment.url
         : `https://${deployment.url}`
       logDebug(`Found deployment URL: ${url}`)
+      logDebug(`  State: ${deployment.state || 'unknown'}`)
+      logDebug(`  Created: ${deployment.created || 'unknown'}`)
+      logDebug(`  Git ref: ${deployment.meta?.githubCommitRef || 'unknown'}`)
+      logDebug(`  Git SHA: ${deployment.meta?.githubCommitSha || 'unknown'}`)
       return url
     }
   }
