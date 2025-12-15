@@ -2,6 +2,9 @@
 // Cross-platform wrapper: resolves the dev Preview URL and runs the given command with DEV_WEB_E2E_BASE_URL and TEST_ENV=dev set.
 import { execFileSync } from 'node:child_process'
 import process from 'node:process'
+import fs from 'node:fs'
+import path from 'node:path'
+import { config as loadEnv } from 'dotenv'
 
 function fail(message) {
   console.error(message)
@@ -54,6 +57,11 @@ function resolveApiUrl() {
 }
 
 function main() {
+  const envPath = path.resolve(process.cwd(), '.env.dev')
+  if (fs.existsSync(envPath)) {
+    loadEnv({ path: envPath })
+  }
+
   const command = process.argv.slice(2).join(' ')
   if (!command) {
     fail('Usage: node scripts/set-dev-web-e2e-base-url.mjs "<command to run>"')
