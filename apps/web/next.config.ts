@@ -1,5 +1,5 @@
 import type { NextConfig } from 'next'
-import { config as loadEnv } from 'dotenv'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { resolveGitMetadata } from './git-metadata'
 
@@ -10,11 +10,43 @@ const rootEnvFiles = [
   '.env',
 ]
 
+// Load root `.env*` files when present; CI-injected env vars always win.
+// Parsed manually to avoid a runtime dotenv dependency in Vercel builds.
 for (const file of rootEnvFiles) {
-  loadEnv({ path: path.join(rootDir, file), override: false, quiet: true })
+  const fullPath = path.join(rootDir, file)
+  if (!existsSync(fullPath)) continue
+
+  const content = readFileSync(fullPath, 'utf8')
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+
+    const equalIndex = line.indexOf('=')
+    if (equalIndex <= 0) continue
+
+    const key = line.slice(0, equalIndex).trim()
+    if (!key || process.env[key] !== undefined) continue
+
+    let value = line.slice(equalIndex + 1).trim()
+    const isWrappedWithDoubleQuotes =
+      value.length >= 2 &&
+      value.charCodeAt(0) === 34 &&
+      value.charCodeAt(value.length - 1) === 34
+    const isWrappedWithSingleQuotes =
+      value.length >= 2 &&
+      value.charCodeAt(0) === 39 &&
+      value.charCodeAt(value.length - 1) === 39
+
+    if (isWrappedWithDoubleQuotes || isWrappedWithSingleQuotes) {
+      value = value.slice(1, -1)
+    }
+
+    process.env[key] = value
+  }
 }
 
 const { gitSha: buildGitSha, gitBranch: buildGitBranch } = resolveGitMetadata()
+// Prefer canonical POSTHOG_* vars; keep NEXT_PUBLIC_* fallback.
 const posthogKey =
   process.env.POSTHOG_API_KEY || process.env.NEXT_PUBLIC_POSTHOG_KEY || ''
 const posthogHost =
