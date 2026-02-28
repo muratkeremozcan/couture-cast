@@ -1,3 +1,5 @@
+import { PostHogClickTracker } from './components/posthog-click-tracker'
+
 const navLinks = [
   { href: '#ritual', label: 'Daily ritual', testId: 'nav-ritual' },
   { href: '#wardrobe', label: 'Wardrobe', testId: 'nav-wardrobe' },
@@ -30,6 +32,9 @@ export default function Home() {
               href={link.href}
               className="hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300"
               data-testid={link.testId}
+              data-ph-event="nav_link_clicked"
+              data-ph-label={link.label}
+              data-ph-href={link.href}
             >
               {link.label}
             </a>
@@ -58,6 +63,9 @@ export default function Home() {
               data-testid="cta-primary"
               className="bg-amber-300 text-black px-6 py-3 rounded-full font-semibold hover:bg-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
               href="#"
+              data-ph-event="cta_clicked"
+              data-ph-cta-label="Preview outfits"
+              data-ph-cta-type="primary"
             >
               Preview outfits
             </a>
@@ -65,6 +73,9 @@ export default function Home() {
               data-testid="cta-secondary"
               className="border border-white/30 px-6 py-3 rounded-full font-semibold hover:border-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               href="#wardrobe"
+              data-ph-event="cta_clicked"
+              data-ph-cta-label="See the planner"
+              data-ph-cta-type="secondary"
             >
               See the planner
             </a>
@@ -87,6 +98,7 @@ export default function Home() {
           </p>
         </section>
       </main>
+      <PostHogClickTracker />
     </div>
   )
 }

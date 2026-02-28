@@ -1,6 +1,10 @@
 # CoutureCast — Project Brief
 
-_(Version 1.1 — Audience Update Included)_
+<!-- markdownlint-configure-file {"MD013": false, "MD060": false} -->
+
+Updated: 2026-02-28 — align roadmap authority, age policy, and activation metrics
+
+Version 1.1 — Audience update included
 
 Prepared by: **Mary – Business Analyst (BMAD Method v6)**  
 Date: November 2025
@@ -28,7 +32,8 @@ By integrating **weather data**, **personal wardrobes**, and **style-driven comm
 | **Adults (30+)**         | 30–65 | Pragmatic, convenience-driven           | Quick outfit guidance, minimal input      |
 
 **Future Segment:** _CoutureCast Jr._ (Ages 12 and under)  
-A simplified, COPPA-compliant educational app for kids, with no social features and parental supervision.
+A separate COPPA-compliant app planned for kids. Until Jr launches, users under 13 cannot access any
+main CoutureCast features (core weather/outfit experience or community).
 
 ---
 
@@ -46,15 +51,15 @@ A simplified, COPPA-compliant educational app for kids, with no social features 
 
 | Category                             | Description                                                                     |
 | ------------------------------------ | ------------------------------------------------------------------------------- |
-| **Weather Engine**                   | Real-time local & hourly weather; 7-day forecast (premium)                      |
+| **Weather Engine**                   | Free: current + hourly (next 24h); Premium: full 7-day forecast                  |
 | **Outfit Recommendations**           | AI-driven suggestions mapped to conditions + wardrobe                           |
 | **Wardrobe Management**              | Upload clothing photos, categorize, tag comfort/temp rating                     |
 | **Customization Controls**           | Toggle between “Simple” and “Detailed” modes; privacy and data toggles          |
 | **Community Feed**                   | Share looks, gain feedback, and engage in themed outfit challenges              |
 | **Widgets & Smartwatch Integration** | Quick-glance “What to Wear” summaries                                           |
 | **Localization**                     | English, Spanish, and French experiences with locale-aware units and legal copy |
-| **Monetization Model**               | Freemium: Free daily forecasts, Premium for extended insights and wardrobe AI   |
-| **Privacy & Security**               | Designed for users 13+; opt-in data linking, OAuth for external accounts        |
+| **Monetization Model**               | Freemium: Free same-day guidance; Premium unlocks 7-day forecasts/planner + advanced pairing |
+| **Privacy & Security**               | Main product is strictly 13+; under-13 blocked from core/community until separate Jr app launches |
 
 ---
 
@@ -62,8 +67,8 @@ A simplified, COPPA-compliant educational app for kids, with no social features 
 
 | Tier             | Features                                                             | Revenue                       |
 | ---------------- | -------------------------------------------------------------------- | ----------------------------- |
-| **Free**         | Daily weather + outfit suggestion; limited wardrobe items            | Ads (non-intrusive)           |
-| **Premium**      | 7-day forecast, advanced outfit pairing, ad-free, unlimited wardrobe | Subscription (monthly/yearly) |
+| **Free**         | Current conditions + next 24h hourly forecast + same-day outfit suggestion; up to 30 wardrobe items | Ads (non-intrusive)           |
+| **Premium**      | Full 7-day weather forecast + 7-day outfit planner, advanced pairing, ad-free, unlimited wardrobe | Subscription (monthly/yearly) |
 | **Partnerships** | Sponsored outfits, affiliate shopping links (clearly labeled)        | B2B collaborations            |
 
 ---
@@ -95,7 +100,8 @@ A simplified, COPPA-compliant educational app for kids, with no social features 
 
 ## 🛡️ 8. Compliance & Ethics
 
-- Users under 13 excluded (separate product: _CoutureCast Jr._)
+- Main CoutureCast is strictly 13+; users under 13 cannot create accounts or access any core/community features
+- Ages 12 and under are deferred to a separate product path: _CoutureCast Jr._ (when launched)
 - GDPR/CCPA compliant: consent, deletion, export
 - No ad personalization for minors
 - Transparent data-use disclosures and parental options planned for future child-friendly version
@@ -104,12 +110,15 @@ A simplified, COPPA-compliant educational app for kids, with no social features 
 
 ## 🚀 9. Go-To-Market Plan
 
+Phase names and ordering in this brief follow `docs/couturecast_roadmap.md`; roadmap sequencing is the source
+of truth if future docs diverge.
+
 | Phase       | Deliverable                                      | Duration           |
 | ----------- | ------------------------------------------------ | ------------------ |
-| **Phase 1** | MVP for 13+ (CoutureCast App + Widget)           | 10–12 weeks        |
-| **Phase 2** | Community Beta (Social feed + Gamified features) | +6 weeks           |
-| **Phase 3** | Launch of CoutureCast Jr.                        | +3 months post MVP |
-| **Phase 4** | Brand partnerships & analytics dashboards        | Ongoing            |
+| **Phase 1** | MVP Build for 13+ (weather + outfit core, widgets, EN/ES/FR) | 10–12 weeks        |
+| **Phase 2** | Community Beta (social feed + moderation + challenges) | +6 weeks           |
+| **Phase 3** | Monetization + Wardrobe Uploads                  | +4 weeks           |
+| **Phase 4** | Expansion & Jr. planning                          | +6 weeks           |
 
 ---
 
@@ -117,7 +126,7 @@ A simplified, COPPA-compliant educational app for kids, with no social features 
 
 | KPI                   | Goal                                       |
 | --------------------- | ------------------------------------------ |
-| MVP Activation        | ≥ 70% new users complete setup in < 2 mins |
+| MVP Activation        | ≥ 70% new users complete setup and view first outfit card in ≤ 2 mins |
 | Retention (D7)        | ≥ 25%                                      |
 | Wardrobe Engagement   | 40%+ upload ≥5 items                       |
 | User Satisfaction     | ≥ 4.5/5 average “Outfit Accuracy” rating   |
@@ -132,68 +141,68 @@ It has clear **product-market fit**, manageable technical scope, and strong **ph
 
 ---
 
-# 🧱 REQUIREMENTS BACKLOG (v1)
+## 🧱 Requirements backlog (v1)
 
 ### Epic 1 — Core Weather Experience
 
 - **User Story 1.1**: As a user, I want to view current temperature, precipitation, and forecast so that I can plan my day.
   - ✅ _Acceptance Criteria:_ Displays temperature, conditions, icons, and “feels like” info; updates automatically every 30 min.
 - **User Story 1.2**: As a user, I want to receive weather alerts when conditions change significantly.
-  - ✅ _Acceptance Criteria:_ Push notifications trigger for rain/temp drops; user can toggle alerts.
+  - ✅ _Acceptance Criteria:_ Alerts trigger within 5 minutes when rain probability reaches ≥60% or temperature shifts by ≥8°F within 3 hours; users can independently toggle rain vs. temperature alerts.
 
 ### Epic 2 — Outfit Recommendation Engine
 
 - **User Story 2.1**: As a user, I want outfit suggestions based on today’s weather so that I know what to wear.
-  - ✅ AC: Outfit categories (tops, bottoms, shoes, accessories) adapt to temp/wind/precip.
+  - ✅ AC: Engine returns at least one recommendation each for tops, bottoms, and shoes, recalculating when temperature, wind, or precipitation inputs change.
 - **User Story 2.2**: As a user, I want to customize my comfort range (e.g., "I run cold") to personalize recommendations.
-  - ✅ AC: Preference slider changes outfit thresholds dynamically.
+  - ✅ AC: A 5-level comfort slider shifts recommendation thresholds by up to ±10°F and applies updated thresholds to the next recommendation request.
 - **User Story 2.3**: As a premium user, I want to see a 7-day outfit planner.
   - ✅ AC: Planner lists 7 daily outfits; available only in Premium.
 
 ### Epic 3 — Wardrobe Management
 
 - **User Story 3.1**: As a user, I can upload clothing photos and categorize them.
-  - ✅ AC: Auto-tagging detects garment type (shirt, pants, jacket); editable.
+  - ✅ AC: Upload flow auto-tags garment type from supported labels (shirt, pants, jacket, shoes, accessory), and users can edit tags before saving.
 - **User Story 3.2**: As a user, I can build outfits manually for later use.
-  - ✅ AC: “Save outfit” function; searchable by tag or condition.
+  - ✅ AC: Saved outfits appear in library within 2 seconds and are retrievable by tag and weather-condition filters.
 
 ### Epic 4 — Community & Social
 
 - **User Story 4.1**: As a user, I can post my daily outfit and view others’ posts.
-  - ✅ AC: Feed sorted by weather similarity (e.g., “others near 60°F and rainy”).
+  - ✅ AC: Default feed ranks posts from locations within ±5°F and matching precipitation type before recency-based fallback.
 - **User Story 4.2**: As a user, I can like, comment, and follow friends.
-  - ✅ AC: Standard engagement features; mod tools in place.
+  - ✅ AC: Users can like, comment, and follow/unfollow from feed and profile views; report actions create moderation-queue entries visible within 60 seconds.
 - **User Story 4.3**: As a user, I can participate in weekly outfit challenges.
-  - ✅ AC: Auto-generated themes (“Rainy Day Fit”, “Layer Master”).
+  - ✅ AC: System publishes one challenge every Monday (00:00 local time) with title, rules, and a 7-day submission window.
 
 ### Epic 5 — Privacy & Security
 
 - **User Story 5.1**: As a user, I can control data permissions.
-  - ✅ AC: Clear toggles for data sharing, API connections.
-- **User Story 5.2**: As a user 13+, I confirm my age before accessing community features.
-  - ✅ AC: One-time age verification gate.
+  - ✅ AC: Settings provide separate toggles for data sharing, connected-account sync, and profile visibility; each change persists after app restart.
+- **User Story 5.2**: As a prospective user, I must pass 13+ age verification before accessing any main CoutureCast features.
+  - ✅ AC: Signup requires date of birth; accounts calculated under 13 are blocked from main app login/signup and shown Jr waitlist messaging, while only 13+ users can proceed to core and community experiences.
 - **User Story 5.3**: As a user, I can delete my account and data.
   - ✅ AC: GDPR-compliant deletion within 72 hours.
 
 ### Epic 6 — Monetization
 
 - **User Story 6.1**: As a user, I can upgrade to Premium via in-app purchase.
-  - ✅ AC: Stripe/Apple Pay integration.
+  - ✅ AC: Monthly and yearly purchases complete via Stripe or Apple Pay sandbox flows, and Premium entitlement activates in-app within 30 seconds.
 - **User Story 6.2**: As an advertiser, I can submit sponsored outfits.
   - ✅ AC: Sponsored label; only shown to 18+ users.
 
 ### Epic 7 — Cross-Platform Delivery
 
 - **User Story 7.1**: As a user, I can view CoutureCast as a widget (home/lock screen).
-  - ✅ AC: Widget shows weather + outfit summary.
+  - ✅ AC: Widget displays current temperature, condition icon, and top outfit recommendation, refreshing at least every 30 minutes.
 - **User Story 7.2**: As a smartwatch user, I can see quick outfit icons.
-  - ✅ AC: Watch interface auto-syncs with mobile settings.
+  - ✅ AC: Watch interface syncs selected units and outfit-preference settings from mobile within 60 seconds of a mobile change.
 
 ### Epic 8 — Analytics & Insights
 
 - **User Story 8.1**: As an admin, I can track engagement metrics (DAU, retention, outfit shares).
-  - ✅ AC: Dashboard in admin portal.
+  - ✅ AC: Admin dashboard shows DAU, D7 retention, and outfit-share counts with 7/30/90-day date-range filters.
 - **User Story 8.2**: As a data analyst, I can export anonymized usage data.
-  - ✅ AC: GDPR-compliant export format.
+  - ✅ AC: Export supports CSV and JSON, uses anonymized user IDs, and completes within 2 minutes for datasets up to 1M events.
 
-✅ **Total:** 8 Epics → 20 Core User Stories (MVP + Premium foundation)
+✅ **Total:** 8 Epics → 19 Core User Stories (MVP + Premium foundation)

@@ -1,10 +1,20 @@
+import { useEffect } from 'react'
 import { StatusBar } from 'expo-status-bar'
 import { Platform, StyleSheet } from 'react-native'
+import { usePostHog } from 'posthog-react-native'
 
 import EditScreenInfo from '@/components/edit-screen-info'
 import { Text, View } from '@/components/themed'
 
 export default function ModalScreen() {
+  const posthog = usePostHog()
+
+  // Track when user opens the modal
+  // @see https://posthog.com/docs/libraries/react-native#capturing-events
+  useEffect(() => {
+    posthog.capture('modal_opened')
+  }, [posthog])
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Modal</Text>

@@ -1,12 +1,15 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
 import { useFonts } from 'expo-font'
-import { Stack } from 'expo-router'
+import { Stack, usePathname } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import 'react-native-reanimated'
 
 import { useColorScheme } from 'react-native'
+import { PostHogProvider } from 'posthog-react-native'
+
+import { posthog } from '../src/config/posthog'
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -54,13 +57,38 @@ function RootLayoutNav() {
   /* eslint-disable @typescript-eslint/no-unsafe-assignment */
   const colorScheme = useColorScheme()
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
+
+  const pathname = usePathname()
+  const previousPathname = useRef<string | undefined>(undefined)
+
+  // Manual screen tracking for Expo Router
+  // @see https://posthog.com/docs/libraries/react-native#screen-tracking
+  useEffect(() => {
+    if (previousPathname.current !== pathname) {
+      void posthog.screen(pathname, {
+        previous_screen: previousPathname.current ?? null,
+      })
+      previousPathname.current = pathname
+    }
+  }, [pathname])
+
   return (
-    <ThemeProvider value={theme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <PostHogProvider
+      client={posthog}
+      autocapture={{
+        captureScreens: false, // Manual tracking with Expo Router
+        captureTouches: true,
+        propsToCapture: ['testID'],
+        maxElementsCaptured: 20,
+      }}
+    >
+      <ThemeProvider value={theme}>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        </Stack>
+      </ThemeProvider>
+    </PostHogProvider>
   )
   /* eslint-enable @typescript-eslint/no-unsafe-assignment */
 }
