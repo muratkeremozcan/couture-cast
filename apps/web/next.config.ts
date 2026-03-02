@@ -46,13 +46,8 @@ for (const file of rootEnvFiles) {
 }
 
 const { gitSha: buildGitSha, gitBranch: buildGitBranch } = resolveGitMetadata()
-// Prefer canonical POSTHOG_* vars; keep NEXT_PUBLIC_* fallback.
-const posthogKey =
-  process.env.POSTHOG_API_KEY || process.env.NEXT_PUBLIC_POSTHOG_KEY || ''
-const posthogHost =
-  process.env.POSTHOG_HOST ||
-  process.env.NEXT_PUBLIC_POSTHOG_HOST ||
-  'https://us.i.posthog.com'
+const posthogKey = process.env.POSTHOG_API_KEY || ''
+const posthogHost = process.env.POSTHOG_HOST || 'https://us.i.posthog.com'
 const posthogAssetsHost = posthogHost.includes('.i.posthog.com')
   ? posthogHost.replace('.i.posthog.com', '-assets.i.posthog.com')
   : 'https://us-assets.i.posthog.com'
@@ -61,8 +56,8 @@ const nextConfig: NextConfig = {
   env: {
     BUILD_GIT_SHA: buildGitSha ?? '',
     BUILD_GIT_BRANCH: buildGitBranch ?? '',
-    NEXT_PUBLIC_POSTHOG_KEY: posthogKey,
-    NEXT_PUBLIC_POSTHOG_HOST: posthogHost,
+    POSTHOG_API_KEY: posthogKey,
+    POSTHOG_HOST: posthogHost,
   },
   eslint: {
     ignoreDuringBuilds: true,

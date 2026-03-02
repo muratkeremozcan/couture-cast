@@ -19,9 +19,9 @@ so that we can track success metrics and monitor system health across all enviro
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create PostHog projects and configure SDKs (AC: #1)
+- [x] Task 1: Create PostHog projects and configure SDKs (AC: #1)
   - [x] Sign up for PostHog Cloud
-  - [ ] Create two projects: `couturecast-test` (dev/CI), `couturecast-production`
+  - [x] Create two projects: `couturecast-dev` (dev/CI), `couturecast-prod`
   - [x] Install PostHog SDK for Expo: `npm install posthog-react-native --workspace apps/mobile`
   - [x] Install PostHog SDK for Next.js: `npm install posthog-js --workspace apps/web`
   - [x] Install PostHog SDK for API: `npm install posthog-node --workspace apps/api`
@@ -32,22 +32,44 @@ so that we can track success metrics and monitor system health across all enviro
   - [x] Initialize PostHog in Expo app: `PostHogProvider` wrapper in `apps/mobile/app/_layout.tsx`
   - [x] Initialize PostHog in Next.js via `apps/web/instrumentation-client.ts` + `apps/web/next.config.ts` ingest rewrites
   - [x] Centralize PostHog env vars at repo root `.env.local/.env.dev/.env.prod`: `POSTHOG_API_KEY`, `POSTHOG_HOST`
-  - [ ] Add `POSTHOG_API_KEY` and `POSTHOG_HOST` as GitHub Actions repository secrets (replace legacy `NEXT_PUBLIC_POSTHOG_KEY`/`NEXT_PUBLIC_POSTHOG_HOST`)
-  - [ ] Link Supabase data warehouse source to `couturecast-test`:
-    - In PostHog `couturecast-test`: `Import data` -> `Supabase`
+  - [x] Add `POSTHOG_API_KEY` and `POSTHOG_HOST` as GitHub Actions repository secrets
+  - [x] Supabase DB password note:
+    - `[YOUR-PASSWORD]` is the Supabase DB password (not `SUPABASE_ANON_KEY` or `SUPABASE_SERVICE_ROLE_KEY`)
+    - If password is unknown, open Supabase `Connect` modal and click `Database Settings` link under "Reset your database password", then set a new password
+    - Save DB passwords to env files: `SUPABASE_DB_DEV_PW`, `SUPABASE_DB_PROD_PW`
+    - Save DB passwords to GitHub Actions secrets with matching names
+  - [x] Link Supabase data warehouse source to `couturecast-dev`:
+    - In PostHog `couturecast-dev`: `Import data` -> `Supabase`
     - In Supabase dev project: `Settings` -> `Database` -> `Connection string`
-    - Copy Postgres URI with password and paste into PostHog `Connection string`
+    - In Supabase `Connect` modal: choose `Connection String` tab, `Type=URI`, and use `Method=Session Pooler` if `Direct connection` shows not IPv4 compatible
+    - Copy Postgres URI, replace `[YOUR-PASSWORD]` with the Supabase DB password, and paste into PostHog `Connection string`
     - Set `Schema=public`, `Use SSH tunnel=off`, `Table prefix=sb_dev`, then click `Next`
-  - [ ] Link Supabase data warehouse source to `couturecast-production`:
-    - In PostHog `couturecast-production`: `Import data` -> `Supabase`
+  - [x] Link Supabase data warehouse source to `couturecast-prod`:
+    - In PostHog `couturecast-prod`: `Import data` -> `Supabase`
     - In Supabase prod project: `Settings` -> `Database` -> `Connection string`
-    - Copy Postgres URI with password and paste into PostHog `Connection string`
+    - In Supabase `Connect` modal: choose `Connection String` tab, `Type=URI`, and use `Method=Session Pooler` if `Direct connection` shows not IPv4 compatible
+    - Copy Postgres URI, replace `[YOUR-PASSWORD]` with the Supabase DB password, and paste into PostHog `Connection string`
     - Set `Schema=public`, `Use SSH tunnel=off`, `Table prefix=sb_prod`, then click `Next`
-  - [ ] Verify import health in both PostHog projects:
+  
+  - [x] Verify import health in both PostHog projects:
     - Confirm connection succeeds
     - Confirm at least one Supabase table appears under data warehouse sources
-  - [ ] Environment scope note: this repository uses `dev` and `prod` only (no staging)
+  - [x] Environment scope note: this repository uses `dev` and `prod` only (no staging)
+  - [x] Prisma migration scripts used before PostHog import (copy/paste):
+    ```bash
+    # Dev (Session Pooler, one line, URL-encoded password)
+    DATABASE_URL='postgresql://postgres.ckmgpxfjvuthsgtkfqez:<DEV_DB_PASSWORD_URLENCODED>@aws-1-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require' npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
 
+    # Prod (Session Pooler, one line, URL-encoded password)
+    DATABASE_URL='postgresql://postgres.kxypzmbqwpuhfnbrdpmc:<PROD_DB_PASSWORD_URLENCODED>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require' npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+    ```
+    - Keep each `DATABASE_URL` on a single line (no line wraps/newlines)
+    - URL-encode special password characters (example: `!` -> `%21`)
+    1. Set up analytics for your app (PostHog) for both dev and prod.
+    2. Connected your app code (web, mobile, API) so it can send analytics data.
+    3. Connected Supabase databases to PostHog so DB tables can be queried in PostHog.
+    4. Applied database schema migrations so tables actually exist.
+   
 - [ ] Task 2: Implement event schema (AC: #2)
   - [ ] Create `packages/api-client/src/types/analytics-events.ts` for event definitions
   - [ ] Define core events per test-design-system.md:
@@ -374,6 +396,10 @@ docs/
 **Environment Variables:**
 - `POSTHOG_API_KEY`: PostHog project key (root `.env` files + GitHub Actions secret)
 - `POSTHOG_HOST`: PostHog host URL (`https://us.i.posthog.com`)
+- `SUPABASE_DB_DEV_PW`: Supabase dev database password (`[YOUR-PASSWORD]` in dev URI)
+- `SUPABASE_DB_PROD_PW`: Supabase prod database password (`[YOUR-PASSWORD]` in prod URI)
+- `DATABASE_URL`: Prisma Postgres connection URL in `.env.local` / `.env.dev` / `.env.prod`
+- `DATABASE_URL_DEV`, `DATABASE_URL_PROD`: GitHub Actions secrets for CI jobs
 - `GRAFANA_OTLP_ENDPOINT`: Grafana OTLP endpoint URL
 - `GRAFANA_API_KEY`: Grafana API key for OTLP
 - `LOG_LEVEL`: Pino log level (debug, info, warn, error)

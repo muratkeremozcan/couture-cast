@@ -44,11 +44,14 @@ jobs:
       base-ref: 'main'
       test-directory: 'playwright/'
       install-command: ${{ needs.vars.outputs.install_command }}
+    secrets: inherit
 
   pw-e2e:
     needs: [vars, burn-in]
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
     strategy:
       fail-fast: false
       matrix:

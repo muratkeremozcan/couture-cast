@@ -20,7 +20,7 @@ so that credentials stay secure across environments and comply with security bes
 
 - [ ] Task 1: Set up Doppler account and projects (AC: #1)
   - [ ] Sign up for Doppler (free tier supports 5 projects)
-  - [ ] Create Doppler projects: `couturecast-local`, `couturecast-ci`, `couturecast-dev`, `couturecast-staging`, `couturecast-production`
+  - [ ] Create Doppler projects: `couturecast-local`, `couturecast-ci`, `couturecast-dev`, `couturecast-staging`, `couturecast-prod`
   - [ ] Install Doppler CLI: `brew install dopplerhq/cli/doppler` (macOS) or download binary
   - [ ] Authenticate CLI: `doppler login`
   - [ ] Configure default project: `doppler setup` in repo root
