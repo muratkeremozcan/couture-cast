@@ -40,7 +40,7 @@ npm run dev       # turbo spins up mobile, web, and api concurrently
 
 **CI**: Mobile e2e is disabled on GitHub-hosted runners due to emulator instability and long runtimes. Use self-hosted/device cloud or trigger the manual workflow if needed.
 
-**Local**: iOS + Android testing supported (see `npm run test:mobile:e2e` and docs/sprint-artifacts/0-13-scaffold-cross-surface-e2e-automation.md)
+**Local**: iOS + Android testing supported (see `npm run test:mobile:e2e` and docs/implementation-artifacts/0-13-scaffold-cross-surface-e2e-automation.md)
 
 ```bash
 npm run dev        # Turborepo parallel dev servers (Expo / Next / Nest)
@@ -129,7 +129,7 @@ Local E2E with clean DB:
 
 ## E2E smoke (Playwright + Maestro)
 
-**One-time setup:** https://github.com/murat/opensource/couture-cast/blob/main/docs/sprint-artifacts/0-13-scaffold-cross-surface-e2e-automation.md#maestro-setup--operational-notes
+**One-time setup:** https://github.com/murat/opensource/couture-cast/blob/main/docs/implementation-artifacts/0-13-scaffold-cross-surface-e2e-automation.md#maestro-setup--operational-notes
 
 - Xcode + CLI tools on macOS (`sudo xcode-select --switch /Applications/Xcode.app`).
 - Android Studio SDK + AVD (e.g., Pixel 8 API 34) booted once.
@@ -158,7 +158,7 @@ Local E2E with clean DB:
 
 - `.nvmrc` pins Node 24, matching `actions/setup-node` in `.github/workflows/pr-checks.yml`.
 - ESLint, Prettier, and `lint-staged` configs match the reference repo’s rules (no-only-tests, consistent type imports, formatting).
-- `docs/epics.md` Epic 0 stories describe these guardrails explicitly so all Sprint 0 tasks stay tied to product strategy.
+- `docs/planning-artifacts/epics.md` Epic 0 stories describe these guardrails explicitly so all Sprint 0 tasks stay tied to product strategy.
 - CI currently executes: install → typecheck → lint (workspace + root) → build → tests. Burn-in/Selective runners plug into the same workflow after CC-0.6.
 
 ### CI at a glance
@@ -180,7 +180,7 @@ Preview URLs as the "dev" target: `pr-pw-e2e-vercel-preview.yml` reads the Previ
 `DEV_WEB_E2E_BASE_URL`, so `npm run test:pw-dev` runs against that Preview deployment.
 
 If your Preview deployments are protected (health check returns 401), set `VERCEL_AUTOMATION_BYPASS_SECRET` locally (in `.env.dev`) and
-in CI (GitHub repo secret). See `docs/ci-cd-pipeline.md`.
+in CI (GitHub repo secret). See `docs/test-artifacts/ci-cd-pipeline.md`.
 
 #### Local Preview testing
 
@@ -239,7 +239,7 @@ npm run test:pw-dev
 ## Helpful references
 
 - [docs/couturecast_brief.md](docs/couturecast_brief.md) for positioning & personas.
-- [docs/epics.md](docs/epics.md) for Epic 0 (platform enablement) + feature backlogs.
+- [docs/planning-artifacts/epics.md](docs/planning-artifacts/epics.md) for Epic 0 (platform enablement) + feature backlogs.
 - [`playwright-utils` repo](../playwright-utils) if you need deeper examples of test tooling wiring.
 
 Questions? Tag Murat (TEA) for quality gates or Amelia (dev agent) for implementation details.

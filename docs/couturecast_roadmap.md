@@ -65,7 +65,7 @@ Version: 1.3 — BMAD Integration + GitHub Preservation
 | ----------- | ----------------------------------------------------------------------- | ------------------------------------------- | --------------------------------- |
 | **UX / UI** | Mockups: “What to Wear” screen + widget + watch view + localized copy specs | Figma → BMAD Design Export                  | Saved to GitHub `/design/` folder |
 | **Dev**     | Frontend (React Native), backend API (Node/Prisma), weather integration, localization pipeline | Code + Markdown BMAD module docs            | GitHub `/src/` + `/docs/` folders |
-| **PM**      | PRD, user flow charts, release checklist                                | BMAD project YAML + Markdown brief          | GitHub `/planning/` folder        |
+| **PM**      | PRD, user flow charts, release checklist                                | BMAD project YAML + Markdown brief          | GitHub `/docs/planning-artifacts/` folder |
 | **QA**      | Acceptance test scripts (mapped to backlog AC) + localization regression pack | Cypress / Playwright suite + BMAD test YAML | GitHub `/tests/` folder           |
 
 All deliverables follow **BMAD Method v6 repository structure**, ensuring full traceability and automated artifact preservation under version control.
@@ -120,7 +120,7 @@ All deliverables follow **BMAD Method v6 repository structure**, ensuring full t
 | **QA / Test Architect**   | Risk visibility   | Sprint-end demo       |
 | **Marketing**             | Launch prep       | 3 weeks pre-launch    |
 
-All updates and retros are stored as **BMAD sprint logs** in the GitHub `/sprints/` directory.
+All updates and retros are stored as **BMAD sprint logs** in the GitHub `/docs/implementation-artifacts/` directory.
 
 ---
 

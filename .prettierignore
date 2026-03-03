@@ -2,8 +2,11 @@ node_modules
 .next
 .turbo
 .bmad
+_bmad
 .windsurf
 .claude
+.agents
+.cursor
 .github/chatmodes
 .github/workflows
 .vscode
