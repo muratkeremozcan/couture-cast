@@ -24,7 +24,7 @@ so that tests run deterministically without affecting production and all test in
 ## Tasks / Subtasks
 
 - [ ] Task 1: Provision Supabase test project (AC: #1)
-  - [ ] Create new Supabase project: `couturecast-test`
+  - [ ] Create new Supabase project: `couturecast-dev`
   - [ ] Apply Prisma schema migrations
   - [ ] Seed with anonymized test data (from CC-0.10 factories)
   - [ ] Configure RLS policies (identical to prod)

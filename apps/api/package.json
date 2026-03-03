@@ -37,6 +37,7 @@
     "expo-server-sdk": "^4.0.0",
     "ioredis": "^5.8.2",
     "pino": "^9.4.0",
+    "posthog-node": "^5.21.2",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "socket.io": "^4.8.1",

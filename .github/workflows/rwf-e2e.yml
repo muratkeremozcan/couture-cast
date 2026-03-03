@@ -34,6 +34,10 @@ on:
         required: false
       VERCEL_TEAM_SLUG:
         required: false
+      DATABASE_URL_DEV:
+        required: false
+      DATABASE_URL_PROD:
+        required: false
 
 jobs:
   e2e:
@@ -99,6 +103,8 @@ jobs:
         shell: bash
         env:
           TEST_ENV: ${{ inputs.test_env }}
+          DATABASE_URL_DEV: ${{ secrets.DATABASE_URL_DEV }}
+          DATABASE_URL_PROD: ${{ secrets.DATABASE_URL_PROD }}
           EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.expected_sha.outputs.sha }}
           GH_TOKEN: ${{ github.token }}
@@ -112,6 +118,15 @@ jobs:
           # Enable debug logging for URL resolution scripts
           DEBUG: true
         run: |
+          case "$TEST_ENV" in
+            prod) export DATABASE_URL="${DATABASE_URL_PROD}" ;;
+            *) export DATABASE_URL="${DATABASE_URL_DEV}" ;;
+          esac
+
+          if [ -z "$DATABASE_URL" ]; then
+            echo "Warning: DATABASE_URL is empty for TEST_ENV=$TEST_ENV"
+          fi
+
           custom_base_url="${{ inputs.custom_base_url }}"
           if [ -n "$custom_base_url" ]; then
             case "${{ inputs.test_env }}" in

@@ -19,6 +19,9 @@ on:
       runE2E:
         description: Whether downstream E2E should run
         value: ${{ jobs.burn-in.outputs.runE2E }}
+    secrets:
+      DATABASE_URL_DEV:
+        required: false
 
 jobs:
   burn-in:
@@ -79,6 +82,7 @@ jobs:
           EXPECTED_SHA: ${{ steps.git-sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.git-sha.outputs.sha }}
           TEST_ENV: local
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
 
       - name: Record git SHA
         id: git-sha

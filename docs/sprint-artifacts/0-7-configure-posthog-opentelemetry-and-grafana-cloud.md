@@ -10,7 +10,8 @@ so that we can track success metrics and monitor system health across all enviro
 
 ## Acceptance Criteria
 
-1. Create PostHog projects: test (CI/dev/staging), production; configure SDK integration in Expo and Next.js apps.
+1. Create PostHog projects: test (CI/dev) and production; configure SDK integration in Expo,
+   Next.js, and API apps.
 2. Implement event schema per test-design-system.md Analytics Validation Strategy: `ritual_created`, `wardrobe_upload_started`, `alert_received`, `moderation_action`, `guardian_consent_granted`.
 3. Set up OpenTelemetry exporters in NestJS (Pino logs → OTLP → Grafana Cloud) with structured logging (timestamp, requestId, userId, feature).
 4. Create Grafana dashboards for: queue depth, cache hit rate, Socket.io disconnects, API latency, database query time with alert thresholds per test-design-system.md Performance Baselines.
@@ -18,16 +19,57 @@ so that we can track success metrics and monitor system health across all enviro
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create PostHog projects and configure SDKs (AC: #1)
-  - [ ] Sign up for PostHog Cloud (or self-hosted)
-  - [ ] Create two projects: `couturecast-test` (dev/staging/CI), `couturecast-production`
-  - [ ] Install PostHog SDK for Expo: `npm install posthog-react-native --workspace apps/mobile`
-  - [ ] Install PostHog SDK for Next.js: `npm install posthog-js --workspace apps/web`
-  - [ ] Configure PostHog client in `packages/config/posthog.ts` with project API keys
-  - [ ] Initialize PostHog in Expo app: `PostHogProvider` wrapper in App.tsx
-  - [ ] Initialize PostHog in Next.js: `app/providers.tsx` with client-side init
-  - [ ] Add environment-specific API keys to Doppler (POSTHOG_API_KEY_TEST, POSTHOG_API_KEY_PROD)
+- [x] Task 1: Create PostHog projects and configure SDKs (AC: #1)
+  - [x] Sign up for PostHog Cloud
+  - [x] Create two projects: `couturecast-dev` (dev/CI), `couturecast-prod`
+  - [x] Install PostHog SDK for Expo: `npm install posthog-react-native --workspace apps/mobile`
+  - [x] Install PostHog SDK for Next.js: `npm install posthog-js --workspace apps/web`
+  - [x] Install PostHog SDK for API: `npm install posthog-node --workspace apps/api`
+  - [x] Configure PostHog clients using env vars in:
+    - `apps/mobile/src/config/posthog.ts`
+    - `apps/web/instrumentation-client.ts`
+    - `apps/api/src/posthog/posthog.service.ts`
+  - [x] Initialize PostHog in Expo app: `PostHogProvider` wrapper in `apps/mobile/app/_layout.tsx`
+  - [x] Initialize PostHog in Next.js via `apps/web/instrumentation-client.ts` + `apps/web/next.config.ts` ingest rewrites
+  - [x] Centralize PostHog env vars at repo root `.env.local/.env.dev/.env.prod`: `POSTHOG_API_KEY`, `POSTHOG_HOST`
+  - [x] Add `POSTHOG_API_KEY` and `POSTHOG_HOST` as GitHub Actions repository secrets
+  - [x] Supabase DB password note:
+    - `[YOUR-PASSWORD]` is the Supabase DB password (not `SUPABASE_ANON_KEY` or `SUPABASE_SERVICE_ROLE_KEY`)
+    - If password is unknown, open Supabase `Connect` modal and click `Database Settings` link under "Reset your database password", then set a new password
+    - Save DB passwords to env files: `SUPABASE_DB_DEV_PW`, `SUPABASE_DB_PROD_PW`
+    - Save DB passwords to GitHub Actions secrets with matching names
+  - [x] Link Supabase data warehouse source to `couturecast-dev`:
+    - In PostHog `couturecast-dev`: `Import data` -> `Supabase`
+    - In Supabase dev project: `Settings` -> `Database` -> `Connection string`
+    - In Supabase `Connect` modal: choose `Connection String` tab, `Type=URI`, and use `Method=Session Pooler` if `Direct connection` shows not IPv4 compatible
+    - Copy Postgres URI, replace `[YOUR-PASSWORD]` with the Supabase DB password, and paste into PostHog `Connection string`
+    - Set `Schema=public`, `Use SSH tunnel=off`, `Table prefix=sb_dev`, then click `Next`
+  - [x] Link Supabase data warehouse source to `couturecast-prod`:
+    - In PostHog `couturecast-prod`: `Import data` -> `Supabase`
+    - In Supabase prod project: `Settings` -> `Database` -> `Connection string`
+    - In Supabase `Connect` modal: choose `Connection String` tab, `Type=URI`, and use `Method=Session Pooler` if `Direct connection` shows not IPv4 compatible
+    - Copy Postgres URI, replace `[YOUR-PASSWORD]` with the Supabase DB password, and paste into PostHog `Connection string`
+    - Set `Schema=public`, `Use SSH tunnel=off`, `Table prefix=sb_prod`, then click `Next`
+  
+  - [x] Verify import health in both PostHog projects:
+    - Confirm connection succeeds
+    - Confirm at least one Supabase table appears under data warehouse sources
+  - [x] Environment scope note: this repository uses `dev` and `prod` only (no staging)
+  - [x] Prisma migration scripts used before PostHog import (copy/paste):
+    ```bash
+    # Dev (Session Pooler, one line, URL-encoded password)
+    DATABASE_URL='postgresql://postgres.ckmgpxfjvuthsgtkfqez:<DEV_DB_PASSWORD_URLENCODED>@aws-1-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require' npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
 
+    # Prod (Session Pooler, one line, URL-encoded password)
+    DATABASE_URL='postgresql://postgres.kxypzmbqwpuhfnbrdpmc:<PROD_DB_PASSWORD_URLENCODED>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require' npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+    ```
+    - Keep each `DATABASE_URL` on a single line (no line wraps/newlines)
+    - URL-encode special password characters (example: `!` -> `%21`)
+    1. Set up analytics for your app (PostHog) for both dev and prod.
+    2. Connected your app code (web, mobile, API) so it can send analytics data.
+    3. Connected Supabase databases to PostHog so DB tables can be queried in PostHog.
+    4. Applied database schema migrations so tables actually exist.
+   
 - [ ] Task 2: Implement event schema (AC: #2)
   - [ ] Create `packages/api-client/src/types/analytics-events.ts` for event definitions
   - [ ] Define core events per test-design-system.md:
@@ -75,14 +117,14 @@ so that we can track success metrics and monitor system health across all enviro
   - [ ] Configure structured log format: { timestamp, requestId, userId, feature, level, message }
   - [ ] Set up request ID generation middleware (UUID v4)
   - [ ] Integrate Pino with OpenTelemetry: correlate logs with traces
-  - [ ] Configure log levels per environment: debug (local), info (dev/staging), warn (prod)
+  - [ ] Configure log levels per environment: debug (local), info (dev), warn (prod)
   - [ ] Add Pino HTTP middleware to log all requests/responses
 
 - [ ] Task 6: Set up Grafana Cloud account (AC: #4)
   - [ ] Sign up for Grafana Cloud (free tier)
   - [ ] Create stack: `couturecast-observability`
   - [ ] Generate OTLP endpoint credentials (zone, instance ID, API key)
-  - [ ] Add credentials to Doppler: GRAFANA_OTLP_ENDPOINT, GRAFANA_API_KEY
+  - [ ] Add credentials to root `.env` files for local use and GitHub Actions secrets for CI: `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_API_KEY`
   - [ ] Verify connection: send test trace from local NestJS app
   - [ ] Configure data source in Grafana: Tempo (traces), Loki (logs), Prometheus (metrics)
 
@@ -228,7 +270,7 @@ so that we can track success metrics and monitor system health across all enviro
 
 **PostHog Event Tracking Pattern:**
 ```typescript
-// packages/config/posthog.ts
+// apps/web/instrumentation-client.ts
 import posthog from 'posthog-js';
 
 export function trackEvent(eventName: string, properties: Record<string, any>) {
@@ -352,8 +394,12 @@ docs/
 ```
 
 **Environment Variables:**
-- `POSTHOG_API_KEY_TEST`: PostHog project key (test)
-- `POSTHOG_API_KEY_PROD`: PostHog project key (production)
+- `POSTHOG_API_KEY`: PostHog project key (root `.env` files + GitHub Actions secret)
+- `POSTHOG_HOST`: PostHog host URL (`https://us.i.posthog.com`)
+- `SUPABASE_DB_DEV_PW`: Supabase dev database password (`[YOUR-PASSWORD]` in dev URI)
+- `SUPABASE_DB_PROD_PW`: Supabase prod database password (`[YOUR-PASSWORD]` in prod URI)
+- `DATABASE_URL`: Prisma Postgres connection URL in `.env.local` / `.env.dev` / `.env.prod`
+- `DATABASE_URL_DEV`, `DATABASE_URL_PROD`: GitHub Actions secrets for CI jobs
 - `GRAFANA_OTLP_ENDPOINT`: Grafana OTLP endpoint URL
 - `GRAFANA_API_KEY`: Grafana API key for OTLP
 - `LOG_LEVEL`: Pino log level (debug, info, warn, error)
@@ -380,7 +426,7 @@ docs/
 - Create migration for `feature_flags` table
 
 **From CC-0.3 (Supabase):**
-- Store sensitive keys in Doppler
+- Store sensitive keys in root `.env` files locally and GitHub Actions secrets for CI/deploy
 - Separate test and production projects
 
 **From CC-0.4 (Redis/BullMQ):**

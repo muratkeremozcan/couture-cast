@@ -10,7 +10,7 @@ so that credentials stay secure across environments and comply with security bes
 
 ## Acceptance Criteria
 
-1. Configure Doppler projects: local, ci, dev, staging, production with secrets per test-design-system.md Secrets & Configuration Management table (DATABASE_URL, WEATHER_API_KEY, REDIS_URL, LAUNCHDARKLY_SDK_KEY, SUPABASE_SERVICE_KEY).
+1. Configure Doppler projects: local, ci, dev, production with secrets per test-design-system.md Secrets & Configuration Management table (DATABASE_URL, WEATHER_API_KEY, REDIS_URL, LAUNCHDARKLY_SDK_KEY, SUPABASE_SERVICE_KEY).
 2. Implement healthcheck endpoint (`/api/health?check=secrets`) to validate Doppler sync on deploy.
 3. Set up pre-commit hooks using `gitleaks` or `detect-secrets` to scan for hardcoded secrets; CI fails if patterns detected.
 4. Document quarterly secret rotation schedule and test secret rotation via staging environment.
@@ -20,7 +20,7 @@ so that credentials stay secure across environments and comply with security bes
 
 - [ ] Task 1: Set up Doppler account and projects (AC: #1)
   - [ ] Sign up for Doppler (free tier supports 5 projects)
-  - [ ] Create Doppler projects: `couturecast-local`, `couturecast-ci`, `couturecast-dev`, `couturecast-staging`, `couturecast-production`
+  - [ ] Create Doppler projects: `couturecast-local`, `couturecast-ci`, `couturecast-dev`, `couturecast-staging`, `couturecast-prod`
   - [ ] Install Doppler CLI: `brew install dopplerhq/cli/doppler` (macOS) or download binary
   - [ ] Authenticate CLI: `doppler login`
   - [ ] Configure default project: `doppler setup` in repo root
