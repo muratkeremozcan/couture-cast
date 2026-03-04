@@ -23,6 +23,9 @@ export default function TabTwoScreen() {
         darkColor="rgba(255,255,255,0.1)"
       />
       <EditScreenInfo path="app/(tabs)/two.tsx" />
+      <Text style={styles.infoText}>
+        alert_received tracking is wired to real push notification receipt listeners.
+      </Text>
     </View>
   )
 }
@@ -41,5 +44,12 @@ const styles = StyleSheet.create({
     marginVertical: 30,
     height: 1,
     width: '80%',
+  },
+  infoText: {
+    marginTop: 16,
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    maxWidth: '80%',
   },
 })

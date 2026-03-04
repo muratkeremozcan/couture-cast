@@ -35,6 +35,9 @@ so that web and mobile journeys are validated end-to-end before feature teams br
 
 - [x] Task 4: CI integration (AC: #4)
   - CI decision: Web Playwright smoke runs in PRs (`pr-pw-e2e.yml`); mobile Maestro is local/manual only (GitHub-hosted emulators too slow/flaky). Mobile workflow kept manual for reference; no PR gating.
+  - Follow-up package in Story 0.14: burn-in hardening in `.github/workflows/rwf-burn-in.yml`,
+    auth-session rollout for login-backed web journeys, Pact + schema contract gates, and
+    performance baseline workflows.
 
 ## Dev Notes
 

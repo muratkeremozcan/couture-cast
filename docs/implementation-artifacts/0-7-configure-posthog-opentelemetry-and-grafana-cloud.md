@@ -82,17 +82,17 @@ so that we can track success metrics and monitor system health across all enviro
   - [x] Create helper functions for tracking: `trackRitualCreated()`, `trackWardrobeUpload()`, etc.
   - [x] Document event schema in `docs/analytics-events.md`
 
-- [ ] Task 3: Implement event tracking in apps (AC: #2)
-  - [ ] Add event tracking to mobile app (Expo):
+- [x] Task 3: Implement event tracking in apps (AC: #2)
+  - [x] Add event tracking to mobile app (Expo):
     - Import PostHog from context
     - Track `ritual_created` on outfit generation
     - Track `wardrobe_upload_started` on image upload
     - Track `alert_received` on push notification receipt
-  - [ ] Add event tracking to web app (Next.js):
+  - [x] Add event tracking to web app (Next.js):
     - Import PostHog client
     - Track same events as mobile
     - Track page views automatically
-  - [ ] Add event tracking to API (NestJS):
+  - [x] Add event tracking to API (NestJS):
     - Use PostHog REST API for server-side events
     - Track `moderation_action` in moderation module
     - Track `guardian_consent_granted` in auth module
@@ -462,6 +462,12 @@ docs/
 ### Debug Log References
 
 - `npm run typecheck --workspace @couture/api-client`
+- `npm run test --workspace api`
+- `npm run typecheck`
+- `npm run test`
+- `npm run lint`
+- `npm install expo-image-picker expo-notifications --workspace apps/mobile`
+- `npm run lint && npm run typecheck && npm run test`
 
 ### Completion Notes List
 
@@ -474,12 +480,50 @@ docs/
 - Exported analytics events module from `packages/api-client/src/index.ts`.
 - Replaced `docs/analytics-events.md` placeholder with event catalog and validation/testing notes.
 - Verified package type safety with `npm run typecheck --workspace @couture/api-client`.
+- Added mobile analytics helper `apps/mobile/src/analytics/track-events.ts` and wired captures in
+  `apps/mobile/app/(tabs)/index.tsx` + `apps/mobile/app/(tabs)/two.tsx` for
+  `ritual_created`, `wardrobe_upload_started`, and `alert_received`.
+- Added web analytics action component `apps/web/src/app/components/analytics-event-actions.tsx`,
+  integrated it in `apps/web/src/app/page.tsx`, and enabled automatic pageview capture in
+  `apps/web/instrumentation-client.ts`.
+- Added API `AuthModule` and `ModerationModule` with validated controllers/services that send
+  `guardian_consent_granted` and `moderation_action` events via `PostHogService`.
+- Added API unit tests for new auth/moderation controllers and services; validated full workspace
+  with `npm run lint`, `npm run typecheck`, and `npm run test`.
+- Applied CR fixes:
+  - Replaced placeholder analytics identities with runtime distinct IDs + timezone context.
+  - Wired `alert_received` to real push-notification receipt via `expo-notifications` listener in
+    mobile root layout.
+  - Wired `wardrobe_upload_started` to real file-picker upload start on mobile and web.
+  - Restored web hero CTA anchor semantics while retaining analytics capture.
+  - Added API integration coverage for auth/moderation tracking routes.
 
 ### File List
 
 - `packages/api-client/src/types/analytics-events.ts` (new)
 - `packages/api-client/src/index.ts` (modified)
 - `docs/analytics-events.md` (modified)
+- `apps/mobile/src/analytics/track-events.ts` (new)
+- `apps/mobile/app/(tabs)/index.tsx` (modified)
+- `apps/mobile/app/(tabs)/two.tsx` (modified)
+- `apps/mobile/app/_layout.tsx` (modified)
+- `apps/mobile/package.json` (modified)
+- `apps/web/src/app/components/analytics-event-actions.tsx` (new)
+- `apps/web/src/app/page.tsx` (modified)
+- `apps/web/instrumentation-client.ts` (modified)
+- `apps/api/src/modules/auth/auth.module.ts` (new)
+- `apps/api/src/modules/auth/auth.controller.ts` (new)
+- `apps/api/src/modules/auth/auth.service.ts` (new)
+- `apps/api/src/modules/auth/auth.controller.spec.ts` (new)
+- `apps/api/src/modules/auth/auth.service.spec.ts` (new)
+- `apps/api/src/modules/moderation/moderation.module.ts` (new)
+- `apps/api/src/modules/moderation/moderation.controller.ts` (new)
+- `apps/api/src/modules/moderation/moderation.service.ts` (new)
+- `apps/api/src/modules/moderation/moderation.controller.spec.ts` (new)
+- `apps/api/src/modules/moderation/moderation.service.spec.ts` (new)
+- `apps/api/integration/analytics-tracking.integration.spec.ts` (new)
+- `apps/api/src/app.module.ts` (modified)
+- `package-lock.json` (modified)
 - `docs/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md` (modified)
 
 ## Change Log
@@ -488,3 +532,48 @@ docs/
 | ---- | ------ | ------ |
 | 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.7 acceptance criteria |
 | 2026-03-03 | Amelia (Developer Agent) | Completed Task 2 event schema/types/helpers/docs and validated via api-client typecheck |
+| 2026-03-04 | Amelia (Developer Agent) | Completed Task 3 event tracking across mobile/web/API with auth+moderation modules, added API tests, and validated via lint/typecheck/test |
+| 2026-03-04 | Amelia (Senior Developer Review AI) | Reviewed Task 3 implementation, found 5 High/Medium issues, applied automatic fixes, and revalidated lint/typecheck/test |
+
+## Senior Developer Review (AI)
+
+### Review Date
+
+- 2026-03-04
+
+### Reviewer
+
+- Amelia (Senior Developer Review AI)
+
+### Outcome
+
+- Changes Applied Automatically (Status remains `in-progress` until remaining story ACs/tasks are complete)
+
+### Findings Summary
+
+- High issues found: 3
+- Medium issues found: 2
+- Low issues found: 1
+- High/Medium issues fixed in this review: 5
+- Follow-up action items created: 0
+
+### Issues Fixed
+
+- ✅ `alert_received` now tracks on real push notification receipt in mobile runtime listener
+  ([apps/mobile/app/_layout.tsx](../../apps/mobile/app/_layout.tsx)).
+- ✅ Removed synthetic mobile alert trigger; event now tied to notification channel receipt
+  ([apps/mobile/app/(tabs)/two.tsx](../../apps/mobile/app/(tabs)/two.tsx)).
+- ✅ Replaced placeholder/demo IDs with runtime PostHog distinct IDs + locale/timezone context in
+  mobile/web tracking handlers
+  ([apps/mobile/app/(tabs)/index.tsx](../../apps/mobile/app/(tabs)/index.tsx),
+  [apps/web/src/app/components/analytics-event-actions.tsx](../../apps/web/src/app/components/analytics-event-actions.tsx)).
+- ✅ Restored web hero CTA anchor semantics while preserving analytics capture
+  ([apps/web/src/app/components/analytics-event-actions.tsx](../../apps/web/src/app/components/analytics-event-actions.tsx)).
+- ✅ Added API integration tests for auth/moderation tracking endpoints
+  ([apps/api/integration/analytics-tracking.integration.spec.ts](../../apps/api/integration/analytics-tracking.integration.spec.ts)).
+
+### Validation Evidence
+
+- `npm run lint` ✅
+- `npm run typecheck` ✅
+- `npm run test` ✅

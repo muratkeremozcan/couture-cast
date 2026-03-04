@@ -48,6 +48,12 @@ for (const file of rootEnvFiles) {
 const { gitSha: buildGitSha, gitBranch: buildGitBranch } = resolveGitMetadata()
 const posthogKey = process.env.POSTHOG_API_KEY || ''
 const posthogHost = process.env.POSTHOG_HOST || 'https://us.i.posthog.com'
+const apiProxyBaseUrl =
+  process.env.API_BASE_URL ||
+  process.env.DEV_API_BASE_URL ||
+  process.env.PROD_API_BASE_URL ||
+  process.env.VERCEL_API_BASE_URL ||
+  process.env.VERCEL_API_BRANCH_URL
 const posthogAssetsHost = posthogHost.includes('.i.posthog.com')
   ? posthogHost.replace('.i.posthog.com', '-assets.i.posthog.com')
   : 'https://us-assets.i.posthog.com'
@@ -66,16 +72,26 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   rewrites() {
-    return Promise.resolve([
-      {
-        source: '/ingest/static/:path*',
-        destination: `${posthogAssetsHost}/static/:path*`,
-      },
-      {
-        source: '/ingest/:path*',
-        destination: `${posthogHost}/:path*`,
-      },
-    ])
+    const routes: NonNullable<Awaited<ReturnType<NonNullable<NextConfig['rewrites']>>>> =
+      [
+        {
+          source: '/ingest/static/:path*',
+          destination: `${posthogAssetsHost}/static/:path*`,
+        },
+        {
+          source: '/ingest/:path*',
+          destination: `${posthogHost}/:path*`,
+        },
+      ]
+
+    if (apiProxyBaseUrl) {
+      routes.push({
+        source: '/api/v1/:path*',
+        destination: `${apiProxyBaseUrl}/api/v1/:path*`,
+      })
+    }
+
+    return Promise.resolve(routes)
   },
   // This is required to support PostHog trailing slash API requests
   skipTrailingSlashRedirect: true,

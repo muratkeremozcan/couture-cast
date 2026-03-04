@@ -15,13 +15,14 @@
   "scripts": {
     "dev": "turbo run dev --parallel",
     "build": "npm run --workspaces --if-present build",
-    "typecheck": "npm run --workspaces --if-present typecheck && tsc --noEmit -p playwright/tsconfig.json",
+    "typecheck": "npm run --workspaces typecheck && tsc --noEmit -p playwright/tsconfig.json",
+    "check:web:aliased-runtime-deps": "node scripts/check-web-aliased-runtime-deps.mjs",
     "typecheck:clear-cache": "find . -name \"*.tsbuildinfo\" -delete && rm -rf node_modules/.cache/typescript",
-    "lint": "npm run --workspaces --if-present lint && eslint --max-warnings=0 --ext .ts,.tsx apps playwright && prettier --ignore-path .prettierignore --check \"**/*.{ts,tsx,js,json,md}\"",
+    "lint": "npm run --workspaces lint && eslint --max-warnings=0 --ext .ts,.tsx playwright && prettier --ignore-path .prettierignore --check \"**/*.{ts,tsx,js,json,md}\"",
     "lint:fix": "npm run --workspaces --if-present lint -- --fix && eslint --max-warnings=0 --ext .ts,.tsx apps playwright --fix && npm run format",
     "format": "prettier --ignore-path .prettierignore --write \"**/*.{ts,tsx,js,json,md}\"",
     "lint:staged": "lint-staged",
-    "test": "npm run --workspaces --if-present test",
+    "test": "npm run --workspaces test",
     "start:web": "npm run build && npm run start --workspace web -- --hostname 127.0.0.1 --port 3005",
     "start:api": "npm run db:generate && cross-env PORT=4000 npm run start:dev --workspace api",
     "start:mobile:server": "bash ./scripts/start-mobile-server.sh",
@@ -32,6 +33,8 @@
     "start:all": "cross-env DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres npm-run-all2 --sequential supabase:start db:reset && npm-run-all2 --parallel start:api start:web",
     "test:pw-local": "cross-env TEST_ENV=local npx playwright test",
     "test:pw-local-ui": "cross-env TEST_ENV=local npx playwright test --ui",
+    "test:pw-dev": "npm run test:pw-preview-dev",
+    "test:pw-dev-ui": "npm run test:pw-preview-dev-ui",
     "test:pw-preview-dev": "node scripts/set-dev-web-e2e-base-url.mjs \"npx playwright test\"",
     "test:pw-preview-dev-ui": "node scripts/set-dev-web-e2e-base-url.mjs \"npx playwright test --ui\"",
     "mobile:build": "cd apps/mobile && EXPO_TOKEN=\"$EXPO_TOKEN\" npx eas build --profile production --platform android",
@@ -47,7 +50,7 @@
     "test:mobile:e2e:ios": "npm run maestro:install --silent && bash ./scripts/start-ios-simulator.sh && node ./scripts/run-maestro.mjs maestro/sanity.yaml",
     "test:mobile:e2e:attached": "npm run maestro:install --silent && cross-env MOBILE_E2E_SKIP_SERVER=1 node ./scripts/run-maestro.mjs maestro/sanity.yaml",
     "test:mobile:e2e:ci": "npm run maestro:install --silent && node ./scripts/run-maestro.mjs maestro/sanity.yaml --ci",
-    "validate": "npm-run-all --aggregate-output --parallel typecheck lint test",
+    "validate": "npm-run-all typecheck lint test",
     "clean": "rimraf \"apps/**/dist\" \"packages/**/dist\" \"**/tsconfig.tsbuildinfo\"",
     "clean:install": "npx rimraf node_modules \"apps/**/node_modules\" \"packages/**/node_modules\" && npm install --no-progress",
     "prepare": "node .husky/install.mjs",
@@ -61,8 +64,8 @@
   "devDependencies": {
     "@couture/eslint-config": "workspace:*",
     "@faker-js/faker": "10.1.0",
-    "@playwright/test": "1.56.1",
-    "@seontechnologies/playwright-utils": "^3.10.1",
+    "@playwright/test": "1.58.2",
+    "@seontechnologies/playwright-utils": "3.14.0",
     "@types/lodash.merge": "4.6.9",
     "@types/node": "22.9.3",
     "@types/picomatch": "4.0.2",
@@ -95,7 +98,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "eslint --max-warnings=0 --cache --cache-location node_modules/.cache/eslint --fix",
+      "eslint --max-warnings=0 --cache --cache-location node_modules/.cache/eslint --fix --no-ignore",
       "prettier --write"
     ],
     "*.{json,md}": [
@@ -107,5 +110,10 @@
   },
   "dependencies": {
     "@prisma/client": "6.19.0"
+  },
+  "msw": {
+    "workerDirectory": [
+      "apps/web/public"
+    ]
   }
 }

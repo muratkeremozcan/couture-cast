@@ -25,6 +25,9 @@ jobs:
         with:
           use-npm-ci: 'false'
 
+      - name: Verify web aliased runtime dependencies
+        run: npm run check:web:aliased-runtime-deps
+
       - name: Typecheck workspaces
         run: npm run typecheck
 

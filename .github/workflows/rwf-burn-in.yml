@@ -37,13 +37,40 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
+      - name: Resolve base ref
+        id: base-ref
+        run: |
+          INPUT_BASE_REF="${{ inputs.base-ref }}"
+          PR_BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          EFFECTIVE_BASE_REF="$INPUT_BASE_REF"
+
+          if [[ "${{ github.event_name }}" == "pull_request" && -n "$PR_BASE_SHA" ]]; then
+            if [[ -z "$INPUT_BASE_REF" || "$INPUT_BASE_REF" == "origin/main" ]]; then
+              EFFECTIVE_BASE_REF="$PR_BASE_SHA"
+            fi
+          fi
+
+          echo "value=$EFFECTIVE_BASE_REF" >> "$GITHUB_OUTPUT"
+          echo "Resolved base ref: $EFFECTIVE_BASE_REF"
+
       - name: Detect changed Playwright specs
         id: detect-changed
         run: |
-          git fetch origin "${{ inputs.base-ref }}" --quiet || true
-          git branch -f "${{ inputs.base-ref }}" "origin/${{ inputs.base-ref }}" || true
+          BASE_REF="${{ steps.base-ref.outputs.value }}"
+          if [[ "$BASE_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            # If the commit is already present locally, no fetch is required.
+            git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null || git fetch origin "$BASE_REF" --quiet || true
+          else
+            REMOTE_REF="$BASE_REF"
+            LOCAL_REF="$BASE_REF"
+            if [[ "$BASE_REF" =~ ^origin/ ]]; then
+              REMOTE_REF="${BASE_REF#origin/}"
+            fi
+            git fetch origin "$REMOTE_REF" --quiet || true
+            git branch -f "$LOCAL_REF" "origin/$REMOTE_REF" || true
+          fi
 
-          CHANGED=$(git diff "${{ inputs.base-ref }}"...HEAD --name-only | grep -E '^${{ inputs.test-directory }}.*\.(spec|test)\.(ts|tsx)$' || true)
+          CHANGED=$(git diff "$BASE_REF"...HEAD --name-only | grep -E '^${{ inputs.test-directory }}.*\.(spec|test)\.(ts|tsx)$' || true)
 
           if [[ -z "$CHANGED" ]]; then
             echo "changed=false" >> $GITHUB_OUTPUT
@@ -66,9 +93,24 @@ jobs:
       - name: Prepare base branch for diff
         if: steps.detect-changed.outputs.changed == 'true'
         run: |
-          git fetch origin "${{ inputs.base-ref }}" --quiet || true
-          # Align local ref to remote to avoid ambiguous ref errors
-          git branch -f "${{ inputs.base-ref }}" "origin/${{ inputs.base-ref }}" || true
+          BASE_REF="${{ steps.base-ref.outputs.value }}"
+          if [[ "$BASE_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null || git fetch origin "$BASE_REF" --quiet || true
+          else
+            REMOTE_REF="$BASE_REF"
+            LOCAL_REF="$BASE_REF"
+            if [[ "$BASE_REF" =~ ^origin/ ]]; then
+              REMOTE_REF="${BASE_REF#origin/}"
+            fi
+            git fetch origin "$REMOTE_REF" --quiet || true
+            # Align local ref to remote to avoid ambiguous ref errors.
+            git branch -f "$LOCAL_REF" "origin/$REMOTE_REF" || true
+          fi
+
+      - name: Record git SHA
+        id: git-sha
+        if: steps.detect-changed.outputs.changed == 'true'
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Run burn-in for changed specs
         id: burn-in-step
@@ -76,7 +118,7 @@ jobs:
         if: steps.detect-changed.outputs.changed == 'true'
         run: |
           HUSKY=0 NEXT_DISABLE_ESLINT=1 NEXT_PRIVATE_SKIP_TYPE_CHECK=1 npm run build --workspace web
-          npm run test:pw:burn-in-changed -- --base-branch=${{ inputs.base-ref }}
+          npm run test:pw:burn-in-changed -- --base-branch=${{ steps.base-ref.outputs.value }}
         env:
           # Align health check SHA with the build produced in this workflow; use HEAD, not the PR merge ref
           EXPECTED_SHA: ${{ steps.git-sha.outputs.sha }}
@@ -84,29 +126,16 @@ jobs:
           TEST_ENV: local
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
 
-      - name: Record git SHA
-        id: git-sha
-        if: steps.detect-changed.outputs.changed == 'true'
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Comment on burn-in failure
-        if: ${{ github.event_name == 'pull_request' && steps.detect-changed.outputs.changed == 'true' && failure() }}
-        uses: actions/github-script@v7
+      - name: Upload burn-in failure artifacts
+        id: upload-burn-in-artifacts
+        if: ${{ steps.detect-changed.outputs.changed == 'true' && steps.burn-in-step.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const body = [
-              '🚨 Burn-in failed for changed Playwright specs.',
-              'Downstream E2E is blocked until burn-in is green.',
-              'Check burn-in logs for details.'
-            ].join('\n');
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body,
-            });
+          name: playwright-report
+          path: |
+            ${{ inputs.test-directory }}/playwright-report
+            ${{ inputs.test-directory }}/test-results
+          if-no-files-found: warn
 
       - name: Set downstream gating output
         id: set-output

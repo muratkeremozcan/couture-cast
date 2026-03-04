@@ -104,6 +104,8 @@ Notes against ACs
   - [x] Post failure comment to PR when burn-in fails
   - [x] Allow skip via `SKIP_BURN_IN` label on PR
   - [x] Reference playwright-utils burn-in script pattern
+  - Follow-up: advanced burn-in hardening (SHA ordering, base-ref stability, deterministic
+    reporting) is tracked in Story 0.14 Task 1.
 
 - [x] Task 9: Add security scanning workflows
   - [x] Create `.github/workflows/gitleaks-check.yml` for secret detection:

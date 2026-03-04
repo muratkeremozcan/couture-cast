@@ -14,7 +14,11 @@ const config: BurnInConfig = {
     '**/tsconfig.json',
     '**/*.md',
   ],
-  testPatterns: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e.ts'],
+  testPatterns: [
+    'playwright/tests/**/*.spec.ts',
+    'playwright/tests/**/*.test.ts',
+    'playwright/tests/**/*.e2e.ts',
+  ],
   burnIn: {
     repeatEach: 3,
     retries: process.env.CI ? 0 : 1,

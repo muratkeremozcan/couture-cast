@@ -197,6 +197,8 @@ so that tests run deterministically without affecting production and all test in
     ```
   - [ ] Run smoke tests in CI before main test suite
   - [ ] Fail fast if smoke tests fail
+  - [ ] Follow-up: mobile analytics journey assertions (ritual/upload/alerts) remain
+    Maestro-first and are tracked in Story 0.14 Task 5.
 
 - [ ] Task 10: Create environment teardown scripts (AC: #5)
   - [ ] Create `    - Stop weather harness

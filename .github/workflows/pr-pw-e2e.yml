@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
   pull-requests: write
 
@@ -41,7 +42,7 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && needs.vars.outputs.SKIP_BURN_IN != 'true' }}
     uses: ./.github/workflows/rwf-burn-in.yml
     with:
-      base-ref: 'main'
+      base-ref: ${{ github.base_ref || 'main' }}
       test-directory: 'playwright/'
       install-command: ${{ needs.vars.outputs.install_command }}
     secrets: inherit
@@ -114,8 +115,8 @@ jobs:
           retention-days: 5
 
   merge-reports:
-    needs: pw-e2e
-    if: always()
+    needs: [vars, burn-in, pw-e2e]
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -125,10 +126,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+        with:
+          install-command: ${{ needs.vars.outputs.install_command }}
+
       - name: Merge, upload, and comment
         uses: ./.github/actions/playwright-merge-report-comment
         with:
+          environment: local
           burn-in-result: ${{ needs.burn-in.result || 'skipped' }}
           shards: '2'
           e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  e2e-required-gate:
+    name: E2E required gate
+    needs: [vars, burn-in, pw-e2e]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce required e2e path
+        run: |
+          E2E_RESULT="${{ needs.pw-e2e.result }}"
+          BURN_IN_RESULT="${{ needs.burn-in.result || 'skipped' }}"
+          SKIP_BURN_IN="${{ needs.vars.outputs.SKIP_BURN_IN || 'false' }}"
+
+          echo "pw-e2e result: ${E2E_RESULT}"
+          echo "burn-in result: ${BURN_IN_RESULT}"
+          echo "SKIP_BURN_IN: ${SKIP_BURN_IN}"
+
+          if [[ "${E2E_RESULT}" == "success" ]]; then
+            echo "✅ Required e2e path passed."
+            exit 0
+          fi
+
+          echo "::error::Required e2e path did not pass (pw-e2e=${E2E_RESULT}, burn-in=${BURN_IN_RESULT}, SKIP_BURN_IN=${SKIP_BURN_IN})."
+          exit 1

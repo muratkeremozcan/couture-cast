@@ -179,6 +179,9 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
   - [ ] Test: Cross-account access denial
     - Teen A cannot access Teen B's wardrobe
     - Guardian A cannot access unlinked teen
+  - [ ] Follow-up boundary: auth-session rollout is implemented in Story 0.14 Task 2 only
+    after login/session-backed journeys are stable; keep 401/403 negative contract tests
+    unauthenticated.
 
 - [ ] Task 9: Create guardian consent UI (AC: #2)
   - [ ] Teen signup flow: add birthdate picker, show guardian invitation screen if 13-15

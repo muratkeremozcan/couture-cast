@@ -7,7 +7,9 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "lint": "eslint --max-warnings=0 --ext .ts src scripts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node -e \"console.log('@couture/api-client: no unit tests configured')\"",
     "gen:openapi:events": "tsx scripts/generate-events-openapi.ts"
   },
   "dependencies": {
