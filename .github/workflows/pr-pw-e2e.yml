@@ -116,7 +116,7 @@ jobs:
 
   merge-reports:
     needs: [vars, burn-in, pw-e2e]
-    if: ${{ always() && needs.pw-e2e.result != 'skipped' && needs.pw-e2e.result != 'cancelled' }}
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -134,6 +134,7 @@ jobs:
       - name: Merge, upload, and comment
         uses: ./.github/actions/playwright-merge-report-comment
         with:
+          environment: local
           burn-in-result: ${{ needs.burn-in.result || 'skipped' }}
           shards: '2'
           e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}

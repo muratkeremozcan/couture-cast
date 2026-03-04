@@ -131,43 +131,11 @@ jobs:
         if: ${{ steps.detect-changed.outputs.changed == 'true' && steps.burn-in-step.outcome == 'failure' }}
         uses: actions/upload-artifact@v4
         with:
-          name: burn-in-report-${{ github.run_id }}-${{ github.run_attempt }}
+          name: playwright-report
           path: |
             ${{ inputs.test-directory }}/playwright-report
             ${{ inputs.test-directory }}/test-results
           if-no-files-found: warn
-
-      - name: Resolve burn-in artifact URL
-        id: resolve-burn-in-artifact-url
-        if: ${{ steps.detect-changed.outputs.changed == 'true' && steps.burn-in-step.outcome == 'failure' }}
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const artifactName = 'burn-in-report-${{ github.run_id }}-${{ github.run_attempt }}';
-            const { owner, repo } = context.repo;
-            const runId = context.runId;
-
-            let artifact;
-            for (let attempt = 1; attempt <= 5; attempt += 1) {
-              const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
-                owner,
-                repo,
-                run_id: runId,
-                per_page: 100,
-              });
-              artifact = artifacts.find((item) => item.name === artifactName && !item.expired);
-              if (artifact) break;
-              await new Promise((resolve) => setTimeout(resolve, 2000));
-            }
-
-            const reportUrl = artifact
-              ? `https://github.com/${owner}/${repo}/actions/runs/${runId}/artifacts/${artifact.id}`
-              : '';
-            const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${runId}`;
-
-            core.setOutput('report-url', reportUrl);
-            core.setOutput('run-url', runUrl);
 
       - name: Set downstream gating output
         id: set-output
@@ -193,68 +161,3 @@ jobs:
           else
             echo "❌ Burn-in gate blocked"
           fi
-
-      - name: Build burn-in PR comment body
-        id: burn-in-comment-body
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        shell: bash
-        env:
-          CHANGED: ${{ steps.detect-changed.outputs.changed }}
-          BURN_IN_OUTCOME: ${{ steps.burn-in-step.outcome || 'skipped' }}
-          UPLOADED_ARTIFACT_ID: ${{ steps.upload-burn-in-artifacts.outputs.artifact-id }}
-          RESOLVED_REPORT_URL: ${{ steps.resolve-burn-in-artifact-url.outputs.report-url }}
-          RESOLVED_RUN_URL: ${{ steps.resolve-burn-in-artifact-url.outputs.run-url }}
-        run: |
-          RUN_URL="${RESOLVED_RUN_URL}"
-          if [[ -z "$RUN_URL" ]]; then
-            RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          fi
-
-          ARTIFACT_URL=""
-          if [[ -n "${UPLOADED_ARTIFACT_ID}" ]]; then
-            ARTIFACT_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts/${UPLOADED_ARTIFACT_ID}"
-          elif [[ -n "${RESOLVED_REPORT_URL}" ]]; then
-            ARTIFACT_URL="${RESOLVED_REPORT_URL}"
-          fi
-
-          {
-            echo "body<<EOF"
-            echo "<!-- burn-in-gate-status -->"
-
-            if [[ "${CHANGED}" != "true" ]]; then
-              echo "ℹ️ Burn-in skipped (no changed Playwright specs)."
-              echo "- Run: ${RUN_URL}"
-            elif [[ "${BURN_IN_OUTCOME}" == "success" ]]; then
-              echo "✅ Burn-in passed for changed Playwright specs."
-              echo "- Run: ${RUN_URL}"
-            else
-              echo "🚨 Burn-in failed for changed Playwright specs."
-              echo "Downstream E2E is blocked until burn-in is green."
-              if [[ -n "${ARTIFACT_URL}" ]]; then
-                echo "- Burn-in report + traces: ${ARTIFACT_URL}"
-              else
-                echo "- Burn-in run: ${RUN_URL}"
-              fi
-            fi
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Find existing burn-in PR comment
-        id: find-burn-in-comment
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        uses: peter-evans/find-comment@v3
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body-includes: '<!-- burn-in-gate-status -->'
-          comment-author: 'github-actions[bot]'
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upsert burn-in PR comment
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          comment-id: ${{ steps.find-burn-in-comment.outputs.comment-id }}
-          body: ${{ steps.burn-in-comment-body.outputs.body }}
-          edit-mode: replace
-          token: ${{ secrets.GITHUB_TOKEN }}

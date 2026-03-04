@@ -5,7 +5,20 @@ import { test, expect } from '../support/fixtures/merged-fixtures'
 test.describe('Web smoke', () => {
   test('hero renders with healthy services and passes accessibility scan', async ({
     page,
+    interceptNetworkCall,
   }, testInfo) => {
+    const pollCallPromise = interceptNetworkCall({
+      method: 'GET',
+      url: '**/api/v1/events/poll*',
+      fulfillResponse: {
+        status: 200,
+        body: {
+          events: [],
+          nextSince: null,
+        },
+      },
+    })
+
     const metadata = (testInfo.project.metadata ?? {}) as Record<string, string>
     const healthEndpoint =
       metadata.healthEndpoint ??
@@ -26,6 +39,8 @@ test.describe('Web smoke', () => {
     expect(body.status).toBe('ok')
 
     await page.goto('/')
+    const pollCall = await pollCallPromise
+    expect(pollCall.status).toBe(200)
 
     await expect(page.getByTestId('hero-headline')).toContainText(
       'Plan confident outfits'
