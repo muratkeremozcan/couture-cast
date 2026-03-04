@@ -50,7 +50,6 @@
     "test:mobile:e2e:ios": "npm run maestro:install --silent && bash ./scripts/start-ios-simulator.sh && node ./scripts/run-maestro.mjs maestro/sanity.yaml",
     "test:mobile:e2e:attached": "npm run maestro:install --silent && cross-env MOBILE_E2E_SKIP_SERVER=1 node ./scripts/run-maestro.mjs maestro/sanity.yaml",
     "test:mobile:e2e:ci": "npm run maestro:install --silent && node ./scripts/run-maestro.mjs maestro/sanity.yaml --ci",
-    "guard:deps:web-api-client": "node ./scripts/guard-web-api-client-runtime-deps.mjs",
     "validate": "npm-run-all typecheck lint test",
     "clean": "rimraf \"apps/**/dist\" \"packages/**/dist\" \"**/tsconfig.tsbuildinfo\"",
     "clean:install": "npx rimraf node_modules \"apps/**/node_modules\" \"packages/**/node_modules\" && npm install --no-progress",

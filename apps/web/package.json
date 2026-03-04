@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "vitest:run": "vitest run --config vitest.headless.config.ts",
+    "vitest:run": "vitest run --config vitest.config.ts",
+    "vitest:browser:run": "vitest run --config vitest.headless.config.ts",
     "vitest:open": "vitest --config vitest.browser.config.ts",
     "test": "npm run vitest:run",
     "dev": "node ../../node_modules/next/dist/bin/next dev",

@@ -1,6 +1,7 @@
 import { createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useMswHandlers } from '../../test-utils/msw/runtime'
 
 const { captureMock, distinctIdMock } = vi.hoisted(() => ({
   captureMock: vi.fn(),
@@ -53,7 +54,6 @@ vi.mock('posthog-js', () => ({
 }))
 
 import { AnalyticsEventActions } from './analytics-event-actions'
-import { worker } from '../../test-utils/msw/browser'
 
 describe('AnalyticsEventActions', () => {
   beforeEach(() => {
@@ -88,7 +88,7 @@ describe('AnalyticsEventActions', () => {
   })
 
   it('keeps CTA interactions working when polling fetch fails', async () => {
-    worker.use(http.get('/api/v1/events/poll', () => HttpResponse.error()))
+    useMswHandlers(http.get('/api/v1/events/poll', () => HttpResponse.error()))
 
     render(<AnalyticsEventActions />)
 
@@ -137,7 +137,7 @@ describe('AnalyticsEventActions', () => {
   })
 
   it('captures alert analytics when event polling returns alert channels', async () => {
-    worker.use(
+    useMswHandlers(
       http.get('/api/v1/events/poll', () =>
         HttpResponse.json({
           events: [
