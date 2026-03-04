@@ -9,9 +9,20 @@ export default defineConfig({
     include: ['react/jsx-dev-runtime'],
   },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
+    alias: [
+      {
+        find: /^@couture\/api-client$/,
+        replacement: path.resolve(__dirname, '../../packages/api-client/src/index.ts'),
+      },
+      {
+        find: /^@couture\/api-client\/(.*)$/,
+        replacement: path.resolve(__dirname, '../../packages/api-client/src/$1'),
+      },
+      {
+        find: '@',
+        replacement: path.resolve(__dirname, './src'),
+      },
+    ],
   },
   test: {
     environment: 'jsdom',
