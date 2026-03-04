@@ -1,4 +1,5 @@
 import { test, expect } from '../../support/fixtures/merged-fixtures'
+import { resolveApiBaseUrl } from '../../support/helpers/api-test'
 
 process.env.API_E2E_UI_MODE = 'true'
 
@@ -13,12 +14,10 @@ test.describe('Realtime poll API', () => {
   test('[P1] poll returns events array and nextSince shape', async ({
     apiRequest,
   }, testInfo) => {
-    const projectMeta = (testInfo.project.metadata ?? {}) as Record<string, string>
-    const baseUrl =
-      process.env.LIVE_POLL_BASE_URL ||
-      projectMeta.apiBaseUrl ||
-      process.env.API_BASE_URL ||
-      'http://localhost:4000'
+    const baseUrl = resolveApiBaseUrl(testInfo, {
+      overrideEnvVar: 'LIVE_POLL_BASE_URL',
+      fallback: 'http://localhost:4000',
+    })
 
     const { status, body } = (await apiRequest({
       method: 'GET',
@@ -33,12 +32,10 @@ test.describe('Realtime poll API', () => {
   })
 
   test('[P2] poll rejects invalid since timestamp', async ({ apiRequest }, testInfo) => {
-    const projectMeta = (testInfo.project.metadata ?? {}) as Record<string, string>
-    const baseUrl =
-      process.env.LIVE_POLL_BASE_URL ||
-      projectMeta.apiBaseUrl ||
-      process.env.API_BASE_URL ||
-      'http://localhost:4000'
+    const baseUrl = resolveApiBaseUrl(testInfo, {
+      overrideEnvVar: 'LIVE_POLL_BASE_URL',
+      fallback: 'http://localhost:4000',
+    })
 
     const pollUrl = `${POLL_PATH}?since=not-a-date`
 

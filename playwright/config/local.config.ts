@@ -63,6 +63,10 @@ export default defineConfig(
         stdout: 'pipe',
         stderr: 'pipe',
         cwd: repoRoot,
+        env: {
+          ...process.env,
+          API_BASE_URL: environment.apiBaseUrl,
+        },
       },
     ],
   })

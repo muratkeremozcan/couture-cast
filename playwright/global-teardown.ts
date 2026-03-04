@@ -13,38 +13,55 @@ export default function globalTeardown() {
     .filter(Boolean)
     .join(path.delimiter)
 
-  if (env.CI || !env.DATABASE_URL) {
-    console.warn('Skipping db:reset in global teardown (CI or DATABASE_URL missing)')
+  if (env.CI || !env.DATABASE_URL || env.PLAYWRIGHT_SKIP_DB_RESET === 'true') {
+    console.warn(
+      'Skipping db:reset in global teardown (CI, DATABASE_URL missing, or PLAYWRIGHT_SKIP_DB_RESET=true)'
+    )
     return
   }
 
-  let resetError: unknown
-
   try {
     execSync('npm run db:reset', {
-      stdio: 'inherit',
+      stdio: 'pipe',
       env,
     })
   } catch (error) {
+    const details = (() => {
+      if (!(error instanceof Error)) {
+        return String(error)
+      }
+
+      const maybeStdout = 'stdout' in error ? error.stdout : undefined
+      const maybeStderr = 'stderr' in error ? error.stderr : undefined
+      const stdout =
+        typeof maybeStdout === 'string'
+          ? maybeStdout
+          : Buffer.isBuffer(maybeStdout)
+            ? maybeStdout.toString()
+            : ''
+      const stderr =
+        typeof maybeStderr === 'string'
+          ? maybeStderr
+          : Buffer.isBuffer(maybeStderr)
+            ? maybeStderr.toString()
+            : ''
+
+      return `${error.message}\n${stdout}\n${stderr}`
+    })()
+
+    const isDatabaseUnavailable =
+      details.includes('P1001') || details.includes('reach database server')
+    if (isDatabaseUnavailable) {
+      console.warn(
+        'Skipping db:reset in global teardown because the database is unreachable.'
+      )
+      return
+    }
+
     console.error(
       'Global teardown failed: Unable to reset the database. Check DATABASE_URL and db:reset script.'
     )
-    console.error('Error details:', error)
-    resetError = error
-  }
-
-  if (resetError) {
-    if (resetError instanceof Error) {
-      throw resetError
-    }
-    const serialized = (() => {
-      try {
-        return JSON.stringify(resetError)
-      } catch {
-        if (typeof resetError === 'string') return resetError
-        return '[unserializable error]'
-      }
-    })()
-    throw new Error(`Global teardown failed: ${serialized}`)
+    console.error('Error details:', details)
+    throw error
   }
 }

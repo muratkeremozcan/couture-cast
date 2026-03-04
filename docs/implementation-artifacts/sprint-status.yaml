@@ -41,7 +41,7 @@ story_location: docs/implementation-artifacts
 
 development_status:
   # Epic 0: Platform Foundation & Infrastructure (Sprint 0)
-  # All 13 stories must complete before Epic 1 begins
+  # All 14 stories must complete before Epic 1 begins
   epic-0: in-progress
   0-1-initialize-turborepo-monorepo: done
   0-13-scaffold-cross-surface-e2e-automation: done
@@ -56,6 +56,7 @@ development_status:
   0-10-implement-test-fixture-factories-and-seed-data: drafted
   0-11-implement-guardian-consent-flow-and-rls-policies: drafted
   0-12-provision-test-environments-and-harness-services: drafted
+  0-14-expand-test-infra-auth-contract-performance: drafted
   epic-0-retrospective: optional
 
   # Epic 1: Weather Intelligence & Platform Foundation (Phase 1)

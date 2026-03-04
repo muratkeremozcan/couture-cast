@@ -2,5 +2,10 @@
   "name": "@couture/eslint-config",
   "version": "0.1.0",
   "private": true,
-  "main": "index.js"
+  "main": "index.js",
+  "scripts": {
+    "typecheck": "node -e \"console.log('@couture/eslint-config: no typecheck step')\"",
+    "lint": "node -e \"console.log('@couture/eslint-config: no lint step')\" --",
+    "test": "node -e \"console.log('@couture/eslint-config: no unit tests configured')\""
+  }
 }

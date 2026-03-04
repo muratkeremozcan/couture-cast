@@ -60,12 +60,26 @@ runs:
 
     - name: Download shard reports
       uses: actions/download-artifact@v4
+      continue-on-error: true
       with:
         path: ${{ inputs.blob-path }}
         pattern: ${{ inputs.blob-pattern }}
         merge-multiple: true
 
+    - name: Detect downloaded blob reports
+      id: detect-blobs
+      shell: bash
+      run: |
+        if [ -d "${{ inputs.blob-path }}" ] && [ -n "$(find "${{ inputs.blob-path }}" -mindepth 1 -type f -print -quit 2>/dev/null)" ]; then
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "Found Playwright blob artifacts."
+        else
+          echo "found=false" >> "$GITHUB_OUTPUT"
+          echo "No Playwright blob artifacts found."
+        fi
+
     - name: Merge Playwright reports
+      if: ${{ steps.detect-blobs.outputs.found == 'true' }}
       shell: bash
       run: |
         mkdir -p "${{ inputs.report-path }}/trace"
@@ -74,6 +88,7 @@ runs:
 
     - name: Upload merged report
       id: upload-report
+      if: ${{ steps.detect-blobs.outputs.found == 'true' }}
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.report-name }}
@@ -87,7 +102,9 @@ runs:
         github-token: ${{ inputs.github-token || github.token }}
         script: |
           const artifactName = '${{ inputs.report-name }}';
-          let reportUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          let reportUrl = runUrl;
+          let hasReport = false;
           try {
             const { data } = await github.rest.actions.listWorkflowRunArtifacts({
               owner: context.repo.owner,
@@ -95,19 +112,16 @@ runs:
               run_id: context.runId,
             });
             const artifact = data.artifacts.find((a) => a.name === artifactName);
-            if (artifact?.archive_download_url) {
-              const res = await fetch(artifact.archive_download_url, {
-                method: 'GET',
-                headers: { Authorization: `token ${process.env.GITHUB_TOKEN}` },
-                redirect: 'manual',
-              });
-              const loc = res.headers.get('location');
-              if (loc) reportUrl = loc;
+            if (artifact?.id) {
+              hasReport = true;
+              reportUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts/${artifact.id}`;
             }
           } catch (e) {
             core.warning(`Could not resolve report URL: ${e.message}`);
           }
           core.setOutput('report_url', reportUrl);
+          core.setOutput('run_url', runUrl);
+          core.setOutput('has_report', String(hasReport));
 
     - name: Generate summary
       if: always()
@@ -116,48 +130,71 @@ runs:
         BURN_IN: ${{ inputs.burn-in-result }}
         SHARDS: ${{ inputs.shards }}
         DEPLOY_URL: ${{ inputs.deployment-url }}
+        HAS_REPORT: ${{ steps.resolve-url.outputs.has_report }}
+        REPORT_URL: ${{ steps.resolve-url.outputs.report_url }}
+        RUN_URL: ${{ steps.resolve-url.outputs.run_url }}
       run: |
         echo "## Playwright E2E" >> $GITHUB_STEP_SUMMARY
         echo "- Shards: ${SHARDS}" >> $GITHUB_STEP_SUMMARY
         echo "- Burn-in: ${BURN_IN}" >> $GITHUB_STEP_SUMMARY
-        echo "- Report: see uploaded artifact 'playwright-report'" >> $GITHUB_STEP_SUMMARY
+        if [ "${HAS_REPORT}" = "true" ]; then
+          echo "- Report: [${{ inputs.report-name }}](${REPORT_URL})" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- Report: no Playwright blob artifacts found in this run" >> $GITHUB_STEP_SUMMARY
+          echo "- Run: ${RUN_URL}" >> $GITHUB_STEP_SUMMARY
+        fi
         if [ -n "${DEPLOY_URL}" ]; then
           echo "- Deployment: ${DEPLOY_URL}" >> $GITHUB_STEP_SUMMARY
         fi
 
-    - name: Comment results on PR
-      if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' }}
-      uses: actions/github-script@v7
+    - name: Build PR comment body
+      id: pr-comment-body
+      if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
+      shell: bash
+      env:
+        BURN_IN_RESULT: ${{ inputs.burn-in-result }}
+        E2E_RESULT: ${{ inputs.e2e-result }}
+        DEPLOYMENT_URL: ${{ inputs.deployment-url }}
+        SHARDS: ${{ inputs.shards }}
+        REPORT_NAME: ${{ inputs.report-name }}
+        REPORT_URL: ${{ steps.resolve-url.outputs.report_url }}
+        RUN_URL: ${{ steps.resolve-url.outputs.run_url }}
+        HAS_REPORT: ${{ steps.resolve-url.outputs.has_report }}
+      run: |
+        {
+          echo "body<<EOF"
+          echo "<!-- playwright-e2e-report -->"
+          echo "Playwright E2E: **${E2E_RESULT^^}** (burn-in: ${BURN_IN_RESULT})"
+          echo
+          if [ -n "${DEPLOYMENT_URL}" ]; then
+            echo "- Deployment: ${DEPLOYMENT_URL}"
+          fi
+          if [ "${HAS_REPORT}" = "true" ]; then
+            echo "- Artifact: [${REPORT_NAME}](${REPORT_URL}) (merged HTML + traces)"
+          else
+            echo "- Artifact: No Playwright blob artifacts were found for this run."
+            echo "- Run: ${RUN_URL}"
+          fi
+          echo "- Shards: ${SHARDS} (fail-fast: false)"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Find existing Playwright PR comment
+      id: find-pr-comment
+      if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
+      uses: peter-evans/find-comment@v3
       with:
-        github-token: ${{ inputs.github-token || github.token }}
-        script: |
-          // Skip commenting on PRs from forks to avoid permissions issues
-          if (context.payload.pull_request && context.payload.pull_request.head.repo.full_name !== context.payload.pull_request.base.repo.full_name) {
-            core.info('Skipping PR comment for forked repository');
-            return;
-          }
+        issue-number: ${{ github.event.pull_request.number }}
+        body-includes: '<!-- playwright-e2e-report -->'
+        comment-author: 'github-actions[bot]'
+        token: ${{ inputs.github-token || github.token }}
 
-          const burnInResult = '${{ inputs.burn-in-result }}';
-          const e2eResult = '${{ inputs.e2e-result }}';
-          const reportUrl = '${{ steps.resolve-url.outputs.report_url }}';
-          const deploymentUrl = '${{ inputs.deployment-url }}';
-
-          const lines = [
-            `Playwright E2E: **${e2eResult.toUpperCase()}** (burn-in: ${burnInResult})`,
-            '',
-            `- Artifact: [playwright-report](${reportUrl}) (merged HTML + traces)`,
-            `- Shards: ${{ inputs.shards }} (fail-fast: false)`,
-          ];
-
-          if (deploymentUrl) {
-            lines.splice(2, 0, `- Deployment: ${deploymentUrl}`);
-          }
-
-          const body = lines.join('\n');
-
-          await github.rest.issues.createComment({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: context.issue.number,
-            body,
-          });
+    - name: Upsert Playwright PR comment
+      if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
+      uses: peter-evans/create-or-update-comment@v4
+      with:
+        issue-number: ${{ github.event.pull_request.number }}
+        comment-id: ${{ steps.find-pr-comment.outputs.comment-id }}
+        body: ${{ steps.pr-comment-body.outputs.body }}
+        edit-mode: replace
+        token: ${{ inputs.github-token || github.token }}

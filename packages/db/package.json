@@ -10,7 +10,9 @@
     "db:reset": "prisma migrate reset --force --skip-seed && prisma db seed",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
-    "typecheck": "prisma generate && tsc --noEmit -p tsconfig.json"
+    "lint": "eslint --max-warnings=0 --ext .ts prisma/seeds",
+    "typecheck": "prisma generate && tsc --noEmit -p tsconfig.json",
+    "test": "node -e \"console.log('@couture/db: no unit tests configured')\""
   },
   "dependencies": {
     "@faker-js/faker": "10.1.0",

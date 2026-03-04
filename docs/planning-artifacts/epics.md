@@ -180,6 +180,20 @@ As the master test architect, I need baseline Playwright (web) and Maestro (mobi
 4. Extend `.github/workflows/pr-checks.yml` with an `e2e` job that reuses the install cache, builds once, runs Playwright + Maestro smoke commands, captures HTML/log artifacts, and is marked optional until suites stabilize.
    **Prerequisites:** CC-0.1 (monorepo scaffold), CC-0.5 (Turborepo/task graph), CC-0.6 (CI skeleton), CC-0.10 (fixture factories once data seeds land).
 
+**Story CC-0.14: Expand test infrastructure for auth-session, burn-in, contract, performance, and PR review automation**
+As the master test architect, I need to mature the post-scaffold testing stack so that
+auth-backed E2E, CI burn-in reliability, contract checks, and performance baselines are
+production-ready.
+**Acceptance Criteria**
+
+1. Harden `.github/workflows/rwf-burn-in.yml` (SHA ordering, stable changed-spec handling, deterministic reporting) while preserving existing PR gating behavior.
+2. Roll out `auth-session` for login-backed Playwright journeys while keeping explicit unauthenticated/security-negative tests out of auth-session.
+3. Add API contract-testing baseline (OpenAPI schema + Pact consumer/provider verification) in CI as non-blocking first, with promotion criteria to required gates.
+4. Add performance-testing baseline (k6 scenarios, thresholds, artifacts) in a non-blocking workflow mode (nightly/manual) with promotion criteria.
+5. Add Maestro analytics journey coverage and define objective reliability criteria for promotion from manual/local-only to PR optional gating.
+6. Add CodeRabbit PR-review automation with repository config and path-scoped instructions focused on test/CI-risk changes, starting advisory before any merge-blocking policy.
+   **Prerequisites:** CC-0.6 (CI workflows), CC-0.7 (analytics events), CC-0.11 (auth-backed user journeys), CC-0.12 (test environment readiness), CC-0.13 (baseline E2E scaffolding).
+
 ---
 
 ## Epic 1 — Weather Intelligence & Platform Foundation (Phase 1)

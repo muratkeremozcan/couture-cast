@@ -1,13 +1,15 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
 import { useFonts } from 'expo-font'
+import * as Notifications from 'expo-notifications'
 import { Stack, usePathname } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useRef } from 'react'
 import 'react-native-reanimated'
 
-import { useColorScheme } from 'react-native'
+import { Platform, useColorScheme } from 'react-native'
 import { PostHogProvider } from 'posthog-react-native'
+import { trackMobileAlertReceived } from '@/src/analytics/track-events'
 
 import { posthog } from '../src/config/posthog'
 
@@ -71,6 +73,34 @@ function RootLayoutNav() {
       previousPathname.current = pathname
     }
   }, [pathname])
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      return
+    }
+
+    const subscription = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data as Record<string, unknown>
+      const severityCandidate = data?.severity
+      const severity =
+        severityCandidate === 'warning' || severityCandidate === 'critical'
+          ? severityCandidate
+          : 'info'
+
+      trackMobileAlertReceived(posthog, {
+        userId: posthog.getDistinctId() || 'mobile-anonymous-user',
+        alertType:
+          (typeof data?.alertType === 'string' && data.alertType) ||
+          notification.request.content.title ||
+          'push_notification',
+        severity,
+        weatherSeverity:
+          typeof data?.weatherSeverity === 'string' ? data.weatherSeverity : undefined,
+      })
+    })
+
+    return () => subscription.remove()
+  }, [])
 
   return (
     <PostHogProvider

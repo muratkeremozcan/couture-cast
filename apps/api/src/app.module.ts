@@ -9,6 +9,8 @@ import { AdminCron } from './admin/admin.cron'
 import { GatewayModule } from './modules/gateway/gateway.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { EventsModule } from './modules/events/events.module'
+import { AuthModule } from './modules/auth/auth.module'
+import { ModerationModule } from './modules/moderation/moderation.module'
 import { PostHogService } from './posthog/posthog.service'
 
 // Disable websockets by setting DISABLE_WEBSOCKETS=true (e.g., in specific tests)
@@ -20,6 +22,8 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     ...websocketModules,
     NotificationsModule,
     EventsModule,
+    AuthModule,
+    ModerationModule,
   ],
   controllers: [AppController, HealthController, AdminController],
   providers: [AppService, AdminService, AdminCron, PostHogService],

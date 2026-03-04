@@ -1,3 +1,4 @@
+import { AnalyticsEventActions } from './components/analytics-event-actions'
 import { PostHogClickTracker } from './components/posthog-click-tracker'
 
 const navLinks = [
@@ -58,28 +59,7 @@ export default function Home() {
             insight to recommend looks that respect the commute, the meeting, and the
             vibe.
           </p>
-          <div className="flex flex-wrap gap-4" data-testid="hero-cta-group">
-            <a
-              data-testid="cta-primary"
-              className="bg-amber-300 text-black px-6 py-3 rounded-full font-semibold hover:bg-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
-              href="#"
-              data-ph-event="cta_clicked"
-              data-ph-cta-label="Preview outfits"
-              data-ph-cta-type="primary"
-            >
-              Preview outfits
-            </a>
-            <a
-              data-testid="cta-secondary"
-              className="border border-white/30 px-6 py-3 rounded-full font-semibold hover:border-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              href="#wardrobe"
-              data-ph-event="cta_clicked"
-              data-ph-cta-label="See the planner"
-              data-ph-cta-type="secondary"
-            >
-              See the planner
-            </a>
-          </div>
+          <AnalyticsEventActions />
         </section>
 
         <section

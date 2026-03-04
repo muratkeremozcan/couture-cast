@@ -123,6 +123,7 @@
       <idea ac="AC2">Create a smoke spec that warms the Nest API GET / endpoint, loads the Next.js landing page, asserts the hero content + nav links, runs axe-core, and captures traces/screenshots for debugging.</idea>
       <idea ac="AC3">Implement a Maestro sanity run that launches the Expo tabs shell (local dev server or Maestro Cloud), taps through each tab verifying copy/data-testid markers, and exercises a mocked offline toggle to prove network handling works.</idea>
       <idea ac="AC4">Write a CI-focused test that parses README and package.json to ensure the new test:e2e:* scripts are documented, and validate the GitHub Actions workflow contains the e2e job with artifact upload + continue-on-error wiring before allowing merges.</idea>
+      <idea ac="AC4">Track deferred reliability hardening in Story 0.14: rwf-burn-in SHA/base-ref fixes, auth-session adoption for login-backed journeys only, Pact + schema contract gates, and non-blocking performance baselines.</idea>
     </ideas>
   </tests>
 </story-context>
