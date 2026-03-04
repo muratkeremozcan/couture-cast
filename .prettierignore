@@ -17,6 +17,7 @@ playwright/artifacts
 playwright/playwright-report
 apps/**/dist
 apps/**/.next
+apps/web/public/mockServiceWorker.js
 packages/**/dist
 AGENTS.md
 docs
