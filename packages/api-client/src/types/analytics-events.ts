@@ -1,8 +1,20 @@
 import { z } from 'zod'
 
+/** Story 0.7 Task 2/3: analytics contracts + tracking wrappers.
+ * Analytics contract here = canonical event name + validated input shape + provider property shape.
+ * Tracking wrapper here = track* helper that validates and returns a capture-ready payload.
+ * Problems solved: schema drift across apps, inconsistent event/property naming, weak observability from split metrics.
+ * Why typed contracts: compile-time event safety plus runtime validation at the analytics boundary.
+ * Alternatives: direct untyped posthog.capture calls, ingest-only JSON Schema validation, or Protobuf/Avro contracts.
+ * Setup steps (where we did this):
+ *   1) define canonical event names and input/property schemas in this file.
+ *   2) normalize domain inputs to snake_case analytics properties in track* wrappers below.
+ *   3) reuse these wrappers in app layers and validate endpoint emissions in API integration assertions.
+ */
 const isoTimestamp = z.string().datetime()
 const nonEmptyString = z.string().min(1)
 
+// 1) define canonical event names and input/property schemas in this file.
 export const analyticsEventNameSchema = z.enum([
   'ritual_created',
   'wardrobe_upload_started',
@@ -139,6 +151,8 @@ export type GuardianConsentGrantedProperties = z.infer<
   typeof guardianConsentGrantedPropertiesSchema
 >
 
+// 2) normalize domain inputs to snake_case analytics properties in track* wrappers below.
+// 3) reuse these wrappers in app layers and validate endpoint emissions in API integration assertions.
 export function trackRitualCreated(
   event: RitualCreatedEvent
 ): AnalyticsCapturePayload<'ritual_created', RitualCreatedProperties> {

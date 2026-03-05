@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 'use client'
 
 import {
@@ -18,6 +19,16 @@ type EventPollResponse = {
   nextSince?: string | null
 }
 
+/** Story 0.7 Task 2/3: explicit web tracking wrapper usage.
+ * Wrapper role: keep handlers thin by delegating event/property contracts to shared track* helpers.
+ * Problems solved: avoids per-handler payload drift that weakens funnel/debug observability across web and mobile.
+ * Alternatives: raw posthog.capture calls in each handler or full reliance on DOM auto-capture conventions.
+ * Setup steps (where we did this):
+ *   1) collect identity + feature context (CTA, upload, alert poll payloads).
+ *   2) build canonical analytics payloads via trackRitualCreated/trackWardrobeUploadStarted/trackAlertReceived.
+ *   3) emit normalized events with posthog.capture in each flow below.
+ */
+// 1) collect identity + feature context (CTA, upload, alert poll payloads).
 function getWebAnalyticsIdentity() {
   return {
     userId: posthog.get_distinct_id() || 'web-anonymous-user',
@@ -56,6 +67,7 @@ export function AnalyticsEventActions() {
             continue
           }
 
+          // 2) build canonical analytics payloads via trackRitualCreated/trackWardrobeUploadStarted/trackAlertReceived.
           const payload = trackAlertReceived({
             userId: event.userId || getWebAnalyticsIdentity().userId,
             alertType:
@@ -72,6 +84,7 @@ export function AnalyticsEventActions() {
                 : undefined,
             timestamp: new Date().toISOString(),
           })
+          // 3) emit normalized events with posthog.capture in each flow below.
           posthog.capture(payload.event, payload.properties)
         }
       } catch {
