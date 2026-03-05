@@ -97,8 +97,8 @@ so that we can track success metrics and monitor system health across all enviro
     - Track `moderation_action` in moderation module
     - Track `guardian_consent_granted` in auth module
 
-- [ ] Task 4: Set up OpenTelemetry in NestJS (AC: #3)
-  - [ ] Install OpenTelemetry packages:
+- [x] Task 4: Set up OpenTelemetry in NestJS (AC: #3)
+  - [x] Install OpenTelemetry packages:
     ```bash
     npm install @opentelemetry/api @opentelemetry/sdk-node \
       @opentelemetry/auto-instrumentations-node \
@@ -106,10 +106,10 @@ so that we can track success metrics and monitor system health across all enviro
       @opentelemetry/exporter-metrics-otlp-http \
       --workspace apps/api
     ```
-  - [ ] Create `apps/api/src/instrumentation.ts` for OTLP setup
-  - [ ] Configure OTLP exporters to Grafana Cloud endpoint
-  - [ ] Set up trace context propagation (B3 or W3C Trace Context)
-  - [ ] Add OpenTelemetry initialization to `main.ts` (before NestJS bootstrap)
+  - [x] Create `apps/api/src/instrumentation.ts` for OTLP setup
+  - [x] Configure OTLP exporters to Grafana Cloud endpoint
+  - [x] Set up trace context propagation (B3 or W3C Trace Context)
+  - [x] Add OpenTelemetry initialization to `main.ts` (before NestJS bootstrap)
 
 - [ ] Task 5: Configure Pino structured logging (AC: #3)
   - [ ] Install Pino: `npm install pino pino-http pino-pretty --workspace apps/api`
@@ -468,6 +468,14 @@ docs/
 - `npm run lint`
 - `npm install expo-image-picker expo-notifications --workspace apps/mobile`
 - `npm run lint && npm run typecheck && npm run test`
+- `npm install @opentelemetry/api @opentelemetry/sdk-node @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-trace-otlp-http @opentelemetry/exporter-metrics-otlp-http --workspace apps/api`
+- `npm run test --workspace api -- src/instrumentation.spec.ts` (red: missing module)
+- `npm run test --workspace api -- src/instrumentation.spec.ts` (green)
+- `npm run typecheck --workspace api`
+- `npm run test --workspace api`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
 
 ### Completion Notes List
 
@@ -497,6 +505,13 @@ docs/
   - Wired `wardrobe_upload_started` to real file-picker upload start on mobile and web.
   - Restored web hero CTA anchor semantics while retaining analytics capture.
   - Added API integration coverage for auth/moderation tracking routes.
+- Completed Task 4 OpenTelemetry setup in API:
+  - Added `apps/api/src/instrumentation.ts` with Grafana OTLP config resolver, trace+metrics
+    exporters, W3C trace context propagator, auto-instrumentations, and init/shutdown helpers.
+  - Added `apps/api/src/instrumentation.spec.ts` unit coverage for OTLP env config, W3C propagator
+    selection, and one-time init semantics.
+  - Updated `apps/api/src/main.ts` to initialize OpenTelemetry before NestJS bootstrap.
+  - Revalidated workspace quality gates: `npm run lint`, `npm run typecheck`, `npm run test`.
 
 ### File List
 
@@ -523,6 +538,10 @@ docs/
 - `apps/api/src/modules/moderation/moderation.service.spec.ts` (new)
 - `apps/api/integration/analytics-tracking.integration.spec.ts` (new)
 - `apps/api/src/app.module.ts` (modified)
+- `apps/api/src/instrumentation.ts` (new)
+- `apps/api/src/instrumentation.spec.ts` (new)
+- `apps/api/src/main.ts` (modified)
+- `apps/api/package.json` (modified)
 - `package-lock.json` (modified)
 - `docs/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md` (modified)
 
@@ -534,6 +553,7 @@ docs/
 | 2026-03-03 | Amelia (Developer Agent) | Completed Task 2 event schema/types/helpers/docs and validated via api-client typecheck |
 | 2026-03-04 | Amelia (Developer Agent) | Completed Task 3 event tracking across mobile/web/API with auth+moderation modules, added API tests, and validated via lint/typecheck/test |
 | 2026-03-04 | Amelia (Senior Developer Review AI) | Reviewed Task 3 implementation, found 5 High/Medium issues, applied automatic fixes, and revalidated lint/typecheck/test |
+| 2026-03-05 | Amelia (Developer Agent) | Completed Task 4 OpenTelemetry setup in `apps/api` with Grafana OTLP traces/metrics, W3C propagation, bootstrap init wiring, new unit tests, and full workspace validation |
 
 ## Senior Developer Review (AI)
 

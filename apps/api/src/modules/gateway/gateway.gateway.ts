@@ -8,6 +8,28 @@ import type { Server, Socket, ExtendedError } from 'socket.io'
 import { ConnectionManager, type DisconnectResult } from './connection-manager.service'
 
 /**
+ * Story 0.5 (Tasks 1-5): realtime + push integration overview.
+ *
+ * Realtime gateway handles low-latency delivery for active sessions, while push notifications
+ * cover background/offline delivery. If realtime remains unstable, clients fall back to polling.
+ *
+ * Problems solved:
+ * - Latency: socket channels deliver updates faster than request/response polling.
+ * - Reliability: retry + backoff absorbs temporary network drops.
+ * - Offline fallback: explicit polling activation keeps event delivery available.
+ *
+ * Setup flow:
+ * 1) Apply socket auth middleware so each connection carries a token.
+ * 2) Track connect/disconnect lifecycle state in ConnectionManager.
+ * 3) Emit retry/fallback hints on disconnect so clients know the next step.
+ * 4) Persist push tokens and deliver pushes for users not actively connected.
+ * 5) Use polling as the final delivery safety net when realtime is unavailable.
+ *
+ * Alternatives:
+ * - SSE for one-way server updates with lower protocol complexity.
+ * - Polling-only architecture with simpler ops but higher latency/load.
+ * - Message brokers (for example NATS/Kafka) for larger fan-out and stronger guarantees.
+ *
  * Namespaces map to ADR-007 surface areas:
  * - lookbook -> new posts
  * - ritual -> ritual updates
@@ -84,12 +106,15 @@ export function createAuthMiddleware() {
 }
 
 function emitDisconnectResult(socket: Socket, result: DisconnectResult) {
+  // Server-side guidance for client recovery path: retry first, then polling fallback.
   if (result.shouldRetry) {
     const payload = { delayMs: result.delayMs, attempt: result.attempt }
     socket.emit('connection:retry', payload)
     return { event: 'connection:retry', payload }
   }
 
+  // 4) Persist push tokens and deliver pushes for users not actively connected.
+  // 5) Use polling as the final delivery safety net when realtime is unavailable.
   const payload = { activatePolling: result.activatePolling, attempt: result.attempt }
   socket.emit('connection:fallback', payload)
   return { event: 'connection:fallback', payload }
@@ -106,14 +131,17 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server!: Server
 
   afterInit(server: ServerLike) {
+    // 1) Apply socket auth middleware so each connection carries a token.
     server.use(createAuthMiddleware())
   }
 
   handleConnection(socket: Socket) {
+    // 2) Track connect/disconnect lifecycle state in ConnectionManager.
     this.connectionManager.handleConnect(socket)
   }
 
   handleDisconnect(socket: Socket) {
+    // 3) Emit retry/fallback hints on disconnect so clients know the next step.
     const result = this.connectionManager.handleDisconnect(socket)
     this.logger.warn(
       { attempt: result.attempt, namespace: socket.nsp?.name },

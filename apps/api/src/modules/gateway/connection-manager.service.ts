@@ -1,6 +1,20 @@
 import type { Socket } from 'socket.io'
 import type { Logger } from 'pino'
 
+/**
+ * Story 0.5 (Tasks 2-3): connection lifecycle tracking.
+ *
+ * Why this exists:
+ * - Socket disconnect events are frequent and ambiguous (tab sleep, wifi switch, app background).
+ * - We need server-visible retry state to give clients consistent recovery instructions.
+ *
+ * Reliability model:
+ * - Retry with bounded backoff for transient failures.
+ * - After max retries, activate polling fallback to preserve delivery continuity.
+ *
+ * Alternative:
+ * - Rely only on client-side auto-reconnect, which is simpler but gives less server control/observability.
+ */
 export type DisconnectResult =
   | {
       shouldRetry: true
@@ -27,6 +41,7 @@ const defaultMaxRetries = 5
 export class ConnectionManager {
   private readonly backoffDelays: number[]
   private readonly maxRetries: number
+  // Per-socket lifecycle state used to decide retry vs fallback on disconnect.
   private readonly retryCounts = new Map<string, number>()
 
   constructor(
@@ -42,6 +57,7 @@ export class ConnectionManager {
   }
 
   handleConnect(socket: Socket): GatewayContext {
+    // New session starts with zero retries.
     this.retryCounts.set(socket.id, 0)
     const context = this.extractContext(socket)
 
@@ -50,6 +66,7 @@ export class ConnectionManager {
   }
 
   handleDisconnect(socket: Socket): DisconnectResult {
+    // Increment attempt counter before choosing reconnect delay or polling fallback.
     const previousAttempts = this.retryCounts.get(socket.id) ?? 0
     const attempt = previousAttempts + 1
     this.retryCounts.set(socket.id, attempt)
