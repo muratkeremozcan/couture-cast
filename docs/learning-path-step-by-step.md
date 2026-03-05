@@ -2,6 +2,31 @@
 
 Updated: 2026-03-05 - synthesized from docs + code agent scan
 
+## LLM collaborator prompt
+
+Use this prompt when asking an LLM to improve this document and apply the same in-code comment
+style:
+
+```text
+You are improving Couture Cast learning docs and code commentary.
+
+Goals:
+1) Improve docs/learning-path-step-by-step.md with clearer teaching content.
+2) For each step touched, explicitly list impacted files in the step section.
+3) Add/adjust in-file educational comments for impacted code using this style:
+   - brief "what it is / problem solved / alternatives"
+   - numbered setup steps `1) 2) 3) ...`
+   - "where we did this" anchor comments near actual implementation
+   - searchable step text appears in two places in the same file:
+     a) overview list, b) implementation anchor
+
+Rules:
+- Keep behavior unchanged unless asked.
+- Keep comments concise and ASCII.
+- Preserve existing Story/Task mapping in docs.
+- After edits, run formatting/lint checks and report changed files.
+```
+
 ## How to use this
 
 1. Follow steps in order.
@@ -606,6 +631,5 @@ flowchart LR
   mobile_smoke --> mobile_artifacts["Maestro screenshots and logs"]
   mobile_artifacts --> mobile_policy["Local manual default, non gating CI"]
 ```
-
 
 
