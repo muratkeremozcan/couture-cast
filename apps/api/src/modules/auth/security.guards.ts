@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
+import { updateRequestContext } from '../../logger/request-context'
 import { API_ROLES_KEY } from './security.decorators'
 import { API_ROLES, type ApiRole, type AuthenticatedRequest } from './security.types'
 
@@ -61,6 +62,7 @@ export class RequestAuthGuard implements CanActivate {
     }
 
     request.auth = { token, userId, role }
+    updateRequestContext({ userId })
     return true
   }
 }

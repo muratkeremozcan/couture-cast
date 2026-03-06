@@ -572,7 +572,65 @@ flowchart TD
 
 
 
-## Step 10 - Cross-surface E2E confidence
+## Step 10 - API observability with structured logging
+
+User/business impact:
+
+Structured request logging makes production failures diagnosable without guesswork across API,
+trace, and queue activity. The business gets faster incident response and stronger release
+confidence because every request can be tied to a request ID, user context, feature area, and
+OpenTelemetry trace.
+
+Key takeaways:
+
+1. Structured logs are part of the contract: API logs emit stable JSON fields including
+  `timestamp`, `requestId`, `userId`, `feature`, `level`, and `message`.
+2. Request context survives the full request lifecycle: middleware generates or reuses
+  `x-request-id`, auth guards enrich `userId`, and later logs inherit that context automatically.
+3. Trace correlation is built into the logger: active OpenTelemetry span IDs are attached so logs
+  and traces line up in Grafana during debugging.
+4. Environment policy matters: local defaults to `debug`, dev to `info`, and prod to `warn`,
+  keeping signal-to-noise appropriate per environment.
+
+Story/Task mapping:
+
+- Story 0.7
+- Task 5 (Pino structured logging)
+
+Story reference:
+
+- `docs/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md`
+
+Code evidence:
+
+- `apps/api/src/main.ts`
+- `apps/api/src/logger/pino.config.ts`
+- `apps/api/src/logger/request-context.ts`
+- `apps/api/src/logger/request-logger.middleware.ts`
+- `apps/api/src/logger/pino.config.spec.ts`
+- `apps/api/src/logger/request-context.spec.ts`
+- `apps/api/src/logger/request-logger.middleware.spec.ts`
+
+Architecture diagram:
+
+```mermaid
+flowchart LR
+  client["Client request"] --> reqid["Request-context middleware<br/>generate or reuse x-request-id"]
+  reqid --> httplog["pino-http middleware<br/>request_received / request_completed"]
+  httplog --> nest["Nest guards + handlers"]
+  nest --> auth["Auth guard enriches userId"]
+  auth --> svc["Shared Pino logger in services"]
+  svc --> trace["Active OTEL span context"]
+  trace --> grafana["Grafana / OTLP correlation"]
+
+  reqid --> context["AsyncLocalStorage request context"]
+  context --> httplog
+  context --> svc
+```
+
+
+
+## Step 11 - Cross-surface E2E confidence
 
 User/business impact:
 
@@ -631,5 +689,3 @@ flowchart LR
   mobile_smoke --> mobile_artifacts["Maestro screenshots and logs"]
   mobile_artifacts --> mobile_policy["Local manual default, non gating CI"]
 ```
-
-

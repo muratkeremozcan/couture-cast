@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core'
 import { AppModule } from './app.module'
 import { initializeOpenTelemetry } from './instrumentation'
+import { bindRequestContext } from './logger/request-context'
+import { createRequestLoggerMiddleware } from './logger/request-logger.middleware'
 import { PostHogService } from './posthog/posthog.service'
 
 async function bootstrap() {
@@ -8,6 +10,8 @@ async function bootstrap() {
   initializeOpenTelemetry()
 
   const app = await NestFactory.create(AppModule)
+  app.use(bindRequestContext)
+  app.use(createRequestLoggerMiddleware())
   const port = Number(process.env.PORT ?? 3000)
   await app.listen(port)
 

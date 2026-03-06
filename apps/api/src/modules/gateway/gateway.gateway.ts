@@ -2,8 +2,8 @@ import { Inject } from '@nestjs/common'
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets'
 import type { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets'
 import type { Logger } from 'pino'
-import pino from 'pino'
 import type { Server, Socket, ExtendedError } from 'socket.io'
+import { createBaseLogger } from '../../logger/pino.config'
 // Value import required so Nest can reflect the provider token
 import { ConnectionManager, type DisconnectResult } from './connection-manager.service'
 
@@ -154,8 +154,5 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 export const gatewayLoggerProvider = {
   provide: GATEWAY_LOGGER,
   useFactory: () =>
-    pino({
-      name: 'gateway',
-      level: process.env.LOG_LEVEL ?? 'info',
-    }),
+    createBaseLogger().child({ feature: 'gateway', loggerName: 'gateway' }),
 }

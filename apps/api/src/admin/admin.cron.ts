@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
+import { createBaseLogger } from '../logger/pino.config'
 
 import { AdminService } from './admin.service'
 // Keep runtime reference so import isn't treated as type-only
@@ -8,7 +9,7 @@ const __adminServiceRef = AdminService
 
 @Injectable()
 export class AdminCron {
-  private readonly logger = new Logger(AdminCron.name)
+  private readonly logger = createBaseLogger().child({ feature: 'admin' })
 
   constructor(private readonly adminService: AdminService) {}
 
@@ -16,9 +17,9 @@ export class AdminCron {
   async pruneJobFailures() {
     try {
       const result = await this.adminService.pruneFailedJobs(30)
-      this.logger.log(`Pruned ${result.deleted} job failures older than 30 days`)
+      this.logger.info({ deleted: result.deleted }, 'pruned_job_failures')
     } catch (err) {
-      this.logger.error('Failed to prune job failures', err)
+      this.logger.error({ err }, 'prune_job_failures_failed')
     }
   }
 }
