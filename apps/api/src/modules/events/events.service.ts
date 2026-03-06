@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
+import { createBaseLogger } from '../../logger/pino.config'
 import { EventsRepository } from './events.repository'
 
 /**
@@ -13,7 +14,7 @@ import { EventsRepository } from './events.repository'
  */
 @Injectable()
 export class EventsService {
-  private readonly logger = new Logger(EventsService.name)
+  private readonly logger = createBaseLogger().child({ feature: 'events' })
 
   constructor(private readonly repo: EventsRepository) {}
 
@@ -36,7 +37,7 @@ export class EventsService {
       }
     } catch (error) {
       // Gracefully degrade if storage is unavailable; clients can still poll without breaking.
-      this.logger.error('poll events failed', error as Error)
+      this.logger.error({ err: error }, 'poll_events_failed')
       return { events: [], nextSince: null }
     }
   }

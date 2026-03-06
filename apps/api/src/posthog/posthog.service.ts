@@ -1,5 +1,6 @@
-import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common'
+import { Injectable, OnApplicationShutdown } from '@nestjs/common'
 import { PostHog } from 'posthog-node'
+import { createBaseLogger } from '../logger/pino.config'
 
 export interface PostHogCaptureEvent {
   distinctId: string
@@ -9,7 +10,7 @@ export interface PostHogCaptureEvent {
 
 @Injectable()
 export class PostHogService implements OnApplicationShutdown {
-  private readonly logger = new Logger(PostHogService.name)
+  private readonly logger = createBaseLogger().child({ feature: 'posthog' })
   private readonly client: PostHog | null
 
   constructor() {
@@ -34,7 +35,7 @@ export class PostHogService implements OnApplicationShutdown {
         properties,
       })
     } catch (error) {
-      this.logger.warn(`PostHog capture failed for "${event}"`, error as Error)
+      this.logger.warn({ err: error, event }, 'posthog_capture_failed')
     }
   }
 
@@ -44,7 +45,7 @@ export class PostHogService implements OnApplicationShutdown {
     try {
       void this.client.shutdown()
     } catch (error) {
-      this.logger.warn('PostHog shutdown failed', error as Error)
+      this.logger.warn({ err: error }, 'posthog_shutdown_failed')
     }
   }
 }

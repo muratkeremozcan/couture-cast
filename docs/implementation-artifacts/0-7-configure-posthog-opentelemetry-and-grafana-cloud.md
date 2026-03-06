@@ -111,14 +111,14 @@ so that we can track success metrics and monitor system health across all enviro
   - [x] Set up trace context propagation (B3 or W3C Trace Context)
   - [x] Add OpenTelemetry initialization to `main.ts` (before NestJS bootstrap)
 
-- [ ] Task 5: Configure Pino structured logging (AC: #3)
-  - [ ] Install Pino: `npm install pino pino-http pino-pretty --workspace apps/api`
-  - [ ] Create `apps/api/src/logger/pino.config.ts` with log format
-  - [ ] Configure structured log format: { timestamp, requestId, userId, feature, level, message }
-  - [ ] Set up request ID generation middleware (UUID v4)
-  - [ ] Integrate Pino with OpenTelemetry: correlate logs with traces
-  - [ ] Configure log levels per environment: debug (local), info (dev), warn (prod)
-  - [ ] Add Pino HTTP middleware to log all requests/responses
+- [x] Task 5: Configure Pino structured logging (AC: #3)
+  - [x] Install Pino: `npm install pino pino-http pino-pretty --workspace apps/api`
+  - [x] Create `apps/api/src/logger/pino.config.ts` with log format
+  - [x] Configure structured log format: { timestamp, requestId, userId, feature, level, message }
+  - [x] Set up request ID generation middleware (UUID v4)
+  - [x] Integrate Pino with OpenTelemetry: correlate logs with traces
+  - [x] Configure log levels per environment: debug (local), info (dev), warn (prod)
+  - [x] Add Pino HTTP middleware to log all requests/responses
 
 - [ ] Task 6: Set up Grafana Cloud account (AC: #4)
   - [ ] Sign up for Grafana Cloud (free tier)
@@ -476,6 +476,11 @@ docs/
 - `npm run lint`
 - `npm run typecheck`
 - `npm run test`
+- `npm install pino-http pino-pretty --workspace apps/api`
+- `npm run test --workspace apps/api -- src/logger/request-context.spec.ts src/logger/pino.config.spec.ts src/logger/request-logger.middleware.spec.ts`
+- `npm run typecheck --workspace apps/api`
+- `npm run lint --workspace apps/api`
+- `npm run test --workspace apps/api`
 
 ### Completion Notes List
 
@@ -512,6 +517,19 @@ docs/
     selection, and one-time init semantics.
   - Updated `apps/api/src/main.ts` to initialize OpenTelemetry before NestJS bootstrap.
   - Revalidated workspace quality gates: `npm run lint`, `npm run typecheck`, `npm run test`.
+- Completed Task 5 Pino structured logging in API:
+  - Added `apps/api/src/logger/pino.config.ts` for shared Pino config with ISO timestamps,
+    request/user/feature fields, OTEL trace correlation, env-aware log levels, and optional local
+    pretty transport.
+  - Added `apps/api/src/logger/request-context.ts` and
+    `apps/api/src/logger/request-logger.middleware.ts` to generate/reuse `x-request-id`, bind
+    async request context, and log HTTP request/response lifecycle with `pino-http`.
+  - Updated `apps/api/src/main.ts` and `apps/api/src/modules/auth/security.guards.ts` so request
+    context survives the request path and authenticated `userId` enriches later logs.
+  - Normalized API Pino usage in gateway, PostHog, events, and admin cron modules to the shared
+    logger contract.
+  - Added logger unit/integration-style tests and revalidated `apps/api` via lint, typecheck, and
+    full Vitest suite.
 
 ### File List
 
@@ -541,6 +559,17 @@ docs/
 - `apps/api/src/instrumentation.ts` (new)
 - `apps/api/src/instrumentation.spec.ts` (new)
 - `apps/api/src/main.ts` (modified)
+- `apps/api/src/logger/pino.config.ts` (new)
+- `apps/api/src/logger/request-context.ts` (new)
+- `apps/api/src/logger/request-logger.middleware.ts` (new)
+- `apps/api/src/logger/pino.config.spec.ts` (new)
+- `apps/api/src/logger/request-context.spec.ts` (new)
+- `apps/api/src/logger/request-logger.middleware.spec.ts` (new)
+- `apps/api/src/admin/admin.cron.ts` (modified)
+- `apps/api/src/modules/auth/security.guards.ts` (modified)
+- `apps/api/src/modules/events/events.service.ts` (modified)
+- `apps/api/src/modules/gateway/gateway.gateway.ts` (modified)
+- `apps/api/src/posthog/posthog.service.ts` (modified)
 - `apps/api/package.json` (modified)
 - `package-lock.json` (modified)
 - `docs/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md` (modified)
@@ -554,6 +583,7 @@ docs/
 | 2026-03-04 | Amelia (Developer Agent) | Completed Task 3 event tracking across mobile/web/API with auth+moderation modules, added API tests, and validated via lint/typecheck/test |
 | 2026-03-04 | Amelia (Senior Developer Review AI) | Reviewed Task 3 implementation, found 5 High/Medium issues, applied automatic fixes, and revalidated lint/typecheck/test |
 | 2026-03-05 | Amelia (Developer Agent) | Completed Task 4 OpenTelemetry setup in `apps/api` with Grafana OTLP traces/metrics, W3C propagation, bootstrap init wiring, new unit tests, and full workspace validation |
+| 2026-03-06 | Amelia (Developer Agent) | Completed Task 5 Pino structured logging in `apps/api` with shared logger config, request-context + `pino-http` middleware, OTEL trace correlation, env-based log levels, logger tests, and full API validation |
 
 ## Senior Developer Review (AI)
 
