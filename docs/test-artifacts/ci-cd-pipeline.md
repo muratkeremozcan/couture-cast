@@ -10,6 +10,8 @@ This repo uses GitHub Actions for CI and uses Vercel Git integration for web dep
 - `main` → Vercel Production deployments
 
 In CI, we treat Vercel Preview URLs as the "dev" target for `npm run test:pw-dev`.
+That is Playwright naming only. This setup does not maintain a separate hosted Vercel
+Development environment; PRs use Preview and `main` uses Production.
 
 ```mermaid
 flowchart TD
@@ -26,7 +28,8 @@ flowchart TD
 
 Playwright environment selection uses `TEST_ENV`:
 
-- `TEST_ENV=dev` uses `DEV_WEB_E2E_BASE_URL` (CI sets this to the Vercel Preview URL)
+- `TEST_ENV=dev` uses `DEV_WEB_E2E_BASE_URL` (CI sets this to the Vercel Preview URL; it does not
+  mean Vercel Development)
 - `TEST_ENV=prod` uses `PROD_WEB_E2E_BASE_URL` (set to your production domain)
 
 ## Workflows

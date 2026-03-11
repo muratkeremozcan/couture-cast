@@ -247,5 +247,5 @@ _Updated: 2025-11-13 — ADR-012 through ADR-014 added to resolve open technical
 - **Expo push flow:**
   1) Client registers Expo push token → `PushNotificationService.registerPushToken` (validates format, stores via Prisma `PushToken`).
   2) Batch sends (`EXPO_BATCH_SIZE=100`) via Expo SDK; classifies `DeviceNotRegistered` and `MessageRateExceeded` tickets.
-  3) Access token: `EXPO_ACCESS_TOKEN` (documented in .env.example).
+  3) Access token: `EXPO_TOKEN` (documented in root env files / deployment secrets).
 - **Troubleshooting:** Missing socket auth token → connection rejected. Exceeded retries → client switches to polling. Invalid `since` → poll returns `{ error: 'Invalid since timestamp' }` and empty events. Expo errors surfaced per-ticket; invalid tokens are reported for cleanup.

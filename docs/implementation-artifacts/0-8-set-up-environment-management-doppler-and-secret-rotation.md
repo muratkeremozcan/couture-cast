@@ -37,7 +37,7 @@ so that credentials stay secure across environments and comply with security bes
     - `GRAFANA_INSTANCE_ID`: Grafana OTLP instance ID
     - `GRAFANA_API_KEY`: Grafana OTLP API token
     - `GRAFANA_OTLP_ENDPOINT`: Grafana OTLP endpoint URL
-    - `EXPO_ACCESS_TOKEN`: Expo Push API token
+    - `EXPO_TOKEN`: Expo access token
     - `VERCEL_TOKEN`: Vercel deployment token
     - `VERCEL_ORG_ID`: Vercel org/team ID
     - `VERCEL_PROJECT_ID_WEB`: Vercel project ID for web/API deploy

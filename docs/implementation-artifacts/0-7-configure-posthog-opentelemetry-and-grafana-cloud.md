@@ -143,7 +143,7 @@ so that we can track success metrics and monitor system health across all enviro
     - Confirm the token includes at least `traces:write` and `metrics:write`; `logs:write` can
       stay enabled if you plan to export logs later
     - Save the token immediately when Grafana shows it; Grafana tokens are shown once
-  - [x] Add credentials to root env files and GitHub Actions
+  - [x] Add credentials to root env files, GitHub Actions, and Vercel
     - Open the root `.env.local`, `.env.dev`, and `.env.prod` files
     - Set `GRAFANA_OTLP_ENDPOINT=https://otlp-gateway-prod-us-east-2.grafana.net/otlp`
     - Set `GRAFANA_INSTANCE_ID=1555123`
@@ -164,6 +164,11 @@ so that we can track success metrics and monitor system health across all enviro
     - Set GitHub Actions secret `GRAFANA_INSTANCE_ID` to `1555123`
     - Set GitHub Actions secret `GRAFANA_API_KEY` to the same API token you just generated in
       Grafana Cloud
+    - In the Vercel API project, add the same three keys as project environment variables
+    - Use Vercel `All Pre-Production Environments` for values that mirror `.env.dev`
+    - Use Vercel `Production` for values that mirror `.env.prod`
+    - This repo currently uses Vercel Preview for PRs and Vercel Production for `main`; it does
+      not keep a separate hosted Vercel Development environment in sync
   - [x] Verify connection from the local NestJS app before touching dashboards
     - Start the API with the Grafana env vars loaded:
       `npm run start:dev --workspace api`
@@ -523,13 +528,13 @@ docs/
 ```
 
 **Environment Variables:**
-- `POSTHOG_API_KEY`: PostHog project key (root `.env` files + GitHub Actions secret)
+- `POSTHOG_API_KEY`: PostHog project key (root `.env` files + GitHub Actions secret + Vercel env var)
 - `POSTHOG_HOST`: PostHog host URL (`https://us.i.posthog.com`)
 - `SUPABASE_DB_DEV_PW`: Supabase dev database password (`[YOUR-PASSWORD]` in dev URI)
 - `SUPABASE_DB_PROD_PW`: Supabase prod database password (`[YOUR-PASSWORD]` in prod URI)
 - `DATABASE_URL`: Prisma Postgres connection URL in `.env.local` / `.env.dev` / `.env.prod`
 - `DATABASE_URL_DEV`, `DATABASE_URL_PROD`: GitHub Actions secrets for CI jobs
-- `GRAFANA_OTLP_ENDPOINT`: Grafana OTLP endpoint URL
+- `GRAFANA_OTLP_ENDPOINT`: Grafana OTLP endpoint URL (local env files + GitHub Actions + Vercel env var)
 - `GRAFANA_INSTANCE_ID`: Grafana OTLP instance ID used as the Basic auth username
 - `GRAFANA_API_KEY`: Grafana OTLP API token used as the Basic auth password
 - `OTEL_SERVICE_NAME`: Optional override for the exported OpenTelemetry `service.name`
@@ -685,8 +690,9 @@ docs/
   - Updated OTLP exporter URLs to use JS signal-specific paths
     (`/v1/traces`, `/v1/metrics`) while keeping the base endpoint in env/docs.
   - Updated Task 6, learning-path guidance, and environment-management docs so local env files and
-    GitHub Actions now use `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, and
-    `GRAFANA_API_KEY`.
+    GitHub Actions and Vercel now use `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, and
+    `GRAFANA_API_KEY`, with Vercel Preview mirroring `.env.dev` and Vercel Production mirroring
+    `.env.prod`.
   - Revalidated the OTLP setup with targeted API tests, API typecheck, and API lint.
 
 ### File List

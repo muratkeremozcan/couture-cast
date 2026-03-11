@@ -63,7 +63,9 @@ Notes against ACs
   - Web (Vercel):
     - [x] Sign up/login to Vercel and create a team/project for web.
     - [x] Install Vercel CLI: `npm i -g vercel`.
-    - [x] Configure env vars directly in Vercel (Preview→dev, Production→prod), set `HUSKY=0`, `NODE_VERSION=24`.
+    - [x] Configure env vars directly in Vercel so Preview mirrors `.env.dev` and Production
+      mirrors `.env.prod`, set `HUSKY=0`, `NODE_VERSION=24`. No separate hosted Vercel
+      Development environment is in active use.
     - [x] Build runs on main via Vercel (no GH Actions deploy).
     - [x] Optional: add PR comment with preview URL after deploy.
   - API (Vercel serverless, Nest adapter):
@@ -142,7 +144,7 @@ Notes against ACs
     - Vercel Dashboard → New Project → Import `muratkeremozcan/couture-cast` → Framework preset: Other → Root directory: `apps/api` → Continue.
     - If repo already linked, go to Project Settings → General → Framework preset: Other → Root directory: `apps/api`.
   - [x] Set Vercel env vars for API (Supabase keys, etc.), plus `HUSKY=0`, `NODE_VERSION=24`.
-    - Vercel Dashboard → Project → Settings → Environment Variables → add Preview/Production vars: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `REDIS_URL`, `REDIS_TLS`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `HUSKY=0`, `NODE_VERSION=24`.
+    - Vercel Dashboard → Project → Settings → Environment Variables → add Preview/Production vars: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `REDIS_URL`, `REDIS_TLS`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `POSTHOG_API_KEY`, `POSTHOG_HOST`, `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, `GRAFANA_API_KEY`, `HUSKY=0`, `NODE_VERSION=24`.
   - [x] Choose deploy trigger: Vercel Git integration (default) or GH Actions workflow for API deploys.
     - Default: keep Git integration on (auto Preview on PRs, Production on main).
     - Optional: disable auto-deploy and add a GH Actions workflow that runs `vercel pull/build/deploy` for `apps/api`.

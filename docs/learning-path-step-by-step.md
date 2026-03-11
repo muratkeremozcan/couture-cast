@@ -534,8 +534,10 @@ Key takeaways:
 2. Guardrails prevent noisy telemetry: missing `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, or
   `GRAFANA_API_KEY`, `NODE_ENV=test`, `OTEL_SDK_DISABLED=true`, or prior SDK init all no-op
   safely.
-3. Root env loading is part of the contract: the API now reads root `.env.local`, `.env.dev` /
-  `.env.prod`, and `.env` before OTEL startup, so env changes require a full API restart.
+3. Root env loading is part of the local contract: the API now reads root `.env.local`, `.env.dev`
+  / `.env.prod`, and `.env` before OTEL startup, so env changes require a full API restart.
+  Hosted Vercel deployments do not read those repo files at runtime; they must be configured in
+  Vercel project environment variables separately.
 4. Exported identity matters: set a stable OpenTelemetry `service.name` so Grafana shows
   `couturecast-api` instead of `unknown_service:node`.
 5. Vendor-neutral observability is explicit: W3C trace propagation + Node auto-instrumentations +
@@ -549,6 +551,10 @@ Environment setup:
 - Add all three keys to the root `.env.local`, `.env.dev`, and `.env.prod` files.
 - Add matching GitHub Actions repository secrets named `GRAFANA_OTLP_ENDPOINT`,
   `GRAFANA_INSTANCE_ID`, and `GRAFANA_API_KEY`.
+- Add the same three keys to the Vercel API project environment variables:
+  Preview should mirror `.env.dev`, and Production should mirror `.env.prod`.
+- In this repo there is no separate hosted Vercel Development environment in active use:
+  PRs deploy to Vercel Preview, and merges to `main` deploy to Vercel Production.
 - The API exports `service.name = couturecast-api` by default; use `OTEL_SERVICE_NAME` only if you
   intentionally need to override that.
 
@@ -605,8 +611,9 @@ Key takeaways:
   without a stack and OTLP credentials, the API's OpenTelemetry bootstrap safely no-ops.
 2. This repository uses three exact placeholders for Grafana OTLP setup:
   `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, and `GRAFANA_API_KEY`.
-3. Those same three names must be used in both local root env files and GitHub Actions
-  repository secrets so local development and CI read the same contract.
+3. Those same three names must be used across local root env files, GitHub Actions repository
+  secrets, and Vercel API project environment variables so local, CI, Preview, and Production all
+  read the same contract.
 4. Grafana Cloud usually provisions the core stack data sources already, including Tempo
   (traces), Loki (logs), and Prometheus/Mimir (metrics), and it may also add other
   Grafana-managed sources such as alert history, profiles, or usage views. First-time setup
@@ -639,15 +646,20 @@ GRAFANA_API_KEY=<paste-the-token-you-generated-in-grafana>
   Set `GRAFANA_OTLP_ENDPOINT` to `https://otlp-gateway-prod-us-east-2.grafana.net/otlp`.
   Set `GRAFANA_INSTANCE_ID` to `1555123`.
   Set `GRAFANA_API_KEY` to the same API token you just generated in Grafana Cloud.
-9. Start the API with `npm run start:dev --workspace api`, hit
+9. In the Vercel API project, add those same three keys to environment variables.
+  Use `All Pre-Production Environments` for the values that mirror `.env.dev`.
+  Use `Production` for the values that mirror `.env.prod`.
+  This repo currently uses Vercel Preview for PRs and Vercel Production for `main`; there is no
+  separate hosted Vercel Development environment to keep in sync.
+10. Start the API with `npm run start:dev --workspace api`, hit
   `http://localhost:3000/api/v1/health/queues`, then verify traces in Grafana `Explore` using
   Tempo and metrics using Prometheus. On the Prometheus screen, an empty graph with no selected
   metric does not prove metrics are broken yet; first click the `Metric` selector and choose an
   available metric before judging the result.
-10. If Grafana still shows no traces, add `OTEL_LOG_LEVEL=debug` to `.env.local`, restart the API,
+11. If Grafana still shows no traces, add `OTEL_LOG_LEVEL=debug` to `.env.local`, restart the API,
   and inspect the API terminal for OpenTelemetry patching or OTLP export/auth errors before making
   more code changes.
-11. Successful verification should show traces under service `couturecast-api`, not
+12. Successful verification should show traces under service `couturecast-api`, not
   `unknown_service:node`.
 
 Story/Task mapping:
@@ -689,6 +701,12 @@ flowchart TD
   endpoint --> gh["GitHub Actions secret: GRAFANA_OTLP_ENDPOINT"]
   id["GRAFANA_INSTANCE_ID"] --> gh2["GitHub Actions secret: GRAFANA_INSTANCE_ID"]
   token --> gh3["GitHub Actions secret: GRAFANA_API_KEY"]
+  endpoint --> vercelPreview["Vercel Preview env vars<br/>mirrors .env.dev"]
+  id --> vercelPreview
+  token --> vercelPreview
+  endpoint --> vercelProd["Vercel Production env vars<br/>mirrors .env.prod"]
+  id --> vercelProd
+  token --> vercelProd
   envfiles --> api["apps/api/src/instrumentation.ts"]
   gh --> ci["CI jobs"]
   gh2 --> ci
