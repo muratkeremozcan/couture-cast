@@ -531,10 +531,26 @@ Key takeaways:
 
 1. Bootstrap order is the control point: OpenTelemetry starts before Nest app creation so startup
   and request paths are instrumented from the first tick.
-2. Guardrails prevent noisy telemetry: missing Grafana OTLP credentials, `NODE_ENV=test`,
-  `OTEL_SDK_DISABLED=true`, or prior SDK init all no-op safely.
-3. Vendor-neutral observability is explicit: W3C trace propagation + Node auto-instrumentations +
+2. Guardrails prevent noisy telemetry: missing `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, or
+  `GRAFANA_API_KEY`, `NODE_ENV=test`, `OTEL_SDK_DISABLED=true`, or prior SDK init all no-op
+  safely.
+3. Root env loading is part of the contract: the API now reads root `.env.local`, `.env.dev` /
+  `.env.prod`, and `.env` before OTEL startup, so env changes require a full API restart.
+4. Exported identity matters: set a stable OpenTelemetry `service.name` so Grafana shows
+  `couturecast-api` instead of `unknown_service:node`.
+5. Vendor-neutral observability is explicit: W3C trace propagation + Node auto-instrumentations +
   OTLP exporters stream metrics/traces to Grafana with minimal app-level coupling.
+
+Environment setup:
+
+- Put the OTLP endpoint into `GRAFANA_OTLP_ENDPOINT`.
+- Put the Grafana OTLP `Instance ID` into `GRAFANA_INSTANCE_ID`.
+- Put the generated Grafana token into `GRAFANA_API_KEY`.
+- Add all three keys to the root `.env.local`, `.env.dev`, and `.env.prod` files.
+- Add matching GitHub Actions repository secrets named `GRAFANA_OTLP_ENDPOINT`,
+  `GRAFANA_INSTANCE_ID`, and `GRAFANA_API_KEY`.
+- The API exports `service.name = couturecast-api` by default; use `OTEL_SERVICE_NAME` only if you
+  intentionally need to override that.
 
 Story/Task mapping:
 
@@ -550,6 +566,8 @@ Code evidence:
 - `apps/api/src/instrumentation.ts`
 - `apps/api/src/main.ts`
 - `apps/api/src/instrumentation.spec.ts`
+- `apps/api/src/load-env.ts`
+- `apps/api/src/load-env.spec.ts`
 
 Architecture diagram:
 
@@ -557,7 +575,7 @@ Architecture diagram:
 flowchart TD
   env["Process env"] --> skip{"Test env, SDK disabled, or already initialized?"}
   skip -- Yes --> noop["Skip OTEL bootstrap"]
-  skip -- No --> creds{"Grafana OTLP endpoint and API key present?"}
+  skip -- No --> creds{"OTLP endpoint, instance ID, and token present?"}
   creds -- No --> noop
   creds -- Yes --> cfg["Build OTLP exporter config"]
   cfg --> exporters["Create trace and metric exporters"]
@@ -566,13 +584,139 @@ flowchart TD
   start --> nest["Bootstrap Nest app"]
   nest --> app["Handle HTTP requests and worker activity"]
   app --> otlp["Export spans and metrics via OTLP"]
-  otlp --> grafana["Grafana OTLP endpoint"]
+  otlp --> grafana["GRAFANA_OTLP_ENDPOINT"]
   start --> tests["instrumentation.spec.ts validates init behavior"]
 ```
 
 
 
-## Step 10 - API observability with structured logging
+## Step 10 - Grafana Cloud account and OTLP credential setup
+
+User/business impact:
+
+A working Grafana Cloud stack turns local OpenTelemetry instrumentation into an actual
+observability workflow the team can use. The business gets faster debugging and safer rollout
+decisions once traces and metrics can be verified in a shared hosted backend instead of only in
+local code.
+
+Key takeaways:
+
+1. Grafana Cloud account setup is part of the implementation, not an external prerequisite:
+  without a stack and OTLP credentials, the API's OpenTelemetry bootstrap safely no-ops.
+2. This repository uses three exact placeholders for Grafana OTLP setup:
+  `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, and `GRAFANA_API_KEY`.
+3. Those same three names must be used in both local root env files and GitHub Actions
+  repository secrets so local development and CI read the same contract.
+4. Grafana Cloud usually provisions the core stack data sources already, including Tempo
+  (traces), Loki (logs), and Prometheus/Mimir (metrics), and it may also add other
+  Grafana-managed sources such as alert history, profiles, or usage views. First-time setup
+  should verify those built-in data sources before creating duplicates.
+
+First-time setup flow:
+
+1. Create a Grafana Cloud account and open the Grafana Cloud Portal.
+2. Create stack `couturecastobservability`.
+  Grafana stack names must be lowercase alphanumeric, start with a letter, and cannot contain
+  dots, dashes, underscores, or spaces.
+3. Open the stack `Configure` page and copy the stack OTLP endpoint.
+4. On the stack OTLP connection details page, copy the `Instance ID`.
+5. On the stack OTLP connection details page, under `Password / API Token`, click `Generate now`.
+  Grafana pre-fills the OTLP write policy for this stack; confirm it includes `traces:write` and
+  `metrics:write`. `logs:write` can stay enabled if logs may be exported later.
+6. Put the endpoint, instance ID, and token into the root env files:
+  `.env.local`, `.env.dev`, `.env.prod`.
+7. Use these exact entries in each root env file:
+
+```bash
+GRAFANA_OTLP_ENDPOINT=https://otlp-gateway-prod-us-east-2.grafana.net/otlp
+GRAFANA_INSTANCE_ID=1555123
+GRAFANA_API_KEY=<paste-the-token-you-generated-in-grafana>
+```
+
+8. In GitHub, go to `Settings` -> `Secrets and variables` -> `Actions` and create repository
+  secrets with those same exact names:
+  `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, and `GRAFANA_API_KEY`.
+  Set `GRAFANA_OTLP_ENDPOINT` to `https://otlp-gateway-prod-us-east-2.grafana.net/otlp`.
+  Set `GRAFANA_INSTANCE_ID` to `1555123`.
+  Set `GRAFANA_API_KEY` to the same API token you just generated in Grafana Cloud.
+9. Start the API with `npm run start:dev --workspace api`, hit
+  `http://localhost:3000/api/v1/health/queues`, then verify traces in Grafana `Explore` using
+  Tempo and metrics using Prometheus. On the Prometheus screen, an empty graph with no selected
+  metric does not prove metrics are broken yet; first click the `Metric` selector and choose an
+  available metric before judging the result.
+10. If Grafana still shows no traces, add `OTEL_LOG_LEVEL=debug` to `.env.local`, restart the API,
+  and inspect the API terminal for OpenTelemetry patching or OTLP export/auth errors before making
+  more code changes.
+11. Successful verification should show traces under service `couturecast-api`, not
+  `unknown_service:node`.
+
+Story/Task mapping:
+
+- Story 0.7
+- Task 6 (Grafana Cloud account setup)
+
+Story reference:
+
+- `docs/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md`
+
+Impacted files:
+
+- `docs/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md`
+- `docs/learning-path-step-by-step.md`
+- `apps/api/src/instrumentation.ts`
+- `.env.local`
+- `.env.dev`
+- `.env.prod`
+
+Supporting references:
+
+- `https://grafana.com/docs/grafana-cloud/get-started/create-account/`
+- `https://grafana.com/docs/grafana-cloud/security-and-account-management/cloud-stacks/create-update-stacks/`
+- `https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/`
+- `https://grafana.com/docs/grafana-cloud/security-and-account-management/authentication-and-permissions/access-policies/create-access-policies/`
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  portal["Grafana Cloud Portal"] --> stack["Create stack couturecastobservability"]
+  stack --> configure["Stack Configure page"]
+  configure --> endpoint["Copy OTLP endpoint"]
+  configure --> token["Create stack-scoped access policy token"]
+  endpoint --> envfiles[".env.local .env.dev .env.prod"]
+  id --> envfiles
+  token --> envfiles
+  endpoint --> gh["GitHub Actions secret: GRAFANA_OTLP_ENDPOINT"]
+  id["GRAFANA_INSTANCE_ID"] --> gh2["GitHub Actions secret: GRAFANA_INSTANCE_ID"]
+  token --> gh3["GitHub Actions secret: GRAFANA_API_KEY"]
+  envfiles --> api["apps/api/src/instrumentation.ts"]
+  gh --> ci["CI jobs"]
+  gh2 --> ci
+  gh3 --> ci
+  api --> grafana["Grafana Explore: Tempo and Prometheus"]
+```
+
+Quick translation cheat sheet:
+
+| Grafana term | Plain English | What it means in this project | Rough DataDog equivalent | Rough AWS equivalent |
+| --- | --- | --- | --- | --- |
+| Tempo / `-traces` | Distributed traces | Request flows, spans, and timing for API calls such as `GET /api/v1/health/queues` | APM Traces / Trace Explorer | AWS X-Ray traces |
+| Prometheus / Mimir / `-prom` | Metrics store | Numeric time-series data such as request duration, process metrics, and exporter metrics | Metrics Explorer / custom metrics | CloudWatch Metrics |
+| Loki / `-logs` | Log store | Centralized application logs; for this story it may exist before log ingestion is wired up | Log Explorer / Log Management | CloudWatch Logs |
+| Profiles | Continuous profiling | CPU and runtime profiling for deeper performance debugging; not the main focus of Story 0.7 | Continuous Profiler | CodeGuru Profiler |
+| Alertmanager / alert state history | Alert routing and alert history | Where alert notifications and state transitions live after dashboards and alerts are added | Monitors / monitor state history | CloudWatch Alarms plus SNS notification flow |
+| Usage / usage insights | Grafana account usage data | Grafana's own billing or platform usage views, not your app telemetry | Usage / billing views | Cost Explorer or service usage dashboards |
+
+Quick way to think about it:
+
+- `Tempo` answers: "What happened during this request?"
+- `Prometheus` answers: "How much, how often, how long?"
+- `Loki` answers: "What did the app log?"
+- `Profiles` answers: "Where is the CPU or runtime time going?"
+
+
+
+## Step 11 - API observability with structured logging
 
 User/business impact:
 
@@ -630,7 +774,7 @@ flowchart LR
 
 
 
-## Step 11 - Cross-surface E2E confidence
+## Step 12 - Cross-surface E2E confidence
 
 User/business impact:
 

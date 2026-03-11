@@ -1,13 +1,45 @@
-import { NestFactory } from '@nestjs/core'
-import { AppModule } from './app.module'
-import { initializeOpenTelemetry } from './instrumentation'
-import { bindRequestContext } from './logger/request-context'
-import { createRequestLoggerMiddleware } from './logger/request-logger.middleware'
-import { PostHogService } from './posthog/posthog.service'
+import './load-env'
+import {
+  initializeOpenTelemetry,
+  resolveOtelDiagnosticLogLevel,
+  resolveOtlpExporterConfig,
+} from './instrumentation'
 
 async function bootstrap() {
   // 4) initialize SDK before app bootstrap
-  initializeOpenTelemetry()
+  const otelInitialized = initializeOpenTelemetry()
+  const otlpConfig = resolveOtlpExporterConfig(process.env)
+  const otelDiagnosticLevel = resolveOtelDiagnosticLogLevel(process.env)
+
+  // Emit one explicit OTEL bootstrap line so local verification is not guesswork.
+  console.info(
+    JSON.stringify({
+      component: 'otel',
+      diagnosticsEnabled: otelDiagnosticLevel !== null,
+      hasAuthHeader: Boolean(otlpConfig?.headers.Authorization),
+      hasEndpoint: Boolean(otlpConfig?.url),
+      initialized: otelInitialized,
+      level: 'info',
+      message: 'otel_bootstrap',
+      otelLogLevel: process.env.OTEL_LOG_LEVEL ?? null,
+    })
+  )
+
+  // Delay Nest/app imports until after OTEL starts so HTTP/framework modules are patched before
+  // they load; otherwise incoming request instrumentation can be missed.
+  const [
+    { NestFactory },
+    { AppModule },
+    { bindRequestContext },
+    { createRequestLoggerMiddleware },
+    { PostHogService },
+  ] = await Promise.all([
+    import('@nestjs/core'),
+    import('./app.module.js'),
+    import('./logger/request-context.js'),
+    import('./logger/request-logger.middleware.js'),
+    import('./posthog/posthog.service.js'),
+  ])
 
   const app = await NestFactory.create(AppModule)
   app.use(bindRequestContext)
@@ -29,4 +61,7 @@ async function bootstrap() {
   }
 }
 
-void bootstrap()
+bootstrap().catch((error: unknown) => {
+  console.error('bootstrap_failed', error)
+  process.exit(1)
+})
