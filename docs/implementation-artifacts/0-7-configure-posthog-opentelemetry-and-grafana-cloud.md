@@ -110,6 +110,7 @@ so that we can track success metrics and monitor system health across all enviro
   - [x] Configure OTLP exporters to Grafana Cloud endpoint
   - [x] Set up trace context propagation (B3 or W3C Trace Context)
   - [x] Add OpenTelemetry initialization to `main.ts` (before NestJS bootstrap)
+  - [x] Load root `.env.local`, `.env.dev` / `.env.prod`, and `.env` before OTEL + Nest bootstrap
 
 - [x] Task 5: Configure Pino structured logging (AC: #3)
   - [x] Install Pino: `npm install pino pino-http pino-pretty --workspace apps/api`
@@ -121,12 +122,126 @@ so that we can track success metrics and monitor system health across all enviro
   - [x] Add Pino HTTP middleware to log all requests/responses
 
 - [ ] Task 6: Set up Grafana Cloud account (AC: #4)
-  - [ ] Sign up for Grafana Cloud (free tier)
-  - [ ] Create stack: `couturecast-observability`
-  - [ ] Generate OTLP endpoint credentials (zone, instance ID, API key)
-  - [ ] Add credentials to root `.env` files for local use and GitHub Actions secrets for CI: `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_API_KEY`
-  - [ ] Verify connection: send test trace from local NestJS app
-  - [ ] Configure data source in Grafana: Tempo (traces), Loki (logs), Prometheus (metrics)
+  - [x] Sign up for Grafana Cloud (free tier)
+    - Go to `https://grafana.com/products/cloud/` and click `Create free account`
+    - Complete email verification, then open the Grafana Cloud Portal
+  - [x] Create stack in the Grafana Cloud Portal (https://grafana.com/orgs/muratkerem)
+    (Each stack is an isolated Grafana instance with its own URL, Prometheus, Loki, Tempo, etc.)
+    (by default it creates a stack with the name of the organization, you can delete it and create a new one with the name you want)
+    - In the portal, click `Add stack`
+    - Use stack slug `couturecastobservability`
+    - Grafana stack names must be lowercase alphanumeric, start with a letter, and cannot contain
+      dots, dashes, underscores, or spaces, so `couturecast-observability` is not a valid stack
+      name
+    - Pick the region closest to the primary API deployment region to minimize telemetry latency
+  - [x] Generate OTLP credentials for this repository's direct SDK export flow
+    - In the Grafana Cloud Portal, open the new stack, then click `Configure`
+    - In the `OpenTelemetry` / `OTLP Endpoint` section, copy the generated OTLP endpoint
+    - On that same page, copy the `Instance ID`
+    - On that same page, under `Password / API Token`, click `Generate now`
+    - Grafana pre-fills the OTLP write policy for this stack on the token form
+    - Confirm the token includes at least `traces:write` and `metrics:write`; `logs:write` can
+      stay enabled if you plan to export logs later
+    - Save the token immediately when Grafana shows it; Grafana tokens are shown once
+  - [x] Add credentials to root env files, GitHub Actions, and Vercel
+    - Open the root `.env.local`, `.env.dev`, and `.env.prod` files
+    - Set `GRAFANA_OTLP_ENDPOINT=https://otlp-gateway-prod-us-east-2.grafana.net/otlp`
+    - Set `GRAFANA_INSTANCE_ID=1555123`
+    - Set `GRAFANA_API_KEY` to the API token you just generated in Grafana Cloud
+    - Use this exact block in each file:
+      ```bash
+      GRAFANA_OTLP_ENDPOINT=https://otlp-gateway-prod-us-east-2.grafana.net/otlp
+      GRAFANA_INSTANCE_ID=1555123
+      GRAFANA_API_KEY=<paste-the-token-you-generated-in-grafana>
+      ```
+    - In GitHub, go to repository `Settings` -> `Secrets and variables` -> `Actions`
+    - Create three repository secrets:
+      - `GRAFANA_OTLP_ENDPOINT`
+      - `GRAFANA_INSTANCE_ID`
+      - `GRAFANA_API_KEY`
+    - Set GitHub Actions secret `GRAFANA_OTLP_ENDPOINT` to
+      `https://otlp-gateway-prod-us-east-2.grafana.net/otlp`
+    - Set GitHub Actions secret `GRAFANA_INSTANCE_ID` to `1555123`
+    - Set GitHub Actions secret `GRAFANA_API_KEY` to the same API token you just generated in
+      Grafana Cloud
+    - In the Vercel API project, add the same three keys as project environment variables
+    - Use Vercel `All Pre-Production Environments` for values that mirror `.env.dev`
+    - Use Vercel `Production` for values that mirror `.env.prod`
+    - This repo currently uses Vercel Preview for PRs and Vercel Production for `main`; it does
+      not keep a separate hosted Vercel Development environment in sync
+  - [x] Verify connection from the local NestJS app before touching dashboards
+    - Start the API with the Grafana env vars loaded:
+      `npm run start:dev --workspace api`
+    - If you change `.env.local`, fully restart the API process before testing again
+    - Trigger a few test requests after startup:
+      ```bash
+      curl http://localhost:3000/api/v1/health/queues
+      curl http://localhost:3000/api/v1/health/queues
+      curl http://localhost:3000/api/v1/health/queues
+      ```
+    - In Grafana, open the stack's Grafana instance, then go to `Explore`
+    - First verify traces, not metrics:
+      - Open the data source dropdown at the top of the query panel
+      - Select the data source whose name ends with `-traces`
+      - In this stack, that should be `grafanacloud-couturecastobservability-traces`
+      - The type shown on the right should be `Tempo`
+      - Also check the small label inside query row `A`; it must switch to
+        `(grafanacloud-couturecastobservability-traces)`
+      - If you still see a `Metric` field, you are still in Prometheus and have not switched to
+        traces yet
+      - If the page title says `-traces` but query row `A` still shows `(...-prom)`, Grafana has
+        not actually switched the active query to traces yet
+      - In that case, delete the old query row and create a new query using the `-traces` data
+        source instead of trying to convert the existing Prometheus query
+    - After switching to the `-traces` data source:
+      - Set the time range to `Last 15 minutes`
+      - Leave the default search settings alone for the first check
+      - Use `Query type = Search`
+      - Do not add filters, TraceQL text, or service filters for the first check
+      - Click `Run query` once with the empty/default traces search
+      - Wait a few seconds, then click `Run query` again if needed
+      - Look for any recent trace generated by the local API requests you just sent
+      - The `Service` column should resolve to `couturecast-api`; if you still see
+        `unknown_service:node`, the API is exporting traces without an explicit `service.name`
+    - Once traces are visible, verify metrics separately:
+      - Switch the data source dropdown to the one ending with `-prom`
+      - In this stack, that should be `grafanacloud-couturecastobservability-prom`
+      - The type shown on the right should be `Prometheus`
+      - This metrics screen is expected to show a `Metric` selector; that is normal for Prometheus
+      - If no metric is selected yet, Grafana is not actually querying anything yet, so `No data`
+        on its own does not mean metrics are broken
+      - Click the `Metric` selector first, then search for a metric name instead of pressing
+        `Run query` on an empty Prometheus query
+      - For a first check, search for broad built-in metrics such as `http`, `nodejs`, `process`,
+        or `target`
+      - Pick one metric that has recent samples, then click `Run query`
+      - If the metric dropdown itself is empty after traces are already visible and you have waited
+        a minute or two, treat that as a metrics ingestion problem and go back to the API terminal
+        to inspect OTLP metric export output
+      - Metrics can take a little longer than traces to appear, so traces are the first success
+        check
+    - If no trace data appears after a minute:
+      - Confirm the API was restarted after adding Grafana env vars
+      - Confirm `.env.local` includes `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, and
+        `GRAFANA_API_KEY`
+      - Confirm the Grafana token has `traces:write` and `metrics:write`
+      - Set `OTEL_LOG_LEVEL=debug` in `.env.local`, restart the API, and watch the API terminal for
+        OpenTelemetry patch/export/auth messages
+      - Healthy local debug output should include:
+        - an `otel_bootstrap` JSON line with `diagnosticsEnabled=true`, `hasEndpoint=true`,
+          `hasAuthHeader=true`, and `initialized=true`
+        - `Applying instrumentation patch` lines for `http`, `express`, and `@nestjs/core`
+        - request logs that now include `traceId` / `spanId`
+        - `OTLPExportDelegate items to be sent` after you hit the health endpoint
+      - Check the API terminal for OTLP export/auth errors before moving on
+  - [x] Verify built-in Grafana Cloud data sources instead of creating duplicates
+    - In Grafana, go to `Connections` -> `Data sources`
+    - Confirm the stack already exposes Tempo (traces), Loki (logs), and Prometheus/Mimir
+      (metrics)
+    - Only create or clone a data source if a provisioned default is missing or you need custom
+      settings / cross-stack queries
+    - Current repo caveat: traces and metrics can be verified now; Loki log ingestion may remain
+      empty until a dedicated OTLP log pipeline or collector is added
 
 - [ ] Task 7: Create Grafana dashboards (AC: #4)
   - [ ] Create dashboard: "CoutureCast API Health"
@@ -347,16 +462,35 @@ logger.info({
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+import {
+  ATTR_DEPLOYMENT_ENVIRONMENT_NAME,
+  ATTR_SERVICE_NAME,
+  ATTR_SERVICE_VERSION,
+} from '@opentelemetry/semantic-conventions';
 
 const sdk = new NodeSDK({
+  resource: resourceFromAttributes({
+    [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME ?? 'couturecast-api',
+    [ATTR_SERVICE_VERSION]: process.env.npm_package_version ?? '0.0.1',
+    [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: process.env.NODE_ENV ?? 'local',
+  }),
   traceExporter: new OTLPTraceExporter({
-    url: process.env.GRAFANA_OTLP_ENDPOINT,
-    headers: { Authorization: `Bearer ${process.env.GRAFANA_API_KEY}` },
+    url: `${process.env.GRAFANA_OTLP_ENDPOINT}/v1/traces`,
+    headers: {
+      Authorization: `Basic ${Buffer.from(
+        `${process.env.GRAFANA_INSTANCE_ID}:${process.env.GRAFANA_API_KEY}`
+      ).toString('base64')}`,
+    },
   }),
   metricExporter: new OTLPMetricExporter({
-    url: process.env.GRAFANA_OTLP_ENDPOINT,
-    headers: { Authorization: `Bearer ${process.env.GRAFANA_API_KEY}` },
+    url: `${process.env.GRAFANA_OTLP_ENDPOINT}/v1/metrics`,
+    headers: {
+      Authorization: `Basic ${Buffer.from(
+        `${process.env.GRAFANA_INSTANCE_ID}:${process.env.GRAFANA_API_KEY}`
+      ).toString('base64')}`,
+    },
   }),
   instrumentations: [getNodeAutoInstrumentations()],
 });
@@ -394,14 +528,16 @@ docs/
 ```
 
 **Environment Variables:**
-- `POSTHOG_API_KEY`: PostHog project key (root `.env` files + GitHub Actions secret)
+- `POSTHOG_API_KEY`: PostHog project key (root `.env` files + GitHub Actions secret + Vercel env var)
 - `POSTHOG_HOST`: PostHog host URL (`https://us.i.posthog.com`)
 - `SUPABASE_DB_DEV_PW`: Supabase dev database password (`[YOUR-PASSWORD]` in dev URI)
 - `SUPABASE_DB_PROD_PW`: Supabase prod database password (`[YOUR-PASSWORD]` in prod URI)
 - `DATABASE_URL`: Prisma Postgres connection URL in `.env.local` / `.env.dev` / `.env.prod`
 - `DATABASE_URL_DEV`, `DATABASE_URL_PROD`: GitHub Actions secrets for CI jobs
-- `GRAFANA_OTLP_ENDPOINT`: Grafana OTLP endpoint URL
-- `GRAFANA_API_KEY`: Grafana API key for OTLP
+- `GRAFANA_OTLP_ENDPOINT`: Grafana OTLP endpoint URL (local env files + GitHub Actions + Vercel env var)
+- `GRAFANA_INSTANCE_ID`: Grafana OTLP instance ID used as the Basic auth username
+- `GRAFANA_API_KEY`: Grafana OTLP API token used as the Basic auth password
+- `OTEL_SERVICE_NAME`: Optional override for the exported OpenTelemetry `service.name`
 - `LOG_LEVEL`: Pino log level (debug, info, warn, error)
 
 ### References
@@ -413,6 +549,12 @@ docs/
 - [PostHog Documentation](https://posthog.com/docs)
 - [OpenTelemetry Node.js](https://opentelemetry.io/docs/instrumentation/js/getting-started/nodejs/)
 - [Grafana Cloud](https://grafana.com/docs/grafana-cloud/)
+- [Grafana Cloud: Create an account](https://grafana.com/docs/grafana-cloud/get-started/create-account/)
+- [Grafana Cloud: Create or update stacks](https://grafana.com/docs/grafana-cloud/security-and-account-management/cloud-stacks/create-update-stacks/)
+- [Grafana Cloud: Manage cloud stacks](https://grafana.com/docs/grafana-cloud/security-and-account-management/cloud-stacks/)
+- [Grafana Cloud: Send OTLP data](https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/)
+- [Grafana Cloud: Create access policies](https://grafana.com/docs/grafana-cloud/security-and-account-management/authentication-and-permissions/access-policies/create-access-policies/)
+- [Grafana Cloud: Use traces with Grafana](https://grafana.com/docs/grafana-cloud/send-data/traces/use-traces-with-grafana/)
 - [Pino Logging](https://getpino.io/)
 
 ### Learnings from Previous Stories
@@ -480,7 +622,11 @@ docs/
 - `npm run test --workspace apps/api -- src/logger/request-context.spec.ts src/logger/pino.config.spec.ts src/logger/request-logger.middleware.spec.ts`
 - `npm run typecheck --workspace apps/api`
 - `npm run lint --workspace apps/api`
+- `npm run test --workspace apps/api -- src/instrumentation.spec.ts`
+- `npm run typecheck --workspace apps/api`
+- `npm run lint --workspace apps/api`
 - `npm run test --workspace apps/api`
+- `npx markdownlint-cli2 docs/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md` (existing document-wide lint debt; 108 findings)
 
 ### Completion Notes List
 
@@ -515,7 +661,9 @@ docs/
     exporters, W3C trace context propagator, auto-instrumentations, and init/shutdown helpers.
   - Added `apps/api/src/instrumentation.spec.ts` unit coverage for OTLP env config, W3C propagator
     selection, and one-time init semantics.
-  - Updated `apps/api/src/main.ts` to initialize OpenTelemetry before NestJS bootstrap.
+- Updated `apps/api/src/main.ts` to initialize OpenTelemetry before NestJS bootstrap.
+- Added `apps/api/src/load-env.ts` so the API loads root env files before OTEL + Nest startup, and
+  added `apps/api/src/load-env.spec.ts` coverage for dev/prod env file selection.
   - Revalidated workspace quality gates: `npm run lint`, `npm run typecheck`, `npm run test`.
 - Completed Task 5 Pino structured logging in API:
   - Added `apps/api/src/logger/pino.config.ts` for shared Pino config with ISO timestamps,
@@ -530,6 +678,22 @@ docs/
     logger contract.
   - Added logger unit/integration-style tests and revalidated `apps/api` via lint, typecheck, and
     full Vitest suite.
+- Expanded Task 6 in the story doc with first-time Grafana Cloud setup steps validated against
+  official Grafana/OpenTelemetry docs, including stack naming constraints, OTLP token setup,
+  repo env var mapping, local verification flow, and the note that Grafana Cloud data sources are
+  typically provisioned already.
+- Normalized Grafana OTLP naming across the story and learning-path docs so both now instruct
+  `GRAFANA_OTLP_ENDPOINT` and `GRAFANA_API_KEY` in root env files and GitHub Actions secrets.
+- Corrected Grafana Cloud OTLP auth to use Basic auth semantics instead of Bearer:
+  - Updated `apps/api/src/instrumentation.ts` to build the OTLP `Authorization` header from
+    `GRAFANA_INSTANCE_ID` + `GRAFANA_API_KEY`, with optional `GRAFANA_OTLP_AUTH_HEADER` override.
+  - Updated OTLP exporter URLs to use JS signal-specific paths
+    (`/v1/traces`, `/v1/metrics`) while keeping the base endpoint in env/docs.
+  - Updated Task 6, learning-path guidance, and environment-management docs so local env files and
+    GitHub Actions and Vercel now use `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, and
+    `GRAFANA_API_KEY`, with Vercel Preview mirroring `.env.dev` and Vercel Production mirroring
+    `.env.prod`.
+  - Revalidated the OTLP setup with targeted API tests, API typecheck, and API lint.
 
 ### File List
 
@@ -558,6 +722,8 @@ docs/
 - `apps/api/src/app.module.ts` (modified)
 - `apps/api/src/instrumentation.ts` (new)
 - `apps/api/src/instrumentation.spec.ts` (new)
+- `apps/api/src/load-env.ts` (new)
+- `apps/api/src/load-env.spec.ts` (new)
 - `apps/api/src/main.ts` (modified)
 - `apps/api/src/logger/pino.config.ts` (new)
 - `apps/api/src/logger/request-context.ts` (new)
@@ -573,6 +739,8 @@ docs/
 - `apps/api/package.json` (modified)
 - `package-lock.json` (modified)
 - `docs/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md` (modified)
+- `docs/learning-path-step-by-step.md` (modified)
+- `docs/implementation-artifacts/0-8-set-up-environment-management-doppler-and-secret-rotation.md` (modified)
 
 ## Change Log
 
@@ -584,6 +752,7 @@ docs/
 | 2026-03-04 | Amelia (Senior Developer Review AI) | Reviewed Task 3 implementation, found 5 High/Medium issues, applied automatic fixes, and revalidated lint/typecheck/test |
 | 2026-03-05 | Amelia (Developer Agent) | Completed Task 4 OpenTelemetry setup in `apps/api` with Grafana OTLP traces/metrics, W3C propagation, bootstrap init wiring, new unit tests, and full workspace validation |
 | 2026-03-06 | Amelia (Developer Agent) | Completed Task 5 Pino structured logging in `apps/api` with shared logger config, request-context + `pino-http` middleware, OTEL trace correlation, env-based log levels, logger tests, and full API validation |
+| 2026-03-07 | Amelia (Developer Agent) | Expanded Task 6 story guidance with docs-verified Grafana Cloud account, stack, OTLP credential, env, verification, and provisioned data source steps for first-time setup |
 
 ## Senior Developer Review (AI)
 

@@ -12,7 +12,7 @@ import { PushTokenRepository } from './push-token.repository'
     PushTokenRepository,
     {
       provide: EXPO_CLIENT,
-      useFactory: () => new Expo({ accessToken: process.env.EXPO_ACCESS_TOKEN }),
+      useFactory: () => new Expo({ accessToken: process.env.EXPO_TOKEN }),
     },
   ],
   exports: [PushNotificationService],

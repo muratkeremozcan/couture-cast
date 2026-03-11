@@ -39,7 +39,7 @@ so that users receive weather alerts and community updates instantly via Socket.
   - [x] Create `apps/api/src/modules/notifications/` directory
   - [x] Implement `PushNotificationService` with Expo Push token registration
   - [x] Add batch notification dispatch method (handle up to 100 notifications per batch per Expo limits)
-  - [x] Configure Expo Access Token in environment variables (EXPO_ACCESS_TOKEN)
+  - [x] Configure Expo access token in environment variables (`EXPO_TOKEN`)
   - [x] Implement error handling for invalid push tokens and rate limits
   - [x] Create `PushTokenRepository` to store user push tokens in Postgres
 
@@ -220,7 +220,7 @@ packages/api-client/src/types/
 ```
 
 **Environment Variables:**
-- `EXPO_ACCESS_TOKEN`: Expo Push API access token
+- `EXPO_TOKEN`: Expo access token used by EAS and the API push client
 - `SOCKET_IO_CORS_ORIGIN`: Allowed origins for Socket.io CORS
 - `SOCKET_IO_PORT`: Port for Socket.io server (default: same as API)
 
@@ -289,7 +289,7 @@ packages/api-client/src/types/
 - Task 4: Added shared socket event types/schemas (base + namespaces), published via @couture/api-client, and documented in docs/api-events.md
 - Task 5: Added poll endpoint + repository/service backing, web/mobile fallback polling controllers with telemetry hooks, shared PollingService, and service/controller tests
 - Task 5: Added shared Prisma module to reuse PrismaClient across modules; streamlined Husky pre-commit to run lint-staged/full lint:fix
-- Secrets: EXPO_ACCESS_TOKEN requirement documented; generation/rotation deferred to story 0-8 environment management
+- Secrets: `EXPO_TOKEN` requirement documented; generation/rotation deferred to story 0-8 environment management
 
 ### File List
 

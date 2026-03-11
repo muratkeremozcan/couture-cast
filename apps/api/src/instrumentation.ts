@@ -1,8 +1,14 @@
+import { DiagConsoleLogger, DiagLogLevel, diag } from '@opentelemetry/api'
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
+import { resourceFromAttributes } from '@opentelemetry/resources'
 import type { NodeSDKConfiguration } from '@opentelemetry/sdk-node'
 import { NodeSDK, core, metrics } from '@opentelemetry/sdk-node'
+import {
+  ATTR_SERVICE_NAME,
+  ATTR_SERVICE_VERSION,
+} from '@opentelemetry/semantic-conventions'
 
 /** Task 3: Implement event tracking in apps (AC: #2)
  * OpenTelemetry (OTEL) in this service:
@@ -29,22 +35,118 @@ type OtlpExporterConfig = {
 }
 
 let telemetrySdk: TelemetrySdk | null = null
+let diagnosticsLoggerConfigured = false
+const DEPLOYMENT_ENVIRONMENT_ATTRIBUTE = 'deployment.environment.name'
+
+export function resolveOtelDiagnosticLogLevel(
+  env: EnvVars = process.env
+): DiagLogLevel | null {
+  const value = env.OTEL_LOG_LEVEL?.toLowerCase().trim()
+
+  switch (value) {
+    case 'all':
+      return DiagLogLevel.ALL
+    case 'debug':
+      return DiagLogLevel.DEBUG
+    case 'info':
+      return DiagLogLevel.INFO
+    case 'warn':
+      return DiagLogLevel.WARN
+    case 'error':
+      return DiagLogLevel.ERROR
+    case 'verbose':
+      return DiagLogLevel.VERBOSE
+    case 'none':
+      return DiagLogLevel.NONE
+    default:
+      return null
+  }
+}
+
+export function configureOpenTelemetryDiagnostics(env: EnvVars = process.env): boolean {
+  const logLevel = resolveOtelDiagnosticLogLevel(env)
+  if (logLevel === null || diagnosticsLoggerConfigured) {
+    return false
+  }
+
+  diag.setLogger(new DiagConsoleLogger(), logLevel)
+  diagnosticsLoggerConfigured = true
+  return true
+}
+
+export function normalizeGrafanaOtlpAuthHeader(header: string): string {
+  const trimmed = header.trim()
+
+  if (trimmed.startsWith('Authorization=')) {
+    const rawValue = trimmed.slice('Authorization='.length).trim()
+
+    try {
+      return decodeURIComponent(rawValue).trim()
+    } catch {
+      return rawValue.replace(/%20/g, ' ').trim()
+    }
+  }
+
+  return trimmed
+}
+
+export function resolveGrafanaOtlpAuthHeader(env: EnvVars): string | null {
+  const directHeader = env.GRAFANA_OTLP_AUTH_HEADER
+  if (directHeader) {
+    return normalizeGrafanaOtlpAuthHeader(directHeader)
+  }
+
+  const instanceId = env.GRAFANA_INSTANCE_ID
+  const apiKey = env.GRAFANA_API_KEY
+
+  if (!instanceId || !apiKey) {
+    return null
+  }
+
+  const encoded = Buffer.from(`${instanceId}:${apiKey}`).toString('base64')
+  return `Basic ${encoded}`
+}
+
+export function resolveSignalEndpoint(
+  baseUrl: string,
+  signal: 'traces' | 'metrics'
+): string {
+  const trimmed = baseUrl.replace(/\/+$/, '')
+  const suffix = `/v1/${signal}`
+
+  if (trimmed.endsWith(suffix)) {
+    return trimmed
+  }
+
+  return `${trimmed}${suffix}`
+}
+
+export function createTelemetryResource(env: EnvVars = process.env) {
+  const deploymentEnvironment =
+    env.APP_ENV ?? env.DEPLOY_ENV ?? env.VERCEL_ENV ?? env.NODE_ENV ?? 'local'
+
+  return resourceFromAttributes({
+    [ATTR_SERVICE_NAME]: env.OTEL_SERVICE_NAME ?? 'couturecast-api',
+    [ATTR_SERVICE_VERSION]: env.npm_package_version ?? '0.0.1',
+    [DEPLOYMENT_ENVIRONMENT_ATTRIBUTE]: deploymentEnvironment,
+  })
+}
 
 // 1) define backend endpoint + auth
 export function resolveOtlpExporterConfig(
   env: EnvVars = process.env
 ): OtlpExporterConfig | null {
   const url = env.GRAFANA_OTLP_ENDPOINT
-  const apiKey = env.GRAFANA_API_KEY
+  const authHeader = resolveGrafanaOtlpAuthHeader(env)
 
-  if (!url || !apiKey) {
+  if (!url || !authHeader) {
     return null
   }
 
   return {
     url,
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: authHeader,
     },
   }
 }
@@ -58,10 +160,17 @@ export function createOpenTelemetrySdkOptions(
     return null
   }
 
-  const traceExporter = new OTLPTraceExporter(exporterConfig)
-  const metricExporter = new OTLPMetricExporter(exporterConfig)
+  const traceExporter = new OTLPTraceExporter({
+    ...exporterConfig,
+    url: resolveSignalEndpoint(exporterConfig.url, 'traces'),
+  })
+  const metricExporter = new OTLPMetricExporter({
+    ...exporterConfig,
+    url: resolveSignalEndpoint(exporterConfig.url, 'metrics'),
+  })
 
   return {
+    resource: createTelemetryResource(env),
     traceExporter,
     metricReaders: [
       new metrics.PeriodicExportingMetricReader({
@@ -89,6 +198,8 @@ export function initializeOpenTelemetry(
     return false
   }
 
+  configureOpenTelemetryDiagnostics(env)
+
   const createSdk =
     runtime.createSdk ??
     ((sdkOptions: Partial<NodeSDKConfiguration>) => new NodeSDK(sdkOptions))
@@ -109,4 +220,5 @@ export async function shutdownOpenTelemetry(): Promise<void> {
 
 export function resetOpenTelemetryForTests() {
   telemetrySdk = null
+  diagnosticsLoggerConfigured = false
 }

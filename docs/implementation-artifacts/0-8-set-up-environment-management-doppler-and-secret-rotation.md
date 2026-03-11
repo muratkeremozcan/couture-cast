@@ -10,7 +10,7 @@ so that credentials stay secure across environments and comply with security bes
 
 ## Acceptance Criteria
 
-1. Configure Doppler projects: local, ci, dev, production with secrets per test-design-system.md Secrets & Configuration Management table (DATABASE_URL, WEATHER_API_KEY, REDIS_URL, LAUNCHDARKLY_SDK_KEY, SUPABASE_SERVICE_KEY).
+1. Configure Doppler projects: local, ci, dev, production with secrets per test-design-system.md Secrets & Configuration Management table (DATABASE_URL, WEATHER_API_KEY, REDIS_URL, POSTHOG_API_KEY, GRAFANA_OTLP_ENDPOINT, GRAFANA_INSTANCE_ID, GRAFANA_API_KEY, SUPABASE_SERVICE_KEY).
 2. Implement healthcheck endpoint (`/api/health?check=secrets`) to validate Doppler sync on deploy.
 3. Set up pre-commit hooks using `gitleaks` or `detect-secrets` to scan for hardcoded secrets; CI fails if patterns detected.
 4. Document quarterly secret rotation schedule and test secret rotation via staging environment.
@@ -34,9 +34,10 @@ so that credentials stay secure across environments and comply with security bes
     - `SUPABASE_SERVICE_KEY`: Supabase service role key (server-only)
     - `WEATHER_API_KEY`: OpenWeather API key
     - `POSTHOG_API_KEY`: PostHog project key
-    - `GRAFANA_API_KEY`: Grafana Cloud API key
+    - `GRAFANA_INSTANCE_ID`: Grafana OTLP instance ID
+    - `GRAFANA_API_KEY`: Grafana OTLP API token
     - `GRAFANA_OTLP_ENDPOINT`: Grafana OTLP endpoint URL
-    - `EXPO_ACCESS_TOKEN`: Expo Push API token
+    - `EXPO_TOKEN`: Expo access token
     - `VERCEL_TOKEN`: Vercel deployment token
     - `VERCEL_ORG_ID`: Vercel org/team ID
     - `VERCEL_PROJECT_ID_WEB`: Vercel project ID for web/API deploy
