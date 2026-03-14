@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-03-05 - synthesized from docs + code agent scan
+Updated: 2026-03-13 - aligned Story 0.7 telemetry inventory and dashboard guidance
 
 ## LLM collaborator prompt
 
@@ -550,13 +550,13 @@ Environment setup:
 - Put the generated Grafana token into `GRAFANA_API_KEY`.
 - Add all three keys to the root `.env.local`, `.env.dev`, and `.env.prod` files.
 - Add matching GitHub Actions repository secrets named `GRAFANA_OTLP_ENDPOINT`,
-  `GRAFANA_INSTANCE_ID`, and `GRAFANA_API_KEY`.
+`GRAFANA_INSTANCE_ID`, and `GRAFANA_API_KEY`.
 - Add the same three keys to the Vercel API project environment variables:
-  Preview should mirror `.env.dev`, and Production should mirror `.env.prod`.
+Preview should mirror `.env.dev`, and Production should mirror `.env.prod`.
 - In this repo there is no separate hosted Vercel Development environment in active use:
-  PRs deploy to Vercel Preview, and merges to `main` deploy to Vercel Production.
+PRs deploy to Vercel Preview, and merges to `main` deploy to Vercel Production.
 - The API exports `service.name = couturecast-api` by default; use `OTEL_SERVICE_NAME` only if you
-  intentionally need to override that.
+intentionally need to override that.
 
 Story/Task mapping:
 
@@ -596,7 +596,7 @@ flowchart TD
 
 
 
-## Step 10 - Grafana Cloud account and OTLP credential setup
+## Step 10 - Grafana Cloud setup, telemetry inventory, and dashboard planning
 
 User/business impact:
 
@@ -618,54 +618,34 @@ Key takeaways:
   (traces), Loki (logs), and Prometheus/Mimir (metrics), and it may also add other
   Grafana-managed sources such as alert history, profiles, or usage views. First-time setup
   should verify those built-in data sources before creating duplicates.
+5. Dashboard work starts with telemetry inventory, not panel creation: use the Prometheus metric
+  browser/selector to record what actually exists under prefixes like `http`, `nodejs`, and
+  `process` before writing PromQL.
+6. Honest dashboards are better than empty charts: if queue/cache/socket/database metrics are not
+  instrumented yet, use a `Text` panel that says so instead of implying coverage that the repo
+  does not have.
 
-First-time setup flow:
+Actual working flow in this repo:
 
-1. Create a Grafana Cloud account and open the Grafana Cloud Portal.
-2. Create stack `couturecastobservability`.
-  Grafana stack names must be lowercase alphanumeric, start with a letter, and cannot contain
-  dots, dashes, underscores, or spaces.
-3. Open the stack `Configure` page and copy the stack OTLP endpoint.
-4. On the stack OTLP connection details page, copy the `Instance ID`.
-5. On the stack OTLP connection details page, under `Password / API Token`, click `Generate now`.
-  Grafana pre-fills the OTLP write policy for this stack; confirm it includes `traces:write` and
-  `metrics:write`. `logs:write` can stay enabled if logs may be exported later.
-6. Put the endpoint, instance ID, and token into the root env files:
-  `.env.local`, `.env.dev`, `.env.prod`.
-7. Use these exact entries in each root env file:
-
-```bash
-GRAFANA_OTLP_ENDPOINT=https://otlp-gateway-prod-us-east-2.grafana.net/otlp
-GRAFANA_INSTANCE_ID=1555123
-GRAFANA_API_KEY=<paste-the-token-you-generated-in-grafana>
-```
-
-8. In GitHub, go to `Settings` -> `Secrets and variables` -> `Actions` and create repository
-  secrets with those same exact names:
-  `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, and `GRAFANA_API_KEY`.
-  Set `GRAFANA_OTLP_ENDPOINT` to `https://otlp-gateway-prod-us-east-2.grafana.net/otlp`.
-  Set `GRAFANA_INSTANCE_ID` to `1555123`.
-  Set `GRAFANA_API_KEY` to the same API token you just generated in Grafana Cloud.
-9. In the Vercel API project, add those same three keys to environment variables.
-  Use `All Pre-Production Environments` for the values that mirror `.env.dev`.
-  Use `Production` for the values that mirror `.env.prod`.
-  This repo currently uses Vercel Preview for PRs and Vercel Production for `main`; there is no
-  separate hosted Vercel Development environment to keep in sync.
-10. Start the API with `npm run start:dev --workspace api`, hit
-  `http://localhost:3000/api/v1/health/queues`, then verify traces in Grafana `Explore` using
-  Tempo and metrics using Prometheus. On the Prometheus screen, an empty graph with no selected
-  metric does not prove metrics are broken yet; first click the `Metric` selector and choose an
-  available metric before judging the result.
-11. If Grafana still shows no traces, add `OTEL_LOG_LEVEL=debug` to `.env.local`, restart the API,
-  and inspect the API terminal for OpenTelemetry patching or OTLP export/auth errors before making
-  more code changes.
-12. Successful verification should show traces under service `couturecast-api`, not
-  `unknown_service:node`.
+1. Verify telemetry first.
+   Start the API locally, hit `http://localhost:3000/api/v1/health/queues`, confirm traces, then
+   confirm the metric families you actually have.
+2. Use repo JSON as the dashboard source of truth.
+   Files live in `infra/grafana/dashboards/`.
+3. In Grafana, import the JSON instead of building from scratch.
+   Official path: `Dashboards` -> `New` -> `Import`.
+   In newer UI, the same action may be under the top-right `Add` dropdown.
+4. If the dashboard renders and looks useful, save it and move on.
+   For this repo, API Health has real panels; the queue/cache, realtime, and database dashboards
+   are intentionally placeholders until those metric families exist.
+5. Re-export only if Grafana materially changed the JSON model.
 
 Story/Task mapping:
 
 - Story 0.7
 - Task 6 (Grafana Cloud account setup)
+- Task 6.5 (telemetry inventory before dashboards)
+- Task 7 (Grafana dashboards built from real metrics)
 
 Story reference:
 
@@ -676,6 +656,10 @@ Impacted files:
 - `docs/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md`
 - `docs/learning-path-step-by-step.md`
 - `apps/api/src/instrumentation.ts`
+- `apps/api/src/controllers/health.controller.ts`
+- `apps/api/src/modules/gateway/connection-manager.service.ts`
+- `apps/api/src/config/queues.ts`
+- `apps/api/src/admin/admin.service.ts`
 - `.env.local`
 - `.env.dev`
 - `.env.prod`
@@ -686,6 +670,11 @@ Supporting references:
 - `https://grafana.com/docs/grafana-cloud/security-and-account-management/cloud-stacks/create-update-stacks/`
 - `https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/`
 - `https://grafana.com/docs/grafana-cloud/security-and-account-management/authentication-and-permissions/access-policies/create-access-policies/`
+- `https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/create-dashboard/`
+- `https://grafana.com/docs/grafana/latest/panels-visualizations/visualizations/text/`
+- `https://grafana.com/docs/grafana/latest/datasources/prometheus/query-editor/`
+- `https://grafana.com/docs/grafana/latest/alerting/alerting-rules/create-grafana-managed-rule/`
+- `https://grafana.com/docs/grafana/latest/dashboards/share-dashboards-panels/`
 
 Architecture diagram:
 
@@ -714,16 +703,20 @@ flowchart TD
   api --> grafana["Grafana Explore: Tempo and Prometheus"]
 ```
 
+
+
 Quick translation cheat sheet:
 
-| Grafana term | Plain English | What it means in this project | Rough DataDog equivalent | Rough AWS equivalent |
-| --- | --- | --- | --- | --- |
-| Tempo / `-traces` | Distributed traces | Request flows, spans, and timing for API calls such as `GET /api/v1/health/queues` | APM Traces / Trace Explorer | AWS X-Ray traces |
-| Prometheus / Mimir / `-prom` | Metrics store | Numeric time-series data such as request duration, process metrics, and exporter metrics | Metrics Explorer / custom metrics | CloudWatch Metrics |
-| Loki / `-logs` | Log store | Centralized application logs; for this story it may exist before log ingestion is wired up | Log Explorer / Log Management | CloudWatch Logs |
-| Profiles | Continuous profiling | CPU and runtime profiling for deeper performance debugging; not the main focus of Story 0.7 | Continuous Profiler | CodeGuru Profiler |
-| Alertmanager / alert state history | Alert routing and alert history | Where alert notifications and state transitions live after dashboards and alerts are added | Monitors / monitor state history | CloudWatch Alarms plus SNS notification flow |
-| Usage / usage insights | Grafana account usage data | Grafana's own billing or platform usage views, not your app telemetry | Usage / billing views | Cost Explorer or service usage dashboards |
+
+| Grafana term                       | Plain English                   | What it means in this project                                                               | Rough DataDog equivalent          | Rough AWS equivalent                         |
+| ---------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------- | -------------------------------------------- |
+| Tempo / `-traces`                  | Distributed traces              | Request flows, spans, and timing for API calls such as `GET /api/v1/health/queues`          | APM Traces / Trace Explorer       | AWS X-Ray traces                             |
+| Prometheus / Mimir / `-prom`       | Metrics store                   | Numeric time-series data such as request duration, process metrics, and exporter metrics    | Metrics Explorer / custom metrics | CloudWatch Metrics                           |
+| Loki / `-logs`                     | Log store                       | Centralized application logs; for this story it may exist before log ingestion is wired up  | Log Explorer / Log Management     | CloudWatch Logs                              |
+| Profiles                           | Continuous profiling            | CPU and runtime profiling for deeper performance debugging; not the main focus of Story 0.7 | Continuous Profiler               | CodeGuru Profiler                            |
+| Alertmanager / alert state history | Alert routing and alert history | Where alert notifications and state transitions live after dashboards and alerts are added  | Monitors / monitor state history  | CloudWatch Alarms plus SNS notification flow |
+| Usage / usage insights             | Grafana account usage data      | Grafana's own billing or platform usage views, not your app telemetry                       | Usage / billing views             | Cost Explorer or service usage dashboards    |
+
 
 Quick way to think about it:
 
@@ -731,8 +724,6 @@ Quick way to think about it:
 - `Prometheus` answers: "How much, how often, how long?"
 - `Loki` answers: "What did the app log?"
 - `Profiles` answers: "Where is the CPU or runtime time going?"
-
-
 
 ## Step 11 - API observability with structured logging
 

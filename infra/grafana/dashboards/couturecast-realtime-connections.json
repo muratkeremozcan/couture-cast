@@ -1,0 +1,63 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana",
+        "uid": "-- Grafana --"
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "content": "## Pending Socket.io connection instrumentation\n\nNo `socket*`, `websocket*`, `connection*`, or `disconnect*` metric families were present in the local Grafana inventory pass.\n\nCurrent repo evidence:\n\n- `apps/api/src/modules/gateway/connection-manager.service.ts` logs `socket_connected`, `socket_disconnected`, and `socket_fallback`\n- dedicated Prometheus counters and gauges are not exposed yet\n\nDo not add disconnect-rate alerts until real connection metrics exist.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.2.0",
+      "title": "Pending Socket.io connection instrumentation",
+      "type": "text"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["couturecast", "observability", "realtime"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Real-time Connections",
+  "uid": "couturecast-realtime-connections",
+  "version": 1,
+  "weekStart": ""
+}
