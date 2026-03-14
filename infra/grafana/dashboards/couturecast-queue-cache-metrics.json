@@ -1,0 +1,63 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana",
+        "uid": "-- Grafana --"
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "content": "## Pending custom BullMQ / Redis instrumentation\n\nNo `bull*`, `queue*`, or `redis*` metrics were present in the local Grafana inventory pass.\n\nCurrent repo evidence:\n\n- `apps/api/src/controllers/health.controller.ts` still returns placeholder queue metrics\n- `apps/api/src/config/queues.ts` defines queues but does not expose queue depth metrics\n\nDo not add queue-depth or cache-hit alerts until real metrics exist.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.2.0",
+      "title": "Pending custom BullMQ / Redis instrumentation",
+      "type": "text"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["couturecast", "observability", "queue", "cache"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Queue & Cache Metrics",
+  "uid": "couturecast-queue-cache",
+  "version": 1,
+  "weekStart": ""
+}
