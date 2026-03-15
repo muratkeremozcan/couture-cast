@@ -1,10 +1,9 @@
 import { Controller, Get, Query, HttpException, HttpStatus } from '@nestjs/common'
 import { AdminService } from './admin.service'
 
-/** Story 0.4 Task 5 context
- * Minimal operator surface for DLQ workflows:
- * 1) read recent failed jobs,
- * 2) request replay by failure id.
+/** Story 0.4 support file: minimal operator surface for DLQ workflows.
+ * Flow refs:
+ * - S0.4/T3: expose read + replay endpoints for the durable dead-letter workflow.
  */
 // Touch the import to avoid it being treated as type-only
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -14,13 +13,13 @@ const __adminServiceRef = AdminService
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
-  // 1) read recent failed jobs,
+  // Flow ref S0.4/T3: read recent failed jobs for operator triage.
   @Get('failed-jobs')
   async getFailedJobs(@Query('queue') queue?: string) {
     return this.adminService.listFailedJobs(queue)
   }
 
-  // 2) request replay by failure id.
+  // Flow ref S0.4/T3: request replay by failure id.
   @Get('failed-jobs/retry')
   retryFailedJob(@Query('id') id?: string) {
     if (!id) {

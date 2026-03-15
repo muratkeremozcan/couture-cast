@@ -295,6 +295,22 @@ Code evidence:
 - `apps/api/src/admin/admin.service.ts`
 - `apps/api/src/admin/admin.controller.ts`
 
+Owner map:
+
+- Story 0.4 Task 2 owner: define shared BullMQ queue names, retry policy, timeouts, and queue
+  construction in `apps/api/src/config/queues.ts`
+- Story 0.4 Task 3 owner: persist failed job context as durable DLQ records for operator
+  workflows in `apps/api/src/workers/base.worker.ts`
+- Story 0.4 Task 4 owner: apply per-queue concurrency and rate-limit policy during worker startup
+  in `apps/api/src/workers/bootstrap.ts`
+- Story 0.4 Task 5 owner: bootstrap and shut down the dedicated worker process group cleanly in
+  `apps/api/src/workers/bootstrap.ts`
+
+Support refs:
+
+- `apps/api/src/admin/admin.service.ts` and `apps/api/src/admin/admin.controller.ts` expose the
+  operator read, replay, and prune path for DLQ records.
+
 Architecture diagram:
 
 ```mermaid
@@ -369,7 +385,27 @@ Code evidence:
 - `apps/api/src/modules/events/events.service.ts`
 - `apps/api/src/modules/notifications/push-token.repository.ts`
 - `apps/api/src/modules/notifications/push-notification.service.ts`
+- `packages/api-client/src/types/socket-events.ts`
 - `packages/api-client/src/realtime/polling-service.ts`
+
+Owner map:
+
+- Story 0.5 Task 1 owner: expose the Socket.io gateway surface and attach the core auth +
+  connection orchestration in `apps/api/src/modules/gateway/gateway.gateway.ts`
+- Story 0.5 Task 2 owner: decide retry vs fallback based on connection lifecycle state in
+  `apps/api/src/modules/gateway/connection-manager.service.ts`
+- Story 0.5 Task 3 owner: dispatch Expo push notifications for users who are not on an active
+  realtime session in `apps/api/src/modules/notifications/push-notification.service.ts`
+- Story 0.5 Task 4 owner: define shared socket payload schemas for realtime namespaces in
+  `packages/api-client/src/types/socket-events.ts`
+- Story 0.5 Task 5 owner: activate, advance, and stop client polling when realtime is
+  unavailable in `packages/api-client/src/realtime/polling-service.ts`
+
+Support refs:
+
+- `apps/api/src/modules/events/events.service.ts` provides the incremental polling data path.
+- `apps/api/src/modules/notifications/push-token.repository.ts` keeps push token storage durable
+  across reconnects and app restarts.
 
 Architecture diagram:
 
@@ -503,6 +539,26 @@ Code evidence:
 - `apps/api/src/modules/auth/auth.service.ts`
 - `apps/api/integration/analytics-tracking.integration.spec.ts`
 
+Task 2/3 analytics owners:
+
+- Story 0.7 Task 2 step 1 owner: define canonical event names and input/property schemas in
+  `packages/api-client/src/types/analytics-events.ts`
+- Story 0.7 Task 2 step 2 owner: normalize domain inputs to snake_case analytics properties in
+  track* wrappers in `packages/api-client/src/types/analytics-events.ts`
+- Story 0.7 Task 3 step 1 owner: publish shared track* wrappers for app-layer reuse and
+  integration assertions in `packages/api-client/src/types/analytics-events.ts`
+
+Task 2/3 support refs:
+
+- `apps/mobile/src/analytics/track-events.ts` and
+  `apps/web/src/app/components/analytics-event-actions.tsx` reuse the shared wrappers in app
+  code.
+- `apps/web/src/app/components/posthog-click-tracker.tsx` covers the lighter DOM-attribute-based
+  tracking path.
+- `apps/api/src/modules/auth/auth.service.ts` and
+  `apps/api/integration/analytics-tracking.integration.spec.ts` keep API-side analytics aligned
+  with the same shared contract.
+
 Task 8 feature-flag flow owners:
 
 - Story 0.7 Task 8 step 1 owner: shared flag keys, value kinds, and code defaults in
@@ -592,6 +648,22 @@ Code evidence:
 - `apps/api/src/instrumentation.spec.ts`
 - `apps/api/src/load-env.ts`
 - `apps/api/src/load-env.spec.ts`
+
+Owner map:
+
+- Story 0.7 Task 4 step 1 owner: define OTLP backend endpoint + auth resolution in
+  `apps/api/src/instrumentation.ts`
+- Story 0.7 Task 4 step 2 owner: create OTLP exporters for traces and metrics in
+  `apps/api/src/instrumentation.ts`
+- Story 0.7 Task 4 step 3 owner: enable instrumentation + W3C propagation in
+  `apps/api/src/instrumentation.ts`
+- Story 0.7 Task 4 step 4 owner: initialize the SDK before app bootstrap in
+  `apps/api/src/instrumentation.ts`
+
+Support refs:
+
+- `apps/api/src/main.ts` preserves the bootstrap order so OTEL starts before Nest app creation.
+- `apps/api/src/load-env.ts` keeps local root env loading aligned with OTEL startup expectations.
 
 Architecture diagram:
 
@@ -781,6 +853,22 @@ Code evidence:
 - `apps/api/src/logger/pino.config.spec.ts`
 - `apps/api/src/logger/request-context.spec.ts`
 - `apps/api/src/logger/request-logger.middleware.spec.ts`
+
+Owner map:
+
+- Story 0.7 Task 5 step 1 owner: resolve environment-driven log level policy in
+  `apps/api/src/logger/pino.config.ts`
+- Story 0.7 Task 5 step 2 owner: inject request + trace context via the shared logger mixin in
+  `apps/api/src/logger/pino.config.ts`
+- Story 0.7 Task 5 step 3 owner: keep the base logger reusable for HTTP middleware and
+  feature-specific child loggers in `apps/api/src/logger/pino.config.ts`
+
+Support refs:
+
+- `apps/api/src/logger/request-context.ts` handles request ID and AsyncLocalStorage context
+  propagation.
+- `apps/api/src/logger/request-logger.middleware.ts` applies the shared logger contract at the
+  HTTP boundary.
 
 Architecture diagram:
 

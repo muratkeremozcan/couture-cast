@@ -38,7 +38,7 @@
     "start:workers:prod": "node dist/workers/bootstrap.js"
   },
   "dependencies": {
-    "@couture/config": "workspace:*",
+    "@couture/config": "file:../../packages/config",
     "@nestjs/common": "11.1.9",
     "@nestjs/core": "11.1.9",
     "@nestjs/platform-express": "11.1.9",
