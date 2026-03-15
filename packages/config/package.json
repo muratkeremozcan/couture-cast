@@ -14,9 +14,9 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
     "lint": "eslint --max-warnings=0 --ext .ts src",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run --config vitest.config.ts"
   }
 }
