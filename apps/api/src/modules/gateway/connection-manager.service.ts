@@ -2,7 +2,7 @@ import type { Socket } from 'socket.io'
 import type { Logger } from 'pino'
 
 /**
- * Story 0.5 (Tasks 2-3): connection lifecycle tracking.
+ * Story 0.5 owner file: connection lifecycle tracking.
  *
  * Why this exists:
  * - Socket disconnect events are frequent and ambiguous (tab sleep, wifi switch, app background).
@@ -14,6 +14,13 @@ import type { Logger } from 'pino'
  *
  * Alternative:
  * - Rely only on client-side auto-reconnect, which is simpler but gives less server control/observability.
+ *
+ * Ownership anchor:
+ * - Story 0.5 Task 2 owner: decide retry vs fallback based on connection lifecycle state.
+ *
+ * Flow refs:
+ * - S0.5/T1: gateway wiring calls into this service on connect/disconnect.
+ * - S0.5/T5: once retries are exhausted, the caller activates polling fallback.
  */
 export type DisconnectResult =
   | {
@@ -57,7 +64,7 @@ export class ConnectionManager {
   }
 
   handleConnect(socket: Socket): GatewayContext {
-    // New session starts with zero retries.
+    // Flow ref S0.5/T2: a new session starts with zero retries.
     this.retryCounts.set(socket.id, 0)
     const context = this.extractContext(socket)
 
@@ -66,7 +73,7 @@ export class ConnectionManager {
   }
 
   handleDisconnect(socket: Socket): DisconnectResult {
-    // Increment attempt counter before choosing reconnect delay or polling fallback.
+    // Flow ref S0.5/T2: increment attempt state before choosing retry vs fallback.
     const previousAttempts = this.retryCounts.get(socket.id) ?? 0
     const attempt = previousAttempts + 1
     this.retryCounts.set(socket.id, attempt)

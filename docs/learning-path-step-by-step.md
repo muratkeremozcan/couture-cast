@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-03-13 - aligned Story 0.7 telemetry inventory and dashboard guidance
+Updated: 2026-03-14 - aligned Story 0.7 telemetry guidance and documented the stabilized mobile smoke path
 
 ## LLM collaborator prompt
 
@@ -295,6 +295,22 @@ Code evidence:
 - `apps/api/src/admin/admin.service.ts`
 - `apps/api/src/admin/admin.controller.ts`
 
+Owner map:
+
+- Story 0.4 Task 2 owner: define shared BullMQ queue names, retry policy, timeouts, and queue
+  construction in `apps/api/src/config/queues.ts`
+- Story 0.4 Task 3 owner: persist failed job context as durable DLQ records for operator
+  workflows in `apps/api/src/workers/base.worker.ts`
+- Story 0.4 Task 4 owner: apply per-queue concurrency and rate-limit policy during worker startup
+  in `apps/api/src/workers/bootstrap.ts`
+- Story 0.4 Task 5 owner: bootstrap and shut down the dedicated worker process group cleanly in
+  `apps/api/src/workers/bootstrap.ts`
+
+Support refs:
+
+- `apps/api/src/admin/admin.service.ts` and `apps/api/src/admin/admin.controller.ts` expose the
+  operator read, replay, and prune path for DLQ records.
+
 Architecture diagram:
 
 ```mermaid
@@ -369,7 +385,27 @@ Code evidence:
 - `apps/api/src/modules/events/events.service.ts`
 - `apps/api/src/modules/notifications/push-token.repository.ts`
 - `apps/api/src/modules/notifications/push-notification.service.ts`
+- `packages/api-client/src/types/socket-events.ts`
 - `packages/api-client/src/realtime/polling-service.ts`
+
+Owner map:
+
+- Story 0.5 Task 1 owner: expose the Socket.io gateway surface and attach the core auth +
+  connection orchestration in `apps/api/src/modules/gateway/gateway.gateway.ts`
+- Story 0.5 Task 2 owner: decide retry vs fallback based on connection lifecycle state in
+  `apps/api/src/modules/gateway/connection-manager.service.ts`
+- Story 0.5 Task 3 owner: dispatch Expo push notifications for users who are not on an active
+  realtime session in `apps/api/src/modules/notifications/push-notification.service.ts`
+- Story 0.5 Task 4 owner: define shared socket payload schemas for realtime namespaces in
+  `packages/api-client/src/types/socket-events.ts`
+- Story 0.5 Task 5 owner: activate, advance, and stop client polling when realtime is
+  unavailable in `packages/api-client/src/realtime/polling-service.ts`
+
+Support refs:
+
+- `apps/api/src/modules/events/events.service.ts` provides the incremental polling data path.
+- `apps/api/src/modules/notifications/push-token.repository.ts` keeps push token storage durable
+  across reconnects and app restarts.
 
 Architecture diagram:
 
@@ -405,7 +441,7 @@ confidence.
 Key takeaways:
 
 1. PR quality gates are split intentionally: `pr-checks.yml` blocks typecheck/lint/test/build,
-  while `pr-pw-e2e.yml` runs sharded Playwright and enforces the required E2E gate.
+  while `pr-pw-e2e-local.yml` runs sharded Playwright and enforces the required E2E gate.
 2. Flake control is explicit: `rwf-burn-in.yml` reruns changed Playwright specs 3x (with
   `SKIP_BURN_IN` override) before full E2E proceeds.
 3. Deployment confidence is surface-aware: Vercel Preview smoke runs from `deployment_status`
@@ -424,7 +460,7 @@ Story reference:
 Code evidence:
 
 - `.github/workflows/pr-checks.yml`
-- `.github/workflows/pr-pw-e2e.yml`
+- `.github/workflows/pr-pw-e2e-local.yml`
 - `.github/workflows/rwf-burn-in.yml`
 - `.github/workflows/pr-pw-e2e-vercel-preview.yml`
 - `.github/workflows/gitleaks-check.yml`
@@ -442,7 +478,7 @@ Architecture diagram:
 flowchart TD
   PR[Pull request] --> PRCHECKS[pr-checks.yml<br/>typecheck + lint + test + build]
   PR --> GITLEAKS[gitleaks-check.yml]
-  PR --> E2E[pr-pw-e2e.yml]
+  PR --> E2E[pr-pw-e2e-local.yml]
 
   E2E --> BURNIN[rwf-burn-in.yml<br/>changed Playwright specs x3]
   BURNIN --> SHARDS[Playwright shards<br/>1/2 + 2/2]
@@ -502,6 +538,44 @@ Code evidence:
 - `apps/web/src/app/components/posthog-click-tracker.tsx`
 - `apps/api/src/modules/auth/auth.service.ts`
 - `apps/api/integration/analytics-tracking.integration.spec.ts`
+
+Task 2/3 analytics owners:
+
+- Story 0.7 Task 2 step 1 owner: define canonical event names and input/property schemas in
+  `packages/api-client/src/types/analytics-events.ts`
+- Story 0.7 Task 2 step 2 owner: normalize domain inputs to snake_case analytics properties in
+  track* wrappers in `packages/api-client/src/types/analytics-events.ts`
+- Story 0.7 Task 3 step 1 owner: publish shared track* wrappers for app-layer reuse and
+  integration assertions in `packages/api-client/src/types/analytics-events.ts`
+
+Task 2/3 support refs:
+
+- `apps/mobile/src/analytics/track-events.ts` and
+  `apps/web/src/app/components/analytics-event-actions.tsx` reuse the shared wrappers in app
+  code.
+- `apps/web/src/app/components/posthog-click-tracker.tsx` covers the lighter DOM-attribute-based
+  tracking path.
+- `apps/api/src/modules/auth/auth.service.ts` and
+  `apps/api/integration/analytics-tracking.integration.spec.ts` keep API-side analytics aligned
+  with the same shared contract.
+
+Task 8 feature-flag flow owners:
+
+- Story 0.7 Task 8 step 1 owner: shared flag keys, value kinds, and code defaults in
+  `packages/config/src/flags.ts`
+- Story 0.7 Task 8 step 2 owner: remote PostHog flag evaluation in
+  `apps/api/src/posthog/posthog.service.ts`
+- Story 0.7 Task 8 step 3 owner: request-time fallback order in
+  `packages/config/src/flags.ts`
+- Story 0.7 Task 8 step 4 owner: fallback cache warmup and refresh in
+  `apps/api/src/modules/feature-flags/feature-flags.cron.ts`
+
+Task 8 support refs:
+
+- `apps/api/src/modules/feature-flags/feature-flags.service.ts` coordinates the full flow
+  without owning a single exact step anchor.
+- `apps/api/src/modules/feature-flags/feature-flags.repository.ts` persists fallback reads and
+  sync writes for the cache-backed path.
 
 Architecture diagram:
 
@@ -574,6 +648,22 @@ Code evidence:
 - `apps/api/src/instrumentation.spec.ts`
 - `apps/api/src/load-env.ts`
 - `apps/api/src/load-env.spec.ts`
+
+Owner map:
+
+- Story 0.7 Task 4 step 1 owner: define OTLP backend endpoint + auth resolution in
+  `apps/api/src/instrumentation.ts`
+- Story 0.7 Task 4 step 2 owner: create OTLP exporters for traces and metrics in
+  `apps/api/src/instrumentation.ts`
+- Story 0.7 Task 4 step 3 owner: enable instrumentation + W3C propagation in
+  `apps/api/src/instrumentation.ts`
+- Story 0.7 Task 4 step 4 owner: initialize the SDK before app bootstrap in
+  `apps/api/src/instrumentation.ts`
+
+Support refs:
+
+- `apps/api/src/main.ts` preserves the bootstrap order so OTEL starts before Nest app creation.
+- `apps/api/src/load-env.ts` keeps local root env loading aligned with OTEL startup expectations.
 
 Architecture diagram:
 
@@ -764,6 +854,22 @@ Code evidence:
 - `apps/api/src/logger/request-context.spec.ts`
 - `apps/api/src/logger/request-logger.middleware.spec.ts`
 
+Owner map:
+
+- Story 0.7 Task 5 step 1 owner: resolve environment-driven log level policy in
+  `apps/api/src/logger/pino.config.ts`
+- Story 0.7 Task 5 step 2 owner: inject request + trace context via the shared logger mixin in
+  `apps/api/src/logger/pino.config.ts`
+- Story 0.7 Task 5 step 3 owner: keep the base logger reusable for HTTP middleware and
+  feature-specific child loggers in `apps/api/src/logger/pino.config.ts`
+
+Support refs:
+
+- `apps/api/src/logger/request-context.ts` handles request ID and AsyncLocalStorage context
+  propagation.
+- `apps/api/src/logger/request-logger.middleware.ts` applies the shared logger contract at the
+  HTTP boundary.
+
 Architecture diagram:
 
 ```mermaid
@@ -800,6 +906,9 @@ Key takeaways:
 3. Confidence comes from artifacts plus policy: Playwright HTML/trace outputs and Maestro
   screenshots/logs support fast triage, while web is PR-gated and mobile remains manual/local by
    default.
+4. Expo Go orchestration is part of the test harness: `scripts/run-maestro.mjs` now resolves the
+  active mobile target, waits for Expo Go on iOS when needed, and reuses a healthy Metro server
+  before running Maestro.
 
 Story/Task mapping:
 
@@ -822,7 +931,9 @@ Code evidence:
 - `playwright/tests/web-health-sha.spec.ts`
 - `maestro/sanity.yaml`
 - `scripts/run-maestro.mjs`
-- `.github/workflows/pr-pw-e2e.yml`
+- `scripts/start-mobile-server.sh`
+- `apps/mobile/src/realtime/mobile-fallback-controller.ts`
+- `.github/workflows/pr-pw-e2e-local.yml`
 - `.github/workflows/pr-mobile-e2e.yml`
 
 Architecture diagram:
@@ -831,13 +942,14 @@ Architecture diagram:
 flowchart LR
   trigger["Developer or CI run"] --> pick{"Select surface"}
   pick --> web_e2e["Web E2E test:pw-local"]
-  pick --> mobile_e2e["Mobile E2E test:mobile:e2e"]
+  pick --> mobile_e2e["Mobile E2E test:mobile:e2e or test:mobile:e2e:ios"]
   web_e2e --> web_server["Start API and Web test servers"]
   web_server --> web_smoke["Run Chromium smoke tests"]
   web_smoke --> web_artifacts["HTML report, traces, screenshots"]
   web_artifacts --> web_gate["PR gating checks"]
   mobile_e2e --> maestro_install["Install Maestro CLI"]
-  maestro_install --> metro["Start or reuse Metro and Expo URL"]
+  maestro_install --> target["Resolve Android target or boot iOS simulator"]
+  target --> metro["Start or reuse Metro / Expo Go session"]
   metro --> mobile_smoke["Run maestro sanity flow"]
   mobile_smoke --> mobile_artifacts["Maestro screenshots and logs"]
   mobile_artifacts --> mobile_policy["Local manual default, non gating CI"]

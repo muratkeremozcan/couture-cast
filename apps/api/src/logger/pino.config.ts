@@ -81,7 +81,7 @@ function shouldUsePrettyTransport(env: EnvVars, destination?: DestinationStream)
   return !destination && env.PINO_PRETTY === 'true'
 }
 
-/** Task 5 (AC #3): shared Pino logger contract.
+/** Story 0.7 owner file: shared Pino logger contract.
  * Why this exists:
  * - We need one JSON log shape across HTTP, cron, sockets, and service logs.
  * - Request context and OTEL trace context should attach automatically instead of per call site.
@@ -89,13 +89,14 @@ function shouldUsePrettyTransport(env: EnvVars, destination?: DestinationStream)
  * Alternatives:
  * - Nest Logger only, which is simpler but weaker for structured fields and child loggers.
  * - A heavier Nest/Pino adapter package, which adds abstraction we do not need yet.
- * Setup steps (where we did this):
- *   1) resolve environment-driven log level policy.
- *   2) inject request + trace context via Pino mixins.
- *   3) keep the base logger reusable for HTTP middleware and feature-specific child loggers.
+ * Ownership anchors:
+ * - Story 0.7 Task 5 step 1 owner: resolve environment-driven log level policy.
+ * - Story 0.7 Task 5 step 2 owner: inject request + trace context via the shared logger mixin.
+ * - Story 0.7 Task 5 step 3 owner: keep the base logger reusable for HTTP middleware and feature-specific child loggers.
  */
 export function createBaseLogger(options: CreateBaseLoggerOptions = {}) {
-  // 3) keep the base logger reusable for HTTP middleware and feature-specific child loggers.
+  // Flow ref S0.7/T5/3: keep the base logger reusable for HTTP middleware and
+  // feature-specific child loggers.
   const env = options.env ?? process.env
 
   return pino(
@@ -119,7 +120,8 @@ export function createBaseLogger(options: CreateBaseLoggerOptions = {}) {
             },
           }
         : undefined,
-      // 2) inject request + trace context via Pino mixins.
+      // Flow ref S0.7/T5/2: inject request + trace context via Pino mixins so
+      // call sites do not have to repeat those fields manually.
       mixin() {
         const requestContext = getRequestContext()
         return removeUndefined({

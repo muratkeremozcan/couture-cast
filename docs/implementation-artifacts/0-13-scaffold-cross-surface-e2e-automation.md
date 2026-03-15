@@ -34,7 +34,7 @@ so that web and mobile journeys are validated end-to-end before feature teams br
   - [x] Add a short “E2E smoke playbook” subsection to docs/test-artifacts/test-design-system.md describing when to run Playwright vs Maestro and how to tag @p0 smoke tests; include env hints (`WEB_E2E_BASE_URL`, `MOBILE_E2E_APP_URL`) and artifact publishing.
 
 - [x] Task 4: CI integration (AC: #4)
-  - CI decision: Web Playwright smoke runs in PRs (`pr-pw-e2e.yml`); mobile Maestro is local/manual only (GitHub-hosted emulators too slow/flaky). Mobile workflow kept manual for reference; no PR gating.
+  - CI decision: Web Playwright smoke runs in PRs (`pr-pw-e2e-local.yml`); mobile Maestro is local/manual only (GitHub-hosted emulators too slow/flaky). Mobile workflow kept manual for reference; no PR gating.
   - Follow-up package in Story 0.14: burn-in hardening in `.github/workflows/rwf-burn-in.yml`,
     auth-session rollout for login-backed web journeys, Pact + schema contract gates, and
     performance baseline workflows.

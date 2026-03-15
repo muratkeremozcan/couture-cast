@@ -47,7 +47,10 @@ export default defineConfig(
     },
     webServer: [
       {
-        command: 'npm run start:api',
+        // Use the compiled API runtime for Playwright. `tsx` startup is fine for
+        // interactive local development, but the CI/local smoke path needs a
+        // deterministic server process that actually reaches `app.listen()`.
+        command: 'npm run start:api:e2e',
         url: environment.apiBaseUrl,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,

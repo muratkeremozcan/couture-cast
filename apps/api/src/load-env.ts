@@ -36,11 +36,18 @@ const rootEnvFiles = [
   process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.dev',
   '.env',
 ]
+const shouldForceLocalEnv = (process.env.TEST_ENV ?? '').toLowerCase() === 'local'
 
 // Load root env files before AppModule/bootstrap reads process.env.
 for (const file of rootEnvFiles) {
   const fullPath = path.join(rootDir, file)
   if (!existsSync(fullPath)) continue
 
-  loadEnv({ path: fullPath, override: false, quiet: true })
+  // Local smoke/test runs should not inherit remote service URLs from the
+  // parent shell. When TEST_ENV=local, let .env.local win for keys it defines.
+  loadEnv({
+    path: fullPath,
+    override: shouldForceLocalEnv && file === '.env.local',
+    quiet: true,
+  })
 }

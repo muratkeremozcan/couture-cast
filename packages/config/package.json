@@ -1,0 +1,22 @@
+{
+  "name": "@couture/config",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Shared configuration contracts for CoutureCast",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
+    "lint": "eslint --max-warnings=0 --ext .ts src",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --config vitest.config.ts"
+  }
+}

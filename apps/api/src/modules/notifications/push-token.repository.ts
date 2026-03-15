@@ -2,20 +2,24 @@ import { Injectable } from '@nestjs/common'
 import { PrismaClient, type PushToken } from '@prisma/client'
 
 /**
- * Story 0.5 (Task 4): push token persistence for offline/background delivery.
+ * Story 0.5 support file: push token persistence for offline/background delivery.
  *
  * Realtime sockets are best for active sessions, but push needs durable device tokens.
  * We upsert by token so reinstall/login changes can rebind ownership without duplicates.
  *
  * Alternative:
  * - Store tokens only in memory/session, which loses offline reachability across restarts.
+ *
+ * Flow refs:
+ * - S0.5/T3: push dispatch depends on durable tokens that survive reconnects.
+ * - S0.5/T4: token persistence is the stable storage layer behind the push path.
  */
 @Injectable()
 export class PushTokenRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async saveToken(userId: string, token: string, platform?: string): Promise<PushToken> {
-    // Normalize inputs before persistence so downstream dispatch can rely on stable token/user values.
+    // Flow ref S0.5/T4: normalize inputs before persistence so downstream dispatch can rely on stable values.
     const normalizedUserId = userId.trim()
     const normalizedToken = token.trim()
 
@@ -42,7 +46,7 @@ export class PushTokenRepository {
   }
 
   async findByUserIds(userIds: string[]): Promise<PushToken[]> {
-    // Fan-out lookup for multi-recipient push dispatch.
+    // Flow ref S0.5/T3: fan-out lookup for multi-recipient push dispatch.
     if (!userIds.length) return []
     const records = await this.prisma.pushToken.findMany({
       where: { user_id: { in: userIds } },

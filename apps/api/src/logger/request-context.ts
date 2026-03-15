@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { NextFunction, Request, Response } from 'express'
 import type { AuthenticatedRequest } from '../modules/auth/security.types'
 
-/** Task 5 (AC #3): request-scoped logging context.
+/** Story 0.7 support file: request-scoped logging context.
  * Why this exists:
  * - Structured logs need stable request metadata even after execution moves across async boundaries.
  * - HTTP middleware, auth guards, and downstream services all need the same requestId/userId/feature fields.
@@ -11,10 +11,9 @@ import type { AuthenticatedRequest } from '../modules/auth/security.types'
  * Alternatives:
  * - Pass context manually through every service call, which is noisy and easy to miss.
  * - Store fields directly on req only, which does not help code running later outside the immediate handler.
- * Setup steps (where we did this):
- *   1) normalize or generate x-request-id for every request.
- *   2) infer stable feature metadata from the routed path.
- *   3) store request context in AsyncLocalStorage so later logs can read it automatically.
+ * Flow refs:
+ * - S0.7/T5/1: request IDs are normalized once at the boundary instead of per logger call.
+ * - S0.7/T5/2: later logs read request metadata from AsyncLocalStorage rather than manual parameter threading.
  */
 export type RequestContext = {
   feature?: string
@@ -44,12 +43,13 @@ function normalizeHeaderValue(value: string | string[] | undefined): string | un
 }
 
 export function resolveRequestId(value?: string | string[]): string {
-  // 1) normalize or generate x-request-id for every request.
+  // Flow ref S0.7/T5/1: normalize or generate x-request-id for every request.
   return normalizeHeaderValue(value) ?? randomUUID()
 }
 
 export function inferFeatureFromPath(path?: string): string {
-  // 2) infer stable feature metadata from the routed path.
+  // Flow ref S0.7/T5/2: infer stable feature metadata once so downstream logs
+  // reuse the same feature label.
   if (!path) {
     return 'api'
   }
@@ -86,7 +86,8 @@ export function getRequestContext(): RequestContext | undefined {
 }
 
 export function runWithRequestContext<T>(context: RequestContext, callback: () => T): T {
-  // 3) store request context in AsyncLocalStorage so later logs can read it automatically.
+  // Flow ref S0.7/T5/2: store request context in AsyncLocalStorage so later
+  // logs can read it automatically.
   return requestContextStorage.run({ ...context }, callback)
 }
 

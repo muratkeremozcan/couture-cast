@@ -19,16 +19,16 @@ type EventPollResponse = {
   nextSince?: string | null
 }
 
-/** Story 0.7 Task 2/3: explicit web tracking wrapper usage.
+/** Story 0.7 support file: explicit web tracking wrapper usage.
  * Wrapper role: keep handlers thin by delegating event/property contracts to shared track* helpers.
  * Problems solved: avoids per-handler payload drift that weakens funnel/debug observability across web and mobile.
  * Alternatives: raw posthog.capture calls in each handler or full reliance on DOM auto-capture conventions.
- * Setup steps (where we did this):
- *   1) collect identity + feature context (CTA, upload, alert poll payloads).
- *   2) build canonical analytics payloads via trackRitualCreated/trackWardrobeUploadStarted/trackAlertReceived.
- *   3) emit normalized events with posthog.capture in each flow below.
+ * Flow refs:
+ * - S0.7/T3/1: web handlers reuse the shared track* wrappers instead of building payloads inline.
+ * - S0.7/T2/2: wrapper calls keep the snake_case property contract consistent with mobile/API.
  */
-// 1) collect identity + feature context (CTA, upload, alert poll payloads).
+// Flow ref S0.7/T3/1: collect identity + feature context here, then let the
+// shared wrappers decide the analytics payload shape.
 function getWebAnalyticsIdentity() {
   return {
     userId: posthog.get_distinct_id() || 'web-anonymous-user',
@@ -67,7 +67,8 @@ export function AnalyticsEventActions() {
             continue
           }
 
-          // 2) build canonical analytics payloads via trackRitualCreated/trackWardrobeUploadStarted/trackAlertReceived.
+          // Flow ref S0.7/T2/2: build canonical analytics payloads via the
+          // shared track* wrappers, not ad hoc posthog.capture calls.
           const payload = trackAlertReceived({
             userId: event.userId || getWebAnalyticsIdentity().userId,
             alertType:
@@ -84,7 +85,7 @@ export function AnalyticsEventActions() {
                 : undefined,
             timestamp: new Date().toISOString(),
           })
-          // 3) emit normalized events with posthog.capture in each flow below.
+          // Flow ref S0.7/T3/1: emit only the normalized contract payload.
           posthog.capture(payload.event, payload.properties)
         }
       } catch {

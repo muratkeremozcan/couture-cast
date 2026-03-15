@@ -36,3 +36,5 @@ downloads/
 *.log
 npm-debug.log*
 maestro/artifacts
+
+*.tsbuildinfo

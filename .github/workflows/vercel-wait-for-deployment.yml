@@ -45,37 +45,57 @@ jobs:
           SLEEP_SECONDS: ${{ inputs.sleep_seconds }}
           VERCEL_BYPASS_SECRET: ${{ secrets.vercel_bypass_secret }}
         run: |
-          # Use HTTP header for bypass (more reliable than query params per Vercel community reports)
+          # Use the same bypass shape as preview Playwright runs:
+          # 1) send the bypass header,
+          # 2) ask Vercel to mint the bypass cookie,
+          # 3) keep that cookie jar across polling attempts.
           echo "Waiting for deployment at ${HEALTH_URL} (with Vercel bypass header)"
           EXPECTED_SHORT="${EXPECTED_SHA:0:7}"
+          COOKIE_JAR="$(mktemp)"
 
           MATCHED=false
 
-          for i in $(seq 1 "${RETRIES}"); do
-            RESPONSE=$(curl -s -f -H "x-vercel-protection-bypass: ${VERCEL_BYPASS_SECRET}" "${HEALTH_URL}" || true)
+          fetch_health() {
+            local response
+            response=$(
+              curl -sS -L \
+                -c "${COOKIE_JAR}" \
+                -b "${COOKIE_JAR}" \
+                -H "x-vercel-protection-bypass: ${VERCEL_BYPASS_SECRET}" \
+                -H "x-vercel-set-bypass-cookie: true" \
+                -w $'\n__STATUS__:%{http_code}' \
+                "${HEALTH_URL}" || true
+            )
 
-            if [ -z "${RESPONSE}" ]; then
-              echo "⏳ Waiting for health... (attempt ${i}/${RETRIES})"
+            FETCH_STATUS=$(printf '%s\n' "${response}" | sed -n 's/^__STATUS__://p' | tail -n 1)
+            FETCH_BODY=$(printf '%s\n' "${response}" | sed '/^__STATUS__:/d')
+          }
+
+          for i in $(seq 1 "${RETRIES}"); do
+            fetch_health
+
+            if [ -z "${FETCH_BODY}" ]; then
+              echo "⏳ Waiting for health... (attempt ${i}/${RETRIES}, http=${FETCH_STATUS:-none})"
               sleep "${SLEEP_SECONDS}"
               continue
             fi
 
             # Debug: Check if response is JSON
-            if ! echo "${RESPONSE}" | jq empty 2>/dev/null; then
-              echo "⏳ Response is not valid JSON (attempt ${i}/${RETRIES})"
+            if ! echo "${FETCH_BODY}" | jq empty 2>/dev/null; then
+              echo "⏳ Response is not valid JSON (attempt ${i}/${RETRIES}, http=${FETCH_STATUS:-none})"
               echo "First 200 chars of response:"
-              echo "${RESPONSE}" | head -c 200
+              echo "${FETCH_BODY}" | head -c 200
               echo ""
               sleep "${SLEEP_SECONDS}"
               continue
             fi
 
-            STATUS=$(echo "${RESPONSE}" | jq -r '.status // "unknown"')
-            DEPLOYED_SHA=$(echo "${RESPONSE}" | jq -r '.gitSha // "unknown"')
+            STATUS=$(echo "${FETCH_BODY}" | jq -r '.status // "unknown"')
+            DEPLOYED_SHA=$(echo "${FETCH_BODY}" | jq -r '.gitSha // "unknown"')
             DEPLOYED_SHORT="${DEPLOYED_SHA:0:7}"
 
             if [ "${STATUS}" != "ok" ]; then
-              echo "⏳ Health endpoint not ready (status=${STATUS})... (attempt ${i}/${RETRIES})"
+              echo "⏳ Health endpoint not ready (status=${STATUS}, http=${FETCH_STATUS:-none})... (attempt ${i}/${RETRIES})"
               sleep "${SLEEP_SECONDS}"
               continue
             fi
@@ -99,12 +119,13 @@ jobs:
           done
 
           # Final verification
-          if ! curl -f -H "x-vercel-protection-bypass: ${VERCEL_BYPASS_SECRET}" "${HEALTH_URL}" > /dev/null; then
+          fetch_health
+          if [ -z "${FETCH_BODY}" ] || ! echo "${FETCH_BODY}" | jq empty 2>/dev/null; then
             echo "❌ Deployment failed to become healthy after waiting."
             exit 1
           fi
 
-          FINAL_SHA=$(curl -s -f -H "x-vercel-protection-bypass: ${VERCEL_BYPASS_SECRET}" "${HEALTH_URL}" | jq -r '.gitSha // "unknown"')
+          FINAL_SHA=$(echo "${FETCH_BODY}" | jq -r '.gitSha // "unknown"')
           echo "observed_sha=${FINAL_SHA}" >> "$GITHUB_OUTPUT"
 
           if [ "${MATCHED}" = "false" ]; then
@@ -118,3 +139,5 @@ jobs:
               exit 1
             fi
           fi
+
+          rm -f "${COOKIE_JAR}"

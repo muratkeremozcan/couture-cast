@@ -17,6 +17,7 @@ describe('load-env', () => {
     vi.resetModules()
     vi.clearAllMocks()
     delete process.env.NODE_ENV
+    delete process.env.TEST_ENV
   })
 
   it('loads root .env files in expected precedence order for development', async () => {
@@ -26,6 +27,19 @@ describe('load-env', () => {
     expect(loadEnvMock).toHaveBeenCalledTimes(1)
     expect(loadEnvMock.mock.calls[0]?.[0]).toMatchObject({
       override: false,
+      quiet: true,
+    })
+    expect(String(loadEnvMock.mock.calls[0]?.[0]?.path)).toContain('.env.local')
+  })
+
+  it('lets .env.local override inherited values for TEST_ENV=local', async () => {
+    process.env.TEST_ENV = 'local'
+
+    await import('./load-env.js')
+
+    expect(loadEnvMock).toHaveBeenCalledTimes(1)
+    expect(loadEnvMock.mock.calls[0]?.[0]).toMatchObject({
+      override: true,
       quiet: true,
     })
     expect(String(loadEnvMock.mock.calls[0]?.[0]?.path)).toContain('.env.local')

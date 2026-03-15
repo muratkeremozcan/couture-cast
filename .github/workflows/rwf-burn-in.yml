@@ -27,6 +27,8 @@ jobs:
   burn-in:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     outputs:
       runE2E: ${{ steps.set-output.outputs.runE2E }}
       status: ${{ steps.set-output.outputs.status }}
@@ -90,6 +92,16 @@ jobs:
         if: steps.detect-changed.outputs.changed == 'true'
         uses: ./.github/actions/setup-playwright-browsers
 
+      - name: Start local Supabase services
+        if: steps.detect-changed.outputs.changed == 'true'
+        run: npm run supabase:start
+
+      - name: Reset local burn-in database
+        if: steps.detect-changed.outputs.changed == 'true'
+        run: npm run db:reset
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+
       - name: Prepare base branch for diff
         if: steps.detect-changed.outputs.changed == 'true'
         run: |
@@ -124,7 +136,7 @@ jobs:
           EXPECTED_SHA: ${{ steps.git-sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.git-sha.outputs.sha }}
           TEST_ENV: local
-          DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
 
       - name: Upload burn-in failure artifacts
         id: upload-burn-in-artifacts

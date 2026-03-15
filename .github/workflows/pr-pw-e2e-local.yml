@@ -52,7 +52,7 @@ jobs:
     timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
+      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     strategy:
       fail-fast: false
       matrix:
@@ -90,6 +90,14 @@ jobs:
       - name: Cache Playwright browsers
         uses: ./.github/actions/setup-playwright-browsers
 
+      - name: Start local Supabase services
+        run: npm run supabase:start
+
+      - name: Reset local Playwright database
+        run: npm run db:reset
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+
       - name: Build web app
         run: npm run build --workspace web
 
@@ -98,6 +106,8 @@ jobs:
 
       - name: Run Playwright local suite
         run: npm run test:pw-local -- --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --reporter=blob
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
 
       - name: Copy trace files to blob-report
         if: always()

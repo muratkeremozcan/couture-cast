@@ -16,7 +16,7 @@ Development environment; PRs use Preview and `main` uses Production.
 ```mermaid
 flowchart TD
   PR[Pull request] --> PRChecks[pr-checks.yml]
-  PR --> PRE2E[pr-pw-e2e.yml]
+  PR --> PRE2E[pr-pw-e2e-local.yml]
   PR --> VercelPreview[Vercel Preview deploy]
   VercelPreview --> PreviewSmoke[pr-pw-e2e-vercel-preview.yml (web-health-sha)]
   PRChecks --> Merge[Merge to main]
@@ -37,7 +37,7 @@ Playwright environment selection uses `TEST_ENV`:
 ### CI (PR)
 
 - `.github/workflows/pr-checks.yml`: lint/typecheck/unit tests/build on PRs.
-- `.github/workflows/pr-pw-e2e.yml`: Playwright E2E sharded on PRs (includes burn-in gate).
+- `.github/workflows/pr-pw-e2e-local.yml`: Playwright E2E sharded on PRs (includes burn-in gate).
 - `.github/workflows/gitleaks-check.yml`: secret scanning.
 
 ### Vercel Preview smoke

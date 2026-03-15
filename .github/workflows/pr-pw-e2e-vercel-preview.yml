@@ -14,11 +14,18 @@ concurrency:
 
 jobs:
   resolve-url:
+    # Purpose:
+    # - Find the exact web and API preview URLs for this PR branch.
+    # - Export both health endpoints so later jobs can wait for the correct SHA
+    #   on each project separately.
     if: |
       github.event.action == 'synchronize' || github.event.label.name == 'PREVIEW'
     runs-on: ubuntu-latest
     outputs:
+      web_url: ${{ steps.resolve.outputs.web_url }}
       health_url: ${{ steps.resolve.outputs.health_url }}
+      api_url: ${{ steps.resolve.outputs.api_url }}
+      api_health_url: ${{ steps.resolve.outputs.api_health_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,22 +41,41 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_WEB_PROJECT_SLUG: couture-cast-web
+          VERCEL_API_PROJECT_SLUG: couture-cast-api
           VERCEL_TEAM_SLUG: muratkeremozcans-projects
           VERCEL_GIT_COMMIT_REF: ${{ github.head_ref }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
           DEBUG: true
         run: |
           echo "Resolving preview URL for branch: $VERCEL_GIT_COMMIT_REF"
+          # Web and API deploy independently on Vercel, so we resolve both URLs here
+          # instead of assuming they share the same deployment hostname.
           web_url=$(node scripts/resolve-vercel-preview-url.mjs)
           if [ -z "$web_url" ] || [[ "$web_url" != https://* ]]; then
             echo "Failed to resolve web URL"
             exit 1
           fi
 
-          health_url="${web_url}/api/health"
-          echo "Resolved health URL: $health_url"
-          echo "health_url=$health_url" >> "$GITHUB_OUTPUT"
+          api_url=$(node scripts/resolve-api-preview-url.mjs)
+          if [ -z "$api_url" ] || [[ "$api_url" != https://* ]]; then
+            echo "Failed to resolve API URL"
+            exit 1
+          fi
 
-  wait:
+          health_url="${web_url}/api/health"
+          api_health_url="${api_url}/api/health"
+          echo "Resolved web URL: $web_url"
+          echo "Resolved health URL: $health_url"
+          echo "Resolved API URL: $api_url"
+          echo "Resolved API health URL: $api_health_url"
+          echo "web_url=$web_url" >> "$GITHUB_OUTPUT"
+          echo "health_url=$health_url" >> "$GITHUB_OUTPUT"
+          echo "api_url=$api_url" >> "$GITHUB_OUTPUT"
+          echo "api_health_url=$api_health_url" >> "$GITHUB_OUTPUT"
+
+  wait-web:
+    # Wait for the web preview to serve the PR commit before E2E begins.
     needs: resolve-url
     uses: ./.github/workflows/vercel-wait-for-deployment.yml
     with:
@@ -60,13 +86,29 @@ jobs:
     secrets:
       vercel_bypass_secret: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
+  wait-api:
+    # Wait for the API preview separately; this avoids testing a fresh web build
+    # against a stale API deployment from the same branch.
+    needs: resolve-url
+    uses: ./.github/workflows/vercel-wait-for-deployment.yml
+    with:
+      health_url: ${{ needs.resolve-url.outputs.api_health_url }}
+      expected_sha: ${{ github.event.pull_request.head.sha }}
+      retries: 20
+      sleep_seconds: 30
+    secrets:
+      vercel_bypass_secret: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
   pw-e2e:
-    needs: wait
+    # Only start Playwright after both projects agree on the PR SHA, and pass
+    # those exact URLs through so the test command does not re-resolve previews.
+    needs: [resolve-url, wait-web, wait-api]
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: dev
       test_command: npm run test:pw-preview-dev
       gh_ref: ${{ github.event.pull_request.head.sha }}
       deployment_ref: ${{ github.head_ref }}
-      custom_base_url: ''
+      custom_base_url: ${{ needs.resolve-url.outputs.web_url }}
+      custom_api_base_url: ${{ needs.resolve-url.outputs.api_url }}
     secrets: inherit

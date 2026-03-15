@@ -4,8 +4,8 @@
 Status: review
 
 Current state (2025-12-13)
-- CI in place: `.github/workflows/pr-checks.yml` (typecheck, lint, test, build) and `.github/workflows/pr-pw-e2e.yml` (Playwright, 2 shards, artifacts retained 5d, browser cache). Mobile Maestro workflow exists but is manual-only.
-- Burn-in: implemented for PRs via `.github/workflows/rwf-burn-in.yml` + gating in `pr-pw-e2e.yml` (TS runner from `@seontechnologies/playwright-utils`; skip label `SKIP_BURN_IN`; falls through when no test diffs; comments on PR when burn-in fails).
+- CI in place: `.github/workflows/pr-checks.yml` (typecheck, lint, test, build) and `.github/workflows/pr-pw-e2e-local.yml` (Playwright, 2 shards, artifacts retained 5d, browser cache). Mobile Maestro workflow exists but is manual-only.
+- Burn-in: implemented for PRs via `.github/workflows/rwf-burn-in.yml` + gating in `pr-pw-e2e-local.yml` (TS runner from `@seontechnologies/playwright-utils`; skip label `SKIP_BURN_IN`; falls through when no test diffs; comments on PR when burn-in fails).
 - Load testing: out of scope for now (remove from ACs/tasks; consider future story if needed).
 - Deployments: web/mobile workflows exist; API now targeted to Vercel serverless (Nest) instead of Fly.
 - Notifications/triage: no Slack/PagerDuty wiring; GitHub Actions summary/artifacts only.
@@ -37,7 +37,7 @@ Notes against ACs
 - [x] Task 1: Create test workflow with multi-stage pipeline (AC: #1)
   - Decision: keep existing split workflows instead of a single `test.yml`.
     - `pr-checks.yml`: lint/typecheck/test/build (covers smoke/unit/integration implicitly)
-    - `pr-pw-e2e.yml`: Playwright E2E (2 shards) with PR-only burn-in gate
+    - `pr-pw-e2e-local.yml`: Playwright E2E (2 shards) with PR-only burn-in gate
     - Maestro remains manual (`pr-mobile-e2e.yml`)
   - Concurrency: already present in `pr-checks` and `pr-pw-e2e` (cancel in progress)
   - Env: TEST_ENV set per suite (`test:pw-local` uses dev), CI=true inherited from runner
@@ -45,12 +45,12 @@ Notes against ACs
 
 - [x] Task 2: Configure parallelization and timeouts (AC: #2)
   - Unit sharding: not adopted (unit/integration run in `pr-checks` as a single job)
-  - E2E sharding: 2 shards with fail-fast=false (`pr-pw-e2e.yml`)
+  - E2E sharding: 2 shards with fail-fast=false (`pr-pw-e2e-local.yml`)
   - Timeouts: burn-in 30m; E2E job 15m; smoke/unit not split into separate stages (covered in `pr-checks` defaults)
   - [x] Add fail-fast: false to matrix strategies to allow all shards to complete
 
 - [x] Task 3: Create merge reports job (AC: #1, #4)
-  - [x] Add merge-reports job that runs after E2E shards complete (`pr-pw-e2e.yml`)
+  - [x] Add merge-reports job that runs after E2E shards complete (`pr-pw-e2e-local.yml`)
   - [x] Download all shard artifacts (blob-report-*)
   - [x] Merge Playwright reports: `npx playwright merge-reports --reporter=html`
   - [x] Copy trace files to merged report directory
@@ -101,7 +101,7 @@ Notes against ACs
     - [x] Reference from playwright-utils pattern
 
 - [x] Task 8: Add burn-in workflow (AC: #1)
-  - [x] Create burn-in job that detects changed test files (wired to PRs via `pr-pw-e2e.yml`)
+  - [x] Create burn-in job that detects changed test files (wired to PRs via `pr-pw-e2e-local.yml`)
   - [x] Run detected tests 3 times sequentially
   - [x] Post failure comment to PR when burn-in fails
   - [x] Allow skip via `SKIP_BURN_IN` label on PR

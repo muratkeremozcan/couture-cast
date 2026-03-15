@@ -3,7 +3,7 @@ import type { WorkerOptions, JobsOptions, Job } from 'bullmq'
 import { getRedisConfig, redisOptionsFromConfig } from '../config/redis'
 import { getPrismaClient } from './prisma'
 
-/** Story 0.4 Task 2/3/4/5 context
+/** Story 0.4 owner file: worker foundation and dead-letter capture.
  * Worker foundation and failure capture:
  * - Why DLQ exists: failed background jobs need a durable triage/retry path instead of being
  *   lost in transient logs.
@@ -13,11 +13,12 @@ import { getPrismaClient } from './prisma'
  *   so workers must cap parallelism to protect service stability.
  * - Alternatives: rely only on BullMQ's failed set, use dedicated `<queue>-dlq` queues, or push
  *   failures to external incident systems.
- * - Setup steps:
- *   1) Create a worker with the queue processor.
- *   2) Attach a failed-job listener.
- *   3) Persist failure context for operator workflows.
- *   4) Apply connection + concurrency defaults used by worker bootstrap.
+ * Ownership anchor:
+ * - Story 0.4 Task 3 owner: persist failed job context as durable DLQ records for operator workflows.
+ *
+ * Flow refs:
+ * - S0.4/T4: worker bootstrap passes queue-specific concurrency into this foundation layer.
+ * - S0.4/T5: the dedicated worker process group creates workers through this shared factory.
  */
 export type WorkerFactory = (queueName: string, opts: WorkerOptions) => Worker
 
@@ -27,16 +28,18 @@ export function createWorker(
   options: WorkerOptions
 ) {
   const prisma = getPrismaClient()
-  // 1) Create a worker with the queue processor.
+  // Flow ref S0.4/T5: create a worker from the queue processor shared by the
+  // dedicated worker process group.
   const worker = new Worker(queueName, processor, options)
 
-  // 2) Attach a failed-job listener.
-  // Persist failed job details as our DLQ record for admin triage and replay.
+  // Flow ref S0.4/T3: attach a failed-job listener that persists DLQ records
+  // for admin triage and replay.
   worker.on('failed', (job, err) => {
     if (!job) return
     void (async () => {
       try {
-        // 3) Persist failure context for operator workflows.
+        // Flow ref S0.4/T3: persist failure context so operators can inspect,
+        // retry, and prune dead-lettered jobs later.
         await prisma.jobFailure.create({
           data: {
             queue_name: queueName,
@@ -57,7 +60,8 @@ export function createWorker(
 
 export function defaultWorkerOptions(concurrency: number): WorkerOptions {
   const redisConfig = getRedisConfig()
-  // 4) Apply connection + concurrency defaults used by worker bootstrap.
+  // Flow ref S0.4/T4: apply the shared connection plus queue-specific
+  // concurrency defaults passed in by worker bootstrap.
   return {
     connection: redisOptionsFromConfig(redisConfig),
     // Queue-specific caps are passed here; finer rate limits are set in bootstrap.ts.

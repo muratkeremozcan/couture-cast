@@ -1,4 +1,20 @@
 #!/usr/bin/env node
+/**
+ * Resolve the API Preview URL that matches the branch or commit under test.
+ *
+ * Why this file exists:
+ * - Web and API deploy as separate Vercel projects, so the web preview URL
+ *   cannot be transformed into the API preview URL.
+ * - Branch-only matching is not strong enough during rapid PR pushes because
+ *   multiple READY API deployments can exist for the same branch.
+ *
+ * Resolution order:
+ * 1. Respect an explicit API URL override from the caller.
+ * 2. Query Vercel for the API project and fetch READY deployments.
+ * 3. Prefer deployments whose commit SHA matches EXPECTED_SHA/GITHUB_SHA.
+ * 4. Fall back to a deterministic branch alias only if the API query cannot
+ *    produce a better answer.
+ */
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
@@ -87,10 +103,30 @@ async function resolveProjectId(projectSlug, teamId) {
   return result?.id
 }
 
+function getCanonicalDeploymentUrl(deployment) {
+  if (!deployment?.url) return undefined
+  return deployment.url.startsWith('https://')
+    ? deployment.url
+    : `https://${deployment.url}`
+}
+
+function getGitBranchAliasUrl(deployment) {
+  if (!Array.isArray(deployment?.alias)) return undefined
+
+  const gitBranchAlias = deployment.alias.find(
+    (alias) => typeof alias === 'string' && alias.includes('-git-')
+  )
+
+  if (!gitBranchAlias) return undefined
+
+  return gitBranchAlias.startsWith('https://')
+    ? gitBranchAlias
+    : `https://${gitBranchAlias}`
+}
+
 async function findDeploymentUrl(projectId, teamId, branch) {
   const searchParams = new URLSearchParams({
     projectId,
-    state: 'READY',
     limit: '20',
   })
   if (teamId) searchParams.set('teamId', teamId)
@@ -99,15 +135,54 @@ async function findDeploymentUrl(projectId, teamId, branch) {
   const url = `https://api.vercel.com/v6/deployments?${searchParams.toString()}`
   const result = await fetchJson(url)
   const deployments = result?.deployments ?? []
-  for (const deployment of deployments) {
-    if (!deployment?.url) continue
-    if (deployment.state && deployment.state !== 'READY') continue
-    const metaRef = deployment.meta?.githubCommitRef
-    if (branch && metaRef && metaRef !== branch && metaRef !== branchSlug) continue
-    return deployment.url.startsWith('https://')
-      ? deployment.url
-      : `https://${deployment.url}`
+  const expectedSha =
+    env('EXPECTED_SHA') ??
+    env('GITHUB_SHA') ??
+    env('VERCEL_GIT_COMMIT_SHA') ??
+    env('COMMIT_SHA')
+  // Commit matching is the critical safeguard for preview E2E: after a PR push,
+  // the newest READY deployment on a branch is not always the one Playwright should test.
+  const matchingDeployments =
+    expectedSha === undefined
+      ? deployments
+      : deployments.filter((deployment) => {
+          const deploymentSha = deployment?.meta?.githubCommitSha
+          return (
+            typeof deploymentSha === 'string' && deploymentSha.startsWith(expectedSha)
+          )
+        })
+
+  if (expectedSha && matchingDeployments.length > 0) {
+    logDebug(
+      `Preferring API deployment with commit SHA ${expectedSha.slice(0, 7)} (${matchingDeployments.length} match(es))`
+    )
+
+    for (const deployment of matchingDeployments) {
+      const url = getCanonicalDeploymentUrl(deployment)
+      if (!url) continue
+
+      logDebug(`Using exact API deployment URL for expected SHA: ${url}`)
+      return url
+    }
   }
+
+  // If the exact deployment is not visible yet, do not pin a stale canonical
+  // deployment URL from the same branch. Use the mutable git-branch alias so
+  // the waiter can observe the alias switch to the new deployment when Vercel
+  // finishes the rollout.
+  const branchCandidates = deployments.filter((deployment) => {
+    const metaRef = deployment.meta?.githubCommitRef
+    return !branch || !metaRef || metaRef === branch || metaRef === branchSlug
+  })
+
+  for (const deployment of branchCandidates) {
+    const aliasUrl = getGitBranchAliasUrl(deployment)
+    if (!aliasUrl) continue
+
+    logDebug(`Using git-branch alias URL while waiting for expected SHA: ${aliasUrl}`)
+    return aliasUrl
+  }
+
   return undefined
 }
 
@@ -147,6 +222,7 @@ async function main() {
   if (!projectId) fail(`Unable to resolve project ID for ${projectSlug}`)
   logDebug(`Project ID: ${projectId}`)
 
+  // Prefer the exact deployment URL Vercel reports over a guessed hostname.
   const deploymentUrl = await findDeploymentUrl(projectId, teamId, branch)
   if (deploymentUrl) {
     logDebug(`Found deployment URL: ${deploymentUrl}`)
@@ -154,6 +230,8 @@ async function main() {
     return
   }
 
+  // Deterministic aliases are a useful fallback, but they are weaker than the
+  // explicit deployment lookup above because they do not prove the commit SHA.
   logDebug('No deployment found via API, trying deterministic URL')
   const fallback = deterministicUrl(projectSlug, branchSlug, teamSlug)
   if (fallback) {

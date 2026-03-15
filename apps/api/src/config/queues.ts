@@ -2,17 +2,18 @@ import { Queue } from 'bullmq'
 import type { QueueOptions, JobsOptions } from 'bullmq'
 import { getRedisConfig, redisOptionsFromConfig } from './redis'
 
-/** Story 0.4 Task 2/3/4/5 context
+/** Story 0.4 owner file: BullMQ queue configuration.
  * BullMQ queue config in this service:
  * - What BullMQ is: a Redis-backed job queue and worker system for Node.js.
  * - Problems it solves: moves slow or retryable work out of request handlers, survives restarts,
  *   and gives standard retry/backoff behavior.
  * - Alternatives: RabbitMQ consumers, AWS SQS workers, Kafka consumers, or in-process task runners.
- * - Setup steps:
- *   1) Resolve shared Redis connection settings.
- *   2) Define stable queue names used by producers and workers.
- *   3) Define shared default job retry/backoff/retention options.
- *   4) Create Queue instances from one shared config source.
+ * Ownership anchor:
+ * - Story 0.4 Task 2 owner: define shared BullMQ queue names, retry policy, timeouts, and queue construction.
+ *
+ * Flow refs:
+ * - S0.4/T4: worker bootstrap applies concurrency policy against these stable queue names.
+ * - S0.4/T5: the dedicated worker process group starts from this shared queue config.
  */
 export type QueueName =
   | 'weather-ingestion'
@@ -25,11 +26,13 @@ export type QueueConfig = {
   options: QueueOptions
 }
 
-// 1) Resolve shared Redis connection settings.
+// Flow ref S0.4/T2: resolve shared Redis connection settings once so every
+// queue client points at the same backend contract.
 const redisConfig = getRedisConfig()
 const connection = redisOptionsFromConfig(redisConfig)
 
-// 3) Define shared default job retry/backoff/retention options.
+// Flow ref S0.4/T2: keep retry/backoff/retention defaults centralized so queue
+// producers and workers stay aligned.
 const defaultJobOptions: JobsOptions = {
   attempts: 3,
   backoff: { type: 'exponential', delay: 1000 },
@@ -37,7 +40,8 @@ const defaultJobOptions: JobsOptions = {
   removeOnFail: 1000,
 }
 
-// 2) Define stable queue names used by producers and workers.
+// Flow ref S0.4/T2: stable queue names let producers, workers, and health
+// checks talk about the same queues without string drift.
 export const queueConfigs: QueueConfig[] = [
   {
     name: 'weather-ingestion',
@@ -81,7 +85,7 @@ export const queueConfigs: QueueConfig[] = [
   },
 ]
 
-// 4) Create Queue instances from one shared config source.
+// Flow ref S0.4/T2: build Queue instances from one shared config source.
 export function createQueues() {
   return queueConfigs.map(({ name, options }) => new Queue(name, options))
 }
