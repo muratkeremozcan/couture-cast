@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
+import { ApiHealthController } from './controllers/api-health.controller'
 import { HealthController } from './controllers/health.controller'
 import { AdminController } from './admin/admin.controller'
 import { AdminService } from './admin/admin.service'
@@ -27,7 +28,7 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     FeatureFlagsModule,
     ModerationModule,
   ],
-  controllers: [AppController, HealthController, AdminController],
+  controllers: [AppController, ApiHealthController, HealthController, AdminController],
   providers: [AppService, AdminService, AdminCron, PostHogService],
 })
 export class AppModule {}

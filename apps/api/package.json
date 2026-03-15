@@ -22,7 +22,7 @@
     "start:debug": "tsx watch --inspect src/main.ts",
     "start:prod": "node dist/src/main.js",
     "lint": "eslint \"{src,apps,libs,test,integration}/**/*.ts\" --fix",
-    "pretypecheck": "prisma generate --schema ../../packages/db/prisma/schema.prisma",
+    "pretypecheck": "npm run prepare:shared-config && prisma generate --schema ../../packages/db/prisma/schema.prisma",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run prepare:shared-config",
     "test": "vitest run",

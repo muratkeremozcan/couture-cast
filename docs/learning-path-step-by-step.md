@@ -441,7 +441,7 @@ confidence.
 Key takeaways:
 
 1. PR quality gates are split intentionally: `pr-checks.yml` blocks typecheck/lint/test/build,
-  while `pr-pw-e2e.yml` runs sharded Playwright and enforces the required E2E gate.
+  while `pr-pw-e2e-local.yml` runs sharded Playwright and enforces the required E2E gate.
 2. Flake control is explicit: `rwf-burn-in.yml` reruns changed Playwright specs 3x (with
   `SKIP_BURN_IN` override) before full E2E proceeds.
 3. Deployment confidence is surface-aware: Vercel Preview smoke runs from `deployment_status`
@@ -460,7 +460,7 @@ Story reference:
 Code evidence:
 
 - `.github/workflows/pr-checks.yml`
-- `.github/workflows/pr-pw-e2e.yml`
+- `.github/workflows/pr-pw-e2e-local.yml`
 - `.github/workflows/rwf-burn-in.yml`
 - `.github/workflows/pr-pw-e2e-vercel-preview.yml`
 - `.github/workflows/gitleaks-check.yml`
@@ -478,7 +478,7 @@ Architecture diagram:
 flowchart TD
   PR[Pull request] --> PRCHECKS[pr-checks.yml<br/>typecheck + lint + test + build]
   PR --> GITLEAKS[gitleaks-check.yml]
-  PR --> E2E[pr-pw-e2e.yml]
+  PR --> E2E[pr-pw-e2e-local.yml]
 
   E2E --> BURNIN[rwf-burn-in.yml<br/>changed Playwright specs x3]
   BURNIN --> SHARDS[Playwright shards<br/>1/2 + 2/2]
@@ -933,7 +933,7 @@ Code evidence:
 - `scripts/run-maestro.mjs`
 - `scripts/start-mobile-server.sh`
 - `apps/mobile/src/realtime/mobile-fallback-controller.ts`
-- `.github/workflows/pr-pw-e2e.yml`
+- `.github/workflows/pr-pw-e2e-local.yml`
 - `.github/workflows/pr-mobile-e2e.yml`
 
 Architecture diagram:
