@@ -70,8 +70,13 @@ export type FeatureFlagRecord<K extends FeatureFlagKey = FeatureFlagKey> = {
   value: FeatureFlagValue<K>
 }
 
-type FeatureFlagAdapters = {
-  readPostHogFlag: (flagKey: FeatureFlagKey, userId: string) => Promise<unknown>
+export type FeatureFlagEvaluationSubject = string
+
+export type FeatureFlagAdapters = {
+  readRemoteFlag: (
+    flagKey: FeatureFlagKey,
+    subjectId: FeatureFlagEvaluationSubject
+  ) => Promise<unknown>
   readFallbackFlag: (flagKey: FeatureFlagKey) => Promise<FeatureFlagStoredValue | null>
 }
 
@@ -157,17 +162,17 @@ export function getDefaultFeatureFlagValue<K extends FeatureFlagKey>(
 // 3) only the final declaration below is emitted as runtime JavaScript.
 export async function getFeatureFlag<K extends FeatureFlagKey>(
   flagKey: K,
-  userId: string,
+  subjectId: FeatureFlagEvaluationSubject,
   adapters?: Partial<FeatureFlagAdapters>
 ): Promise<FeatureFlagValue<K>>
 export async function getFeatureFlag(
   flagKey: string,
-  userId: string,
+  subjectId: FeatureFlagEvaluationSubject,
   adapters?: Partial<FeatureFlagAdapters>
 ): Promise<FeatureFlagStoredValue>
 export async function getFeatureFlag(
   flagKey: string,
-  userId: string,
+  subjectId: FeatureFlagEvaluationSubject,
   adapters?: Partial<FeatureFlagAdapters>
 ): Promise<FeatureFlagStoredValue> {
   // Flow ref S0.7/T8/1: validate the requested key before any lookup so typos
@@ -175,10 +180,10 @@ export async function getFeatureFlag(
   const normalizedFlagKey = parseFeatureFlagKey(flagKey)
 
   try {
-    if (adapters?.readPostHogFlag) {
-      // Flow ref S0.7/T8/2: ask PostHog first because it is the source of
-      // truth for rollout state.
-      const remoteValue = await adapters.readPostHogFlag(normalizedFlagKey, userId)
+    if (adapters?.readRemoteFlag) {
+      // Flow ref S0.7/T8/2: ask the remote provider first because it is the
+      // source of truth for rollout state.
+      const remoteValue = await adapters.readRemoteFlag(normalizedFlagKey, subjectId)
       const coercedRemoteValue = coerceFeatureFlagValue(normalizedFlagKey, remoteValue)
       if (coercedRemoteValue !== undefined) {
         return coercedRemoteValue

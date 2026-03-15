@@ -5,6 +5,7 @@
     "integration/**/*.ts",
     "test/**/*.ts",
     "scripts/**/*.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "../../packages/config/src/**/*.ts"
   ]
 }

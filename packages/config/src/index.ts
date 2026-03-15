@@ -6,6 +6,8 @@ export {
   getFeatureFlag,
 } from './flags.js'
 export type {
+  FeatureFlagAdapters,
+  FeatureFlagEvaluationSubject,
   FeatureFlagJsonValue,
   FeatureFlagKey,
   FeatureFlagRecord,

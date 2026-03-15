@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common'
-import { PostHogService } from '../../posthog/posthog.service'
+import { AnalyticsModule } from '../../analytics/analytics.module'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { RequestAuthGuard, RolesGuard } from './security.guards'
 
 @Module({
+  imports: [AnalyticsModule],
   controllers: [AuthController],
-  providers: [AuthService, RequestAuthGuard, RolesGuard, PostHogService],
+  providers: [AuthService, RequestAuthGuard, RolesGuard],
 })
 export class AuthModule {}

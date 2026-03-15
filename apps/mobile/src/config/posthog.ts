@@ -20,7 +20,10 @@ if (!isPostHogConfigured) {
 }
 
 /**
- * PostHog client instance for Expo
+ * PostHog-backed provider client for Expo analytics.
+ *
+ * The repo-local mobile analytics facade wraps this instance so feature code
+ * can depend on `MobileAnalyticsClient` instead of importing PostHog directly.
  *
  * Configuration loaded from Expo app config extra values.
  * Root env files provide canonical POSTHOG_API_KEY and POSTHOG_HOST values.
@@ -29,7 +32,7 @@ if (!isPostHogConfigured) {
  *
  * @see https://posthog.com/docs/libraries/react-native
  */
-export const posthog = new PostHog(apiKey ?? 'placeholder_key', {
+export const posthogProviderClient = new PostHog(apiKey ?? 'placeholder_key', {
   // PostHog API host
   host,
 
@@ -57,5 +60,9 @@ export const posthog = new PostHog(apiKey ?? 'placeholder_key', {
   fetchRetryCount: 3, // Number of retry attempts for failed requests
   fetchRetryDelay: 3000, // Delay between retries in ms
 })
+
+// Backwards-compatible alias while the repo-local facade rolls out across the
+// mobile app.
+export const posthog = posthogProviderClient
 
 export const isPostHogEnabled = isPostHogConfigured

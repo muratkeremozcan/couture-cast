@@ -19,7 +19,12 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "baseUrl": ".",
+    "paths": {
+      "@couture/config": ["../../packages/config/src/index.ts"],
+      "@couture/config/*": ["../../packages/config/src/*"]
+    }
   },
   "extends": "../../tsconfig.json",
   "include": [

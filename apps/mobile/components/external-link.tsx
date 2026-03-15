@@ -2,12 +2,12 @@ import { Link, type ExternalPathString } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import type { ComponentProps } from 'react'
 import { Platform } from 'react-native'
-import { usePostHog } from 'posthog-react-native'
+import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 
 export function ExternalLink(
   props: Omit<ComponentProps<typeof Link>, 'href'> & { href: ExternalPathString }
 ) {
-  const posthog = usePostHog()
+  const analytics = useMobileAnalytics()
 
   return (
     <Link
@@ -17,7 +17,7 @@ export function ExternalLink(
       onPress={(e) => {
         // Track external link taps for user engagement analytics
         // @see https://posthog.com/docs/libraries/react-native#capturing-events
-        posthog.capture('external_link_tapped', { url: props.href })
+        analytics.capture('external_link_tapped', { url: props.href })
 
         if (Platform.OS !== 'web') {
           // Prevent the default behavior of linking to the default browser on native.

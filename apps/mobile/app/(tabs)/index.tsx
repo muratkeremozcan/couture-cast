@@ -2,28 +2,28 @@ import { useEffect } from 'react'
 import { Pressable, StyleSheet } from 'react-native'
 import * as FileSystem from 'expo-file-system'
 import * as ImagePicker from 'expo-image-picker'
-import { usePostHog } from 'posthog-react-native'
 
 import EditScreenInfo from '@/components/edit-screen-info'
 import { Text, View } from '@/components/themed'
+import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import {
   trackMobileRitualCreated,
   trackMobileWardrobeUploadStarted,
 } from '@/src/analytics/track-events'
 
 export default function TabOneScreen() {
-  const posthog = usePostHog()
-  const analyticsUserId = posthog.getDistinctId() || 'mobile-anonymous-user'
+  const analytics = useMobileAnalytics()
+  const analyticsUserId = analytics.getDistinctId() || 'mobile-anonymous-user'
   const locationId = Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown'
 
   // Track when user views Tab One — top of the engagement funnel
   // @see https://posthog.com/docs/libraries/react-native#capturing-events
   useEffect(() => {
-    posthog.capture('tab_one_viewed')
-  }, [posthog])
+    analytics.capture('tab_one_viewed')
+  }, [analytics])
 
   const handleGenerateOutfit = () => {
-    trackMobileRitualCreated(posthog, {
+    trackMobileRitualCreated(analytics, {
       userId: analyticsUserId,
       locationId,
       ritualType: 'daily_outfit',
@@ -59,7 +59,7 @@ export default function TabOneScreen() {
       return
     }
 
-    trackMobileWardrobeUploadStarted(posthog, {
+    trackMobileWardrobeUploadStarted(analytics, {
       userId: analyticsUserId,
       itemId: asset.fileName ?? `mobile-upload-${Date.now()}`,
       fileSize,

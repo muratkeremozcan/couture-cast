@@ -8,10 +8,11 @@ import { useEffect, useRef } from 'react'
 import 'react-native-reanimated'
 
 import { Platform, useColorScheme } from 'react-native'
-import { PostHogProvider } from 'posthog-react-native'
+import {
+  MobileAnalyticsProvider,
+  mobileAnalyticsClient,
+} from '@/src/analytics/mobile-analytics'
 import { trackMobileAlertReceived } from '@/src/analytics/track-events'
-
-import { posthog } from '../src/config/posthog'
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -67,7 +68,7 @@ function RootLayoutNav() {
   // @see https://posthog.com/docs/libraries/react-native#screen-tracking
   useEffect(() => {
     if (previousPathname.current !== pathname) {
-      void posthog.screen(pathname, {
+      void mobileAnalyticsClient.screen(pathname, {
         previous_screen: previousPathname.current ?? null,
       })
       previousPathname.current = pathname
@@ -87,8 +88,8 @@ function RootLayoutNav() {
           ? severityCandidate
           : 'info'
 
-      trackMobileAlertReceived(posthog, {
-        userId: posthog.getDistinctId() || 'mobile-anonymous-user',
+      trackMobileAlertReceived(mobileAnalyticsClient, {
+        userId: mobileAnalyticsClient.getDistinctId() || 'mobile-anonymous-user',
         alertType:
           (typeof data?.alertType === 'string' && data.alertType) ||
           notification.request.content.title ||
@@ -103,22 +104,14 @@ function RootLayoutNav() {
   }, [])
 
   return (
-    <PostHogProvider
-      client={posthog}
-      autocapture={{
-        captureScreens: false, // Manual tracking with Expo Router
-        captureTouches: true,
-        propsToCapture: ['testID'],
-        maxElementsCaptured: 20,
-      }}
-    >
+    <MobileAnalyticsProvider>
       <ThemeProvider value={theme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
         </Stack>
       </ThemeProvider>
-    </PostHogProvider>
+    </MobileAnalyticsProvider>
   )
   /* eslint-enable @typescript-eslint/no-unsafe-assignment */
 }

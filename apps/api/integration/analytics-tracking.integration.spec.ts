@@ -5,7 +5,7 @@ import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 
-import { PostHogService } from '../src/posthog/posthog.service'
+import { ANALYTICS_CLIENT } from '../src/analytics/analytics.service'
 import { AuthController } from '../src/modules/auth/auth.controller'
 import { AuthService } from '../src/modules/auth/auth.service'
 import { RequestAuthGuard, RolesGuard } from '../src/modules/auth/security.guards'
@@ -55,7 +55,7 @@ describe('Analytics tracking endpoints (integration)', () => {
         RequestAuthGuard,
         RolesGuard,
         {
-          provide: PostHogService,
+          provide: ANALYTICS_CLIENT,
           useValue: {
             capture,
           },

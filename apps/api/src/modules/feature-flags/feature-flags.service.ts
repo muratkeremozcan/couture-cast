@@ -10,9 +10,12 @@ import {
   type FeatureFlagValue,
 } from '@couture/config'
 import { createBaseLogger } from '../../logger/pino.config'
-import { PostHogService } from '../../posthog/posthog.service'
 
 import { FeatureFlagsRepository } from './feature-flags.repository'
+import {
+  InjectRemoteFeatureFlagProvider,
+  type RemoteFeatureFlagProvider,
+} from './remote-feature-flag-provider'
 
 export type FeatureFlagSyncResult = {
   synced: number
@@ -36,7 +39,8 @@ export class FeatureFlagsService {
 
   constructor(
     private readonly repository: FeatureFlagsRepository,
-    private readonly posthog: PostHogService
+    @InjectRemoteFeatureFlagProvider()
+    private readonly remoteProvider: RemoteFeatureFlagProvider
   ) {}
 
   async getFeatureFlag<K extends FeatureFlagKey>(
@@ -46,8 +50,8 @@ export class FeatureFlagsService {
     // Flow ref S0.7/T8/1-3: one call path for all request-time reads: validate
     // key, ask PostHog, then fall back safely if needed.
     return resolveFeatureFlag(flagKey, userId, {
-      readPostHogFlag: async (key, distinctId) =>
-        this.posthog.getFeatureFlagValue(key, distinctId),
+      readRemoteFlag: async (key, subjectId) =>
+        this.remoteProvider.getFeatureFlagValue(key, subjectId),
       readFallbackFlag: async (key) => this.repository.findValue(key),
     })
   }
@@ -75,7 +79,7 @@ export class FeatureFlagsService {
     // Flow ref S0.7/T8/2: ask PostHog with a stable synthetic distinct id. We
     // are not evaluating a user-targeted experience here; we are refreshing the
     // shared fallback cache.
-    const remoteValue = await this.posthog.getFeatureFlagValue(
+    const remoteValue = await this.remoteProvider.getFeatureFlagValue(
       key,
       FEATURE_FLAG_SYNC_DISTINCT_ID
     )

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import posthog from 'posthog-js'
+import { browserAnalytics } from '../../analytics/browser-analytics'
 
 /** Story 0.7 support file: DOM attribute-based tracking wrapper.
  * This is the lightweight alternative to explicit typed track* wrappers for simple click instrumentation.
@@ -38,7 +38,7 @@ export function PostHogClickTracker() {
           return acc
         }, {})
 
-      posthog.capture(eventName, properties)
+      browserAnalytics.capture(eventName, properties)
     }
 
     // Flow ref S0.7/T3/1: emit one delegated posthog.capture call from a

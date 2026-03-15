@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { PostHogService } from '../../posthog/posthog.service'
+import type { AnalyticsClient } from '../../analytics/analytics.service'
 import { ModerationService } from './moderation.service'
 
 const createService = () => {
   const capture = vi.fn()
-  const posthog = {
+  const analyticsClient = {
     capture,
-  } as unknown as PostHogService
+  } as unknown as AnalyticsClient
 
-  return { service: new ModerationService(posthog), capture }
+  return { service: new ModerationService(analyticsClient), capture }
 }
 
 describe('ModerationService', () => {

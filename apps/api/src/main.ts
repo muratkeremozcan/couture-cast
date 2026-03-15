@@ -1,4 +1,5 @@
 import './load-env'
+import type { AnalyticsClient } from './analytics/analytics.service'
 import {
   initializeOpenTelemetry,
   resolveOtelDiagnosticLogLevel,
@@ -30,15 +31,15 @@ async function bootstrap() {
   const [
     { NestFactory },
     { AppModule },
+    { ANALYTICS_CLIENT },
     { bindRequestContext },
     { createRequestLoggerMiddleware },
-    { PostHogService },
   ] = await Promise.all([
     import('@nestjs/core'),
     import('./app.module.js'),
+    import('./analytics/analytics.service.js'),
     import('./logger/request-context.js'),
     import('./logger/request-logger.middleware.js'),
-    import('./posthog/posthog.service.js'),
   ])
 
   const app = await NestFactory.create(AppModule)
@@ -48,7 +49,7 @@ async function bootstrap() {
   await app.listen(port)
 
   try {
-    void app.get(PostHogService).capture({
+    void app.get<AnalyticsClient>(ANALYTICS_CLIENT).capture({
       distinctId: 'api',
       event: 'api_started',
       properties: {

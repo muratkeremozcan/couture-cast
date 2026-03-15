@@ -46,10 +46,10 @@ vi.mock('@couture/api-client', () => ({
   ),
 }))
 
-vi.mock('posthog-js', () => ({
-  default: {
+vi.mock('../../analytics/browser-analytics', () => ({
+  browserAnalytics: {
     capture: captureMock,
-    get_distinct_id: distinctIdMock,
+    getDistinctId: distinctIdMock,
   },
 }))
 
