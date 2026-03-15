@@ -43,6 +43,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     permissions:
       contents: read
       id-token: write
@@ -62,6 +64,16 @@ jobs:
 
       - name: Setup Playwright browsers
         uses: ./.github/actions/setup-playwright-browsers
+
+      - name: Start local Supabase services
+        if: inputs.test_env == 'local'
+        run: npm run supabase:start
+
+      - name: Reset local E2E database
+        if: inputs.test_env == 'local'
+        run: npm run db:reset
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
 
       - name: Resolve branch name from SHA
         id: resolve_branch
@@ -119,6 +131,7 @@ jobs:
           DEBUG: true
         run: |
           case "$TEST_ENV" in
+            local) export DATABASE_URL="${LOCAL_DATABASE_URL}" ;;
             prod) export DATABASE_URL="${DATABASE_URL_PROD}" ;;
             *) export DATABASE_URL="${DATABASE_URL_DEV}" ;;
           esac
