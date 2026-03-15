@@ -10,7 +10,7 @@
   },
   "scripts": {
     "prepare:shared-config": "npm run build --workspace @couture/config",
-    "vercel:build": "cd .. && npx prisma@6.19.0 generate --schema packages/db/prisma/schema.prisma && npm run build --workspace api",
+    "vercel:build": "cd ../.. && npx prisma@6.19.0 generate --schema packages/db/prisma/schema.prisma && npm run build --workspace api",
     "prebuild": "npm run prepare:shared-config",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"integration/**/*.ts\"",
@@ -20,7 +20,7 @@
     "start:dev": "tsx watch src/main.ts",
     "prestart:debug": "npm run prepare:shared-config",
     "start:debug": "tsx watch --inspect src/main.ts",
-    "start:prod": "node dist/apps/api/src/main.js",
+    "start:prod": "node dist/src/main.js",
     "lint": "eslint \"{src,apps,libs,test,integration}/**/*.ts\" --fix",
     "pretypecheck": "prisma generate --schema ../../packages/db/prisma/schema.prisma",
     "typecheck": "tsc --noEmit",
