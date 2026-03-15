@@ -8,8 +8,8 @@ const { captureMock, openBrowserAsyncMock, preventDefaultMock } = vi.hoisted(() 
   preventDefaultMock: vi.fn(),
 }))
 
-vi.mock('posthog-react-native', () => ({
-  usePostHog: () => ({
+vi.mock('@/src/analytics/mobile-analytics', () => ({
+  useMobileAnalytics: () => ({
     capture: captureMock,
   }),
 }))

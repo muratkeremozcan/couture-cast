@@ -6,8 +6,8 @@ import {
   trackRitualCreated,
   trackWardrobeUploadStarted,
 } from '@couture/api-client'
-import posthog from 'posthog-js'
 import { useEffect, useRef, type ChangeEvent, type MouseEvent } from 'react'
+import { browserAnalytics } from '../../analytics/browser-analytics'
 
 type EventPollResponse = {
   events?: {
@@ -31,7 +31,7 @@ type EventPollResponse = {
 // shared wrappers decide the analytics payload shape.
 function getWebAnalyticsIdentity() {
   return {
-    userId: posthog.get_distinct_id() || 'web-anonymous-user',
+    userId: browserAnalytics.getDistinctId() || 'web-anonymous-user',
     locationId: Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown',
   }
 }
@@ -86,7 +86,7 @@ export function AnalyticsEventActions() {
             timestamp: new Date().toISOString(),
           })
           // Flow ref S0.7/T3/1: emit only the normalized contract payload.
-          posthog.capture(payload.event, payload.properties)
+          browserAnalytics.capture(payload.event, payload.properties)
         }
       } catch {
         // Ignore transient polling failures and retry on the next interval.
@@ -112,7 +112,7 @@ export function AnalyticsEventActions() {
       weatherContext: 'hero_cta',
       timestamp: new Date().toISOString(),
     })
-    posthog.capture(payload.event, payload.properties)
+    browserAnalytics.capture(payload.event, payload.properties)
   }
 
   const handleWardrobeUploadStarted = (event: ChangeEvent<HTMLInputElement>) => {
@@ -130,7 +130,7 @@ export function AnalyticsEventActions() {
       uploadSource: 'web_file_picker',
       timestamp: new Date().toISOString(),
     })
-    posthog.capture(payload.event, payload.properties)
+    browserAnalytics.capture(payload.event, payload.properties)
     event.target.value = ''
   }
 

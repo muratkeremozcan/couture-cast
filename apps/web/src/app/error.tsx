@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import posthog from 'posthog-js'
 import { useEffect } from 'react'
+import { browserAnalytics } from '../analytics/browser-analytics'
 
 export default function GlobalError({
   error,
@@ -12,14 +12,14 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
-    posthog.capture('error_page_viewed', {
+    browserAnalytics.capture('error_page_viewed', {
       error_name: error.name,
       error_digest: error.digest ?? 'none',
     })
   }, [error.digest, error.name])
 
   const handleReset = () => {
-    posthog.capture('error_reset_clicked', {
+    browserAnalytics.capture('error_reset_clicked', {
       error_name: error.name,
       error_digest: error.digest ?? 'none',
     })

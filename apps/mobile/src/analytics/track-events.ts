@@ -3,7 +3,7 @@ import {
   trackRitualCreated,
   trackWardrobeUploadStarted,
 } from '@couture/api-client'
-import type { PostHog } from 'posthog-react-native'
+import type { MobileAnalyticsClient } from './mobile-analytics'
 
 /** Story 0.7 support file: mobile analytics wrapper layer.
  * Wrapper role: collect mobile context, stamp timestamp, and delegate schema enforcement to shared contracts.
@@ -13,7 +13,7 @@ import type { PostHog } from 'posthog-react-native'
  * - S0.7/T3/1: mobile callers feed feature context into the shared analytics wrappers.
  * - S0.7/T2/2: @couture/api-client performs the canonical property normalization.
  */
-type MobilePostHogClient = Pick<PostHog, 'capture'>
+type MobileAnalyticsCaptureClient = Pick<MobileAnalyticsClient, 'capture'>
 
 type TrackAlertReceivedInput = {
   userId: string
@@ -25,7 +25,7 @@ type TrackAlertReceivedInput = {
 // Flow ref S0.7/T3/1: accept mobile feature context here, then delegate the
 // canonical event shape to the shared wrapper.
 export function trackMobileRitualCreated(
-  client: MobilePostHogClient,
+  client: MobileAnalyticsCaptureClient,
   input: {
     userId: string
     locationId: string
@@ -48,7 +48,7 @@ export function trackMobileRitualCreated(
 }
 
 export function trackMobileWardrobeUploadStarted(
-  client: MobilePostHogClient,
+  client: MobileAnalyticsCaptureClient,
   input: {
     userId: string
     itemId: string
@@ -70,7 +70,7 @@ export function trackMobileWardrobeUploadStarted(
 }
 
 export function trackMobileAlertReceived(
-  client: MobilePostHogClient,
+  client: MobileAnalyticsCaptureClient,
   input: TrackAlertReceivedInput
 ) {
   const payload = trackAlertReceived({

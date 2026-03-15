@@ -5,8 +5,8 @@ const { captureMock } = vi.hoisted(() => ({
   captureMock: vi.fn(),
 }))
 
-vi.mock('posthog-js', () => ({
-  default: {
+vi.mock('../../analytics/browser-analytics', () => ({
+  browserAnalytics: {
     capture: captureMock,
   },
 }))

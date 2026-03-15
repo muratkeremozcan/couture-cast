@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { FEATURE_FLAG_KEYS } from '@couture/config'
-import type { PostHogService } from '../../posthog/posthog.service'
 
 import { FeatureFlagsService } from './feature-flags.service'
 import type { FeatureFlagsRepository } from './feature-flags.repository'
+import type { RemoteFeatureFlagProvider } from './remote-feature-flag-provider'
 
 function createService({
   remoteValue,
@@ -21,11 +21,11 @@ function createService({
     upsertMany,
   } as unknown as FeatureFlagsRepository
 
-  const posthog = {
+  const remoteProvider = {
     getFeatureFlagValue,
-  } as unknown as PostHogService
+  } as unknown as RemoteFeatureFlagProvider
 
-  const service = new FeatureFlagsService(repository, posthog)
+  const service = new FeatureFlagsService(repository, remoteProvider)
 
   return { service, findValue, upsertMany, getFeatureFlagValue }
 }
@@ -107,11 +107,11 @@ describe('FeatureFlagsService', () => {
       upsertMany,
     } as unknown as FeatureFlagsRepository
 
-    const posthog = {
+    const remoteProvider = {
       getFeatureFlagValue,
-    } as unknown as PostHogService
+    } as unknown as RemoteFeatureFlagProvider
 
-    const service = new FeatureFlagsService(repository, posthog)
+    const service = new FeatureFlagsService(repository, remoteProvider)
 
     await expect(service.syncFlags()).resolves.toEqual({ synced: 4, fallbackCount: 0 })
     expect(upsertMany).toHaveBeenCalledWith([
@@ -138,11 +138,11 @@ describe('FeatureFlagsService', () => {
       upsertMany,
     } as unknown as FeatureFlagsRepository
 
-    const posthog = {
+    const remoteProvider = {
       getFeatureFlagValue,
-    } as unknown as PostHogService
+    } as unknown as RemoteFeatureFlagProvider
 
-    const service = new FeatureFlagsService(repository, posthog)
+    const service = new FeatureFlagsService(repository, remoteProvider)
 
     await expect(service.syncFlags()).resolves.toEqual({ synced: 4, fallbackCount: 4 })
     expect(upsertMany).toHaveBeenCalledWith([

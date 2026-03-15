@@ -331,24 +331,24 @@ so that we can track success metrics and monitor system health across all enviro
   - [x] Create migration for `feature_flags` table: { key, enabled, updated_at }
   - [x] Sync PostHog flags to Postgres via cron job (every 5 minutes)
 
-- [ ] Task 8.5: Future-proof analytics and feature-flag provider abstractions
-  - [ ] Introduce provider-neutral analytics interfaces in repo-local code:
+- [x] Task 8.5: Future-proof analytics and feature-flag provider abstractions
+  - [x] Introduce provider-neutral analytics interfaces in repo-local code:
     - API server interface for capture/event emission
     - web client interface for browser-side event capture
     - mobile client interface for Expo-side event capture
-  - [ ] Introduce provider-neutral feature-flag interfaces in repo-local code:
+  - [x] Introduce provider-neutral feature-flag interfaces in repo-local code:
     - shared flag-evaluation contract in `packages/config`
     - API-side provider adapter interface for remote flag resolution
-  - [ ] Move PostHog-specific code behind adapters/facades:
+  - [x] Move PostHog-specific code behind adapters/facades:
     - `apps/api/src/posthog/posthog.service.ts`
     - `apps/web/instrumentation-client.ts`
     - `apps/mobile/src/config/posthog.ts`
-  - [ ] Update feature and analytics call sites to depend on repo-local abstractions instead of vendor SDK imports where practical
-  - [ ] Preserve current runtime behavior:
+  - [x] Update feature and analytics call sites to depend on repo-local abstractions instead of vendor SDK imports where practical
+  - [x] Preserve current runtime behavior:
     - same PostHog-backed analytics behavior
     - same PostHog-backed feature-flag behavior
     - same env var contract unless a compatibility shim is documented
-  - [ ] Keep the task future-proof but bounded:
+  - [x] Keep the task future-proof but bounded:
     - do not require implementing a second analytics provider yet
     - do not require implementing a second feature-flag provider yet
     - do require that adding a second provider later is a localized adapter task, not a cross-app refactor
@@ -707,6 +707,14 @@ docs/
 - `npm run lint --workspace api`
 - `npm run test`
 - `npm run lint`
+- `npm run test --workspace @couture/config && npm run typecheck --workspace @couture/config`
+- `npm run typecheck --workspace web && npm run test --workspace web -- src/app/components/analytics-event-actions.test.tsx src/app/components/posthog-click-tracker.test.tsx src/app/components/analytics-event-actions.style.test.tsx && npm run lint --workspace web`
+- `npm run typecheck --workspace mobile`
+- `npm run test --workspace mobile -- src/analytics/mobile-analytics.test.tsx components/external-link.test.tsx`
+- `npm run test --workspace api -- src/posthog/posthog.service.spec.ts src/modules/feature-flags/feature-flags.service.spec.ts src/modules/auth/auth.service.spec.ts src/modules/moderation/moderation.service.spec.ts integration/analytics-tracking.integration.spec.ts`
+- `npm run typecheck --workspace api`
+- `npm run lint --workspace api`
+- `npm run typecheck`
 
 ### Completion Notes List
 
@@ -820,6 +828,20 @@ docs/
     `feature_flags`.
   - Added regression coverage proving cached values survive PostHog misses and startup triggers an
     immediate warm sync.
+- Completed Task 8.5 provider-neutral seams without changing runtime providers:
+  - Added repo-local analytics interfaces/facades for API, web, and mobile in
+    `apps/api/src/analytics/`, `apps/web/src/analytics/browser-analytics.ts`, and
+    `apps/mobile/src/analytics/mobile-analytics.tsx`.
+  - Moved PostHog-specific SDK usage behind those seams so feature code now depends on repo-local
+    analytics clients and the API injects neutral analytics and remote-flag tokens instead of
+    `PostHogService` directly.
+  - Renamed the shared flag adapter contract in `packages/config/src/flags.ts` from
+    `readPostHogFlag` to `readRemoteFlag`, keeping the shared evaluation order while removing the
+    vendor name from the contract.
+  - Preserved the existing PostHog env/runtime behavior across API, web, and mobile while adding
+    targeted tests for the new web/mobile facades and revalidating API integration coverage.
+  - Added API workspace path mapping for `@couture/config` so type-aware lint resolves the shared
+    package source correctly after the new abstraction layer.
 
 ### File List
 
@@ -885,6 +907,23 @@ docs/
 - `packages/config/src/flags.spec.ts` (new)
 - `packages/db/prisma/schema.prisma` (modified)
 - `packages/db/prisma/migrations/20260314160000_add_feature_flags/migration.sql` (new)
+- `apps/api/src/analytics/analytics.module.ts` (new)
+- `apps/api/src/analytics/analytics.service.ts` (new)
+- `apps/api/src/modules/feature-flags/remote-feature-flag-provider.ts` (new)
+- `apps/api/tsconfig.json` (modified)
+- `apps/api/tsconfig.eslint.json` (modified)
+- `apps/mobile/src/analytics/mobile-analytics.tsx` (new)
+- `apps/mobile/src/analytics/mobile-analytics.test.tsx` (new)
+- `apps/mobile/app/modal.tsx` (modified)
+- `apps/mobile/components/external-link.tsx` (modified)
+- `apps/mobile/components/external-link.test.tsx` (modified)
+- `apps/mobile/src/config/posthog.ts` (modified)
+- `apps/mobile/vitest.config.ts` (modified)
+- `apps/web/src/analytics/browser-analytics.ts` (new)
+- `apps/web/src/app/components/analytics-event-actions.test.tsx` (modified)
+- `apps/web/src/app/components/posthog-click-tracker.tsx` (modified)
+- `apps/web/src/app/components/posthog-click-tracker.test.tsx` (modified)
+- `apps/web/src/app/error.tsx` (modified)
 
 ## Change Log
 
@@ -906,6 +945,7 @@ docs/
 | 2026-03-14 | Amelia (Developer Agent) | Replaced the API dashboard's unused 5xx placeholder with a working outbound HTTP client latency panel derived from confirmed `http_client_*` metrics |
 | 2026-03-14 | Amelia (Developer Agent) | Completed Task 8 by adding the shared feature-flag registry, Postgres fallback table + cron sync in `apps/api`, unit coverage, and the four matching PostHog flags in both `couturecast-dev` and `couturecast-prod` |
 | 2026-03-14 | Amelia (Developer Agent) | Fixed Task 8 review defects by preserving last-known fallback values on PostHog sync misses and warming the fallback cache on module init before the scheduled cron cadence |
+| 2026-03-15 | Amelia (Developer Agent) | Completed Task 8.5 by introducing repo-local analytics and remote-flag interfaces across API, web, and mobile, moving PostHog behind those seams, adding targeted facade coverage, and fixing API lint workspace resolution for `@couture/config` |
 
 ## Senior Developer Review (AI)
 

@@ -35,40 +35,40 @@ describe('getFeatureFlag', () => {
     )
   })
 
-  it('returns the PostHog value when it resolves to a boolean', async () => {
-    const readPostHogFlag = vi.fn().mockResolvedValue(true)
+  it('returns the remote provider value when it resolves to a boolean', async () => {
+    const readRemoteFlag = vi.fn().mockResolvedValue(true)
     const readFallbackFlag = vi.fn()
 
     await expect(
       getFeatureFlag('premium_themes_enabled', 'user-1', {
-        readPostHogFlag,
+        readRemoteFlag,
         readFallbackFlag,
       })
     ).resolves.toBe(true)
 
-    expect(readPostHogFlag).toHaveBeenCalledWith('premium_themes_enabled', 'user-1')
+    expect(readRemoteFlag).toHaveBeenCalledWith('premium_themes_enabled', 'user-1')
     expect(readFallbackFlag).not.toHaveBeenCalled()
   })
 
-  it('falls back to the stored toggle when PostHog errors', async () => {
-    const readPostHogFlag = vi.fn().mockRejectedValue(new Error('posthog unavailable'))
+  it('falls back to the stored toggle when the remote provider errors', async () => {
+    const readRemoteFlag = vi.fn().mockRejectedValue(new Error('provider unavailable'))
     const readFallbackFlag = vi.fn().mockResolvedValue(false)
 
     await expect(
       getFeatureFlag('color_analysis_enabled', 'user-2', {
-        readPostHogFlag,
+        readRemoteFlag,
         readFallbackFlag,
       })
     ).resolves.toBe(false)
   })
 
   it('falls back to the registry default when no adapter resolves a value', async () => {
-    const readPostHogFlag = vi.fn().mockResolvedValue(undefined)
+    const readRemoteFlag = vi.fn().mockResolvedValue(undefined)
     const readFallbackFlag = vi.fn().mockResolvedValue(null)
 
     await expect(
       getFeatureFlag('weather_alerts_enabled', 'user-3', {
-        readPostHogFlag,
+        readRemoteFlag,
         readFallbackFlag,
       })
     ).resolves.toBe(true)

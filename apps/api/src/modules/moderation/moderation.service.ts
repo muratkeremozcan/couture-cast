@@ -1,6 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { z } from 'zod'
-import { PostHogService } from '../../posthog/posthog.service'
+import {
+  InjectAnalyticsClient,
+  type AnalyticsClient,
+} from '../../analytics/analytics.service'
 
 const moderationActionInputSchema = z.object({
   moderatorId: z.string().min(1),
@@ -15,13 +18,15 @@ export type ModerationActionInput = z.infer<typeof moderationActionInputSchema>
 
 @Injectable()
 export class ModerationService {
-  constructor(@Inject(PostHogService) private readonly posthogService: PostHogService) {}
+  constructor(
+    @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient
+  ) {}
 
   recordAction(input: ModerationActionInput) {
     const parsed = moderationActionInputSchema.parse(input)
     const timestamp = parsed.timestamp ?? new Date().toISOString()
 
-    this.posthogService.capture({
+    this.analyticsClient.capture({
       distinctId: parsed.moderatorId,
       event: 'moderation_action',
       properties: {

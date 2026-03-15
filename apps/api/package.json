@@ -20,7 +20,7 @@
     "start:dev": "tsx watch src/main.ts",
     "prestart:debug": "npm run prepare:shared-config",
     "start:debug": "tsx watch --inspect src/main.ts",
-    "start:prod": "node dist/src/main.js",
+    "start:prod": "node dist/apps/api/src/main.js",
     "lint": "eslint \"{src,apps,libs,test,integration}/**/*.ts\" --fix",
     "pretypecheck": "npm run prepare:shared-config && prisma generate --schema ../../packages/db/prisma/schema.prisma",
     "typecheck": "tsc --noEmit",
@@ -35,7 +35,7 @@
     "prestart:workers": "npm run prepare:shared-config",
     "start:workers": "tsx src/workers/bootstrap.ts",
     "prestart:workers:prod": "npm run prepare:shared-config",
-    "start:workers:prod": "node dist/workers/bootstrap.js"
+    "start:workers:prod": "node dist/apps/api/src/workers/bootstrap.js"
   },
   "dependencies": {
     "@couture/config": "file:../../packages/config",

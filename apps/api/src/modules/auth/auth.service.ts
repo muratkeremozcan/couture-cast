@@ -1,6 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { z } from 'zod'
-import { PostHogService } from '../../posthog/posthog.service'
+import {
+  InjectAnalyticsClient,
+  type AnalyticsClient,
+} from '../../analytics/analytics.service'
 
 const guardianConsentInputSchema = z.object({
   guardianId: z.string().min(1),
@@ -13,7 +16,9 @@ export type GuardianConsentInput = z.infer<typeof guardianConsentInputSchema>
 
 @Injectable()
 export class AuthService {
-  constructor(@Inject(PostHogService) private readonly posthogService: PostHogService) {}
+  constructor(
+    @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient
+  ) {}
 
   /** Story 0.7 support file: API-side analytics boundary for guardian consent.
    * Why typed validation exists here: API callers are external to UI wrappers, so we enforce schema before capture.
@@ -33,7 +38,7 @@ export class AuthService {
 
     // Flow ref S0.7/T3/1: capture one canonical guardian_consent_granted event
     // payload instead of shaping a route-specific variant.
-    this.posthogService.capture({
+    this.analyticsClient.capture({
       distinctId: parsed.guardianId,
       event: 'guardian_consent_granted',
       properties: {

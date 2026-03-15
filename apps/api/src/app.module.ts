@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
+import { AnalyticsModule } from './analytics/analytics.module'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { ApiHealthController } from './controllers/api-health.controller'
@@ -13,7 +14,6 @@ import { EventsModule } from './modules/events/events.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module'
 import { ModerationModule } from './modules/moderation/moderation.module'
-import { PostHogService } from './posthog/posthog.service'
 
 // Disable websockets by setting DISABLE_WEBSOCKETS=true (e.g., in specific tests)
 const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [GatewayModule]
@@ -21,6 +21,7 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    AnalyticsModule,
     ...websocketModules,
     NotificationsModule,
     EventsModule,
@@ -29,6 +30,6 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     ModerationModule,
   ],
   controllers: [AppController, ApiHealthController, HealthController, AdminController],
-  providers: [AppService, AdminService, AdminCron, PostHogService],
+  providers: [AppService, AdminService, AdminCron],
 })
 export class AppModule {}
