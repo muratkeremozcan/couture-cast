@@ -103,10 +103,30 @@ async function resolveProjectId(projectSlug, teamId) {
   return result?.id
 }
 
+function getCanonicalDeploymentUrl(deployment) {
+  if (!deployment?.url) return undefined
+  return deployment.url.startsWith('https://')
+    ? deployment.url
+    : `https://${deployment.url}`
+}
+
+function getGitBranchAliasUrl(deployment) {
+  if (!Array.isArray(deployment?.alias)) return undefined
+
+  const gitBranchAlias = deployment.alias.find(
+    (alias) => typeof alias === 'string' && alias.includes('-git-')
+  )
+
+  if (!gitBranchAlias) return undefined
+
+  return gitBranchAlias.startsWith('https://')
+    ? gitBranchAlias
+    : `https://${gitBranchAlias}`
+}
+
 async function findDeploymentUrl(projectId, teamId, branch) {
   const searchParams = new URLSearchParams({
     projectId,
-    state: 'READY',
     limit: '20',
   })
   if (teamId) searchParams.set('teamId', teamId)
@@ -136,21 +156,33 @@ async function findDeploymentUrl(projectId, teamId, branch) {
     logDebug(
       `Preferring API deployment with commit SHA ${expectedSha.slice(0, 7)} (${matchingDeployments.length} match(es))`
     )
+
+    for (const deployment of matchingDeployments) {
+      const url = getCanonicalDeploymentUrl(deployment)
+      if (!url) continue
+
+      logDebug(`Using exact API deployment URL for expected SHA: ${url}`)
+      return url
+    }
   }
 
-  const candidates = matchingDeployments.length > 0 ? matchingDeployments : deployments
-  for (const deployment of candidates) {
-    if (!deployment?.url) continue
-    if (deployment.state && deployment.state !== 'READY') continue
+  // If the exact deployment is not visible yet, do not pin a stale canonical
+  // deployment URL from the same branch. Use the mutable git-branch alias so
+  // the waiter can observe the alias switch to the new deployment when Vercel
+  // finishes the rollout.
+  const branchCandidates = deployments.filter((deployment) => {
     const metaRef = deployment.meta?.githubCommitRef
-    if (branch && metaRef && metaRef !== branch && metaRef !== branchSlug) continue
-    logDebug(
-      `Checking API deployment: ${deployment.url} (sha=${deployment.meta?.githubCommitSha || 'unknown'})`
-    )
-    return deployment.url.startsWith('https://')
-      ? deployment.url
-      : `https://${deployment.url}`
+    return !branch || !metaRef || metaRef === branch || metaRef === branchSlug
+  })
+
+  for (const deployment of branchCandidates) {
+    const aliasUrl = getGitBranchAliasUrl(deployment)
+    if (!aliasUrl) continue
+
+    logDebug(`Using git-branch alias URL while waiting for expected SHA: ${aliasUrl}`)
+    return aliasUrl
   }
+
   return undefined
 }
 
