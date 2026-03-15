@@ -58,16 +58,21 @@ const rootEnvFiles = [
   process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.dev',
   '.env',
 ]
+const shouldForceLocalEnv = (process.env.TEST_ENV ?? '').toLowerCase() === 'local'
 
 // Load env files in the same order the local API path expects: the most
 // specific repo-level file first, then the environment-specific file, then the
-// generic fallback. `override: false` preserves values already supplied by the
-// parent shell or CI runner.
+// generic fallback. Local Playwright smoke runs should prefer .env.local over
+// inherited remote service URLs from the parent shell.
 for (const file of rootEnvFiles) {
   const fullPath = path.join(repoRoot, file)
   if (!existsSync(fullPath)) continue
 
-  loadEnv({ path: fullPath, override: false, quiet: true })
+  loadEnv({
+    path: fullPath,
+    override: shouldForceLocalEnv && file === '.env.local',
+    quiet: true,
+  })
 }
 
 // Run the deploy-style migration command, which applies committed migrations

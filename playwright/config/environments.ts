@@ -9,7 +9,9 @@ const envFiles = [`.env.${envSuffix}`, '.env']
 for (const file of envFiles) {
   const envPath = path.resolve(process.cwd(), file)
   if (fs.existsSync(envPath)) {
-    loadEnv({ path: envPath })
+    // Local Playwright runs should prefer .env.local over any inherited remote
+    // DATABASE_URL or service origin from the parent shell.
+    loadEnv({ path: envPath, override: envSuffix === 'local' && file === '.env.local' })
     break
   }
 }
