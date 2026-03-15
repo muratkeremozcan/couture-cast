@@ -5,7 +5,7 @@ import type { Logger } from 'pino'
 import { createBaseLogger } from './pino.config'
 import { extractUserId, inferFeatureFromPath, resolveRequestId } from './request-context'
 
-/** Task 5 (AC #3): HTTP request/response logging middleware.
+/** Story 0.7 support file: HTTP request/response logging middleware.
  * Why this exists:
  * - API logs should capture one consistent lifecycle for every HTTP request without repeating code in controllers.
  * - We need request IDs, feature metadata, duration, and user context attached at the HTTP boundary.
@@ -13,10 +13,10 @@ import { extractUserId, inferFeatureFromPath, resolveRequestId } from './request
  * Alternatives:
  * - Manual controller/service logging, which misses framework-level failures and duplicates boilerplate.
  * - Nest interceptors only, which still leave request-id generation and HTTP log formatting to custom code.
- * Setup steps (where we did this):
- *   1) attach or reuse x-request-id on the HTTP boundary.
- *   2) shape request/response log payloads with feature, path, status, and user context.
- *   3) reuse the shared Pino base logger so HTTP logs match the rest of the API log contract.
+ * Flow refs:
+ * - S0.7/T5/1: attach or reuse x-request-id on the HTTP boundary.
+ * - S0.7/T5/2: shape request/response log payloads with feature, path, status, and user context.
+ * - S0.7/T5/3: reuse the shared Pino base logger so HTTP logs match the rest of the API log contract.
  */
 type EnvVars = Record<string, string | undefined>
 type CreateRequestLoggerOptions = {
@@ -41,7 +41,8 @@ function extractDurationMs(value: unknown): number | undefined {
 export function createRequestLoggerMiddleware(
   options: CreateRequestLoggerOptions = {}
 ): HttpLogger<Request, Response> {
-  // 3) reuse the shared Pino base logger so HTTP logs match the rest of the API log contract.
+  // Flow ref S0.7/T5/3: reuse the shared Pino base logger so HTTP logs match
+  // the rest of the API log contract.
   const env = options.env ?? process.env
   return pinoHttp<Request, Response>({
     logger: options.logger ?? createBaseLogger({ env }),
@@ -53,7 +54,7 @@ export function createRequestLoggerMiddleware(
       responseTime: 'durationMs',
     },
     genReqId(request, response) {
-      // 1) attach or reuse x-request-id on the HTTP boundary.
+      // Flow ref S0.7/T5/1: attach or reuse x-request-id on the HTTP boundary.
       const requestId = resolveRequestId(request.headers['x-request-id'])
       request.id = requestId
       response.setHeader('x-request-id', requestId)
@@ -69,7 +70,8 @@ export function createRequestLoggerMiddleware(
       return 'request_failed'
     },
     customReceivedObject(request) {
-      // 2) shape request/response log payloads with feature, path, status, and user context.
+      // Flow ref S0.7/T5/2: shape request/response log payloads with feature,
+      // path, status, and user context.
       return {
         feature: inferFeatureFromPath(request.originalUrl ?? request.url),
         method: request.method,

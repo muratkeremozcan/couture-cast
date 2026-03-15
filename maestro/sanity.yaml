@@ -4,25 +4,27 @@ tags:
   - smoke
   - maestro
 env:
-  APP_URL: "exp://127.0.0.1:8081/--/"
-  TAB_ONE_COPY: "Tab One"
-  TAB_TWO_COPY: "Tab Two"
+  TAB_TWO_A11Y: "Tab Two, tab, 2 of 2"
+  TAB_TWO_PATH: "app/(tabs)/two.tsx"
 ---
 
 - launchApp:
     appId: ${MAESTRO_APP_ID}
-    clearState: true
-    stopApp: true
+    clearState: false
+    stopApp: false
 
-- tapOn: "Enter URL manually"
+- tapOn:
+    # Expo Go can render a first-run sheet over the app. This tap dismisses it
+    # on iOS while still landing in a harmless area once the sheet is gone.
+    point: "50%,92%"
 
-- inputText: ${APP_URL}
+- tapOn:
+    text: ${TAB_TWO_A11Y}
+    retryTapIfNoChange: true
 
-- tapOn: "Connect"
-
-- pressKey: Back
-
-- pressKey: Back
+# The screen path text is more stable than the generic "Tab Two" title, which
+# also appears in the tab bar accessibility tree.
+- assertVisible: ${TAB_TWO_PATH}
 
 - takeScreenshot:
     path: maestro/artifacts/tab-navigation.png

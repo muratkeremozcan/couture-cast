@@ -3,7 +3,7 @@ import { createBaseLogger } from '../../logger/pino.config'
 import { EventsRepository } from './events.repository'
 
 /**
- * Story 0.5 (Task 5): polling fallback data path.
+ * Story 0.5 support file: polling fallback data path.
  *
  * This service backs "offline-safe" event sync when realtime delivery is unavailable.
  * It returns incremental events using a cursor-like since timestamp (nextSince) so clients
@@ -11,6 +11,9 @@ import { EventsRepository } from './events.repository'
  *
  * Alternative:
  * - Full snapshot fetch on each poll, which is simpler but increases payload and duplicate processing.
+ *
+ * Flow refs:
+ * - S0.5/T5: polling fallback depends on incremental event retrieval with a stable cursor.
  */
 @Injectable()
 export class EventsService {
@@ -19,7 +22,7 @@ export class EventsService {
   constructor(private readonly repo: EventsRepository) {}
 
   async poll(since?: Date) {
-    // Polling stays available even when websocket or push delivery paths are degraded.
+    // Flow ref S0.5/T5: polling stays available even when websocket or push paths are degraded.
     try {
       const events = await this.repo.findSince(since)
       const nextSince = events.length
@@ -36,7 +39,7 @@ export class EventsService {
         nextSince,
       }
     } catch (error) {
-      // Gracefully degrade if storage is unavailable; clients can still poll without breaking.
+      // Flow ref S0.5/T5: degrade gracefully so polling clients do not crash on transient storage issues.
       this.logger.error({ err: error }, 'poll_events_failed')
       return { events: [], nextSince: null }
     }

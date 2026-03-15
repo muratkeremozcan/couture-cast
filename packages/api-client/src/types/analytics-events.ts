@@ -1,20 +1,23 @@
 import { z } from 'zod'
 
-/** Story 0.7 Task 2/3: analytics contracts + tracking wrappers.
+/** Story 0.7 owner file: analytics contracts + tracking wrappers.
  * Analytics contract here = canonical event name + validated input shape + provider property shape.
  * Tracking wrapper here = track* helper that validates and returns a capture-ready payload.
  * Problems solved: schema drift across apps, inconsistent event/property naming, weak observability from split metrics.
  * Why typed contracts: compile-time event safety plus runtime validation at the analytics boundary.
  * Alternatives: direct untyped posthog.capture calls, ingest-only JSON Schema validation, or Protobuf/Avro contracts.
- * Setup steps (where we did this):
- *   1) define canonical event names and input/property schemas in this file.
- *   2) normalize domain inputs to snake_case analytics properties in track* wrappers below.
- *   3) reuse these wrappers in app layers and validate endpoint emissions in API integration assertions.
+ * Ownership anchors:
+ * - Story 0.7 Task 2 step 1 owner: define canonical event names and input/property schemas.
+ * - Story 0.7 Task 2 step 2 owner: normalize domain inputs to snake_case analytics properties in track* wrappers.
+ * - Story 0.7 Task 3 step 1 owner: publish shared track* wrappers for app-layer reuse and integration assertions.
+ * Flow refs:
+ * - S0.7/T3/1: mobile, web, and API call sites import these wrappers instead of inventing local payload shapes.
  */
 const isoTimestamp = z.string().datetime()
 const nonEmptyString = z.string().min(1)
 
-// 1) define canonical event names and input/property schemas in this file.
+// Flow ref S0.7/T2/1: define canonical event names and input/property schemas
+// in one shared place before any app calls capture().
 export const analyticsEventNameSchema = z.enum([
   'ritual_created',
   'wardrobe_upload_started',
@@ -151,8 +154,10 @@ export type GuardianConsentGrantedProperties = z.infer<
   typeof guardianConsentGrantedPropertiesSchema
 >
 
-// 2) normalize domain inputs to snake_case analytics properties in track* wrappers below.
-// 3) reuse these wrappers in app layers and validate endpoint emissions in API integration assertions.
+// Flow ref S0.7/T2/2: normalize domain inputs to snake_case analytics
+// properties in the shared wrappers below.
+// Flow ref S0.7/T3/1: app layers and integration assertions reuse these
+// wrappers instead of rolling their own payload shapes.
 export function trackRitualCreated(
   event: RitualCreatedEvent
 ): AnalyticsCapturePayload<'ritual_created', RitualCreatedProperties> {

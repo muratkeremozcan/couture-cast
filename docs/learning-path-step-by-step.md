@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-03-13 - aligned Story 0.7 telemetry inventory and dashboard guidance
+Updated: 2026-03-14 - aligned Story 0.7 telemetry guidance and documented the stabilized mobile smoke path
 
 ## LLM collaborator prompt
 
@@ -503,6 +503,24 @@ Code evidence:
 - `apps/api/src/modules/auth/auth.service.ts`
 - `apps/api/integration/analytics-tracking.integration.spec.ts`
 
+Task 8 feature-flag flow owners:
+
+- Story 0.7 Task 8 step 1 owner: shared flag keys, value kinds, and code defaults in
+  `packages/config/src/flags.ts`
+- Story 0.7 Task 8 step 2 owner: remote PostHog flag evaluation in
+  `apps/api/src/posthog/posthog.service.ts`
+- Story 0.7 Task 8 step 3 owner: request-time fallback order in
+  `packages/config/src/flags.ts`
+- Story 0.7 Task 8 step 4 owner: fallback cache warmup and refresh in
+  `apps/api/src/modules/feature-flags/feature-flags.cron.ts`
+
+Task 8 support refs:
+
+- `apps/api/src/modules/feature-flags/feature-flags.service.ts` coordinates the full flow
+  without owning a single exact step anchor.
+- `apps/api/src/modules/feature-flags/feature-flags.repository.ts` persists fallback reads and
+  sync writes for the cache-backed path.
+
 Architecture diagram:
 
 ```mermaid
@@ -800,6 +818,9 @@ Key takeaways:
 3. Confidence comes from artifacts plus policy: Playwright HTML/trace outputs and Maestro
   screenshots/logs support fast triage, while web is PR-gated and mobile remains manual/local by
    default.
+4. Expo Go orchestration is part of the test harness: `scripts/run-maestro.mjs` now resolves the
+  active mobile target, waits for Expo Go on iOS when needed, and reuses a healthy Metro server
+  before running Maestro.
 
 Story/Task mapping:
 
@@ -822,6 +843,8 @@ Code evidence:
 - `playwright/tests/web-health-sha.spec.ts`
 - `maestro/sanity.yaml`
 - `scripts/run-maestro.mjs`
+- `scripts/start-mobile-server.sh`
+- `apps/mobile/src/realtime/mobile-fallback-controller.ts`
 - `.github/workflows/pr-pw-e2e.yml`
 - `.github/workflows/pr-mobile-e2e.yml`
 
@@ -831,13 +854,14 @@ Architecture diagram:
 flowchart LR
   trigger["Developer or CI run"] --> pick{"Select surface"}
   pick --> web_e2e["Web E2E test:pw-local"]
-  pick --> mobile_e2e["Mobile E2E test:mobile:e2e"]
+  pick --> mobile_e2e["Mobile E2E test:mobile:e2e or test:mobile:e2e:ios"]
   web_e2e --> web_server["Start API and Web test servers"]
   web_server --> web_smoke["Run Chromium smoke tests"]
   web_smoke --> web_artifacts["HTML report, traces, screenshots"]
   web_artifacts --> web_gate["PR gating checks"]
   mobile_e2e --> maestro_install["Install Maestro CLI"]
-  maestro_install --> metro["Start or reuse Metro and Expo URL"]
+  maestro_install --> target["Resolve Android target or boot iOS simulator"]
+  target --> metro["Start or reuse Metro / Expo Go session"]
   metro --> mobile_smoke["Run maestro sanity flow"]
   mobile_smoke --> mobile_artifacts["Maestro screenshots and logs"]
   mobile_artifacts --> mobile_policy["Local manual default, non gating CI"]

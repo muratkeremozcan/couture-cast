@@ -10,6 +10,7 @@ import { GatewayModule } from './modules/gateway/gateway.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { EventsModule } from './modules/events/events.module'
 import { AuthModule } from './modules/auth/auth.module'
+import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module'
 import { ModerationModule } from './modules/moderation/moderation.module'
 import { PostHogService } from './posthog/posthog.service'
 
@@ -23,6 +24,7 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     NotificationsModule,
     EventsModule,
     AuthModule,
+    FeatureFlagsModule,
     ModerationModule,
   ],
   controllers: [AppController, HealthController, AdminController],

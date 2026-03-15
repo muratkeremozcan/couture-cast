@@ -15,22 +15,24 @@ export type GuardianConsentInput = z.infer<typeof guardianConsentInputSchema>
 export class AuthService {
   constructor(@Inject(PostHogService) private readonly posthogService: PostHogService) {}
 
-  /** Story 0.7 Task 2/3: API-side analytics boundary for guardian consent.
+  /** Story 0.7 support file: API-side analytics boundary for guardian consent.
    * Why typed validation exists here: API callers are external to UI wrappers, so we enforce schema before capture.
    * Problems solved: request payload drift, inconsistent property keys, and weaker incident visibility from bad events.
    * Alternatives: reuse shared contract builders server-side, or enqueue events for async contract validation.
-   * Setup steps (where we did this):
-   *   1) validate inbound payload with guardianConsentInputSchema.
-   *   2) normalize timestamp so every event has consistent temporal fields.
-   *   3) capture one canonical guardian_consent_granted event payload.
+   * Flow refs:
+   * - S0.7/T3/1: API endpoints are also part of the shared analytics surface, not a separate event contract.
+   * - S0.7/T2/2: API capture still emits canonical snake_case properties.
    */
   grantGuardianConsent(input: GuardianConsentInput) {
-    // 1) validate inbound payload with guardianConsentInputSchema.
+    // Flow ref S0.7/T3/1: validate the API payload at the boundary before
+    // emitting the shared analytics event.
     const parsed = guardianConsentInputSchema.parse(input)
-    // 2) normalize timestamp so every event has consistent temporal fields.
+    // Flow ref S0.7/T2/2: normalize timestamp so every emitted payload keeps
+    // the shared temporal field contract.
     const timestamp = parsed.timestamp ?? new Date().toISOString()
 
-    // 3) capture one canonical guardian_consent_granted event payload.
+    // Flow ref S0.7/T3/1: capture one canonical guardian_consent_granted event
+    // payload instead of shaping a route-specific variant.
     this.posthogService.capture({
       distinctId: parsed.guardianId,
       event: 'guardian_consent_granted',

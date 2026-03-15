@@ -10,16 +10,16 @@ import {
   ATTR_SERVICE_VERSION,
 } from '@opentelemetry/semantic-conventions'
 
-/** Task 3: Implement event tracking in apps (AC: #2)
+/** Story 0.7 owner file: OpenTelemetry bootstrap and OTLP export configuration.
  * OpenTelemetry (OTEL) in this service:
  * - Why: vendor-neutral observability so traces/metrics/log context are consistent across tools.
  * - Problem solved: fragmented debugging ("logs say one thing, APM says another") and vendor lock-in.
  * - Alternatives: Datadog APM, New Relic, Dynatrace, Elastic APM, Sentry Performance.
- * - Core setup steps (where we did this):
- *   1) define backend endpoint + auth
- *   2) create OTLP exporters for traces/metrics
- *   3) enable instrumentation + propagation standard (W3C here)
- *   4) initialize SDK before app bootstrap
+ * Ownership anchors:
+ * - Story 0.7 Task 4 step 1 owner: define OTLP backend endpoint + auth resolution.
+ * - Story 0.7 Task 4 step 2 owner: create OTLP exporters for traces and metrics.
+ * - Story 0.7 Task 4 step 3 owner: enable instrumentation + W3C propagation.
+ * - Story 0.7 Task 4 step 4 owner: initialize the SDK before app bootstrap.
  */
 type EnvVars = Record<string, string | undefined>
 
@@ -132,7 +132,8 @@ export function createTelemetryResource(env: EnvVars = process.env) {
   })
 }
 
-// 1) define backend endpoint + auth
+// Flow ref S0.7/T4/1: define backend endpoint + auth before any exporter is
+// created so missing creds can no-op safely.
 export function resolveOtlpExporterConfig(
   env: EnvVars = process.env
 ): OtlpExporterConfig | null {
@@ -151,7 +152,8 @@ export function resolveOtlpExporterConfig(
   }
 }
 
-// 2) create OTLP exporters for traces/metrics
+// Flow ref S0.7/T4/2: create OTLP exporters for traces/metrics from the shared
+// Grafana config so both signals use the same auth contract.
 export function createOpenTelemetrySdkOptions(
   env: EnvVars = process.env
 ): Partial<NodeSDKConfiguration> | null {
@@ -177,14 +179,15 @@ export function createOpenTelemetrySdkOptions(
         exporter: metricExporter,
       }),
     ],
-    // 3) enable instrumentation + propagation standard (W3C here)
-    // createOpenTelemetrySdkOptions() via textMapPropagator + auto-instrumentations.
+    // Flow ref S0.7/T4/3: enable instrumentation + W3C propagation via
+    // textMapPropagator + auto-instrumentations.
     textMapPropagator: new core.W3CTraceContextPropagator(),
     instrumentations: [getNodeAutoInstrumentations()],
   }
 }
 
-// 4) initialize SDK before app bootstrap
+// Flow ref S0.7/T4/4: initialize SDK before app bootstrap so the first request
+// path is instrumented instead of starting mid-flight.
 export function initializeOpenTelemetry(
   env: EnvVars = process.env,
   runtime: InitializeRuntime = {}

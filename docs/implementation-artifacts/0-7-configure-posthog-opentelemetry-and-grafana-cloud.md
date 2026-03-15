@@ -314,22 +314,44 @@ so that we can track success metrics and monitor system health across all enviro
 
   - [ ] Create alerts only after a real backing metric and query are verified
 
-- [ ] Task 8: Configure PostHog feature flags (AC: #5)
-  - [ ] Create feature flags in PostHog:
+- [x] Task 8: Configure PostHog feature flags (AC: #5)
+  - [x] Create feature flags in PostHog:
     - `premium_themes_enabled`: boolean (default: false)
     - `community_feed_enabled`: boolean (default: false)
     - `color_analysis_enabled`: boolean (default: true)
     - `weather_alerts_enabled`: boolean (default: true)
-  - [ ] Implement feature flag helper in `packages/config/flags.ts`:
+  - [x] Implement feature flag helper in `packages/config/flags.ts`:
     ```typescript
     export async function getFeatureFlag(flagKey: string, userId: string): Promise<boolean> {
       // Check PostHog first
       // Fall back to Postgres toggle if PostHog unavailable
     }
     ```
-  - [ ] Add offline mode fallback: query `feature_flags` table in Postgres
-  - [ ] Create migration for `feature_flags` table: { key, enabled, updated_at }
-  - [ ] Sync PostHog flags to Postgres via cron job (every 5 minutes)
+  - [x] Add offline mode fallback: query `feature_flags` table in Postgres
+  - [x] Create migration for `feature_flags` table: { key, enabled, updated_at }
+  - [x] Sync PostHog flags to Postgres via cron job (every 5 minutes)
+
+- [ ] Task 8.5: Future-proof analytics and feature-flag provider abstractions
+  - [ ] Introduce provider-neutral analytics interfaces in repo-local code:
+    - API server interface for capture/event emission
+    - web client interface for browser-side event capture
+    - mobile client interface for Expo-side event capture
+  - [ ] Introduce provider-neutral feature-flag interfaces in repo-local code:
+    - shared flag-evaluation contract in `packages/config`
+    - API-side provider adapter interface for remote flag resolution
+  - [ ] Move PostHog-specific code behind adapters/facades:
+    - `apps/api/src/posthog/posthog.service.ts`
+    - `apps/web/instrumentation-client.ts`
+    - `apps/mobile/src/config/posthog.ts`
+  - [ ] Update feature and analytics call sites to depend on repo-local abstractions instead of vendor SDK imports where practical
+  - [ ] Preserve current runtime behavior:
+    - same PostHog-backed analytics behavior
+    - same PostHog-backed feature-flag behavior
+    - same env var contract unless a compatibility shim is documented
+  - [ ] Keep the task future-proof but bounded:
+    - do not require implementing a second analytics provider yet
+    - do not require implementing a second feature-flag provider yet
+    - do require that adding a second provider later is a localized adapter task, not a cross-app refactor
 
 - [ ] Task 9: Implement analytics validation tests (AC: #2)
   - [ ] (Pruned) analytics scripts will live alongside app code; no separate testing package
@@ -674,6 +696,17 @@ docs/
 - `npm run lint --workspace apps/api`
 - `npm run test --workspace apps/api`
 - `npx markdownlint-cli2 docs/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md` (existing document-wide lint debt; 108 findings)
+- `npm run db:generate`
+- `npm run test --workspace @couture/config`
+- `npm run test --workspace api -- src/modules/feature-flags/feature-flags.service.spec.ts src/modules/feature-flags/feature-flags.cron.spec.ts src/posthog/posthog.service.spec.ts`
+- `npm run typecheck --workspace api`
+- `npm run test`
+- `npm run lint`
+- `npm run test --workspace api -- src/modules/feature-flags/feature-flags.service.spec.ts src/modules/feature-flags/feature-flags.cron.spec.ts`
+- `npm run typecheck --workspace api`
+- `npm run lint --workspace api`
+- `npm run test`
+- `npm run lint`
 
 ### Completion Notes List
 
@@ -765,6 +798,28 @@ docs/
     `GRAFANA_API_KEY`, with Vercel Preview mirroring `.env.dev` and Vercel Production mirroring
     `.env.prod`.
   - Revalidated the OTLP setup with targeted API tests, API typecheck, and API lint.
+- Completed Task 8 feature flags:
+  - Added `packages/config/src/flags.ts` as the canonical boolean flag registry and shared
+    `getFeatureFlag()` fallback helper for `premium_themes_enabled`,
+    `community_feed_enabled`, `color_analysis_enabled`, and `weather_alerts_enabled`.
+  - Added Prisma `feature_flags` persistence with a dedicated migration so offline reads have a
+    durable Postgres fallback keyed by `key`.
+  - Added `apps/api/src/modules/feature-flags/` with repository, service, and five-minute cron
+    sync so the API evaluates PostHog first and refreshes Postgres fallback values on a schedule.
+  - Extended `apps/api/src/posthog/posthog.service.ts` with boolean flag evaluation support and
+    added unit coverage for SDK-backed flag reads plus service/cron coverage for the fallback path.
+  - Created the four Story 0.7 Task 8 boolean flags in both PostHog projects:
+    `couturecast-dev` and `couturecast-prod`, with the repo defaults mirrored as `0%` or `100%`
+    rollouts.
+- Applied review fixes to Task 8:
+  - `apps/api/src/modules/feature-flags/feature-flags.service.ts` now preserves the last known
+    Postgres-backed value when PostHog cannot resolve a boolean during sync, instead of overwriting
+    the fallback cache with code defaults during outages.
+  - `apps/api/src/modules/feature-flags/feature-flags.cron.ts` now warms the fallback cache on
+    module init so fresh boots do not wait for the first five-minute tick before populating
+    `feature_flags`.
+  - Added regression coverage proving cached values survive PostHog misses and startup triggers an
+    immediate warm sync.
 
 ### File List
 
@@ -807,8 +862,13 @@ docs/
 - `apps/api/src/modules/events/events.service.ts` (modified)
 - `apps/api/src/modules/gateway/gateway.gateway.ts` (modified)
 - `apps/api/src/posthog/posthog.service.ts` (modified)
-- `apps/api/package.json` (modified)
-- `package-lock.json` (modified)
+- `apps/api/src/posthog/posthog.service.spec.ts` (new)
+- `apps/api/src/modules/feature-flags/feature-flags.module.ts` (new)
+- `apps/api/src/modules/feature-flags/feature-flags.repository.ts` (new)
+- `apps/api/src/modules/feature-flags/feature-flags.service.ts` (new)
+- `apps/api/src/modules/feature-flags/feature-flags.service.spec.ts` (new)
+- `apps/api/src/modules/feature-flags/feature-flags.cron.ts` (new)
+- `apps/api/src/modules/feature-flags/feature-flags.cron.spec.ts` (new)
 - `docs/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md` (modified)
 - `docs/learning-path-step-by-step.md` (modified)
 - `docs/observability.md` (modified)
@@ -818,6 +878,13 @@ docs/
 - `infra/grafana/dashboards/couturecast-realtime-connections.json` (new)
 - `infra/grafana/dashboards/couturecast-database-performance.json` (new)
 - `docs/implementation-artifacts/0-8-set-up-environment-management-doppler-and-secret-rotation.md` (modified)
+- `packages/config/package.json` (new)
+- `packages/config/tsconfig.json` (new)
+- `packages/config/src/index.ts` (new)
+- `packages/config/src/flags.ts` (new)
+- `packages/config/src/flags.spec.ts` (new)
+- `packages/db/prisma/schema.prisma` (modified)
+- `packages/db/prisma/migrations/20260314160000_add_feature_flags/migration.sql` (new)
 
 ## Change Log
 
@@ -837,6 +904,8 @@ docs/
 | 2026-03-14 | Amelia (Developer Agent) | Started Task 7 by adding four Grafana dashboard JSON exports to the repo, using real API metrics where confirmed and Text panels where instrumentation is still missing |
 | 2026-03-14 | Amelia (Developer Agent) | Updated the API dashboard request-rate query to the Grafana-validated `increase(...[5m]) / 5` form so the checked-in JSON matches the working local panel |
 | 2026-03-14 | Amelia (Developer Agent) | Replaced the API dashboard's unused 5xx placeholder with a working outbound HTTP client latency panel derived from confirmed `http_client_*` metrics |
+| 2026-03-14 | Amelia (Developer Agent) | Completed Task 8 by adding the shared feature-flag registry, Postgres fallback table + cron sync in `apps/api`, unit coverage, and the four matching PostHog flags in both `couturecast-dev` and `couturecast-prod` |
+| 2026-03-14 | Amelia (Developer Agent) | Fixed Task 8 review defects by preserving last-known fallback values on PostHog sync misses and warming the fallback cache on module init before the scheduled cron cadence |
 
 ## Senior Developer Review (AI)
 

@@ -14,6 +14,17 @@ export EXPO_USE_DEV_SERVER_PORT="$USE_DEV_SERVER_PORT"
 export EXPO_WEB_PORT="$WEB_PORT"
 export EXPO_NO_INTERACTIVE=1
 
+# Expo Go startup differs by platform: iOS can fetch/install Expo Go via Expo
+# CLI, while Android local smoke assumes an already attached Expo Go target.
+ARGS=(--clear --port "$METRO_PORT")
+if [[ "${MOBILE_E2E_PLATFORM:-}" == "ios" ]]; then
+  ARGS+=(--ios --go)
+elif [[ "${MOBILE_E2E_PLATFORM:-}" == "android" ]]; then
+  ARGS+=(--offline --android --go)
+else
+  ARGS+=(--offline)
+fi
+
 if command -v lsof >/dev/null 2>&1; then
   if lsof -ti tcp:"$METRO_PORT" >/dev/null 2>&1; then
     echo "[mobile-server] Port $METRO_PORT in use, stopping existing process"
@@ -23,4 +34,4 @@ if command -v lsof >/dev/null 2>&1; then
 fi
 
 echo "[mobile-server] Starting Expo on Metro port ${METRO_PORT}, dev server ${DEV_PORT}"
-exec npm run start --workspace mobile -- --offline --clear --port "$METRO_PORT"
+exec npm run start --workspace mobile -- "${ARGS[@]}"

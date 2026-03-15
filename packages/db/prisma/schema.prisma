@@ -269,3 +269,13 @@ model AuditLog {
 
   @@index([user_id])
 }
+
+/// Task 8 step 4 persistence: stores the last known typed value for each
+/// canonical flag so the API can keep evaluating flags during PostHog outages.
+model FeatureFlag {
+  key        String   @id
+  value      Json
+  updated_at DateTime @updatedAt
+
+  @@map("feature_flags")
+}

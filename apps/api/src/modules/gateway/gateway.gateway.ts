@@ -8,7 +8,7 @@ import { createBaseLogger } from '../../logger/pino.config'
 import { ConnectionManager, type DisconnectResult } from './connection-manager.service'
 
 /**
- * Story 0.5 (Tasks 1-5): realtime + push integration overview.
+ * Story 0.5 owner file: realtime + push integration overview.
  *
  * Realtime gateway handles low-latency delivery for active sessions, while push notifications
  * cover background/offline delivery. If realtime remains unstable, clients fall back to polling.
@@ -18,12 +18,14 @@ import { ConnectionManager, type DisconnectResult } from './connection-manager.s
  * - Reliability: retry + backoff absorbs temporary network drops.
  * - Offline fallback: explicit polling activation keeps event delivery available.
  *
- * Setup flow:
- * 1) Apply socket auth middleware so each connection carries a token.
- * 2) Track connect/disconnect lifecycle state in ConnectionManager.
- * 3) Emit retry/fallback hints on disconnect so clients know the next step.
- * 4) Persist push tokens and deliver pushes for users not actively connected.
- * 5) Use polling as the final delivery safety net when realtime is unavailable.
+ * Ownership anchor:
+ * - Story 0.5 Task 1 owner: expose the Socket.io gateway surface and attach the core auth +
+ *   connection orchestration.
+ *
+ * Flow refs:
+ * - S0.5/T2: connection lifecycle state and retry math live in ConnectionManager.
+ * - S0.5/T3: push delivery covers users who are no longer actively connected.
+ * - S0.5/T5: polling remains the final fallback when realtime continuity is unavailable.
  *
  * Alternatives:
  * - SSE for one-way server updates with lower protocol complexity.
@@ -113,8 +115,8 @@ function emitDisconnectResult(socket: Socket, result: DisconnectResult) {
     return { event: 'connection:retry', payload }
   }
 
-  // 4) Persist push tokens and deliver pushes for users not actively connected.
-  // 5) Use polling as the final delivery safety net when realtime is unavailable.
+  // Flow ref S0.5/T3: push delivery covers users who are no longer actively connected.
+  // Flow ref S0.5/T5: polling remains the final delivery safety net.
   const payload = { activatePolling: result.activatePolling, attempt: result.attempt }
   socket.emit('connection:fallback', payload)
   return { event: 'connection:fallback', payload }
@@ -131,17 +133,17 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server!: Server
 
   afterInit(server: ServerLike) {
-    // 1) Apply socket auth middleware so each connection carries a token.
+    // Flow ref S0.5/T1: apply gateway auth middleware before any socket joins.
     server.use(createAuthMiddleware())
   }
 
   handleConnection(socket: Socket) {
-    // 2) Track connect/disconnect lifecycle state in ConnectionManager.
+    // Flow ref S0.5/T2: delegate lifecycle state to ConnectionManager.
     this.connectionManager.handleConnect(socket)
   }
 
   handleDisconnect(socket: Socket) {
-    // 3) Emit retry/fallback hints on disconnect so clients know the next step.
+    // Flow ref S0.5/T2: emit retry/fallback hints so the client recovery path is explicit.
     const result = this.connectionManager.handleDisconnect(socket)
     this.logger.warn(
       { attempt: result.attempt, namespace: socket.nsp?.name },

@@ -1,5 +1,22 @@
 import { z } from 'zod'
 
+/** Story 0.5 owner file: shared socket payload schemas.
+ * Why this file exists:
+ * - Realtime namespaces need one payload contract so web, mobile, and API all
+ *   agree on version, timestamp, userId, and event-specific data.
+ * - If each surface shaped its own socket payloads, fallback and debugging
+ *   would drift quickly.
+ * Alternatives:
+ * - Untyped ad hoc JSON payloads per namespace.
+ * - Provider-specific schema definitions duplicated in each app.
+ * Ownership anchor:
+ * - Story 0.5 Task 4 owner: define shared socket payload schemas for realtime namespaces.
+ *
+ * Flow refs:
+ * - S0.5/T1: the gateway emits namespace-specific events using these contracts.
+ * - S0.5/T5: polling fallback returns events that still need to match the same
+ *   shared payload expectations.
+ */
 export interface BaseEvent<T = unknown> {
   version: string
   timestamp: string
@@ -9,6 +26,8 @@ export interface BaseEvent<T = unknown> {
 
 const isoTimestamp = z.string().datetime()
 
+// Flow ref S0.5/T4: every socket payload starts from the same envelope before
+// namespace-specific data is added.
 const baseEventSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
   z.object({
     version: z.string().min(1),

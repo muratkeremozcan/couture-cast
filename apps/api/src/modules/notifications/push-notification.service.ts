@@ -4,7 +4,7 @@ import { Expo, type ExpoPushMessage, type ExpoPushTicket } from 'expo-server-sdk
 import { PushTokenRepository } from './push-token.repository'
 
 /**
- * Story 0.5 (Task 4): push delivery leg in the hybrid realtime architecture.
+ * Story 0.5 owner file: push delivery leg in the hybrid realtime architecture.
  *
  * Role in delivery strategy:
  * - Realtime gateway handles active sessions with lowest latency.
@@ -17,6 +17,12 @@ import { PushTokenRepository } from './push-token.repository'
  *
  * Alternative:
  * - APNs/FCM direct integrations instead of Expo for more control at higher integration cost.
+ *
+ * Ownership anchor:
+ * - Story 0.5 Task 3 owner: dispatch Expo push notifications for users who are not on an active realtime session.
+ *
+ * Flow refs:
+ * - S0.5/T4: token persistence keeps the push path durable across app restarts and reconnects.
  */
 type ExpoClient = Pick<Expo, 'sendPushNotificationsAsync'>
 export const EXPO_CLIENT = Symbol('EXPO_CLIENT')
@@ -40,7 +46,7 @@ export class PushNotificationService {
   }
 
   async registerPushToken(userId: string, token: string, platform?: string) {
-    // Validate provider-specific token format before persistence.
+    // Flow ref S0.5/T3: validate provider-specific token format before dispatch can rely on it.
     if (!Expo.isExpoPushToken(token)) {
       throw new Error(
         'Invalid Expo push token: expected format ExpoPushToken[xxxxxxxxxxxxxxxxxxxxxx]. See https://docs.expo.dev/push-notifications/overview/.'
@@ -54,7 +60,7 @@ export class PushNotificationService {
   async sendBatchNotifications(
     messages: ExpoPushMessage[]
   ): Promise<NotificationDispatchResult> {
-    // Keep batches within Expo API limits to reduce provider-side request failures.
+    // Flow ref S0.5/T3: keep batches within Expo API limits to reduce provider-side failures.
     const batches: ExpoPushMessage[][] = []
     for (let i = 0; i < messages.length; i += EXPO_BATCH_SIZE) {
       batches.push(messages.slice(i, i + EXPO_BATCH_SIZE))

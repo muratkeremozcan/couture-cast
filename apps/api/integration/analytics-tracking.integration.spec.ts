@@ -19,14 +19,13 @@ vi.mock('@prisma/client', () => {
   return { PrismaClient: PrismaClientMock }
 })
 
-/** Story 0.7 Task 2/3: integration assertions for analytics tracking.
+/** Story 0.7 support file: integration assertions for analytics tracking.
  * Why these assertions exist: unit tests alone can miss guard/routing regressions and payload-shape mismatches.
  * Problems solved: unauthorized event noise and schema drift that reduce observability quality.
  * Alternatives: end-to-end browser/mobile tests or contract tests against a collector mock; both are broader/slower.
- * Setup steps (where we did this):
- *   1) boot Nest with PostHogService.capture mocked.
- *   2) exercise authorized and unauthorized HTTP paths.
- *   3) assert status codes and exact emitted analytics payloads.
+ * Flow refs:
+ * - S0.7/T3/1: integration coverage proves API routes reuse the shared analytics contract.
+ * - S0.7/T2/2: assertions pin the exact emitted property shapes so snake_case drift is visible.
  */
 describe('Analytics tracking endpoints (integration)', () => {
   let app: INestApplication | undefined
@@ -43,7 +42,8 @@ describe('Analytics tracking endpoints (integration)', () => {
     return app.getHttpServer() as Parameters<typeof request>[0]
   }
 
-  // 1) boot Nest with PostHogService.capture mocked.
+  // Flow ref S0.7/T3/1: boot Nest with capture mocked so HTTP routes can be
+  // exercised without a real PostHog dependency.
   beforeEach(async () => {
     capture.mockReset()
 
@@ -74,7 +74,7 @@ describe('Analytics tracking endpoints (integration)', () => {
     }
   })
 
-  // 2) exercise authorized and unauthorized HTTP paths.
+  // Flow ref S0.7/T3/1: exercise both authorized and unauthorized HTTP paths.
   it('returns 401 for guardian consent when auth headers are missing', async () => {
     const response = await request(getHttpServer())
       .post('/api/v1/auth/guardian-consent')
@@ -84,7 +84,8 @@ describe('Analytics tracking endpoints (integration)', () => {
         consentLevel: 'full',
       })
 
-    // 3) assert status codes and exact emitted analytics payloads.
+    // Flow ref S0.7/T2/2: assert the exact emitted payload so property drift is
+    // caught at the integration boundary.
     expect(response.status).toBe(401)
     expect(capture).not.toHaveBeenCalled()
   })
