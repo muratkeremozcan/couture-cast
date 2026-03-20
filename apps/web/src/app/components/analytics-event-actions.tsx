@@ -19,6 +19,13 @@ type EventPollResponse = {
   nextSince?: string | null
 }
 
+declare global {
+  interface Window {
+    __enableAnalyticsTestHook?: boolean
+    __analyticsBindingsReady?: boolean
+  }
+}
+
 /** Story 0.7 support file: explicit web tracking wrapper usage.
  * Wrapper role: keep handlers thin by delegating event/property contracts to shared track* helpers.
  * Problems solved: avoids per-handler payload drift that weakens funnel/debug observability across web and mobile.
@@ -40,6 +47,10 @@ export function AnalyticsEventActions() {
   const nextSinceRef = useRef<string | null>(null)
 
   useEffect(() => {
+    if (window.__enableAnalyticsTestHook) {
+      window.__analyticsBindingsReady = true
+    }
+
     const trackAlertEvents = async () => {
       const params = new URLSearchParams()
       if (nextSinceRef.current) {
@@ -98,7 +109,13 @@ export function AnalyticsEventActions() {
     const interval = window.setInterval(() => {
       void trackAlertEvents()
     }, 30_000)
-    return () => window.clearInterval(interval)
+    return () => {
+      window.clearInterval(interval)
+
+      if (window.__enableAnalyticsTestHook) {
+        window.__analyticsBindingsReady = false
+      }
+    }
   }, [])
 
   const handleRitualCreated = (event: MouseEvent<HTMLAnchorElement>) => {

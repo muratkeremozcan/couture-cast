@@ -11,6 +11,7 @@
     "baseUrl": ".",
     "paths": {
       "@couture/api-client": ["../../packages/api-client/src/index.ts"],
+      "@couture/api-client/testing/*": ["../../packages/api-client/testing/*"],
       "@couture/api-client/*": ["../../packages/api-client/src/*"]
     },
     "plugins": [

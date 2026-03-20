@@ -357,12 +357,12 @@ so that we can track success metrics and monitor system health across all enviro
     - do not require implementing a second feature-flag provider yet
     - do require that adding a second provider later is a localized adapter task, not a cross-app refactor
 
-- [ ] Task 9: Implement analytics validation tests (AC: #2)
-  - [ ] (Pruned) analytics scripts will live alongside app code; no separate testing package
-  - [ ] Write integration test: verify `ritual_created` event sent to PostHog
-  - [ ] Write integration test: verify `guardian_consent_granted` event sent to PostHog
-  - [ ] Mock PostHog in CI: capture events in memory, assert schema
-  - [ ] Add test helper: `expectEventTracked(eventName, properties)`
+- [x] Task 9: Implement analytics validation tests (AC: #2)
+  - [x] (Pruned) analytics scripts will live alongside app code; no separate testing package
+  - [x] Write integration test: verify `ritual_created` event sent to PostHog
+  - [x] Write integration test: verify `guardian_consent_granted` event sent to PostHog
+  - [x] Mock PostHog in CI: capture events in memory, assert schema
+  - [x] Add test helper: `expectEventTracked(eventName, properties)`
   - [x] Document testing patterns in `_bmad-output/project-knowledge/analytics-events.md`
 
 - [ ] Task 10: Implement observability tests (AC: #3, #4)
@@ -743,6 +743,16 @@ _bmad-output/
 - `npm run typecheck --workspace api`
 - `npm run lint --workspace api`
 - `npm run typecheck`
+- `npm run test --workspace web -- src/app/components/analytics-event-actions.test.tsx`
+- `npm run test --workspace api -- integration/analytics-tracking.integration.spec.ts`
+- `npm run typecheck --workspace @couture/api-client`
+- `npm run lint --workspace @couture/api-client`
+- `npm run test --workspace web`
+- `npm run test --workspace api`
+- `npm run typecheck --workspace web`
+- `npm run typecheck --workspace api`
+- `npm run lint --workspace web`
+- `npm run lint --workspace api`
 
 ### Completion Notes List
 
@@ -870,6 +880,20 @@ _bmad-output/
     targeted tests for the new web/mobile facades and revalidating API integration coverage.
   - Added API workspace path mapping for `@couture/config` so type-aware lint resolves the shared
     package source correctly after the new abstraction layer.
+- Completed Task 9 analytics validation tests:
+  - Added `packages/api-client/src/testing/analytics-event-assertions.ts` with the shared
+    `expectEventTracked(eventName, properties, { afterIndex, count })` helper that validates
+    captured analytics payloads against the canonical event-property schemas and can assert exact
+    new-event counts after a test cursor.
+  - Updated `apps/web/src/app/components/analytics-event-actions.test.tsx` to mock `posthog-js`
+    in memory and verify `ritual_created`, `wardrobe_upload_started`, and `alert_received` reach
+    the browser analytics adapter with schema-valid properties exactly once per triggering action.
+  - Updated `apps/api/integration/analytics-tracking.integration.spec.ts` to boot the real
+    `AuthModule` and `ModerationModule` against mocked `posthog-node` capture and verify
+    `guardian_consent_granted` plus `moderation_action` reach the API PostHog adapter with the
+    canonical payload shape exactly once per authorized request.
+  - Revalidated the final Task 9 file set with targeted and full `web`/`api` test runs plus
+    `@couture/api-client`, `web`, and `api` lint/typecheck passes.
 
 ### File List
 
@@ -952,28 +976,32 @@ _bmad-output/
 - `apps/web/src/app/components/posthog-click-tracker.tsx` (modified)
 - `apps/web/src/app/components/posthog-click-tracker.test.tsx` (modified)
 - `apps/web/src/app/error.tsx` (modified)
+- `playwright/tests/home-analytics-capture.spec.ts` (new)
+- `packages/api-client/src/testing/analytics-event-assertions.ts` (new)
 
 ## Change Log
 
-| Date       | Author                              | Change                                                                                                                                                                                                                                            |
-| ---------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2025-11-13 | Bob (Scrum Master)                  | Story drafted from Epic 0, CC-0.7 acceptance criteria                                                                                                                                                                                             |
-| 2026-03-03 | Amelia (Developer Agent)            | Completed Task 2 event schema/types/helpers/docs and validated via api-client typecheck                                                                                                                                                           |
-| 2026-03-04 | Amelia (Developer Agent)            | Completed Task 3 event tracking across mobile/web/API with auth+moderation modules, added API tests, and validated via lint/typecheck/test                                                                                                        |
-| 2026-03-04 | Amelia (Senior Developer Review AI) | Reviewed Task 3 implementation, found 5 High/Medium issues, applied automatic fixes, and revalidated lint/typecheck/test                                                                                                                          |
-| 2026-03-05 | Amelia (Developer Agent)            | Completed Task 4 OpenTelemetry setup in `apps/api` with Grafana OTLP traces/metrics, W3C propagation, bootstrap init wiring, new unit tests, and full workspace validation                                                                        |
-| 2026-03-06 | Amelia (Developer Agent)            | Completed Task 5 Pino structured logging in `apps/api` with shared logger config, request-context + `pino-http` middleware, OTEL trace correlation, env-based log levels, logger tests, and full API validation                                   |
-| 2026-03-07 | Amelia (Developer Agent)            | Expanded Task 6 story guidance with docs-verified Grafana Cloud account, stack, OTLP credential, env, verification, and provisioned data source steps for first-time setup                                                                        |
-| 2026-03-13 | Amelia (Developer Agent)            | Aligned Task 6.5 and Task 7 docs with current repo telemetry reality, added beginner-friendly Grafana metric inventory guidance, and documented pending-instrumentation dashboard fallback rules                                                  |
-| 2026-03-13 | Amelia (Developer Agent)            | Replaced placeholder `_bmad-output/project-knowledge/observability.md`, created `infra/grafana/dashboards/README.md`, and documented the repo-side dashboard export workflow pending Grafana metric inventory                                     |
-| 2026-03-14 | Amelia (Developer Agent)            | Captured the first Grafana metric inventory in `_bmad-output/project-knowledge/observability.md`, confirming server HTTP and runtime metrics while documenting the absence of queue/cache/socket/db metric families                               |
-| 2026-03-14 | Amelia (Developer Agent)            | Marked Task 6.5 complete after confirming the local Grafana metric inventory and documenting the current metric families available for dashboard work                                                                                             |
-| 2026-03-14 | Amelia (Developer Agent)            | Started Task 7 by adding four Grafana dashboard JSON exports to the repo, using real API metrics where confirmed and Text panels where instrumentation is still missing                                                                           |
-| 2026-03-14 | Amelia (Developer Agent)            | Updated the API dashboard request-rate query to the Grafana-validated `increase(...[5m]) / 5` form so the checked-in JSON matches the working local panel                                                                                         |
-| 2026-03-14 | Amelia (Developer Agent)            | Replaced the API dashboard's unused 5xx placeholder with a working outbound HTTP client latency panel derived from confirmed `http_client_*` metrics                                                                                              |
-| 2026-03-14 | Amelia (Developer Agent)            | Completed Task 8 by adding the shared feature-flag registry, Postgres fallback table + cron sync in `apps/api`, unit coverage, and the four matching PostHog flags in both `couturecast-dev` and `couturecast-prod`                               |
-| 2026-03-14 | Amelia (Developer Agent)            | Fixed Task 8 review defects by preserving last-known fallback values on PostHog sync misses and warming the fallback cache on module init before the scheduled cron cadence                                                                       |
-| 2026-03-15 | Amelia (Developer Agent)            | Completed Task 8.5 by introducing repo-local analytics and remote-flag interfaces across API, web, and mobile, moving PostHog behind those seams, adding targeted facade coverage, and fixing API lint workspace resolution for `@couture/config` |
+| Date       | Author                              | Change                                                                                                                                                                                                                                               |
+| ---------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2025-11-13 | Bob (Scrum Master)                  | Story drafted from Epic 0, CC-0.7 acceptance criteria                                                                                                                                                                                                |
+| 2026-03-03 | Amelia (Developer Agent)            | Completed Task 2 event schema/types/helpers/docs and validated via api-client typecheck                                                                                                                                                              |
+| 2026-03-04 | Amelia (Developer Agent)            | Completed Task 3 event tracking across mobile/web/API with auth+moderation modules, added API tests, and validated via lint/typecheck/test                                                                                                           |
+| 2026-03-04 | Amelia (Senior Developer Review AI) | Reviewed Task 3 implementation, found 5 High/Medium issues, applied automatic fixes, and revalidated lint/typecheck/test                                                                                                                             |
+| 2026-03-05 | Amelia (Developer Agent)            | Completed Task 4 OpenTelemetry setup in `apps/api` with Grafana OTLP traces/metrics, W3C propagation, bootstrap init wiring, new unit tests, and full workspace validation                                                                           |
+| 2026-03-06 | Amelia (Developer Agent)            | Completed Task 5 Pino structured logging in `apps/api` with shared logger config, request-context + `pino-http` middleware, OTEL trace correlation, env-based log levels, logger tests, and full API validation                                      |
+| 2026-03-07 | Amelia (Developer Agent)            | Expanded Task 6 story guidance with docs-verified Grafana Cloud account, stack, OTLP credential, env, verification, and provisioned data source steps for first-time setup                                                                           |
+| 2026-03-13 | Amelia (Developer Agent)            | Aligned Task 6.5 and Task 7 docs with current repo telemetry reality, added beginner-friendly Grafana metric inventory guidance, and documented pending-instrumentation dashboard fallback rules                                                     |
+| 2026-03-13 | Amelia (Developer Agent)            | Replaced placeholder `_bmad-output/project-knowledge/observability.md`, created `infra/grafana/dashboards/README.md`, and documented the repo-side dashboard export workflow pending Grafana metric inventory                                        |
+| 2026-03-14 | Amelia (Developer Agent)            | Captured the first Grafana metric inventory in `_bmad-output/project-knowledge/observability.md`, confirming server HTTP and runtime metrics while documenting the absence of queue/cache/socket/db metric families                                  |
+| 2026-03-14 | Amelia (Developer Agent)            | Marked Task 6.5 complete after confirming the local Grafana metric inventory and documenting the current metric families available for dashboard work                                                                                                |
+| 2026-03-14 | Amelia (Developer Agent)            | Started Task 7 by adding four Grafana dashboard JSON exports to the repo, using real API metrics where confirmed and Text panels where instrumentation is still missing                                                                              |
+| 2026-03-14 | Amelia (Developer Agent)            | Updated the API dashboard request-rate query to the Grafana-validated `increase(...[5m]) / 5` form so the checked-in JSON matches the working local panel                                                                                            |
+| 2026-03-14 | Amelia (Developer Agent)            | Replaced the API dashboard's unused 5xx placeholder with a working outbound HTTP client latency panel derived from confirmed `http_client_*` metrics                                                                                                 |
+| 2026-03-14 | Amelia (Developer Agent)            | Completed Task 8 by adding the shared feature-flag registry, Postgres fallback table + cron sync in `apps/api`, unit coverage, and the four matching PostHog flags in both `couturecast-dev` and `couturecast-prod`                                  |
+| 2026-03-14 | Amelia (Developer Agent)            | Fixed Task 8 review defects by preserving last-known fallback values on PostHog sync misses and warming the fallback cache on module init before the scheduled cron cadence                                                                          |
+| 2026-03-15 | Amelia (Developer Agent)            | Completed Task 8.5 by introducing repo-local analytics and remote-flag interfaces across API, web, and mobile, moving PostHog behind those seams, adding targeted facade coverage, and fixing API lint workspace resolution for `@couture/config`    |
+| 2026-03-20 | Amelia (Developer Agent)            | Completed Task 9 by adding in-memory PostHog analytics assertions with exact new-event count checks, provider-boundary web/API integration coverage for `ritual_created` and `guardian_consent_granted`, and final package/web/api validation passes |
+| 2026-03-20 | Murat (Test Architect)              | Added a PR-blocking Playwright smoke for the home CTA analytics path, using a browser-side runtime hook plus shared schema validation to assert `ritual_created` in the built web app without external PostHog dependency                            |
 
 ## Senior Developer Review (AI)
 
