@@ -1,0 +1,12 @@
+title = "Couture Cast gitleaks config"
+
+[extend]
+useDefault = true
+
+# Gitleaks 8.24.3 correctly applies this top-level path allowlist during `detect`
+# for BMAD vendor files that trigger generic-api-key false positives.
+[allowlist]
+paths = [
+  '''_bmad/_config/files-manifest\.csv''',
+  '''_bmad/wds/workflows/6-asset-generation/steps-p/step-01-load-context\.md''',
+]

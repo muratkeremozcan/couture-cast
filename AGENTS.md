@@ -1,9 +1,10 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `docs/` is the collaboration surface: `couturecast_brief.md` (positioning, audience) and `couturecast_roadmap.md` (release plan) drive every downstream artifact.
+- `_bmad-output/` is the collaboration surface: `_bmad-output/project-knowledge/couturecast_brief.md` (positioning, audience) and `_bmad-output/project-knowledge/couturecast_roadmap.md` (release plan) drive every downstream artifact.
+- `_bmad-output/planning-artifacts/`, `_bmad-output/implementation-artifacts/`, and `_bmad-output/test-artifacts/` hold BMAD-generated planning, delivery, and QA artifacts.
 - `bmad/` is vendor-managed BMAD scaffolding; leave it untouched unless you deliberately rerun `npx bmad-method@alpha install` after an upstream update.
-- Keep root-level helpers (like this guide) lightweight and point contributors back to the docs rather than duplicating narrative content.
+- Keep root-level helpers (like this guide) lightweight and point contributors back to `_bmad-output/` rather than duplicating narrative content.
 
 ## Maintaining Brief & Roadmap
 - Edit the brief first when vision, personas, or success metrics shift; update the roadmap immediately after so phase names and milestones stay aligned.
@@ -12,7 +13,7 @@
 
 ## Build, Test, and Development Commands
 - `npx bmad-method@alpha install` (optional) refreshes BMAD payloads; run only when intentionally upgrading the framework.
-- `npx markdownlint-cli2 docs/**/*.md` (if available) checks headings, spacing, and table formatting before you push.
+- `npx markdownlint-cli2 _bmad-output/**/*.md docs/**/*.md` (if available) checks headings, spacing, and table formatting before you push.
 - Preview Markdown locally (VS Code, Obsidian, GitHub web) to confirm emoji, tables, and callouts render cleanly.
 
 ## Coding Style & Naming Conventions

@@ -16,17 +16,18 @@ Thin Turborepo for Couture Cast apps and smoke tests. Keep it lean: shared lint 
 
 ## Repository layout
 
-| Path                     | Purpose                                                                                      |
-| ------------------------ | -------------------------------------------------------------------------------------------- |
-| `apps/web`               | Next.js 15.5.6 App Router surface (React 19.1).                                              |
-| `apps/mobile`            | Expo Router SDK 54 project (tabs template, React Native 0.81).                               |
-| `apps/api`               | NestJS 11 monolith wired to Vitest 4.                                                        |
-| `maestro/`               | Minimal Maestro smoke flow for mobile sanity checks (URL load + screenshot).                 |
-| `playwright/`            | Root-level Playwright smoke suite (fixtures + README) shared by web + API teams.             |
-| `playwright/scripts`     | Utility scripts for Playwright (burn-in variants).                                           |
-| `packages/eslint-config` | Shared ESLint config consumed across workspaces.                                             |
-| `.github/workflows`      | GitHub Actions quality gates (PR checks, Playwright E2E with burn-in, Vercel Preview smoke). |
-| `docs/`                  | Product brief, architecture, epics/stories—**source of truth** for what we build.            |
+| Path                     | Purpose                                                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `apps/web`               | Next.js 15.5.6 App Router surface (React 19.1).                                                            |
+| `apps/mobile`            | Expo Router SDK 54 project (tabs template, React Native 0.81).                                             |
+| `apps/api`               | NestJS 11 monolith wired to Vitest 4.                                                                      |
+| `maestro/`               | Minimal Maestro smoke flow for mobile sanity checks (URL load + screenshot).                               |
+| `playwright/`            | Root-level Playwright smoke suite (fixtures + README) shared by web + API teams.                           |
+| `playwright/scripts`     | Utility scripts for Playwright (burn-in variants).                                                         |
+| `packages/eslint-config` | Shared ESLint config consumed across workspaces.                                                           |
+| `.github/workflows`      | GitHub Actions quality gates (PR checks, Playwright E2E with burn-in, Vercel Preview smoke).               |
+| `_bmad-output/`          | Product knowledge plus planning, implementation, and test artifacts—**source of truth** for what we build. |
+| `docs/`                  | Lightweight compatibility pointer to `_bmad-output/`.                                                      |
 
 ## Getting started
 
@@ -40,7 +41,7 @@ npm run dev       # turbo spins up mobile, web, and api concurrently
 
 **CI**: Mobile e2e is disabled on GitHub-hosted runners due to emulator instability and long runtimes. Use self-hosted/device cloud or trigger the manual workflow if needed.
 
-**Local**: iOS + Android testing supported (see `npm run test:mobile:e2e` and docs/implementation-artifacts/0-13-scaffold-cross-surface-e2e-automation.md)
+**Local**: iOS + Android testing supported (see `npm run test:mobile:e2e` and \_bmad-output/implementation-artifacts/0-13-scaffold-cross-surface-e2e-automation.md)
 
 ```bash
 npm run dev        # Turborepo parallel dev servers (Expo / Next / Nest)
@@ -51,43 +52,43 @@ npm run typecheck  # TypeScript project references across every workspace
 npm run typecheck:clear-cache
 ```
 
-| Command                                   | What it does                                                                                      |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `npm run dev`                             | Runs all workspace `dev` scripts via Turborepo (parallel).                                        |
-| `npm run build`                           | Builds all workspaces respecting dependency graph.                                                |
-| `npm run typecheck`                       | Composite TypeScript check (per package via Turborepo).                                           |
-| `npm run typecheck:clear-cache`           | Deletes `*.tsbuildinfo` + TS cache folders.                                                       |
-| `npm run lint`                            | Runs all workspace lint targets, shared root config, and a Prettier check for docs/config.        |
-| `npm run lint:fix`                        | Runs lint across workspaces + root with `--fix`, then formats via Prettier.                       |
-| `npm run lint:staged`                     | Lints + formats staged files via `lint-staged`. Wire into your git hooks if desired.              |
-| `npm run start:web`                       | Starts the built Next.js app on port 3005 (used by Playwright’s webServer hook).                  |
-| `npm run start:api`                       | Boots the NestJS API in watch mode so local smoke tests can exercise server flows.                |
-| `npm run start:mobile:server`             | Starts Expo dev server on 19000/19001 for Maestro smoke runs.                                     |
-| `npm run start:mobile:e2e`                | One-shot mobile smoke: boots a simulator (android→iOS), starts Expo, runs Maestro.                |
-| `npm run mobile:sim:ios`                  | Boots the default iOS simulator (`IOS_SIM_DEVICE` override) and shows booted devices.             |
-| `npm run mobile:sim:android`              | Boots the default Android AVD (`AVD_NAME` override) and waits for `adb` ready.                    |
-| `npm run mobile:device`                   | Convenience opener for a simulator/emulator (launch one manually if this no-ops).                 |
-| `npm run mobile:expo-go`                  | Installs Expo Go APK onto the connected emulator/device.                                          |
-| `npm run start:all`                       | Starts both API + web servers concurrently (mirrors Playwright’s `webServer` config).             |
-| `npm run test:pw`                         | Runs the Playwright smoke suite using the current `TEST_ENV` (defaults to `local`).               |
-| `npm run test:pw-local`                   | Convenience wrapper that sets `TEST_ENV=local` and runs the smoke suite.                          |
-| `npm run test:pw-dev`                     | Targets the dev deployment (`TEST_ENV=dev`).                                                      |
-| `npm run test:pw-stage`                   | Targets the stage deployment (`TEST_ENV=stage`).                                                  |
-| `npm run test:pw-prod`                    | Targets the prod deployment (`TEST_ENV=prod`).                                                    |
-| `npm run test:pw:burn-in`                 | Burn-in all specs locally (`PW_BURN_IN=true`, repeat-each=3, retries=0).                          |
-| `npm run test:pw:burn-in-changed-classic` | Playwright built-in `--only-changed` burn-in vs main (3x, retries=0) — can overrun.               |
-| `npm run test:pw:burn-in-changed`         | Smart burn-in via `@seontechnologies/playwright-utils` (config-driven, respects skip/percentage). |
-| `npm run maestro:install`                 | Installs the Maestro CLI (brew/curl on macOS; npx fallback on CI).                                |
-| `npm run test:mobile:e2e`                 | Starts Expo (if needed) and runs the Maestro smoke flow against the dev server it spawns.         |
-| `npm run test:mobile:e2e:ios`             | Boots the default iOS simulator and runs the Maestro smoke flow against Expo dev server.          |
-| `npm run validate`                        | Runs typecheck, lint (workspace + root), and tests in parallel—reference flow.                    |
-| `npm run clean`                           | Cleans each workspace’s build outputs.                                                            |
-| `npm run clean:install`                   | Nukes every `node_modules` (root/apps/packages) and performs a fresh `npm install`.               |
-| `npm run db:migrate`                      | Runs Prisma migrate in `packages/db` (requires `DATABASE_URL`).                                   |
-| `npm run db:seed`                         | Runs Prisma seed in `packages/db` (requires `DATABASE_URL`).                                      |
-| `npm run db:reset`                        | Resets DB (migrate reset + seed) in `packages/db` (requires `DATABASE_URL`).                      |
-| `npm run supabase:start`                  | Starts local Supabase stack (Postgres/auth/storage/Studio) via Docker.                            |
-| `npm run supabase:stop`                   | Stops the local Supabase stack.                                                                   |
+| Command                                   | What it does                                                                                         |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `npm run dev`                             | Runs all workspace `dev` scripts via Turborepo (parallel).                                           |
+| `npm run build`                           | Builds all workspaces respecting dependency graph.                                                   |
+| `npm run typecheck`                       | Composite TypeScript check (per package via Turborepo).                                              |
+| `npm run typecheck:clear-cache`           | Deletes `*.tsbuildinfo` + TS cache folders.                                                          |
+| `npm run lint`                            | Runs all workspace lint targets, shared root config, and a Prettier check for `_bmad-output`/config. |
+| `npm run lint:fix`                        | Runs lint across workspaces + root with `--fix`, then formats via Prettier.                          |
+| `npm run lint:staged`                     | Lints + formats staged files via `lint-staged`. Wire into your git hooks if desired.                 |
+| `npm run start:web`                       | Starts the built Next.js app on port 3005 (used by Playwright’s webServer hook).                     |
+| `npm run start:api`                       | Boots the NestJS API in watch mode so local smoke tests can exercise server flows.                   |
+| `npm run start:mobile:server`             | Starts Expo dev server on 19000/19001 for Maestro smoke runs.                                        |
+| `npm run start:mobile:e2e`                | One-shot mobile smoke: boots a simulator (android→iOS), starts Expo, runs Maestro.                   |
+| `npm run mobile:sim:ios`                  | Boots the default iOS simulator (`IOS_SIM_DEVICE` override) and shows booted devices.                |
+| `npm run mobile:sim:android`              | Boots the default Android AVD (`AVD_NAME` override) and waits for `adb` ready.                       |
+| `npm run mobile:device`                   | Convenience opener for a simulator/emulator (launch one manually if this no-ops).                    |
+| `npm run mobile:expo-go`                  | Installs Expo Go APK onto the connected emulator/device.                                             |
+| `npm run start:all`                       | Starts both API + web servers concurrently (mirrors Playwright’s `webServer` config).                |
+| `npm run test:pw`                         | Runs the Playwright smoke suite using the current `TEST_ENV` (defaults to `local`).                  |
+| `npm run test:pw-local`                   | Convenience wrapper that sets `TEST_ENV=local` and runs the smoke suite.                             |
+| `npm run test:pw-dev`                     | Targets the dev deployment (`TEST_ENV=dev`).                                                         |
+| `npm run test:pw-stage`                   | Targets the stage deployment (`TEST_ENV=stage`).                                                     |
+| `npm run test:pw-prod`                    | Targets the prod deployment (`TEST_ENV=prod`).                                                       |
+| `npm run test:pw:burn-in`                 | Burn-in all specs locally (`PW_BURN_IN=true`, repeat-each=3, retries=0).                             |
+| `npm run test:pw:burn-in-changed-classic` | Playwright built-in `--only-changed` burn-in vs main (3x, retries=0) — can overrun.                  |
+| `npm run test:pw:burn-in-changed`         | Smart burn-in via `@seontechnologies/playwright-utils` (config-driven, respects skip/percentage).    |
+| `npm run maestro:install`                 | Installs the Maestro CLI (brew/curl on macOS; npx fallback on CI).                                   |
+| `npm run test:mobile:e2e`                 | Starts Expo (if needed) and runs the Maestro smoke flow against the dev server it spawns.            |
+| `npm run test:mobile:e2e:ios`             | Boots the default iOS simulator and runs the Maestro smoke flow against Expo dev server.             |
+| `npm run validate`                        | Runs typecheck, lint (workspace + root), and tests in parallel—reference flow.                       |
+| `npm run clean`                           | Cleans each workspace’s build outputs.                                                               |
+| `npm run clean:install`                   | Nukes every `node_modules` (root/apps/packages) and performs a fresh `npm install`.                  |
+| `npm run db:migrate`                      | Runs Prisma migrate in `packages/db` (requires `DATABASE_URL`).                                      |
+| `npm run db:seed`                         | Runs Prisma seed in `packages/db` (requires `DATABASE_URL`).                                         |
+| `npm run db:reset`                        | Resets DB (migrate reset + seed) in `packages/db` (requires `DATABASE_URL`).                         |
+| `npm run supabase:start`                  | Starts local Supabase stack (Postgres/auth/storage/Studio) via Docker.                               |
+| `npm run supabase:stop`                   | Stops the local Supabase stack.                                                                      |
 
 > Pre-commit guardrails: `.husky/pre-commit` already runs `npm run lint` and `npm run lint:staged`. Extend that file if you need extra checks.
 
@@ -129,7 +130,7 @@ Local E2E with clean DB:
 
 ## E2E smoke (Playwright + Maestro)
 
-**One-time setup:** https://github.com/murat/opensource/couture-cast/blob/main/docs/implementation-artifacts/0-13-scaffold-cross-surface-e2e-automation.md#maestro-setup--operational-notes
+**One-time setup:** https://github.com/murat/opensource/couture-cast/blob/main/_bmad-output/implementation-artifacts/0-13-scaffold-cross-surface-e2e-automation.md#maestro-setup--operational-notes
 
 - Xcode + CLI tools on macOS (`sudo xcode-select --switch /Applications/Xcode.app`).
 - Android Studio SDK + AVD (e.g., Pixel 8 API 34) booted once.
@@ -158,7 +159,7 @@ Local E2E with clean DB:
 
 - `.nvmrc` pins Node 24, matching `actions/setup-node` in `.github/workflows/pr-checks.yml`.
 - ESLint, Prettier, and `lint-staged` configs match the reference repo’s rules (no-only-tests, consistent type imports, formatting).
-- `docs/planning-artifacts/epics.md` Epic 0 stories describe these guardrails explicitly so all Sprint 0 tasks stay tied to product strategy.
+- `_bmad-output/planning-artifacts/epics.md` Epic 0 stories describe these guardrails explicitly so all Sprint 0 tasks stay tied to product strategy.
 - CI currently executes: install → typecheck → lint (workspace + root) → build → tests. Burn-in/Selective runners plug into the same workflow after CC-0.6.
 
 ### CI at a glance
@@ -180,7 +181,7 @@ Preview URLs as the "dev" target: `pr-pw-e2e-vercel-preview.yml` reads the Previ
 `DEV_WEB_E2E_BASE_URL`, so `npm run test:pw-dev` runs against that Preview deployment.
 
 If your Preview deployments are protected (health check returns 401), set `VERCEL_AUTOMATION_BYPASS_SECRET` locally (in `.env.dev`) and
-in CI (GitHub repo secret). See `docs/test-artifacts/ci-cd-pipeline.md`.
+in CI (GitHub repo secret). See `_bmad-output/test-artifacts/ci-cd-pipeline.md`.
 
 #### Local Preview testing
 
@@ -238,8 +239,8 @@ npm run test:pw-dev
 
 ## Helpful references
 
-- [docs/couturecast_brief.md](docs/couturecast_brief.md) for positioning & personas.
-- [docs/planning-artifacts/epics.md](docs/planning-artifacts/epics.md) for Epic 0 (platform enablement) + feature backlogs.
+- [\_bmad-output/project-knowledge/couturecast_brief.md](_bmad-output/project-knowledge/couturecast_brief.md) for positioning & personas.
+- [\_bmad-output/planning-artifacts/epics.md](_bmad-output/planning-artifacts/epics.md) for Epic 0 (platform enablement) + feature backlogs.
 - [`playwright-utils` repo](../playwright-utils) if you need deeper examples of test tooling wiring.
 
 Questions? Tag Murat (TEA) for quality gates or Amelia (dev agent) for implementation details.
