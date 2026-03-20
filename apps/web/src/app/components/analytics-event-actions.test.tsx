@@ -1,64 +1,43 @@
 import { createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  createAnalyticsEventExpectations,
+  type MemoryTrackedAnalyticsEvent,
+} from '@couture/api-client/testing/analytics-event-assertions'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 
-const { captureMock, distinctIdMock } = vi.hoisted(() => ({
-  captureMock: vi.fn(),
-  distinctIdMock: vi.fn(() => 'web-test-user'),
-}))
+const { trackedEvents, captureMock, distinctIdMock, initMock } = vi.hoisted(() => {
+  const trackedEvents: MemoryTrackedAnalyticsEvent[] = []
 
-vi.mock('@couture/api-client', () => ({
-  trackAlertReceived: vi.fn(
-    (input: {
-      alertType: string
-      severity: 'info' | 'warning' | 'critical'
-      userId: string
-      weatherSeverity?: string
-    }) => ({
-      event: 'alert_received',
-      properties: {
-        alert_type: input.alertType,
-        severity: input.severity,
-        user_id: input.userId,
-        weather_severity: input.weatherSeverity,
-      },
-    })
-  ),
-  trackRitualCreated: vi.fn((input: { userId: string }) => ({
-    event: 'ritual_created',
-    properties: {
-      user_id: input.userId,
-      ritual_type: 'daily_outfit',
-      weather_context: 'hero_cta',
-    },
-  })),
-  trackWardrobeUploadStarted: vi.fn(
-    (input: { userId: string; itemId: string; fileSize: number }) => ({
-      event: 'wardrobe_upload_started',
-      properties: {
-        user_id: input.userId,
-        item_id: input.itemId,
-        file_size: input.fileSize,
-        upload_source: 'web_file_picker',
-      },
-    })
-  ),
-}))
+  return {
+    trackedEvents,
+    captureMock: vi.fn((event: string, properties?: Record<string, unknown>) => {
+      trackedEvents.push({ event, properties })
+    }),
+    distinctIdMock: vi.fn(() => 'web-test-user'),
+    initMock: vi.fn(),
+  }
+})
 
-vi.mock('../../analytics/browser-analytics', () => ({
-  browserAnalytics: {
+vi.mock('posthog-js', () => ({
+  default: {
     capture: captureMock,
-    getDistinctId: distinctIdMock,
+    get_distinct_id: distinctIdMock,
+    init: initMock,
   },
 }))
 
 import { AnalyticsEventActions } from './analytics-event-actions'
 
 describe('AnalyticsEventActions', () => {
+  const eventExpectations = createAnalyticsEventExpectations(trackedEvents)
+
   beforeEach(() => {
+    trackedEvents.splice(0, trackedEvents.length)
     captureMock.mockClear()
-    distinctIdMock.mockClear()
+    initMock.mockClear()
+    distinctIdMock.mockReset()
     distinctIdMock.mockReturnValue('web-test-user')
   })
 
@@ -70,20 +49,26 @@ describe('AnalyticsEventActions', () => {
     render(<AnalyticsEventActions />)
 
     const primaryCta = screen.getByTestId('cta-primary')
+    const eventCursor = eventExpectations.createCursor()
     const clickEvent = createEvent.click(primaryCta)
     fireEvent(primaryCta, clickEvent)
 
     expect(clickEvent.defaultPrevented).toBe(true)
 
     await waitFor(() => {
-      expect(captureMock).toHaveBeenCalledWith(
+      const trackedEvent = eventExpectations.expectEventTracked(
         'ritual_created',
-        expect.objectContaining({
-          user_id: 'web-test-user',
+        {
+          location_id: Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown',
           ritual_type: 'daily_outfit',
+          user_id: 'web-test-user',
           weather_context: 'hero_cta',
-        })
+        },
+        { afterIndex: eventCursor, count: 1 }
       )
+
+      expect(trackedEvent.properties?.user_id).toBe('web-test-user')
+      expect(typeof trackedEvent.properties?.timestamp).toBe('string')
     })
   })
 
@@ -93,17 +78,17 @@ describe('AnalyticsEventActions', () => {
     render(<AnalyticsEventActions />)
 
     const primaryCta = screen.getByTestId('cta-primary')
+    const eventCursor = eventExpectations.createCursor()
     const clickEvent = createEvent.click(primaryCta)
     fireEvent(primaryCta, clickEvent)
 
     expect(clickEvent.defaultPrevented).toBe(true)
 
     await waitFor(() => {
-      expect(captureMock).toHaveBeenCalledWith(
+      eventExpectations.expectEventTracked(
         'ritual_created',
-        expect.objectContaining({
-          user_id: 'web-test-user',
-        })
+        { user_id: 'web-test-user' },
+        { afterIndex: eventCursor, count: 1 }
       )
     })
   })
@@ -117,19 +102,21 @@ describe('AnalyticsEventActions', () => {
     ) as HTMLInputElement | null
 
     expect(uploadInput).not.toBeNull()
+    const eventCursor = eventExpectations.createCursor()
     fireEvent.change(uploadInput as HTMLInputElement, {
       target: { files: [file] },
     })
 
     await waitFor(() => {
-      expect(captureMock).toHaveBeenCalledWith(
+      eventExpectations.expectEventTracked(
         'wardrobe_upload_started',
-        expect.objectContaining({
-          user_id: 'web-test-user',
-          item_id: 'outfit.jpg',
+        {
           file_size: 4,
+          item_id: 'outfit.jpg',
           upload_source: 'web_file_picker',
-        })
+          user_id: 'web-test-user',
+        },
+        { afterIndex: eventCursor, count: 1 }
       )
     })
 
@@ -158,16 +145,18 @@ describe('AnalyticsEventActions', () => {
     )
 
     render(<AnalyticsEventActions />)
+    const eventCursor = eventExpectations.createCursor()
 
     await waitFor(() => {
-      expect(captureMock).toHaveBeenCalledWith(
+      eventExpectations.expectEventTracked(
         'alert_received',
-        expect.objectContaining({
+        {
           alert_type: 'storm_warning',
           severity: 'warning',
           user_id: 'alert-user',
           weather_severity: 'severe',
-        })
+        },
+        { afterIndex: eventCursor, count: 1 }
       )
     })
   })
