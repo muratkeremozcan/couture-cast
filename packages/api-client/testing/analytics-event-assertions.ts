@@ -7,7 +7,7 @@ import {
   ritualCreatedPropertiesSchema,
   wardrobeUploadStartedPropertiesSchema,
   type AnalyticsEventName,
-} from '../types/analytics-events'
+} from '../src/types/analytics-events'
 
 export type MemoryTrackedAnalyticsEvent = {
   distinctId?: string

@@ -7,7 +7,7 @@ import request from 'supertest'
 import {
   createAnalyticsEventExpectations,
   type MemoryTrackedAnalyticsEvent,
-} from '../../../packages/api-client/src/testing/analytics-event-assertions'
+} from '../../../packages/api-client/testing/analytics-event-assertions'
 import { AuthModule } from '../src/modules/auth/auth.module'
 import { ModerationModule } from '../src/modules/moderation/moderation.module'
 

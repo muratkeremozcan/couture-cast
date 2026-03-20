@@ -32,6 +32,7 @@ import { AnalyticsEventActions } from './analytics-event-actions'
 
 describe('AnalyticsEventActions', () => {
   const eventExpectations = createAnalyticsEventExpectations(trackedEvents)
+  const originalPostHogApiKey = process.env.POSTHOG_API_KEY
 
   beforeEach(() => {
     trackedEvents.splice(0, trackedEvents.length)
@@ -39,9 +40,11 @@ describe('AnalyticsEventActions', () => {
     initMock.mockClear()
     distinctIdMock.mockReset()
     distinctIdMock.mockReturnValue('web-test-user')
+    process.env.POSTHOG_API_KEY = 'phc_test'
   })
 
   afterEach(() => {
+    process.env.POSTHOG_API_KEY = originalPostHogApiKey
     vi.restoreAllMocks()
   })
 
