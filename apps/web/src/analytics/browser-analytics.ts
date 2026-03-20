@@ -23,6 +23,12 @@ function isAnalyticsTestMode() {
   return typeof window !== 'undefined' && window.__enableAnalyticsTestHook === true
 }
 
+function getPostHogToken() {
+  const token = process.env.POSTHOG_API_KEY
+
+  return typeof token === 'string' && token.trim().length > 0 ? token : null
+}
+
 export const browserAnalytics: BrowserAnalyticsClient = {
   capture(event, properties) {
     if (isAnalyticsTestMode()) {
@@ -31,6 +37,10 @@ export const browserAnalytics: BrowserAnalyticsClient = {
         event,
         properties: properties ?? {},
       })
+    }
+
+    if (!getPostHogToken()) {
+      return
     }
 
     initializeBrowserAnalytics()
@@ -46,6 +56,10 @@ export const browserAnalytics: BrowserAnalyticsClient = {
     )
   },
   getDistinctId() {
+    if (!getPostHogToken()) {
+      return undefined
+    }
+
     initializeBrowserAnalytics()
     return posthog.get_distinct_id() || undefined
   },
@@ -54,8 +68,13 @@ export const browserAnalytics: BrowserAnalyticsClient = {
 export function initializeBrowserAnalytics(): BrowserAnalyticsClient {
   if (!initialized) {
     const analyticsTestMode = isAnalyticsTestMode()
+    const postHogToken = getPostHogToken()
 
-    posthog.init(process.env.POSTHOG_API_KEY!, {
+    if (!postHogToken) {
+      return browserAnalytics
+    }
+
+    posthog.init(postHogToken, {
       api_host: '/ingest',
       ui_host: 'https://us.posthog.com',
       capture_pageview: analyticsTestMode ? false : 'history_change',

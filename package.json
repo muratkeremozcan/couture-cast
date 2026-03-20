@@ -23,7 +23,7 @@
     "format": "prettier --ignore-path .prettierignore --write \"**/*.{ts,tsx,js,json,md}\"",
     "lint:staged": "lint-staged",
     "test": "npm run --workspaces test",
-    "start:web": "npm run build && npm run start --workspace web -- --hostname 127.0.0.1 --port 3005",
+    "start:web": "npm run build --workspace web && npm run start --workspace web -- --hostname 127.0.0.1 --port 3005",
     "start:api": "npm run db:generate && node scripts/prisma-migrate-deploy.mjs && cross-env PORT=4000 npm run start:dev --workspace api",
     "start:api:e2e": "npm run db:generate && node scripts/prisma-migrate-deploy.mjs && npm run build --workspace api && cross-env PORT=4000 npm run start:prod --workspace api",
     "start:mobile:server": "bash ./scripts/start-mobile-server.sh",
