@@ -15,7 +15,6 @@ jobs:
       - uses: kachick/wait-other-jobs@v3
         with:
           skip-same-workflow: true
-					# this is an example of declaring what jobs you don't care about
           skip-list: |
             [
               {
