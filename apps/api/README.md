@@ -34,10 +34,10 @@ $ npm install
 ## Compile and run the project
 
 ```bash
-# development
+# development (build once, then run compiled output)
 $ npm run start
 
-# watch mode
+# watch mode (rebuild + restart on source changes)
 $ npm run start:dev
 
 # production mode

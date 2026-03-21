@@ -90,9 +90,17 @@ export function normalizeGrafanaOtlpAuthHeader(header: string): string {
   return trimmed
 }
 
+function isGrafanaOtlpAuthDisabled(header: string): boolean {
+  const normalized = normalizeGrafanaOtlpAuthHeader(header).toLowerCase()
+  return normalized === 'disabled' || normalized === 'none'
+}
+
 export function resolveGrafanaOtlpAuthHeader(env: EnvVars): string | null {
   const directHeader = env.GRAFANA_OTLP_AUTH_HEADER
   if (directHeader) {
+    if (isGrafanaOtlpAuthDisabled(directHeader)) {
+      return null
+    }
     return normalizeGrafanaOtlpAuthHeader(directHeader)
   }
 
@@ -138,9 +146,21 @@ export function resolveOtlpExporterConfig(
   env: EnvVars = process.env
 ): OtlpExporterConfig | null {
   const url = env.GRAFANA_OTLP_ENDPOINT
-  const authHeader = resolveGrafanaOtlpAuthHeader(env)
+  const directHeader = env.GRAFANA_OTLP_AUTH_HEADER
 
-  if (!url || !authHeader) {
+  if (!url) {
+    return null
+  }
+
+  if (directHeader && isGrafanaOtlpAuthDisabled(directHeader)) {
+    return {
+      url,
+      headers: {},
+    }
+  }
+
+  const authHeader = resolveGrafanaOtlpAuthHeader(env)
+  if (!authHeader) {
     return null
   }
 

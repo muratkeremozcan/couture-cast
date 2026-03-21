@@ -1,0 +1,16 @@
+services:
+  lgtm:
+    image: grafana/otel-lgtm:0.22.0
+    container_name: couturecast-lgtm
+    ports:
+      - '3300:3000'
+      - '4318:4318'
+      - '9090:9090'
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_BASIC_ENABLED: 'false'
+    volumes:
+      - ./provisioning/datasources:/otel-lgtm/grafana/conf/provisioning/datasources:ro
+      - ./provisioning/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards:ro
+      - ./generated-dashboards:/var/lib/couturecast-grafana/dashboards:ro

@@ -4,6 +4,10 @@ Updated: 2026-03-13 - created dashboard export folder and naming contract
 
 Store exported Grafana dashboard JSON files here.
 
+For local dashboard development, use the opt-in stack in
+`infra/grafana/local/`. It provisions these JSON files into a local
+Grafana instance without requiring Grafana Cloud credentials.
+
 Expected files:
 
 - `couturecast-api-health.json`
@@ -23,3 +27,5 @@ Rule:
 
 - Export only dashboards backed by real metrics or an intentional Text panel.
 - Do not invent metric names in repo JSON exports.
+- Keep the local stack honest: if a dashboard is still a Text panel in
+  cloud, it should stay a Text panel locally too.

@@ -62,7 +62,7 @@ npm run typecheck:clear-cache
 | `npm run lint:fix`                        | Runs lint across workspaces + root with `--fix`, then formats via Prettier.                          |
 | `npm run lint:staged`                     | Lints + formats staged files via `lint-staged`. Wire into your git hooks if desired.                 |
 | `npm run start:web`                       | Starts the built Next.js app on port 3005 (used by Playwright’s webServer hook).                     |
-| `npm run start:api`                       | Boots the NestJS API in watch mode so local smoke tests can exercise server flows.                   |
+| `npm run start:api`                       | Boots the NestJS API from compiled output and rebuilds/restarts it on source changes.                |
 | `npm run start:mobile:server`             | Starts Expo dev server on 19000/19001 for Maestro smoke runs.                                        |
 | `npm run start:mobile:e2e`                | One-shot mobile smoke: boots a simulator (android→iOS), starts Expo, runs Maestro.                   |
 | `npm run mobile:sim:ios`                  | Boots the default iOS simulator (`IOS_SIM_DEVICE` override) and shows booted devices.                |
