@@ -60,6 +60,23 @@ describe('instrumentation', () => {
     })
   })
 
+  it('allows an explicit no-auth override for local OTLP targets', () => {
+    expect(
+      resolveOtlpExporterConfig({
+        GRAFANA_OTLP_ENDPOINT: 'http://127.0.0.1:4318',
+        GRAFANA_OTLP_AUTH_HEADER: 'disabled',
+      })
+    ).toEqual({
+      url: 'http://127.0.0.1:4318',
+      headers: {},
+    })
+    expect(
+      resolveGrafanaOtlpAuthHeader({
+        GRAFANA_OTLP_AUTH_HEADER: 'disabled',
+      })
+    ).toBeNull()
+  })
+
   it('builds a direct OTLP auth header override when provided', () => {
     expect(
       resolveGrafanaOtlpAuthHeader({

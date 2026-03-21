@@ -1,3 +1,4 @@
+import 'reflect-metadata'
 import './load-env'
 import type { AnalyticsClient } from './analytics/analytics.service'
 import {

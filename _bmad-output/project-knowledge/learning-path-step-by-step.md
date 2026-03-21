@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-03-14 - aligned Story 0.7 telemetry guidance and documented the stabilized mobile smoke path
+Updated: 2026-03-21 - aligned Story 0.7 observability testing guidance with Task 10 coverage
 
 ## LLM collaborator prompt
 
@@ -692,16 +692,21 @@ Key takeaways:
    should verify those built-in data sources before creating duplicates.
 5. Dashboard work starts with telemetry inventory, not panel creation: use the Prometheus metric
    browser/selector to record what actually exists under prefixes like `http`, `nodejs`, and
-   `process` before writing PromQL.
+   `v8js` before writing PromQL.
 6. Honest dashboards are better than empty charts: if queue/cache/socket/database metrics are not
    instrumented yet, use a `Text` panel that says so instead of implying coverage that the repo
    does not have.
+7. Manual Grafana verification is trace-first in this repo: confirm Tempo traces in Grafana, but
+   do not treat Loki as a required success signal yet because log ingestion is not wired.
 
 Actual working flow in this repo:
 
 1. Verify telemetry first.
    Start the API locally, hit `http://localhost:3000/api/v1/health/queues`, confirm traces, then
    confirm the metric families you actually have.
+   Current local inventory: `http_server_duration_milliseconds_*`, `http_client_*`,
+   `nodejs_eventloop_*`, and `v8js_*` are present; `process*`, `redis*`, `bull*`, `socket*`, and
+   `db*` were not present in the same pass.
 2. Use repo JSON as the dashboard source of truth.
    Files live in `infra/grafana/dashboards/`.
 3. In Grafana, import the JSON instead of building from scratch.
@@ -738,6 +743,7 @@ Impacted files:
 
 Supporting references:
 
+- `_bmad-output/project-knowledge/observability.md`
 - `https://grafana.com/docs/grafana-cloud/get-started/create-account/`
 - `https://grafana.com/docs/grafana-cloud/security-and-account-management/cloud-stacks/create-update-stacks/`
 - `https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/`
@@ -812,11 +818,15 @@ Key takeaways:
    and traces line up in Grafana during debugging.
 4. Environment policy matters: local defaults to `debug`, dev to `info`, and prod to `warn`,
    keeping signal-to-noise appropriate per environment.
+5. Verification now has two layers: automated integration coverage proves OTLP trace export and
+   `requestId` log correlation locally, while the manual Grafana check confirms Tempo visibility in
+   the hosted stack. Loki remains optional until log ingestion is wired.
 
 Story/Task mapping:
 
 - Story 0.7
 - Task 5 (Pino structured logging)
+- Task 10 (observability tests)
 
 Story reference:
 
@@ -825,12 +835,14 @@ Story reference:
 Code evidence:
 
 - `apps/api/src/main.ts`
+- `apps/api/integration/observability.integration.spec.ts`
 - `apps/api/src/logger/pino.config.ts`
 - `apps/api/src/logger/request-context.ts`
 - `apps/api/src/logger/request-logger.middleware.ts`
 - `apps/api/src/logger/pino.config.spec.ts`
 - `apps/api/src/logger/request-context.spec.ts`
 - `apps/api/src/logger/request-logger.middleware.spec.ts`
+- `packages/api-client/testing/observability-assertions.ts`
 
 Owner map:
 
@@ -847,6 +859,10 @@ Support refs:
   propagation.
 - `apps/api/src/logger/request-logger.middleware.ts` applies the shared logger contract at the
   HTTP boundary.
+- `apps/api/integration/observability.integration.spec.ts` verifies OTLP export requests and
+  request log correlation against the real Nest module wiring.
+- `_bmad-output/project-knowledge/observability.md` holds the current manual Grafana trace check
+  and the note that Loki log verification is not part of the required path yet.
 
 Architecture diagram:
 
