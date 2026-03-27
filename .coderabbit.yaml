@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "en-US"
+early_access: true
+enable_free_tier: true
+
+reviews:
+  profile: chill
+  high_level_summary: false
+  request_changes_workflow: false
+  review_status: false
+  commit_status: false
+  poem: false
+  in_progress_fortune: false
+  suggested_labels: false
+  suggested_reviewers: false
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: false
+    base_branches:
+      - main
+  path_filters:
+    - "!.coderabbit.yaml"
+    - "!**/node_modules/**"
+    - "!apps/web/.next/**"
+    - "!apps/api/dist/**"
+    - "!apps/api/coverage/**"
+    - "!packages/**/dist/**"
+    - "!playwright/artifacts/**"
+    - "!playwright/playwright-logs/**"
+    - "!playwright/playwright-report/**"
+    - "!coverage/**"
+    - "!**/*.generated.*"
+    - "!**/*.min.js"
+    - "!*.png"
+    - "!*.jpg"
+    - "!*.jpeg"
+    - "!*.gif"
+    - "!*.svg"
+    - "!_bmad/**"
+    - "!_bmad-output/**/validation-report-*.md"
+  path_instructions:
+    - path: ".github/workflows/**"
+      instructions: |
+        GitHub Actions workflow change. Review for branch/ref correctness, job
+        dependencies, secret handling, permission scope, fork safety, and whether
+        required-vs-advisory behavior still matches the repository policy.
+        Flag brittle SHA assumptions, label-dependent control flow, and any step
+        ordering that could make preview, burn-in, or deployment checks flaky.
+    - path: "playwright/**"
+      instructions: |
+        Playwright test infrastructure change. Prioritize flake risk, deterministic
+        waiting, fixture isolation, auth/session leakage between tests, and
+        environment portability across local, preview, and production runs.
+        Flag implicit cross-test dependencies, non-deterministic data setup, and
+        assertions that are too timing-sensitive for CI.
+    - path: "apps/api/**"
+      instructions: |
+        API/backend change. Pay extra attention to auth/session boundaries,
+        contract compatibility, request/response validation, error handling,
+        health/observability behavior, and configuration loading. Flag changes
+        that silently widen access, break existing API consumers, or reduce test
+        diagnosability in CI.
+    - path: "_bmad-output/test-artifacts/**"
+      instructions: |
+        Test strategy or QA artifact change. Treat this as advisory documentation
+        review, not application logic review. Check that workflow names, commands,
+        file paths, environment variable names, and promotion criteria still match
+        the repository's actual implementation.
+
+chat:
+  auto_reply: true
+
+issue_enrichment:
+  auto_enrich:
+    enabled: false
