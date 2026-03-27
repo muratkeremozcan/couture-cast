@@ -26,6 +26,12 @@ Change `{spec_file}` status to `in-progress` in the frontmatter before starting 
 
 Hand `{spec_file}` to a sub-agent/task and let it implement. If no sub-agents are available, implement directly.
 
+**Path formatting rule:** Any markdown links written into `{spec_file}` must use paths relative to `{spec_file}`'s directory so they are clickable in VS Code. Any file paths displayed in terminal/conversation output must use CWD-relative format with `:line` notation (e.g., `src/path/file.ts:42`) for terminal clickability. No leading `/` in either case.
+
+### Self-Check
+
+Before leaving this step, verify every task in the `## Tasks & Acceptance` section of `{spec_file}` is complete. Mark each finished task `[x]`. If any task is not done, finish it before proceeding.
+
 ## NEXT
 
 Read fully and follow `./step-04-review.md`

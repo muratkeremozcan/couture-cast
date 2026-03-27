@@ -219,7 +219,7 @@ Does this look correct? [y/n/edit]
 <action>For each part, scan for existing documentation using patterns:
 - README.md, README.rst, README.txt
 - CONTRIBUTING.md, CONTRIBUTING.rst
-- ARCHITECTURE.md, ARCHITECTURE.txt, _bmad-output/project-knowledge/architecture/
+- ARCHITECTURE.md, ARCHITECTURE.txt, docs/architecture/
 - DEPLOYMENT.md, DEPLOY.md, docs/deployment/
 - API.md, docs/api/
 - Any files in docs/, documentation/, .github/ folders

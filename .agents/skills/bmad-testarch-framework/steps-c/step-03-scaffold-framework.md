@@ -2,7 +2,7 @@
 name: 'step-03-scaffold-framework'
 description: 'Create framework scaffold with adaptive orchestration (agent-team, subagent, or sequential)'
 nextStepFile: './step-04-docs-and-scripts.md'
-knowledgeIndex: '{project-root}/_bmad/tea/testarch/tea-index.csv'
+knowledgeIndex: '{project-root}/_bmad/tea/agents/bmad-tea/resources/tea-index.csv'
 outputFile: '{test_artifacts}/framework-setup-progress.md'
 ---
 
@@ -202,7 +202,8 @@ Read `{config_source}` and use `{knowledgeIndex}` to load fragments based on `co
 
 **If Playwright Utils enabled:**
 
-- `overview.md`, `fixtures-composition.md`, `auth-session.md`, `api-request.md`, `burn-in.md`, `network-error-monitor.md`, `data-factories.md`
+- `overview.md`, `fixtures-composition.md`, `auth-session.md`, `api-request.md`, `recurse.md`, `log.md`, `burn-in.md`, `network-error-monitor.md`, `data-factories.md`
+- If `{detected_stack}` is `frontend` or `fullstack`, also load `intercept-network-call.md`
 - Recommend installing `@seontechnologies/playwright-utils`
 
 **If disabled:**
