@@ -21,25 +21,63 @@ reviews:
     base_branches:
       - main
   path_filters:
-    - "!.coderabbit.yaml"
+    # Whitelist-first: keep review context focused on actual repo surfaces.
+    - ".coderabbit.yaml"
+    - ".github/**"
+    - ".husky/**"
+    - "apps/**"
+    - "packages/**"
+    - "playwright/**"
+    - "maestro/**"
+    - "infra/**"
+    - "scripts/**"
+    - "supabase/**"
+    - "docs/**"
+    - "test-support/**"
+    - "_bmad-output/**"
+    - "AGENTS.md"
+    - "README.md"
+    - "app.json"
+    - "docker-compose.yml"
+    - "package.json"
+    - "playwright.config.ts"
+    - "tsconfig.json"
+    - "turbo.json"
+    - ".env.example"
+    - ".eslintignore"
+    - ".eslintrc.js"
+    - ".gitleaks.toml"
+    - ".gitignore"
+    - ".npmrc"
+    - ".nvmrc"
+    - ".prettierignore"
+    - ".prettierrc"
+    # Exclude generated, binary, and high-noise paths within the included surface.
     - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/coverage/**"
     - "!apps/web/.next/**"
-    - "!apps/api/dist/**"
-    - "!apps/api/coverage/**"
-    - "!packages/**/dist/**"
     - "!playwright/artifacts/**"
     - "!playwright/playwright-logs/**"
     - "!playwright/playwright-report/**"
-    - "!coverage/**"
+    - "!maestro/artifacts/**"
+    - "!blob-report/**"
+    - "!playwright-logs/**"
+    - "!_bmad-output/**/refs/**"
+    - "!_bmad-output/**/validation-report-*.md"
+    - "!_bmad-output/implementation-artifacts/stories/**/*.context.xml"
+    - "!package-lock.json"
     - "!**/*.generated.*"
     - "!**/*.min.js"
-    - "!*.png"
-    - "!*.jpg"
-    - "!*.jpeg"
-    - "!*.gif"
-    - "!*.svg"
-    - "!_bmad/**"
-    - "!_bmad-output/**/validation-report-*.md"
+    - "!**/*.woff"
+    - "!**/*.woff2"
+    - "!**/*.ttf"
+    - "!**/*.ico"
+    - "!**/*.png"
+    - "!**/*.jpg"
+    - "!**/*.jpeg"
+    - "!**/*.gif"
+    - "!**/*.svg"
   path_instructions:
     - path: ".github/workflows/**"
       instructions: |
@@ -48,6 +86,18 @@ reviews:
         required-vs-advisory behavior still matches the repository policy.
         Flag brittle SHA assumptions, label-dependent control flow, and any step
         ordering that could make preview, burn-in, or deployment checks flaky.
+    - path: ".github/actions/**"
+      instructions: |
+        Composite GitHub Action change. Review with the same rigor as workflow
+        files: input/output correctness, shell safety, permission assumptions,
+        secret handling, action portability, and whether downstream workflows can
+        rely on the action's current contract without hidden regressions.
+    - path: "scripts/**"
+      instructions: |
+        Automation script change. Check shell/Node portability, argument parsing,
+        failure handling, exit codes, and whether the script still matches the CI,
+        local developer workflow, and deployment assumptions used elsewhere in the
+        repository.
     - path: "playwright/**"
       instructions: |
         Playwright test infrastructure change. Prioritize flake risk, deterministic
@@ -55,6 +105,12 @@ reviews:
         environment portability across local, preview, and production runs.
         Flag implicit cross-test dependencies, non-deterministic data setup, and
         assertions that are too timing-sensitive for CI.
+    - path: "maestro/**"
+      instructions: |
+        Maestro/mobile E2E change. Focus on emulator/device determinism, analytics
+        journey coverage, screenshot/log artifact usefulness, and whether the flow
+        remains stable in manual or CI-triggered execution without hidden platform
+        assumptions.
     - path: "apps/api/**"
       instructions: |
         API/backend change. Pay extra attention to auth/session boundaries,
@@ -62,12 +118,44 @@ reviews:
         health/observability behavior, and configuration loading. Flag changes
         that silently widen access, break existing API consumers, or reduce test
         diagnosability in CI.
-    - path: "_bmad-output/test-artifacts/**"
+    - path: "apps/web/**"
       instructions: |
-        Test strategy or QA artifact change. Treat this as advisory documentation
-        review, not application logic review. Check that workflow names, commands,
-        file paths, environment variable names, and promotion criteria still match
-        the repository's actual implementation.
+        Next.js/web change. Review for server/client boundary mistakes, preview
+        deployment assumptions, analytics capture correctness, hydration/runtime
+        errors, accessibility regressions, and testability of user-visible flows.
+    - path: "apps/mobile/**"
+      instructions: |
+        Expo/mobile change. Review for platform-specific behavior, analytics event
+        integrity, offline/error handling, deterministic test support, and any
+        config or dependency changes that could break local emulator workflows or
+        CI/manual smoke execution.
+    - path: "packages/**"
+      instructions: |
+        Shared package change. Check for downstream contract breakage across apps,
+        type/schema compatibility, migration safety, feature-flag semantics, and
+        whether shared helpers remain stable for both runtime code and tests.
+    - path: "infra/**"
+      instructions: |
+        Infrastructure or observability change. Review for environment parity,
+        safe defaults, credential handling, dashboard/query correctness, local
+        bootstrap reliability, and whether the change impacts deployment or debug
+        workflows outside the edited file itself.
+    - path: "supabase/**"
+      instructions: |
+        Supabase/local platform config change. Check environment assumptions,
+        migration compatibility, local bootstrap correctness, and whether the
+        change can drift from Prisma, CI, or documented developer setup steps.
+    - path: "_bmad-output/**/*.md"
+      instructions: |
+        BMAD artifact change. Treat this as advisory documentation review, not
+        application logic review. Check that workflow names, commands, file paths,
+        environment variable names, acceptance criteria, and promotion criteria
+        still match the repository's actual implementation.
+    - path: "docs/**"
+      instructions: |
+        Documentation change. Check internal consistency with the current repo,
+        commands and paths that actually exist, and whether the change should also
+        be reflected in `_bmad-output` or root README guidance.
 
 chat:
   auto_reply: true

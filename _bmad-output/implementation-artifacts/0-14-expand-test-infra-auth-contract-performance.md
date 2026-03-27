@@ -1,6 +1,8 @@
 # Story 0.14: Expand test infrastructure for auth-session, burn-in, contracts, performance, and PR review automation
 
-Status: drafted
+Updated: 2026-03-27 — record partial completion of CodeRabbit advisory rollout setup
+
+Status: in progress
 
 ## Story
 
@@ -89,13 +91,18 @@ without blocking current feature delivery.
   - [ ] Keep required gating disabled until criteria are met.
 
 - [ ] Task 6: Add CodeRabbit PR review automation (AC: #6)
-  - [ ] Add `.coderabbit.yaml` configuration using the same baseline style as the reference
+  - [x] Add `.coderabbit.yaml` configuration using the same baseline style as the reference
         BMAD repository profile.
-  - [ ] Scope path instructions for high-risk areas first (`playwright/**`, `.github/workflows/**`,
+  - [x] Scope path instructions for high-risk areas first (`playwright/**`, `.github/workflows/**`,
         `apps/api/**`, `_bmad-output/test-artifacts/**`).
-  - [ ] Keep review checks advisory initially (no merge blocking) while noise/false positives
+  - [x] Keep review checks advisory initially (no merge blocking) while noise/false positives
         are tuned.
-  - [ ] Document promotion criteria for stricter review policy.
+  - [x] Add PR/rollout support artifacts for the advisory-first setup:
+        `.github/workflows/coderabbit-review.yml`, `.github/PULL_REQUEST_TEMPLATE.md`, and CI/CD
+        documentation notes in `_bmad-output/test-artifacts/ci-cd-pipeline.md`.
+  - [ ] Install/enable the CodeRabbit GitHub App on `muratkeremozcan/couture-cast` and verify the
+        first live review on PR `#42`.
+  - [ ] Document promotion criteria for stricter review policy after initial noise tuning.
 
 ## Dev Notes
 
@@ -105,6 +112,9 @@ without blocking current feature delivery.
   executed in the same sprint window.
 - Mobile native E2E remains Maestro-first; Playwright stays web/API-focused.
 - CodeRabbit rollout starts advisory-first to avoid blocking delivery while path rules stabilize.
+- Current partial implementation status for Task 6:
+  repo-side config/workflow/template work is complete; GitHub App installation still requires
+  authenticated GitHub interaction before the first live review can be verified.
 
 ## Change Log
 
@@ -112,3 +122,4 @@ without blocking current feature delivery.
 | ---------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-03-04 | Codex (Test Architect) | Added follow-up story for deferred testing infrastructure: burn-in hardening, auth-session rollout, contract testing, and performance baseline |
 | 2026-03-04 | Codex (Test Architect) | Expanded 0.14 scope with CodeRabbit PR review automation and explicit Pact setup in contract-testing tasks                                     |
+| 2026-03-27 | Codex                  | Recorded partial completion of Task 6: added `.coderabbit.yaml`, advisory review trigger workflow, PR template, CI/CD notes, and PR `#42`      |
