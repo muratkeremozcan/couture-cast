@@ -41,13 +41,13 @@ Playwright environment selection uses `TEST_ENV`:
 - `.github/workflows/gitleaks-check.yml`: secret scanning.
 - `CodeRabbit` GitHub App: advisory PR review on `main`-bound pull requests once the app is
   installed; repo guidance lives in `.coderabbit.yaml`.
-- `.github/workflows/coderabbit-review.yml`: posts `@coderabbitai review` when a draft PR is moved
-  to `Ready for review`, so CodeRabbit runs after draft iteration without becoming a required gate.
 
 ### Advisory PR review
 
 - CodeRabbit is intentionally advisory-first in this repository. The required merge check remains
   `PR Gate`; CodeRabbit is not part of that required status policy.
+- Automatic review behavior is configured in `.coderabbit.yaml`; this repository does not rely on
+  a separate GitHub Actions workflow to summon CodeRabbit on draft transitions.
 - Initial review guidance is concentrated on higher-risk paths:
   `.github/workflows/**`, `playwright/**`, `apps/api/**`, and
   `_bmad-output/test-artifacts/**`.

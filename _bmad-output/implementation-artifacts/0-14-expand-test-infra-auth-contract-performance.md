@@ -98,8 +98,8 @@ without blocking current feature delivery.
   - [x] Keep review checks advisory initially (no merge blocking) while noise/false positives
         are tuned.
   - [x] Add PR/rollout support artifacts for the advisory-first setup:
-        `.github/workflows/coderabbit-review.yml`, `.github/PULL_REQUEST_TEMPLATE.md`, and CI/CD
-        documentation notes in `_bmad-output/test-artifacts/ci-cd-pipeline.md`.
+        `.github/PULL_REQUEST_TEMPLATE.md` and CI/CD documentation notes in
+        `_bmad-output/test-artifacts/ci-cd-pipeline.md`.
   - [ ] Install/enable the CodeRabbit GitHub App on `muratkeremozcan/couture-cast` and verify the
         first live review on PR `#42`.
   - [ ] Document promotion criteria for stricter review policy after initial noise tuning.
@@ -122,4 +122,5 @@ without blocking current feature delivery.
 | ---------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-03-04 | Codex (Test Architect) | Added follow-up story for deferred testing infrastructure: burn-in hardening, auth-session rollout, contract testing, and performance baseline |
 | 2026-03-04 | Codex (Test Architect) | Expanded 0.14 scope with CodeRabbit PR review automation and explicit Pact setup in contract-testing tasks                                     |
-| 2026-03-27 | Codex                  | Recorded partial completion of Task 6: added `.coderabbit.yaml`, advisory review trigger workflow, PR template, CI/CD notes, and PR `#42`      |
+| 2026-03-27 | Codex                  | Recorded partial completion of Task 6: added `.coderabbit.yaml`, PR template, CI/CD notes, and PR `#42`                                        |
+| 2026-03-27 | Codex                  | Removed redundant CodeRabbit ready-for-review workflow after review feedback; automatic review remains configured in `.coderabbit.yaml`        |
