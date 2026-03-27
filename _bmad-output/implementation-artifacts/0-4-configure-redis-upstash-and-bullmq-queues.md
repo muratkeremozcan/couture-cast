@@ -211,7 +211,7 @@ packages/db/prisma/schema.prisma  # Add job_failures table
 
 - Need Postgres connection for dead-letter queue (job_failures table)
 - Will add job_failures table to Prisma schema from CC-0.2
-- Redis credentials stored in Doppler (setup in CC-0.8)
+- Redis credentials stored in gitignored `.env` files for local use and GitHub/provider-native secret stores for CI/deployments (documented in CC-0.8)
 
 ## Dev Agent Record
 

@@ -226,7 +226,7 @@ CoutureCast has achieved **exceptional planning maturity** for a Level 3 greenfi
 - **CC-0.5:** Initialize Socket.io gateway + Expo Push API credentials
 - **CC-0.6:** Scaffold CI/CD pipelines (lint, test, deploy) per ADR-010
 - **CC-0.7:** Configure PostHog + OpenTelemetry + Grafana Cloud telemetry stack
-- **CC-0.8:** Set up environment management (Doppler or Supabase Vault) + secret rotation
+- **CC-0.8:** Document env and secret management workflow + secret rotation
 - **CC-0.9:** Initialize OpenAPI spec generation + API client SDK tooling
 
 **Recommendation:** **CREATE EPIC 0** before proceeding to sprint planning. These stories must complete before Epic 1 can begin.
@@ -510,7 +510,7 @@ CoutureCast has achieved **exceptional planning maturity** for a Level 3 greenfi
      - Socket.io gateway + Expo Push credentials
      - CI/CD pipeline scaffold (lint, test, deploy workflows)
      - PostHog + OpenTelemetry + Grafana Cloud telemetry
-     - Environment management (Doppler/Vault) + secret rotation
+     - Environment management (`.env` + GitHub/provider secrets) + secret rotation
      - OpenAPI spec generation + API client SDK tooling
      - Guardian consent flow implementation + RLS policies
    - **Priority:** CRITICAL - blocks all feature work

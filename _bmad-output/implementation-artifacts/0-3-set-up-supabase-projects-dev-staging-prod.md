@@ -14,7 +14,7 @@ so that developers can test locally and deploy to production with proper isolati
 2. Configure Storage buckets: `wardrobe-images`, `derived-assets`, `community-uploads` with RLS policies per ADR-004.
 3. Set up Supabase local development via Supabase CLI (`npx supabase start`); document access in README.
 4. Configure database connection pooling (max 100 connections per environment) and backups (PITR enabled for prod).
-5. Document environment URLs, service keys, and access credentials in Doppler (or Supabase Vault).
+5. Document environment URLs, service keys, and access credentials in gitignored `.env` files for local development and GitHub/provider-native secret stores for CI/deployments.
 
 ## Tasks / Subtasks
 
@@ -61,8 +61,8 @@ so that developers can test locally and deploy to production with proper isolati
     SUPABASE_SERVICE_KEY={service-key}
     DATABASE_URL=postgresql://postgres:{password}@db.{project-ref}.supabase.co:5432/postgres
     ```
-  - [x] Create Doppler projects (or Supabase Vault secrets): local, ci, dev, prod (staging deferred until available)
-  - [x] Store credentials securely in Doppler for each environment
+  - [x] Document local credentials in gitignored `.env` files and keep `.env.example` current
+  - [x] Store CI and deployment credentials in GitHub/provider-native secret stores for each environment
   - [x] Document in README.md: how to access Supabase projects, how to sync env vars, how to run local development
   - [x] Add to root README.md: "Prerequisites: Supabase CLI, Docker (for local Postgres)"
 
