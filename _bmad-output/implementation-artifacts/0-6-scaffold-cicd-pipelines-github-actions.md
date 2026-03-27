@@ -323,7 +323,7 @@ e2e-test:
 - `EXPO_TOKEN`: Expo EAS token
 - `SLACK_WEBHOOK_URL`: Slack incoming webhook
 - `PAGERDUTY_INTEGRATION_KEY`: PagerDuty service integration
-- `DOPPLER_TOKEN`: Doppler secrets sync token
+- Environment-scoped GitHub Actions secrets for app configuration (for example `DATABASE_URL`, `REDIS_URL`, `SUPABASE_SERVICE_KEY`, `WEATHER_API_KEY`)
 
 ### References
 

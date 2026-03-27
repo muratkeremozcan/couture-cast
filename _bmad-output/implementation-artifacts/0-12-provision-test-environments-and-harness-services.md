@@ -29,7 +29,7 @@ so that tests run deterministically without affecting production and all test in
   - [ ] Seed with anonymized test data (from CC-0.10 factories)
   - [ ] Configure RLS policies (identical to prod)
   - [ ] Set up Storage buckets with test data
-  - [ ] Document connection details in Doppler (test environment)
+  - [ ] Document connection details in the secrets-management guide and configure matching GitHub/provider secrets for the test environment
   - [ ] Configure weekly reset job to wipe/reseed test database
 
 - [ ] Task 2: Create weather provider harness (AC: #1, #3)

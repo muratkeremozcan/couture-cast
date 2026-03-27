@@ -310,7 +310,7 @@ packages/api-client/src/types/
 - Task 4: Added shared socket event types/schemas (base + namespaces), published via @couture/api-client, and documented in \_bmad-output/project-knowledge/api-events.md
 - Task 5: Added poll endpoint + repository/service backing, web/mobile fallback polling controllers with telemetry hooks, shared PollingService, and service/controller tests
 - Task 5: Added shared Prisma module to reuse PrismaClient across modules; streamlined Husky pre-commit to run lint-staged/full lint:fix
-- Secrets: `EXPO_TOKEN` requirement documented; generation/rotation deferred to story 0-8 environment management
+- Secrets: `EXPO_TOKEN` requirement documented; generation/rotation deferred to story 0-8 secret-management documentation
 
 ### File List
 

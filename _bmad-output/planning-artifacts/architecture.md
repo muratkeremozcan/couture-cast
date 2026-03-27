@@ -177,7 +177,7 @@ couturecast/
 - Postgres `pgcrypto` encrypts sensitive guardian/contact fields.
 - NestJS guards enforce role-based access (teen, adult, guardian, moderator, brand).
 - Audit logging writes immutable entries for authentication changes, moderation decisions, and data exports.
-- All secrets managed via Doppler (or Supabase Vault) per environment; least-privilege service keys for Supabase Storage.
+- All secrets managed via gitignored `.env` files for local development and GitHub/provider-native secret stores for CI and deployments; least-privilege service keys for Supabase Storage.
 
 ## Performance Considerations
 

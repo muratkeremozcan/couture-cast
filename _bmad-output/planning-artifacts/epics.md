@@ -60,7 +60,7 @@ As a platform team, we need Supabase infrastructure across environments so that 
 2. Configure Storage buckets: `wardrobe-images`, `derived-assets`, `community-uploads` with RLS policies per ADR-004.
 3. Set up Supabase local development via Supabase CLI (`npx supabase start`); document access in README.
 4. Configure database connection pooling (max 100 connections per environment) and backups (PITR enabled for prod).
-5. Document environment URLs, service keys, and access credentials in Doppler (or Supabase Vault).
+5. Document environment URLs, service keys, and access credentials in gitignored `.env` files for local development and GitHub/provider-native secret stores for CI/deployments.
    **Prerequisites:** CC-0.1 (monorepo for config files).
 
 **Story CC-0.4: Configure Redis (Upstash) and BullMQ queues**
@@ -107,15 +107,15 @@ As a product team, we need analytics and observability infrastructure so that we
 5. Configure PostHog feature flags with offline mode fallback for tests per ADR-011.
    **Prerequisites:** CC-0.1 (apps scaffold), CC-0.4 (BullMQ for queue metrics).
 
-**Story CC-0.8: Set up environment management (Doppler) and secret rotation**
-As a security-conscious team, we need centralized secret management with rotation policies so that credentials stay secure across environments.
+**Story CC-0.8: Document env and secret management workflow**
+As a security-conscious team, we need a simple documented secret-management workflow so that credentials stay secure across environments without adding extra paid tooling.
 **Acceptance Criteria**
 
-1. Configure Doppler projects: local, ci, dev, staging, production with secrets per test-design-system.md Secrets & Configuration Management table (DATABASE_URL, WEATHER_API_KEY, REDIS_URL, LAUNCHDARKLY_SDK_KEY, SUPABASE_SERVICE_KEY).
-2. Implement healthcheck endpoint (`/api/health?check=secrets`) to validate Doppler sync on deploy.
-3. Set up pre-commit hooks using `gitleaks` or `detect-secrets` to scan for hardcoded secrets; CI fails if patterns detected.
-4. Document quarterly secret rotation schedule and test secret rotation via staging environment.
-5. Enforce least-privilege service keys for Supabase Storage (read-only for web, write for API workers).
+1. Standardize gitignored `.env` files for local development and keep `.env.example` as the canonical list of required variables.
+2. Use GitHub Actions secrets for CI and provider-native secret stores for hosted environments; no standalone secret manager is required.
+3. Keep `gitleaks`-based secret scanning in local workflows and CI.
+4. Document quarterly secret rotation and incident-response procedures for leaked or revoked credentials.
+5. Enforce least-privilege service keys for Supabase Storage and other hosted services.
    **Prerequisites:** CC-0.3 (Supabase projects), CC-0.4 (Redis credentials).
 
 **Story CC-0.9: Initialize OpenAPI spec generation and API client SDK**

@@ -93,7 +93,7 @@ The 45/35/20 split keeps most validation at deterministic layers while reserving
 
 ## NFR Testing Approach
 
-- **Security:** Automate auth/RLS tests (risk-governance + probability-impact guidance), OWASP probes on `/api/v1` routes, signed-URL expiry checks, and audit-log immutability assertions. Add dependency scanning for TensorFlow/Sharp workers and verify Doppler secrets per environment.
+- **Security:** Automate auth/RLS tests (risk-governance + probability-impact guidance), OWASP probes on `/api/v1` routes, signed-URL expiry checks, and audit-log immutability assertions. Add dependency scanning for TensorFlow/Sharp workers and verify env/provider secrets per environment.
 - **Performance:** k6 scenarios for weather ingestion, personalization cache refresh, and alert fan-out; Playwright synthetic monitors on Ritual pages to enforce <2 s FCP (per PRD). Track Redis cache hit rates, queue latency, and Supabase query plans in Grafana.
 - **Reliability:** Chaos toggles that simulate provider outages, Socket.io disconnects, and Redis eviction; resiliency tests confirm fallback banners, cached payload use, and recovery timers. Maestro flows validate offline/low-bandwidth states for mobile/watch.
 - **Maintainability:** Enforce Test Quality Definition of Done (no hard waits, <1.5 min runtime, explicit assertions). Turborepo pipeline already runs lint -> unit -> schema diff -> e2e; add coverage thresholds and snapshot discipline per package.
@@ -139,9 +139,9 @@ The 45/35/20 split keeps most validation at deterministic layers while reserving
 | `LAUNCHDARKLY_SDK_KEY` | Offline mode   | Offline mode   | LD Test          | LD Test          | LD Prod          | Fallback to defaults when LD unavailable; flag evaluation tests   |
 | `SUPABASE_SERVICE_KEY` | Local CLI      | Local CLI      | Supabase Dev     | Supabase Staging | Supabase Prod    | RLS bypass validation (service key should bypass); rotation tests |
 
-**Doppler Integration:**
+**Environment Secret Integration:**
 
-- **Test Strategy:** Validate Doppler sync on deploy via healthcheck endpoint (`/api/health?check=secrets`)
+- **Test Strategy:** Validate required env/provider secrets during deploy and startup checks
 - **Secret Rotation:** Quarterly rotation enforced; tests must pass with rotated secrets before prod deployment
 - **Leak Prevention:** Pre-commit hooks scan for hardcoded secrets; CI fails if `WEATHER_API_KEY` pattern found in code
 
@@ -930,7 +930,7 @@ describe('Upload Tests', () => {
 1. **Document ADRs:** Create missing Architecture Decision Records in `_bmad-output/project-knowledge/architecture/decisions/` for all 8 patterns documented in ADR mapping table
 2. **Stand Up Test Environments:** Provision Supabase test project, weather provider harness, BullMQ/Redis sandbox, and media pipeline lab per Test Environment Requirements section
 3. **Configure Environment Promotion:** Implement environment promotion pipeline (Local → CI → Dev → Staging → Prod) with documented promotion criteria
-4. **Secrets Management:** Configure Doppler integration with per-environment testing strategy; implement pre-commit hooks for secret scanning
+4. **Secrets Management:** Document the `.env` plus GitHub/provider-secrets workflow with per-environment testing strategy; implement pre-commit hooks for secret scanning
 
 **Test Data & Fixtures (BLOCKERS):** 5. **Build Fixture Factories:** Implement factory pattern for all core entities (User, WardrobeItem, Ritual, Weather) using `fixture-architecture` knowledge fragment 6. **Seed Data Creation:** Create Prisma seed scripts with coverage per Seed Data Coverage table (5 teens, 3 guardians, 50 wardrobe items, etc.) 7. **Weather API Stub:** Implement `IWeatherProvider` adapter pattern with stub implementation for deterministic E2E tests 8. **Cleanup Discipline:** Establish cleanup patterns in test templates; enforce in code review checklist
 

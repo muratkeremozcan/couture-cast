@@ -118,7 +118,7 @@ Local E2E with clean DB:
 - Why: Offload slow/CPU-bound or rate-limited work (weather ingest, alert fan-out, color extraction, moderation) from HTTP requests; retry with backoff; keep a dead-letter trail.
 - Components: BullMQ queues/workers using Redis; DLQ persisted to Postgres (`job_failures`); Redis cache for short-lived personalization payloads.
 - Local: `docker-compose up redis` then `npm run start:workers` (apps/api) to run workers. Redis defaults to `redis://localhost:6379` (see `.env.example`).
-- Cloud: Upstash Redis for dev/prod (`REDIS_URL`, `REDIS_TLS=true`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`); store real tokens in gitignored envs/Doppler.
+- Cloud: Upstash Redis for dev/prod (`REDIS_URL`, `REDIS_TLS=true`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`); store real tokens in gitignored env files and CI/deployment secret stores.
 
 ### Common local flow (DX)
 

@@ -1000,7 +1000,7 @@ _bmad-output/
 - `infra/grafana/local/docker-compose.yml` (new)
 - `infra/grafana/local/provisioning/dashboards/dashboards.yaml` (new)
 - `infra/grafana/local/provisioning/datasources/datasources.yaml` (new)
-- `_bmad-output/implementation-artifacts/0-8-set-up-environment-management-doppler-and-secret-rotation.md` (modified)
+- `_bmad-output/implementation-artifacts/0-8-document-env-and-secret-management-workflow.md` (modified)
 - `.env.example` (modified)
 - `package.json` (modified)
 - `apps/api/package.json` (modified)
