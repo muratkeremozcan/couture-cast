@@ -32,7 +32,7 @@ Updated: 2026-03-27 - replaced third-party secret-manager plan with the existing
 
 ## Rotation policy
 
-- Quarterly: `DATABASE_URL`, `JWT_SECRET`, `SUPABASE_SERVICE_KEY`, Redis tokens, deployment tokens.
+- Quarterly: `DATABASE_URL`, `JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, Redis tokens, deployment tokens.
 - Annual: low-risk third-party API keys if they have not already been rotated.
 - Immediate: any suspected compromise, offboarding event, or accidental exposure.
 
