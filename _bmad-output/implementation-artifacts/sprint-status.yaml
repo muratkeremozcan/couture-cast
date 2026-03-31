@@ -52,7 +52,7 @@ development_status:
   0-6-scaffold-cicd-pipelines-github-actions: done
   0-7-configure-posthog-opentelemetry-and-grafana-cloud: done
   0-8-document-env-and-secret-management-workflow: done
-  0-9-initialize-openapi-spec-generation-and-api-client-sdk: drafted
+  0-9-initialize-openapi-spec-generation-and-api-client-sdk: in-progress
   0-10-implement-test-fixture-factories-and-seed-data: drafted
   0-11-implement-guardian-consent-flow-and-rls-policies: drafted
   0-12-provision-test-environments-and-harness-services: drafted

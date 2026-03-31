@@ -35,17 +35,26 @@ async function bootstrap() {
     { ANALYTICS_CLIENT },
     { bindRequestContext },
     { createRequestLoggerMiddleware },
+    { configureOpenApi },
   ] = await Promise.all([
     import('@nestjs/core'),
     import('./app.module.js'),
     import('./analytics/analytics.service.js'),
     import('./logger/request-context.js'),
     import('./logger/request-logger.middleware.js'),
+    import('./openapi.js'),
   ])
 
+  // 2) NestFactory.create(AppModule) builds the route graph from that metadata.
   const app = await NestFactory.create(AppModule)
   app.use(bindRequestContext)
   app.use(createRequestLoggerMiddleware())
+  // Story 0.9 Task 1 step 3 owner:
+  // hook OpenAPI setup into the Nest bootstrap flow here.
+  //
+  // Task 1 hook point: run Swagger setup after Nest has created the app, but before listen(),
+  // so the documentation endpoints are available as soon as the server starts.
+  configureOpenApi(app)
   const port = Number(process.env.PORT ?? 3000)
   await app.listen(port)
 

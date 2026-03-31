@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-03-21 - aligned Story 0.7 observability testing guidance with Task 10 coverage
+Updated: 2026-03-31 - added Story 0.9 Task 1 OpenAPI/Swagger learning flow and cross-links
 
 ## LLM collaborator prompt
 
@@ -945,4 +945,94 @@ flowchart LR
   metro --> mobile_smoke["Run maestro sanity flow"]
   mobile_smoke --> mobile_artifacts["Maestro screenshots and logs"]
   mobile_artifacts --> mobile_policy["Local manual default, non gating CI"]
+```
+
+## Step 13 - OpenAPI document assembly and Swagger bootstrap
+
+User/business impact:
+
+OpenAPI turns the API surface into a machine-readable contract, which lets frontend and mobile
+work from generated types instead of hand-maintained guesses. The business gets safer releases
+because contract drift becomes visible early and SDK generation can be automated later in the
+story.
+
+Key takeaways:
+
+1. NestJS decorators do two jobs in this step: route decorators such as `@Controller` and `@Get`
+   define runtime endpoints, while Swagger decorators such as `@ApiTags`, `@ApiOperation`, and
+   `@ApiOkResponse` add documentation metadata to the same handlers.
+2. `SwaggerModule.createDocument(app, config)` is the assembly step: it reads Nest's route graph
+   plus Swagger metadata after the app has been created and produces one OpenAPI document.
+3. `SwaggerModule.setup(...)` exposes two outputs from the same generated document: Swagger UI at
+   `/api/docs` for humans and raw JSON at `/api/v1/openapi.json` for tooling.
+4. This step follows the same bootstrap discipline as the OpenTelemetry work in Step 9: keep the
+   delayed imports in `main.ts`, create the Nest app, attach shared middleware, then attach the
+   OpenAPI surface before `listen()`.
+5. The verification test is an in-process integration test, not a pure unit test: it creates a
+   real Nest app, serves the in-memory HTTP server, issues HTTP requests with `supertest`, and
+   closes the app after each test.
+
+Story/Task mapping:
+
+- Story 0.9
+- Task 1 (NestJS Swagger decorators and OpenAPI bootstrap)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/0-9-initialize-openapi-spec-generation-and-api-client-sdk.md`
+
+Cross-links to earlier steps:
+
+- Step 2 explains why `apps/api/src/main.ts` is the API bootstrap boundary.
+- Step 7 explains why contract generation belongs in the broader quality-gates story.
+- Step 9 explains the delayed-import bootstrap pattern already used in `main.ts`.
+
+Impacted files:
+
+- `_bmad-output/implementation-artifacts/0-9-initialize-openapi-spec-generation-and-api-client-sdk.md`
+- `_bmad-output/project-knowledge/learning-path-step-by-step.md`
+- `apps/api/package.json`
+- `apps/api/src/main.ts`
+- `apps/api/src/openapi.ts`
+- `apps/api/src/openapi.spec.ts`
+- `apps/api/src/controllers/api-health.controller.ts`
+- `apps/api/src/controllers/health.controller.ts`
+- `package-lock.json`
+
+Task 1 owner map:
+
+- Story 0.9 Task 1 step 1 owner: install Swagger runtime dependencies in `apps/api/package.json`
+  and `package-lock.json`
+- Story 0.9 Task 1 step 2 owner: build the shared Swagger/OpenAPI assembly helper in
+  `apps/api/src/openapi.ts`
+- Story 0.9 Task 1 step 3 owner: hook OpenAPI setup into the Nest bootstrap flow in
+  `apps/api/src/main.ts`
+- Story 0.9 Task 1 step 4 owner: attach Swagger metadata to health endpoints in
+  `apps/api/src/controllers/api-health.controller.ts` and
+  `apps/api/src/controllers/health.controller.ts`
+- Story 0.9 Task 1 step 5 owner: prove `/api/docs` and `/api/v1/openapi.json` through the
+  in-process integration test in `apps/api/src/openapi.spec.ts`
+
+Support refs:
+
+- `apps/api/src/openapi.ts` contains the teaching comments for the full Swagger lifecycle.
+- `apps/api/src/main.ts` shows the exact hook point in the Nest bootstrap sequence.
+- `apps/api/src/openapi.spec.ts` documents why this is an integration test and how the app
+  lifecycle is managed during testing.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  decorators["Nest route decorators\n@Controller @Get"] --> nest_meta["Nest metadata"]
+  swagger_decorators["Swagger decorators\n@ApiTags @ApiOperation @ApiOkResponse"] --> swagger_meta["Swagger metadata"]
+  appmodule["AppModule loaded"] --> nest_app["NestFactory.create(AppModule)"]
+  nest_meta --> nest_app
+  swagger_meta --> docgen["SwaggerModule.createDocument(app, config)"]
+  nest_app --> docgen
+  docconfig["DocumentBuilder\n title description version auth"] --> docgen
+  docgen --> docs["/api/docs\nSwagger UI"]
+  docgen --> json["/api/v1/openapi.json\nraw OpenAPI spec"]
+  test["openapi.spec.ts\nsupertest integration check"] --> docs
+  test --> json
 ```
