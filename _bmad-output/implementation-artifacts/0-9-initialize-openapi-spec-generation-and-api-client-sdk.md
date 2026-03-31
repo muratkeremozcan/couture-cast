@@ -1,6 +1,6 @@
 # Story 0.9: Initialize OpenAPI spec generation and API client SDK
 
-Status: drafted
+Status: in-progress
 
 ## Story
 
@@ -18,9 +18,9 @@ so that I can call backend endpoints without manual typing errors and catch brea
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add NestJS Swagger decorators (AC: #1)
-  - [ ] Install Swagger dependencies: `npm install @nestjs/swagger swagger-ui-express --workspace apps/api`
-  - [ ] Initialize Swagger in `apps/api/src/main.ts`:
+- [x] Task 1: Add NestJS Swagger decorators (AC: #1)
+  - [x] Install Swagger dependencies: `npm install @nestjs/swagger swagger-ui-express --workspace apps/api`
+  - [x] Initialize Swagger in `apps/api/src/main.ts`:
     ```typescript
     const config = new DocumentBuilder()
       .setTitle('CoutureCast API')
@@ -31,14 +31,14 @@ so that I can call backend endpoints without manual typing errors and catch brea
     const document = SwaggerModule.createDocument(app, config)
     SwaggerModule.setup('api/docs', app, document)
     ```
-  - [ ] Add decorators to example controller (health check):
+  - [x] Add decorators to example controller (health check):
     ```typescript
     @ApiTags('health')
     @ApiOperation({ summary: 'Health check endpoint' })
     @ApiResponse({ status: 200, description: 'Service is healthy' })
     ```
-  - [ ] Test Swagger UI: navigate to `http://localhost:3001/api/docs`
-  - [ ] Export OpenAPI JSON: `GET http://localhost:3001/api/v1/openapi.json`
+  - [x] Test Swagger UI: navigate to `http://localhost:3001/api/docs`
+  - [x] Export OpenAPI JSON: `GET http://localhost:3001/api/v1/openapi.json`
 
 - [ ] Task 2: Configure OpenAPI generator CLI (AC: #2)
   - [ ] Install generator: `npm install @openapitools/openapi-generator-cli --save-dev --workspace-root`
@@ -367,22 +367,38 @@ _bmad-output/
 
 ### Agent Model Used
 
-<!-- Will be filled by dev agent -->
+GPT-5 Codex
 
 ### Debug Log References
 
-<!-- Will be filled by dev agent during implementation -->
+- `npm test --workspace api -- openapi.spec.ts` (failed: missing `configureOpenApi`)
+- `npm test --workspace api -- openapi.spec.ts` (passed after Swagger wiring)
+- `npm test --workspace api`
+- `npm run lint --workspace api`
+- `npm run typecheck --workspace api`
 
 ### Completion Notes List
 
-<!-- Will be filled by dev agent upon completion -->
+- Task 1 complete.
+- Configured Swagger UI at `/api/docs` and exposed OpenAPI JSON at `/api/v1/openapi.json` via `configureOpenApi`.
+- Annotated the two existing health endpoints with Swagger decorators so the document contains tagged health operations.
+- Included OpenAPI integration coverage for Swagger UI and JSON export.
+- `npm install` emitted Node engine warnings under local Node `v22.12.0`, but install and validations succeeded.
 
 ### File List
 
-<!-- Will be filled by dev agent with NEW/MODIFIED/DELETED files -->
+- \_bmad-output/implementation-artifacts/0-9-initialize-openapi-spec-generation-and-api-client-sdk.md
+- apps/api/package.json
+- apps/api/src/controllers/api-health.controller.ts
+- apps/api/src/controllers/health.controller.ts
+- apps/api/src/main.ts
+- apps/api/src/openapi.spec.ts
+- apps/api/src/openapi.ts
+- package-lock.json
 
 ## Change Log
 
 | Date       | Author             | Change                                                |
 | ---------- | ------------------ | ----------------------------------------------------- |
 | 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.9 acceptance criteria |
+| 2026-03-31 | Amelia             | Completed Task 1 Swagger wiring and validation.       |
