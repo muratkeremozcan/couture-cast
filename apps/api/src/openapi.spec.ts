@@ -5,7 +5,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import request from 'supertest'
 import { ApiHealthController } from './controllers/api-health.controller'
 import { HealthController } from './controllers/health.controller'
-import { configureOpenApi } from './openapi'
+import {
+  configureOpenApi,
+  isOpenApiEnabled,
+  OPENAPI_DOCS_ROUTE,
+  OPENAPI_JSON_ROUTE,
+} from './openapi'
 
 type OpenApiSpec = {
   info: {
@@ -52,10 +57,11 @@ describe('OpenAPI integration', () => {
   it('serves an OpenAPI document for health endpoints', async () => {
     // supertest talks to Nest's HTTP server directly, so this is a real HTTP request path.
     const server = app!.getHttpServer() as Parameters<typeof request>[0]
-    const response = await request(server).get('/api/v1/openapi.json')
+    const response = await request(server).get(OPENAPI_JSON_ROUTE)
     const spec = response.body as OpenApiSpec
 
     expect(response.status).toBe(200)
+    expect(response.headers['content-type']).toContain('application/json')
     expect(spec.openapi).toMatch(/^3\./)
     expect(spec.info).toMatchObject({
       title: 'CoutureCast API',
@@ -67,9 +73,21 @@ describe('OpenAPI integration', () => {
 
   it('serves the Swagger UI', async () => {
     const server = app!.getHttpServer() as Parameters<typeof request>[0]
-    const response = await request(server).get('/api/docs')
+    const response = await request(server).get(OPENAPI_DOCS_ROUTE)
 
     expect(response.status).toBe(200)
+    expect(response.headers['content-type']).toContain('text/html')
     expect(response.text).toContain('Swagger UI')
+  })
+
+  it('disables OpenAPI by default in production unless explicitly enabled', () => {
+    expect(isOpenApiEnabled({ NODE_ENV: 'production' })).toBe(false)
+    expect(isOpenApiEnabled({ NODE_ENV: 'production', OPENAPI_ENABLED: 'true' })).toBe(
+      true
+    )
+    expect(isOpenApiEnabled({ NODE_ENV: 'development', OPENAPI_ENABLED: 'false' })).toBe(
+      false
+    )
+    expect(isOpenApiEnabled({ NODE_ENV: 'development' })).toBe(true)
   })
 })

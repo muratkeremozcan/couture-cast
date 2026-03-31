@@ -1,6 +1,33 @@
 import type { INestApplication } from '@nestjs/common'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 
+export const OPENAPI_DOCS_ROUTE = '/api/docs'
+export const OPENAPI_JSON_ROUTE = '/api/v1/openapi.json'
+
+export function isOpenApiEnabled(env: NodeJS.ProcessEnv): boolean {
+  const override = env.OPENAPI_ENABLED?.trim().toLowerCase()
+
+  if (
+    override === 'true' ||
+    override === '1' ||
+    override === 'yes' ||
+    override === 'on'
+  ) {
+    return true
+  }
+
+  if (
+    override === 'false' ||
+    override === '0' ||
+    override === 'no' ||
+    override === 'off'
+  ) {
+    return false
+  }
+
+  return env.NODE_ENV !== 'production'
+}
+
 export function configureOpenApi(app: INestApplication) {
   // Story 0.9 Task 1 step 2 owner:
   // build the shared Swagger/OpenAPI assembly helper in this file.
@@ -30,7 +57,7 @@ export function configureOpenApi(app: INestApplication) {
   // Expose both human and machine entry points:
   // - /api/docs renders Swagger UI for developers
   // - /api/v1/openapi.json returns the raw spec for SDK generation and CI checks
-  SwaggerModule.setup('api/docs', app, document, {
-    jsonDocumentUrl: '/api/v1/openapi.json',
+  SwaggerModule.setup(OPENAPI_DOCS_ROUTE, app, document, {
+    jsonDocumentUrl: OPENAPI_JSON_ROUTE,
   })
 }

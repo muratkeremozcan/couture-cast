@@ -380,9 +380,9 @@ GPT-5 Codex
 ### Completion Notes List
 
 - Task 1 complete.
-- Added `configureOpenApi` helper and wired Swagger UI at `/api/docs` plus JSON export at `/api/v1/openapi.json`.
-- Added Swagger decorators to the two existing health endpoints so the generated document contains tagged health operations.
-- Added OpenAPI integration coverage for Swagger UI and JSON export.
+- Configured Swagger UI at `/api/docs` and exposed OpenAPI JSON at `/api/v1/openapi.json` via `configureOpenApi`.
+- Annotated the two existing health endpoints with Swagger decorators so the document contains tagged health operations.
+- Included OpenAPI integration coverage for Swagger UI and JSON export.
 - `npm install` emitted Node engine warnings under local Node `v22.12.0`, but install and validations succeeded.
 
 ### File List

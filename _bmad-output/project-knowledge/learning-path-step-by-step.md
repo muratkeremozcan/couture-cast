@@ -983,9 +983,9 @@ Story reference:
 
 Cross-links to earlier steps:
 
-- Step 2 explains why `apps/api/src/main.ts` is the API bootstrap boundary.
-- Step 7 explains why contract generation belongs in the broader quality-gates story.
-- Step 9 explains the delayed-import bootstrap pattern already used in `main.ts`.
+- Step 2 clarifies why `apps/api/src/main.ts` is the API bootstrap boundary.
+- Step 7 places contract generation within the broader quality-gates story.
+- Step 9 describes the delayed-import bootstrap pattern already used in `main.ts`.
 
 Impacted files:
 
