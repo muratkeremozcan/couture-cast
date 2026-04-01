@@ -70,6 +70,35 @@
           "timestamp"
         ]
       },
+      "QueueMetrics": {
+        "type": "object",
+        "properties": {
+          "waiting": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "active": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "delayed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "paused": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
       "QueueHealthResponse": {
         "type": "object",
         "properties": {
@@ -88,7 +117,32 @@
           },
           "metrics": {
             "type": "object",
-            "additionalProperties": {}
+            "properties": {
+              "waiting": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "active": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "completed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "failed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "delayed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "paused": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
           }
         },
         "required": [
@@ -133,7 +187,8 @@
         "properties": {
           "since": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Fetch only events created after this ISO timestamp."
           }
         }
       },
@@ -143,35 +198,7 @@
           "events": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "channel": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "payload": {},
-                "userId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "minLength": 1
-                },
-                "createdAt": {
-                  "type": "string",
-                  "format": "date-time"
-                }
-              },
-              "required": [
-                "id",
-                "channel",
-                "userId",
-                "createdAt"
-              ]
+              "$ref": "#/components/schemas/PolledEvent"
             }
           },
           "nextSince": {
@@ -193,35 +220,7 @@
           "events": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "channel": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "payload": {},
-                "userId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "minLength": 1
-                },
-                "createdAt": {
-                  "type": "string",
-                  "format": "date-time"
-                }
-              },
-              "required": [
-                "id",
-                "channel",
-                "userId",
-                "createdAt"
-              ]
+              "$ref": "#/components/schemas/PolledEvent"
             }
           },
           "nextSince": {
@@ -241,105 +240,10 @@
       "EventsPollResult": {
         "anyOf": [
           {
-            "type": "object",
-            "properties": {
-              "events": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "channel": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "payload": {},
-                    "userId": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "minLength": 1
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "channel",
-                    "userId",
-                    "createdAt"
-                  ]
-                }
-              },
-              "nextSince": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
-              }
-            },
-            "required": [
-              "events",
-              "nextSince"
-            ]
+            "$ref": "#/components/schemas/EventsPollResponse"
           },
           {
-            "type": "object",
-            "properties": {
-              "events": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "channel": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "payload": {},
-                    "userId": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "minLength": 1
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "channel",
-                    "userId",
-                    "createdAt"
-                  ]
-                }
-              },
-              "nextSince": {
-                "type": "null"
-              },
-              "error": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "required": [
-              "events",
-              "nextSince",
-              "error"
-            ]
+            "$ref": "#/components/schemas/EventsPollInvalidSinceResponse"
           }
         ]
       }
@@ -438,7 +342,32 @@
                     },
                     "metrics": {
                       "type": "object",
-                      "additionalProperties": {}
+                      "properties": {
+                        "waiting": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "active": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "completed": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "failed": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "delayed": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "paused": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
                     }
                   },
                   "required": [
@@ -462,14 +391,15 @@
         "description": "Returns unseen events plus the next cursor for polling fallback clients.",
         "parameters": [
           {
-            "name": "since",
-            "in": "query",
-            "required": false,
             "schema": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "description": "Fetch only events created after this ISO timestamp."
             },
-            "description": "Fetch only events created after this ISO timestamp."
+            "required": false,
+            "description": "Fetch only events created after this ISO timestamp.",
+            "name": "since",
+            "in": "query"
           }
         ],
         "responses": {
@@ -478,109 +408,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "events": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "channel": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "payload": {},
-                              "userId": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ],
-                                "minLength": 1
-                              },
-                              "createdAt": {
-                                "type": "string",
-                                "format": "date-time"
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "channel",
-                              "userId",
-                              "createdAt"
-                            ]
-                          }
-                        },
-                        "nextSince": {
-                          "type": [
-                            "string",
-                            "null"
-                          ],
-                          "format": "date-time"
-                        }
-                      },
-                      "required": [
-                        "events",
-                        "nextSince"
-                      ]
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "events": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "channel": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "payload": {},
-                              "userId": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ],
-                                "minLength": 1
-                              },
-                              "createdAt": {
-                                "type": "string",
-                                "format": "date-time"
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "channel",
-                              "userId",
-                              "createdAt"
-                            ]
-                          }
-                        },
-                        "nextSince": {
-                          "type": "null"
-                        },
-                        "error": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": [
-                        "events",
-                        "nextSince",
-                        "error"
-                      ]
-                    }
-                  ]
+                  "$ref": "#/components/schemas/EventsPollResult"
                 }
               }
             }

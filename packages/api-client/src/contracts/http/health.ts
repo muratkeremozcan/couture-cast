@@ -1,11 +1,6 @@
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
-import {
-  isoTimestampSchema,
-  nonEmptyStringSchema,
-  okStatusSchema,
-  unknownObjectSchema,
-} from './common'
+import { isoTimestampSchema, nonEmptyStringSchema, okStatusSchema } from './common'
 
 // Story 0.9 Task 2 step 2 owner:
 // model the first health endpoints here so the pattern is proven on a small real API slice.
@@ -25,16 +20,28 @@ export const apiHealthResponseSchema = z.object({
 
 export type ApiHealthResponse = z.infer<typeof apiHealthResponseSchema>
 
+export const queueMetricsSchema = z.object({
+  waiting: z.number().int().nonnegative().optional(),
+  active: z.number().int().nonnegative().optional(),
+  completed: z.number().int().nonnegative().optional(),
+  failed: z.number().int().nonnegative().optional(),
+  delayed: z.number().int().nonnegative().optional(),
+  paused: z.number().int().nonnegative().optional(),
+})
+
+export type QueueMetrics = z.infer<typeof queueMetricsSchema>
+
 export const queueHealthResponseSchema = z.object({
   status: okStatusSchema,
   queues: z.array(nonEmptyStringSchema),
-  metrics: unknownObjectSchema,
+  metrics: queueMetricsSchema,
 })
 
 export type QueueHealthResponse = z.infer<typeof queueHealthResponseSchema>
 
 export function registerHealthContracts(registry: OpenAPIRegistry) {
   registry.register('ApiHealthResponse', apiHealthResponseSchema)
+  registry.register('QueueMetrics', queueMetricsSchema)
   registry.register('QueueHealthResponse', queueHealthResponseSchema)
 
   registry.registerPath({

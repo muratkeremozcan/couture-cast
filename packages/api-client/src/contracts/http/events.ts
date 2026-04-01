@@ -1,5 +1,4 @@
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
-import type { ParameterObject } from 'openapi3-ts/oas31'
 import { z } from 'zod'
 import { apiErrorSchema, isoTimestampSchema, nonEmptyStringSchema } from './common'
 
@@ -9,8 +8,12 @@ import { apiErrorSchema, isoTimestampSchema, nonEmptyStringSchema } from './comm
 // Why this step matters:
 // this file proves the pattern can handle real query params, unions, arrays, and graceful
 // error payloads, which is what turns the Zod-first approach from a demo into an architecture.
+const eventsSinceQuerySchema = isoTimestampSchema
+  .optional()
+  .describe('Fetch only events created after this ISO timestamp.')
+
 export const eventsPollQuerySchema = z.object({
-  since: isoTimestampSchema.optional(),
+  since: eventsSinceQuerySchema,
 })
 
 export type EventsPollQuery = z.infer<typeof eventsPollQuerySchema>
@@ -25,18 +28,29 @@ export const polledEventSchema = z.object({
 
 export type PolledEvent = z.infer<typeof polledEventSchema>
 
-export const eventsPollResponseSchema = z.object({
-  events: z.array(polledEventSchema),
-  nextSince: isoTimestampSchema.nullable(),
-})
+function createEventsPollResponseSchema(eventSchema: typeof polledEventSchema) {
+  return z.object({
+    events: z.array(eventSchema),
+    nextSince: isoTimestampSchema.nullable(),
+  })
+}
+
+export const eventsPollResponseSchema = createEventsPollResponseSchema(polledEventSchema)
 
 export type EventsPollResponse = z.infer<typeof eventsPollResponseSchema>
 
-export const eventsPollInvalidSinceResponseSchema = z.object({
-  events: z.array(polledEventSchema),
-  nextSince: z.null(),
-  error: apiErrorSchema.shape.error,
-})
+function createEventsPollInvalidSinceResponseSchema(
+  eventSchema: typeof polledEventSchema
+) {
+  return z.object({
+    events: z.array(eventSchema),
+    nextSince: z.null(),
+    error: apiErrorSchema.shape.error,
+  })
+}
+
+export const eventsPollInvalidSinceResponseSchema =
+  createEventsPollInvalidSinceResponseSchema(polledEventSchema)
 
 export type EventsPollInvalidSinceResponse = z.infer<
   typeof eventsPollInvalidSinceResponseSchema
@@ -47,26 +61,27 @@ export const eventsPollResultSchema = z.union([
   eventsPollInvalidSinceResponseSchema,
 ])
 
-const sinceQueryParameter: ParameterObject = {
-  name: 'since',
-  in: 'query',
-  required: false,
-  schema: {
-    type: 'string',
-    format: 'date-time',
-  },
-  description: 'Fetch only events created after this ISO timestamp.',
-}
-
 export function registerEventsContracts(registry: OpenAPIRegistry) {
-  registry.register('PolledEvent', polledEventSchema)
-  registry.register('EventsPollQuery', eventsPollQuerySchema)
-  registry.register('EventsPollResponse', eventsPollResponseSchema)
-  registry.register(
-    'EventsPollInvalidSinceResponse',
-    eventsPollInvalidSinceResponseSchema
+  const registeredPolledEventSchema = registry.register('PolledEvent', polledEventSchema)
+  const registeredEventsPollQuerySchema = registry.register(
+    'EventsPollQuery',
+    eventsPollQuerySchema
   )
-  registry.register('EventsPollResult', eventsPollResultSchema)
+  const registeredEventsPollResponseSchema = registry.register(
+    'EventsPollResponse',
+    createEventsPollResponseSchema(registeredPolledEventSchema)
+  )
+  const registeredEventsPollInvalidSinceResponseSchema = registry.register(
+    'EventsPollInvalidSinceResponse',
+    createEventsPollInvalidSinceResponseSchema(registeredPolledEventSchema)
+  )
+  const registeredEventsPollResultSchema = registry.register(
+    'EventsPollResult',
+    z.union([
+      registeredEventsPollResponseSchema,
+      registeredEventsPollInvalidSinceResponseSchema,
+    ])
+  )
 
   registry.registerPath({
     method: 'get',
@@ -75,14 +90,16 @@ export function registerEventsContracts(registry: OpenAPIRegistry) {
     summary: 'Poll incremental realtime fallback events',
     description:
       'Returns unseen events plus the next cursor for polling fallback clients.',
-    parameters: [sinceQueryParameter],
+    request: {
+      query: registeredEventsPollQuerySchema,
+    },
     responses: {
       200: {
         description:
           'Incremental polling result. Invalid query timestamps currently return a graceful payload instead of a 4xx.',
         content: {
           'application/json': {
-            schema: eventsPollResultSchema,
+            schema: registeredEventsPollResultSchema,
           },
         },
       },

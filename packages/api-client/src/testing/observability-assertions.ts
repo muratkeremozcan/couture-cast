@@ -1,3 +1,5 @@
+import type { ExpectLike } from './expect-like'
+
 export type MemoryLogEntry = Record<string, unknown> & {
   level?: string
   message?: string
@@ -6,17 +8,6 @@ export type MemoryLogEntry = Record<string, unknown> & {
 type LogExpectationOptions = {
   afterIndex?: number
   count?: number
-}
-
-type ExpectLike = ((
-  actual: unknown,
-  message?: string
-) => {
-  toBeGreaterThan(expected: number): void
-  toEqual(expected: unknown): void
-  toHaveLength(expected: number): void
-}) & {
-  objectContaining(expected: Record<string, unknown>): unknown
 }
 
 const formatCapturedLogs = (entries: readonly MemoryLogEntry[]) =>

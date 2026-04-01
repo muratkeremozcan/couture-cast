@@ -11,7 +11,7 @@ import { spawn } from 'node:child_process'
 // bootstrap path.
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const apiBundlePath = path.join(repoRoot, 'apps/api/dist/apps/api/src/main.js')
+const apiBundlePath = path.join(repoRoot, 'apps/api/dist/src/main.js')
 const inspectEnabled = process.argv.includes('--inspect')
 const watchReadyPatterns = [
   'Found 0 errors. Watching for file changes.',
@@ -72,7 +72,7 @@ function startRuntime() {
   runtimeStarted = true
   runtimeProcess = spawn(
     'node',
-    [...(inspectEnabled ? ['--inspect'] : []), 'apps/api/dist/apps/api/src/main.js'],
+    [...(inspectEnabled ? ['--inspect'] : []), 'apps/api/dist/src/main.js'],
     {
       cwd: repoRoot,
       env: process.env,

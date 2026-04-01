@@ -7,6 +7,7 @@ import {
   wardrobeUploadStartedPropertiesSchema,
   type AnalyticsEventName,
 } from '../types/analytics-events'
+import type { ExpectLike } from './expect-like'
 
 export type MemoryTrackedAnalyticsEvent = {
   distinctId?: string
@@ -17,18 +18,6 @@ export type MemoryTrackedAnalyticsEvent = {
 type EventExpectationOptions = {
   afterIndex?: number
   count?: number
-}
-
-type ExpectLike = ((
-  actual: unknown,
-  message?: string
-) => {
-  toBe(expected: unknown): void
-  toBeGreaterThan(expected: number): void
-  toEqual(expected: unknown): void
-  toHaveLength(expected: number): void
-}) & {
-  objectContaining(expected: Record<string, unknown>): unknown
 }
 
 const analyticsPropertySchemas = {

@@ -104,14 +104,20 @@ so that I can call backend endpoints without manual typing errors and catch brea
           - name: Install dependencies
             run: npm ci
           - name: Generate current spec
-            run: npm run generate:http-openapi
+            run: |
+              npm run generate:http-openapi
+              cp packages/api-client/docs/http.openapi.json packages/api-client/docs/http.openapi.new.json
           - name: Checkout base branch
             run: git checkout ${{ github.base_ref }}
           - name: Generate base spec
-            run: npm run generate:http-openapi
+            run: |
+              npm run generate:http-openapi
+              cp packages/api-client/docs/http.openapi.json packages/api-client/docs/http.openapi.base.json
           - name: Run diff check
             run: |
-              npx oasdiff breaking path/to/openapi-base.json path/to/openapi-new.json
+              npx oasdiff breaking \
+                packages/api-client/docs/http.openapi.base.json \
+                packages/api-client/docs/http.openapi.new.json
               if [ $? -ne 0 ]; then
                 echo "::error::Breaking changes detected. Bump API version or fix compatibility."
                 exit 1

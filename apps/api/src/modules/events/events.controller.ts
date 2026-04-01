@@ -11,7 +11,7 @@ export class EventsController {
 
   @Get('poll')
   async poll(@Query('since') since?: string) {
-    const parsed = eventsPollQuerySchema.shape.since.safeParse(since)
+    const parsed = eventsPollQuerySchema.safeParse({ since })
     if (!parsed.success && since !== undefined) {
       return eventsPollInvalidSinceResponseSchema.parse({
         events: [],
@@ -20,7 +20,8 @@ export class EventsController {
       })
     }
 
-    const sinceDate = parsed.success && parsed.data ? new Date(parsed.data) : undefined
+    const sinceDate =
+      parsed.success && parsed.data.since ? new Date(parsed.data.since) : undefined
     return this.eventsService.poll(sinceDate)
   }
 }

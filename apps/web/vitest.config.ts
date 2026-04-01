@@ -16,7 +16,7 @@ export default defineConfig({
       },
       {
         find: /^@couture\/api-client\/testing\/(.*)$/,
-        replacement: path.resolve(__dirname, '../../packages/api-client/dist/testing/$1'),
+        replacement: path.resolve(__dirname, '../../packages/api-client/src/testing/$1'),
       },
       {
         find: /^@couture\/api-client\/realtime\/(.*)$/,

@@ -1,5 +1,10 @@
-import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
+import {
+  extendZodWithOpenApi,
+  type OpenAPIRegistry,
+} from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
+
+extendZodWithOpenApi(z)
 
 // Story 0.9 Task 2 step 1 owner:
 // define reusable HTTP primitives here before endpoint-specific contracts exist.

@@ -9,37 +9,37 @@
     "#analytics/analytics.service": {
       "development": "./src/analytics/analytics.service.ts",
       "types": "./src/analytics/analytics.service.ts",
-      "default": "./dist/apps/api/src/analytics/analytics.service.js"
+      "default": "./dist/src/analytics/analytics.service.js"
     },
     "#app.module": {
       "development": "./src/app.module.ts",
       "types": "./src/app.module.ts",
-      "default": "./dist/apps/api/src/app.module.js"
+      "default": "./dist/src/app.module.js"
     },
     "#load-env": {
       "development": "./src/load-env.ts",
       "types": "./src/load-env.ts",
-      "default": "./dist/apps/api/src/load-env.js"
+      "default": "./dist/src/load-env.js"
     },
     "#logger/request-context": {
       "development": "./src/logger/request-context.ts",
       "types": "./src/logger/request-context.ts",
-      "default": "./dist/apps/api/src/logger/request-context.js"
+      "default": "./dist/src/logger/request-context.js"
     },
     "#logger/request-logger.middleware": {
       "development": "./src/logger/request-logger.middleware.ts",
       "types": "./src/logger/request-logger.middleware.ts",
-      "default": "./dist/apps/api/src/logger/request-logger.middleware.js"
+      "default": "./dist/src/logger/request-logger.middleware.js"
     },
     "#openapi": {
       "development": "./src/openapi.ts",
       "types": "./src/openapi.ts",
-      "default": "./dist/apps/api/src/openapi.js"
+      "default": "./dist/src/openapi.js"
     },
     "#posthog/posthog.service": {
       "development": "./src/posthog/posthog.service.ts",
       "types": "./src/posthog/posthog.service.ts",
-      "default": "./dist/apps/api/src/posthog/posthog.service.js"
+      "default": "./dist/src/posthog/posthog.service.js"
     }
   },
   "engines": {
@@ -53,10 +53,10 @@
     "build:watch": "nest build --watch",
     "format": "prettier --write \"src/**/*.ts\" \"integration/**/*.ts\"",
     "prestart": "npm run build",
-    "start": "node dist/apps/api/src/main.js",
+    "start": "node dist/src/main.js",
     "start:dev": "node ../../scripts/start-api-watch.mjs",
     "start:debug": "node ../../scripts/start-api-watch.mjs --inspect",
-    "start:prod": "node dist/apps/api/src/main.js",
+    "start:prod": "node dist/src/main.js",
     "lint": "eslint \"{src,apps,libs,test,integration}/**/*.ts\" --fix",
     "pretypecheck": "npm run prepare:shared-deps && prisma generate --schema ../../packages/db/prisma/schema.prisma",
     "typecheck": "tsc --noEmit",
@@ -71,7 +71,7 @@
     "prestart:workers": "npm run prepare:shared-deps",
     "start:workers": "tsx src/workers/bootstrap.ts",
     "prestart:workers:prod": "npm run prepare:shared-deps",
-    "start:workers:prod": "node dist/apps/api/src/workers/bootstrap.js"
+    "start:workers:prod": "node dist/src/workers/bootstrap.js"
   },
   "dependencies": {
     "@couture/api-client": "file:../../packages/api-client",
@@ -99,7 +99,6 @@
     "rxjs": "7.8.2",
     "socket.io": "^4.8.1",
     "swagger-ui-express": "^5.0.1",
-    "testcontainers": "^11.9.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -119,28 +118,12 @@
     "prettier": "3.6.2",
     "source-map-support": "0.5.21",
     "supertest": "7.1.4",
+    "testcontainers": "^11.9.0",
     "ts-loader": "9.5.4",
     "ts-node": "10.9.2",
     "tsconfig-paths": "3.15.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.46.4",
     "vitest": "4.0.9"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
   }
 }

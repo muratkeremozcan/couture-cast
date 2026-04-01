@@ -22,5 +22,7 @@ export function writeHttpOpenApiDocument(outputDir = resolve(process.cwd(), 'doc
   return outputPath
 }
 
-const outputPath = writeHttpOpenApiDocument()
-console.log(`✅ Wrote ${outputPath}`)
+if (require.main === module) {
+  const outputPath = writeHttpOpenApiDocument()
+  console.log(`✅ Wrote ${outputPath}`)
+}

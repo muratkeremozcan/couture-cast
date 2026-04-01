@@ -110,11 +110,11 @@ function collectExternalRuntimeImports(filePath) {
 const webTsconfig = readJson(webTsconfigPath)
 const aliasPaths = webTsconfig?.compilerOptions?.paths ?? {}
 const aliasTargetEntries = [
-  ['@couture/api-client', ...(aliasPaths['@couture/api-client'] ?? [])],
-  ['@couture/api-client/testing/*', ...(aliasPaths['@couture/api-client/testing/*'] ?? [])],
-  ['@couture/api-client/realtime/*', ...(aliasPaths['@couture/api-client/realtime/*'] ?? [])],
-  ['@couture/api-client/types/*', ...(aliasPaths['@couture/api-client/types/*'] ?? [])],
-]
+  '@couture/api-client',
+  '@couture/api-client/testing/*',
+  '@couture/api-client/realtime/*',
+  '@couture/api-client/types/*',
+].flatMap((aliasKey) => (aliasPaths[aliasKey] ?? []).map((target) => [aliasKey, target]))
 
 const usesAliasedApiClientSource = aliasTargetEntries.some(([, target]) =>
   typeof target === 'string' && target.includes('packages/api-client/src')

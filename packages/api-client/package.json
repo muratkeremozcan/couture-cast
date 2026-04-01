@@ -11,27 +11,27 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
     "./realtime/*": {
-      "types": "./src/realtime/*.ts",
+      "types": "./dist/realtime/*.d.ts",
       "default": "./dist/realtime/*.js"
     },
     "./types/*": {
-      "types": "./src/types/*.ts",
+      "types": "./dist/types/*.d.ts",
       "default": "./dist/types/*.js"
     },
     "./contracts/http": {
-      "types": "./src/contracts/http/index.ts",
+      "types": "./dist/contracts/http/index.d.ts",
       "default": "./dist/contracts/http/index.js"
     },
     "./contracts/http/*": {
-      "types": "./src/contracts/http/*.ts",
+      "types": "./dist/contracts/http/*.d.ts",
       "default": "./dist/contracts/http/*.js"
     },
     "./testing/*": {
-      "types": "./src/testing/*.ts",
+      "types": "./dist/testing/*.d.ts",
       "default": "./dist/testing/*.js"
     }
   },
