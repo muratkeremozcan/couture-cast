@@ -13,6 +13,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
+    "preinstall": "node scripts/check-node-version.mjs",
     "dev": "turbo run dev --parallel",
     "build": "npm run --workspaces --if-present build",
     "typecheck": "npm run --workspaces typecheck && tsc --noEmit -p playwright/tsconfig.json",

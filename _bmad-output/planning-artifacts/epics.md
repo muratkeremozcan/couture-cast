@@ -122,10 +122,11 @@ As a security-conscious team, we need a simple documented secret-management work
 As a frontend developer, I need type-safe API clients so that I can call backend endpoints without manual typing errors.
 **Acceptance Criteria**
 
-1. Add NestJS Swagger decorators to all API controllers; generate OpenAPI spec at `/api/v1/openapi.json`.
-2. Configure `@openapitools/openapi-generator-cli` to produce TypeScript SDK in `3. Implement automated OpenAPI diff checks in CI (fail PR if breaking changes detected without version bump).
-3. Publish SDK to npm workspace so web and mobile apps can import typed client.
-4. Document API versioning strategy: `/api/v1` stable; `/api/v2` for breaking changes; deprecation policy (90-day notice).
+1. Expose `/api/v1/openapi.json` during Story 0 while transitioning toward canonical shared Zod contracts as the permanent source of truth.
+2. Define canonical request/response contracts as shared Zod schemas and derive the OpenAPI spec at `/api/v1/openapi.json` from those contracts rather than controller decorators.
+3. Generate a TypeScript SDK from the canonical contract-derived spec and publish it to the npm workspace for web/mobile use.
+4. Implement automated OpenAPI diff checks in CI (fail PR if breaking changes are introduced without a versioning decision).
+5. Document API versioning strategy: `/api/v1` stable; `/api/v2` for breaking changes; 90-day deprecation notice; shared Zod contracts are the source of truth.
    **Prerequisites:** CC-0.1 (NestJS API scaffold).
 
 **Story CC-0.10: Implement test fixture factories and seed data**

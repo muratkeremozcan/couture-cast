@@ -28,7 +28,7 @@ describe('PostHogService', () => {
   })
 
   it('returns boolean feature flag values from the SDK', async () => {
-    const { PostHogService } = await import('./posthog.service.js')
+    const { PostHogService } = await import('#posthog/posthog.service')
     getFeatureFlag.mockResolvedValue(true)
 
     const service = new PostHogService()
@@ -42,7 +42,7 @@ describe('PostHogService', () => {
   })
 
   it('returns non-boolean feature flag values unchanged for downstream coercion', async () => {
-    const { PostHogService } = await import('./posthog.service.js')
+    const { PostHogService } = await import('#posthog/posthog.service')
     getFeatureFlag.mockResolvedValue('variant-a')
 
     const service = new PostHogService()
@@ -53,7 +53,7 @@ describe('PostHogService', () => {
   })
 
   it('returns undefined when the SDK is not configured', async () => {
-    const { PostHogService } = await import('./posthog.service.js')
+    const { PostHogService } = await import('#posthog/posthog.service')
     delete process.env.POSTHOG_API_KEY
 
     const service = new PostHogService()

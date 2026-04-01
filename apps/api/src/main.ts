@@ -1,6 +1,6 @@
 import 'reflect-metadata'
 import './load-env'
-import type { AnalyticsClient } from './analytics/analytics.service'
+import type { AnalyticsClient } from '#analytics/analytics.service'
 import {
   initializeOpenTelemetry,
   resolveOtelDiagnosticLogLevel,
@@ -38,11 +38,11 @@ async function bootstrap() {
     { configureOpenApi, isOpenApiEnabled },
   ] = await Promise.all([
     import('@nestjs/core'),
-    import('./app.module.js'),
-    import('./analytics/analytics.service.js'),
-    import('./logger/request-context.js'),
-    import('./logger/request-logger.middleware.js'),
-    import('./openapi.js'),
+    import('#app.module'),
+    import('#analytics/analytics.service'),
+    import('#logger/request-context'),
+    import('#logger/request-logger.middleware'),
+    import('#openapi'),
   ])
 
   // 2) NestFactory.create(AppModule) builds the route graph from that metadata.

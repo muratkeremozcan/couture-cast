@@ -1,4 +1,3 @@
-import { expect } from 'vitest'
 import {
   alertReceivedPropertiesSchema,
   analyticsEventNameSchema,
@@ -7,7 +6,8 @@ import {
   ritualCreatedPropertiesSchema,
   wardrobeUploadStartedPropertiesSchema,
   type AnalyticsEventName,
-} from '../src/types/analytics-events'
+} from '../types/analytics-events'
+import type { ExpectLike } from './expect-like'
 
 export type MemoryTrackedAnalyticsEvent = {
   distinctId?: string
@@ -32,7 +32,8 @@ const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>
   events.map(({ event }) => event).join(', ')
 
 export function createAnalyticsEventExpectations(
-  events: readonly MemoryTrackedAnalyticsEvent[]
+  events: readonly MemoryTrackedAnalyticsEvent[],
+  expectLike: ExpectLike
 ) {
   return {
     createCursor() {
@@ -52,12 +53,12 @@ export function createAnalyticsEventExpectations(
       )
 
       if (options.count !== undefined) {
-        expect(
+        expectLike(
           matchingEvents,
           `Expected ${options.count} "${normalizedEventName}" event(s) after cursor ${options.afterIndex ?? 0}. Captured: ${formatCapturedEvents(scopedEvents)}`
         ).toHaveLength(options.count)
       } else {
-        expect(
+        expectLike(
           matchingEvents.length,
           `Expected analytics event "${normalizedEventName}" to be tracked. Captured: ${formatCapturedEvents(scopedEvents)}`
         ).toBeGreaterThan(0)
@@ -68,11 +69,13 @@ export function createAnalyticsEventExpectations(
         trackedEvent?.properties ?? {}
       )
 
-      expect(
+      expectLike(
         parsedProperties.success,
         parsedProperties.success ? undefined : parsedProperties.error.message
       ).toBe(true)
-      expect(trackedEvent?.properties ?? {}).toEqual(expect.objectContaining(properties))
+      expectLike(trackedEvent?.properties ?? {}).toEqual(
+        expectLike.objectContaining(properties)
+      )
 
       return trackedEvent as MemoryTrackedAnalyticsEvent
     },

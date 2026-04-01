@@ -13,6 +13,8 @@ Thin Turborepo for Couture Cast apps and smoke tests. Keep it lean: shared lint 
 | Expo Go (optional) | Latest store build  | Handy for validating `apps/mobile` during `npm run dev`.                                            |
 
 > CI runs on Node 24 to match `.nvmrc`. Use that baseline unless an architecture decision explicitly requests a lower version.
+> `npm install` now fails fast if your active Node major version does not match `.nvmrc`,
+> so setup errors surface before workspace scripts drift.
 
 ## Repository layout
 

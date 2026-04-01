@@ -13,8 +13,6 @@ const repoRoot = path.resolve(__dirname, '..')
 
 const webTsconfigPath = path.join(repoRoot, 'apps/web/tsconfig.json')
 const webPackagePath = path.join(repoRoot, 'apps/web/package.json')
-const apiClientSrcDir = path.join(repoRoot, 'packages/api-client/src')
-
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'))
 }
@@ -33,6 +31,23 @@ function collectSourceFiles(dirPath) {
     }
   }
   return files
+}
+
+function resolveTsCandidate(basePath) {
+  const candidates = [
+    basePath,
+    `${basePath}.ts`,
+    `${basePath}.tsx`,
+    path.join(basePath, 'index.ts'),
+    path.join(basePath, 'index.tsx'),
+  ]
+
+  return (
+    candidates.find((candidate) => {
+      if (!fs.existsSync(candidate)) return false
+      return fs.statSync(candidate).isFile()
+    }) ?? null
+  )
 }
 
 function normalizePackageName(specifier) {
@@ -94,13 +109,15 @@ function collectExternalRuntimeImports(filePath) {
 
 const webTsconfig = readJson(webTsconfigPath)
 const aliasPaths = webTsconfig?.compilerOptions?.paths ?? {}
-const aliasTargets = [
-  ...(aliasPaths['@couture/api-client'] ?? []),
-  ...(aliasPaths['@couture/api-client/*'] ?? []),
-]
+const aliasTargetEntries = [
+  '@couture/api-client',
+  '@couture/api-client/testing/*',
+  '@couture/api-client/realtime/*',
+  '@couture/api-client/types/*',
+].flatMap((aliasKey) => (aliasPaths[aliasKey] ?? []).map((target) => [aliasKey, target]))
 
-const usesAliasedApiClientSource = aliasTargets.some(
-  (target) => typeof target === 'string' && target.includes('packages/api-client/src')
+const usesAliasedApiClientSource = aliasTargetEntries.some(([, target]) =>
+  typeof target === 'string' && target.includes('packages/api-client/src')
 )
 
 if (!usesAliasedApiClientSource) {
@@ -117,11 +134,50 @@ const declaredRuntimeDeps = new Set([
 
 const builtins = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)])
 const externalImports = new Set()
+const filesToScan = new Set()
+const filesSeen = new Set()
 
-for (const sourceFile of collectSourceFiles(apiClientSrcDir)) {
+for (const [aliasKey, target] of aliasTargetEntries) {
+  if (typeof target !== 'string' || !target.includes('packages/api-client/src')) continue
+
+  const normalizedTarget = target.replace(/\/\*$/, '')
+  const absoluteTarget = path.resolve(path.dirname(webTsconfigPath), normalizedTarget)
+
+  if (aliasKey.endsWith('/*')) {
+    if (fs.existsSync(absoluteTarget)) {
+      for (const file of collectSourceFiles(absoluteTarget)) {
+        filesToScan.add(file)
+      }
+    }
+    continue
+  }
+
+  const candidate = resolveTsCandidate(absoluteTarget)
+  if (candidate) {
+    filesToScan.add(candidate)
+  }
+}
+
+while (filesToScan.size > 0) {
+  const [sourceFile] = filesToScan
+  filesToScan.delete(sourceFile)
+  if (filesSeen.has(sourceFile)) continue
+  filesSeen.add(sourceFile)
+
   for (const specifier of collectExternalRuntimeImports(sourceFile)) {
     const packageName = normalizePackageName(specifier)
-    if (!packageName || builtins.has(packageName)) continue
+    if (!packageName) {
+      if (specifier.startsWith('.')) {
+        const resolvedRelativeImport = resolveTsCandidate(
+          path.resolve(path.dirname(sourceFile), specifier)
+        )
+        if (resolvedRelativeImport) {
+          filesToScan.add(resolvedRelativeImport)
+        }
+      }
+      continue
+    }
+    if (builtins.has(packageName)) continue
     externalImports.add(packageName)
   }
 }

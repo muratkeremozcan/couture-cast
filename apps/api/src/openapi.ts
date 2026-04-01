@@ -28,7 +28,7 @@ export function isOpenApiEnabled(env: NodeJS.ProcessEnv): boolean {
   return env.NODE_ENV !== 'production'
 }
 
-export function configureOpenApi(app: INestApplication) {
+function buildOpenApiConfig() {
   // Story 0.9 Task 1 step 2 owner:
   // build the shared Swagger/OpenAPI assembly helper in this file.
   //
@@ -50,9 +50,19 @@ export function configureOpenApi(app: INestApplication) {
     .addBearerAuth()
     .build()
 
+  return config
+}
+
+function createOpenApiDocument(app: INestApplication) {
+  const config = buildOpenApiConfig()
+
   // 3) SwaggerModule.createDocument(app, config) walks the registered routes and the
   //    Swagger-specific metadata to produce one OpenAPI document for the whole app.
-  const document = SwaggerModule.createDocument(app, config)
+  return SwaggerModule.createDocument(app, config)
+}
+
+export function configureOpenApi(app: INestApplication) {
+  const document = createOpenApiDocument(app)
 
   // Expose both human and machine entry points:
   // - /api/docs renders Swagger UI for developers

@@ -1,11 +1,14 @@
 {
   "extends": "./tsconfig.json",
-  "include": [
-    "src/**/*.ts",
-    "integration/**/*.ts",
-    "test/**/*.ts",
-    "scripts/**/*.ts",
-    "vitest.config.ts",
-    "../../packages/config/src/**/*.ts"
-  ]
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@couture/config": ["../../packages/config/src/index.ts"],
+      "@couture/api-client": ["../../packages/api-client/src/index.ts"],
+      "@couture/api-client/contracts/http": [
+        "../../packages/api-client/src/contracts/http/index.ts"
+      ],
+      "@couture/api-client/testing/*": ["../../packages/api-client/src/testing/*"]
+    }
+  }
 }

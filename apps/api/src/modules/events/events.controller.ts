@@ -1,8 +1,9 @@
 import { Controller, Get, Query } from '@nestjs/common'
-import { z } from 'zod'
+import {
+  eventsPollInvalidSinceResponseSchema,
+  eventsPollQuerySchema,
+} from '../../contracts/http'
 import { EventsService } from './events.service'
-
-const sinceSchema = z.string().datetime().optional()
 
 @Controller('/api/v1/events')
 export class EventsController {
@@ -10,12 +11,17 @@ export class EventsController {
 
   @Get('poll')
   async poll(@Query('since') since?: string) {
-    const parsed = sinceSchema.safeParse(since)
+    const parsed = eventsPollQuerySchema.safeParse({ since })
     if (!parsed.success && since !== undefined) {
-      return { events: [], nextSince: null, error: 'Invalid since timestamp' }
+      return eventsPollInvalidSinceResponseSchema.parse({
+        events: [],
+        nextSince: null,
+        error: 'Invalid since timestamp',
+      })
     }
 
-    const sinceDate = parsed.success && parsed.data ? new Date(parsed.data) : undefined
+    const sinceDate =
+      parsed.success && parsed.data.since ? new Date(parsed.data.since) : undefined
     return this.eventsService.poll(sinceDate)
   }
 }

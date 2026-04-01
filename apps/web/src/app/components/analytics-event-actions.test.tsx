@@ -31,7 +31,7 @@ vi.mock('posthog-js', () => ({
 import { AnalyticsEventActions } from './analytics-event-actions'
 
 describe('AnalyticsEventActions', () => {
-  const eventExpectations = createAnalyticsEventExpectations(trackedEvents)
+  const eventExpectations = createAnalyticsEventExpectations(trackedEvents, expect)
   const originalPostHogApiKey = process.env.POSTHOG_API_KEY
 
   beforeEach(() => {

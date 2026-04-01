@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-03-31 - added Story 0.9 Task 1 OpenAPI/Swagger learning flow and cross-links
+Updated: 2026-04-01 - corrected Story 0.9 toward a Zod-first contract architecture
 
 ## LLM collaborator prompt
 
@@ -842,7 +842,7 @@ Code evidence:
 - `apps/api/src/logger/pino.config.spec.ts`
 - `apps/api/src/logger/request-context.spec.ts`
 - `apps/api/src/logger/request-logger.middleware.spec.ts`
-- `packages/api-client/testing/observability-assertions.ts`
+- `packages/api-client/src/testing/observability-assertions.ts`
 
 Owner map:
 
@@ -1035,4 +1035,158 @@ flowchart TD
   docgen --> json["/api/v1/openapi.json\nraw OpenAPI spec"]
   test["openapi.spec.ts\nsupertest integration check"] --> docs
   test --> json
+```
+
+## Step 14 - Build Zod to OpenAPI the future-facing way
+
+User/business impact:
+
+If this repo is meant to be a reference-quality foundation, the HTTP contract cannot live in
+controllers, generated clients, or test helpers. It has to live in one shared contract layer that
+every runtime can trust.
+
+Key takeaways:
+
+1. The permanent order is: define Zod contracts first, register them into OpenAPI second, generate
+   the document third, then generate SDKs and adapters from that stable document.
+2. The shared contract package should own request schemas, response schemas, error envelopes,
+   inferred TypeScript types, and OpenAPI metadata in one place.
+3. Nest controllers should become thin adapters that validate or shape real runtime data against
+   those shared schemas instead of inventing their own contract types.
+4. The sample-app pattern from `playwright-utils` is still the right mental model:
+   schema -> registry -> document -> file. Couture Cast simply splits that flow into per-slice
+   modules so it scales beyond a demo backend.
+
+Story/Task mapping:
+
+- Story 0.9
+- Task 2 (Zod-first REST contract foundation)
+- Task 3 depends on Task 2 being stable first
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/0-9-initialize-openapi-spec-generation-and-api-client-sdk.md`
+
+Cross-links:
+
+- Step 2 clarifies why Nest bootstrap is a later concern than contract definition.
+- Step 7 places contract generation inside the broader quality-gates story.
+- Step 13 shows the temporary Swagger bootstrap that remains useful as a live docs surface.
+
+Impacted files:
+
+- `packages/api-client/src/contracts/http/common.ts`
+- `packages/api-client/src/contracts/http/health.ts`
+- `packages/api-client/src/contracts/http/events.ts`
+- `packages/api-client/src/contracts/http/openapi.ts`
+- `packages/api-client/scripts/generate-http-openapi.ts`
+- `packages/api-client/testing/http-openapi.spec.ts`
+- `packages/api-client/docs/http.openapi.json`
+- `apps/api/src/contracts/http.ts`
+- `apps/api/src/controllers/api-health.controller.ts`
+- `apps/api/src/controllers/health.controller.ts`
+- `apps/api/src/modules/events/events.controller.ts`
+- `apps/api/src/modules/events/events.service.ts`
+
+Task 2 owner map:
+
+- Story 0.9 Task 2 step 1 owner: define reusable HTTP primitives in
+  `packages/api-client/src/contracts/http/common.ts`
+- Story 0.9 Task 2 step 2 owner: model the first health endpoints in
+  `packages/api-client/src/contracts/http/health.ts`
+- Story 0.9 Task 2 step 3 owner: model the first non-trivial feature slice in
+  `packages/api-client/src/contracts/http/events.ts`
+- Story 0.9 Task 2 step 4 owner: compose the registry and generate one canonical OpenAPI document
+  in `packages/api-client/src/contracts/http/openapi.ts`
+- Story 0.9 Task 2 step 5 owner: write the canonical document to disk in
+  `packages/api-client/scripts/generate-http-openapi.ts`
+- Story 0.9 Task 2 step 6 owner: prove the generated spec is valid in
+  `packages/api-client/testing/http-openapi.spec.ts`
+- Story 0.9 Task 2 step 7 owner: consume the same contracts from thin Nest adapters through
+  `apps/api/src/contracts/http.ts` and the first migrated controllers/services
+
+Support refs:
+
+- `packages/api-client/src/contracts/http/openapi.ts` is the central registry + document assembly
+  step.
+- `packages/api-client/scripts/generate-http-openapi.ts` is the static file generation step.
+- `packages/api-client/testing/http-openapi.spec.ts` is the contract validation gate.
+- `apps/api/src/contracts/http.ts` shows how the API consumes the package boundary instead of
+  reaching into repo internals.
+
+Sequence to follow:
+
+1. Start with the smallest real slice, not the whole API.
+   In Couture Cast, the first slice is `/api/health`, `/api/v1/health/queues`, and
+   `/api/v1/events/poll`. This keeps the pattern teachable while still proving it on real
+   endpoints.
+
+2. Create shared primitives before endpoint schemas.
+   Put reusable pieces like ISO timestamps, non-empty strings, standard `"ok"` statuses, and error
+   envelopes in `common.ts`. If every endpoint reinvents these pieces, your document drifts and
+   your SDK types become inconsistent.
+
+3. Define each endpoint contract with Zod and export the inferred types immediately.
+   In `health.ts` and `events.ts`, each request/response schema is declared once and its TypeScript
+   type is derived with `z.infer`. This is the step that makes runtime validation and compile-time
+   typing come from the same source.
+
+4. Keep schema registration next to the schema definitions.
+   Each module exposes a `register*Contracts(registry)` function. That function registers:
+   the named component schemas and the matching OpenAPI paths. This mirrors the sample app's
+   registry pattern, but keeps the registration local to the slice that owns it.
+
+5. Compose all slice registries into one canonical OpenAPI builder.
+   `openapi.ts` creates the `OpenAPIRegistry`, calls each slice registration function, and feeds
+   the collected definitions into `OpenApiGeneratorV31`. This is the point where many local
+   contracts become one document.
+
+6. Generate a static document from code, not from a running server.
+   `generate-http-openapi.ts` writes `packages/api-client/docs/http.openapi.json` directly from the
+   shared contract package. That means CI, SDK generation, and local validation do not need a live
+   Nest server to exist first.
+
+7. Validate the generated document before you generate SDKs from it.
+   `http-openapi.spec.ts` is the confidence gate. It proves the document is valid OpenAPI and
+   includes the expected initial contract slice. Do not move on to SDK generation while this step
+   is flaky or incomplete.
+
+8. Make the backend consume the contracts instead of duplicating them.
+   The API-side bridge in `apps/api/src/contracts/http.ts` imports the package surface, and the
+   controllers/services parse or shape responses with those schemas. This is where Nest stops being
+   the contract source and becomes an adapter layer.
+
+9. Keep live docs and canonical contracts as separate responsibilities.
+   The temporary Swagger UI at `/api/docs` is still helpful for humans, but the contract source of
+   truth is the Zod-first package flow above. The live docs surface is a viewer, not the author.
+
+10. Only after Steps 1-9 are stable should you generate the SDK.
+    Task 3 is intentionally later. If you generate clients before the contract package and spec
+    pipeline are stable, you create churn and teach the wrong dependency order.
+
+Pattern summary:
+
+- First: define Zod schemas
+- Second: register schemas + paths
+- Third: generate the OpenAPI document
+- Fourth: write the document to disk
+- Fifth: validate the document
+- Sixth: consume the same contracts from adapters
+- Seventh: generate SDKs from the validated document
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  common["common.ts\nshared primitives"] --> health["health.ts\nhealth schemas + path registration"]
+  common --> events["events.ts\nevents schemas + path registration"]
+  health --> registry["OpenAPIRegistry"]
+  events --> registry
+  registry --> generator["OpenApiGeneratorV31"]
+  generator --> document["HTTP OpenAPI document"]
+  document --> file["docs/http.openapi.json"]
+  document --> tests["http-openapi.spec.ts"]
+  document --> sdk["Task 3 SDK generation"]
+  health --> nest["Nest adapters parse/shape data"]
+  events --> nest
 ```

@@ -5,38 +5,76 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
+  "imports": {
+    "#analytics/analytics.service": {
+      "development": "./src/analytics/analytics.service.ts",
+      "types": "./src/analytics/analytics.service.ts",
+      "default": "./dist/src/analytics/analytics.service.js"
+    },
+    "#app.module": {
+      "development": "./src/app.module.ts",
+      "types": "./src/app.module.ts",
+      "default": "./dist/src/app.module.js"
+    },
+    "#load-env": {
+      "development": "./src/load-env.ts",
+      "types": "./src/load-env.ts",
+      "default": "./dist/src/load-env.js"
+    },
+    "#logger/request-context": {
+      "development": "./src/logger/request-context.ts",
+      "types": "./src/logger/request-context.ts",
+      "default": "./dist/src/logger/request-context.js"
+    },
+    "#logger/request-logger.middleware": {
+      "development": "./src/logger/request-logger.middleware.ts",
+      "types": "./src/logger/request-logger.middleware.ts",
+      "default": "./dist/src/logger/request-logger.middleware.js"
+    },
+    "#openapi": {
+      "development": "./src/openapi.ts",
+      "types": "./src/openapi.ts",
+      "default": "./dist/src/openapi.js"
+    },
+    "#posthog/posthog.service": {
+      "development": "./src/posthog/posthog.service.ts",
+      "types": "./src/posthog/posthog.service.ts",
+      "default": "./dist/src/posthog/posthog.service.js"
+    }
+  },
   "engines": {
-    "node": "20.x"
+    "node": ">=24.0.0"
   },
   "scripts": {
-    "prepare:shared-config": "npm run build --workspace @couture/config",
+    "prepare:shared-deps": "npm run build --workspace @couture/config && npm run build --workspace @couture/api-client",
     "vercel:build": "cd ../.. && npx prisma@6.19.0 generate --schema packages/db/prisma/schema.prisma && npm run build --workspace api",
-    "prebuild": "npm run prepare:shared-config",
+    "prebuild": "npm run prepare:shared-deps",
     "build": "nest build",
     "build:watch": "nest build --watch",
     "format": "prettier --write \"src/**/*.ts\" \"integration/**/*.ts\"",
     "prestart": "npm run build",
-    "start": "node dist/apps/api/src/main.js",
+    "start": "node dist/src/main.js",
     "start:dev": "node ../../scripts/start-api-watch.mjs",
     "start:debug": "node ../../scripts/start-api-watch.mjs --inspect",
-    "start:prod": "node dist/apps/api/src/main.js",
+    "start:prod": "node dist/src/main.js",
     "lint": "eslint \"{src,apps,libs,test,integration}/**/*.ts\" --fix",
-    "pretypecheck": "npm run prepare:shared-config && prisma generate --schema ../../packages/db/prisma/schema.prisma",
+    "pretypecheck": "npm run prepare:shared-deps && prisma generate --schema ../../packages/db/prisma/schema.prisma",
     "typecheck": "tsc --noEmit",
-    "pretest": "npm run prepare:shared-config",
-    "test": "vitest run",
-    "pretest:watch": "npm run prepare:shared-config",
-    "test:watch": "vitest",
-    "pretest:cov": "npm run prepare:shared-config",
-    "test:cov": "vitest run --coverage",
-    "pretest:integration": "npm run prepare:shared-config",
-    "test:integration": "vitest run integration/**/*.spec.ts",
-    "prestart:workers": "npm run prepare:shared-config",
+    "pretest": "npm run prepare:shared-deps",
+    "test": "cross-env NODE_OPTIONS=--conditions=development vitest run",
+    "pretest:watch": "npm run prepare:shared-deps",
+    "test:watch": "cross-env NODE_OPTIONS=--conditions=development vitest",
+    "pretest:cov": "npm run prepare:shared-deps",
+    "test:cov": "cross-env NODE_OPTIONS=--conditions=development vitest run --coverage",
+    "pretest:integration": "npm run prepare:shared-deps",
+    "test:integration": "cross-env NODE_OPTIONS=--conditions=development vitest run integration/**/*.spec.ts",
+    "prestart:workers": "npm run prepare:shared-deps",
     "start:workers": "tsx src/workers/bootstrap.ts",
-    "prestart:workers:prod": "npm run prepare:shared-config",
-    "start:workers:prod": "node dist/apps/api/src/workers/bootstrap.js"
+    "prestart:workers:prod": "npm run prepare:shared-deps",
+    "start:workers:prod": "node dist/src/workers/bootstrap.js"
   },
   "dependencies": {
+    "@couture/api-client": "file:../../packages/api-client",
     "@couture/config": "file:../../packages/config",
     "@nestjs/common": "11.1.9",
     "@nestjs/core": "11.1.9",
@@ -61,7 +99,6 @@
     "rxjs": "7.8.2",
     "socket.io": "^4.8.1",
     "swagger-ui-express": "^5.0.1",
-    "testcontainers": "^11.9.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -81,28 +118,12 @@
     "prettier": "3.6.2",
     "source-map-support": "0.5.21",
     "supertest": "7.1.4",
+    "testcontainers": "^11.9.0",
     "ts-loader": "9.5.4",
     "ts-node": "10.9.2",
     "tsconfig-paths": "3.15.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.46.4",
     "vitest": "4.0.9"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
   }
 }

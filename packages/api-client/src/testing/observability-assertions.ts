@@ -1,4 +1,4 @@
-import { expect } from 'vitest'
+import type { ExpectLike } from './expect-like'
 
 export type MemoryLogEntry = Record<string, unknown> & {
   level?: string
@@ -18,7 +18,10 @@ const formatCapturedLogs = (entries: readonly MemoryLogEntry[]) =>
     )
     .join(', ')
 
-export function createLogExpectations(entries: readonly MemoryLogEntry[]) {
+export function createLogExpectations(
+  entries: readonly MemoryLogEntry[],
+  expectLike: ExpectLike
+) {
   return {
     createCursor() {
       return entries.length
@@ -37,20 +40,20 @@ export function createLogExpectations(entries: readonly MemoryLogEntry[]) {
       )
 
       if (options.count !== undefined) {
-        expect(
+        expectLike(
           matchingEntries,
           `Expected ${options.count} "${level}:${message}" log entr(y/ies) after cursor ${options.afterIndex ?? 0}. Captured: ${formatCapturedLogs(scopedEntries)}`
         ).toHaveLength(options.count)
       } else {
-        expect(
+        expectLike(
           matchingEntries.length,
           `Expected structured log "${level}:${message}" to be emitted. Captured: ${formatCapturedLogs(scopedEntries)}`
         ).toBeGreaterThan(0)
       }
 
       const logEntry = matchingEntries.at(-1)
-      expect(logEntry ?? {}).toEqual(
-        expect.objectContaining({
+      expectLike(logEntry ?? {}).toEqual(
+        expectLike.objectContaining({
           level,
           message,
           ...context,

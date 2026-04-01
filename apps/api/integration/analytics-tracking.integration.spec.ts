@@ -7,7 +7,7 @@ import request from 'supertest'
 import {
   createAnalyticsEventExpectations,
   type MemoryTrackedAnalyticsEvent,
-} from '../../../packages/api-client/testing/analytics-event-assertions'
+} from '@couture/api-client/testing/analytics-event-assertions'
 import { AuthModule } from '../src/modules/auth/auth.module'
 import { ModerationModule } from '../src/modules/moderation/moderation.module'
 
@@ -59,7 +59,7 @@ vi.mock('@prisma/client', () => {
 describe('Analytics tracking endpoints (integration)', () => {
   let app: INestApplication | undefined
   const originalEnv = { ...process.env }
-  const eventExpectations = createAnalyticsEventExpectations(trackedEvents)
+  const eventExpectations = createAnalyticsEventExpectations(trackedEvents, expect)
   const createHeaders = (userId: string, role: 'guardian' | 'moderator' | 'admin') => ({
     authorization: 'Bearer test-token',
     'x-user-id': userId,

@@ -152,7 +152,7 @@ Automated coverage:
 - The same integration spec boots the real `AuthModule` behind the
   request logging middleware and asserts structured `request_received`
   and `request_completed` log entries carry the same `requestId`.
-- `packages/api-client/testing/observability-assertions.ts` provides
+- `packages/api-client/src/testing/observability-assertions.ts` provides
   the shared `expectLogEntry(level, message, context)` helper used by
   observability integration tests.
 

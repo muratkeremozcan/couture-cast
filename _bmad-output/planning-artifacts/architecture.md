@@ -169,7 +169,7 @@ couturecast/
   - `GET /api/v1/ritual?locationId=...` → `{ data: { weather, outfits, badges } }`
   - `POST /api/v1/lookbook` → creates post; responds with `{ data: { id, status } }`
   - `POST /api/v1/moderation/:id/resolve` → moderators mark events complete.
-- OpenAPI spec generated from NestJS decorators and published to ` for typed SDK generation; schema drift caught via automated OpenAPI diff checks in CI.
+- Canonical REST contracts live in shared Zod schemas, with OpenAPI generated from those contracts and published for typed SDK generation; schema drift caught via automated OpenAPI diff checks in CI.
 
 ## Security Architecture
 
