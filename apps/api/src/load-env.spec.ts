@@ -21,7 +21,7 @@ describe('load-env', () => {
   })
 
   it('loads root .env files in expected precedence order for development', async () => {
-    await import('./load-env.js')
+    await import('#load-env')
 
     expect(existsSyncMock).toHaveBeenCalled()
     expect(loadEnvMock).toHaveBeenCalledTimes(1)
@@ -35,7 +35,7 @@ describe('load-env', () => {
   it('lets .env.local override inherited values for TEST_ENV=local', async () => {
     process.env.TEST_ENV = 'local'
 
-    await import('./load-env.js')
+    await import('#load-env')
 
     expect(loadEnvMock).toHaveBeenCalledTimes(1)
     expect(loadEnvMock.mock.calls[0]?.[0]).toMatchObject({
@@ -49,7 +49,7 @@ describe('load-env', () => {
     process.env.NODE_ENV = 'production'
     existsSyncMock.mockImplementation((target: string) => target.endsWith('.env.prod'))
 
-    await import('./load-env.js')
+    await import('#load-env')
 
     expect(loadEnvMock).toHaveBeenCalledTimes(1)
     expect(String(loadEnvMock.mock.calls[0]?.[0]?.path)).toContain('.env.prod')

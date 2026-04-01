@@ -14,6 +14,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@couture/api-client": "file:../../packages/api-client",
     "@expo/vector-icons": "15.0.3",
     "@react-navigation/native": "7.1.20",
     "expo": "~54.0.33",

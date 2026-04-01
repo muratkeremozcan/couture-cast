@@ -12,7 +12,7 @@ import request from 'supertest'
 import {
   createLogExpectations,
   type MemoryLogEntry,
-} from '../../../packages/api-client/testing/observability-assertions'
+} from '@couture/api-client/testing/observability-assertions'
 import {
   initializeOpenTelemetry,
   resetOpenTelemetryForTests,
@@ -269,7 +269,7 @@ describe('observability integration', () => {
     const stream = new JsonMemoryStream()
     const env = { LOG_LEVEL: 'info' }
     const logger = createBaseLogger({ destination: stream, env })
-    const logExpectations = createLogExpectations(stream.entries)
+    const logExpectations = createLogExpectations(stream.entries, expect)
     const requestId = 'req-observe-123'
 
     const moduleFixture = await Test.createTestingModule({

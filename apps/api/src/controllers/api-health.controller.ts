@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common'
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { apiHealthResponseSchema } from '../contracts/http'
 import { resolveGitMetadata } from '../git-metadata'
 
 /**
@@ -31,7 +32,7 @@ export class ApiHealthController {
       ? `https://${process.env.VERCEL_URL}`
       : undefined
 
-    return {
+    return apiHealthResponseSchema.parse({
       status: 'ok',
       service: 'couturecast-api',
       environment,
@@ -39,6 +40,6 @@ export class ApiHealthController {
       gitBranch,
       deployUrl,
       timestamp: new Date().toISOString(),
-    }
+    })
   }
 }

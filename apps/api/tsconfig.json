@@ -5,6 +5,7 @@
     "resolvePackageJsonExports": true,
     "esModuleInterop": true,
     "isolatedModules": true,
+    "rootDir": "../..",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
@@ -19,12 +20,7 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false,
-    "baseUrl": ".",
-    "paths": {
-      "@couture/config": ["../../packages/config/src/index.ts"],
-      "@couture/config/*": ["../../packages/config/src/*"]
-    }
+    "noFallthroughCasesInSwitch": false
   },
   "extends": "../../tsconfig.json",
   "include": [

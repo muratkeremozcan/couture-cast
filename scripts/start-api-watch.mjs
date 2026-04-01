@@ -23,6 +23,10 @@ const watchTargets = [
     command: ['npm', ['run', 'build:watch', '--workspace', '@couture/config']],
   },
   {
+    name: 'api-client',
+    command: ['npm', ['run', 'build:watch', '--workspace', '@couture/api-client']],
+  },
+  {
     name: 'api',
     command: ['npm', ['run', 'build:watch', '--workspace', 'api']],
   },

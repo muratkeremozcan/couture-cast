@@ -2,19 +2,54 @@
   "name": "@couture/api-client",
   "version": "0.0.1",
   "private": true,
+  "type": "commonjs",
   "description": "Shared API client types and schemas",
+  "files": [
+    "dist"
+  ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./realtime/*": {
+      "types": "./src/realtime/*.ts",
+      "default": "./dist/realtime/*.js"
+    },
+    "./types/*": {
+      "types": "./src/types/*.ts",
+      "default": "./dist/types/*.js"
+    },
+    "./contracts/http": {
+      "types": "./src/contracts/http/index.ts",
+      "default": "./dist/contracts/http/index.js"
+    },
+    "./contracts/http/*": {
+      "types": "./src/contracts/http/*.ts",
+      "default": "./dist/contracts/http/*.js"
+    },
+    "./testing/*": {
+      "types": "./src/testing/*.ts",
+      "default": "./dist/testing/*.js"
+    }
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "lint": "eslint --max-warnings=0 --ext .ts src scripts",
+    "build": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
+    "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "lint": "eslint --max-warnings=0 --ext .ts src scripts testing",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node -e \"console.log('@couture/api-client: no unit tests configured')\"",
-    "gen:openapi:events": "tsx scripts/generate-events-openapi.ts"
+    "test": "tsx --test testing/**/*.spec.ts",
+    "gen:openapi:events": "tsx scripts/generate-events-openapi.ts",
+    "gen:openapi:http": "tsx scripts/generate-http-openapi.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",
     "ts-node": "^10.9.2",
     "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0"
   }
 }

@@ -3,9 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prepare:shared-deps": "npm run build --workspace @couture/api-client",
+    "pretypecheck": "npm run prepare:shared-deps",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "previtest:run": "npm run prepare:shared-deps",
     "vitest:run": "vitest run --config vitest.config.ts",
+    "previtest:browser:run": "npm run prepare:shared-deps",
     "vitest:browser:run": "vitest run --config vitest.headless.config.ts",
+    "previtest:open": "npm run prepare:shared-deps",
     "vitest:open": "vitest --config vitest.browser.config.ts",
     "test": "npm run vitest:run",
     "dev": "node ../../node_modules/next/dist/bin/next dev",
@@ -14,6 +19,7 @@
     "lint": "node ../../node_modules/next/dist/bin/next lint"
   },
   "dependencies": {
+    "@couture/api-client": "file:../../packages/api-client",
     "next": "15.5.9",
     "posthog-js": "^1.356.1",
     "react": "19.1.0",

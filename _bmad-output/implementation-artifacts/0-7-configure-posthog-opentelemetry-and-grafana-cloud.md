@@ -900,7 +900,7 @@ _bmad-output/
   - Revalidated the final Task 9 file set with targeted and full `web`/`api` test runs plus
     `@couture/api-client`, `web`, and `api` lint/typecheck passes.
 - Completed Task 10 observability tests:
-  - Added `packages/api-client/testing/observability-assertions.ts` with the shared
+  - Added `packages/api-client/src/testing/observability-assertions.ts` with the shared
     `expectLogEntry(level, message, context, { afterIndex, count })` helper so structured log
     assertions can pin exact new log entries after a test cursor.
   - Added `apps/api/integration/observability.integration.spec.ts` to export a real OTLP trace to
@@ -1031,7 +1031,7 @@ _bmad-output/
 - `playwright/tests/home-analytics-capture.spec.ts` (new)
 - `packages/api-client/src/testing/analytics-event-assertions.ts` (new)
 - `apps/api/integration/observability.integration.spec.ts` (new)
-- `packages/api-client/testing/observability-assertions.ts` (new)
+- `packages/api-client/src/testing/observability-assertions.ts` (new)
 - `_bmad-output/project-knowledge/feature-flags.md` (new)
 - `scripts/prepare-local-grafana-dashboards.mjs` (new)
 - `scripts/start-api-watch.mjs` (new)

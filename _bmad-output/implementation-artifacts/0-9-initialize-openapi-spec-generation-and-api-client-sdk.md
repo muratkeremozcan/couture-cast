@@ -10,15 +10,15 @@ so that I can call backend endpoints without manual typing errors and catch brea
 
 ## Acceptance Criteria
 
-1. Add NestJS Swagger decorators to all API controllers; generate OpenAPI spec at `/api/v1/openapi.json`.
-2. Configure `@openapitools/openapi-generator-cli` to produce TypeScript SDK in `packages/api-client/`.
-3. Implement automated OpenAPI diff checks in CI (fail PR if breaking changes detected without version bump).
+1. Define canonical request/response contracts as shared Zod schemas and derive the OpenAPI spec at `/api/v1/openapi.json` from those contracts rather than controller decorators.
+2. Generate a TypeScript SDK in `packages/api-client/` from the canonical contract-derived spec.
+3. Implement automated OpenAPI diff checks in CI (fail PR if breaking changes are introduced without a versioning decision).
 4. Publish SDK to npm workspace so web and mobile apps can import typed client.
-5. Document API versioning strategy: `/api/v1` stable; `/api/v2` for breaking changes; deprecation policy (90-day notice).
+5. Document API versioning strategy: `/api/v1` stable; `/api/v2` for breaking changes; 90-day deprecation notice; shared Zod contracts are the source of truth.
 
 ## Tasks / Subtasks
 
-- [x] Task 1: Add NestJS Swagger decorators (AC: #1)
+- [x] Task 1: Keep Nest Swagger bootstrap as temporary Story 0 scaffolding (supports AC: #1 during migration)
   - [x] Install Swagger dependencies: `npm install @nestjs/swagger swagger-ui-express --workspace apps/api`
   - [x] Initialize Swagger in `apps/api/src/main.ts`:
     ```typescript
@@ -39,36 +39,30 @@ so that I can call backend endpoints without manual typing errors and catch brea
     ```
   - [x] Test Swagger UI: navigate to `http://localhost:3001/api/docs`
   - [x] Export OpenAPI JSON: `GET http://localhost:3001/api/v1/openapi.json`
+  - Note: This is temporary Story 0 scaffolding so the repo has a live docs surface while the canonical Zod-first contract layer is introduced. It is not the desired long-term source of truth.
 
-- [ ] Task 2: Configure OpenAPI generator CLI (AC: #2)
-  - [ ] Install generator: `npm install @openapitools/openapi-generator-cli --save-dev --workspace-root`
-  - [ ] Create `openapitools.json` config:
-    ```json
-    {
-      "generator-cli": {
-        "version": "7.2.0",
-        "generators": {
-          "typescript-axios": {
-            "inputSpec": "http://localhost:3001/api/v1/openapi.json",
-            "output": "packages/api-client/src/generated",
-            "generatorName": "typescript-axios"
-          }
-        }
-      }
-    }
-    ```
-  - [ ] Add generation script to root `package.json`:
-    ```json
-    {
-      "scripts": {
-        "generate:api-client": "openapi-generator-cli generate"
-      }
-    }
-    ```
-  - [ ] Run generator: `npm run generate:api-client`
-  - [ ] Verify generated files in `packages/api-client/src/generated/`
+- [x] Task 2: Establish Zod-first REST contract foundation (AC: #1, #2)
+  - [x] Define shared HTTP contract modules in `packages/api-client/src/contracts/http/` for:
+    - common success/error envelopes
+    - health endpoints as the initial migration slice
+    - at least one non-trivial feature endpoint used by a real client flow
+  - [x] Reuse `zod` + `@asteasolutions/zod-to-openapi` so each contract module provides:
+    - runtime validation schemas
+    - inferred TypeScript types
+    - OpenAPI metadata/examples
+  - [x] Create `packages/api-client/scripts/generate-http-openapi.ts` that registers the contract modules and writes a canonical spec file (for example `packages/api-client/docs/http.openapi.json`)
+  - [x] Add validation coverage that the generated spec is valid OpenAPI and includes the initial migrated contract slice
+  - [x] Document the migration rule: new REST endpoints start with shared Zod contracts first, and existing Swagger decorators are transitional until replaced
+  - [x] Initial migration slice implemented for:
+    - `GET /api/health`
+    - `GET /api/v1/health/queues`
+    - `GET /api/v1/events/poll`
 
-- [ ] Task 3: Create typed API client wrapper (AC: #4)
+- [ ] Task 3: Generate SDK from the canonical contract-derived spec and add wrapper exports (AC: #2, #4)
+  - [ ] Install generator tooling only after the canonical Zod-first spec file exists
+  - [ ] Create `openapitools.json` config pointing at the canonical contract-derived spec
+  - [ ] Add root generation script(s) so SDK generation does not require a manually running API server
+  - [ ] Generate TypeScript SDK into `packages/api-client/src/generated/`
   - [ ] Create `packages/api-client/src/index.ts`:
     ```typescript
     export * from './generated'
@@ -88,17 +82,7 @@ so that I can call backend endpoints without manual typing errors and catch brea
     }
     ```
 
-  - [ ] Add `packages/api-client/package.json`:
-    ```json
-    {
-      "name": "@couture-cast/api-client",
-      "version": "0.1.0",
-      "main": "src/index.ts",
-      "dependencies": {
-        "axios": "^1.6.0"
-      }
-    }
-    ```
+  - [ ] Add runtime dependencies only where the generated client actually requires them
 
 - [ ] Task 4: Implement OpenAPI diff check in CI (AC: #3)
   - [ ] Install diff tool: `npm install oasdiff --save-dev --workspace-root`
@@ -119,23 +103,15 @@ so that I can call backend endpoints without manual typing errors and catch brea
               node-version-file: '.nvmrc'
           - name: Install dependencies
             run: npm ci
-          - name: Start API server
-            run: npm run dev:api &
-          - name: Wait for API
-            run: npx wait-on http://localhost:3001/api/health
-          - name: Download current spec
-            run: curl http://localhost:3001/api/v1/openapi.json > openapi-new.json
+          - name: Generate current spec
+            run: npm run generate:http-openapi
           - name: Checkout base branch
             run: git checkout ${{ github.base_ref }}
-          - name: Start API server (base)
-            run: npm run dev:api &
-          - name: Wait for API
-            run: npx wait-on http://localhost:3001/api/health
-          - name: Download base spec
-            run: curl http://localhost:3001/api/v1/openapi.json > openapi-base.json
+          - name: Generate base spec
+            run: npm run generate:http-openapi
           - name: Run diff check
             run: |
-              npx oasdiff breaking openapi-base.json openapi-new.json
+              npx oasdiff breaking path/to/openapi-base.json path/to/openapi-new.json
               if [ $? -ne 0 ]; then
                 echo "::error::Breaking changes detected. Bump API version or fix compatibility."
                 exit 1
@@ -148,53 +124,32 @@ so that I can call backend endpoints without manual typing errors and catch brea
     - **Version Strategy**: `/api/v1` for current stable, `/api/v2` for breaking changes
     - **Breaking Change**: Remove endpoint, change required field, change response structure
     - **Non-Breaking**: Add optional field, add new endpoint, deprecate endpoint (with 90-day notice)
-    - **Deprecation Policy**: Announce in `/api/v1/openapi.json` metadata, log warnings, remove after 90 days
-  - [ ] Add deprecation decorator:
-    ```typescript
-    @ApiOperation({ deprecated: true, summary: 'Use /v2/endpoint instead' })
-    ```
-  - [ ] Document in architecture doc
+    - **Deprecation Policy**: Announce in canonical contract metadata / `/api/v1/openapi.json`, log warnings, remove after 90 days
+  - [ ] Define how deprecation metadata is expressed in the canonical contract modules and surfaced in `/api/v1/openapi.json`
+  - [ ] Document contract ownership in architecture doc: shared Zod schemas are canonical; controller decorators are transitional until migration completes
 
-- [ ] Task 6: Add OpenAPI decorators to all planned controllers (AC: #1)
-  - [ ] Create placeholder controllers for Epic 0:
-    - `HealthController` (already done)
-    - `AuthController` (login, register, refresh token)
-    - `UserController` (profile, preferences)
-  - [ ] Add decorators to each endpoint:
-    ```typescript
-    @ApiTags('auth')
-    @ApiOperation({ summary: 'User login' })
-    @ApiBody({ type: LoginDto })
-    @ApiResponse({ status: 200, type: AuthResponseDto })
-    @ApiResponse({ status: 401, description: 'Invalid credentials' })
-    ```
-  - [ ] Create DTOs with validation decorators:
-
-    ```typescript
-    export class LoginDto {
-      @ApiProperty()
-      @IsEmail()
-      email: string
-
-      @ApiProperty()
-      @IsString()
-      password: string
-    }
-    ```
+- [ ] Task 6: Migrate planned REST endpoints to canonical Zod contracts and thin Nest adapters (AC: #1)
+  - [ ] Create contract modules for the planned Epic 0 slices:
+    - `health`
+    - `auth`
+    - `user`
+  - [ ] Co-locate request/response schemas, inferred types, and OpenAPI metadata in those contract modules
+  - [ ] Update controllers/services so they consume shared contract schemas instead of ad hoc request/response typing
+  - [ ] Keep Swagger decorators only where needed temporarily until the controller surface is fully migrated
 
 - [ ] Task 7: Integrate SDK in web and mobile apps (AC: #4)
-  - [ ] Update `apps/web/package.json` to depend on `@couture-cast/api-client`
-  - [ ] Update `apps/mobile/package.json` to depend on `@couture-cast/api-client`
+  - [ ] Update `apps/web/package.json` to depend on `@couture/api-client`
+  - [ ] Update `apps/mobile/package.json` to depend on `@couture/api-client`
   - [ ] Create API client instance in web app:
     ```typescript
     // apps/web/lib/api.ts
-    import { createApiClient } from '@couture-cast/api-client'
+    import { createApiClient } from '@couture/api-client'
     export const apiClient = createApiClient(process.env.NEXT_PUBLIC_API_URL)
     ```
   - [ ] Create API client instance in mobile app:
     ```typescript
     // apps/mobile/services/api.ts
-    import { createApiClient } from '@couture-cast/api-client'
+    import { createApiClient } from '@couture/api-client'
     export const apiClient = createApiClient(process.env.EXPO_PUBLIC_API_URL)
     ```
   - [ ] Test API call: `await apiClient.healthCheck()`
@@ -207,14 +162,15 @@ so that I can call backend endpoints without manual typing errors and catch brea
     import SwaggerParser from 'swagger-parser'
 
     it('should generate valid OpenAPI 3.0 spec', async () => {
-      const spec = await fetch('http://localhost:3001/api/v1/openapi.json').then((r) =>
-        r.json()
-      )
+      const spec = await readFile(
+        'packages/api-client/docs/http.openapi.json',
+        'utf8'
+      ).then(JSON.parse)
       await expect(SwaggerParser.validate(spec)).resolves.toBeDefined()
     })
     ```
 
-  - [ ] Run test in CI after API starts
+  - [ ] Run test in CI after contract-generation step
 
 - [ ] Task 9: Document SDK usage patterns (AC: #4, #5)
   - [ ] Create `packages/api-client/README.md` with examples:
@@ -224,22 +180,15 @@ so that I can call backend endpoints without manual typing errors and catch brea
     - Error handling
     - TypeScript type inference
   - [ ] Add example usage in `_bmad-output/project-knowledge/api-versioning.md`
-  - [ ] Document how to regenerate SDK after API changes
+  - [ ] Document how to regenerate the canonical spec and SDK after contract changes
 
 - [ ] Task 10: Set up automatic SDK regeneration (AC: #2)
-  - [ ] Add `postinstall` script to root `package.json`:
+  - [ ] Add npm script(s) to regenerate contracts/spec/SDK on demand:
     ```json
     {
       "scripts": {
-        "postinstall": "npm run generate:api-client || echo 'API not running, skipping SDK generation'"
-      }
-    }
-    ```
-  - [ ] Add npm script to regenerate on API changes:
-    ```json
-    {
-      "scripts": {
-        "dev:api:watch": "concurrently \"npm run dev:api\" \"nodemon --watch apps/api/src --exec npm run generate:api-client\""
+        "generate:http-openapi": "tsx packages/api-client/scripts/generate-http-openapi.ts",
+        "generate:api-client": "npm run generate:http-openapi && openapi-generator-cli generate --generator-key api-client"
       }
     }
     ```
@@ -259,7 +208,7 @@ so that I can call backend endpoints without manual typing errors and catch brea
 
 - All public endpoints prefixed `/api/v1`
 - Authentication via Supabase JWT
-- OpenAPI spec generated from NestJS decorators
+- Canonical REST contracts live in shared Zod schemas; the current Swagger route is temporary scaffolding
 - Published to `packages/api-client` for typed SDK generation
 - Schema drift caught via automated OpenAPI diff checks in CI
 
@@ -273,7 +222,7 @@ so that I can call backend endpoints without manual typing errors and catch brea
 
 ### Implementation Patterns
 
-**Swagger Decorator Pattern:**
+**Temporary Swagger decorator pattern (migration scaffold only):**
 
 ```typescript
 // apps/api/src/modules/auth/auth.controller.ts
@@ -291,11 +240,11 @@ export class AuthController {
 }
 ```
 
-**Client Usage Pattern:**
+**Target Zod-first client usage pattern:**
 
 ```typescript
 // apps/web/app/auth/login.tsx
-import { createApiClient } from '@couture-cast/api-client'
+import { createApiClient } from '@couture/api-client'
 
 const apiClient = createApiClient(process.env.NEXT_PUBLIC_API_URL)
 
@@ -318,21 +267,18 @@ async function handleLogin(email: string, password: string) {
 ```
 packages/api-client/
 ├── src/
-│   ├── generated/              # Auto-generated by OpenAPI generator
-│   │   ├── api.ts
-│   │   ├── models.ts
-│   │   └── configuration.ts
+│   ├── contracts/
+│   │   └── http/               # Canonical Zod request/response contracts
+│   ├── generated/              # Auto-generated from the canonical contract-derived spec
 │   ├── client.ts               # Wrapper for convenience
 │   └── index.ts                # Public exports
 ├── README.md
 └── package.json
 apps/api/src/
-├── dto/                        # DTOs with decorators
-│   ├── login.dto.ts
-│   ├── auth-response.dto.ts
-│   └── ...
 └── openapi.test.ts             # Validation test
-openapitools.json               # Generator config
+packages/api-client/scripts/
+└── generate-http-openapi.ts    # Contract-derived OpenAPI writer
+openapitools.json               # Generator config (added after canonical spec exists)
 _bmad-output/
 └── project-knowledge/
     └── api-versioning.md       # Versioning strategy
@@ -353,10 +299,10 @@ _bmad-output/
 
 **For this story:**
 
-- OpenAPI spec must stay in sync with implementation
-- SDK regeneration should be automated
+- Canonical HTTP contracts must stay in sync with implementation
+- Shared Zod schemas should drive validation, typing, and OpenAPI generation
+- SDK regeneration should be automated from the canonical spec, not a manually running server
 - Breaking change detection prevents accidental API breakage
-- Type-safe clients catch errors at compile time
 - Versioning strategy prevents production disruptions
 
 ## Dev Agent Record
@@ -376,6 +322,14 @@ GPT-5 Codex
 - `npm test --workspace api`
 - `npm run lint --workspace api`
 - `npm run typecheck --workspace api`
+- `npm uninstall @openapitools/openapi-generator-cli --save-dev`
+- `npm uninstall axios --workspace @couture/api-client --workspace web --workspace mobile`
+- `npm install --workspace @couture/api-client --save-dev @apidevtools/swagger-parser`
+- `npm run gen:openapi:http --workspace @couture/api-client`
+- `npm run typecheck --workspace @couture/api-client`
+- `npm run lint --workspace @couture/api-client`
+- `npm test --workspace @couture/api-client`
+- `npm test --workspace api -- openapi.spec.ts api-health.controller.spec.ts events.controller.spec.ts`
 
 ### Completion Notes List
 
@@ -383,22 +337,45 @@ GPT-5 Codex
 - Configured Swagger UI at `/api/docs` and exposed OpenAPI JSON at `/api/v1/openapi.json` via `configureOpenApi`.
 - Annotated the two existing health endpoints with Swagger decorators so the document contains tagged health operations.
 - Included OpenAPI integration coverage for Swagger UI and JSON export.
+- Rolled back the Swagger-derived SDK generation spike after reviewing Zod-first alternatives for a greenfield/reference-quality foundation.
+- Rewrote Task 2 onward so shared Zod contracts become the canonical REST contract layer and the current Swagger route is treated as temporary scaffolding only.
+- Task 2 complete for the initial migration slice: shared HTTP contracts now cover `/api/health`, `/api/v1/health/queues`, and `/api/v1/events/poll`.
+- Added `packages/api-client/scripts/generate-http-openapi.ts` and committed the canonical contract-derived spec at `packages/api-client/docs/http.openapi.json`.
+- API controllers/services now validate and shape the migrated health/events responses through shared contract schemas instead of local ad hoc schemas.
 - `npm install` emitted Node engine warnings under local Node `v22.12.0`, but install and validations succeeded.
 
 ### File List
 
 - \_bmad-output/implementation-artifacts/0-9-initialize-openapi-spec-generation-and-api-client-sdk.md
+- \_bmad-output/planning-artifacts/architecture.md
+- \_bmad-output/planning-artifacts/epics.md
 - apps/api/package.json
+- apps/api/src/contracts/http.ts
 - apps/api/src/controllers/api-health.controller.ts
 - apps/api/src/controllers/health.controller.ts
+- apps/api/src/modules/events/events.controller.ts
+- apps/api/src/modules/events/events.service.ts
 - apps/api/src/main.ts
 - apps/api/src/openapi.spec.ts
 - apps/api/src/openapi.ts
 - package-lock.json
+- package.json
+- packages/api-client/package.json
+- packages/api-client/docs/http.openapi.json
+- packages/api-client/scripts/generate-http-openapi.ts
+- packages/api-client/src/contracts/http/common.ts
+- packages/api-client/src/contracts/http/events.ts
+- packages/api-client/src/contracts/http/health.ts
+- packages/api-client/src/contracts/http/index.ts
+- packages/api-client/src/contracts/http/openapi.ts
+- packages/api-client/src/index.ts
+- packages/api-client/testing/http-openapi.spec.ts
 
 ## Change Log
 
-| Date       | Author             | Change                                                |
-| ---------- | ------------------ | ----------------------------------------------------- |
-| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.9 acceptance criteria |
-| 2026-03-31 | Amelia             | Completed Task 1 Swagger wiring and validation.       |
+| Date       | Author             | Change                                                                                                      |
+| ---------- | ------------------ | ----------------------------------------------------------------------------------------------------------- |
+| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.9 acceptance criteria                                                       |
+| 2026-03-31 | Amelia             | Completed Task 1 Swagger wiring and validation.                                                             |
+| 2026-04-01 | Amelia             | Corrected Story 0.9 toward a Zod-first contract architecture and rolled back the Swagger-derived SDK spike. |
+| 2026-04-01 | Amelia             | Completed Task 2 initial Zod-first contract slice for health and polling endpoints.                         |

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { eventsPollResponseSchema } from '../../contracts/http'
 import { createBaseLogger } from '../../logger/pino.config'
 import { EventsRepository } from './events.repository'
 
@@ -28,7 +29,7 @@ export class EventsService {
       const nextSince = events.length
         ? events[events.length - 1]?.created_at.toISOString()
         : null
-      return {
+      return eventsPollResponseSchema.parse({
         events: events.map((event) => ({
           id: event.id,
           channel: event.channel,
@@ -37,11 +38,11 @@ export class EventsService {
           createdAt: event.created_at.toISOString(),
         })),
         nextSince,
-      }
+      })
     } catch (error) {
       // Flow ref S0.5/T5: degrade gracefully so polling clients do not crash on transient storage issues.
       this.logger.error({ err: error }, 'poll_events_failed')
-      return { events: [], nextSince: null }
+      return eventsPollResponseSchema.parse({ events: [], nextSince: null })
     }
   }
 }

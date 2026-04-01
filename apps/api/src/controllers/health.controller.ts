@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common'
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { queueHealthResponseSchema } from '../contracts/http'
 import { queueConfigs } from '../config/queues'
 
 // NOTE: This is a placeholder health endpoint. In a full implementation,
@@ -16,13 +17,13 @@ export class HealthController {
   @ApiOkResponse({ description: 'Configured queue names returned successfully' })
   queues() {
     const queues = queueConfigs.map((q) => q.name)
-    return {
+    return queueHealthResponseSchema.parse({
       status: 'ok',
       queues,
       metrics: {
         // TODO: wire real metrics (queue depth, failed count, latency) using Queue.getJobCounts()
         // and/or QueueEvents. Stubbed for now.
       },
-    }
+    })
   }
 }

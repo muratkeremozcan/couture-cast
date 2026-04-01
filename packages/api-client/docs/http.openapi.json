@@ -1,0 +1,593 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CoutureCast HTTP API",
+    "version": "0.1.0",
+    "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001",
+      "description": "Local development server"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "ApiHealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "service": {
+            "type": "string",
+            "enum": [
+              "couturecast-api"
+            ]
+          },
+          "environment": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gitSha": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gitBranch": {
+            "type": "string",
+            "minLength": 1
+          },
+          "deployUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "environment",
+          "gitSha",
+          "gitBranch",
+          "timestamp"
+        ]
+      },
+      "QueueHealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "queues": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "status",
+          "queues",
+          "metrics"
+        ]
+      },
+      "PolledEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "channel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "payload": {},
+          "userId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "userId",
+          "createdAt"
+        ]
+      },
+      "EventsPollQuery": {
+        "type": "object",
+        "properties": {
+          "since": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EventsPollResponse": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "channel": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "payload": {},
+                "userId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "channel",
+                "userId",
+                "createdAt"
+              ]
+            }
+          },
+          "nextSince": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "events",
+          "nextSince"
+        ]
+      },
+      "EventsPollInvalidSinceResponse": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "channel": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "payload": {},
+                "userId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "channel",
+                "userId",
+                "createdAt"
+              ]
+            }
+          },
+          "nextSince": {
+            "type": "null"
+          },
+          "error": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "events",
+          "nextSince",
+          "error"
+        ]
+      },
+      "EventsPollResult": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "channel": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "payload": {},
+                    "userId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "channel",
+                    "userId",
+                    "createdAt"
+                  ]
+                }
+              },
+              "nextSince": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "events",
+              "nextSince"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "channel": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "payload": {},
+                    "userId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "channel",
+                    "userId",
+                    "createdAt"
+                  ]
+                }
+              },
+              "nextSince": {
+                "type": "null"
+              },
+              "error": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "events",
+              "nextSince",
+              "error"
+            ]
+          }
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "API health metadata for smoke tests and preview waiters",
+        "responses": {
+          "200": {
+            "description": "API deployment metadata returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    },
+                    "service": {
+                      "type": "string",
+                      "enum": [
+                        "couturecast-api"
+                      ]
+                    },
+                    "environment": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "gitSha": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "gitBranch": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "deployUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "service",
+                    "environment",
+                    "gitSha",
+                    "gitBranch",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/queues": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Queue health snapshot",
+        "responses": {
+          "200": {
+            "description": "Configured queue names returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    },
+                    "queues": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "metrics": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "queues",
+                    "metrics"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/poll": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Poll incremental realtime fallback events",
+        "description": "Returns unseen events plus the next cursor for polling fallback clients.",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Fetch only events created after this ISO timestamp."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Incremental polling result. Invalid query timestamps currently return a graceful payload instead of a 4xx.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "events": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "channel": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "payload": {},
+                              "userId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "minLength": 1
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "channel",
+                              "userId",
+                              "createdAt"
+                            ]
+                          }
+                        },
+                        "nextSince": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "events",
+                        "nextSince"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "events": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "channel": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "payload": {},
+                              "userId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "minLength": 1
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "channel",
+                              "userId",
+                              "createdAt"
+                            ]
+                          }
+                        },
+                        "nextSince": {
+                          "type": "null"
+                        },
+                        "error": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "events",
+                        "nextSince",
+                        "error"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

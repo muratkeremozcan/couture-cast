@@ -16,11 +16,15 @@ export default defineConfig({
       },
       {
         find: /^@couture\/api-client\/testing\/(.*)$/,
-        replacement: path.resolve(__dirname, '../../packages/api-client/testing/$1'),
+        replacement: path.resolve(__dirname, '../../packages/api-client/dist/testing/$1'),
       },
       {
-        find: /^@couture\/api-client\/(.*)$/,
-        replacement: path.resolve(__dirname, '../../packages/api-client/src/$1'),
+        find: /^@couture\/api-client\/realtime\/(.*)$/,
+        replacement: path.resolve(__dirname, '../../packages/api-client/src/realtime/$1'),
+      },
+      {
+        find: /^@couture\/api-client\/types\/(.*)$/,
+        replacement: path.resolve(__dirname, '../../packages/api-client/src/types/$1'),
       },
       {
         find: '@',
