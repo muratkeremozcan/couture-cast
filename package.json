@@ -118,7 +118,9 @@
       "sh -c \"npm run lint:fix\""
     ]
   },
-  "dependencies": {},
+  "dependencies": {
+    "@prisma/client": "6.19.0"
+  },
   "msw": {
     "workerDirectory": [
       "apps/web/public"
