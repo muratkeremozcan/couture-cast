@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-03 - standardized every step around searchable task owner maps and hardened the embedded editing prompt
+Updated: 2026-04-03 — Step 2: replace abstract hoisting text with practical root vs workspace dependency rules
 
 ## LLM collaborator prompt
 
@@ -153,6 +153,18 @@ Key takeaways:
    imports), especially `packages/api-client` and `packages/db`.
 3. Monorepo operations: root npm workspaces + `turbo.json` coordinate consistent `dev`, `test`,
    and `build` behavior.
+4. **Runtime and app-owned deps:** Anything an app or package **imports** or any **script in that
+   folder** runs (`nest build`, `tsc`, a CLI) must appear in **that** `package.json` (`dependencies`
+   vs `devDependencies` by use). Do not satisfy those only from the repo root—hosted installs (for
+   example Vercel) often do not see root the same way your laptop does.
+5. **Root `package.json` deps:** Reserve the root for **repo-wide tooling** tied to root `npm run`
+   scripts: ESLint, Prettier, TypeScript, Turbo, Vitest, Playwright, OpenAPI Generator CLI, Prisma
+   CLI, `tsx`, `rimraf`, `cross-env`, Supabase CLI, Husky, etc. Treat that list as the pattern: if
+   only root scripts need it, root `devDependencies` is fine.
+6. **Exceptions (also at root on purpose):** A small set of **shared** runtime or CLI deps may stay
+   at root when multiple workspaces or root scripts need the same version—here `@prisma/client` and
+   `prisma` for `db:*` / generate flows. Anything else that **one app** imports at runtime should
+   still be listed on that app even if duplicated at root (explicit beats implicit for deploys).
 
 Story/Task mapping:
 
@@ -182,6 +194,13 @@ Task owner map:
 - Step 2 step 3 owner: define the mobile runtime boundary in `apps/mobile/app/_layout.tsx` and `apps/mobile/app/(tabs)/_layout.tsx`
 - Step 2 step 4 owner: define the API runtime boundary in `apps/api/src/main.ts`
 - Step 2 step 5 owner: define shared package boundaries in `packages/api-client/package.json` and `packages/db/package.json`
+
+Current repo note:
+
+- **Rule of thumb:** Apps and packages own their direct usage; root owns cross-cutting dev tooling
+  and a few intentional monorepo pins (Prisma). Repeating a package name under `apps/api` and the
+  root is normal when both need it for different reasons—check the lockfile once, not “did I avoid
+  duplication.”
 
 Architecture diagram:
 
@@ -1125,8 +1144,8 @@ Key takeaways:
 
 1. SDK generation is a downstream operation. It starts only after the canonical contract has been
    generated and validated.
-2. The repo root should orchestrate contract regeneration so developers and CI do not need a
-   manually running API server.
+2. Root-level **npm scripts and the lockfile** should orchestrate contract regeneration (not “npm
+   hoisting” of arbitrary packages) so developers and CI do not need a manually running API server.
 3. Generated output is not the package's final public API. The repo should keep a small
    human-authored wrapper surface such as `createApiClient(...)` for consumers.
 4. CI breaking-change checks, live API parity tests, and web/mobile runtime usage should all depend
