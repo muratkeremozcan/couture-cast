@@ -1,3 +1,4 @@
+// Step 10 step 1 owner: searchable owner anchor
 import { DiagConsoleLogger, DiagLogLevel, diag } from '@opentelemetry/api'
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http'

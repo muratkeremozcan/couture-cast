@@ -1,3 +1,4 @@
+// Step 3 step 2 owner: searchable owner anchor
 import { PrismaClient } from '@prisma/client'
 
 import { seedRituals } from './rituals.js'

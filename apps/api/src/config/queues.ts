@@ -1,3 +1,4 @@
+// Step 10 step 3 owner: searchable owner anchor
 import { Queue } from 'bullmq'
 import type { QueueOptions, JobsOptions } from 'bullmq'
 import { getRedisConfig, redisOptionsFromConfig } from './redis'

@@ -1,9 +1,9 @@
-import assert from 'node:assert/strict'
+// Step 15 step 5 owner: searchable owner anchor
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import test from 'node:test'
 import SwaggerParser from '@apidevtools/swagger-parser'
+import { expect, test } from 'vitest'
 import {
   generateHttpOpenApiDocument,
   HTTP_OPENAPI_OUTPUT_FILENAME,
@@ -15,7 +15,7 @@ import {
 // Why this step matters:
 // SDK generation should depend on a validated contract, not on hope. This test is the quality gate
 // that catches broken registration or invalid schema output before the spec is reused elsewhere.
-void test('writes a valid HTTP OpenAPI document for the initial contract slice', async () => {
+test('writes a valid HTTP OpenAPI document for the initial contract slice', async () => {
   const outputDir = mkdtempSync(join(tmpdir(), 'couture-http-openapi-'))
 
   try {
@@ -29,11 +29,17 @@ void test('writes a valid HTTP OpenAPI document for the initial contract slice',
       savedSpec as unknown as Parameters<typeof SwaggerParser.validate>[0]
     )
 
-    assert.equal(savedSpec.openapi, '3.1.0')
-    assert.ok(savedSpec.paths)
-    assert.ok(savedSpec.paths['/api/health'])
-    assert.ok(savedSpec.paths['/api/v1/health/queues'])
-    assert.ok(savedSpec.paths['/api/v1/events/poll'])
+    expect(savedSpec.openapi).toBe('3.1.0')
+    expect(savedSpec.paths).toBeDefined()
+
+    const paths = savedSpec.paths
+    if (!paths) {
+      throw new Error('Expected generated OpenAPI spec to contain paths')
+    }
+
+    expect(paths['/api/health']).toBeDefined()
+    expect(paths['/api/v1/health/queues']).toBeDefined()
+    expect(paths['/api/v1/events/poll']).toBeDefined()
   } finally {
     rmSync(outputDir, { recursive: true, force: true })
   }

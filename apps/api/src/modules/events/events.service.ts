@@ -1,3 +1,4 @@
+// Step 6 polling backend owner: searchable owner anchor
 import { Injectable } from '@nestjs/common'
 import { eventsPollResponseSchema } from '../../contracts/http'
 import { createBaseLogger } from '../../logger/pino.config'

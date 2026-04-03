@@ -1,3 +1,4 @@
+// Step 8 feature-flag coordination owner: searchable owner anchor
 import { Injectable } from '@nestjs/common'
 import {
   FEATURE_FLAG_KEYS,

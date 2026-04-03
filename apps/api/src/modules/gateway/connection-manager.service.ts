@@ -1,3 +1,4 @@
+// Step 10 step 4 owner: searchable owner anchor
 import type { Socket } from 'socket.io'
 import type { Logger } from 'pino'
 

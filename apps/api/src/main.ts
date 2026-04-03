@@ -1,3 +1,5 @@
+// Step 2 step 4 owner: searchable owner anchor
+// Step 9 bootstrap order owner: searchable owner anchor
 import 'reflect-metadata'
 import './load-env'
 import type { AnalyticsClient } from '#analytics/analytics.service'
@@ -50,6 +52,8 @@ async function bootstrap() {
   app.use(bindRequestContext)
   app.use(createRequestLoggerMiddleware())
   const openApiEnabled = isOpenApiEnabled(process.env)
+  // Step 13 evidence:
+  // this is the API-boundary hook where the OpenAPI surface is attached during bootstrap.
   // Story 0.9 Task 1 step 3 owner:
   // hook OpenAPI setup into the Nest bootstrap flow here.
   //

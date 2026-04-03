@@ -26,6 +26,20 @@ module.exports = {
   },
   overrides: [
     {
+      files: ['**/*.{spec,test}.{ts,tsx}'],
+      rules: {
+        // Post-task consistency follow-through:
+        // allow top-level test registration calls without muting real floating promises inside
+        // test bodies.
+        '@typescript-eslint/no-floating-promises': [
+          'error',
+          {
+            allowForKnownSafeCalls: ['test', 'it', 'describe'],
+          },
+        ],
+      },
+    },
+    {
       files: ['apps/api/**/*.{ts,tsx}'],
       parserOptions: {
         project: ['./apps/api/tsconfig.eslint.json'],

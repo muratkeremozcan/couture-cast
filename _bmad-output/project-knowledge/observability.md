@@ -1,3 +1,5 @@
+<!-- Step 10 support owner: searchable owner anchor -->
+
 # Observability
 
 Updated: 2026-03-21

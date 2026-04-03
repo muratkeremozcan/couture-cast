@@ -1,3 +1,6 @@
+<!-- Step 4 step 2 owner: searchable owner anchor -->
+<!-- Step 4 step 3 owner: searchable owner anchor -->
+
 # Story 0.3: Set up Supabase projects (dev/prod)
 
 Status: done

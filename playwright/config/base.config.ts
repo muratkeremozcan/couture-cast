@@ -1,3 +1,4 @@
+// Step 12 step 1 owner: searchable owner anchor
 import path from 'node:path'
 import { defineConfig, devices } from '@playwright/test'
 import type { PlaywrightTestConfig } from '@playwright/test'

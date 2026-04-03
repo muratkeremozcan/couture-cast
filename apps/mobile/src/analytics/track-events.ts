@@ -1,3 +1,4 @@
+// Step 8 app reuse owner: searchable owner anchor
 import {
   trackAlertReceived,
   trackRitualCreated,

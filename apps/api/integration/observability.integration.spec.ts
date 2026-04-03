@@ -1,3 +1,4 @@
+// Step 11 verification owner: searchable owner anchor
 import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { INestApplication } from '@nestjs/common'

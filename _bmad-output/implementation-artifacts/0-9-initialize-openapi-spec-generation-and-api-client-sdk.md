@@ -10,11 +10,30 @@ so that I can call backend endpoints without manual typing errors and catch brea
 
 ## Acceptance Criteria
 
-1. Define canonical request/response contracts as shared Zod schemas and derive the OpenAPI spec at `/api/v1/openapi.json` from those contracts rather than controller decorators.
-2. Generate a TypeScript SDK in `packages/api-client/` from the canonical contract-derived spec.
-3. Implement automated OpenAPI diff checks in CI (fail PR if breaking changes are introduced without a versioning decision).
-4. Publish SDK to npm workspace so web and mobile apps can import typed client.
-5. Document API versioning strategy: `/api/v1` stable; `/api/v2` for breaking changes; 90-day deprecation notice; shared Zod contracts are the source of truth.
+1. Canonical request/response contracts live in shared Zod schemas, and both the checked-in spec
+   (`packages/api-client/docs/http.openapi.json`) and the live API contract endpoint
+   (`/api/v1/openapi.json`) are derived from those contracts rather than controller decorators.
+2. Generate a TypeScript SDK in `packages/api-client/` from the validated canonical contract-derived
+   spec, with a stable human-authored wrapper surface for consumers.
+3. Implement automated OpenAPI validation and diff checks in CI from the canonical spec file (fail
+   PR if breaking changes are introduced without a versioning decision).
+4. Web and mobile consume the workspace SDK for at least one real HTTP flow using the generated
+   client/types rather than handwritten request typing.
+5. Document API versioning and contract authoring rules: `/api/v1` stable; `/api/v2` for breaking
+   changes; 90-day deprecation notice; shared Zod contracts are the only source of truth for public
+   REST endpoints.
+
+## Simplified target end state
+
+- Author public REST contracts only in `@couture/api-client/src/contracts/http/*`.
+- Derive inferred TypeScript types, OpenAPI metadata, and runtime validation from those same Zod
+  schemas.
+- Generate one canonical spec file from code and validate it before SDK generation.
+- Serve `/api/v1/openapi.json` and `/api/docs` from that canonical contract output, not from
+  `SwaggerModule.createDocument(...)`.
+- Keep Nest controllers/services as thin adapters that parse inputs and shape outputs with shared
+  schemas.
+- Generate SDKs, docs, and CI diffs only from the canonical spec pipeline above.
 
 ## Tasks / Subtasks
 
@@ -58,17 +77,17 @@ so that I can call backend endpoints without manual typing errors and catch brea
     - `GET /api/v1/health/queues`
     - `GET /api/v1/events/poll`
 
-- [ ] Task 3: Generate SDK from the canonical contract-derived spec and add wrapper exports (AC: #2, #4)
-  - [ ] Install generator tooling only after the canonical Zod-first spec file exists
-  - [ ] Create `openapitools.json` config pointing at the canonical contract-derived spec
-  - [ ] Add root generation script(s) so SDK generation does not require a manually running API server
-  - [ ] Generate TypeScript SDK into `packages/api-client/src/generated/`
-  - [ ] Create `packages/api-client/src/index.ts`:
+- [x] Task 3: Generate SDK from the canonical contract-derived spec and add wrapper exports (AC: #2, #4)
+  - [x] Install generator tooling only after the canonical Zod-first spec file exists
+  - [x] Create `openapitools.json` config pointing at the canonical contract-derived spec
+  - [x] Add root generation script(s) so SDK generation does not require a manually running API server
+  - [x] Generate TypeScript SDK into `packages/api-client/src/generated/`
+  - [x] Create `packages/api-client/src/index.ts`:
     ```typescript
     export * from './generated'
     export { createApiClient } from './client'
     ```
-  - [ ] Create `packages/api-client/src/client.ts`:
+  - [x] Create `packages/api-client/src/client.ts`:
 
     ```typescript
     import { Configuration, DefaultApi } from './generated'
@@ -82,123 +101,62 @@ so that I can call backend endpoints without manual typing errors and catch brea
     }
     ```
 
-  - [ ] Add runtime dependencies only where the generated client actually requires them
+  - [x] Add runtime dependencies only where the generated client actually requires them
 
-- [ ] Task 4: Implement OpenAPI diff check in CI (AC: #3)
-  - [ ] Install diff tool: `npm install oasdiff --save-dev --workspace-root`
-  - [ ] Create `.github/workflows/openapi-diff.yml`:
-    ```yaml
-    name: OpenAPI Breaking Change Detection
-    on: pull_request
-    jobs:
-      diff:
-        runs-on: ubuntu-latest
-        steps:
-          - uses: actions/checkout@v4
-            with:
-              fetch-depth: 0
-          - name: Setup Node
-            uses: actions/setup-node@v4
-            with:
-              node-version-file: '.nvmrc'
-          - name: Install dependencies
-            run: npm ci
-          - name: Generate current spec
-            run: |
-              npm run generate:http-openapi
-              cp packages/api-client/docs/http.openapi.json packages/api-client/docs/http.openapi.new.json
-          - name: Checkout base branch
-            run: git checkout ${{ github.base_ref }}
-          - name: Generate base spec
-            run: |
-              npm run generate:http-openapi
-              cp packages/api-client/docs/http.openapi.json packages/api-client/docs/http.openapi.base.json
-          - name: Run diff check
-            run: |
-              npx oasdiff breaking \
-                packages/api-client/docs/http.openapi.base.json \
-                packages/api-client/docs/http.openapi.new.json
-              if [ $? -ne 0 ]; then
-                echo "::error::Breaking changes detected. Bump API version or fix compatibility."
-                exit 1
-              fi
-    ```
-  - [ ] Test workflow: make breaking change, verify CI fails
+- [ ] Task 4: Replace Swagger-authored live docs with the canonical contract output (AC: #1, #2)
+  - [ ] Update `apps/api/src/openapi.ts` so `/api/v1/openapi.json` serves the canonical
+        Zod-generated contract output rather than `SwaggerModule.createDocument(...)`
+  - [ ] Keep `/api/docs` as a human-friendly viewer, but make it render that same canonical spec
+        instead of rebuilding a second spec from decorators
+  - [ ] Verify the live `/api/v1/openapi.json` output matches the canonical generated document for
+        the migrated routes
+  - [ ] Treat the current Nest Swagger decorator path as scaffolding only; do not extend it to new
+        REST endpoints
 
-- [ ] Task 5: Document API versioning strategy (AC: #5)
-  - [ ] Create `_bmad-output/project-knowledge/api-versioning.md`:
-    - **Version Strategy**: `/api/v1` for current stable, `/api/v2` for breaking changes
-    - **Breaking Change**: Remove endpoint, change required field, change response structure
-    - **Non-Breaking**: Add optional field, add new endpoint, deprecate endpoint (with 90-day notice)
-    - **Deprecation Policy**: Announce in canonical contract metadata / `/api/v1/openapi.json`, log warnings, remove after 90 days
-  - [ ] Define how deprecation metadata is expressed in the canonical contract modules and surfaced in `/api/v1/openapi.json`
-  - [ ] Document contract ownership in architecture doc: shared Zod schemas are canonical; controller decorators are transitional until migration completes
-
-- [ ] Task 6: Migrate planned REST endpoints to canonical Zod contracts and thin Nest adapters (AC: #1)
-  - [ ] Create contract modules for the planned Epic 0 slices:
-    - `health`
+- [ ] Task 5: Finish migrating public REST slices to shared contracts and thin Nest adapters (AC: #1)
+  - [ ] Create contract modules for the remaining Epic 0 REST slices, including at least:
     - `auth`
     - `user`
-  - [ ] Co-locate request/response schemas, inferred types, and OpenAPI metadata in those contract modules
-  - [ ] Update controllers/services so they consume shared contract schemas instead of ad hoc request/response typing
-  - [ ] Keep Swagger decorators only where needed temporarily until the controller surface is fully migrated
+    - any additional public REST slice needed before Epic 0 exit
+  - [ ] Co-locate request schemas, response schemas, error envelopes, inferred types, and OpenAPI
+        metadata in those modules
+  - [ ] Update controllers/services so they parse inputs and shape outputs with shared schemas
+        instead of ad hoc DTOs or handwritten response types
+  - [ ] Remove REST Swagger decorators and doc-only DTOs as each slice migrates
+  - [ ] Exit criterion: no public REST endpoint used by web/mobile depends on
+        decorator-authored schema generation
 
-- [ ] Task 7: Integrate SDK in web and mobile apps (AC: #4)
-  - [ ] Update `apps/web/package.json` to depend on `@couture/api-client`
-  - [ ] Update `apps/mobile/package.json` to depend on `@couture/api-client`
-  - [ ] Create API client instance in web app:
-    ```typescript
-    // apps/web/lib/api.ts
-    import { createApiClient } from '@couture/api-client'
-    export const apiClient = createApiClient(process.env.NEXT_PUBLIC_API_URL)
-    ```
-  - [ ] Create API client instance in mobile app:
-    ```typescript
-    // apps/mobile/services/api.ts
-    import { createApiClient } from '@couture/api-client'
-    export const apiClient = createApiClient(process.env.EXPO_PUBLIC_API_URL)
-    ```
-  - [ ] Test API call: `await apiClient.healthCheck()`
+- [ ] Task 6: Add canonical contract parity tests for the live API (AC: #1, #3)
+  - [ ] Keep the package-level canonical spec validation gate in `packages/api-client/testing/`
+  - [ ] Add API integration coverage that hits live endpoints and validates response bodies against
+        the shared Zod schemas
+  - [ ] Add an API-side test that proves the served `/api/v1/openapi.json` contract matches the
+        canonical contract builder output
+  - [ ] Fail tests when implementation drift appears between controller behavior and shared schemas
 
-- [ ] Task 8: Add OpenAPI validation in tests (AC: #3)
-  - [ ] Install validation library: `npm install swagger-parser --save-dev --workspace apps/api`
-  - [ ] Create test `apps/api/src/openapi.test.ts`:
+- [ ] Task 7: Integrate the generated SDK into real web and mobile runtime paths (AC: #4)
+  - [ ] Create app-local client factories that wrap `createApiClient(...)` with each surface's
+        environment-driven base URL and auth behavior
+  - [ ] Replace at least one handwritten HTTP flow in `apps/web` with the generated client
+  - [ ] Replace at least one handwritten HTTP flow in `apps/mobile` with the generated client
+  - [ ] Add tests proving those flows compile and execute against the generated client surface
 
-    ```typescript
-    import SwaggerParser from 'swagger-parser'
+- [ ] Task 8: Implement canonical OpenAPI diff checks in CI (AC: #3)
+  - [ ] Install a breaking-change diff tool at the workspace root
+  - [ ] Generate base and head specs from the canonical contract code path, not from a manually
+        running API server
+  - [ ] Run breaking-change detection against `packages/api-client/docs/http.openapi.json`
+  - [ ] Fail the PR when breaking changes land without an explicit versioning decision
 
-    it('should generate valid OpenAPI 3.0 spec', async () => {
-      const spec = await readFile(
-        'packages/api-client/docs/http.openapi.json',
-        'utf8'
-      ).then(JSON.parse)
-      await expect(SwaggerParser.validate(spec)).resolves.toBeDefined()
-    })
-    ```
-
-  - [ ] Run test in CI after contract-generation step
-
-- [ ] Task 9: Document SDK usage patterns (AC: #4, #5)
-  - [ ] Create `packages/api-client/README.md` with examples:
-    - Installation
-    - Creating client instance
-    - Making authenticated requests
-    - Error handling
-    - TypeScript type inference
-  - [ ] Add example usage in `_bmad-output/project-knowledge/api-versioning.md`
-  - [ ] Document how to regenerate the canonical spec and SDK after contract changes
-
-- [ ] Task 10: Set up automatic SDK regeneration (AC: #2)
-  - [ ] Add npm script(s) to regenerate contracts/spec/SDK on demand:
-    ```json
-    {
-      "scripts": {
-        "generate:http-openapi": "tsx packages/api-client/scripts/generate-http-openapi.ts",
-        "generate:api-client": "npm run generate:http-openapi && openapi-generator-cli generate --generator-key api-client"
-      }
-    }
-    ```
-  - [ ] Document regeneration workflow in `packages/api-client/README.md`
+- [ ] Task 9: Document versioning, contract ownership, and regeneration workflow (AC: #4, #5)
+  - [ ] Create `_bmad-output/project-knowledge/api-versioning.md`
+  - [ ] Document breaking vs non-breaking contract changes and the 90-day deprecation policy
+  - [ ] Define how deprecation metadata is expressed in canonical contract modules and surfaced in
+        the generated OpenAPI document
+  - [ ] Document contract ownership in architecture docs: shared Zod schemas are canonical and new
+        public REST endpoints must start there
+  - [ ] Create `packages/api-client/README.md` with SDK usage, auth/error handling, and the exact
+        regeneration workflow (`generate:http-openapi` -> validate -> `generate:api-client`)
 
 ## Dev Notes
 
@@ -336,6 +294,12 @@ GPT-5 Codex
 - `npm run lint --workspace @couture/api-client`
 - `npm test --workspace @couture/api-client`
 - `npm test --workspace api -- openapi.spec.ts api-health.controller.spec.ts events.controller.spec.ts`
+- `npm test --workspace @couture/api-client -- --test-name-pattern='generated DefaultApi client'` (failed before wrapper exports existed)
+- `npm install --save-dev --save-exact @openapitools/openapi-generator-cli`
+- `npm run generate:api-client`
+- `npm run build --workspace @couture/api-client`
+- `npm run typecheck --workspace web`
+- `npm run typecheck --workspace mobile`
 
 ### Completion Notes List
 
@@ -349,6 +313,15 @@ GPT-5 Codex
 - Added `packages/api-client/scripts/generate-http-openapi.ts` and committed the canonical contract-derived spec at `packages/api-client/docs/http.openapi.json`.
 - API controllers/services now validate and shape the migrated health/events responses through shared contract schemas instead of local ad hoc schemas.
 - `npm install` emitted Node engine warnings under local Node `v22.12.0`, but install and validations succeeded.
+- Task 3 complete.
+- Installed `@openapitools/openapi-generator-cli` after the canonical contract-derived spec existed and pinned generator settings in `openapitools.json`.
+- Added root `generate:http-openapi` and `generate:api-client` scripts so SDK generation runs from checked-in contracts without a manually running API server.
+- Generated the TypeScript SDK into `packages/api-client/src/generated/` and added a postprocess step that normalizes the OpenAPI 3.1 `null` type bug and exposes a `DefaultApi` compatibility wrapper.
+- Added `packages/api-client/src/client.ts` plus root exports in `packages/api-client/src/index.ts`, while preserving the existing analytics and realtime exports already consumed by web and mobile.
+- No extra runtime dependency was required for the generated client because the selected generator uses platform `fetch`.
+- Refined the remaining story tasks so the end state is a single Zod-native contract pipeline:
+  contracts author the spec, the API serves that same canonical spec, SDK/CI consume it, and
+  Swagger decorator authoring is treated as temporary scaffolding to be removed.
 
 ### File List
 
@@ -369,12 +342,23 @@ GPT-5 Codex
 - packages/api-client/package.json
 - packages/api-client/docs/http.openapi.json
 - packages/api-client/scripts/generate-http-openapi.ts
+- openapitools.json
+- packages/api-client/scripts/postprocess-generated-sdk.ts
+- packages/api-client/src/client.ts
 - packages/api-client/src/contracts/http/common.ts
 - packages/api-client/src/contracts/http/events.ts
 - packages/api-client/src/contracts/http/health.ts
 - packages/api-client/src/contracts/http/index.ts
 - packages/api-client/src/contracts/http/openapi.ts
+- packages/api-client/src/generated/apis/EventsApi.ts
+- packages/api-client/src/generated/apis/HealthApi.ts
+- packages/api-client/src/generated/apis/index.ts
+- packages/api-client/src/generated/default-api.ts
+- packages/api-client/src/generated/index.ts
+- packages/api-client/src/generated/models/index.ts
+- packages/api-client/src/generated/runtime.ts
 - packages/api-client/src/index.ts
+- packages/api-client/testing/generated-client.spec.ts
 - packages/api-client/testing/http-openapi.spec.ts
 
 ## Change Log
@@ -385,3 +369,5 @@ GPT-5 Codex
 | 2026-03-31 | Amelia             | Completed Task 1 Swagger wiring and validation.                                                             |
 | 2026-04-01 | Amelia             | Corrected Story 0.9 toward a Zod-first contract architecture and rolled back the Swagger-derived SDK spike. |
 | 2026-04-01 | Amelia             | Completed Task 2 initial Zod-first contract slice for health and polling endpoints.                         |
+| 2026-04-03 | Amelia             | Completed Task 3 canonical SDK generation, wrapper exports, and downstream validation for web/mobile.       |
+| 2026-04-03 | Amelia             | Refined remaining Story 0.9 tasks to converge on a fully Zod-native end state.                              |

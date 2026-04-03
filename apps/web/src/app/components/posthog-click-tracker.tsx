@@ -1,4 +1,5 @@
 'use client'
+// Step 8 lightweight DOM path owner: searchable owner anchor
 
 import { useEffect } from 'react'
 import { browserAnalytics } from '../../analytics/browser-analytics'
