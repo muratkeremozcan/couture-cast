@@ -21,7 +21,7 @@ Fast feedback loops and transparent debugging artifacts are critical for maintai
 
 ### Example 1: Playwright Trace Viewer Configuration (Production Pattern)
 
-**Context**: Capture traces on first retry only (balances storage and diagnostics)
+**Context**: Capture traces for failures and retries so flaky runs can be compared directly. Prefer `retain-on-failure-and-retries` as the default policy so failed retries can be compared with passing runs.
 
 **Implementation**:
 
@@ -31,8 +31,8 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   use: {
-    // Visual debugging artifacts (space-efficient)
-    trace: 'on-first-retry', // Only when test fails once
+    // Visual debugging artifacts (best signal for flaky triage)
+    trace: 'retain-on-failure-and-retries', // Keep every failed attempt
     screenshot: 'only-on-failure', // Not on success
     video: 'retain-on-failure', // Delete on pass
 
@@ -61,8 +61,13 @@ export default defineConfig({
 
 ```bash
 # After test failure in CI, download trace artifact
-# Then open locally:
-npx playwright show-trace path/to/trace.zip
+# Then inspect locally:
+npx playwright trace open path/to/trace.zip
+
+# Filter to the failing expectation or action from the terminal
+npx playwright trace actions path/to/trace.zip --grep="expect"
+npx playwright trace action path/to/trace.zip 9
+npx playwright trace snapshot path/to/trace.zip 9 --name after
 
 # Or serve trace viewer:
 npx playwright show-report
@@ -79,7 +84,7 @@ npx playwright show-report
 
 **Why This Works**:
 
-- `on-first-retry` avoids capturing traces for flaky passes (saves storage)
+- `retain-on-failure-and-retries` preserves enough history to compare the failing retry with a passing run
 - Screenshots + video give visual context without trace overhead
 - Interactive timeline makes timing issues obvious (race conditions, slow API)
 
@@ -169,7 +174,7 @@ test('should replay checkout flow from HAR', async ({ page, context }) => {
 
 ```typescript
 // playwright/support/fixtures/debug-fixture.ts
-import { test as base } from '@playwright/test';
+import { test as base, type Request } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 
@@ -179,28 +184,6 @@ type DebugFixture = {
 
 export const test = base.extend<DebugFixture>({
   captureDebugArtifacts: async ({ page }, use, testInfo) => {
-    const consoleLogs: string[] = [];
-    const networkRequests: Array<{ url: string; status: number; method: string }> = [];
-
-    // Capture console messages
-    page.on('console', (msg) => {
-      consoleLogs.push(`[${msg.type()}] ${msg.text()}`);
-    });
-
-    // Capture network requests
-    page.on('request', (request) => {
-      networkRequests.push({
-        url: request.url(),
-        method: request.method(),
-        status: 0, // Will be updated on response
-      });
-    });
-
-    page.on('response', (response) => {
-      const req = networkRequests.find((r) => r.url === response.url());
-      if (req) req.status = response.status();
-    });
-
     await use(async () => {
       // This function can be called manually in tests
       // But it also runs automatically on failure via afterEach
@@ -211,8 +194,28 @@ export const test = base.extend<DebugFixture>({
       const artifactDir = path.join(testInfo.outputDir, 'debug-artifacts');
       fs.mkdirSync(artifactDir, { recursive: true });
 
+      const consoleLogs = (await page.consoleMessages()).map((msg) => `[${msg.type()} @ ${msg.timestamp().toISOString()}] ${msg.text()}`);
+      const pageErrors = (await page.pageErrors()).map((error) => ({
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      }));
+      const networkRequests = await Promise.all(
+        (await page.requests()).map(async (request: Request) => {
+          const response = await request.response();
+          return {
+            url: request.url(),
+            method: request.method(),
+            status: response?.status() ?? 0,
+          };
+        }),
+      );
+
       // Save console logs
       fs.writeFileSync(path.join(artifactDir, 'console.log'), consoleLogs.join('\n'), 'utf-8');
+
+      // Save page errors
+      fs.writeFileSync(path.join(artifactDir, 'page-errors.json'), JSON.stringify(pageErrors, null, 2), 'utf-8');
 
       // Save network summary
       fs.writeFileSync(path.join(artifactDir, 'network.json'), JSON.stringify(networkRequests, null, 2), 'utf-8');
@@ -506,12 +509,12 @@ test('debug state mutation', async ({ page }) => {
 
 Before deploying tests to CI, ensure:
 
-- [ ] **Artifact configuration**: `trace: 'on-first-retry'`, `screenshot: 'only-on-failure'`, `video: 'retain-on-failure'`
+- [ ] **Artifact configuration**: `trace: 'retain-on-failure-and-retries'`, `screenshot: 'only-on-failure'`, `video: 'retain-on-failure'`
 - [ ] **CI artifact upload**: GitHub Actions/GitLab CI configured to upload `test-results/` and `playwright-report/`
 - [ ] **HAR recording**: Set up for flaky API tests (record once, replay deterministically)
 - [ ] **Custom debug fixtures**: Console logs + network summary captured on failure
 - [ ] **Accessibility integration**: axe-core violations visible in trace viewer
-- [ ] **Trace viewer docs**: README explains how to open traces locally (`npx playwright show-trace`)
+- [ ] **Trace viewer docs**: README explains how to open traces locally (`npx playwright trace open`)
 - [ ] **Inspector workflow**: Document `--debug` flag for interactive debugging
 - [ ] **Storage optimization**: Artifacts deleted after 30 days (CI retention policy)
 
