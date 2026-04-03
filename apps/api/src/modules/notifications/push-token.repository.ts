@@ -1,3 +1,4 @@
+// Step 6 push token owner: searchable owner anchor
 import { Injectable } from '@nestjs/common'
 import { PrismaClient, type PushToken } from '@prisma/client'
 

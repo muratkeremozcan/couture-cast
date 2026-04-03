@@ -1,3 +1,4 @@
+// Step 10 step 2 owner: searchable owner anchor
 import { Controller, Get } from '@nestjs/common'
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { queueHealthResponseSchema } from '../contracts/http'

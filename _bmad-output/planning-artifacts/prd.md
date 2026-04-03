@@ -1,3 +1,5 @@
+<!-- Step 1 step 3 owner: searchable owner anchor -->
+
 # CoutureCast - Product Requirements Document
 
 **Author:** John – Product Manager (BMAD Method v6)

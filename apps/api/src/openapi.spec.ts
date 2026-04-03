@@ -21,6 +21,9 @@ type OpenApiSpec = {
   paths: Record<string, { get?: { tags?: string[] } }>
 }
 
+// Step 13 evidence:
+// this file verifies the API-published contract surface itself, not just the package-level
+// canonical builder.
 // Story 0.9 Task 1 step 5 owner:
 // prove /api/docs and /api/v1/openapi.json through an in-process integration test in this file.
 //

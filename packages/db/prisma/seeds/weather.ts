@@ -1,3 +1,4 @@
+// Step 3 step 3 owner: searchable owner anchor
 import type { PrismaClient } from '@prisma/client'
 
 export type SeededWeather = { snapshotIds: string[]; segmentIds: string[] }

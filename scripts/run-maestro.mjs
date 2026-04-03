@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Step 12 step 4 owner: searchable owner anchor
 
 /**
  * Mobile E2E bootstrap for Maestro.

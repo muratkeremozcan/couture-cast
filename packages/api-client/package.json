@@ -36,11 +36,11 @@
     }
   },
   "scripts": {
-    "build": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
+    "build": "rm -rf dist tsconfig.build.tsbuildinfo && npm exec --yes --package=typescript@5.9.3 -- tsc -p tsconfig.build.json",
     "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "lint": "eslint --max-warnings=0 --ext .ts src scripts testing",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "tsx --test testing/**/*.spec.ts",
+    "test": "vitest run --config vitest.config.ts",
     "gen:openapi:events": "tsx scripts/generate-events-openapi.ts",
     "gen:openapi:http": "tsx scripts/generate-http-openapi.ts"
   },

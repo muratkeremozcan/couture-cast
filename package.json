@@ -16,6 +16,8 @@
     "preinstall": "node scripts/check-node-version.mjs",
     "dev": "turbo run dev --parallel",
     "build": "npm run --workspaces --if-present build",
+    "generate:http-openapi": "npm run gen:openapi:http --workspace @couture/api-client",
+    "generate:api-client": "npm run generate:http-openapi && openapi-generator-cli generate --generator-key api-client && tsx packages/api-client/scripts/postprocess-generated-sdk.ts",
     "typecheck": "npm run --workspaces typecheck && tsc --noEmit -p playwright/tsconfig.json",
     "check:web:aliased-runtime-deps": "node scripts/check-web-aliased-runtime-deps.mjs",
     "typecheck:clear-cache": "find . -name \"*.tsbuildinfo\" -delete && rm -rf node_modules/.cache/typescript",
@@ -70,6 +72,7 @@
   "devDependencies": {
     "@couture/eslint-config": "workspace:*",
     "@faker-js/faker": "10.1.0",
+    "@openapitools/openapi-generator-cli": "2.31.0",
     "@playwright/test": "1.58.2",
     "@seontechnologies/playwright-utils": "3.14.0",
     "@types/lodash.merge": "4.6.9",
@@ -100,7 +103,8 @@
     "supabase": "^2.62.5",
     "tsx": "4.20.6",
     "turbo": "2.6.1",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "4.0.9"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

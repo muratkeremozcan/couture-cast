@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-01 - corrected Story 0.9 toward a Zod-first contract architecture
+Updated: 2026-04-03 — Step 2: replace abstract hoisting text with practical root vs workspace dependency rules
 
 ## LLM collaborator prompt
 
@@ -10,20 +10,65 @@ style:
 ```text
 You are improving Couture Cast learning docs and code commentary.
 
-Goals:
-1) Improve _bmad-output/project-knowledge/learning-path-step-by-step.md with clearer teaching content.
-2) For each step touched, explicitly list impacted files in the step section.
-3) Add/adjust in-file educational comments for impacted code using this style:
-   - brief "what it is / problem solved / alternatives"
-   - numbered setup steps `1) 2) 3) ...`
-   - "where we did this" anchor comments near actual implementation
-   - searchable step text appears in two places in the same file:
-     a) overview list, b) implementation anchor
+Primary goals:
+1) Keep `_bmad-output/project-knowledge/learning-path-step-by-step.md` clear, lean, and teachable.
+2) Preserve one standardized section template across all steps.
+3) Make the `Task owner map` the primary search surface for finding source code.
+4) Keep implementation-anchor comments aligned with the same owner IDs used in this doc.
 
-Rules:
+Step template rules:
+- Every step must use this exact section order:
+  `User/business impact`
+  `Key takeaways`
+  `Story/Task mapping`
+  `Story reference`
+  `Cross-links`
+  `Sequence to follow`
+  `Task owner map`
+  optional `Current repo note`
+  optional `Architecture diagram`
+- Do not invent alternate section headings for the same idea.
+- Do not add `Searchable strings:` sections.
+- Do not add `Pattern summary:` sections.
+- Do not add one-off headings that duplicate the owner map.
+- If a section does not earn its keep, remove it instead of adding another section.
+
+Task owner map rules:
+- Use the section heading `Task owner map:` in every step.
+- Treat the owner ID as the search key.
+- Reuse the exact `Story X Task Y step Z owner` label already used at the implementation anchor whenever one exists.
+- Prefer `Story X Task Y step Z owner` over `Step N step M owner` whenever the implementation already has a story/task anchor comment.
+- Format owner-map bullets as:
+  `- Story X Task Y step Z owner: <action> in \`path\``
+  or
+  `- Step N step M owner: <action> in \`path\``
+- Keep each owner-map bullet on one physical line in the markdown source. Never wrap it.
+- Keep every file path as one full contiguous searchable string on that same line.
+- If multiple files matter, prefer separate owner bullets over hiding paths in wrapped prose.
+- Aim for the exact owner ID to be discoverable in two places:
+  1) this learning doc
+  2) the implementation anchor
+- Validate this with repo search before finishing. For real numbered owner IDs, the expected result is exactly 2 hits:
+  1) this learning doc
+  2) the implementation anchor
+- If the primary target is non-commentable or unstable (for example `package.json`, `openapitools.json`, `package-lock.json`, generated files, or env files), add the second hit in `_bmad-output/project-knowledge/owner-anchor-exceptions.md`.
+- Do not leave a real numbered owner ID with only one searchable hit.
+
+Code comment rules:
 - Keep behavior unchanged unless asked.
 - Keep comments concise and ASCII.
-- Preserve existing Story/Task mapping in docs.
+- Preserve existing Story/Task mapping in docs and code.
+- Add or adjust educational comments only where they improve understanding.
+- Preferred comment style:
+  - brief "what it is / problem solved / alternatives"
+  - numbered setup steps `1) 2) 3) ...` when useful
+  - "where we did this" anchor comments near actual implementation
+  - searchable owner text that matches the learning doc
+
+Working style:
+- Minimize fluff and duplication.
+- Prefer sharpening existing teaching prose over adding new explanatory sections.
+- Preserve the current standardized format going forward.
 - After edits, run formatting/lint checks and report changed files.
 ```
 
@@ -54,13 +99,28 @@ Story/Task mapping:
 
 - Pre-story planning artifacts (source of truth before implementation stories)
 
-Read first:
+Story reference:
 
-- `_bmad-output/project-knowledge/couturecast_brief.md`
-- `_bmad-output/project-knowledge/couturecast_roadmap.md`
-- `_bmad-output/planning-artifacts/prd.md`
-- `_bmad-output/planning-artifacts/architecture.md`
-- `_bmad-output/planning-artifacts/epics.md`
+- none; this step is the pre-story planning chain that later stories inherit.
+
+Cross-links:
+
+- Step 2 turns this planning chain into concrete runtime and package boundaries.
+- Every implementation story in `_bmad-output/implementation-artifacts/` should still trace back to this chain.
+
+Sequence to follow:
+
+1. Read the brief for vision, target users, and success metrics.
+2. Read the roadmap and PRD to understand release order and scoped requirements.
+3. Read the architecture and epics to see how scope turns into implementation stories.
+
+Task owner map:
+
+- Step 1 step 1 owner: define the product vision, target users, and KPIs in `_bmad-output/project-knowledge/couturecast_brief.md`
+- Step 1 step 2 owner: sequence the release plan in `_bmad-output/project-knowledge/couturecast_roadmap.md`
+- Step 1 step 3 owner: translate the roadmap into scoped requirements in `_bmad-output/planning-artifacts/prd.md`
+- Step 1 step 4 owner: capture the technical decision layer in `_bmad-output/planning-artifacts/architecture.md`
+- Step 1 step 5 owner: decompose delivery into epics and implementation stories in `_bmad-output/planning-artifacts/epics.md` and `_bmad-output/implementation-artifacts/`
 
 Architecture diagram:
 
@@ -93,6 +153,18 @@ Key takeaways:
    imports), especially `packages/api-client` and `packages/db`.
 3. Monorepo operations: root npm workspaces + `turbo.json` coordinate consistent `dev`, `test`,
    and `build` behavior.
+4. **Runtime and app-owned deps:** Anything an app or package **imports** or any **script in that
+   folder** runs (`nest build`, `tsc`, a CLI) must appear in **that** `package.json` (`dependencies`
+   vs `devDependencies` by use). Do not satisfy those only from the repo root—hosted installs (for
+   example Vercel) often do not see root the same way your laptop does.
+5. **Root `package.json` deps:** Reserve the root for **repo-wide tooling** tied to root `npm run`
+   scripts: ESLint, Prettier, TypeScript, Turbo, Vitest, Playwright, OpenAPI Generator CLI, Prisma
+   CLI, `tsx`, `rimraf`, `cross-env`, Supabase CLI, Husky, etc. Treat that list as the pattern: if
+   only root scripts need it, root `devDependencies` is fine.
+6. **Exceptions (also at root on purpose):** A small set of **shared** runtime or CLI deps may stay
+   at root when multiple workspaces or root scripts need the same version—here `@prisma/client` and
+   `prisma` for `db:*` / generate flows. Anything else that **one app** imports at runtime should
+   still be listed on that app even if duplicated at root (explicit beats implicit for deploys).
 
 Story/Task mapping:
 
@@ -104,12 +176,31 @@ Story reference:
 
 - `_bmad-output/implementation-artifacts/0-1-initialize-turborepo-monorepo.md`
 
-Code evidence:
+Cross-links:
 
-- `apps/web/src/app/layout.tsx`
-- `apps/mobile/app/_layout.tsx`
-- `apps/mobile/app/(tabs)/_layout.tsx`
-- `apps/api/src/main.ts`
+- Step 1 explains why these boundaries exist before code is written.
+- Step 3 and Step 14 both rely on shared packages instead of cross-app direct imports.
+
+Sequence to follow:
+
+1. Start at the root workspace and task graph in the repo root.
+2. Open the web, mobile, and API entrypoints to see each runtime boundary.
+3. Trace shared contracts through `packages/api-client` and `packages/db` instead of cross-app imports.
+
+Task owner map:
+
+- Step 2 step 1 owner: define the workspace and task graph boundaries in `package.json` and `turbo.json`
+- Step 2 step 2 owner: define the web runtime boundary in `apps/web/src/app/layout.tsx`
+- Step 2 step 3 owner: define the mobile runtime boundary in `apps/mobile/app/_layout.tsx` and `apps/mobile/app/(tabs)/_layout.tsx`
+- Step 2 step 4 owner: define the API runtime boundary in `apps/api/src/main.ts`
+- Step 2 step 5 owner: define shared package boundaries in `packages/api-client/package.json` and `packages/db/package.json`
+
+Current repo note:
+
+- **Rule of thumb:** Apps and packages own their direct usage; root owns cross-cutting dev tooling
+  and a few intentional monorepo pins (Prisma). Repeating a package name under `apps/api` and the
+  root is normal when both need it for different reasons—check the lockfile once, not “did I avoid
+  duplication.”
 
 Architecture diagram:
 
@@ -162,11 +253,22 @@ Story reference:
 
 - `_bmad-output/implementation-artifacts/0-2-configure-prisma-schema-migrations-and-seed-data.md`
 
-Code evidence:
+Cross-links:
 
-- `packages/db/prisma/schema.prisma`
-- `packages/db/prisma/seeds/index.ts`
-- `packages/db/prisma/seeds/weather.ts`
+- Step 2 explains why schema and seed logic belongs in `packages/db`.
+- Step 4 applies these schema and seed rules across Supabase environments.
+
+Sequence to follow:
+
+1. Read `schema.prisma` first because it is the relational source of truth.
+2. Read the seed index to understand deterministic ordering and rerun safety.
+3. Inspect a concrete seed module to see how stable IDs and seeded randomness are applied.
+
+Task owner map:
+
+- Step 3 step 1 owner: define the relational source of truth in `packages/db/prisma/schema.prisma`
+- Step 3 step 2 owner: orchestrate deterministic seed execution in `packages/db/prisma/seeds/index.ts`
+- Step 3 step 3 owner: prove a deterministic seeded domain slice in `packages/db/prisma/seeds/weather.ts`
 
 Architecture diagram:
 
@@ -200,8 +302,6 @@ flowchart TD
 
 ## Step 4 - Environment setup and Supabase operations
 
-Supabase is the managed backend platform in this repo that provides PostgreSQL, Auth, and Storage.
-
 User/business impact:
 
 Disciplined Supabase environment and secret management reduces auth, storage, and database
@@ -227,10 +327,22 @@ Story reference:
 
 - `_bmad-output/implementation-artifacts/0-3-set-up-supabase-projects-dev-staging-prod.md`
 
-Code and config evidence:
+Cross-links:
 
-- `packages/db/prisma/schema.prisma`
-- root env conventions in implementation docs
+- Step 3 defines the schema and seeds these environments must run.
+- Step 7 carries the same environment contract into CI and deployment automation.
+
+Sequence to follow:
+
+1. Identify the active environment names and which ones are intentionally deferred.
+2. Trace how Supabase CLI and Prisma target those environments.
+3. Keep datasource and secret names aligned across local, CI, and hosted environments.
+
+Task owner map:
+
+- Step 4 step 1 owner: anchor the application datasource and database contract in `packages/db/prisma/schema.prisma`
+- Step 4 step 2 owner: define Supabase environment and operational rules in `_bmad-output/implementation-artifacts/0-3-set-up-supabase-projects-dev-staging-prod.md`
+- Step 4 step 3 owner: keep local, CI, and hosted environment naming aligned in `_bmad-output/implementation-artifacts/0-3-set-up-supabase-projects-dev-staging-prod.md`
 
 Architecture diagram:
 
@@ -252,10 +364,6 @@ flowchart TD
 ```
 
 ## Step 5 - Queueing and worker reliability
-
-BullMQ is the Redis-backed job queue system in this repo for background work like weather ingestion,
-alert fan-out, and moderation processing. It separates slow/retryable workloads from request
-handling so the API stays responsive under load.
 
 User/business impact:
 
@@ -279,29 +387,24 @@ Story reference:
 
 - `_bmad-output/implementation-artifacts/0-4-configure-redis-upstash-and-bullmq-queues.md`
 
-Code evidence:
+Cross-links:
 
-- `apps/api/src/config/queues.ts`
-- `apps/api/src/workers/base.worker.ts`
-- `apps/api/src/workers/bootstrap.ts`
-- `apps/api/src/admin/admin.service.ts`
-- `apps/api/src/admin/admin.controller.ts`
+- Step 2 separates request-serving apps from background worker processes.
+- Steps 10 and 11 extend these queues into telemetry and structured logging.
 
-Owner map:
+Sequence to follow:
 
-- Story 0.4 Task 2 owner: define shared BullMQ queue names, retry policy, timeouts, and queue
-  construction in `apps/api/src/config/queues.ts`
-- Story 0.4 Task 3 owner: persist failed job context as durable DLQ records for operator
-  workflows in `apps/api/src/workers/base.worker.ts`
-- Story 0.4 Task 4 owner: apply per-queue concurrency and rate-limit policy during worker startup
-  in `apps/api/src/workers/bootstrap.ts`
-- Story 0.4 Task 5 owner: bootstrap and shut down the dedicated worker process group cleanly in
-  `apps/api/src/workers/bootstrap.ts`
+1. Read the shared queue config and retry policy first.
+2. Read worker bootstrap to see concurrency and rate-limit policy.
+3. Read DLQ capture and admin replay/prune flows so failure recovery is explicit.
 
-Support refs:
+Task owner map:
 
-- `apps/api/src/admin/admin.service.ts` and `apps/api/src/admin/admin.controller.ts` expose the
-  operator read, replay, and prune path for DLQ records.
+- Story 0.4 Task 2 owner: define shared BullMQ queue names, retry policy, timeouts, and queue construction in `apps/api/src/config/queues.ts`
+- Story 0.4 Task 3 owner: persist failed job context as durable DLQ records for operator workflows in `apps/api/src/workers/base.worker.ts`
+- Story 0.4 Task 4 owner: apply per-queue concurrency and rate-limit policy during worker startup in `apps/api/src/workers/bootstrap.ts`
+- Story 0.4 Task 5 owner: bootstrap and shut down the dedicated worker process group cleanly in `apps/api/src/workers/bootstrap.ts`
+- Step 5 support owner: expose operator read, replay, and prune flows in `apps/api/src/admin/admin.service.ts` and `apps/api/src/admin/admin.controller.ts`
 
 Architecture diagram:
 
@@ -343,12 +446,6 @@ For users, Step 6 means faster ritual updates and more reliable alerts even when
 unstable. For the business, it protects engagement and retention by reducing missed notifications
 and delivery-related churn.
 
-Ritual context:
-
-- In Couture Cast, a ritual is the daily outfit + weather decision loop a user follows.
-- Available ritual-related streams are `ritual:update`, `alert:weather`, and `lookbook:new`.
-- They exist to keep recommendations timely, alerts trustworthy, and daily engagement high.
-
 Key takeaways:
 
 1. Delivery is intentionally redundant with Socket+Push+Polling so alerts survive disconnects and
@@ -368,34 +465,26 @@ Story reference:
 
 - `_bmad-output/implementation-artifacts/0-5-initialize-socketio-gateway-and-expo-push-api.md`
 
-Code evidence:
+Cross-links:
 
-- `apps/api/src/modules/gateway/gateway.gateway.ts`
-- `apps/api/src/modules/gateway/connection-manager.service.ts`
-- `apps/api/src/modules/events/events.service.ts`
-- `apps/api/src/modules/notifications/push-token.repository.ts`
-- `apps/api/src/modules/notifications/push-notification.service.ts`
-- `packages/api-client/src/types/socket-events.ts`
-- `packages/api-client/src/realtime/polling-service.ts`
+- Step 5 explains the async work that feeds alert and ritual delivery.
+- Step 12 verifies these fallback paths through end-to-end coverage.
 
-Owner map:
+Sequence to follow:
 
-- Story 0.5 Task 1 owner: expose the Socket.io gateway surface and attach the core auth +
-  connection orchestration in `apps/api/src/modules/gateway/gateway.gateway.ts`
-- Story 0.5 Task 2 owner: decide retry vs fallback based on connection lifecycle state in
-  `apps/api/src/modules/gateway/connection-manager.service.ts`
-- Story 0.5 Task 3 owner: dispatch Expo push notifications for users who are not on an active
-  realtime session in `apps/api/src/modules/notifications/push-notification.service.ts`
-- Story 0.5 Task 4 owner: define shared socket payload schemas for realtime namespaces in
-  `packages/api-client/src/types/socket-events.ts`
-- Story 0.5 Task 5 owner: activate, advance, and stop client polling when realtime is
-  unavailable in `packages/api-client/src/realtime/polling-service.ts`
+1. Start with the gateway and connection lifecycle rules.
+2. Trace push-token persistence and push dispatch for offline delivery.
+3. Follow the polling fallback path used when realtime is unavailable.
 
-Support refs:
+Task owner map:
 
-- `apps/api/src/modules/events/events.service.ts` provides the incremental polling data path.
-- `apps/api/src/modules/notifications/push-token.repository.ts` keeps push token storage durable
-  across reconnects and app restarts.
+- Story 0.5 Task 1 owner: expose the Socket.io gateway surface and attach the core auth + connection orchestration in `apps/api/src/modules/gateway/gateway.gateway.ts`
+- Story 0.5 Task 2 owner: decide retry vs fallback based on connection lifecycle state in `apps/api/src/modules/gateway/connection-manager.service.ts`
+- Step 6 polling backend owner: provide the incremental polling data path in `apps/api/src/modules/events/events.service.ts`
+- Step 6 push token owner: keep push token persistence durable in `apps/api/src/modules/notifications/push-token.repository.ts`
+- Story 0.5 Task 3 owner: dispatch Expo push notifications for users who are not on an active realtime session in `apps/api/src/modules/notifications/push-notification.service.ts`
+- Story 0.5 Task 4 owner: define shared socket payload schemas for realtime namespaces in `packages/api-client/src/types/socket-events.ts`
+- Story 0.5 Task 5 owner: activate, advance, and stop client polling when realtime is unavailable in `packages/api-client/src/realtime/polling-service.ts`
 
 Architecture diagram:
 
@@ -445,20 +534,27 @@ Story reference:
 
 - `_bmad-output/implementation-artifacts/0-6-scaffold-cicd-pipelines-github-actions.md`
 
-Code evidence:
+Cross-links:
 
-- `.github/workflows/pr-checks.yml`
-- `.github/workflows/pr-pw-e2e-local.yml`
-- `.github/workflows/rwf-burn-in.yml`
-- `.github/workflows/pr-pw-e2e-vercel-preview.yml`
-- `.github/workflows/gitleaks-check.yml`
-- `.github/workflows/deploy-mobile.yml`
-- `.github/actions/install/action.yml`
-- `.github/actions/setup-playwright-browsers/action.yml`
+- Step 2 defines the apps and packages these workflows exercise.
+- Step 12 plugs cross-surface smoke coverage into this gate.
+- Step 15 adds contract automation to the same quality-gate model.
 
-Supporting docs:
+Sequence to follow:
 
-- `_bmad-output/test-artifacts/ci-cd-pipeline.md`
+1. Read the required PR workflows first.
+2. See how burn-in, preview smoke, and secret scanning complement the base checks.
+3. Note which deploy paths are automated and which remain manual by design.
+
+Task owner map:
+
+- Step 7 step 1 owner: enforce base PR quality gates in `.github/workflows/pr-checks.yml`
+- Step 7 step 2 owner: enforce local Playwright E2E gating in `.github/workflows/pr-pw-e2e-local.yml`
+- Step 7 step 3 owner: control flake burn-in behavior in `.github/workflows/rwf-burn-in.yml`
+- Step 7 step 4 owner: verify preview deployments with targeted smoke checks in `.github/workflows/pr-pw-e2e-vercel-preview.yml`
+- Step 7 step 5 owner: enforce secret scanning in `.github/workflows/gitleaks-check.yml`
+- Step 7 step 6 owner: keep the mobile deployment path explicit in `.github/workflows/deploy-mobile.yml`
+- Step 7 support owner: centralize install and browser setup in `.github/actions/install/action.yml` and `.github/actions/setup-playwright-browsers/action.yml`
 
 Architecture diagram:
 
@@ -488,10 +584,6 @@ flowchart TD
 
 ## Step 8 - Shared analytics contracts and event tracking
 
-PostHog is the product analytics and feature-flag platform in this repo, used to capture behavior
-events consistently across web, mobile, and API. It gives the team reliable funnel and retention
-signals for product decisions and experiment rollout control.
-
 User/business impact:
 
 Shared analytics contracts keep event names and payloads consistent across web, mobile, and API,  
@@ -516,52 +608,30 @@ Story reference:
 
 - `_bmad-output/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md`
 
-Code evidence:
+Cross-links:
 
-- `packages/api-client/src/types/analytics-events.ts`
-- `apps/mobile/src/analytics/track-events.ts`
-- `apps/web/src/app/components/analytics-event-actions.tsx`
-- `apps/web/src/app/components/posthog-click-tracker.tsx`
-- `apps/api/src/modules/auth/auth.service.ts`
-- `apps/api/integration/analytics-tracking.integration.spec.ts`
+- Step 2 explains why analytics logic belongs in shared packages.
+- Step 15 mirrors the same contract-first idea for REST generation and client usage.
 
-Task 2/3 analytics owners:
+Sequence to follow:
 
-- Story 0.7 Task 2 step 1 owner: define canonical event names and input/property schemas in
-  `packages/api-client/src/types/analytics-events.ts`
-- Story 0.7 Task 2 step 2 owner: normalize domain inputs to snake_case analytics properties in
-  track\* wrappers in `packages/api-client/src/types/analytics-events.ts`
-- Story 0.7 Task 3 step 1 owner: publish shared track\* wrappers for app-layer reuse and
-  integration assertions in `packages/api-client/src/types/analytics-events.ts`
+1. Start with the shared analytics event contracts and flag defaults.
+2. Read the wrappers that normalize and emit events.
+3. Trace consumption in web, mobile, API, and feature-flag evaluation.
 
-Task 2/3 support refs:
+Task owner map:
 
-- `apps/mobile/src/analytics/track-events.ts` and
-  `apps/web/src/app/components/analytics-event-actions.tsx` reuse the shared wrappers in app
-  code.
-- `apps/web/src/app/components/posthog-click-tracker.tsx` covers the lighter DOM-attribute-based
-  tracking path.
-- `apps/api/src/modules/auth/auth.service.ts` and
-  `apps/api/integration/analytics-tracking.integration.spec.ts` keep API-side analytics aligned
-  with the same shared contract.
-
-Task 8 feature-flag flow owners:
-
-- Story 0.7 Task 8 step 1 owner: shared flag keys, value kinds, and code defaults in
-  `packages/config/src/flags.ts`
-- Story 0.7 Task 8 step 2 owner: remote PostHog flag evaluation in
-  `apps/api/src/posthog/posthog.service.ts`
-- Story 0.7 Task 8 step 3 owner: request-time fallback order in
-  `packages/config/src/flags.ts`
-- Story 0.7 Task 8 step 4 owner: fallback cache warmup and refresh in
-  `apps/api/src/modules/feature-flags/feature-flags.cron.ts`
-
-Task 8 support refs:
-
-- `apps/api/src/modules/feature-flags/feature-flags.service.ts` coordinates the full flow
-  without owning a single exact step anchor.
-- `apps/api/src/modules/feature-flags/feature-flags.repository.ts` persists fallback reads and
-  sync writes for the cache-backed path.
+- Story 0.7 Task 2 step 1 owner: define canonical event names and input/property schemas in `packages/api-client/src/types/analytics-events.ts`
+- Story 0.7 Task 2 step 2 owner: normalize domain inputs to snake_case analytics properties in track\* wrappers in `packages/api-client/src/types/analytics-events.ts`
+- Story 0.7 Task 3 step 1 owner: publish shared track\* wrappers for app-layer reuse and integration assertions in `packages/api-client/src/types/analytics-events.ts`
+- Step 8 app reuse owner: consume the shared analytics wrappers in `apps/mobile/src/analytics/track-events.ts` and `apps/web/src/app/components/analytics-event-actions.tsx`
+- Step 8 lightweight DOM path owner: cover attribute-driven tracking in `apps/web/src/app/components/posthog-click-tracker.tsx`
+- Step 8 API analytics owner: keep server-side tracking aligned in `apps/api/src/modules/auth/auth.service.ts` and `apps/api/integration/analytics-tracking.integration.spec.ts`
+- Story 0.7 Task 8 step 1 owner: shared flag keys, value kinds, and code defaults in `packages/config/src/flags.ts`
+- Story 0.7 Task 8 step 2 owner: remote PostHog flag evaluation in `apps/api/src/posthog/posthog.service.ts`
+- Story 0.7 Task 8 step 3 owner: request-time fallback order in `packages/config/src/flags.ts`
+- Story 0.7 Task 8 step 4 owner: fallback cache warmup and refresh in `apps/api/src/modules/feature-flags/feature-flags.cron.ts`
+- Step 8 feature-flag coordination owner: connect the request path and persistence layer in `apps/api/src/modules/feature-flags/feature-flags.service.ts` and `apps/api/src/modules/feature-flags/feature-flags.repository.ts`
 
 Architecture diagram:
 
@@ -601,21 +671,6 @@ Key takeaways:
 5. Vendor-neutral observability is explicit: W3C trace propagation + Node auto-instrumentations +
    OTLP exporters stream metrics/traces to Grafana with minimal app-level coupling.
 
-Environment setup:
-
-- Put the OTLP endpoint into `GRAFANA_OTLP_ENDPOINT`.
-- Put the Grafana OTLP `Instance ID` into `GRAFANA_INSTANCE_ID`.
-- Put the generated Grafana token into `GRAFANA_API_KEY`.
-- Add all three keys to the root `.env.local`, `.env.dev`, and `.env.prod` files.
-- Add matching GitHub Actions repository secrets named `GRAFANA_OTLP_ENDPOINT`,
-  `GRAFANA_INSTANCE_ID`, and `GRAFANA_API_KEY`.
-- Add the same three keys to the Vercel API project environment variables:
-  Preview should mirror `.env.dev`, and Production should mirror `.env.prod`.
-- In this repo there is no separate hosted Vercel Development environment in active use:
-  PRs deploy to Vercel Preview, and merges to `main` deploy to Vercel Production.
-- The API exports `service.name = couturecast-api` by default; use `OTEL_SERVICE_NAME` only if you
-  intentionally need to override that.
-
 Story/Task mapping:
 
 - Story 0.7
@@ -625,29 +680,27 @@ Story reference:
 
 - `_bmad-output/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md`
 
-Code evidence:
+Cross-links:
 
-- `apps/api/src/instrumentation.ts`
-- `apps/api/src/main.ts`
-- `apps/api/src/instrumentation.spec.ts`
-- `apps/api/src/load-env.ts`
-- `apps/api/src/load-env.spec.ts`
+- Step 7 carries the required OTLP credentials into CI and hosted environments.
+- Step 10 consumes the traces and metrics emitted here.
+- Step 11 layers structured logs on the same observability foundation.
 
-Owner map:
+Sequence to follow:
 
-- Story 0.7 Task 4 step 1 owner: define OTLP backend endpoint + auth resolution in
-  `apps/api/src/instrumentation.ts`
-- Story 0.7 Task 4 step 2 owner: create OTLP exporters for traces and metrics in
-  `apps/api/src/instrumentation.ts`
-- Story 0.7 Task 4 step 3 owner: enable instrumentation + W3C propagation in
-  `apps/api/src/instrumentation.ts`
-- Story 0.7 Task 4 step 4 owner: initialize the SDK before app bootstrap in
-  `apps/api/src/instrumentation.ts`
+1. Load the OTLP credential and env-loading rules first.
+2. Read instrumentation bootstrap before `main.ts` so startup order stays clear.
+3. Verify the guardrails and tests before relying on hosted telemetry.
 
-Support refs:
+Task owner map:
 
-- `apps/api/src/main.ts` preserves the bootstrap order so OTEL starts before Nest app creation.
-- `apps/api/src/load-env.ts` keeps local root env loading aligned with OTEL startup expectations.
+- Story 0.7 Task 4 step 1 owner: define OTLP backend endpoint + auth resolution in `apps/api/src/instrumentation.ts`
+- Story 0.7 Task 4 step 2 owner: create OTLP exporters for traces and metrics in `apps/api/src/instrumentation.ts`
+- Story 0.7 Task 4 step 3 owner: enable instrumentation + W3C propagation in `apps/api/src/instrumentation.ts`
+- Story 0.7 Task 4 step 4 owner: initialize the SDK before app bootstrap in `apps/api/src/instrumentation.ts`
+- Step 9 bootstrap order owner: preserve pre-Nest startup ordering in `apps/api/src/main.ts`
+- Step 9 env-loading owner: keep root env loading aligned with OTEL startup in `apps/api/src/load-env.ts`
+- Step 9 verification owner: validate instrumentation and env-loading behavior in `apps/api/src/instrumentation.spec.ts` and `apps/api/src/load-env.spec.ts`
 
 Architecture diagram:
 
@@ -699,24 +752,6 @@ Key takeaways:
 7. Manual Grafana verification is trace-first in this repo: confirm Tempo traces in Grafana, but
    do not treat Loki as a required success signal yet because log ingestion is not wired.
 
-Actual working flow in this repo:
-
-1. Verify telemetry first.
-   Start the API locally, hit `http://localhost:3000/api/v1/health/queues`, confirm traces, then
-   confirm the metric families you actually have.
-   Current local inventory: `http_server_duration_milliseconds_*`, `http_client_*`,
-   `nodejs_eventloop_*`, and `v8js_*` are present; `process*`, `redis*`, `bull*`, `socket*`, and
-   `db*` were not present in the same pass.
-2. Use repo JSON as the dashboard source of truth.
-   Files live in `infra/grafana/dashboards/`.
-3. In Grafana, import the JSON instead of building from scratch.
-   Official path: `Dashboards` -> `New` -> `Import`.
-   In newer UI, the same action may be under the top-right `Add` dropdown.
-4. If the dashboard renders and looks useful, save it and move on.
-   For this repo, API Health has real panels; the queue/cache, realtime, and database dashboards
-   are intentionally placeholders until those metric families exist.
-5. Re-export only if Grafana materially changed the JSON model.
-
 Story/Task mapping:
 
 - Story 0.7
@@ -728,31 +763,26 @@ Story reference:
 
 - `_bmad-output/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md`
 
-Impacted files:
+Cross-links:
 
-- `_bmad-output/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md`
-- `_bmad-output/project-knowledge/learning-path-step-by-step.md`
-- `apps/api/src/instrumentation.ts`
-- `apps/api/src/controllers/health.controller.ts`
-- `apps/api/src/modules/gateway/connection-manager.service.ts`
-- `apps/api/src/config/queues.ts`
-- `apps/api/src/admin/admin.service.ts`
-- `.env.local`
-- `.env.dev`
-- `.env.prod`
+- Step 9 is the source of the telemetry this step inspects.
+- Step 11 adds correlated logs to the same operational picture.
+- Step 7 is where these checks can later become stricter automation.
 
-Supporting references:
+Sequence to follow:
 
-- `_bmad-output/project-knowledge/observability.md`
-- `https://grafana.com/docs/grafana-cloud/get-started/create-account/`
-- `https://grafana.com/docs/grafana-cloud/security-and-account-management/cloud-stacks/create-update-stacks/`
-- `https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/`
-- `https://grafana.com/docs/grafana-cloud/security-and-account-management/authentication-and-permissions/access-policies/create-access-policies/`
-- `https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/create-dashboard/`
-- `https://grafana.com/docs/grafana/latest/panels-visualizations/visualizations/text/`
-- `https://grafana.com/docs/grafana/latest/datasources/prometheus/query-editor/`
-- `https://grafana.com/docs/grafana/latest/alerting/alerting-rules/create-grafana-managed-rule/`
-- `https://grafana.com/docs/grafana/latest/dashboards/share-dashboards-panels/`
+1. Provision or verify the Grafana stack and OTLP credentials.
+2. Confirm traces and real metric families from the local verification path.
+3. Import dashboards only after the inventory matches what the repo actually emits.
+
+Task owner map:
+
+- Step 10 step 1 owner: emit traces and metrics toward Grafana Cloud in `apps/api/src/instrumentation.ts`
+- Step 10 step 2 owner: provide the local verification endpoint in `apps/api/src/controllers/health.controller.ts`
+- Step 10 step 3 owner: define the first queue-related telemetry inventory targets in `apps/api/src/config/queues.ts` and `apps/api/src/admin/admin.service.ts`
+- Step 10 step 4 owner: define the realtime telemetry inventory target in `apps/api/src/modules/gateway/connection-manager.service.ts`
+- Step 10 step 5 owner: keep local and hosted Grafana credentials aligned in `.env.local`, `.env.dev`, and `.env.prod`
+- Step 10 support owner: document the manual verification workflow in `_bmad-output/project-knowledge/observability.md`
 
 Architecture diagram:
 
@@ -780,24 +810,6 @@ flowchart TD
   gh3 --> ci
   api --> grafana["Grafana Explore: Tempo and Prometheus"]
 ```
-
-Quick translation cheat sheet:
-
-| Grafana term                       | Plain English                   | What it means in this project                                                               | Rough DataDog equivalent          | Rough AWS equivalent                         |
-| ---------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------- | -------------------------------------------- |
-| Tempo / `-traces`                  | Distributed traces              | Request flows, spans, and timing for API calls such as `GET /api/v1/health/queues`          | APM Traces / Trace Explorer       | AWS X-Ray traces                             |
-| Prometheus / Mimir / `-prom`       | Metrics store                   | Numeric time-series data such as request duration, process metrics, and exporter metrics    | Metrics Explorer / custom metrics | CloudWatch Metrics                           |
-| Loki / `-logs`                     | Log store                       | Centralized application logs; for this story it may exist before log ingestion is wired up  | Log Explorer / Log Management     | CloudWatch Logs                              |
-| Profiles                           | Continuous profiling            | CPU and runtime profiling for deeper performance debugging; not the main focus of Story 0.7 | Continuous Profiler               | CodeGuru Profiler                            |
-| Alertmanager / alert state history | Alert routing and alert history | Where alert notifications and state transitions live after dashboards and alerts are added  | Monitors / monitor state history  | CloudWatch Alarms plus SNS notification flow |
-| Usage / usage insights             | Grafana account usage data      | Grafana's own billing or platform usage views, not your app telemetry                       | Usage / billing views             | Cost Explorer or service usage dashboards    |
-
-Quick way to think about it:
-
-- `Tempo` answers: "What happened during this request?"
-- `Prometheus` answers: "How much, how often, how long?"
-- `Loki` answers: "What did the app log?"
-- `Profiles` answers: "Where is the CPU or runtime time going?"
 
 ## Step 11 - API observability with structured logging
 
@@ -832,37 +844,26 @@ Story reference:
 
 - `_bmad-output/implementation-artifacts/0-7-configure-posthog-opentelemetry-and-grafana-cloud.md`
 
-Code evidence:
+Cross-links:
 
-- `apps/api/src/main.ts`
-- `apps/api/integration/observability.integration.spec.ts`
-- `apps/api/src/logger/pino.config.ts`
-- `apps/api/src/logger/request-context.ts`
-- `apps/api/src/logger/request-logger.middleware.ts`
-- `apps/api/src/logger/pino.config.spec.ts`
-- `apps/api/src/logger/request-context.spec.ts`
-- `apps/api/src/logger/request-logger.middleware.spec.ts`
-- `packages/api-client/src/testing/observability-assertions.ts`
+- Step 9 provides the trace context this logger attaches to.
+- Step 10 is where those correlated traces and logs are inspected operationally.
+- Step 7 is where observability verification can become a stronger gate over time.
 
-Owner map:
+Sequence to follow:
 
-- Story 0.7 Task 5 step 1 owner: resolve environment-driven log level policy in
-  `apps/api/src/logger/pino.config.ts`
-- Story 0.7 Task 5 step 2 owner: inject request + trace context via the shared logger mixin in
-  `apps/api/src/logger/pino.config.ts`
-- Story 0.7 Task 5 step 3 owner: keep the base logger reusable for HTTP middleware and
-  feature-specific child loggers in `apps/api/src/logger/pino.config.ts`
+1. Start with log-level policy and the base logger shape.
+2. Trace request ID and AsyncLocalStorage propagation.
+3. Finish with the middleware and tests that prove log/trace correlation.
 
-Support refs:
+Task owner map:
 
-- `apps/api/src/logger/request-context.ts` handles request ID and AsyncLocalStorage context
-  propagation.
-- `apps/api/src/logger/request-logger.middleware.ts` applies the shared logger contract at the
-  HTTP boundary.
-- `apps/api/integration/observability.integration.spec.ts` verifies OTLP export requests and
-  request log correlation against the real Nest module wiring.
-- `_bmad-output/project-knowledge/observability.md` holds the current manual Grafana trace check
-  and the note that Loki log verification is not part of the required path yet.
+- Story 0.7 Task 5 step 1 owner: resolve environment-driven log level policy in `apps/api/src/logger/pino.config.ts`
+- Story 0.7 Task 5 step 2 owner: inject request + trace context via the shared logger mixin in `apps/api/src/logger/pino.config.ts`
+- Story 0.7 Task 5 step 3 owner: keep the base logger reusable for HTTP middleware and feature-specific child loggers in `apps/api/src/logger/pino.config.ts`
+- Step 11 request-context owner: handle request ID and AsyncLocalStorage propagation in `apps/api/src/logger/request-context.ts`
+- Step 11 HTTP-boundary owner: apply the shared logger contract in `apps/api/src/logger/request-logger.middleware.ts`
+- Step 11 verification owner: validate logger behavior and observability integration in `apps/api/integration/observability.integration.spec.ts`, `apps/api/src/logger/pino.config.spec.ts`, `apps/api/src/logger/request-context.spec.ts`, `apps/api/src/logger/request-logger.middleware.spec.ts`, and `packages/api-client/src/testing/observability-assertions.ts`
 
 Architecture diagram:
 
@@ -911,22 +912,25 @@ Story reference:
 
 - `_bmad-output/implementation-artifacts/0-13-scaffold-cross-surface-e2e-automation.md`
 
-Supporting docs:
+Cross-links:
 
-- `_bmad-output/test-artifacts/test-design-system.md`
+- Step 6 defines the realtime fallback behavior this step exercises.
+- Step 7 connects these smoke flows to PR automation.
 
-Code evidence:
+Sequence to follow:
 
-- `playwright/config/base.config.ts`
-- `playwright/config/local.config.ts`
-- `playwright/tests/home.spec.ts`
-- `playwright/tests/web-health-sha.spec.ts`
-- `maestro/sanity.yaml`
-- `scripts/run-maestro.mjs`
-- `scripts/start-mobile-server.sh`
-- `apps/mobile/src/realtime/mobile-fallback-controller.ts`
-- `.github/workflows/pr-pw-e2e-local.yml`
-- `.github/workflows/pr-mobile-e2e.yml`
+1. Read the shared web and mobile harness config first.
+2. Inspect the Playwright smoke specs and Maestro flow.
+3. Trace how artifacts and CI wiring turn these runs into release confidence.
+
+Task owner map:
+
+- Step 12 step 1 owner: define shared Playwright harness behavior in `playwright/config/base.config.ts` and `playwright/config/local.config.ts`
+- Step 12 step 2 owner: define the core web smoke flows in `playwright/tests/home.spec.ts` and `playwright/tests/web-health-sha.spec.ts`
+- Step 12 step 3 owner: define the mobile smoke flow in `maestro/sanity.yaml`
+- Step 12 step 4 owner: orchestrate the mobile test harness in `scripts/run-maestro.mjs` and `scripts/start-mobile-server.sh`
+- Step 12 step 5 owner: keep the mobile fallback runtime behavior aligned in `apps/mobile/src/realtime/mobile-fallback-controller.ts`
+- Step 12 step 6 owner: connect web and mobile E2E execution to CI in `.github/workflows/pr-pw-e2e-local.yml` and `.github/workflows/pr-mobile-e2e.yml`
 
 Architecture diagram:
 
@@ -947,121 +951,64 @@ flowchart LR
   mobile_artifacts --> mobile_policy["Local manual default, non gating CI"]
 ```
 
-## Step 13 - OpenAPI document assembly and Swagger bootstrap
+**Overall goal for Steps 13-15**
 
-User/business impact:
+This is the contract loop the repo is trying to enforce:
 
-OpenAPI turns the API surface into a machine-readable contract, which lets frontend and mobile
-work from generated types instead of hand-maintained guesses. The business gets safer releases
-because contract drift becomes visible early and SDK generation can be automated later in the
-story.
+`Zod contracts -> inferred types + runtime validation + OpenAPI registration -> canonical spec -> live docs + generated SDK -> app usage`
 
-Key takeaways:
-
-1. NestJS decorators do two jobs in this step: route decorators such as `@Controller` and `@Get`
-   define runtime endpoints, while Swagger decorators such as `@ApiTags`, `@ApiOperation`, and
-   `@ApiOkResponse` add documentation metadata to the same handlers.
-2. `SwaggerModule.createDocument(app, config)` is the assembly step: it reads Nest's route graph
-   plus Swagger metadata after the app has been created and produces one OpenAPI document.
-3. `SwaggerModule.setup(...)` exposes two outputs from the same generated document: Swagger UI at
-   `/api/docs` for humans and raw JSON at `/api/v1/openapi.json` for tooling.
-4. This step follows the same bootstrap discipline as the OpenTelemetry work in Step 9: keep the
-   delayed imports in `main.ts`, create the Nest app, attach shared middleware, then attach the
-   OpenAPI surface before `listen()`.
-5. The verification test is an in-process integration test, not a pure unit test: it creates a
-   real Nest app, serves the in-memory HTTP server, issues HTTP requests with `supertest`, and
-   closes the app after each test.
-
-Story/Task mapping:
-
-- Story 0.9
-- Task 1 (NestJS Swagger decorators and OpenAPI bootstrap)
-
-Story reference:
-
-- `_bmad-output/implementation-artifacts/0-9-initialize-openapi-spec-generation-and-api-client-sdk.md`
-
-Cross-links to earlier steps:
-
-- Step 2 clarifies why `apps/api/src/main.ts` is the API bootstrap boundary.
-- Step 7 places contract generation within the broader quality-gates story.
-- Step 9 describes the delayed-import bootstrap pattern already used in `main.ts`.
-
-Impacted files:
-
-- `_bmad-output/implementation-artifacts/0-9-initialize-openapi-spec-generation-and-api-client-sdk.md`
-- `_bmad-output/project-knowledge/learning-path-step-by-step.md`
-- `apps/api/package.json`
-- `apps/api/src/main.ts`
-- `apps/api/src/openapi.ts`
-- `apps/api/src/openapi.spec.ts`
-- `apps/api/src/controllers/api-health.controller.ts`
-- `apps/api/src/controllers/health.controller.ts`
-- `package-lock.json`
-
-Task 1 owner map:
-
-- Story 0.9 Task 1 step 1 owner: install Swagger runtime dependencies in `apps/api/package.json`
-  and `package-lock.json`
-- Story 0.9 Task 1 step 2 owner: build the shared Swagger/OpenAPI assembly helper in
-  `apps/api/src/openapi.ts`
-- Story 0.9 Task 1 step 3 owner: hook OpenAPI setup into the Nest bootstrap flow in
-  `apps/api/src/main.ts`
-- Story 0.9 Task 1 step 4 owner: attach Swagger metadata to health endpoints in
-  `apps/api/src/controllers/api-health.controller.ts` and
-  `apps/api/src/controllers/health.controller.ts`
-- Story 0.9 Task 1 step 5 owner: prove `/api/docs` and `/api/v1/openapi.json` through the
-  in-process integration test in `apps/api/src/openapi.spec.ts`
-
-Support refs:
-
-- `apps/api/src/openapi.ts` contains the teaching comments for the full Swagger lifecycle.
-- `apps/api/src/main.ts` shows the exact hook point in the Nest bootstrap sequence.
-- `apps/api/src/openapi.spec.ts` documents why this is an integration test and how the app
-  lifecycle is managed during testing.
-
-Architecture diagram:
+CI is adjacent to that loop, not part of the authoring chain. Its job is to regenerate derived
+artifacts, detect drift, and enforce breaking-change policy automatically.
 
 ```mermaid
-flowchart TD
-  decorators["Nest route decorators\n@Controller @Get"] --> nest_meta["Nest metadata"]
-  swagger_decorators["Swagger decorators\n@ApiTags @ApiOperation @ApiOkResponse"] --> swagger_meta["Swagger metadata"]
-  appmodule["AppModule loaded"] --> nest_app["NestFactory.create(AppModule)"]
-  nest_meta --> nest_app
-  swagger_meta --> docgen["SwaggerModule.createDocument(app, config)"]
-  nest_app --> docgen
-  docconfig["DocumentBuilder\n title description version auth"] --> docgen
-  docgen --> docs["/api/docs\nSwagger UI"]
-  docgen --> json["/api/v1/openapi.json\nraw OpenAPI spec"]
-  test["openapi.spec.ts\nsupertest integration check"] --> docs
-  test --> json
+flowchart LR
+  Z["Zod contracts"]
+  T["Inferred types"]
+  V["Runtime validation"]
+  O["OpenAPI registration"]
+  S["Canonical spec"]
+  D["Live docs"]
+  G["Generated SDK"]
+  A["App usage"]
+  C["CI automation / diff checks"]
+
+  Z --> T
+  Z --> V
+  Z --> O
+  O --> S
+  S --> D
+  S --> G
+  G --> A
+  C -. regenerate + verify .-> S
+  C -. guardrail .-> G
 ```
 
-## Step 14 - Build Zod to OpenAPI the future-facing way
+## Step 13 - Serve one canonical OpenAPI contract from the API boundary
 
 User/business impact:
 
-If this repo is meant to be a reference-quality foundation, the HTTP contract cannot live in
-controllers, generated clients, or test helpers. It has to live in one shared contract layer that
-every runtime can trust.
+Frontend, mobile, CI, and human docs should all see the same contract. If the API serves one
+canonical contract instead of authoring a second one at runtime, the business gets fewer invisible
+drift bugs and a cleaner upgrade path for every client.
 
 Key takeaways:
 
-1. The permanent order is: define Zod contracts first, register them into OpenAPI second, generate
-   the document third, then generate SDKs and adapters from that stable document.
-2. The shared contract package should own request schemas, response schemas, error envelopes,
-   inferred TypeScript types, and OpenAPI metadata in one place.
-3. Nest controllers should become thin adapters that validate or shape real runtime data against
-   those shared schemas instead of inventing their own contract types.
-4. The sample-app pattern from `playwright-utils` is still the right mental model:
-   schema -> registry -> document -> file. Couture Cast simply splits that flow into per-slice
-   modules so it scales beyond a demo backend.
+1. `/api/v1/openapi.json` and `/api/docs` should be two views of the same contract, not two
+   independently authored specs.
+2. The API app publishes the canonical contract that comes from shared Zod modules; it should not
+   become a second contract authoring system.
+3. `main.ts` owns when the OpenAPI surface is attached during bootstrap, and `openapi.ts` owns how
+   the canonical contract is served or rendered.
+4. Swagger UI can still be useful as a renderer, but Swagger decorators are not part of the
+   permanent authoring model for public REST endpoints.
+5. The right verification is parity testing: prove that the served `/api/v1/openapi.json` contract
+   matches the canonical contract builder output.
 
 Story/Task mapping:
 
 - Story 0.9
-- Task 2 (Zod-first REST contract foundation)
-- Task 3 depends on Task 2 being stable first
+- Task 4 (replace Swagger-authored live docs with the canonical contract output)
+- Task 6 (add canonical contract parity tests for the live API)
 
 Story reference:
 
@@ -1069,124 +1016,195 @@ Story reference:
 
 Cross-links:
 
-- Step 2 clarifies why Nest bootstrap is a later concern than contract definition.
-- Step 7 places contract generation inside the broader quality-gates story.
-- Step 13 shows the temporary Swagger bootstrap that remains useful as a live docs surface.
-
-Impacted files:
-
-- `packages/api-client/src/contracts/http/common.ts`
-- `packages/api-client/src/contracts/http/health.ts`
-- `packages/api-client/src/contracts/http/events.ts`
-- `packages/api-client/src/contracts/http/openapi.ts`
-- `packages/api-client/scripts/generate-http-openapi.ts`
-- `packages/api-client/testing/http-openapi.spec.ts`
-- `packages/api-client/docs/http.openapi.json`
-- `apps/api/src/contracts/http.ts`
-- `apps/api/src/controllers/api-health.controller.ts`
-- `apps/api/src/controllers/health.controller.ts`
-- `apps/api/src/modules/events/events.controller.ts`
-- `apps/api/src/modules/events/events.service.ts`
-
-Task 2 owner map:
-
-- Story 0.9 Task 2 step 1 owner: define reusable HTTP primitives in
-  `packages/api-client/src/contracts/http/common.ts`
-- Story 0.9 Task 2 step 2 owner: model the first health endpoints in
-  `packages/api-client/src/contracts/http/health.ts`
-- Story 0.9 Task 2 step 3 owner: model the first non-trivial feature slice in
-  `packages/api-client/src/contracts/http/events.ts`
-- Story 0.9 Task 2 step 4 owner: compose the registry and generate one canonical OpenAPI document
-  in `packages/api-client/src/contracts/http/openapi.ts`
-- Story 0.9 Task 2 step 5 owner: write the canonical document to disk in
-  `packages/api-client/scripts/generate-http-openapi.ts`
-- Story 0.9 Task 2 step 6 owner: prove the generated spec is valid in
-  `packages/api-client/testing/http-openapi.spec.ts`
-- Story 0.9 Task 2 step 7 owner: consume the same contracts from thin Nest adapters through
-  `apps/api/src/contracts/http.ts` and the first migrated controllers/services
-
-Support refs:
-
-- `packages/api-client/src/contracts/http/openapi.ts` is the central registry + document assembly
-  step.
-- `packages/api-client/scripts/generate-http-openapi.ts` is the static file generation step.
-- `packages/api-client/testing/http-openapi.spec.ts` is the contract validation gate.
-- `apps/api/src/contracts/http.ts` shows how the API consumes the package boundary instead of
-  reaching into repo internals.
+- Step 2 clarifies why `apps/api/src/main.ts` is the API bootstrap boundary.
+- Step 7 frames contract publication as part of the repo quality-gates story.
+- Step 14 defines where contracts are authored.
+- Step 15 shows how SDKs and apps consume the same published contract.
 
 Sequence to follow:
 
-1. Start with the smallest real slice, not the whole API.
-   In Couture Cast, the first slice is `/api/health`, `/api/v1/health/queues`, and
-   `/api/v1/events/poll`. This keeps the pattern teachable while still proving it on real
-   endpoints.
+1. Start from the canonical contract builder, not the runtime docs endpoint.
+2. Trace how `main.ts` and `openapi.ts` publish JSON and rendered docs.
+3. Verify parity between the published API contract and the canonical spec output.
 
-2. Create shared primitives before endpoint schemas.
-   Put reusable pieces like ISO timestamps, non-empty strings, standard `"ok"` statuses, and error
-   envelopes in `common.ts`. If every endpoint reinvents these pieces, your document drifts and
-   your SDK types become inconsistent.
+Task owner map:
 
-3. Define each endpoint contract with Zod and export the inferred types immediately.
-   In `health.ts` and `events.ts`, each request/response schema is declared once and its TypeScript
-   type is derived with `z.infer`. This is the step that makes runtime validation and compile-time
-   typing come from the same source.
+- Story 0.9 Task 1 step 3 owner: attach the OpenAPI publication seam during API bootstrap in `apps/api/src/main.ts`
+- Story 0.9 Task 1 step 2 owner: serve or render the API-facing contract outputs in `apps/api/src/openapi.ts`
+- Step 13 step 3 owner: assemble the canonical contract from shared Zod registrations in `packages/api-client/src/contracts/http/openapi.ts`
+- Step 13 step 4 owner: write the canonical contract artifact to disk in `packages/api-client/scripts/generate-http-openapi.ts`
+- Story 0.9 Task 1 step 5 owner: prove the published API contract surface in `apps/api/src/openapi.spec.ts`
 
-4. Keep schema registration next to the schema definitions.
-   Each module exposes a `register*Contracts(registry)` function. That function registers:
-   the named component schemas and the matching OpenAPI paths. This mirrors the sample app's
-   registry pattern, but keeps the registration local to the slice that owns it.
+Current repo note:
 
-5. Compose all slice registries into one canonical OpenAPI builder.
-   `openapi.ts` creates the `OpenAPIRegistry`, calls each slice registration function, and feeds
-   the collected definitions into `OpenApiGeneratorV31`. This is the point where many local
-   contracts become one document.
+- Today `apps/api/src/openapi.ts` still uses `SwaggerModule.createDocument(...)` as temporary
+  scaffolding. Treat that as migration state, not as the pattern to copy into new REST endpoints.
 
-6. Generate a static document from code, not from a running server.
-   `generate-http-openapi.ts` writes `packages/api-client/docs/http.openapi.json` directly from the
-   shared contract package. That means CI, SDK generation, and local validation do not need a live
-   Nest server to exist first.
+Architecture diagram:
 
-7. Validate the generated document before you generate SDKs from it.
-   `http-openapi.spec.ts` is the confidence gate. It proves the document is valid OpenAPI and
-   includes the expected initial contract slice. Do not move on to SDK generation while this step
-   is flaky or incomplete.
+```mermaid
+flowchart LR
+  contracts["Shared Zod contracts"]
+  builder["Canonical contract builder"]
+  spec["Canonical spec file"]
+  json["Published /api/v1/openapi.json"]
+  docs["Rendered /api/docs"]
+  parity["Parity tests"]
 
-8. Make the backend consume the contracts instead of duplicating them.
-   The API-side bridge in `apps/api/src/contracts/http.ts` imports the package surface, and the
-   controllers/services parse or shape responses with those schemas. This is where Nest stops being
-   the contract source and becomes an adapter layer.
+  contracts --> builder
+  builder --> spec
+  spec --> json
+  spec --> docs
+  parity --> spec
+  parity --> json
+```
 
-9. Keep live docs and canonical contracts as separate responsibilities.
-   The temporary Swagger UI at `/api/docs` is still helpful for humans, but the contract source of
-   truth is the Zod-first package flow above. The live docs surface is a viewer, not the author.
+## Step 14 - Author public REST contracts in shared Zod modules
 
-10. Only after Steps 1-9 are stable should you generate the SDK.
-    Task 3 is intentionally later. If you generate clients before the contract package and spec
-    pipeline are stable, you create churn and teach the wrong dependency order.
+User/business impact:
 
-Pattern summary:
+If Couture Cast is meant to be a reference-quality foundation, public REST contracts cannot live in
+controllers, generated clients, or one-off DTOs. They have to live in one shared contract layer
+that every runtime trusts.
 
-- First: define Zod schemas
-- Second: register schemas + paths
-- Third: generate the OpenAPI document
-- Fourth: write the document to disk
-- Fifth: validate the document
-- Sixth: consume the same contracts from adapters
-- Seventh: generate SDKs from the validated document
+Key takeaways:
+
+1. The permanent order is: define Zod contracts first, register them into OpenAPI second, generate
+   the canonical document third, then derive SDKs and adapters from that stable output.
+2. The shared contract package owns request schemas, response schemas, error envelopes, inferred
+   TypeScript types, and OpenAPI metadata in one place.
+3. Each contract slice should keep schema definition and path registration close together, so the
+   module that owns an endpoint also owns its OpenAPI description.
+4. Nest controllers and services should stay thin: parse inputs, shape outputs, and delegate real
+   work. They are adapters, not contract authors.
+5. The first migrated slice is only the proof point. The architecture is not finished until every
+   public REST endpoint used by web/mobile follows the same model.
+
+Story/Task mapping:
+
+- Story 0.9
+- Task 2 (establish the Zod-first contract foundation)
+- Task 5 (finish migrating the remaining public REST slices)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/0-9-initialize-openapi-spec-generation-and-api-client-sdk.md`
+
+Cross-links:
+
+- Step 2 explains why package boundaries matter before contract authoring starts.
+- Step 13 shows how the API should publish the contract once it exists.
+- Step 15 shows what happens downstream after the contract is validated.
+
+Sequence to follow:
+
+1. Start with reusable primitives before endpoint-specific schemas.
+2. Register paths next to the schema definitions and compose them into one canonical builder.
+3. Write and validate the canonical document before any downstream consumer uses it.
+4. Keep Nest controllers and services thin by consuming the shared schemas instead of redefining them.
+
+Task owner map:
+
+- Story 0.9 Task 2 step 1 owner: define reusable HTTP primitives in `packages/api-client/src/contracts/http/common.ts`
+- Story 0.9 Task 2 step 2 owner: define endpoint-specific health contracts in `packages/api-client/src/contracts/http/health.ts`
+- Story 0.9 Task 2 step 3 owner: define endpoint-specific feature contracts in `packages/api-client/src/contracts/http/events.ts`
+- Story 0.9 Task 2 step 4 owner: compose slice registrations into one canonical builder in `packages/api-client/src/contracts/http/openapi.ts`
+- Story 0.9 Task 2 step 5 owner: write the canonical contract artifact to disk in `packages/api-client/scripts/generate-http-openapi.ts`
+- Story 0.9 Task 2 step 6 owner: validate the canonical contract in `packages/api-client/testing/http-openapi.spec.ts`
+- Story 0.9 Task 2 step 7 owner: consume the shared schemas from the API adapter boundary in `apps/api/src/contracts/http.ts`
+
+Current repo note:
+
+- Health and polling already follow this model. The remaining public REST slices still need to move
+  into the same shared-contract path before the architecture is truly complete.
 
 Architecture diagram:
 
 ```mermaid
 flowchart TD
-  common["common.ts\nshared primitives"] --> health["health.ts\nhealth schemas + path registration"]
-  common --> events["events.ts\nevents schemas + path registration"]
-  health --> registry["OpenAPIRegistry"]
+  common["common.ts\nshared primitives"] --> health["health.ts\nendpoint schemas"]
+  common --> events["events.ts\nendpoint schemas"]
+  health --> registry["register*Contracts(...)"]
   events --> registry
-  registry --> generator["OpenApiGeneratorV31"]
-  generator --> document["HTTP OpenAPI document"]
-  document --> file["docs/http.openapi.json"]
-  document --> tests["http-openapi.spec.ts"]
-  document --> sdk["Task 3 SDK generation"]
-  health --> nest["Nest adapters parse/shape data"]
-  events --> nest
+  registry --> builder["OpenAPIRegistry + OpenApiGeneratorV31"]
+  builder --> document["http.openapi.json"]
+  health --> api["Nest adapters"]
+  events --> api
+```
+
+## Step 15 - Validate, generate, and consume the canonical contract
+
+User/business impact:
+
+A canonical contract only becomes valuable once every downstream consumer trusts it. Generated SDKs,
+CI diff checks, and real app usage turn the contract from documentation into an enforced delivery
+boundary.
+
+Key takeaways:
+
+1. SDK generation is a downstream operation. It starts only after the canonical contract has been
+   generated and validated.
+2. Root-level **npm scripts and the lockfile** should orchestrate contract regeneration (not “npm
+   hoisting” of arbitrary packages) so developers and CI do not need a manually running API server.
+3. Generated output is not the package's final public API. The repo should keep a small
+   human-authored wrapper surface such as `createApiClient(...)` for consumers.
+4. CI breaking-change checks, live API parity tests, and web/mobile runtime usage should all depend
+   on the same canonical spec file.
+5. The contract loop closes only when real app flows use the generated client instead of handwritten
+   request typing.
+
+Story/Task mapping:
+
+- Story 0.9
+- Task 3 (generate SDK from the canonical contract-derived spec and add wrapper exports)
+- Task 6 (add contract parity tests)
+- Task 7 (integrate the generated SDK into real web/mobile flows)
+- Task 8 (implement canonical OpenAPI diff checks in CI)
+- Task 9 (document versioning and regeneration workflow)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/0-9-initialize-openapi-spec-generation-and-api-client-sdk.md`
+
+Cross-links:
+
+- Step 13 explains how the API publishes the contract.
+- Step 14 explains how the contract is authored.
+- Step 7 frames CI automation here as part of the repo quality-gates model.
+
+Sequence to follow:
+
+1. Keep canonical spec generation and validation green first.
+2. Generate and normalize the SDK from the checked-in canonical spec, not from a live URL.
+3. Consume the stable wrapper surface from apps and tests.
+4. Use CI only to regenerate, detect drift, and enforce contract guardrails automatically.
+
+Task owner map:
+
+- Story 0.9 Task 3 step 1 owner: install and expose generator tooling from the repo root in `package.json` and `package-lock.json`
+- Story 0.9 Task 3 step 2 owner: point the generator at the checked-in canonical spec in `openapitools.json`
+- Story 0.9 Task 3 step 3 owner: normalize raw generated output in `packages/api-client/scripts/postprocess-generated-sdk.ts`
+- Story 0.9 Task 3 step 4 owner: publish the stable human-authored client factory in `packages/api-client/src/client.ts`
+- Step 15 step 4 owner: re-export the stable package surface in `packages/api-client/src/index.ts`
+- Step 15 step 5 owner: validate the canonical spec before downstream consumption in `packages/api-client/testing/http-openapi.spec.ts`
+- Story 0.9 Task 3 step 5 owner: prove the generated wrapper surface in `packages/api-client/testing/generated-client.spec.ts`
+
+Current repo note:
+
+- The canonical spec generation and SDK wrapper flow already exist. The remaining work is to add
+  live parity checks, CI diff enforcement, and real web/mobile adoption so every consumer depends on
+  that same contract.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  spec["Canonical spec\nhttp.openapi.json"] --> validate["Spec validation"]
+  validate --> sdk["OpenAPI Generator"]
+  sdk --> normalize["Postprocess + wrapper exports"]
+  normalize --> apps["Web / mobile consumers"]
+  spec --> parity["Live API parity tests"]
+  spec --> diff["CI breaking-change diff"]
+  parity --> apps
+  diff --> apps
 ```

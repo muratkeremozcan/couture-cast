@@ -48,9 +48,7 @@
     "@vitest/ui": "^4.0.18",
     "jsdom": "^27.0.1",
     "msw": "^2.12.10",
-    "react-test-renderer": "19.1.0",
-    "typescript": "5.9.3",
-    "vitest": "^4.0.9"
+    "react-test-renderer": "19.1.0"
   },
   "private": true
 }

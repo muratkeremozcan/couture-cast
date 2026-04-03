@@ -4,6 +4,11 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 export const OPENAPI_DOCS_ROUTE = '/api/docs'
 export const OPENAPI_JSON_ROUTE = '/api/v1/openapi.json'
 
+// Step 13 evidence:
+// this file is the API-boundary publication seam for the OpenAPI contract.
+//
+// Today it still uses Swagger scaffolding as a migration state. The durable target is for this
+// file to serve and render the canonical Zod-generated contract rather than authoring a second one.
 export function isOpenApiEnabled(env: NodeJS.ProcessEnv): boolean {
   const override = env.OPENAPI_ENABLED?.trim().toLowerCase()
 
@@ -64,6 +69,10 @@ function createOpenApiDocument(app: INestApplication) {
 export function configureOpenApi(app: INestApplication) {
   const document = createOpenApiDocument(app)
 
+  // Step 13 evidence:
+  // these are the two API-facing views of the contract surface:
+  // - raw machine-readable JSON
+  // - human-friendly docs UI
   // Expose both human and machine entry points:
   // - /api/docs renders Swagger UI for developers
   // - /api/v1/openapi.json returns the raw spec for SDK generation and CI checks

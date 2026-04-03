@@ -1,3 +1,4 @@
+// Step 12 step 5 owner: searchable owner anchor
 import { PollingService, type BaseEvent } from '@couture/api-client'
 
 type MinimalSocket = { on: (event: string, callback: () => void) => void }

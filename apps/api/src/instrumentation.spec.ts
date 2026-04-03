@@ -1,3 +1,4 @@
+// Step 9 verification owner: searchable owner anchor
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DiagLogLevel } from '@opentelemetry/api'
 import { core } from '@opentelemetry/sdk-node'

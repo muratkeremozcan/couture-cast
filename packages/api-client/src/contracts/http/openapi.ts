@@ -1,3 +1,4 @@
+// Step 13 step 3 owner: searchable owner anchor
 import {
   OpenAPIRegistry,
   OpenApiGeneratorV31,

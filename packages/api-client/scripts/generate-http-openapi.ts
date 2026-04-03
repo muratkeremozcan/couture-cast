@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Step 13 step 4 owner: searchable owner anchor
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
