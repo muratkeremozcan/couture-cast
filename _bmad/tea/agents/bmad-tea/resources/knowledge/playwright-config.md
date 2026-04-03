@@ -67,7 +67,7 @@ export const baseConfig = defineConfig({
   use: {
     actionTimeout: 15000,
     navigationTimeout: 30000,
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure-and-retries',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
@@ -92,6 +92,9 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:3000',
+    wait: {
+      stdout: /ready|listening|localhost:/i,
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },
@@ -272,8 +275,8 @@ export default defineConfig({
     // Video recording on failure + retry
     video: 'retain-on-failure',
 
-    // Trace recording on first retry (best debugging data)
-    trace: 'on-first-retry',
+    // Keep failed attempts and retries for flake analysis
+    trace: 'retain-on-failure-and-retries',
   },
 
   reporter: [
@@ -397,7 +400,8 @@ test('capture screenshot on specific error', async ({ page }) => {
 
 - `screenshot: 'only-on-failure'` saves space (not every test)
 - `video: 'retain-on-failure'` captures full flow on failures
-- `trace: 'on-first-retry'` provides deep debugging data (network, DOM, console)
+- `trace: 'retain-on-failure-and-retries'` keeps enough history to compare failing retries against passing runs
+- `webServer.wait` is better than startup sleeps when local servers print readiness to stdout/stderr
 - HTML report at `playwright-report/` (visual debugging)
 - JUnit XML at `test-results/results.xml` (CI integration)
 - CI uploads artifacts on failure with 30-day retention

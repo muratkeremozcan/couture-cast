@@ -67,6 +67,8 @@ snapshot ref {role: "button", name: "Sign In"}
 
 **Evidence collection** — During `test-review`, TEA can capture screenshots, traces, and network logs as evidence without the overhead of a full MCP session.
 
+**Agent-side test debugging** — For existing failing Playwright tests, TEA should prefer Playwright's newer agent-facing debug loop over ad hoc manual reproduction: `npx playwright test --debug` to step through the paused test in Inspector, then `npx playwright trace ...` to inspect the resulting trace artifact from the command line.
+
 ## How CLI Relates to Playwright Utils and API Testing
 
 CLI and playwright-utils are **complementary tools that work at different layers**:
@@ -124,6 +126,31 @@ For parallel safety (multiple agents on the same machine), append a unique suffi
 ```bash
 playwright-cli -s=tea-explore-<timestamp> open https://app.com
 ```
+
+## Recent Playwright Debug Flows Worth Using
+
+For generated tests that already exist and are failing, Playwright now has a better native debugging loop than "re-run locally and guess."
+
+```bash
+# Pause a failing test and attach through playwright-cli
+npx playwright test --debug
+playwright-cli attach <session-id>
+playwright-cli --session <session-id> step-over
+
+# Inspect an existing trace artifact from CI or local runs
+npx playwright trace open test-results/<run>/trace.zip
+npx playwright trace actions test-results/<run>/trace.zip --grep="expect"
+npx playwright trace action test-results/<run>/trace.zip 9
+npx playwright trace snapshot test-results/<run>/trace.zip 9 --name after
+```
+
+Use this when TEA is in healing/review mode:
+
+- `playwright-cli` session commands remain the best lightweight tool for page exploration and selector verification.
+- `npx playwright test --debug` is better for stepping through an already-written failing test.
+- `npx playwright trace ...` is better for understanding flakes and assertion failures from saved artifacts.
+
+If your environment exposes the Playwright dashboard or bound-browser flow, it can help humans inspect what an agent is doing in the background, but TEA should treat that as optional observability rather than a hard dependency.
 
 ## Command Quick Reference
 
