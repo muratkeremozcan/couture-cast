@@ -14,6 +14,7 @@ import { EventsModule } from './modules/events/events.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module'
 import { ModerationModule } from './modules/moderation/moderation.module'
+import { UserModule } from './modules/user/user.module'
 
 // Disable websockets by setting DISABLE_WEBSOCKETS=true (e.g., in specific tests)
 const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [GatewayModule]
@@ -28,6 +29,7 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     AuthModule,
     FeatureFlagsModule,
     ModerationModule,
+    UserModule,
   ],
   controllers: [AppController, ApiHealthController, HealthController, AdminController],
   providers: [AppService, AdminService, AdminCron],

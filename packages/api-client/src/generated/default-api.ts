@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { BaseAPI, type Configuration } from './runtime'
-import { EventsApi, HealthApi } from './apis'
+import { AuthApi, EventsApi, HealthApi, ModerationApi, UserApi } from './apis'
 
 type PublicApi<T> = Pick<T, keyof T>
 
@@ -22,7 +22,12 @@ function applyApiMixins(
   }
 }
 
-export interface DefaultApi extends PublicApi<EventsApi>, PublicApi<HealthApi> {}
+export interface DefaultApi
+  extends PublicApi<AuthApi>,
+    PublicApi<EventsApi>,
+    PublicApi<HealthApi>,
+    PublicApi<ModerationApi>,
+    PublicApi<UserApi> {}
 
 export class DefaultApi extends BaseAPI {
   constructor(configuration?: Configuration) {
@@ -30,4 +35,4 @@ export class DefaultApi extends BaseAPI {
   }
 }
 
-applyApiMixins(DefaultApi, [EventsApi, HealthApi])
+applyApiMixins(DefaultApi, [AuthApi, EventsApi, HealthApi, ModerationApi, UserApi])

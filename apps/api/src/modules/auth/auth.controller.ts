@@ -7,7 +7,8 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common'
-import { AuthService, guardianConsentInputSchema } from './auth.service'
+import { guardianConsentInputSchema } from '../../contracts/http'
+import { AuthService } from './auth.service'
 import { AuthContext, Roles } from './security.decorators'
 import { RequestAuthGuard, RolesGuard } from './security.guards'
 import type { RequestAuthContext } from './security.types'

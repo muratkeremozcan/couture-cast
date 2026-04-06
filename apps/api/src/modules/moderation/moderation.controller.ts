@@ -7,10 +7,11 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common'
+import { moderationActionInputSchema } from '../../contracts/http'
 import { AuthContext, Roles } from '../auth/security.decorators'
 import { RequestAuthGuard, RolesGuard } from '../auth/security.guards'
 import type { RequestAuthContext } from '../auth/security.types'
-import { ModerationService, moderationActionInputSchema } from './moderation.service'
+import { ModerationService } from './moderation.service'
 
 @Controller('/api/v1/moderation')
 export class ModerationController {

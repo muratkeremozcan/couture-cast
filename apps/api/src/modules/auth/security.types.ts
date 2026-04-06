@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 
-export const API_ROLES = ['guardian', 'moderator', 'admin'] as const
+export const API_ROLES = ['guardian', 'teen', 'moderator', 'admin'] as const
 export type ApiRole = (typeof API_ROLES)[number]
 
 export interface RequestAuthContext {
