@@ -38,8 +38,11 @@ test('writes a valid HTTP OpenAPI document for the initial contract slice', asyn
     }
 
     expect(paths['/api/health']).toBeDefined()
+    expect(paths['/api/v1/auth/guardian-consent']).toBeDefined()
     expect(paths['/api/v1/health/queues']).toBeDefined()
     expect(paths['/api/v1/events/poll']).toBeDefined()
+    expect(paths['/api/v1/moderation/actions']).toBeDefined()
+    expect(paths['/api/v1/user/profile']).toBeDefined()
   } finally {
     rmSync(outputDir, { recursive: true, force: true })
   }

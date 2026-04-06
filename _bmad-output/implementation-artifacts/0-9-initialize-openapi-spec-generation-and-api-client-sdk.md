@@ -103,27 +103,27 @@ so that I can call backend endpoints without manual typing errors and catch brea
 
   - [x] Add runtime dependencies only where the generated client actually requires them
 
-- [ ] Task 4: Replace Swagger-authored live docs with the canonical contract output (AC: #1, #2)
-  - [ ] Update `apps/api/src/openapi.ts` so `/api/v1/openapi.json` serves the canonical
+- [x] Task 4: Replace Swagger-authored live docs with the canonical contract output (AC: #1, #2)
+  - [x] Update `apps/api/src/openapi.ts` so `/api/v1/openapi.json` serves the canonical
         Zod-generated contract output rather than `SwaggerModule.createDocument(...)`
-  - [ ] Keep `/api/docs` as a human-friendly viewer, but make it render that same canonical spec
+  - [x] Keep `/api/docs` as a human-friendly viewer, but make it render that same canonical spec
         instead of rebuilding a second spec from decorators
-  - [ ] Verify the live `/api/v1/openapi.json` output matches the canonical generated document for
+  - [x] Verify the live `/api/v1/openapi.json` output matches the canonical generated document for
         the migrated routes
-  - [ ] Treat the current Nest Swagger decorator path as scaffolding only; do not extend it to new
+  - [x] Treat the current Nest Swagger decorator path as scaffolding only; do not extend it to new
         REST endpoints
 
-- [ ] Task 5: Finish migrating public REST slices to shared contracts and thin Nest adapters (AC: #1)
-  - [ ] Create contract modules for the remaining Epic 0 REST slices, including at least:
+- [x] Task 5: Finish migrating public REST slices to shared contracts and thin Nest adapters (AC: #1)
+  - [x] Create contract modules for the remaining Epic 0 REST slices, including at least:
     - `auth`
     - `user`
     - any additional public REST slice needed before Epic 0 exit
-  - [ ] Co-locate request schemas, response schemas, error envelopes, inferred types, and OpenAPI
+  - [x] Co-locate request schemas, response schemas, error envelopes, inferred types, and OpenAPI
         metadata in those modules
-  - [ ] Update controllers/services so they parse inputs and shape outputs with shared schemas
+  - [x] Update controllers/services so they parse inputs and shape outputs with shared schemas
         instead of ad hoc DTOs or handwritten response types
-  - [ ] Remove REST Swagger decorators and doc-only DTOs as each slice migrates
-  - [ ] Exit criterion: no public REST endpoint used by web/mobile depends on
+  - [x] Remove REST Swagger decorators and doc-only DTOs as each slice migrates
+  - [x] Exit criterion: no public REST endpoint used by web/mobile depends on
         decorator-authored schema generation
 
 - [ ] Task 6: Add canonical contract parity tests for the live API (AC: #1, #3)
@@ -300,6 +300,33 @@ GPT-5 Codex
 - `npm run build --workspace @couture/api-client`
 - `npm run typecheck --workspace web`
 - `npm run typecheck --workspace mobile`
+- `npm run build --workspace @couture/api-client`
+- `npm test --workspace @couture/api-client`
+- `npm run typecheck --workspace api` (failed: canonical OpenAPI handoff needed Swagger type normalization)
+- `npm test --workspace api` (failed: Swagger UI HTML assertion was stricter than the actual viewer shell)
+- `npm run typecheck --workspace api`
+- `npm test --workspace api -- openapi.spec.ts`
+- `npm run lint --workspace api`
+- `npm test --workspace api`
+- `npm run typecheck --workspace @couture/api-client`
+- `npm run typecheck --workspace api` (failed: API bridge was missing exported GuardianConsentInput/ModerationActionInput types)
+- `npm run typecheck --workspace api`
+- `npm run gen:openapi:http --workspace @couture/api-client`
+- `npm run generate:api-client`
+- `npm run build --workspace @couture/api-client`
+- `npm run lint --workspace @couture/api-client`
+- `npm test --workspace @couture/api-client`
+- `npm run lint --workspace api`
+- `npm test --workspace api`
+- `npm run typecheck --workspace web`
+- `npm run typecheck --workspace mobile`
+- `npm run typecheck` (failed: generated API files imported unused response model types)
+- `npm run generate:api-client`
+- `npm run typecheck`
+- `npm run lint` (failed: Prettier wanted the touched generated files and story record normalized)
+- `npx prettier --write _bmad-output/implementation-artifacts/0-9-initialize-openapi-spec-generation-and-api-client-sdk.md packages/api-client/src/generated/apis/AuthApi.ts packages/api-client/src/generated/apis/EventsApi.ts packages/api-client/src/generated/apis/HealthApi.ts packages/api-client/src/generated/apis/index.ts packages/api-client/src/generated/apis/ModerationApi.ts packages/api-client/src/generated/apis/UserApi.ts packages/api-client/src/generated/default-api.ts packages/api-client/src/generated/index.ts packages/api-client/src/generated/models/index.ts packages/api-client/src/generated/runtime.ts`
+- `npm run lint`
+- `npm run test`
 
 ### Completion Notes List
 
@@ -322,6 +349,18 @@ GPT-5 Codex
 - Refined the remaining story tasks so the end state is a single Zod-native contract pipeline:
   contracts author the spec, the API serves that same canonical spec, SDK/CI consume it, and
   Swagger decorator authoring is treated as temporary scaffolding to be removed.
+- Task 4 complete.
+- `apps/api/src/openapi.ts` now publishes the canonical document from `@couture/api-client/contracts/http` to both `/api/v1/openapi.json` and `/api/docs`, instead of rebuilding a Swagger decorator-authored spec in-process.
+- Added API integration assertions that the live `/api/v1/openapi.json` response exactly matches the canonical generated document for `/api/health`, `/api/v1/health/queues`, and `/api/v1/events/poll`.
+- Task 5 complete.
+- Added shared `auth`, `user`, and `moderation` HTTP contract modules under `packages/api-client/src/contracts/http/`, including request/response schemas, inferred types, documented error payloads, and OpenAPI path registration.
+- Added a real authenticated `GET /api/v1/user/profile` API slice backed by Prisma so the first `user` REST contract is DB-backed rather than stubbed.
+- Updated auth and moderation controllers/services to consume shared contract schemas instead of local ad hoc Zod definitions, and expanded the request auth role union to include `teen` for authenticated user-profile access.
+- Removed the leftover health Swagger decorators now that the live OpenAPI publication path is fully canonical-contract driven.
+- Regenerated `packages/api-client/docs/http.openapi.json` and the generated SDK so the checked-in contract, live API publication, and client surface now include `/api/v1/auth/guardian-consent`, `/api/v1/user/profile`, and `/api/v1/moderation/actions`.
+- Left `/api/v1/admin/*` out of the canonical public contract set because it remains an operator-only DLQ surface, not a web/mobile client contract.
+- Hardened `packages/api-client/scripts/postprocess-generated-sdk.ts` so generated API files drop unused model-type imports, which keeps the repo-level `npm run typecheck` green after regeneration.
+- Re-ran the repo-level validation surface after the SDK postprocess fix; `npm run typecheck`, `npm run lint`, and `npm run test` all passed.
 
 ### File List
 
@@ -329,11 +368,22 @@ GPT-5 Codex
 - \_bmad-output/planning-artifacts/architecture.md
 - \_bmad-output/planning-artifacts/epics.md
 - apps/api/package.json
+- apps/api/src/app.module.ts
 - apps/api/src/contracts/http.ts
 - apps/api/src/controllers/api-health.controller.ts
 - apps/api/src/controllers/health.controller.ts
+- apps/api/src/modules/auth/auth.controller.ts
+- apps/api/src/modules/auth/auth.service.ts
+- apps/api/src/modules/auth/security.types.ts
 - apps/api/src/modules/events/events.controller.ts
 - apps/api/src/modules/events/events.service.ts
+- apps/api/src/modules/moderation/moderation.controller.ts
+- apps/api/src/modules/moderation/moderation.service.ts
+- apps/api/src/modules/user/user.controller.spec.ts
+- apps/api/src/modules/user/user.controller.ts
+- apps/api/src/modules/user/user.module.ts
+- apps/api/src/modules/user/user.service.spec.ts
+- apps/api/src/modules/user/user.service.ts
 - apps/api/src/main.ts
 - apps/api/src/openapi.spec.ts
 - apps/api/src/openapi.ts
@@ -346,13 +396,19 @@ GPT-5 Codex
 - packages/api-client/scripts/postprocess-generated-sdk.ts
 - packages/api-client/src/client.ts
 - packages/api-client/src/contracts/http/common.ts
+- packages/api-client/src/contracts/http/auth.ts
 - packages/api-client/src/contracts/http/events.ts
 - packages/api-client/src/contracts/http/health.ts
 - packages/api-client/src/contracts/http/index.ts
+- packages/api-client/src/contracts/http/moderation.ts
 - packages/api-client/src/contracts/http/openapi.ts
+- packages/api-client/src/contracts/http/user.ts
+- packages/api-client/src/generated/apis/AuthApi.ts
 - packages/api-client/src/generated/apis/EventsApi.ts
 - packages/api-client/src/generated/apis/HealthApi.ts
 - packages/api-client/src/generated/apis/index.ts
+- packages/api-client/src/generated/apis/ModerationApi.ts
+- packages/api-client/src/generated/apis/UserApi.ts
 - packages/api-client/src/generated/default-api.ts
 - packages/api-client/src/generated/index.ts
 - packages/api-client/src/generated/models/index.ts
@@ -363,11 +419,14 @@ GPT-5 Codex
 
 ## Change Log
 
-| Date       | Author             | Change                                                                                                      |
-| ---------- | ------------------ | ----------------------------------------------------------------------------------------------------------- |
-| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.9 acceptance criteria                                                       |
-| 2026-03-31 | Amelia             | Completed Task 1 Swagger wiring and validation.                                                             |
-| 2026-04-01 | Amelia             | Corrected Story 0.9 toward a Zod-first contract architecture and rolled back the Swagger-derived SDK spike. |
-| 2026-04-01 | Amelia             | Completed Task 2 initial Zod-first contract slice for health and polling endpoints.                         |
-| 2026-04-03 | Amelia             | Completed Task 3 canonical SDK generation, wrapper exports, and downstream validation for web/mobile.       |
-| 2026-04-03 | Amelia             | Refined remaining Story 0.9 tasks to converge on a fully Zod-native end state.                              |
+| Date       | Author             | Change                                                                                                         |
+| ---------- | ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.9 acceptance criteria                                                          |
+| 2026-03-31 | Amelia             | Completed Task 1 Swagger wiring and validation.                                                                |
+| 2026-04-01 | Amelia             | Corrected Story 0.9 toward a Zod-first contract architecture and rolled back the Swagger-derived SDK spike.    |
+| 2026-04-01 | Amelia             | Completed Task 2 initial Zod-first contract slice for health and polling endpoints.                            |
+| 2026-04-03 | Amelia             | Completed Task 3 canonical SDK generation, wrapper exports, and downstream validation for web/mobile.          |
+| 2026-04-03 | Amelia             | Refined remaining Story 0.9 tasks to converge on a fully Zod-native end state.                                 |
+| 2026-04-06 | Amelia             | Completed Task 4 so live OpenAPI JSON and Swagger UI both publish the canonical contract-derived spec.         |
+| 2026-04-06 | Amelia             | Completed Task 5 by migrating auth/user/moderation REST slices into shared contracts and regenerating the SDK. |
+| 2026-04-06 | Amelia             | Hardened generated SDK postprocessing to remove unused model imports and revalidated root typecheck/lint/test. |

@@ -25,6 +25,150 @@
           "error"
         ]
       },
+      "TrackedResponse": {
+        "type": "object",
+        "properties": {
+          "tracked": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "tracked"
+        ]
+      },
+      "BadRequestHttpError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              400
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Bad Request"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ]
+      },
+      "UnauthorizedHttpError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              401
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Unauthorized"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ]
+      },
+      "ForbiddenHttpError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              403
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Forbidden"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ]
+      },
+      "NotFoundHttpError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              404
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Not Found"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ]
+      },
+      "GuardianConsentInput": {
+        "type": "object",
+        "properties": {
+          "guardianId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "teenId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "consentLevel": {
+            "type": "string",
+            "minLength": 1
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "guardianId",
+          "teenId",
+          "consentLevel"
+        ]
+      },
       "ApiHealthResponse": {
         "type": "object",
         "properties": {
@@ -246,11 +390,281 @@
             "$ref": "#/components/schemas/EventsPollInvalidSinceResponse"
           }
         ]
+      },
+      "ModerationActionInput": {
+        "type": "object",
+        "properties": {
+          "moderatorId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "targetId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "moderatorId",
+          "targetId",
+          "action",
+          "reason"
+        ]
+      },
+      "LinkedGuardian": {
+        "type": "object",
+        "properties": {
+          "guardianId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "granted",
+              "revoked"
+            ]
+          },
+          "consentGrantedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "guardianId",
+          "status",
+          "consentGrantedAt"
+        ]
+      },
+      "LinkedTeen": {
+        "type": "object",
+        "properties": {
+          "teenId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "granted",
+              "revoked"
+            ]
+          },
+          "consentGrantedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "teenId",
+          "status",
+          "consentGrantedAt"
+        ]
+      },
+      "UserProfileResponse": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "displayName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "birthdate": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "guardian",
+                  "teen",
+                  "moderator",
+                  "admin"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "displayName",
+              "birthdate",
+              "role"
+            ]
+          },
+          "linkedGuardians": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "guardianId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "granted",
+                    "revoked"
+                  ]
+                },
+                "consentGrantedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "guardianId",
+                "status",
+                "consentGrantedAt"
+              ]
+            }
+          },
+          "linkedTeens": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "teenId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "granted",
+                    "revoked"
+                  ]
+                },
+                "consentGrantedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "teenId",
+                "status",
+                "consentGrantedAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "user",
+          "linkedGuardians",
+          "linkedTeens"
+        ]
       }
     },
     "parameters": {}
   },
   "paths": {
+    "/api/v1/auth/guardian-consent": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Record guardian consent for a teen account",
+        "description": "Captures guardian consent for compliance workflows and downstream audit/analytics handling.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardianConsentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Guardian consent recorded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Guardian consent payload failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated guardian does not match guardianId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -409,6 +823,108 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventsPollResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/moderation/actions": {
+      "post": {
+        "tags": [
+          "moderation"
+        ],
+        "summary": "Record a moderation action",
+        "description": "Captures moderation actions for analytics, policy tracking, and downstream review workflows.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModerationActionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Moderation action recorded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Moderation action payload failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated moderator does not match moderatorId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/user/profile": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Get the authenticated user profile",
+        "description": "Returns profile metadata plus guardian/teen consent links for authenticated dashboards.",
+        "responses": {
+          "200": {
+            "description": "Authenticated user profile returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Authenticated user could not be found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
                 }
               }
             }

@@ -1,5 +1,6 @@
 import 'reflect-metadata'
 import type { INestApplication } from '@nestjs/common'
+import { generateHttpOpenApiDocument } from '@couture/api-client/contracts/http'
 import { Test } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import request from 'supertest'
@@ -12,14 +13,7 @@ import {
   OPENAPI_JSON_ROUTE,
 } from './openapi'
 
-type OpenApiSpec = {
-  info: {
-    title: string
-    version: string
-  }
-  openapi: string
-  paths: Record<string, { get?: { tags?: string[] } }>
-}
+type OpenApiSpec = ReturnType<typeof generateHttpOpenApiDocument>
 
 // Step 13 evidence:
 // this file verifies the API-published contract surface itself, not just the package-level
@@ -57,21 +51,24 @@ describe('OpenAPI integration', () => {
     }
   })
 
-  it('serves an OpenAPI document for health endpoints', async () => {
+  it('serves the canonical contract-derived document', async () => {
     // supertest talks to Nest's HTTP server directly, so this is a real HTTP request path.
     const server = app!.getHttpServer() as Parameters<typeof request>[0]
     const response = await request(server).get(OPENAPI_JSON_ROUTE)
     const spec = response.body as OpenApiSpec
+    const canonicalSpec = generateHttpOpenApiDocument()
+    const livePaths = spec.paths
+    const canonicalPaths = canonicalSpec.paths
 
     expect(response.status).toBe(200)
     expect(response.headers['content-type']).toContain('application/json')
-    expect(spec.openapi).toMatch(/^3\./)
-    expect(spec.info).toMatchObject({
-      title: 'CoutureCast API',
-      version: '1.0',
-    })
-    expect(spec.paths['/api/health']?.get?.tags).toContain('health')
-    expect(spec.paths['/api/v1/health/queues']?.get?.tags).toContain('health')
+    expect(spec).toEqual(canonicalSpec)
+    expect(livePaths).toBeDefined()
+    expect(canonicalPaths).toBeDefined()
+
+    if (!livePaths || !canonicalPaths) {
+      throw new Error('Expected both live and canonical specs to define paths')
+    }
   })
 
   it('serves the Swagger UI', async () => {

@@ -1,19 +1,14 @@
 // Step 8 API analytics owner: searchable owner anchor
 import { Injectable } from '@nestjs/common'
-import { z } from 'zod'
 import {
   InjectAnalyticsClient,
   type AnalyticsClient,
 } from '../../analytics/analytics.service'
-
-const guardianConsentInputSchema = z.object({
-  guardianId: z.string().min(1),
-  teenId: z.string().min(1),
-  consentLevel: z.string().min(1),
-  timestamp: z.string().datetime().optional(),
-})
-
-export type GuardianConsentInput = z.infer<typeof guardianConsentInputSchema>
+import {
+  guardianConsentInputSchema,
+  guardianConsentResponseSchema,
+  type GuardianConsentInput,
+} from '../../contracts/http'
 
 @Injectable()
 export class AuthService {
@@ -51,8 +46,6 @@ export class AuthService {
       },
     })
 
-    return { tracked: true }
+    return guardianConsentResponseSchema.parse({ tracked: true })
   }
 }
-
-export { guardianConsentInputSchema }

@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-03 — Step 2: replace abstract hoisting text with practical root vs workspace dependency rules
+Updated: 2026-04-06 — Step 14/15: align REST contract learning notes with the auth/user/moderation Task 5 migration and Step 15 SDK validation hardening now in repo
 
 ## LLM collaborator prompt
 
@@ -1037,8 +1037,9 @@ Task owner map:
 
 Current repo note:
 
-- Today `apps/api/src/openapi.ts` still uses `SwaggerModule.createDocument(...)` as temporary
-  scaffolding. Treat that as migration state, not as the pattern to copy into new REST endpoints.
+- Today `apps/api/src/openapi.ts` publishes the canonical document from
+  `@couture/api-client/contracts/http` to both `/api/v1/openapi.json` and `/api/docs`. Swagger is
+  still present only as the UI renderer, not as the contract authoring path for new REST endpoints.
 
 Architecture diagram:
 
@@ -1112,11 +1113,17 @@ Task owner map:
 - Story 0.9 Task 2 step 5 owner: write the canonical contract artifact to disk in `packages/api-client/scripts/generate-http-openapi.ts`
 - Story 0.9 Task 2 step 6 owner: validate the canonical contract in `packages/api-client/testing/http-openapi.spec.ts`
 - Story 0.9 Task 2 step 7 owner: consume the shared schemas from the API adapter boundary in `apps/api/src/contracts/http.ts`
+- Story 0.9 Task 5 step 1 owner: define the shared auth REST contract slice in `packages/api-client/src/contracts/http/auth.ts`
+- Story 0.9 Task 5 step 2 owner: define the shared moderation REST contract slice in `packages/api-client/src/contracts/http/moderation.ts`
+- Story 0.9 Task 5 step 3 owner: define the first shared user REST contract slice in `packages/api-client/src/contracts/http/user.ts`
+- Story 0.9 Task 5 step 4 owner: shape the DB-backed authenticated user profile through shared contracts in `apps/api/src/modules/user/user.service.ts`
+- Story 0.9 Task 5 step 5 owner: expose the thin authenticated user REST adapter in `apps/api/src/modules/user/user.controller.ts`
 
 Current repo note:
 
-- Health and polling already follow this model. The remaining public REST slices still need to move
-  into the same shared-contract path before the architecture is truly complete.
+- Health, polling, auth, moderation, and the first authenticated user profile slice now follow
+  this model. The remaining work is to migrate later public REST endpoints as they land so every
+  web/mobile-facing API starts in the same shared-contract path.
 
 Architecture diagram:
 
@@ -1148,8 +1155,9 @@ Key takeaways:
    hoisting” of arbitrary packages) so developers and CI do not need a manually running API server.
 3. Generated output is not the package's final public API. The repo should keep a small
    human-authored wrapper surface such as `createApiClient(...)` for consumers.
-4. CI breaking-change checks, live API parity tests, and web/mobile runtime usage should all depend
-   on the same canonical spec file.
+4. CI breaking-change checks, live API parity tests, repo-level validation commands, and
+   web/mobile runtime usage should all depend on the same canonical spec file and normalized
+   generated surface.
 5. The contract loop closes only when real app flows use the generated client instead of handwritten
    request typing.
 
@@ -1177,13 +1185,15 @@ Sequence to follow:
 1. Keep canonical spec generation and validation green first.
 2. Generate and normalize the SDK from the checked-in canonical spec, not from a live URL.
 3. Consume the stable wrapper surface from apps and tests.
-4. Use CI only to regenerate, detect drift, and enforce contract guardrails automatically.
+4. Re-run repo-level `typecheck`, `lint`, and `test` after regeneration so generator drift is
+   caught where real consumers compile.
+5. Use CI only to regenerate, detect drift, and enforce contract guardrails automatically.
 
 Task owner map:
 
 - Story 0.9 Task 3 step 1 owner: install and expose generator tooling from the repo root in `package.json` and `package-lock.json`
 - Story 0.9 Task 3 step 2 owner: point the generator at the checked-in canonical spec in `openapitools.json`
-- Story 0.9 Task 3 step 3 owner: normalize raw generated output in `packages/api-client/scripts/postprocess-generated-sdk.ts`
+- Story 0.9 Task 3 step 3 owner: normalize raw generated output and prune generator-only import noise in `packages/api-client/scripts/postprocess-generated-sdk.ts`
 - Story 0.9 Task 3 step 4 owner: publish the stable human-authored client factory in `packages/api-client/src/client.ts`
 - Step 15 step 4 owner: re-export the stable package surface in `packages/api-client/src/index.ts`
 - Step 15 step 5 owner: validate the canonical spec before downstream consumption in `packages/api-client/testing/http-openapi.spec.ts`
@@ -1191,8 +1201,11 @@ Task owner map:
 
 Current repo note:
 
-- The canonical spec generation and SDK wrapper flow already exist. The remaining work is to add
-  live parity checks, CI diff enforcement, and real web/mobile adoption so every consumer depends on
+- The canonical spec generation, SDK wrapper flow, live OpenAPI publication parity check, and
+  generated auth/user/moderation client surface now exist. The SDK postprocess layer also strips
+  unused generated model imports so repo-level `npm run typecheck`, `npm run lint`, and
+  `npm run test` stay green after regeneration. The remaining work is CI diff enforcement, broader
+  live response/schema parity coverage, and real web/mobile adoption so every consumer depends on
   that same contract.
 
 Architecture diagram:

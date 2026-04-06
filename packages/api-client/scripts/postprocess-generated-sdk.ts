@@ -98,12 +98,57 @@ function walkGeneratedTypeScriptFiles(currentDir: string): string[] {
   })
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+}
+
 function stripGeneratedTslintComments() {
   for (const filePath of walkGeneratedTypeScriptFiles(generatedRoot)) {
     const source = readFileSync(filePath, 'utf8')
     const normalizedSource = source.replace(/^\/\* tslint:disable \*\/\n/, '')
 
     writeFileSync(filePath, normalizedSource)
+  }
+}
+
+function removeUnusedModelTypeImportsFromGeneratedApis() {
+  const apiFilePaths = readdirSync(apisRoot)
+    .filter((fileName) => fileName.endsWith('.ts'))
+    .map((fileName) => resolve(apisRoot, fileName))
+
+  for (const filePath of apiFilePaths) {
+    const source = readFileSync(filePath, 'utf8')
+    const modelImportMatch = source.match(
+      /import type {\n([\s\S]*?)\n} from '\.\.\/models\/index';\n/
+    )
+
+    if (!modelImportMatch) {
+      continue
+    }
+
+    const importBlock = modelImportMatch[1] ?? ''
+    const importedNames = importBlock
+      .split('\n')
+      .map((line) => line.trim().replace(/,$/, ''))
+      .filter(Boolean)
+
+    const sourceWithoutModelImport = source.replace(modelImportMatch[0], '')
+    const usedNames = importedNames.filter((name) =>
+      new RegExp(`\\b${escapeRegExp(name)}\\b`, 'u').test(sourceWithoutModelImport)
+    )
+
+    if (usedNames.length === importedNames.length) {
+      continue
+    }
+
+    const replacement =
+      usedNames.length === 0
+        ? ''
+        : `import type {\n${usedNames
+            .map((name) => `  ${name},`)
+            .join('\n')}\n} from '../models/index';\n`
+
+    writeFileSync(filePath, source.replace(modelImportMatch[0], replacement))
   }
 }
 
@@ -126,6 +171,7 @@ writeFileSync(generatedIndexPath, createGeneratedIndexSource())
 writeFileSync(defaultApiPath, createDefaultApiSource(apiClassNames))
 normalizeGeneratedModelsIndex()
 stripGeneratedTslintComments()
+removeUnusedModelTypeImportsFromGeneratedApis()
 removeGeneratorNoise()
 
 console.log(`✅ Added DefaultApi compatibility wrapper for ${apiClassNames.join(', ')}`)

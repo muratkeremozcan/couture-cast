@@ -5,9 +5,16 @@
 // the contract source of truth lives in @couture/api-client. This bridge lets the API use that
 // package surface directly instead of redefining request/response shapes inside controller code.
 export {
+  type GuardianConsentInput,
+  guardianConsentInputSchema,
+  guardianConsentResponseSchema,
   apiHealthResponseSchema,
   eventsPollInvalidSinceResponseSchema,
   eventsPollQuerySchema,
   eventsPollResponseSchema,
+  type ModerationActionInput,
+  moderationActionInputSchema,
+  moderationActionResponseSchema,
   queueHealthResponseSchema,
+  userProfileResponseSchema,
 } from '@couture/api-client/contracts/http'
