@@ -169,20 +169,6 @@
           "consentLevel"
         ]
       },
-      "GuardianConsentResponse": {
-        "type": "object",
-        "properties": {
-          "tracked": {
-            "type": "boolean",
-            "enum": [
-              true
-            ]
-          }
-        },
-        "required": [
-          "tracked"
-        ]
-      },
       "ApiHealthResponse": {
         "type": "object",
         "properties": {
@@ -440,20 +426,6 @@
           "reason"
         ]
       },
-      "ModerationActionResponse": {
-        "type": "object",
-        "properties": {
-          "tracked": {
-            "type": "boolean",
-            "enum": [
-              true
-            ]
-          }
-        },
-        "required": [
-          "tracked"
-        ]
-      },
       "LinkedGuardian": {
         "type": "object",
         "properties": {
@@ -560,13 +532,65 @@
           "linkedGuardians": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/LinkedGuardian"
+              "type": "object",
+              "properties": {
+                "guardianId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "granted",
+                    "revoked"
+                  ]
+                },
+                "consentGrantedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "guardianId",
+                "status",
+                "consentGrantedAt"
+              ]
             }
           },
           "linkedTeens": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/LinkedTeen"
+              "type": "object",
+              "properties": {
+                "teenId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "granted",
+                    "revoked"
+                  ]
+                },
+                "consentGrantedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "teenId",
+                "status",
+                "consentGrantedAt"
+              ]
             }
           }
         },
@@ -603,7 +627,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GuardianConsentResponse"
+                  "$ref": "#/components/schemas/TrackedResponse"
                 }
               }
             }
@@ -613,30 +637,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "enum": [
-                        400
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "error": {
-                      "type": "string",
-                      "enum": [
-                        "Bad Request"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "statusCode",
-                    "message",
-                    "error"
-                  ]
+                  "$ref": "#/components/schemas/BadRequestHttpError"
                 }
               }
             }
@@ -646,30 +647,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "enum": [
-                        401
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "error": {
-                      "type": "string",
-                      "enum": [
-                        "Unauthorized"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "statusCode",
-                    "message",
-                    "error"
-                  ]
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
                 }
               }
             }
@@ -679,30 +657,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "enum": [
-                        403
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "error": {
-                      "type": "string",
-                      "enum": [
-                        "Forbidden"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "statusCode",
-                    "message",
-                    "error"
-                  ]
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
                 }
               }
             }
@@ -898,7 +853,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ModerationActionResponse"
+                  "$ref": "#/components/schemas/TrackedResponse"
                 }
               }
             }
@@ -908,30 +863,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "enum": [
-                        400
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "error": {
-                      "type": "string",
-                      "enum": [
-                        "Bad Request"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "statusCode",
-                    "message",
-                    "error"
-                  ]
+                  "$ref": "#/components/schemas/BadRequestHttpError"
                 }
               }
             }
@@ -941,30 +873,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "enum": [
-                        401
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "error": {
-                      "type": "string",
-                      "enum": [
-                        "Unauthorized"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "statusCode",
-                    "message",
-                    "error"
-                  ]
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
                 }
               }
             }
@@ -974,30 +883,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "enum": [
-                        403
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "error": {
-                      "type": "string",
-                      "enum": [
-                        "Forbidden"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "statusCode",
-                    "message",
-                    "error"
-                  ]
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
                 }
               }
             }
@@ -1028,30 +914,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "enum": [
-                        401
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "error": {
-                      "type": "string",
-                      "enum": [
-                        "Unauthorized"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "statusCode",
-                    "message",
-                    "error"
-                  ]
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
                 }
               }
             }
@@ -1061,30 +924,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "number",
-                      "enum": [
-                        404
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "error": {
-                      "type": "string",
-                      "enum": [
-                        "Not Found"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "statusCode",
-                    "message",
-                    "error"
-                  ]
+                  "$ref": "#/components/schemas/NotFoundHttpError"
                 }
               }
             }

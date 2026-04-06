@@ -151,138 +151,6 @@ export type ApiHealthResponseServiceEnum =
 /**
  *
  * @export
- * @interface ApiV1AuthGuardianConsentPost400Response
- */
-export interface ApiV1AuthGuardianConsentPost400Response {
-  /**
-   *
-   * @type {ApiV1AuthGuardianConsentPost400ResponseStatusCodeEnum}
-   * @memberof ApiV1AuthGuardianConsentPost400Response
-   */
-  statusCode: ApiV1AuthGuardianConsentPost400ResponseStatusCodeEnum
-  /**
-   *
-   * @type {string}
-   * @memberof ApiV1AuthGuardianConsentPost400Response
-   */
-  message: string
-  /**
-   *
-   * @type {ApiV1AuthGuardianConsentPost400ResponseErrorEnum}
-   * @memberof ApiV1AuthGuardianConsentPost400Response
-   */
-  error: ApiV1AuthGuardianConsentPost400ResponseErrorEnum
-}
-
-/**
- * @export
- */
-export const ApiV1AuthGuardianConsentPost400ResponseStatusCodeEnum = {
-  NUMBER_400: 400,
-} as const
-export type ApiV1AuthGuardianConsentPost400ResponseStatusCodeEnum =
-  (typeof ApiV1AuthGuardianConsentPost400ResponseStatusCodeEnum)[keyof typeof ApiV1AuthGuardianConsentPost400ResponseStatusCodeEnum]
-
-/**
- * @export
- */
-export const ApiV1AuthGuardianConsentPost400ResponseErrorEnum = {
-  Bad_Request: 'Bad Request',
-} as const
-export type ApiV1AuthGuardianConsentPost400ResponseErrorEnum =
-  (typeof ApiV1AuthGuardianConsentPost400ResponseErrorEnum)[keyof typeof ApiV1AuthGuardianConsentPost400ResponseErrorEnum]
-
-/**
- *
- * @export
- * @interface ApiV1AuthGuardianConsentPost401Response
- */
-export interface ApiV1AuthGuardianConsentPost401Response {
-  /**
-   *
-   * @type {ApiV1AuthGuardianConsentPost401ResponseStatusCodeEnum}
-   * @memberof ApiV1AuthGuardianConsentPost401Response
-   */
-  statusCode: ApiV1AuthGuardianConsentPost401ResponseStatusCodeEnum
-  /**
-   *
-   * @type {string}
-   * @memberof ApiV1AuthGuardianConsentPost401Response
-   */
-  message: string
-  /**
-   *
-   * @type {ApiV1AuthGuardianConsentPost401ResponseErrorEnum}
-   * @memberof ApiV1AuthGuardianConsentPost401Response
-   */
-  error: ApiV1AuthGuardianConsentPost401ResponseErrorEnum
-}
-
-/**
- * @export
- */
-export const ApiV1AuthGuardianConsentPost401ResponseStatusCodeEnum = {
-  NUMBER_401: 401,
-} as const
-export type ApiV1AuthGuardianConsentPost401ResponseStatusCodeEnum =
-  (typeof ApiV1AuthGuardianConsentPost401ResponseStatusCodeEnum)[keyof typeof ApiV1AuthGuardianConsentPost401ResponseStatusCodeEnum]
-
-/**
- * @export
- */
-export const ApiV1AuthGuardianConsentPost401ResponseErrorEnum = {
-  Unauthorized: 'Unauthorized',
-} as const
-export type ApiV1AuthGuardianConsentPost401ResponseErrorEnum =
-  (typeof ApiV1AuthGuardianConsentPost401ResponseErrorEnum)[keyof typeof ApiV1AuthGuardianConsentPost401ResponseErrorEnum]
-
-/**
- *
- * @export
- * @interface ApiV1AuthGuardianConsentPost403Response
- */
-export interface ApiV1AuthGuardianConsentPost403Response {
-  /**
-   *
-   * @type {ApiV1AuthGuardianConsentPost403ResponseStatusCodeEnum}
-   * @memberof ApiV1AuthGuardianConsentPost403Response
-   */
-  statusCode: ApiV1AuthGuardianConsentPost403ResponseStatusCodeEnum
-  /**
-   *
-   * @type {string}
-   * @memberof ApiV1AuthGuardianConsentPost403Response
-   */
-  message: string
-  /**
-   *
-   * @type {ApiV1AuthGuardianConsentPost403ResponseErrorEnum}
-   * @memberof ApiV1AuthGuardianConsentPost403Response
-   */
-  error: ApiV1AuthGuardianConsentPost403ResponseErrorEnum
-}
-
-/**
- * @export
- */
-export const ApiV1AuthGuardianConsentPost403ResponseStatusCodeEnum = {
-  NUMBER_403: 403,
-} as const
-export type ApiV1AuthGuardianConsentPost403ResponseStatusCodeEnum =
-  (typeof ApiV1AuthGuardianConsentPost403ResponseStatusCodeEnum)[keyof typeof ApiV1AuthGuardianConsentPost403ResponseStatusCodeEnum]
-
-/**
- * @export
- */
-export const ApiV1AuthGuardianConsentPost403ResponseErrorEnum = {
-  Forbidden: 'Forbidden',
-} as const
-export type ApiV1AuthGuardianConsentPost403ResponseErrorEnum =
-  (typeof ApiV1AuthGuardianConsentPost403ResponseErrorEnum)[keyof typeof ApiV1AuthGuardianConsentPost403ResponseErrorEnum]
-
-/**
- *
- * @export
  * @interface ApiV1HealthQueuesGet200Response
  */
 export interface ApiV1HealthQueuesGet200Response {
@@ -358,50 +226,6 @@ export interface ApiV1HealthQueuesGet200ResponseMetrics {
    */
   paused?: number
 }
-/**
- *
- * @export
- * @interface ApiV1UserProfileGet404Response
- */
-export interface ApiV1UserProfileGet404Response {
-  /**
-   *
-   * @type {ApiV1UserProfileGet404ResponseStatusCodeEnum}
-   * @memberof ApiV1UserProfileGet404Response
-   */
-  statusCode: ApiV1UserProfileGet404ResponseStatusCodeEnum
-  /**
-   *
-   * @type {string}
-   * @memberof ApiV1UserProfileGet404Response
-   */
-  message: string
-  /**
-   *
-   * @type {ApiV1UserProfileGet404ResponseErrorEnum}
-   * @memberof ApiV1UserProfileGet404Response
-   */
-  error: ApiV1UserProfileGet404ResponseErrorEnum
-}
-
-/**
- * @export
- */
-export const ApiV1UserProfileGet404ResponseStatusCodeEnum = {
-  NUMBER_404: 404,
-} as const
-export type ApiV1UserProfileGet404ResponseStatusCodeEnum =
-  (typeof ApiV1UserProfileGet404ResponseStatusCodeEnum)[keyof typeof ApiV1UserProfileGet404ResponseStatusCodeEnum]
-
-/**
- * @export
- */
-export const ApiV1UserProfileGet404ResponseErrorEnum = {
-  Not_Found: 'Not Found',
-} as const
-export type ApiV1UserProfileGet404ResponseErrorEnum =
-  (typeof ApiV1UserProfileGet404ResponseErrorEnum)[keyof typeof ApiV1UserProfileGet404ResponseErrorEnum]
-
 /**
  *
  * @export
@@ -606,29 +430,6 @@ export interface GuardianConsentInput {
 /**
  *
  * @export
- * @interface GuardianConsentResponse
- */
-export interface GuardianConsentResponse {
-  /**
-   *
-   * @type {GuardianConsentResponseTrackedEnum}
-   * @memberof GuardianConsentResponse
-   */
-  tracked: GuardianConsentResponseTrackedEnum
-}
-
-/**
- * @export
- */
-export const GuardianConsentResponseTrackedEnum = {
-  true: true,
-} as const
-export type GuardianConsentResponseTrackedEnum =
-  (typeof GuardianConsentResponseTrackedEnum)[keyof typeof GuardianConsentResponseTrackedEnum]
-
-/**
- *
- * @export
  * @interface LinkedGuardian
  */
 export interface LinkedGuardian {
@@ -743,29 +544,6 @@ export interface ModerationActionInput {
    */
   timestamp?: string
 }
-/**
- *
- * @export
- * @interface ModerationActionResponse
- */
-export interface ModerationActionResponse {
-  /**
-   *
-   * @type {ModerationActionResponseTrackedEnum}
-   * @memberof ModerationActionResponse
-   */
-  tracked: ModerationActionResponseTrackedEnum
-}
-
-/**
- * @export
- */
-export const ModerationActionResponseTrackedEnum = {
-  true: true,
-} as const
-export type ModerationActionResponseTrackedEnum =
-  (typeof ModerationActionResponseTrackedEnum)[keyof typeof ModerationActionResponseTrackedEnum]
-
 /**
  *
  * @export
@@ -1006,17 +784,91 @@ export interface UserProfileResponse {
   user: UserProfileResponseUser
   /**
    *
-   * @type {Array<LinkedGuardian>}
+   * @type {Array<UserProfileResponseLinkedGuardiansInner>}
    * @memberof UserProfileResponse
    */
-  linkedGuardians: Array<LinkedGuardian>
+  linkedGuardians: Array<UserProfileResponseLinkedGuardiansInner>
   /**
    *
-   * @type {Array<LinkedTeen>}
+   * @type {Array<UserProfileResponseLinkedTeensInner>}
    * @memberof UserProfileResponse
    */
-  linkedTeens: Array<LinkedTeen>
+  linkedTeens: Array<UserProfileResponseLinkedTeensInner>
 }
+/**
+ *
+ * @export
+ * @interface UserProfileResponseLinkedGuardiansInner
+ */
+export interface UserProfileResponseLinkedGuardiansInner {
+  /**
+   *
+   * @type {string}
+   * @memberof UserProfileResponseLinkedGuardiansInner
+   */
+  guardianId: string
+  /**
+   *
+   * @type {UserProfileResponseLinkedGuardiansInnerStatusEnum}
+   * @memberof UserProfileResponseLinkedGuardiansInner
+   */
+  status: UserProfileResponseLinkedGuardiansInnerStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof UserProfileResponseLinkedGuardiansInner
+   */
+  consentGrantedAt: string | null
+}
+
+/**
+ * @export
+ */
+export const UserProfileResponseLinkedGuardiansInnerStatusEnum = {
+  pending: 'pending',
+  granted: 'granted',
+  revoked: 'revoked',
+} as const
+export type UserProfileResponseLinkedGuardiansInnerStatusEnum =
+  (typeof UserProfileResponseLinkedGuardiansInnerStatusEnum)[keyof typeof UserProfileResponseLinkedGuardiansInnerStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface UserProfileResponseLinkedTeensInner
+ */
+export interface UserProfileResponseLinkedTeensInner {
+  /**
+   *
+   * @type {string}
+   * @memberof UserProfileResponseLinkedTeensInner
+   */
+  teenId: string
+  /**
+   *
+   * @type {UserProfileResponseLinkedTeensInnerStatusEnum}
+   * @memberof UserProfileResponseLinkedTeensInner
+   */
+  status: UserProfileResponseLinkedTeensInnerStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof UserProfileResponseLinkedTeensInner
+   */
+  consentGrantedAt: string | null
+}
+
+/**
+ * @export
+ */
+export const UserProfileResponseLinkedTeensInnerStatusEnum = {
+  pending: 'pending',
+  granted: 'granted',
+  revoked: 'revoked',
+} as const
+export type UserProfileResponseLinkedTeensInnerStatusEnum =
+  (typeof UserProfileResponseLinkedTeensInnerStatusEnum)[keyof typeof UserProfileResponseLinkedTeensInnerStatusEnum]
+
 /**
  *
  * @export

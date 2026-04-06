@@ -49,11 +49,34 @@ export const notFoundHttpErrorSchema = z.object({
   error: z.literal('Not Found'),
 })
 
+export type RegisteredCommonHttpSchemas = {
+  apiErrorSchema: typeof apiErrorSchema
+  trackedResponseSchema: typeof trackedResponseSchema
+  badRequestHttpErrorSchema: typeof badRequestHttpErrorSchema
+  unauthorizedHttpErrorSchema: typeof unauthorizedHttpErrorSchema
+  forbiddenHttpErrorSchema: typeof forbiddenHttpErrorSchema
+  notFoundHttpErrorSchema: typeof notFoundHttpErrorSchema
+}
+
 export function registerCommonHttpSchemas(registry: OpenAPIRegistry) {
-  registry.register('ApiError', apiErrorSchema)
-  registry.register('TrackedResponse', trackedResponseSchema)
-  registry.register('BadRequestHttpError', badRequestHttpErrorSchema)
-  registry.register('UnauthorizedHttpError', unauthorizedHttpErrorSchema)
-  registry.register('ForbiddenHttpError', forbiddenHttpErrorSchema)
-  registry.register('NotFoundHttpError', notFoundHttpErrorSchema)
+  return {
+    apiErrorSchema: registry.register('ApiError', apiErrorSchema),
+    trackedResponseSchema: registry.register('TrackedResponse', trackedResponseSchema),
+    badRequestHttpErrorSchema: registry.register(
+      'BadRequestHttpError',
+      badRequestHttpErrorSchema
+    ),
+    unauthorizedHttpErrorSchema: registry.register(
+      'UnauthorizedHttpError',
+      unauthorizedHttpErrorSchema
+    ),
+    forbiddenHttpErrorSchema: registry.register(
+      'ForbiddenHttpError',
+      forbiddenHttpErrorSchema
+    ),
+    notFoundHttpErrorSchema: registry.register(
+      'NotFoundHttpError',
+      notFoundHttpErrorSchema
+    ),
+  } satisfies RegisteredCommonHttpSchemas
 }

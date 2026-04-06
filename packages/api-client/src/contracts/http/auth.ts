@@ -1,12 +1,10 @@
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import {
-  badRequestHttpErrorSchema,
-  forbiddenHttpErrorSchema,
   isoTimestampSchema,
   nonEmptyStringSchema,
+  type RegisteredCommonHttpSchemas,
   trackedResponseSchema,
-  unauthorizedHttpErrorSchema,
 } from './common'
 
 // Story 0.9 Task 5 step 1 owner:
@@ -28,14 +26,13 @@ export const guardianConsentResponseSchema = trackedResponseSchema
 
 export type GuardianConsentResponse = z.infer<typeof guardianConsentResponseSchema>
 
-export function registerAuthContracts(registry: OpenAPIRegistry) {
+export function registerAuthContracts(
+  registry: OpenAPIRegistry,
+  commonSchemas: RegisteredCommonHttpSchemas
+) {
   const registeredGuardianConsentInputSchema = registry.register(
     'GuardianConsentInput',
     guardianConsentInputSchema
-  )
-  const registeredGuardianConsentResponseSchema = registry.register(
-    'GuardianConsentResponse',
-    guardianConsentResponseSchema
   )
 
   registry.registerPath({
@@ -60,7 +57,7 @@ export function registerAuthContracts(registry: OpenAPIRegistry) {
         description: 'Guardian consent recorded successfully',
         content: {
           'application/json': {
-            schema: registeredGuardianConsentResponseSchema,
+            schema: commonSchemas.trackedResponseSchema,
           },
         },
       },
@@ -68,7 +65,7 @@ export function registerAuthContracts(registry: OpenAPIRegistry) {
         description: 'Guardian consent payload failed validation',
         content: {
           'application/json': {
-            schema: badRequestHttpErrorSchema,
+            schema: commonSchemas.badRequestHttpErrorSchema,
           },
         },
       },
@@ -76,7 +73,7 @@ export function registerAuthContracts(registry: OpenAPIRegistry) {
         description: 'Missing or invalid authentication headers',
         content: {
           'application/json': {
-            schema: unauthorizedHttpErrorSchema,
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
           },
         },
       },
@@ -84,7 +81,7 @@ export function registerAuthContracts(registry: OpenAPIRegistry) {
         description: 'Authenticated guardian does not match guardianId',
         content: {
           'application/json': {
-            schema: forbiddenHttpErrorSchema,
+            schema: commonSchemas.forbiddenHttpErrorSchema,
           },
         },
       },

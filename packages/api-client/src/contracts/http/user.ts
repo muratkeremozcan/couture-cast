@@ -3,8 +3,7 @@ import { z } from 'zod'
 import {
   isoTimestampSchema,
   nonEmptyStringSchema,
-  notFoundHttpErrorSchema,
-  unauthorizedHttpErrorSchema,
+  type RegisteredCommonHttpSchemas,
 } from './common'
 
 // Story 0.9 Task 5 step 3 owner:
@@ -47,25 +46,15 @@ export type LinkedGuardian = z.infer<typeof linkedGuardianSchema>
 export type LinkedTeen = z.infer<typeof linkedTeenSchema>
 export type UserProfileResponse = z.infer<typeof userProfileResponseSchema>
 
-export function registerUserContracts(registry: OpenAPIRegistry) {
-  const registeredLinkedGuardianSchema = registry.register(
-    'LinkedGuardian',
-    linkedGuardianSchema
-  )
-  const registeredLinkedTeenSchema = registry.register('LinkedTeen', linkedTeenSchema)
+export function registerUserContracts(
+  registry: OpenAPIRegistry,
+  commonSchemas: RegisteredCommonHttpSchemas
+) {
+  registry.register('LinkedGuardian', linkedGuardianSchema)
+  registry.register('LinkedTeen', linkedTeenSchema)
   const registeredUserProfileResponseSchema = registry.register(
     'UserProfileResponse',
-    z.object({
-      user: z.object({
-        id: nonEmptyStringSchema,
-        email: z.string().email(),
-        displayName: z.string().nullable(),
-        birthdate: isoTimestampSchema.nullable(),
-        role: apiRoleSchema,
-      }),
-      linkedGuardians: z.array(registeredLinkedGuardianSchema),
-      linkedTeens: z.array(registeredLinkedTeenSchema),
-    })
+    userProfileResponseSchema
   )
 
   registry.registerPath({
@@ -88,7 +77,7 @@ export function registerUserContracts(registry: OpenAPIRegistry) {
         description: 'Missing or invalid authentication headers',
         content: {
           'application/json': {
-            schema: unauthorizedHttpErrorSchema,
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
           },
         },
       },
@@ -96,7 +85,7 @@ export function registerUserContracts(registry: OpenAPIRegistry) {
         description: 'Authenticated user could not be found',
         content: {
           'application/json': {
-            schema: notFoundHttpErrorSchema,
+            schema: commonSchemas.notFoundHttpErrorSchema,
           },
         },
       },

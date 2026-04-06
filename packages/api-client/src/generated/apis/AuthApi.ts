@@ -12,7 +12,7 @@
  */
 
 import * as runtime from '../runtime'
-import type { GuardianConsentInput, GuardianConsentResponse } from '../models/index'
+import type { GuardianConsentInput, TrackedResponse } from '../models/index'
 
 export interface ApiV1AuthGuardianConsentPostRequest {
   guardianConsentInput: GuardianConsentInput
@@ -59,7 +59,7 @@ export class AuthApi extends runtime.BaseAPI {
   async apiV1AuthGuardianConsentPostRaw(
     requestParameters: ApiV1AuthGuardianConsentPostRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<runtime.ApiResponse<GuardianConsentResponse>> {
+  ): Promise<runtime.ApiResponse<TrackedResponse>> {
     const requestOptions =
       await this.apiV1AuthGuardianConsentPostRequestOpts(requestParameters)
     const response = await this.request(requestOptions, initOverrides)
@@ -74,7 +74,7 @@ export class AuthApi extends runtime.BaseAPI {
   async apiV1AuthGuardianConsentPost(
     requestParameters: ApiV1AuthGuardianConsentPostRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<GuardianConsentResponse> {
+  ): Promise<TrackedResponse> {
     const response = await this.apiV1AuthGuardianConsentPostRaw(
       requestParameters,
       initOverrides

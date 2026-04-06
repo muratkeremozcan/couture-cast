@@ -1,12 +1,10 @@
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import {
-  badRequestHttpErrorSchema,
-  forbiddenHttpErrorSchema,
   isoTimestampSchema,
   nonEmptyStringSchema,
+  type RegisteredCommonHttpSchemas,
   trackedResponseSchema,
-  unauthorizedHttpErrorSchema,
 } from './common'
 
 // Story 0.9 Task 5 step 2 owner:
@@ -31,14 +29,13 @@ export const moderationActionResponseSchema = trackedResponseSchema
 
 export type ModerationActionResponse = z.infer<typeof moderationActionResponseSchema>
 
-export function registerModerationContracts(registry: OpenAPIRegistry) {
+export function registerModerationContracts(
+  registry: OpenAPIRegistry,
+  commonSchemas: RegisteredCommonHttpSchemas
+) {
   const registeredModerationActionInputSchema = registry.register(
     'ModerationActionInput',
     moderationActionInputSchema
-  )
-  const registeredModerationActionResponseSchema = registry.register(
-    'ModerationActionResponse',
-    moderationActionResponseSchema
   )
 
   registry.registerPath({
@@ -63,7 +60,7 @@ export function registerModerationContracts(registry: OpenAPIRegistry) {
         description: 'Moderation action recorded successfully',
         content: {
           'application/json': {
-            schema: registeredModerationActionResponseSchema,
+            schema: commonSchemas.trackedResponseSchema,
           },
         },
       },
@@ -71,7 +68,7 @@ export function registerModerationContracts(registry: OpenAPIRegistry) {
         description: 'Moderation action payload failed validation',
         content: {
           'application/json': {
-            schema: badRequestHttpErrorSchema,
+            schema: commonSchemas.badRequestHttpErrorSchema,
           },
         },
       },
@@ -79,7 +76,7 @@ export function registerModerationContracts(registry: OpenAPIRegistry) {
         description: 'Missing or invalid authentication headers',
         content: {
           'application/json': {
-            schema: unauthorizedHttpErrorSchema,
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
           },
         },
       },
@@ -87,7 +84,7 @@ export function registerModerationContracts(registry: OpenAPIRegistry) {
         description: 'Authenticated moderator does not match moderatorId',
         content: {
           'application/json': {
-            schema: forbiddenHttpErrorSchema,
+            schema: commonSchemas.forbiddenHttpErrorSchema,
           },
         },
       },

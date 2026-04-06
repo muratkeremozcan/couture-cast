@@ -12,7 +12,7 @@
  */
 
 import * as runtime from '../runtime'
-import type { ModerationActionInput, ModerationActionResponse } from '../models/index'
+import type { ModerationActionInput, TrackedResponse } from '../models/index'
 
 export interface ApiV1ModerationActionsPostRequest {
   moderationActionInput: ModerationActionInput
@@ -59,7 +59,7 @@ export class ModerationApi extends runtime.BaseAPI {
   async apiV1ModerationActionsPostRaw(
     requestParameters: ApiV1ModerationActionsPostRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<runtime.ApiResponse<ModerationActionResponse>> {
+  ): Promise<runtime.ApiResponse<TrackedResponse>> {
     const requestOptions =
       await this.apiV1ModerationActionsPostRequestOpts(requestParameters)
     const response = await this.request(requestOptions, initOverrides)
@@ -74,7 +74,7 @@ export class ModerationApi extends runtime.BaseAPI {
   async apiV1ModerationActionsPost(
     requestParameters: ApiV1ModerationActionsPostRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<ModerationActionResponse> {
+  ): Promise<TrackedResponse> {
     const response = await this.apiV1ModerationActionsPostRaw(
       requestParameters,
       initOverrides

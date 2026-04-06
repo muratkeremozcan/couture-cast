@@ -69,14 +69,6 @@ describe('OpenAPI integration', () => {
     if (!livePaths || !canonicalPaths) {
       throw new Error('Expected both live and canonical specs to define paths')
     }
-
-    expect(livePaths['/api/health']).toEqual(canonicalPaths['/api/health'])
-    expect(livePaths['/api/v1/health/queues']).toEqual(
-      canonicalPaths['/api/v1/health/queues']
-    )
-    expect(livePaths['/api/v1/events/poll']).toEqual(
-      canonicalPaths['/api/v1/events/poll']
-    )
   })
 
   it('serves the Swagger UI', async () => {

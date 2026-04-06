@@ -98,6 +98,10 @@ function walkGeneratedTypeScriptFiles(currentDir: string): string[] {
   })
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+}
+
 function stripGeneratedTslintComments() {
   for (const filePath of walkGeneratedTypeScriptFiles(generatedRoot)) {
     const source = readFileSync(filePath, 'utf8')
@@ -130,7 +134,7 @@ function removeUnusedModelTypeImportsFromGeneratedApis() {
 
     const sourceWithoutModelImport = source.replace(modelImportMatch[0], '')
     const usedNames = importedNames.filter((name) =>
-      new RegExp(`\\b${name}\\b`, 'u').test(sourceWithoutModelImport)
+      new RegExp(`\\b${escapeRegExp(name)}\\b`, 'u').test(sourceWithoutModelImport)
     )
 
     if (usedNames.length === importedNames.length) {

@@ -25,12 +25,12 @@ extendZodWithOpenApi(z)
 export function createHttpOpenApiRegistry() {
   const registry = new OpenAPIRegistry()
 
-  registerCommonHttpSchemas(registry)
-  registerAuthContracts(registry)
+  const commonSchemas = registerCommonHttpSchemas(registry)
+  registerAuthContracts(registry, commonSchemas)
   registerHealthContracts(registry)
   registerEventsContracts(registry)
-  registerModerationContracts(registry)
-  registerUserContracts(registry)
+  registerModerationContracts(registry, commonSchemas)
+  registerUserContracts(registry, commonSchemas)
 
   return registry
 }
