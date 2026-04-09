@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  HttpCode,
   Inject,
   Post,
   UseGuards,
@@ -20,6 +21,7 @@ export class ModerationController {
   ) {}
 
   @Post('actions')
+  @HttpCode(200)
   @UseGuards(RequestAuthGuard, RolesGuard)
   @Roles('moderator', 'admin')
   recordAction(@AuthContext() auth: RequestAuthContext, @Body() payload: unknown) {

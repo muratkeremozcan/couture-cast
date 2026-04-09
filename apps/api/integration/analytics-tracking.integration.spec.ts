@@ -5,6 +5,12 @@ import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 import {
+  badRequestHttpErrorSchema,
+  forbiddenHttpErrorSchema,
+  trackedResponseSchema,
+  unauthorizedHttpErrorSchema,
+} from '@couture/api-client/contracts/http'
+import {
   createAnalyticsEventExpectations,
   type MemoryTrackedAnalyticsEvent,
 } from '@couture/api-client/testing/analytics-event-assertions'
@@ -111,6 +117,20 @@ describe('Analytics tracking endpoints (integration)', () => {
     // Flow ref S0.7/T2/2: assert the exact emitted payload so property drift is
     // caught at the integration boundary.
     expect(response.status).toBe(401)
+    unauthorizedHttpErrorSchema.parse(response.body)
+    expect(trackedEvents).toHaveLength(0)
+  })
+
+  it('returns 400 for guardian consent when payload fails the shared contract', async () => {
+    const response = await request(getHttpServer())
+      .post('/api/v1/auth/guardian-consent')
+      .set(createHeaders('guardian-1', 'guardian'))
+      .send({
+        guardianId: 'guardian-1',
+      })
+
+    expect(response.status).toBe(400)
+    badRequestHttpErrorSchema.parse(response.body)
     expect(trackedEvents).toHaveLength(0)
   })
 
@@ -125,6 +145,7 @@ describe('Analytics tracking endpoints (integration)', () => {
       })
 
     expect(response.status).toBe(403)
+    forbiddenHttpErrorSchema.parse(response.body)
     expect(trackedEvents).toHaveLength(0)
   })
 
@@ -139,6 +160,7 @@ describe('Analytics tracking endpoints (integration)', () => {
       })
 
     expect(response.status).toBe(403)
+    forbiddenHttpErrorSchema.parse(response.body)
     expect(trackedEvents).toHaveLength(0)
   })
 
@@ -154,8 +176,8 @@ describe('Analytics tracking endpoints (integration)', () => {
         timestamp: '2026-03-04T10:00:00.000Z',
       })
 
-    expect(response.status).toBe(201)
-    expect(response.body).toEqual({ tracked: true })
+    expect(response.status).toBe(200)
+    expect(trackedResponseSchema.parse(response.body)).toEqual({ tracked: true })
     const trackedEvent = eventExpectations.expectEventTracked(
       'guardian_consent_granted',
       {
@@ -181,6 +203,20 @@ describe('Analytics tracking endpoints (integration)', () => {
       })
 
     expect(response.status).toBe(401)
+    unauthorizedHttpErrorSchema.parse(response.body)
+    expect(trackedEvents).toHaveLength(0)
+  })
+
+  it('returns 400 for moderation action when payload fails the shared contract', async () => {
+    const response = await request(getHttpServer())
+      .post('/api/v1/moderation/actions')
+      .set(createHeaders('mod-1', 'moderator'))
+      .send({
+        moderatorId: 'mod-1',
+      })
+
+    expect(response.status).toBe(400)
+    badRequestHttpErrorSchema.parse(response.body)
     expect(trackedEvents).toHaveLength(0)
   })
 
@@ -196,6 +232,7 @@ describe('Analytics tracking endpoints (integration)', () => {
       })
 
     expect(response.status).toBe(403)
+    forbiddenHttpErrorSchema.parse(response.body)
     expect(trackedEvents).toHaveLength(0)
   })
 
@@ -211,6 +248,7 @@ describe('Analytics tracking endpoints (integration)', () => {
       })
 
     expect(response.status).toBe(403)
+    forbiddenHttpErrorSchema.parse(response.body)
     expect(trackedEvents).toHaveLength(0)
   })
 
@@ -228,8 +266,8 @@ describe('Analytics tracking endpoints (integration)', () => {
         timestamp: '2026-03-04T10:00:00.000Z',
       })
 
-    expect(response.status).toBe(201)
-    expect(response.body).toEqual({ tracked: true })
+    expect(response.status).toBe(200)
+    expect(trackedResponseSchema.parse(response.body)).toEqual({ tracked: true })
     const trackedEvent = eventExpectations.expectEventTracked(
       'moderation_action',
       {

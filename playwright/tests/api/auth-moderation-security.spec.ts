@@ -1,5 +1,9 @@
 import type { TestInfo } from '@playwright/test'
-import { z } from 'zod'
+import {
+  forbiddenHttpErrorSchema,
+  trackedResponseSchema,
+  unauthorizedHttpErrorSchema,
+} from '@couture/api-client/contracts/http'
 import { test, expect } from '../../support/fixtures/merged-fixtures'
 import {
   authHeaders,
@@ -37,26 +41,15 @@ type ApiRequestFixture = (params: {
   retryConfig: { maxRetries: number }
 }) => Promise<ApiResponsePayload>
 
-const errorResponseSchema = z.object({
-  statusCode: z.number(),
-  message: z.union([z.string(), z.array(z.string())]),
-})
-
-const trackedResponseSchema = z.object({
-  tracked: z.literal(true),
-})
-
 function isProdEnvironment(testInfo: TestInfo): boolean {
   const metadata = (testInfo.project.metadata ?? {}) as Record<string, string>
   return metadata.environment === 'prod'
 }
 
 function extractErrorMessage(body: unknown): string {
-  const parsed = errorResponseSchema.safeParse(body)
-  if (!parsed.success) return ''
-  return Array.isArray(parsed.data.message)
-    ? parsed.data.message.join(' ')
-    : parsed.data.message
+  if (!body || typeof body !== 'object') return ''
+  const message = (body as { message?: unknown }).message
+  return typeof message === 'string' ? message : ''
 }
 
 async function postContract(
@@ -141,7 +134,7 @@ const scenarios: EndpointScenario[] = [
 
 test.describe('Auth and moderation endpoint security contracts', () => {
   test.beforeEach(({}, testInfo) => {
-    // These checks include successful write-path requests (201). Keep them out of prod
+    // These checks include successful write-path requests. Keep them out of prod
     // to avoid mutating live data and analytics without dedicated cleanup isolation.
     test.skip(
       isProdEnvironment(testInfo),
@@ -164,8 +157,8 @@ test.describe('Auth and moderation endpoint security contracts', () => {
         )
 
         expect(status).toBe(401)
-        await validateSchema(errorResponseSchema, body, {
-          shape: { statusCode: 401 },
+        await validateSchema(unauthorizedHttpErrorSchema, body, {
+          shape: { statusCode: 401, error: 'Unauthorized' },
         })
         expect(extractErrorMessage(body)).toContain(
           'Missing or invalid authentication headers'
@@ -187,8 +180,8 @@ test.describe('Auth and moderation endpoint security contracts', () => {
         )
 
         expect(status).toBe(403)
-        await validateSchema(errorResponseSchema, body, {
-          shape: { statusCode: 403 },
+        await validateSchema(forbiddenHttpErrorSchema, body, {
+          shape: { statusCode: 403, error: 'Forbidden' },
         })
         expect(extractErrorMessage(body)).toContain('Insufficient role')
       })
@@ -213,13 +206,13 @@ test.describe('Auth and moderation endpoint security contracts', () => {
         )
 
         expect(status).toBe(403)
-        await validateSchema(errorResponseSchema, body, {
-          shape: { statusCode: 403 },
+        await validateSchema(forbiddenHttpErrorSchema, body, {
+          shape: { statusCode: 403, error: 'Forbidden' },
         })
         expect(extractErrorMessage(body)).toContain(scenario.mismatchMessage)
       })
 
-      test('[P0] returns 201 for authorized request', async ({
+      test('[P0] returns 200 for authorized request', async ({
         apiRequest,
         validateSchema,
       }, testInfo) => {
@@ -233,7 +226,7 @@ test.describe('Auth and moderation endpoint security contracts', () => {
           authHeaders(actorId, scenario.actorRole)
         )
 
-        expect(status).toBe(201)
+        expect(status).toBe(200)
         await validateSchema(trackedResponseSchema, body, {
           shape: { tracked: true },
         })

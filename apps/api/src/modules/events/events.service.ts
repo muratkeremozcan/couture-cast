@@ -1,5 +1,5 @@
 // Step 6 polling backend owner: searchable owner anchor
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { eventsPollResponseSchema } from '../../contracts/http'
 import { createBaseLogger } from '../../logger/pino.config'
 import { EventsRepository } from './events.repository'
@@ -21,7 +21,7 @@ import { EventsRepository } from './events.repository'
 export class EventsService {
   private readonly logger = createBaseLogger().child({ feature: 'events' })
 
-  constructor(private readonly repo: EventsRepository) {}
+  constructor(@Inject(EventsRepository) private readonly repo: EventsRepository) {}
 
   async poll(since?: Date) {
     // Flow ref S0.5/T5: polling stays available even when websocket or push paths are degraded.

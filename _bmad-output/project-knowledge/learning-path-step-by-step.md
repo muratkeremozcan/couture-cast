@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-06 — Step 14/15: align REST contract learning notes with the auth/user/moderation Task 5 migration and Step 15 SDK validation hardening now in repo
+Updated: 2026-04-09 — Steps 13 to 15: reflect landed Task 6 contract parity coverage and the adapter drift it exposed
 
 ## LLM collaborator prompt
 
@@ -1038,8 +1038,10 @@ Task owner map:
 Current repo note:
 
 - Today `apps/api/src/openapi.ts` publishes the canonical document from
-  `@couture/api-client/contracts/http` to both `/api/v1/openapi.json` and `/api/docs`. Swagger is
-  still present only as the UI renderer, not as the contract authoring path for new REST endpoints.
+  `@couture/api-client/contracts/http` to both `/api/v1/openapi.json` and `/api/docs`, and
+  `apps/api/src/openapi.spec.ts` proves the served JSON equals the canonical builder output.
+  Swagger is still present only as the UI renderer, not as the contract authoring path for new
+  REST endpoints.
 
 Architecture diagram:
 
@@ -1123,7 +1125,10 @@ Current repo note:
 
 - Health, polling, auth, moderation, and the first authenticated user profile slice now follow
   this model. The remaining work is to migrate later public REST endpoints as they land so every
-  web/mobile-facing API starts in the same shared-contract path.
+  web/mobile-facing API starts in the same shared-contract path. Task 6 also proved that shared
+  Zod modules are not enough on their own: parity tests caught real adapter drift in Nest defaults
+  and dependency injection seams, so controller/service wiring still has to be verified against the
+  shared contract at runtime.
 
 Architecture diagram:
 
@@ -1201,12 +1206,14 @@ Task owner map:
 
 Current repo note:
 
-- The canonical spec generation, SDK wrapper flow, live OpenAPI publication parity check, and
-  generated auth/user/moderation client surface now exist. The SDK postprocess layer also strips
-  unused generated model imports so repo-level `npm run typecheck`, `npm run lint`, and
-  `npm run test` stay green after regeneration. The remaining work is CI diff enforcement, broader
-  live response/schema parity coverage, and real web/mobile adoption so every consumer depends on
-  that same contract.
+- The repo now enforces a four-layer contract loop: package-level builder validation and checked-in
+  spec sync in `packages/api-client/testing/http-openapi.spec.ts`, API-published OpenAPI parity in
+  `apps/api/src/openapi.spec.ts`, representative API integration parity in
+  `apps/api/integration/http-contract-parity.integration.spec.ts`, and thin live-endpoint smoke in
+  `playwright/tests/api/*.spec.ts`. The SDK postprocess layer also strips unused generated model
+  imports so repo-level `npm run typecheck`, `npm run lint`, and `npm run test` stay green after
+  regeneration. The remaining work is CI diff enforcement and real web/mobile adoption so every
+  consumer depends on that same contract.
 
 Architecture diagram:
 

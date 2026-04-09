@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common'
+import { Controller, Get, Inject, Query } from '@nestjs/common'
 import {
   eventsPollInvalidSinceResponseSchema,
   eventsPollQuerySchema,
@@ -7,7 +7,7 @@ import { EventsService } from './events.service'
 
 @Controller('/api/v1/events')
 export class EventsController {
-  constructor(private readonly eventsService: EventsService) {}
+  constructor(@Inject(EventsService) private readonly eventsService: EventsService) {}
 
   @Get('poll')
   async poll(@Query('since') since?: string) {
