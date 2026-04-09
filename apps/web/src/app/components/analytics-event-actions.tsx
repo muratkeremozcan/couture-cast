@@ -8,21 +8,40 @@ import {
 } from '@couture/api-client'
 import { useEffect, useRef, type ChangeEvent, type MouseEvent } from 'react'
 import { browserAnalytics } from '../../analytics/browser-analytics'
-
-type EventPollResponse = {
-  events?: {
-    id: string
-    channel: string
-    payload?: Record<string, unknown>
-    userId?: string | null
-  }[]
-  nextSince?: string | null
-}
+import { createWebApiClient } from '../../lib/api-client'
+import { pollWebEvents } from '../../lib/events-client'
 
 declare global {
   interface Window {
     __enableAnalyticsTestHook?: boolean
     __analyticsBindingsReady?: boolean
+  }
+}
+
+type AlertEventPayload = {
+  alertType?: string
+  severity?: 'warning' | 'critical'
+  weatherSeverity?: string
+}
+
+function parseAlertEventPayload(payload: unknown): AlertEventPayload {
+  if (!payload || typeof payload !== 'object') {
+    return {}
+  }
+
+  const payloadRecord = payload as Record<string, unknown>
+
+  return {
+    alertType:
+      typeof payloadRecord.alertType === 'string' ? payloadRecord.alertType : undefined,
+    severity:
+      payloadRecord.severity === 'warning' || payloadRecord.severity === 'critical'
+        ? payloadRecord.severity
+        : undefined,
+    weatherSeverity:
+      typeof payloadRecord.weatherSeverity === 'string'
+        ? payloadRecord.weatherSeverity
+        : undefined,
   }
 }
 
@@ -45,6 +64,13 @@ function getWebAnalyticsIdentity() {
 
 export function AnalyticsEventActions() {
   const nextSinceRef = useRef<string | null>(null)
+  const apiClientRef = useRef<ReturnType<typeof createWebApiClient> | null>(null)
+
+  useEffect(() => {
+    // Story 0.9 Task 7 step 4 owner:
+    // hold the generated client at the component edge so polling reuses one app-local runtime wrapper.
+    apiClientRef.current = createWebApiClient()
+  }, [])
 
   useEffect(() => {
     if (window.__enableAnalyticsTestHook) {
@@ -52,23 +78,13 @@ export function AnalyticsEventActions() {
     }
 
     const trackAlertEvents = async () => {
-      const params = new URLSearchParams()
-      if (nextSinceRef.current) {
-        params.set('since', nextSinceRef.current)
+      const apiClient = apiClientRef.current
+      if (!apiClient) {
+        return
       }
 
       try {
-        const response = await fetch(
-          `/api/v1/events/poll${params.toString() ? `?${params.toString()}` : ''}`,
-          {
-            cache: 'no-store',
-          }
-        )
-        if (!response.ok) {
-          return
-        }
-
-        const body = (await response.json()) as EventPollResponse
+        const body = await pollWebEvents(nextSinceRef.current ?? undefined, apiClient)
         if (typeof body.nextSince === 'string') {
           nextSinceRef.current = body.nextSince
         }
@@ -78,22 +94,15 @@ export function AnalyticsEventActions() {
             continue
           }
 
+          const eventPayload = parseAlertEventPayload(event.payload)
+
           // Flow ref S0.7/T2/2: build canonical analytics payloads via the
           // shared track* wrappers, not ad hoc posthog.capture calls.
           const payload = trackAlertReceived({
             userId: event.userId || getWebAnalyticsIdentity().userId,
-            alertType:
-              (typeof event.payload?.alertType === 'string' && event.payload.alertType) ||
-              event.channel,
-            severity:
-              event.payload?.severity === 'warning' ||
-              event.payload?.severity === 'critical'
-                ? event.payload.severity
-                : 'info',
-            weatherSeverity:
-              typeof event.payload?.weatherSeverity === 'string'
-                ? event.payload.weatherSeverity
-                : undefined,
+            alertType: eventPayload.alertType || event.channel,
+            severity: eventPayload.severity ?? 'info',
+            weatherSeverity: eventPayload.weatherSeverity,
             timestamp: new Date().toISOString(),
           })
           // Flow ref S0.7/T3/1: emit only the normalized contract payload.

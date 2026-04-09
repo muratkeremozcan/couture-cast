@@ -134,12 +134,12 @@ so that I can call backend endpoints without manual typing errors and catch brea
         canonical contract builder output
   - [x] Fail tests when implementation drift appears between controller behavior and shared schemas
 
-- [ ] Task 7: Integrate the generated SDK into real web and mobile runtime paths (AC: #4)
-  - [ ] Create app-local client factories that wrap `createApiClient(...)` with each surface's
+- [x] Task 7: Integrate the generated SDK into real web and mobile runtime paths (AC: #4)
+  - [x] Create app-local client factories that wrap `createApiClient(...)` with each surface's
         environment-driven base URL and auth behavior
-  - [ ] Replace at least one handwritten HTTP flow in `apps/web` with the generated client
-  - [ ] Replace at least one handwritten HTTP flow in `apps/mobile` with the generated client
-  - [ ] Add tests proving those flows compile and execute against the generated client surface
+  - [x] Replace at least one handwritten HTTP flow in `apps/web` with the generated client
+  - [x] Replace at least one handwritten HTTP flow in `apps/mobile` with the generated client
+  - [x] Add tests proving those flows compile and execute against the generated client surface
 
 - [ ] Task 8: Implement canonical OpenAPI diff checks in CI (AC: #3)
   - [ ] Install a breaking-change diff tool at the workspace root
@@ -327,6 +327,15 @@ GPT-5 Codex
 - `npx prettier --write _bmad-output/implementation-artifacts/0-9-initialize-openapi-spec-generation-and-api-client-sdk.md packages/api-client/src/generated/apis/AuthApi.ts packages/api-client/src/generated/apis/EventsApi.ts packages/api-client/src/generated/apis/HealthApi.ts packages/api-client/src/generated/apis/index.ts packages/api-client/src/generated/apis/ModerationApi.ts packages/api-client/src/generated/apis/UserApi.ts packages/api-client/src/generated/default-api.ts packages/api-client/src/generated/index.ts packages/api-client/src/generated/models/index.ts packages/api-client/src/generated/runtime.ts`
 - `npm run lint`
 - `npm run test`
+- `npm run vitest:run --workspace web -- src/lib/api-client.test.ts` (failed before the web SDK factory existed)
+- `npm run vitest:run --workspace mobile -- src/lib/api-client.test.ts src/lib/api-health.test.ts 'app/(tabs)/two.test.tsx'` (failed before the mobile SDK helpers and runtime health path existed)
+- `npm run vitest:run --workspace web -- src/lib/api-client.test.ts src/app/components/analytics-event-actions.test.tsx`
+- `npm run vitest:run --workspace mobile -- src/lib/api-client.test.ts src/lib/api-health.test.ts components/msw-network.test.tsx 'app/(tabs)/two.test.tsx'`
+- `npm test --workspace @couture/api-client`
+- `npm test --workspace web` (failed once because an existing partial mock omitted the new `createApiClient` export, then passed after the mock was updated)
+- `npm test --workspace mobile`
+- `npm run typecheck --workspace web` (failed once on non-configured `@` imports, then passed after switching to relative imports)
+- `npm run typecheck --workspace mobile` (failed once on a jest-dom matcher type in the new screen test, then passed after using a plain text assertion)
 
 ### Completion Notes List
 
@@ -361,6 +370,12 @@ GPT-5 Codex
 - Left `/api/v1/admin/*` out of the canonical public contract set because it remains an operator-only DLQ surface, not a web/mobile client contract.
 - Hardened `packages/api-client/scripts/postprocess-generated-sdk.ts` so generated API files drop unused model-type imports, which keeps the repo-level `npm run typecheck` green after regeneration.
 - Re-ran the repo-level validation surface after the SDK postprocess fix; `npm run typecheck`, `npm run lint`, and `npm run test` all passed.
+- Task 7 complete.
+- Expanded `packages/api-client/src/client.ts` so app-local factories can pass auth and runtime overrides through the stable wrapper surface without importing generated internals.
+- Added `createWebApiClient` and `createMobileApiClient` wrappers so each app resolves its own base URL and auth defaults before constructing the generated SDK client.
+- Replaced the web `AnalyticsEventActions` handwritten `/api/v1/events/poll` fetch with generated-client calls through a shared `pollWebEvents` helper.
+- Replaced the existing mobile HTTP smoke path's handwritten fetch with generated-client health calls and wired the same helper into `app/(tabs)/two.tsx` so the mobile runtime now exercises the SDK too.
+- Added web/mobile tests covering the local client factories, the generated-client network paths, the mobile runtime health render, and the widened shared client wrapper surface.
 
 ### File List
 
@@ -416,17 +431,32 @@ GPT-5 Codex
 - packages/api-client/src/index.ts
 - packages/api-client/testing/generated-client.spec.ts
 - packages/api-client/testing/http-openapi.spec.ts
+- apps/web/src/app/components/analytics-event-actions.style.test.tsx
+- apps/web/src/app/components/analytics-event-actions.tsx
+- apps/web/src/lib/api-client.test.ts
+- apps/web/src/lib/api-client.ts
+- apps/web/src/lib/events-client.ts
+- apps/mobile/app/(tabs)/two.test.tsx
+- apps/mobile/app/(tabs)/two.tsx
+- apps/mobile/components/msw-network.test.tsx
+- apps/mobile/src/lib/api-client.test.ts
+- apps/mobile/src/lib/api-client.ts
+- apps/mobile/src/lib/api-health.test.ts
+- apps/mobile/src/lib/api-health.ts
+- apps/mobile/src/test-utils/msw/handlers.ts
+- apps/mobile/vitest.config.ts
 
 ## Change Log
 
-| Date       | Author             | Change                                                                                                         |
-| ---------- | ------------------ | -------------------------------------------------------------------------------------------------------------- |
-| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.9 acceptance criteria                                                          |
-| 2026-03-31 | Amelia             | Completed Task 1 Swagger wiring and validation.                                                                |
-| 2026-04-01 | Amelia             | Corrected Story 0.9 toward a Zod-first contract architecture and rolled back the Swagger-derived SDK spike.    |
-| 2026-04-01 | Amelia             | Completed Task 2 initial Zod-first contract slice for health and polling endpoints.                            |
-| 2026-04-03 | Amelia             | Completed Task 3 canonical SDK generation, wrapper exports, and downstream validation for web/mobile.          |
-| 2026-04-03 | Amelia             | Refined remaining Story 0.9 tasks to converge on a fully Zod-native end state.                                 |
-| 2026-04-06 | Amelia             | Completed Task 4 so live OpenAPI JSON and Swagger UI both publish the canonical contract-derived spec.         |
-| 2026-04-06 | Amelia             | Completed Task 5 by migrating auth/user/moderation REST slices into shared contracts and regenerating the SDK. |
-| 2026-04-06 | Amelia             | Hardened generated SDK postprocessing to remove unused model imports and revalidated root typecheck/lint/test. |
+| Date       | Author             | Change                                                                                                                                                |
+| ---------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.9 acceptance criteria                                                                                                 |
+| 2026-03-31 | Amelia             | Completed Task 1 Swagger wiring and validation.                                                                                                       |
+| 2026-04-01 | Amelia             | Corrected Story 0.9 toward a Zod-first contract architecture and rolled back the Swagger-derived SDK spike.                                           |
+| 2026-04-01 | Amelia             | Completed Task 2 initial Zod-first contract slice for health and polling endpoints.                                                                   |
+| 2026-04-03 | Amelia             | Completed Task 3 canonical SDK generation, wrapper exports, and downstream validation for web/mobile.                                                 |
+| 2026-04-03 | Amelia             | Refined remaining Story 0.9 tasks to converge on a fully Zod-native end state.                                                                        |
+| 2026-04-06 | Amelia             | Completed Task 4 so live OpenAPI JSON and Swagger UI both publish the canonical contract-derived spec.                                                |
+| 2026-04-06 | Amelia             | Completed Task 5 by migrating auth/user/moderation REST slices into shared contracts and regenerating the SDK.                                        |
+| 2026-04-06 | Amelia             | Hardened generated SDK postprocessing to remove unused model imports and revalidated root typecheck/lint/test.                                        |
+| 2026-04-09 | Amelia             | Completed Task 7 by adding app-local SDK factories, swapping the web/mobile HTTP paths to the generated client, and validating both runtime surfaces. |
