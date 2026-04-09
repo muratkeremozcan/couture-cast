@@ -47,3 +47,12 @@ test('writes a valid HTTP OpenAPI document for the initial contract slice', asyn
     rmSync(outputDir, { recursive: true, force: true })
   }
 })
+
+test('keeps the checked-in canonical HTTP OpenAPI document in sync with the builder output', () => {
+  const spec = generateHttpOpenApiDocument()
+  const checkedInSpec = JSON.parse(
+    readFileSync(join(process.cwd(), 'docs', HTTP_OPENAPI_OUTPUT_FILENAME), 'utf8')
+  ) as typeof spec
+
+  expect(checkedInSpec).toEqual(spec)
+})

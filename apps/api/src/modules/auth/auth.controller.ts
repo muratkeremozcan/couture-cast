@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  HttpCode,
   Inject,
   Post,
   UseGuards,
@@ -18,6 +19,7 @@ export class AuthController {
   constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
   @Post('guardian-consent')
+  @HttpCode(200)
   @UseGuards(RequestAuthGuard, RolesGuard)
   @Roles('guardian', 'admin')
   grantGuardianConsent(

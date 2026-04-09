@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 
 type CreateEventInput = {
@@ -10,7 +10,7 @@ type CreateEventInput = {
 
 @Injectable()
 export class EventsRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
 
   async create(input: CreateEventInput) {
     return this.prisma.eventEnvelope.create({

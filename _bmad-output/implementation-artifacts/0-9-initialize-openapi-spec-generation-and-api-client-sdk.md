@@ -126,13 +126,13 @@ so that I can call backend endpoints without manual typing errors and catch brea
   - [x] Exit criterion: no public REST endpoint used by web/mobile depends on
         decorator-authored schema generation
 
-- [ ] Task 6: Add canonical contract parity tests for the live API (AC: #1, #3)
-  - [ ] Keep the package-level canonical spec validation gate in `packages/api-client/testing/`
-  - [ ] Add API integration coverage that hits live endpoints and validates response bodies against
+- [x] Task 6: Add canonical contract parity tests for the live API (AC: #1, #3)
+  - [x] Keep the package-level canonical spec validation gate in `packages/api-client/testing/`
+  - [x] Add API integration coverage that hits live endpoints and validates response bodies against
         the shared Zod schemas
-  - [ ] Add an API-side test that proves the served `/api/v1/openapi.json` contract matches the
+  - [x] Add an API-side test that proves the served `/api/v1/openapi.json` contract matches the
         canonical contract builder output
-  - [ ] Fail tests when implementation drift appears between controller behavior and shared schemas
+  - [x] Fail tests when implementation drift appears between controller behavior and shared schemas
 
 - [ ] Task 7: Integrate the generated SDK into real web and mobile runtime paths (AC: #4)
   - [ ] Create app-local client factories that wrap `createApiClient(...)` with each surface's

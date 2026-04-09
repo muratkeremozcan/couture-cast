@@ -296,7 +296,7 @@ describe('observability integration', () => {
         timestamp: '2026-03-21T12:00:00.000Z',
       })
 
-    expect(response.status).toBe(201)
+    expect(response.status).toBe(200)
     expect(response.headers['x-request-id']).toBe(requestId)
 
     logExpectations.expectLogEntry(
@@ -317,7 +317,7 @@ describe('observability integration', () => {
         feature: 'auth',
         path: '/api/v1/auth/guardian-consent',
         requestId,
-        statusCode: 201,
+        statusCode: 200,
         timestamp: expect.any(String),
         userId: 'guardian-123',
       },
