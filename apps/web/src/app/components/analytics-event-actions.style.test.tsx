@@ -10,6 +10,27 @@ vi.mock('@couture/api-client', () => ({
   })),
 }))
 
+vi.mock('../../lib/api-client', () => ({
+  createWebApiClient: vi.fn(() => ({
+    apiV1EventsPollGetRaw: vi.fn(() =>
+      Promise.resolve({
+        raw: new Response(
+          JSON.stringify({
+            events: [],
+            nextSince: null,
+          }),
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        ),
+      })
+    ),
+  })),
+}))
+
 vi.mock('posthog-js', () => ({
   default: {
     capture: vi.fn(),

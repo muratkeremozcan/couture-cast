@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-09 - Steps 13 to 15: reflect landed Task 6 contract parity coverage and the adapter drift it exposed
+Updated: 2026-04-09 - Steps 13 to 15: reflect landed Task 7 SDK adoption in web/mobile runtimes and the remaining contract guardrails
 
 ## LLM collaborator prompt
 
@@ -1159,7 +1159,8 @@ Key takeaways:
 2. Root-level **npm scripts and the lockfile** should orchestrate contract regeneration (not “npm
    hoisting” of arbitrary packages) so developers and CI do not need a manually running API server.
 3. Generated output is not the package's final public API. The repo should keep a small
-   human-authored wrapper surface such as `createApiClient(...)` for consumers.
+   human-authored wrapper surface such as `createApiClient(...)`, then let each app wrap that
+   again with runtime-local base URL and auth defaults.
 4. CI breaking-change checks, live API parity tests, repo-level validation commands, and
    web/mobile runtime usage should all depend on the same canonical spec file and normalized
    generated surface.
@@ -1189,7 +1190,7 @@ Sequence to follow:
 
 1. Keep canonical spec generation and validation green first.
 2. Generate and normalize the SDK from the checked-in canonical spec, not from a live URL.
-3. Consume the stable wrapper surface from apps and tests.
+3. Consume the stable wrapper surface from app-local factories, typed helpers, and tests.
 4. Re-run repo-level `typecheck`, `lint`, and `test` after regeneration so generator drift is
    caught where real consumers compile.
 5. Use CI only to regenerate, detect drift, and enforce contract guardrails automatically.
@@ -1203,6 +1204,12 @@ Task owner map:
 - Step 15 step 4 owner: re-export the stable package surface in `packages/api-client/src/index.ts`
 - Step 15 step 5 owner: validate the canonical spec before downstream consumption in `packages/api-client/testing/http-openapi.spec.ts`
 - Story 0.9 Task 3 step 5 owner: prove the generated wrapper surface in `packages/api-client/testing/generated-client.spec.ts`
+- Story 0.9 Task 7 step 1 owner: wrap the generated client for web runtime defaults in `apps/web/src/lib/api-client.ts`
+- Story 0.9 Task 7 step 2 owner: wrap the generated client for mobile runtime defaults in `apps/mobile/src/lib/api-client.ts`
+- Story 0.9 Task 7 step 3 owner: route web polling through the generated client in `apps/web/src/lib/events-client.ts`
+- Story 0.9 Task 7 step 4 owner: consume generated polling in the web analytics runtime flow in `apps/web/src/app/components/analytics-event-actions.tsx`
+- Story 0.9 Task 7 step 5 owner: route mobile API health checks through the generated client in `apps/mobile/src/lib/api-health.ts`
+- Story 0.9 Task 7 step 6 owner: consume generated-client health state in the mobile tab runtime in `apps/mobile/app/(tabs)/two.tsx`
 
 Current repo note:
 
@@ -1212,8 +1219,9 @@ Current repo note:
   `apps/api/integration/http-contract-parity.integration.spec.ts`, and thin live-endpoint smoke in
   `playwright/tests/api/*.spec.ts`. The SDK postprocess layer also strips unused generated model
   imports so repo-level `npm run typecheck`, `npm run lint`, and `npm run test` stay green after
-  regeneration. The remaining work is CI diff enforcement and real web/mobile adoption so every
-  consumer depends on that same contract.
+  regeneration. Task 7 also landed app-local SDK factories plus real web/mobile runtime consumers,
+  so the generated surface now reaches production-facing paths instead of package-only tests. The
+  remaining work is CI diff enforcement and the versioning/regeneration documentation closeout.
 
 Architecture diagram:
 
