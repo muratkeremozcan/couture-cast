@@ -14,6 +14,7 @@ import {
   unauthorizedHttpErrorSchema,
   userProfileResponseSchema,
 } from '@couture/api-client/contracts/http'
+import { queueConfigs } from '../src/config/queues'
 import { ApiHealthController } from '../src/controllers/api-health.controller'
 import { HealthController } from '../src/controllers/health.controller'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards'
@@ -105,7 +106,7 @@ describe('HTTP contract parity (integration)', () => {
     expect(response.status).toBe(200)
     const body = queueHealthResponseSchema.parse(response.body)
     expect(body.status).toBe('ok')
-    expect(body.queues.length).toBeGreaterThan(0)
+    expect(body.queues).toEqual(queueConfigs.map((queue) => queue.name))
   })
 
   it('validates the poll route against the shared events schema', async () => {

@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-09 — Steps 13 to 15: reflect landed Task 6 contract parity coverage and the adapter drift it exposed
+Updated: 2026-04-09 - Steps 13 to 15: reflect landed Task 6 contract parity coverage and the adapter drift it exposed
 
 ## LLM collaborator prompt
 
