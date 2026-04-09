@@ -66,11 +66,11 @@ export function AnalyticsEventActions() {
   const nextSinceRef = useRef<string | null>(null)
   const apiClientRef = useRef<ReturnType<typeof createWebApiClient> | null>(null)
 
-  // Story 0.9 Task 7 step 4 owner:
-  // hold the generated client at the component edge so polling reuses one app-local runtime wrapper.
-  if (!apiClientRef.current) {
+  useEffect(() => {
+    // Story 0.9 Task 7 step 4 owner:
+    // hold the generated client at the component edge so polling reuses one app-local runtime wrapper.
     apiClientRef.current = createWebApiClient()
-  }
+  }, [])
 
   useEffect(() => {
     if (window.__enableAnalyticsTestHook) {

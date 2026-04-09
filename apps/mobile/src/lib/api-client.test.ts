@@ -25,6 +25,20 @@ describe('createMobileApiClient', () => {
     expect(await configuration.accessToken?.()).toBe('mobile-token')
   })
 
+  it('falls back to API_BASE_URL when the Expo public base URL is unset', async () => {
+    delete process.env.EXPO_PUBLIC_API_BASE_URL
+    process.env.API_BASE_URL = 'https://fallback-api.couturecast.test/'
+
+    const client = createMobileApiClient({
+      accessToken: () => 'mobile-token',
+    })
+    const configuration = (client as unknown as { configuration: Configuration })
+      .configuration
+
+    expect(configuration.basePath).toBe('https://fallback-api.couturecast.test')
+    expect(await configuration.accessToken?.()).toBe('mobile-token')
+  })
+
   it('throws when no mobile API base URL is configured', () => {
     delete process.env.EXPO_PUBLIC_API_BASE_URL
     delete process.env.API_BASE_URL

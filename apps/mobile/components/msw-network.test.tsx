@@ -39,14 +39,11 @@ describe('mobile msw network mocking', () => {
       )
     )
 
-    try {
-      await loadMobileApiHealth()
-      throw new Error('Expected the generated mobile client to surface the 503 response')
-    } catch (error: unknown) {
-      expect(error).toBeInstanceOf(ResponseError)
+    const request = loadMobileApiHealth()
 
-      const responseError = error as ResponseError
-      expect(responseError.response.status).toBe(503)
-    }
+    await expect(request).rejects.toBeInstanceOf(ResponseError)
+    await expect(request).rejects.toSatisfy(
+      (error: unknown) => error instanceof ResponseError && error.response.status === 503
+    )
   })
 })

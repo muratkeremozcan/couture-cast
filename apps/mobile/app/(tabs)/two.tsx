@@ -6,6 +6,8 @@ import { Text, View } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { loadMobileApiHealth } from '@/src/lib/api-health'
 
+const API_HEALTH_TIMEOUT_MS = 5_000
+
 export default function TabTwoScreen() {
   const analytics = useMobileAnalytics()
   const [apiHealthMessage, setApiHealthMessage] = useState('Checking API health...')
@@ -18,11 +20,19 @@ export default function TabTwoScreen() {
 
   useEffect(() => {
     let isActive = true
+    const unavailableTimer = setTimeout(() => {
+      if (!isActive) {
+        return
+      }
+
+      setApiHealthMessage('API health unavailable')
+    }, API_HEALTH_TIMEOUT_MS)
 
     // Story 0.9 Task 7 step 6 owner:
     // consume the generated-client helper in a real mobile runtime path, not only in isolated tests.
     void loadMobileApiHealth()
       .then((health) => {
+        clearTimeout(unavailableTimer)
         if (!isActive) {
           return
         }
@@ -30,6 +40,7 @@ export default function TabTwoScreen() {
         setApiHealthMessage(`API health: ${health.status}`)
       })
       .catch(() => {
+        clearTimeout(unavailableTimer)
         if (!isActive) {
           return
         }
@@ -39,6 +50,7 @@ export default function TabTwoScreen() {
 
     return () => {
       isActive = false
+      clearTimeout(unavailableTimer)
     }
   }, [])
 

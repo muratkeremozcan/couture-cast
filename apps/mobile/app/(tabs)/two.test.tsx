@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/edit-screen-info', () => ({
   default: () => null,
@@ -11,20 +11,45 @@ vi.mock('@/src/analytics/mobile-analytics', () => ({
   }),
 }))
 
+const { loadMobileApiHealthMock } = vi.hoisted(() => ({
+  loadMobileApiHealthMock: vi.fn(),
+}))
+
+vi.mock('@/src/lib/api-health', () => ({
+  loadMobileApiHealth: loadMobileApiHealthMock,
+}))
+
 import TabTwoScreen from './two'
 
 describe('TabTwoScreen', () => {
-  const originalExpoPublicApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
+  beforeEach(() => {
+    loadMobileApiHealthMock.mockReset()
+  })
 
   afterEach(() => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = originalExpoPublicApiBaseUrl
+    vi.useRealTimers()
   })
 
   it('renders API health loaded from the generated client', async () => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = 'https://example.test'
+    loadMobileApiHealthMock.mockResolvedValue({
+      status: 'ok',
+    })
 
     render(<TabTwoScreen />)
 
-    expect((await screen.findByText('API health: ok')).textContent).toBe('API health: ok')
+    await screen.findByText('API health: ok')
+  })
+
+  it('falls back to unavailable when the API health request never resolves', async () => {
+    vi.useFakeTimers()
+    loadMobileApiHealthMock.mockImplementation(() => new Promise(() => undefined))
+
+    render(<TabTwoScreen />)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000)
+    })
+
+    expect(screen.getByText('API health unavailable')).toBeTruthy()
   })
 })
