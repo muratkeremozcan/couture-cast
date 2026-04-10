@@ -3,6 +3,7 @@
 # CoutureCast Architecture
 
 _Created on 2025-11-10 by BMad-user_
+_Updated: 2026-04-10 - API contract ownership, versioning, and regeneration rules documented._
 
 ---
 
@@ -171,7 +172,21 @@ couturecast/
   - `GET /api/v1/ritual?locationId=...` → `{ data: { weather, outfits, badges } }`
   - `POST /api/v1/lookbook` → creates post; responds with `{ data: { id, status } }`
   - `POST /api/v1/moderation/:id/resolve` → moderators mark events complete.
-- Canonical REST contracts live in shared Zod schemas, with OpenAPI generated from those contracts and published for typed SDK generation; schema drift caught via automated OpenAPI diff checks in CI.
+- Canonical REST contracts live in shared Zod schemas under `packages/api-client/src/contracts/http/*`.
+- Those Zod modules are the only source of truth for public REST endpoints. Nest controllers,
+  decorators, DTOs, checked-in OpenAPI JSON, live docs, and generated SDK files are downstream
+  artifacts.
+- New public REST endpoints must start in the shared Zod contract modules before controller or
+  client implementation lands.
+- `/api/v1` is the stable public namespace. Breaking changes ship on `/api/v2`; they do not land
+  silently in `/api/v1`.
+- Deprecated `/api/v1` operations must carry deprecation metadata in the canonical OpenAPI document
+  and remain available for at least 90 days before removal.
+- `packages/api-client/src/contracts/http/openapi.ts` owns the OpenAPI `info.version` value.
+  Breaking removals or other incompatible changes require a major version bump before merge so
+  Optic records an explicit versioning decision in CI.
+- `packages/api-client/docs/http.openapi.json` is the checked-in canonical contract artifact. Optic
+  diffs that file against `main` in CI to catch breaking changes before merge.
 
 ## Security Architecture
 

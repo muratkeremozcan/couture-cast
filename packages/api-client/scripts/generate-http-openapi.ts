@@ -13,7 +13,9 @@ import {
 // Why this step matters:
 // the build/test pipeline can now regenerate the contract from code alone, which keeps SDK
 // generation and CI drift checks independent from local server bootstrapping.
-export function writeHttpOpenApiDocument(outputDir = resolve(process.cwd(), 'docs')) {
+const packageRoot = resolve(__dirname, '..')
+
+export function writeHttpOpenApiDocument(outputDir = resolve(packageRoot, 'docs')) {
   const document = generateHttpOpenApiDocument()
   mkdirSync(outputDir, { recursive: true })
 

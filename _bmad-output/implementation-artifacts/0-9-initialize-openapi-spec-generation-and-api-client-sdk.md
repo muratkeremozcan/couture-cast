@@ -141,21 +141,21 @@ so that I can call backend endpoints without manual typing errors and catch brea
   - [x] Replace at least one handwritten HTTP flow in `apps/mobile` with the generated client
   - [x] Add tests proving those flows compile and execute against the generated client surface
 
-- [ ] Task 8: Implement canonical OpenAPI diff checks in CI (AC: #3)
-  - [ ] Install a breaking-change diff tool at the workspace root
-  - [ ] Generate base and head specs from the canonical contract code path, not from a manually
+- [x] Task 8: Implement canonical OpenAPI diff checks in CI (AC: #3)
+  - [x] Install a breaking-change diff tool at the workspace root
+  - [x] Generate base and head specs from the canonical contract code path, not from a manually
         running API server
-  - [ ] Run breaking-change detection against `packages/api-client/docs/http.openapi.json`
-  - [ ] Fail the PR when breaking changes land without an explicit versioning decision
+  - [x] Run breaking-change detection against `packages/api-client/docs/http.openapi.json`
+  - [x] Fail the PR when breaking changes land without an explicit versioning decision
 
-- [ ] Task 9: Document versioning, contract ownership, and regeneration workflow (AC: #4, #5)
-  - [ ] Create `_bmad-output/project-knowledge/api-versioning.md`
-  - [ ] Document breaking vs non-breaking contract changes and the 90-day deprecation policy
-  - [ ] Define how deprecation metadata is expressed in canonical contract modules and surfaced in
+- [x] Task 9: Document versioning, contract ownership, and regeneration workflow (AC: #4, #5)
+  - [x] Create `_bmad-output/project-knowledge/api-versioning.md`
+  - [x] Document breaking vs non-breaking contract changes and the 90-day deprecation policy
+  - [x] Define how deprecation metadata is expressed in canonical contract modules and surfaced in
         the generated OpenAPI document
-  - [ ] Document contract ownership in architecture docs: shared Zod schemas are canonical and new
+  - [x] Document contract ownership in architecture docs: shared Zod schemas are canonical and new
         public REST endpoints must start there
-  - [ ] Create `packages/api-client/README.md` with SDK usage, auth/error handling, and the exact
+  - [x] Create `packages/api-client/README.md` with SDK usage, auth/error handling, and the exact
         regeneration workflow (`generate:http-openapi` -> validate -> `generate:api-client`)
 
 ## Dev Notes
@@ -247,7 +247,7 @@ _bmad-output/
 └── project-knowledge/
     └── api-versioning.md       # Versioning strategy
 .github/workflows/
-└── openapi-diff.yml            # Breaking change detection
+└── schema-validation.yml       # Optic schema validation in CI
 ```
 
 ### References
@@ -257,7 +257,6 @@ _bmad-output/
 - [Epics: Epic 0 Story CC-0.9](../planning-artifacts/epics.md#epic-0--platform-foundation--infrastructure-sprint-0)
 - [NestJS Swagger](https://docs.nestjs.com/openapi/introduction)
 - [OpenAPI Generator](https://openapi-generator.tech/docs/generators/typescript-axios)
-- [oasdiff](https://github.com/Tufin/oasdiff)
 
 ### Learnings from Previous Stories
 
