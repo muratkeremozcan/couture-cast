@@ -68,7 +68,7 @@ npm run typecheck:clear-cache
 | `npm run optic:lint`                      | Validates the checked-in canonical HTTP OpenAPI spec with Optic.                                                       |
 | `npm run optic:diff`                      | Compares the canonical HTTP OpenAPI spec against `main` and fails on breaking changes unless versioning is explicit.   |
 | `npm run start:web`                       | Starts the built Next.js app on port 3005 (used by Playwright’s webServer hook).                                       |
-| `npm run start:api`                       | Boots the NestJS API from compiled output and rebuilds/restarts it on source changes.                                  |
+| `npm run start:api`                       | Runs `db:generate` + Prisma migrate deploy, then starts Nest API in watch mode on port 4000.                           |
 | `npm run start:mobile:server`             | Starts Expo dev server on 19000/19001 for Maestro smoke runs.                                                          |
 | `npm run start:mobile:e2e`                | One-shot mobile smoke: boots a simulator (android→iOS), starts Expo, runs Maestro.                                     |
 | `npm run mobile:sim:ios`                  | Boots the default iOS simulator (`IOS_SIM_DEVICE` override) and shows booted devices.                                  |
@@ -76,10 +76,8 @@ npm run typecheck:clear-cache
 | `npm run mobile:device`                   | Convenience opener for a simulator/emulator (launch one manually if this no-ops).                                      |
 | `npm run mobile:expo-go`                  | Installs Expo Go APK onto the connected emulator/device.                                                               |
 | `npm run start:all`                       | Starts both API + web servers concurrently (mirrors Playwright’s `webServer` config).                                  |
-| `npm run test:pw`                         | Runs the Playwright smoke suite using the current `TEST_ENV` (defaults to `local`).                                    |
 | `npm run test:pw-local`                   | Convenience wrapper that sets `TEST_ENV=local` and runs the smoke suite.                                               |
 | `npm run test:pw-dev`                     | Targets the dev deployment (`TEST_ENV=dev`).                                                                           |
-| `npm run test:pw-stage`                   | Targets the stage deployment (`TEST_ENV=stage`).                                                                       |
 | `npm run test:pw-prod`                    | Targets the prod deployment (`TEST_ENV=prod`).                                                                         |
 | `npm run test:pw:burn-in`                 | Burn-in all specs locally (`PW_BURN_IN=true`, repeat-each=3, retries=0).                                               |
 | `npm run test:pw:burn-in-changed-classic` | Playwright built-in `--only-changed` burn-in vs main (3x, retries=0) — can overrun.                                    |
@@ -87,7 +85,7 @@ npm run typecheck:clear-cache
 | `npm run maestro:install`                 | Installs the Maestro CLI (brew/curl on macOS; npx fallback on CI).                                                     |
 | `npm run test:mobile:e2e`                 | Starts Expo (if needed) and runs the Maestro smoke flow against the dev server it spawns.                              |
 | `npm run test:mobile:e2e:ios`             | Boots the default iOS simulator and runs the Maestro smoke flow against Expo dev server.                               |
-| `npm run validate`                        | Runs typecheck, lint (workspace + root), and tests in parallel—reference flow.                                         |
+| `npm run validate`                        | Runs `typecheck`, then `lint`, then `test` sequentially via `npm-run-all`.                                             |
 | `npm run clean`                           | Cleans each workspace’s build outputs.                                                                                 |
 | `npm run clean:install`                   | Nukes every `node_modules` (root/apps/packages) and performs a fresh `npm install`.                                    |
 | `npm run db:migrate`                      | Runs Prisma migrate in `packages/db` (requires `DATABASE_URL`).                                                        |
