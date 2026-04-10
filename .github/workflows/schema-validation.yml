@@ -1,0 +1,39 @@
+name: Run schema validation
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  schema-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+
+      - name: Read Node version from .nvmrc
+        id: node_version
+        run: echo "NODE_VERSION=$(cat .nvmrc)" >> $GITHUB_ENV
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Optic lint base OpenAPI spec ahead of other checks
+        run: npm run optic:lint
+
+      - name: Generate OpenAPI spec from code
+        run: npm run generate:http-openapi
+
+      - name: Fetch main branch for Optic (Begin schema validation)
+        run: git fetch --depth=1 origin main:main
+
+      - name: Optic diff (OpenAPI diff vs snapshot on main)
+        run: npm run optic:diff
