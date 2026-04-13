@@ -53,8 +53,8 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
 
   - [x] Add Prisma integration: persist to database if `{ persist: true }`
 
-- [ ] Task 3: Implement WardrobeItem factory (AC: #1)
-  - [ ] Create ` ```typescript
+- [x] Task 3: Implement WardrobeItem factory (AC: #1)
+  - [x] Create ` ```typescript
         export const createWardrobeItem = createFactory(() => ({
         id: faker.string.uuid(),
         userId: faker.string.uuid(),
@@ -72,9 +72,9 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
 
     ```
 
-- [ ] Task 4: Implement Ritual and Weather factories (AC: #1)
-  - [ ] Create ` for outfit rituals
-  - [ ] Create ` for weather snapshots:
+- [x] Task 4: Implement Ritual and Weather factories (AC: #1)
+  - [x] Create ` for outfit rituals
+  - [x] Create ` for weather snapshots:
     ```typescript
     export const createWeatherSnapshot = createFactory(() => ({
       id: faker.string.uuid(),
@@ -410,6 +410,8 @@ _bmad-output/
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run typecheck --workspace @couture/testing`
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run lint --workspace @couture/testing`
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { buildUserCreateInput, createGuardianUser, createTeenUser } from './packages/testing/src/factories/user.factory.ts'; const teen = createTeenUser({ age: 14 }); const guardian = createGuardianUser(); const teenInput = buildUserCreateInput(teen); console.log(JSON.stringify({ teenRole: teen.role, teenAge: teen.age, guardianRole: guardian.role, teenProfileRole: teenInput.profile.create.preferences.role }))"`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { buildWardrobeItemCreateInput, createWardrobeItem } from './packages/testing/src/factories/wardrobe-item.factory.ts'; const fixture = createWardrobeItem({ userId: 'user-123', category: 'top' }); const input = buildWardrobeItemCreateInput(fixture); console.log(JSON.stringify({ category: fixture.category, userId: fixture.userId, connectId: input.user.connect.id, paletteSize: fixture.colorPalette.length }))"`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { buildRitualCreateInput, createRitual } from './packages/testing/src/factories/ritual.factory.ts'; import { buildWeatherSnapshotCreateInput, createWeatherSnapshot } from './packages/testing/src/factories/weather.factory.ts'; const ritual = createRitual({ userId: 'user-123', forecastSegmentId: 'segment-456' }); const ritualInput = buildRitualCreateInput(ritual); const weather = createWeatherSnapshot({ location: 'Chicago, IL', conditions: 'snow' }); const weatherInput = buildWeatherSnapshotCreateInput(weather); console.log(JSON.stringify({ ritualScenario: ritual.scenario, ritualConnectId: ritualInput.user.connect.id, ritualSegmentId: ritualInput.forecast_segment?.connect?.id, weatherLocation: weatherInput.location, weatherCondition: weatherInput.condition, weatherHasAlerts: Boolean(weatherInput.alerts) }))"`
 
 ### Completion Notes List
 
@@ -418,6 +420,9 @@ _bmad-output/
 - Added a typed cleanup registry with default buckets for `users`, `wardrobeItems`, `rituals`, and `weatherSnapshots`.
 - Implemented task 2 with role-aware `createUser`, `createTeenUser`, and `createGuardianUser` helpers plus Prisma persistence support.
 - Mapped fixture-level `role` and `age` into nested `UserProfile` and `ComfortPreferences` create input so the factory matches the actual schema.
+- Implemented task 3 with a schema-aligned `createWardrobeItem` factory, exported wardrobe constants/types, and Prisma persistence that maps the fixture API onto `GarmentItem`.
+- Implemented task 4 with a `createRitual` factory mapped onto `OutfitRecommendation` and a `createWeatherSnapshot` factory mapped onto `WeatherSnapshot`.
+- Kept the weather fixture API richer than the current schema (`feelsLike`, `windSpeed`, `humidity`, `locationId`) while restricting persistence helpers to the columns Prisma currently supports.
 - Updated `package-lock.json` through npm workspace installs run under Node 24.x.
 - Verified the new workspace with targeted `build`, `typecheck`, `lint`, and a runtime smoke check.
 
@@ -431,10 +436,14 @@ _bmad-output/
 - New: `packages/testing/src/factories/factory.ts`
 - New: `packages/testing/src/factories/registry.ts`
 - New: `packages/testing/src/factories/user.factory.ts`
+- New: `packages/testing/src/factories/wardrobe-item.factory.ts`
+- New: `packages/testing/src/factories/ritual.factory.ts`
+- New: `packages/testing/src/factories/weather.factory.ts`
 - New: `packages/testing/dist/*`
 - New: `packages/testing/tsconfig.build.tsbuildinfo`
 - New: `packages/testing/tsconfig.tsbuildinfo`
 - Modified: `package-lock.json`
+- Modified: `packages/testing/src/factories/index.ts`
 
 ## Change Log
 
@@ -442,3 +451,5 @@ _bmad-output/
 | ---------- | ------------------ | -------------------------------------------------------------------------------------------------- |
 | 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.10 acceptance criteria                                             |
 | 2026-04-13 | Codex (Dev Agent)  | Implemented tasks 1-2 for shared factory infrastructure and the user factory in `@couture/testing` |
+| 2026-04-13 | Codex (Dev Agent)  | Implemented task 3 with a wardrobe item factory and Prisma persistence/export wiring               |
+| 2026-04-13 | Codex (Dev Agent)  | Implemented task 4 with ritual/weather factories and schema-aware persistence helpers              |
