@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-09 - Steps 13 to 15: reflect landed Task 7 SDK adoption in web/mobile runtimes and the remaining contract guardrails
+Updated: 2026-04-13 - Step 2 now includes the shared testing workspace and the Node 24 workspace-install constraint
 
 ## LLM collaborator prompt
 
@@ -149,8 +149,9 @@ Key takeaways:
 
 1. Boundary clarity: `apps/web`, `apps/mobile`, and `apps/api` are separate runtime surfaces with
    distinct entrypoints.
-2. Shared contracts: common logic/types flow through workspace packages (not cross-app direct
-   imports), especially `packages/api-client` and `packages/db`.
+2. Shared contracts and test primitives: common logic/types flow through workspace packages (not
+   cross-app direct imports), especially `packages/api-client`, `packages/db`, and
+   `packages/testing`.
 3. Monorepo operations: root npm workspaces + `turbo.json` coordinate consistent `dev`, `test`,
    and `build` behavior.
 4. **Runtime and app-owned deps:** Anything an app or package **imports** or any **script in that
@@ -185,7 +186,8 @@ Sequence to follow:
 
 1. Start at the root workspace and task graph in the repo root.
 2. Open the web, mobile, and API entrypoints to see each runtime boundary.
-3. Trace shared contracts through `packages/api-client` and `packages/db` instead of cross-app imports.
+3. Trace shared contracts through `packages/api-client`, `packages/db`, and `packages/testing`
+   instead of cross-app imports.
 
 Task owner map:
 
@@ -193,7 +195,7 @@ Task owner map:
 - Step 2 step 2 owner: define the web runtime boundary in `apps/web/src/app/layout.tsx`
 - Step 2 step 3 owner: define the mobile runtime boundary in `apps/mobile/app/_layout.tsx` and `apps/mobile/app/(tabs)/_layout.tsx`
 - Step 2 step 4 owner: define the API runtime boundary in `apps/api/src/main.ts`
-- Step 2 step 5 owner: define shared package boundaries in `packages/api-client/package.json` and `packages/db/package.json`
+- Step 2 step 5 owner: define shared package boundaries in `packages/api-client/package.json`, `packages/db/package.json`, and `packages/testing/package.json`
 
 Current repo note:
 
@@ -201,6 +203,8 @@ Current repo note:
   and a few intentional monorepo pins (Prisma). Repeating a package name under `apps/api` and the
   root is normal when both need it for different reasons—check the lockfile once, not “did I avoid
   duplication.”
+- **Workspace install baseline:** Use Node 24 from `.nvmrc` when adding or reconciling workspaces.
+  The root preinstall guard fails fast on older runtimes before npm can update the workspace graph.
 
 Architecture diagram:
 
@@ -214,6 +218,7 @@ flowchart TD
   ROOT --> API[apps/api<br/>NestJS bootstrap]
   ROOT --> APICLIENT[packages/api-client<br/>shared API/event contracts]
   ROOT --> DB[packages/db<br/>Prisma schema + client]
+  ROOT --> TESTING[packages/testing<br/>shared fixture factories + cleanup registry]
   ROOT --> ESLINT[packages/eslint-config]
 
   ROOT --> TURBO
