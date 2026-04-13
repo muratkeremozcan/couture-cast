@@ -90,13 +90,7 @@ function buildDefaultWardrobeItemFixture(): WardrobeItemFixture {
 function composeWardrobeItemFixture(
   overrides: WardrobeItemFactoryOverrides = {}
 ): WardrobeItemFixture {
-  const defaults = buildDefaultWardrobeItemFixture()
-
-  return mergeWardrobeItemFixture({
-    ...defaults,
-    ...overrides,
-    colorPalette: overrides.colorPalette ?? defaults.colorPalette,
-  })
+  return mergeWardrobeItemFixture(overrides)
 }
 
 export function buildWardrobeItemCreateInput(

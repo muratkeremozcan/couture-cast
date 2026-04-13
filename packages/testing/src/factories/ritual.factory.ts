@@ -61,14 +61,7 @@ function buildDefaultRitualFixture(): RitualFixture {
 }
 
 function composeRitualFixture(overrides: RitualFactoryOverrides = {}): RitualFixture {
-  const defaults = buildDefaultRitualFixture()
-
-  return mergeRitualFixture({
-    ...defaults,
-    ...overrides,
-    garmentIds: overrides.garmentIds ?? defaults.garmentIds,
-    reasoningBadges: overrides.reasoningBadges ?? defaults.reasoningBadges,
-  })
+  return mergeRitualFixture(overrides)
 }
 
 export function buildRitualCreateInput(

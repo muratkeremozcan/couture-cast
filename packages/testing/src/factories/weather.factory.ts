@@ -65,13 +65,7 @@ function buildDefaultWeatherSnapshotFixture(): WeatherSnapshotFixture {
 function composeWeatherSnapshotFixture(
   overrides: WeatherSnapshotFactoryOverrides = {}
 ): WeatherSnapshotFixture {
-  const defaults = buildDefaultWeatherSnapshotFixture()
-
-  return mergeWeatherSnapshotFixture({
-    ...defaults,
-    ...overrides,
-    alerts: overrides.alerts ?? defaults.alerts,
-  })
+  return mergeWeatherSnapshotFixture(overrides)
 }
 
 export function buildWeatherSnapshotCreateInput(

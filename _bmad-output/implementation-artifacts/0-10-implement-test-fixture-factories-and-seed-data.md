@@ -423,6 +423,7 @@ _bmad-output/
 - Implemented task 3 with a schema-aligned `createWardrobeItem` factory, exported wardrobe constants/types, and Prisma persistence that maps the fixture API onto `GarmentItem`.
 - Implemented task 4 with a `createRitual` factory mapped onto `OutfitRecommendation` and a `createWeatherSnapshot` factory mapped onto `WeatherSnapshot`.
 - Kept the weather fixture API richer than the current schema (`feelsLike`, `windSpeed`, `humidity`, `locationId`) while restricting persistence helpers to the columns Prisma currently supports.
+- Verified a Coderabbit nitpick about duplicate default generation in the new factories and removed the redundant default-building pass from wardrobe, ritual, and weather composition.
 - Updated `package-lock.json` through npm workspace installs run under Node 24.x.
 - Verified the new workspace with targeted `build`, `typecheck`, `lint`, and a runtime smoke check.
 
@@ -453,3 +454,4 @@ _bmad-output/
 | 2026-04-13 | Codex (Dev Agent)  | Implemented tasks 1-2 for shared factory infrastructure and the user factory in `@couture/testing` |
 | 2026-04-13 | Codex (Dev Agent)  | Implemented task 3 with a wardrobe item factory and Prisma persistence/export wiring               |
 | 2026-04-13 | Codex (Dev Agent)  | Implemented task 4 with ritual/weather factories and schema-aware persistence helpers              |
+| 2026-04-13 | Codex (Dev Agent)  | Removed redundant default generation in wardrobe, ritual, and weather factory composition          |
