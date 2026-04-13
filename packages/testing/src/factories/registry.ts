@@ -35,7 +35,7 @@ function createRegistrySnapshot<TKey extends string>(
   const snapshot = {} as Record<TKey, readonly string[]>
 
   for (const key of keys) {
-    snapshot[key] = [...state[key]]
+    snapshot[key] = Object.freeze([...state[key]])
   }
 
   return Object.freeze(snapshot)

@@ -42,9 +42,11 @@ export type UserFactoryOverrides = Partial<
 
 export type UserVariantOverrides = Omit<UserFactoryOverrides, 'role'>
 
+type PersistUserPrismaClient = PrismaClient | Prisma.TransactionClient
+
 export interface CreatePersistedUserOptions {
   persist: true
-  prisma: PrismaClient
+  prisma: PersistUserPrismaClient
 }
 
 const persistedUserInclude = {
@@ -153,7 +155,7 @@ export function buildUserCreateInput(fixture: UserFixture): Prisma.UserCreateInp
 }
 
 export async function persistUser(
-  prisma: PrismaClient,
+  prisma: PersistUserPrismaClient,
   fixture: UserFixture
 ): Promise<PersistedUserFixture> {
   const user = await prisma.user.create({

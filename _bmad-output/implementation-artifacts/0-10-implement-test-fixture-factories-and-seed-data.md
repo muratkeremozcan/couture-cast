@@ -19,46 +19,36 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
 ## Tasks / Subtasks
 
 - [x] Task 1: Create factory infrastructure (AC: #1)
-  - [x] Create ` directory
-  - [x] Install dependencies: `npm install @faker-js/faker --save-dev --workspace   - [x] Create base factory helper ` ```typescript
-        import { faker } from '@faker-js/faker';
+  - [x] Create the package directory
+  - [x] Install dependencies:
+        `npm install @faker-js/faker --save-dev --workspace @couture/testing`
+  - [x] Create base factory helper:
 
-    export function createFactory<T>(defaults: () => T) {
-    return (overrides?: Partial<T>): T => ({
-    ...defaults(),
-    ...overrides,
-    });
+    ```typescript
+    import { faker } from '@faker-js/faker'
+
+    export function createFactory<T extends object>(defaults: () => T) {
+      return (overrides: Partial<T> = {}): T => ({
+        ...defaults(),
+        ...overrides,
+      })
     }
-
-    ```
-
     ```
 
   - [x] Create factory registry to track created entities for cleanup
 
 - [x] Task 2: Implement User factory (AC: #1)
-  - [x] Create ` ```typescript
-        import { createFactory } from './factory';
-        import { faker } from '@faker-js/faker';
+  - [x] Create the user factory module:
 
-    export const createUser = createFactory(() => ({
-    id: faker.string.uuid(),
-    email: faker.internet.email(),
-    password: faker.internet.password(),
-    role: 'user' as const,
-    age: faker.number.int({ min: 16, max: 65 }),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    }));
+    ```typescript
+    export const createUser = (overrides?: UserFactoryOverrides) =>
+      composeUserFixture(overrides)
 
-    export const createTeenUser = (overrides?: Partial<ReturnType<typeof createUser>>) =>
-    createUser({ role: 'teen', age: 15, ...overrides });
+    export const createTeenUser = (overrides?: UserVariantOverrides) =>
+      createUser({ ...overrides, role: 'teen' })
 
-    export const createGuardianUser = (overrides?: Partial<ReturnType<typeof createUser>>) =>
-    createUser({ role: 'guardian', age: 42, ...overrides });
-
-    ```
-
+    export const createGuardianUser = (overrides?: UserVariantOverrides) =>
+      createUser({ ...overrides, role: 'guardian' })
     ```
 
   - [x] Add Prisma integration: persist to database if `{ persist: true }`
