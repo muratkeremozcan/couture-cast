@@ -1,6 +1,6 @@
 # Story 0.10: Implement test fixture factories and seed data
 
-Status: drafted
+Status: in-progress
 
 ## Story
 
@@ -18,50 +18,40 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create factory infrastructure (AC: #1)
-  - [ ] Create ` directory
-  - [ ] Install dependencies: `npm install @faker-js/faker --save-dev --workspace   - [ ] Create base factory helper ` ```typescript
-        import { faker } from '@faker-js/faker';
+- [x] Task 1: Create factory infrastructure (AC: #1)
+  - [x] Create the package directory
+  - [x] Install dependencies:
+        `npm install @faker-js/faker --save-dev --workspace @couture/testing`
+  - [x] Create base factory helper:
 
-    export function createFactory<T>(defaults: () => T) {
-    return (overrides?: Partial<T>): T => ({
-    ...defaults(),
-    ...overrides,
-    });
+    ```typescript
+    import { faker } from '@faker-js/faker'
+
+    export function createFactory<T extends object>(defaults: () => T) {
+      return (overrides: Partial<T> = {}): T => ({
+        ...defaults(),
+        ...overrides,
+      })
     }
-
     ```
 
+  - [x] Create factory registry to track created entities for cleanup
+
+- [x] Task 2: Implement User factory (AC: #1)
+  - [x] Create the user factory module:
+
+    ```typescript
+    export const createUser = (overrides?: UserFactoryOverrides) =>
+      composeUserFixture(overrides)
+
+    export const createTeenUser = (overrides?: UserVariantOverrides) =>
+      createUser({ ...overrides, role: 'teen' })
+
+    export const createGuardianUser = (overrides?: UserVariantOverrides) =>
+      createUser({ ...overrides, role: 'guardian' })
     ```
 
-  - [ ] Create factory registry to track created entities for cleanup
-
-- [ ] Task 2: Implement User factory (AC: #1)
-  - [ ] Create ` ```typescript
-        import { createFactory } from './factory';
-        import { faker } from '@faker-js/faker';
-
-    export const createUser = createFactory(() => ({
-    id: faker.string.uuid(),
-    email: faker.internet.email(),
-    password: faker.internet.password(),
-    role: 'user' as const,
-    age: faker.number.int({ min: 16, max: 65 }),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    }));
-
-    export const createTeenUser = (overrides?: Partial<ReturnType<typeof createUser>>) =>
-    createUser({ role: 'teen', age: 15, ...overrides });
-
-    export const createGuardianUser = (overrides?: Partial<ReturnType<typeof createUser>>) =>
-    createUser({ role: 'guardian', age: 42, ...overrides });
-
-    ```
-
-    ```
-
-  - [ ] Add Prisma integration: persist to database if `{ persist: true }`
+  - [x] Add Prisma integration: persist to database if `{ persist: true }`
 
 - [ ] Task 3: Implement WardrobeItem factory (AC: #1)
   - [ ] Create ` ```typescript
@@ -406,26 +396,49 @@ _bmad-output/
 
 ### Context Reference
 
-<!-- Path(s) to story context XML will be added here by context workflow -->
+- No story context XML was linked from this story file during task 1 implementation.
 
 ### Agent Model Used
 
-<!-- Will be filled by dev agent -->
+- GPT-5 Codex
 
 ### Debug Log References
 
-<!-- Will be filled by dev agent during implementation -->
+- `npm install --workspace @couture/testing` failed under Node `v22.12.0` because the repo preinstall guard requires Node 24.x.
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm install --workspace @couture/testing`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run build --workspace @couture/testing`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run typecheck --workspace @couture/testing`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run lint --workspace @couture/testing`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { buildUserCreateInput, createGuardianUser, createTeenUser } from './packages/testing/src/factories/user.factory.ts'; const teen = createTeenUser({ age: 14 }); const guardian = createGuardianUser(); const teenInput = buildUserCreateInput(teen); console.log(JSON.stringify({ teenRole: teen.role, teenAge: teen.age, guardianRole: guardian.role, teenProfileRole: teenInput.profile.create.preferences.role }))"`
 
 ### Completion Notes List
 
-<!-- Will be filled by dev agent upon completion -->
+- Implemented task 1 by creating a new `@couture/testing` workspace for shared test fixture utilities.
+- Added a base `createFactory` helper plus a re-exported `faker` entrypoint for future entity-specific factories.
+- Added a typed cleanup registry with default buckets for `users`, `wardrobeItems`, `rituals`, and `weatherSnapshots`.
+- Implemented task 2 with role-aware `createUser`, `createTeenUser`, and `createGuardianUser` helpers plus Prisma persistence support.
+- Mapped fixture-level `role` and `age` into nested `UserProfile` and `ComfortPreferences` create input so the factory matches the actual schema.
+- Updated `package-lock.json` through npm workspace installs run under Node 24.x.
+- Verified the new workspace with targeted `build`, `typecheck`, `lint`, and a runtime smoke check.
 
 ### File List
 
-<!-- Will be filled by dev agent with NEW/MODIFIED/DELETED files -->
+- New: `packages/testing/package.json`
+- New: `packages/testing/tsconfig.json`
+- New: `packages/testing/tsconfig.build.json`
+- New: `packages/testing/src/index.ts`
+- New: `packages/testing/src/factories/index.ts`
+- New: `packages/testing/src/factories/factory.ts`
+- New: `packages/testing/src/factories/registry.ts`
+- New: `packages/testing/src/factories/user.factory.ts`
+- New: `packages/testing/dist/*`
+- New: `packages/testing/tsconfig.build.tsbuildinfo`
+- New: `packages/testing/tsconfig.tsbuildinfo`
+- Modified: `package-lock.json`
 
 ## Change Log
 
-| Date       | Author             | Change                                                 |
-| ---------- | ------------------ | ------------------------------------------------------ |
-| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.10 acceptance criteria |
+| Date       | Author             | Change                                                                                             |
+| ---------- | ------------------ | -------------------------------------------------------------------------------------------------- |
+| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.10 acceptance criteria                                             |
+| 2026-04-13 | Codex (Dev Agent)  | Implemented tasks 1-2 for shared factory infrastructure and the user factory in `@couture/testing` |
