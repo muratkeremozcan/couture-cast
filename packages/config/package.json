@@ -18,6 +18,7 @@
     "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "lint": "eslint --max-warnings=0 --ext .ts src",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage"
   }
 }

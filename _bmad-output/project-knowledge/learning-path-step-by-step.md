@@ -528,12 +528,15 @@ Key takeaways:
    `SKIP_BURN_IN` override) before full E2E proceeds.
 3. Deployment confidence is surface-aware: Vercel Preview smoke runs from `deployment_status`
    (`pr-pw-e2e-vercel-preview.yml`), while mobile deploy remains manual via `deploy-mobile.yml`.
+4. Coverage visibility is baked into the PR loop: `pr-checks.yml` runs all workspace tests with
+   coverage, merges the summaries into one aggregate report, posts a sticky PR comment with
+   statements/branches/functions/lines metrics, and updates a shields.io badge on push to main.
 
 Story/Task mapping:
 
-- Story 0.6 (status: review)
+- Story 0.6 (status: review), Story 0.14 Task 7 (coverage reporting)
 - Task 1 (test workflow), Task 2 (parallelization), Task 12 (PR preview smoke), Task 13 (API
-  deployment prep)
+  deployment prep), Story 0.14 Task 7 (coverage PR comments and badges)
 
 Story reference:
 
@@ -544,12 +547,14 @@ Cross-links:
 - Step 2 defines the apps and packages these workflows exercise.
 - Step 12 plugs cross-surface smoke coverage into this gate.
 - Step 15 adds contract automation to the same quality-gate model.
+- Story 0.14 Task 7 extends this gate with merged monorepo coverage, PR comments, and badges.
 
 Sequence to follow:
 
 1. Read the required PR workflows first.
 2. See how burn-in, preview smoke, and secret scanning complement the base checks.
 3. Note which deploy paths are automated and which remain manual by design.
+4. Trace how monorepo coverage is collected, merged, and surfaced in PRs and badges.
 
 Task owner map:
 
@@ -560,6 +565,8 @@ Task owner map:
 - Step 7 step 5 owner: enforce secret scanning in `.github/workflows/gitleaks-check.yml`
 - Step 7 step 6 owner: keep the mobile deployment path explicit in `.github/workflows/deploy-mobile.yml`
 - Step 7 support owner: centralize install and browser setup in `.github/actions/install/action.yml` and `.github/actions/setup-playwright-browsers/action.yml`
+- Step 7 step 7 owner: merge monorepo workspace coverage and post sticky PR comment in `.github/workflows/pr-checks.yml`
+- Step 7 step 8 owner: upload coverage artifact, parse metrics, comment on PR, and update badge in `.github/actions/unit-test-coverage-comment/action.yml`
 
 Architecture diagram:
 
@@ -577,15 +584,296 @@ flowchart TD
   PR --> PREVIEW[Vercel Preview deployment]
   PREVIEW --> PREVIEW_SMOKE[pr-pw-e2e-vercel-preview.yml<br/>web-health-sha smoke]
 
+  PRCHECKS --> COV[Merge coverage summaries<br/>all workspaces]
+  COV --> COMMENT[Sticky PR comment<br/>coverage metrics table]
+  COV --> SUMMARY[Step summary<br/>coverage in workflow run]
+
   PRCHECKS --> READY{Ready to merge?}
   GITLEAKS --> READY
   E2E_GATE --> READY
   PREVIEW_SMOKE --> READY
+  COMMENT --> READY
 
   READY --> MAIN[Merge to main]
   MAIN --> PROD[Vercel Production deploy<br/>web + API serverless target]
   MAIN --> MOBILE[deploy-mobile.yml<br/>manual Android EAS build]
+  MAIN --> BADGE[Update shields.io badge<br/>via gist]
 ```
+
+### Coverage reporting and badges — reproducible setup
+
+This is the full recipe for adding unit test coverage PR comments and a shields.io badge to any
+repo. Works for single repos and monorepos.
+
+#### Prerequisites
+
+- Test runner produces `coverage-summary.json` in Istanbul/v8 format (Vitest `json-summary`,
+  Jest `json-summary`, or a normalized output from pytest-cov / JaCoCo).
+- GitHub Actions CI workflow that runs tests.
+
+#### Step 1: Configure test runner to emit `json-summary`
+
+Files: `apps/api/vitest.config.ts`, `apps/web/vitest.config.ts`, `apps/mobile/vitest.config.ts`,
+`packages/api-client/vitest.config.ts`, `packages/config/vitest.config.ts`
+
+Add `"json-summary"` to the coverage reporter array in each test config:
+
+```typescript
+// vitest.config.ts
+coverage: {
+  reporter: ['text', 'json-summary', 'lcov'],
+}
+```
+
+For Jest, add `"json-summary"` to `coverageReporters` in `jest.config.js`.
+
+#### Step 2: Add `test:coverage` scripts
+
+Files: `package.json` (root), `apps/api/package.json`, `apps/web/package.json`,
+`apps/mobile/package.json`, `packages/api-client/package.json`, `packages/config/package.json`
+
+Each workspace (or root for non-monorepo) needs a script that runs tests with `--coverage`:
+
+```json
+"test:coverage": "vitest run --coverage"
+```
+
+For monorepos, add a root script that fans out:
+
+```json
+"test:coverage": "node scripts/run-workspace-test-coverage.mjs"
+```
+
+#### Step 3: Create the composite action
+
+File: `.github/actions/unit-test-coverage-comment/action.yml`
+
+Copy this file into the target repo. This action:
+
+1. **Merges** workspace coverage summaries (monorepo only — when `workspace-dirs` input is provided,
+   reads each workspace's `coverage-summary.json`, sums totals, and writes a merged summary only
+   when all expected workspace reports are present).
+2. **Uploads** the coverage directory as an artifact.
+3. **Parses** `coverage-summary.json` with `jq` to extract statements/branches/functions/lines.
+4. **Builds** a direct artifact download URL from the upload step output.
+5. **Writes** a markdown coverage table to `$GITHUB_STEP_SUMMARY`.
+6. **Posts** a sticky PR comment (find-and-update via `<!-- unit-test-coverage-comment: {label} -->`
+   HTML marker) with the coverage table and download link.
+7. **Updates** a shields.io badge via a GitHub gist (only on push to the default branch, only when
+   badge inputs are provided, coverage is complete, and the test run succeeded).
+
+Security: all `${{ inputs.* }}` values are passed via `env:` blocks (never interpolated directly in
+`run:` or `script:` blocks). All bash steps use `set -euo pipefail`.
+
+#### How the PR comment works (implementation details)
+
+File: `.github/actions/unit-test-coverage-comment/action.yml` (the "Comment coverage on PR" step)
+
+The comment step uses `actions/github-script@v7` to create or update a PR comment via the GitHub
+API. The key pattern is **sticky comments**: one comment per suite label, updated on each push.
+
+**1. HTML marker for identity**
+
+Each comment starts with a hidden HTML marker that the script searches for:
+
+```html
+<!-- unit-test-coverage-comment: Unit Tests -->
+```
+
+The marker includes `test-suite-label` so multiple suites (e.g. "Unit Tests" and "Integration
+Tests") get separate sticky comments without colliding.
+
+**2. Find-and-update logic**
+
+```javascript
+// List all comments on the PR
+const comments = await github.paginate(github.rest.issues.listComments, {
+  owner: context.repo.owner,
+  repo: context.repo.repo,
+  issue_number: context.issue.number,
+})
+
+// Search for existing comment by marker
+const marker = `<!-- unit-test-coverage-comment: ${label} -->`
+const existing = comments.find((c) => c.body && c.body.includes(marker))
+
+if (existing) {
+  // Update in place — no new comment, no spam
+  await github.rest.issues.updateComment({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    comment_id: existing.id,
+    body,
+  })
+} else {
+  // First push on this PR — create the comment
+  await github.rest.issues.createComment({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    issue_number: context.issue.number,
+    body,
+  })
+}
+```
+
+**3. Comment body format**
+
+The body is built from step outputs (coverage percentages, test outcome, artifact URL):
+
+```markdown
+<!-- unit-test-coverage-comment: Unit Tests -->
+
+## 🧪 Unit Tests Coverage: ✅ **SUCCESS**
+
+| Metric     | Coverage | Threshold |
+| ---------- | -------- | --------- |
+| Statements | 92.5%    | 90%       |
+| Branches   | 83.1%    | 80%       |
+| Functions  | 91.2%    | 90%       |
+| Lines      | 93.0%    | 90%       |
+
+📦 **[Download Full Report](https://github.com/.../artifacts/123)**
+
+_Thresholds enforced by test runner in CI_
+```
+
+The threshold column and footer are conditional — they only appear when the `thresholds` input is
+provided. Without thresholds, the table has two columns instead of three.
+
+**4. Guard rails**
+
+- `if: github.event_name == 'pull_request'` — comments are only posted on PRs, not push events.
+- If comment writes are denied (common on fork PRs with read-only tokens), the action warns and
+  continues instead of failing the workflow.
+- The `continue-on-error: true` + deferred fail pattern on the test step ensures the comment is
+  posted even when tests fail, so reviewers see coverage on red PRs too.
+
+**5. Required permission**
+
+The workflow needs `pull-requests: write` at the top level:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+```
+
+**6. Reusing this pattern for other PR comments**
+
+The same marker-based sticky comment pattern works for any PR automation. Replace the marker
+string and body builder:
+
+```javascript
+const marker = `<!-- my-custom-check: ${someLabel} -->`
+const body = [marker, '## My Check Results', '', '...details...'].join('\n')
+// then the same find-and-update logic as above
+```
+
+#### Step 4: Create a GitHub gist for the badge
+
+1. Go to [gist.github.com](https://gist.github.com) and create a **public** gist.
+2. Filename: `<repo-name>-coverage.json`, content: `{}`.
+3. Copy the gist ID from the URL (the hex string after the username).
+
+#### Step 5: Create a PAT with `gist` scope
+
+1. Go to [github.com/settings/tokens](https://github.com/settings/tokens) on the account that
+   owns the gist.
+2. Create a fine-grained or classic token with **only the `gist` scope**.
+3. Store it as a repo secret named `COVERAGE_GIST_TOKEN` in the target repo
+   (Settings → Secrets and variables → Actions).
+
+#### Step 6: Wire the workflow
+
+File: `.github/workflows/pr-checks.yml`
+
+For a **single repo**, add coverage + action after the test step:
+
+```yaml
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+steps:
+  - name: Run tests with coverage
+    id: tests
+    continue-on-error: true
+    run: npm run test:coverage
+
+  - name: Coverage report and PR comment
+    uses: ./.github/actions/unit-test-coverage-comment
+    with:
+      coverage-path: ./coverage
+      coverage-summary-path: ./coverage/coverage-summary.json
+      report-name: coverage-report-${{ github.event.pull_request.number || github.sha }}
+      test-outcome: ${{ steps.tests.outcome }}
+      thresholds: '{"statements":90,"branches":80,"functions":90,"lines":90}'
+      badge-gist-id: <your-gist-id>
+      badge-filename: <repo-name>-coverage.json
+      badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
+
+  - name: Fail if tests failed
+    if: steps.tests.outcome == 'failure'
+    run: exit 1
+```
+
+For a **monorepo**, pass `workspace-dirs` — the action handles the merge internally:
+
+```yaml
+- name: Coverage report and PR comment
+  uses: ./.github/actions/unit-test-coverage-comment
+  with:
+    coverage-path: ./coverage
+    coverage-summary-path: ./coverage/coverage-summary.json
+    report-name: coverage-report-${{ github.event.pull_request.number || github.sha }}
+    test-outcome: ${{ steps.tests.outcome }}
+    workspace-dirs: '["apps/api/coverage","apps/web/coverage","apps/mobile/coverage"]'
+    badge-gist-id: <your-gist-id>
+    badge-filename: <repo-name>-coverage.json
+    badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
+```
+
+When `workspace-dirs` is provided, the action reads each workspace's `coverage-summary.json`,
+sums the raw totals across all workspaces, and writes a merged summary before parsing. If one or
+more expected workspace summaries are missing, it publishes `N/A` metrics instead of pretending a
+partial merge is complete.
+
+#### Step 7: Add the badge to the README
+
+File: `README.md`
+
+```markdown
+![coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/<github-user>/<gist-id>/raw/<repo-name>-coverage.json)
+```
+
+The badge auto-colors from red (0%) to green (100%) based on the `valColorRange` sent by
+`schneegans/dynamic-badges-action`. It updates on every push to the default branch.
+
+#### Step 8: Verify
+
+1. Open a PR — the sticky coverage comment should appear when the PR token is allowed to write
+   comments; otherwise the action warns and continues.
+2. Push another commit to the same PR — the existing comment updates (no spam).
+3. Merge to main — the gist updates with the badge JSON, and the README badge reflects the new
+   coverage percentage.
+
+#### Python and Java repos
+
+The composite action is language-agnostic; it only reads `coverage-summary.json`. For non-JS
+repos, add a normalization step in the calling workflow before the action:
+
+- **Python** (`pytest-cov`): run `coverage json -o coverage-raw.json`, then transform
+  `totals.percent_covered` / `totals.num_statements` / etc. into the Istanbul shape.
+- **Java** (`JaCoCo`): parse `jacoco.csv`, sum `INSTRUCTION`, `BRANCH`, `LINE`, `METHOD` columns,
+  and write the same Istanbul-shaped JSON.
+
+The `functions` metric will be `0` for Python (coverage.py does not track functions). The PR
+comment displays `N/A` for missing metrics.
 
 ## Step 8 - Shared analytics contracts and event tracking
 

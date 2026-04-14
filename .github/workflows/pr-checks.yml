@@ -2,15 +2,22 @@
 name: PR checks
 on:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: write
+
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
+  COVERAGE_GIST_ID: 64348ebdc6e662b93ade9f40bdc03442
 
 jobs:
   quality-gate:
@@ -38,5 +45,23 @@ jobs:
       - name: Build packages
         run: npm run build
 
-      - name: Run tests
-        run: npm test
+      - name: Run tests with coverage
+        id: tests
+        continue-on-error: true
+        run: npm run test:coverage
+
+      - name: Coverage report and PR comment
+        uses: ./.github/actions/unit-test-coverage-comment
+        with:
+          coverage-path: ./coverage
+          coverage-summary-path: ./coverage/coverage-summary.json
+          report-name: coverage-report-${{ github.event.pull_request.number || github.sha }}
+          test-outcome: ${{ steps.tests.outcome }}
+          workspace-dirs: '["apps/api/coverage","apps/web/coverage","apps/mobile/coverage","packages/api-client/coverage","packages/config/coverage"]'
+          badge-gist-id: ${{ env.COVERAGE_GIST_ID }}
+          badge-filename: couture-cast-coverage.json
+          badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
+
+      - name: Fail if tests failed
+        if: steps.tests.outcome == 'failure'
+        run: exit 1

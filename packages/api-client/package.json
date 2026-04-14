@@ -41,6 +41,7 @@
     "lint": "eslint --max-warnings=0 --ext .ts src scripts testing",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --config vitest.config.ts",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "gen:openapi:events": "tsx scripts/generate-events-openapi.ts",
     "gen:openapi:http": "tsx scripts/generate-http-openapi.ts"
   },

@@ -1,5 +1,7 @@
 # Couture Cast Monorepo
 
+![coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442/raw/couture-cast-coverage.json)
+
 Thin Turborepo for Couture Cast apps and smoke tests. Keep it lean: shared lint config, root Playwright, and a minimal Maestro sanity.
 
 > **Usage notice:** All rights reserved. No use, reproduction, or distribution without explicit permission from Couture Cast authors.
