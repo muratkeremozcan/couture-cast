@@ -781,6 +781,9 @@ const body = [marker, '## My Check Results', '', '...details...'].join('\n')
 4. The action will later write four files using `badge-filename-prefix`:
    `<repo-name>-statements.json`, `<repo-name>-branches.json`,
    `<repo-name>-functions.json`, and `<repo-name>-lines.json`.
+5. Optional: pre-seed those four files with valid shields JSON if you want the README badges to
+   render immediately instead of showing `no resource found` until the first successful default
+   branch push.
 
 #### Step 5: Create a PAT with `gist` scope
 
