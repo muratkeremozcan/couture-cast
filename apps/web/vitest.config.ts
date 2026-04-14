@@ -38,5 +38,8 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     restoreMocks: true,
     clearMocks: true,
+    coverage: {
+      reporter: ['text', 'json-summary', 'lcov'],
+    },
   },
 })

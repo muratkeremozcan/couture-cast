@@ -42,5 +42,8 @@ export default defineConfig({
     ],
     restoreMocks: true,
     clearMocks: true,
+    coverage: {
+      reporter: ['text', 'json-summary', 'lcov'],
+    },
   },
 })

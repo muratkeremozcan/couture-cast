@@ -8,6 +8,7 @@
     "vitest:run": "vitest run --config vitest.config.ts",
     "vitest:open": "vitest --config vitest.config.ts --ui",
     "test": "npm run vitest:run",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",

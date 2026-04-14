@@ -1,6 +1,6 @@
 # Story 0.14: Expand test infrastructure for auth-session, burn-in, contracts, performance, and PR review automation
 
-Updated: 2026-03-27 — record partial completion of CodeRabbit advisory rollout setup
+Updated: 2026-04-14 — add Task 7 for unit test coverage reporting, PR comments, and badges
 
 Status: in progress
 
@@ -30,6 +30,9 @@ without blocking current feature delivery.
 6. Set up CodeRabbit PR review automation:
    add repository-level CodeRabbit configuration and review scope for test/CI-risk changes,
    starting as advisory before tightening policy.
+7. Add unit test coverage reporting to CI:
+   publish merged monorepo coverage metrics as sticky PR comments, generate step summaries,
+   and maintain a shields.io coverage badge via a GitHub gist for cross-project visibility.
 
 ## Insertion map for deferred items
 
@@ -45,6 +48,9 @@ without blocking current feature delivery.
 - Contract/perf/PR-review expansion:
   execute as dedicated tasks in this Story 0.14 (`Task 3`, `Task 4`, `Task 6`) to avoid
   overloading 0.6/0.7 implementation scope and to keep quality gates explicit.
+- Coverage reporting and badges:
+  execute in this story (`Task 7`), extending the CI quality gate model from Story 0.6 with
+  visible coverage metrics in PRs and a persistent badge on the README.
 
 ## Sequencing
 
@@ -54,6 +60,7 @@ without blocking current feature delivery.
 4. Maestro analytics journey expansion in Story 0.14 Task 5 with Story 0.12 environments.
 5. Contract (OpenAPI + Pact) and performance baseline tasks in Story 0.14.
 6. CodeRabbit advisory rollout and policy tuning in Story 0.14 Task 6.
+7. Coverage reporting, PR comments, and badge in Story 0.14 Task 7 (immediate, parallel with Task 1).
 
 ## Tasks / Subtasks
 
@@ -104,6 +111,20 @@ without blocking current feature delivery.
         first live review on PR `#42`.
   - [ ] Document promotion criteria for stricter review policy after initial noise tuning.
 
+- [x] Task 7: Unit test coverage reporting and badges (AC: #7)
+  - [x] Create `unit-test-coverage-comment` composite action in `.github/actions/` with security
+        hardening (env blocks for script injection prevention, `set -euo pipefail`).
+  - [x] Add `json-summary` coverage reporter to all five vitest workspace configs
+        (`apps/api`, `apps/web`, `apps/mobile`, `packages/api-client`, `packages/config`).
+  - [x] Add `test:coverage` scripts to all workspaces and root `package.json`.
+  - [x] Wire monorepo coverage merging (inline Node script sums all workspace summaries), sticky
+        PR comment, step summary, and badge update in `.github/workflows/pr-checks.yml`.
+  - [x] Create GitHub gist for shields.io dynamic badge
+        ([`64348ebdc6e662b93ade9f40bdc03442`](https://gist.github.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442)).
+  - [x] Add coverage badge to `README.md`.
+  - [ ] Configure `COVERAGE_GIST_TOKEN` repo secret for badge updates on push to main.
+  - [ ] Verify badge updates after first merge to main.
+
 ## Dev Notes
 
 - This story is intentionally a follow-up to 0.13 and should not replace or rewrite the
@@ -112,6 +133,8 @@ without blocking current feature delivery.
   executed in the same sprint window.
 - Mobile native E2E remains Maestro-first; Playwright stays web/API-focused.
 - CodeRabbit rollout starts advisory-first to avoid blocking delivery while path rules stabilize.
+- Task 7 coverage action is a local composite action in `.github/actions/unit-test-coverage-comment/`.
+  Monorepo coverage merging sums workspace-level `coverage-summary.json` files into one aggregate.
 - Current partial implementation status for Task 6:
   repo-side config/workflow/template work is complete; GitHub App installation still requires
   authenticated GitHub interaction before the first live review can be verified.
@@ -124,3 +147,4 @@ without blocking current feature delivery.
 | 2026-03-04 | Codex (Test Architect) | Expanded 0.14 scope with CodeRabbit PR review automation and explicit Pact setup in contract-testing tasks                                     |
 | 2026-03-27 | Codex                  | Recorded partial completion of Task 6: added `.coderabbit.yaml`, PR template, CI/CD notes, and PR `#42`                                        |
 | 2026-03-27 | Codex                  | Removed redundant CodeRabbit ready-for-review workflow after review feedback; automatic review remains configured in `.coderabbit.yaml`        |
+| 2026-04-14 | Murat + Claude         | Added Task 7: unit test coverage reporting — composite action, monorepo coverage merge, sticky PR comments, shields.io badge via gist          |

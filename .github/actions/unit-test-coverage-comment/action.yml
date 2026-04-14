@@ -1,0 +1,383 @@
+name: Unit Test Coverage Report and PR Comment
+description: |
+  Upload coverage reports, parse metrics from coverage-summary.json,
+  generate a GitHub step summary, and post a sticky PR comment.
+  Language-agnostic: works with any tool that produces a coverage-summary.json
+  in the Istanbul/v8 format (Vitest json-summary, Jest json-summary, or a
+  normalized output from pytest-cov / JaCoCo).
+# ─── Usage — single repo ───────────────────────────────────────────────
+#
+#   env:
+#     COVERAGE_GIST_ID: abc123def456
+#
+#   steps:
+#     - name: Run tests
+#       id: tests
+#       run: npm run test:coverage
+#       continue-on-error: true
+#
+#     - name: Coverage report and PR comment
+#       uses: ./.github/actions/unit-test-coverage-comment
+#       with:
+#         test-outcome: ${{ steps.tests.outcome }}
+#         thresholds: '{"statements":90,"branches":80,"functions":90,"lines":90}'
+#         badge-gist-id: ${{ env.COVERAGE_GIST_ID }}
+#         badge-filename-prefix: my-service
+#         badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
+#
+#     - name: Fail if tests failed
+#       if: steps.tests.outcome == 'failure'
+#       run: exit 1
+#
+# ─── Usage — monorepo ──────────────────────────────────────────────────
+#
+#   steps:
+#     - name: Coverage report and PR comment
+#       uses: ./.github/actions/unit-test-coverage-comment
+#       with:
+#         test-outcome: ${{ steps.tests.outcome }}
+#         workspace-dirs: '["apps/api/coverage","apps/web/coverage"]'
+#         badge-gist-id: ${{ env.COVERAGE_GIST_ID }}
+#         badge-filename-prefix: my-monorepo
+#         badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
+inputs:
+  coverage-path:
+    description: 'Path to the coverage output directory'
+    required: false
+    default: './coverage'
+  coverage-summary-path:
+    description: 'Path to the coverage-summary.json file'
+    required: false
+    default: './coverage/coverage-summary.json'
+  report-name:
+    description: 'Name for the uploaded artifact'
+    required: false
+    default: 'coverage-report'
+  retention-days:
+    description: 'Artifact retention in days'
+    required: false
+    default: '7'
+  test-outcome:
+    description: 'Test step outcome (success/failure)'
+    required: true
+  comment-on-pr:
+    description: 'Whether to post a PR comment'
+    required: false
+    default: 'true'
+  thresholds:
+    description: 'JSON string of thresholds for display'
+    required: false
+    default: ''
+  test-suite-label:
+    description: 'Label for the test suite'
+    required: false
+    default: 'Unit Tests'
+  badge-gist-id:
+    description: 'Gist ID for badge JSON storage (omit to skip badge update)'
+    required: false
+    default: ''
+  badge-filename-prefix:
+    description: 'Prefix for gist badge files (e.g. couture-cast → writes couture-cast-statements.json, -branches.json, -functions.json, -lines.json)'
+    required: false
+    default: ''
+  badge-gist-auth:
+    description: 'PAT with gist scope for writing badge data'
+    required: false
+    default: ''
+  workspace-dirs:
+    description: 'JSON array of workspace coverage dirs for monorepo merge (e.g. ["apps/api/coverage","apps/web/coverage"]). Omit for single-repo.'
+    required: false
+    default: ''
+outputs:
+  report-url:
+    description: 'URL to download the coverage artifact'
+    value: ${{ steps.build-url.outputs.report_url }}
+  statements:
+    description: 'Statements coverage percentage'
+    value: ${{ steps.parse-coverage.outputs.statements }}
+  branches:
+    description: 'Branches coverage percentage'
+    value: ${{ steps.parse-coverage.outputs.branches }}
+  functions:
+    description: 'Functions coverage percentage'
+    value: ${{ steps.parse-coverage.outputs.functions }}
+  lines:
+    description: 'Lines coverage percentage'
+    value: ${{ steps.parse-coverage.outputs.lines }}
+runs:
+  using: composite
+  steps:
+    - name: Merge workspace coverage summaries
+      if: ${{ inputs.workspace-dirs != '' }}
+      shell: bash
+      env:
+        WORKSPACE_DIRS: ${{ inputs.workspace-dirs }}
+        COVERAGE_PATH: ${{ inputs.coverage-path }}
+        SUMMARY_PATH: ${{ inputs.coverage-summary-path }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$COVERAGE_PATH"
+        node -e "
+        const fs = require('fs');
+        const path = require('path');
+        const dirs = JSON.parse(process.env.WORKSPACE_DIRS);
+        const merged = { statements: [0,0], branches: [0,0], functions: [0,0], lines: [0,0] };
+        const missing = [];
+        for (const dir of dirs) {
+          const file = path.join(dir, 'coverage-summary.json');
+          if (!fs.existsSync(file)) { missing.push(file); continue; }
+          const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+          for (const key of Object.keys(merged)) {
+            merged[key][0] += data.total[key].total;
+            merged[key][1] += data.total[key].covered;
+          }
+          console.log('merged: ' + file);
+        }
+        if (missing.length > 0) {
+          const pct = Math.round(missing.length / dirs.length * 100);
+          const msg = 'Coverage merge: ' + missing.length + '/' + dirs.length + ' workspaces missing (' + pct + '%): ' + missing.join(', ');
+          console.log('::warning::' + msg);
+          if (missing.length === dirs.length) {
+            console.log('::error::All workspace coverage summaries are missing — coverage numbers will be zero');
+          }
+        }
+        const result = { total: {} };
+        for (const key of Object.keys(merged)) {
+          const [total, covered] = merged[key];
+          result.total[key] = { total, covered, pct: total > 0 ? Math.round(covered / total * 1000) / 10 : 0 };
+        }
+        fs.mkdirSync(path.dirname(process.env.SUMMARY_PATH), { recursive: true });
+        fs.writeFileSync(process.env.SUMMARY_PATH, JSON.stringify(result, null, 2));
+        console.log('Merged ' + (dirs.length - missing.length) + '/' + dirs.length + ' workspaces');
+        console.log('Merged coverage:', JSON.stringify(result.total, null, 2));
+        "
+    - name: Upload coverage report
+      id: upload-report
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.report-name }}
+        path: ${{ inputs.coverage-path }}
+        retention-days: ${{ inputs.retention-days }}
+    - name: Parse coverage metrics
+      id: parse-coverage
+      shell: bash
+      env:
+        SUMMARY_PATH: ${{ inputs.coverage-summary-path }}
+      run: |
+        set -euo pipefail
+        if [ ! -f "$SUMMARY_PATH" ]; then
+          echo "::warning::Coverage summary not found at $SUMMARY_PATH"
+          echo "statements=N/A" >> "$GITHUB_OUTPUT"
+          echo "branches=N/A" >> "$GITHUB_OUTPUT"
+          echo "functions=N/A" >> "$GITHUB_OUTPUT"
+          echo "lines=N/A" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        STATEMENTS=$(jq -r '.total.statements.pct // "N/A"' "$SUMMARY_PATH")
+        BRANCHES=$(jq -r '.total.branches.pct // "N/A"' "$SUMMARY_PATH")
+        FUNCTIONS=$(jq -r '.total.functions.pct // "N/A"' "$SUMMARY_PATH")
+        LINES=$(jq -r '.total.lines.pct // "N/A"' "$SUMMARY_PATH")
+        echo "statements=$STATEMENTS" >> "$GITHUB_OUTPUT"
+        echo "branches=$BRANCHES" >> "$GITHUB_OUTPUT"
+        echo "functions=$FUNCTIONS" >> "$GITHUB_OUTPUT"
+        echo "lines=$LINES" >> "$GITHUB_OUTPUT"
+    - name: Build artifact URL
+      id: build-url
+      shell: bash
+      env:
+        ARTIFACT_ID: ${{ steps.upload-report.outputs.artifact-id }}
+        SERVER_URL: ${{ github.server_url }}
+        REPO: ${{ github.repository }}
+        RUN_ID: ${{ github.run_id }}
+      run: |
+        set -euo pipefail
+        if [ -n "$ARTIFACT_ID" ]; then
+          echo "report_url=${SERVER_URL}/${REPO}/actions/runs/${RUN_ID}/artifacts/${ARTIFACT_ID}" >> "$GITHUB_OUTPUT"
+        else
+          echo "report_url=" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Generate step summary
+      shell: bash
+      env:
+        LABEL: ${{ inputs.test-suite-label }}
+        TEST_OUTCOME: ${{ inputs.test-outcome }}
+        STATEMENTS: ${{ steps.parse-coverage.outputs.statements }}
+        BRANCHES: ${{ steps.parse-coverage.outputs.branches }}
+        FUNCTIONS: ${{ steps.parse-coverage.outputs.functions }}
+        LINES: ${{ steps.parse-coverage.outputs.lines }}
+        REPORT_URL: ${{ steps.build-url.outputs.report_url }}
+        THRESHOLDS: ${{ inputs.thresholds }}
+      run: |
+        set -euo pipefail
+        echo "## 🧪 ${LABEL} Coverage" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        if [ "$TEST_OUTCOME" == "success" ]; then
+          echo "✅ **Tests: PASSED**" >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "❌ **Tests: FAILED**" >> "$GITHUB_STEP_SUMMARY"
+        fi
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        if [ -n "$THRESHOLDS" ]; then
+          T_STMTS=$(echo "$THRESHOLDS" | jq -r '.statements // "-"')
+          T_BRANCH=$(echo "$THRESHOLDS" | jq -r '.branches // "-"')
+          T_FUNC=$(echo "$THRESHOLDS" | jq -r '.functions // "-"')
+          T_LINES=$(echo "$THRESHOLDS" | jq -r '.lines // "-"')
+          echo "| Metric | Coverage | Threshold |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|----------|-----------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Statements | ${STATEMENTS}% | ${T_STMTS}% |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Branches | ${BRANCHES}% | ${T_BRANCH}% |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Functions | ${FUNCTIONS}% | ${T_FUNC}% |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Lines | ${LINES}% | ${T_LINES}% |" >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "| Metric | Coverage |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|----------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Statements | ${STATEMENTS}% |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Branches | ${BRANCHES}% |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Functions | ${FUNCTIONS}% |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Lines | ${LINES}% |" >> "$GITHUB_STEP_SUMMARY"
+        fi
+        if [ -n "$REPORT_URL" ]; then
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "📦 **[Download Full Report](${REPORT_URL})**" >> "$GITHUB_STEP_SUMMARY"
+        fi
+    - name: Comment coverage on PR
+      if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' }}
+      uses: actions/github-script@v7
+      env:
+        INPUT_LABEL: ${{ inputs.test-suite-label }}
+        INPUT_TEST_OUTCOME: ${{ inputs.test-outcome }}
+        INPUT_REPORT_URL: ${{ steps.build-url.outputs.report_url }}
+        INPUT_STATEMENTS: ${{ steps.parse-coverage.outputs.statements }}
+        INPUT_BRANCHES: ${{ steps.parse-coverage.outputs.branches }}
+        INPUT_FUNCTIONS: ${{ steps.parse-coverage.outputs.functions }}
+        INPUT_LINES: ${{ steps.parse-coverage.outputs.lines }}
+        INPUT_THRESHOLDS: ${{ inputs.thresholds }}
+      with:
+        script: |
+          if (context.payload.pull_request && context.payload.pull_request.head.repo.full_name !== context.payload.pull_request.base.repo.full_name) {
+            core.info('Skipping PR comment for forked repository');
+            return;
+          }
+          const label = process.env.INPUT_LABEL;
+          const testResult = process.env.INPUT_TEST_OUTCOME;
+          const reportUrl = process.env.INPUT_REPORT_URL;
+          const statements = process.env.INPUT_STATEMENTS;
+          const branches = process.env.INPUT_BRANCHES;
+          const functions = process.env.INPUT_FUNCTIONS;
+          const lines = process.env.INPUT_LINES;
+          const thresholdsRaw = process.env.INPUT_THRESHOLDS;
+          const statusEmoji = testResult === 'success' ? '✅' : '❌';
+          const marker = `<!-- unit-test-coverage-comment: ${label} -->`;
+          let hasThresholds = false;
+          let stmtThreshold = '';
+          let branchThreshold = '';
+          let funcThreshold = '';
+          let lineThreshold = '';
+          if (thresholdsRaw) {
+            try {
+              const t = JSON.parse(thresholdsRaw);
+              stmtThreshold = t.statements != null ? `${t.statements}%` : '-';
+              branchThreshold = t.branches != null ? `${t.branches}%` : '-';
+              funcThreshold = t.functions != null ? `${t.functions}%` : '-';
+              lineThreshold = t.lines != null ? `${t.lines}%` : '-';
+              hasThresholds = true;
+            } catch (e) {
+              core.warning(`Could not parse thresholds: ${e.message}`);
+            }
+          }
+          let tableRows;
+          if (hasThresholds) {
+            tableRows = [
+              `| Metric | Coverage | Threshold |`,
+              `|--------|----------|-----------|`,
+              `| Statements | ${statements}% | ${stmtThreshold} |`,
+              `| Branches | ${branches}% | ${branchThreshold} |`,
+              `| Functions | ${functions}% | ${funcThreshold} |`,
+              `| Lines | ${lines}% | ${lineThreshold} |`,
+            ];
+          } else {
+            tableRows = [
+              `| Metric | Coverage |`,
+              `|--------|----------|`,
+              `| Statements | ${statements}% |`,
+              `| Branches | ${branches}% |`,
+              `| Functions | ${functions}% |`,
+              `| Lines | ${lines}% |`,
+            ];
+          }
+          const bodyParts = [
+            marker,
+            `## 🧪 ${label} Coverage: ${statusEmoji} **${testResult.toUpperCase()}**`,
+            '',
+            ...tableRows,
+          ];
+          if (reportUrl) {
+            bodyParts.push('', `📦 **[Download Full Report](${reportUrl})**`);
+          }
+          if (hasThresholds) {
+            bodyParts.push('', `_Thresholds enforced by test runner in CI_`);
+          }
+          const body = bodyParts.join('\n');
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            per_page: 100,
+          });
+          const existing = comments.find((c) => c.body && c.body.includes(marker));
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+            core.info(`Updated existing coverage comment (id: ${existing.id})`);
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+            core.info('Created new coverage comment');
+          }
+    - name: Update coverage badges
+      if: ${{ github.event_name == 'push' && inputs.test-outcome == 'success' && inputs.badge-gist-id != '' && inputs.badge-filename-prefix != '' && inputs.badge-gist-auth != '' }}
+      shell: bash
+      env:
+        GIST_ID: ${{ inputs.badge-gist-id }}
+        GIST_AUTH: ${{ inputs.badge-gist-auth }}
+        PREFIX: ${{ inputs.badge-filename-prefix }}
+        STATEMENTS: ${{ steps.parse-coverage.outputs.statements }}
+        BRANCHES: ${{ steps.parse-coverage.outputs.branches }}
+        FUNCTIONS: ${{ steps.parse-coverage.outputs.functions }}
+        LINES: ${{ steps.parse-coverage.outputs.lines }}
+      run: |
+        set -euo pipefail
+        color_for_pct() {
+          local pct=$1
+          if [ "$pct" = "N/A" ]; then echo "lightgrey"; return; fi
+          local int_pct=${pct%.*}
+          if [ "$int_pct" -ge 90 ]; then echo "brightgreen"
+          elif [ "$int_pct" -ge 70 ]; then echo "green"
+          elif [ "$int_pct" -ge 50 ]; then echo "yellow"
+          elif [ "$int_pct" -ge 30 ]; then echo "orange"
+          else echo "red"; fi
+        }
+        payload=$(jq -n \
+          --arg s_file "${PREFIX}-statements.json" \
+          --arg s_content "{\"schemaVersion\":1,\"label\":\"statements\",\"message\":\"${STATEMENTS}%\",\"color\":\"$(color_for_pct "$STATEMENTS")\"}" \
+          --arg b_file "${PREFIX}-branches.json" \
+          --arg b_content "{\"schemaVersion\":1,\"label\":\"branches\",\"message\":\"${BRANCHES}%\",\"color\":\"$(color_for_pct "$BRANCHES")\"}" \
+          --arg f_file "${PREFIX}-functions.json" \
+          --arg f_content "{\"schemaVersion\":1,\"label\":\"functions\",\"message\":\"${FUNCTIONS}%\",\"color\":\"$(color_for_pct "$FUNCTIONS")\"}" \
+          --arg l_file "${PREFIX}-lines.json" \
+          --arg l_content "{\"schemaVersion\":1,\"label\":\"lines\",\"message\":\"${LINES}%\",\"color\":\"$(color_for_pct "$LINES")\"}" \
+          '{files: {($s_file): {content: $s_content}, ($b_file): {content: $b_content}, ($f_file): {content: $f_content}, ($l_file): {content: $l_content}}}')
+        curl -sf -X PATCH \
+          -H "Authorization: Bearer ${GIST_AUTH}" \
+          -H "Accept: application/vnd.github+json" \
+          -d "$payload" \
+          "https://api.github.com/gists/${GIST_ID}" > /dev/null
+        echo "Updated 4 badge files in gist ${GIST_ID} with prefix ${PREFIX}"
