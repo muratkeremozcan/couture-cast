@@ -59,7 +59,7 @@ jobs:
           test-outcome: ${{ steps.tests.outcome }}
           workspace-dirs: '["apps/api/coverage","apps/web/coverage","apps/mobile/coverage","packages/api-client/coverage","packages/config/coverage"]'
           badge-gist-id: ${{ env.COVERAGE_GIST_ID }}
-          badge-filename: couture-cast-coverage.json
+          badge-filename-prefix: couture-cast
           badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
 
       - name: Fail if tests failed

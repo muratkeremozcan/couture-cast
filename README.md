@@ -1,6 +1,9 @@
 # Couture Cast Monorepo
 
-![coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442/raw/couture-cast-coverage.json)
+![statements](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442/raw/couture-cast-statements.json)
+![branches](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442/raw/couture-cast-branches.json)
+![functions](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442/raw/couture-cast-functions.json)
+![lines](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442/raw/couture-cast-lines.json)
 
 Thin Turborepo for Couture Cast apps and smoke tests. Keep it lean: shared lint config, root Playwright, and a minimal Maestro sanity.
 

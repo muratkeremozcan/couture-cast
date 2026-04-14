@@ -529,8 +529,9 @@ Key takeaways:
 3. Deployment confidence is surface-aware: Vercel Preview smoke runs from `deployment_status`
    (`pr-pw-e2e-vercel-preview.yml`), while mobile deploy remains manual via `deploy-mobile.yml`.
 4. Coverage visibility is baked into the PR loop: `pr-checks.yml` runs all workspace tests with
-   coverage, merges the summaries into one aggregate report, posts a sticky PR comment with
-   statements/branches/functions/lines metrics, and updates a shields.io badge on push to main.
+   coverage, passes workspace coverage directories into the composite action, posts a sticky PR
+   comment with statements/branches/functions/lines metrics, and updates four shields.io badges on
+   push to main.
 
 Story/Task mapping:
 
@@ -565,8 +566,8 @@ Task owner map:
 - Step 7 step 5 owner: enforce secret scanning in `.github/workflows/gitleaks-check.yml`
 - Step 7 step 6 owner: keep the mobile deployment path explicit in `.github/workflows/deploy-mobile.yml`
 - Step 7 support owner: centralize install and browser setup in `.github/actions/install/action.yml` and `.github/actions/setup-playwright-browsers/action.yml`
-- Step 7 step 7 owner: merge monorepo workspace coverage and post sticky PR comment in `.github/workflows/pr-checks.yml`
-- Step 7 step 8 owner: upload coverage artifact, parse metrics, comment on PR, and update badge in `.github/actions/unit-test-coverage-comment/action.yml`
+- Step 7 step 7 owner: wire monorepo workspace coverage directories and badge inputs in `.github/workflows/pr-checks.yml`
+- Step 7 step 8 owner: merge workspace summaries, upload coverage artifact, parse metrics, comment on PR, and update four gist-backed badges in `.github/actions/unit-test-coverage-comment/action.yml`
 
 Architecture diagram:
 
@@ -584,7 +585,7 @@ flowchart TD
   PR --> PREVIEW[Vercel Preview deployment]
   PREVIEW --> PREVIEW_SMOKE[pr-pw-e2e-vercel-preview.yml<br/>web-health-sha smoke]
 
-  PRCHECKS --> COV[Merge coverage summaries<br/>all workspaces]
+  PRCHECKS --> COV[Coverage action merges summaries<br/>all workspaces]
   COV --> COMMENT[Sticky PR comment<br/>coverage metrics table]
   COV --> SUMMARY[Step summary<br/>coverage in workflow run]
 
@@ -597,13 +598,14 @@ flowchart TD
   READY --> MAIN[Merge to main]
   MAIN --> PROD[Vercel Production deploy<br/>web + API serverless target]
   MAIN --> MOBILE[deploy-mobile.yml<br/>manual Android EAS build]
-  MAIN --> BADGE[Update shields.io badge<br/>via gist]
+  MAIN --> BADGE[Update four shields.io badges<br/>via gist]
 ```
 
 ### Coverage reporting and badges — reproducible setup
 
 This is the full recipe for adding unit test coverage PR comments and a shields.io badge to any
-repo. Works for single repos and monorepos.
+repo. Works for single repos and monorepos. In Couture Cast, the same setup writes four badges
+(`statements`, `branches`, `functions`, `lines`) into gist-backed JSON files.
 
 #### Prerequisites
 
@@ -651,19 +653,20 @@ File: `.github/actions/unit-test-coverage-comment/action.yml`
 Copy this file into the target repo. This action:
 
 1. **Merges** workspace coverage summaries (monorepo only — when `workspace-dirs` input is provided,
-   reads each workspace's `coverage-summary.json`, sums totals, and writes a merged summary only
-   when all expected workspace reports are present).
+   reads each workspace's `coverage-summary.json`, sums totals, always writes a merged summary,
+   emits `::warning::` with any missing summaries, and emits `::error::` if all are missing).
 2. **Uploads** the coverage directory as an artifact.
 3. **Parses** `coverage-summary.json` with `jq` to extract statements/branches/functions/lines.
 4. **Builds** a direct artifact download URL from the upload step output.
 5. **Writes** a markdown coverage table to `$GITHUB_STEP_SUMMARY`.
 6. **Posts** a sticky PR comment (find-and-update via `<!-- unit-test-coverage-comment: {label} -->`
    HTML marker) with the coverage table and download link.
-7. **Updates** a shields.io badge via a GitHub gist (only on push to the default branch, only when
-   badge inputs are provided, coverage is complete, and the test run succeeded).
+7. **Updates** four shields.io badge JSON files via a GitHub gist in one `curl`/`jq` PATCH request
+   (only on push to the default branch and only when the test run succeeded).
 
 Security: all `${{ inputs.* }}` values are passed via `env:` blocks (never interpolated directly in
-`run:` or `script:` blocks). All bash steps use `set -euo pipefail`.
+`run:` or `script:` blocks). All bash steps use `set -euo pipefail`. The gist write uses
+`Authorization: Bearer`, not `Authorization: token`, so fine-grained PATs work correctly.
 
 #### How the PR comment works (implementation details)
 
@@ -691,6 +694,7 @@ const comments = await github.paginate(github.rest.issues.listComments, {
   owner: context.repo.owner,
   repo: context.repo.repo,
   issue_number: context.issue.number,
+  per_page: 100,
 })
 
 // Search for existing comment by marker
@@ -743,8 +747,8 @@ provided. Without thresholds, the table has two columns instead of three.
 **4. Guard rails**
 
 - `if: github.event_name == 'pull_request'` — comments are only posted on PRs, not push events.
-- If comment writes are denied (common on fork PRs with read-only tokens), the action warns and
-  continues instead of failing the workflow.
+- Fork PRs are skipped explicitly because the canonical action only comments when head and base are
+  in the same repository.
 - The `continue-on-error: true` + deferred fail pattern on the test step ensures the comment is
   posted even when tests fail, so reviewers see coverage on red PRs too.
 
@@ -772,8 +776,11 @@ const body = [marker, '## My Check Results', '', '...details...'].join('\n')
 #### Step 4: Create a GitHub gist for the badge
 
 1. Go to [gist.github.com](https://gist.github.com) and create a **public** gist.
-2. Filename: `<repo-name>-coverage.json`, content: `{}`.
+2. Add any placeholder file (content can be `{}`) so the gist exists.
 3. Copy the gist ID from the URL (the hex string after the username).
+4. The action will later write four files using `badge-filename-prefix`:
+   `<repo-name>-statements.json`, `<repo-name>-branches.json`,
+   `<repo-name>-functions.json`, and `<repo-name>-lines.json`.
 
 #### Step 5: Create a PAT with `gist` scope
 
@@ -814,7 +821,7 @@ steps:
       test-outcome: ${{ steps.tests.outcome }}
       thresholds: '{"statements":90,"branches":80,"functions":90,"lines":90}'
       badge-gist-id: <your-gist-id>
-      badge-filename: <repo-name>-coverage.json
+      badge-filename-prefix: <repo-name>
       badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
 
   - name: Fail if tests failed
@@ -834,33 +841,44 @@ For a **monorepo**, pass `workspace-dirs` — the action handles the merge inter
     test-outcome: ${{ steps.tests.outcome }}
     workspace-dirs: '["apps/api/coverage","apps/web/coverage","apps/mobile/coverage"]'
     badge-gist-id: <your-gist-id>
-    badge-filename: <repo-name>-coverage.json
+    badge-filename-prefix: <repo-name>
     badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
 ```
 
 When `workspace-dirs` is provided, the action reads each workspace's `coverage-summary.json`,
 sums the raw totals across all workspaces, and writes a merged summary before parsing. If one or
-more expected workspace summaries are missing, it publishes `N/A` metrics instead of pretending a
-partial merge is complete.
+more expected workspace summaries are missing, it emits a warning listing the missing files; if all
+are missing, it also emits an error while still producing zeroed metrics for visibility.
 
 #### Step 7: Add the badge to the README
 
 File: `README.md`
 
 ```markdown
-![coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/<github-user>/<gist-id>/raw/<repo-name>-coverage.json)
+![statements](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/<github-user>/<gist-id>/raw/<repo-name>-statements.json)
+![branches](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/<github-user>/<gist-id>/raw/<repo-name>-branches.json)
+![functions](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/<github-user>/<gist-id>/raw/<repo-name>-functions.json)
+![lines](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/<github-user>/<gist-id>/raw/<repo-name>-lines.json)
 ```
 
-The badge auto-colors from red (0%) to green (100%) based on the `valColorRange` sent by
-`schneegans/dynamic-badges-action`. It updates on every push to the default branch.
+The badges auto-color from red to bright green based on the percentage bucket selected in the
+composite action's `color_for_pct` helper. They update in one gist PATCH request on every
+successful push to the default branch.
+
+For Couture Cast specifically:
+
+- GitHub username: `muratkeremozcan`
+- Gist ID: `64348ebdc6e662b93ade9f40bdc03442`
+- Badge prefix: `couture-cast`
 
 #### Step 8: Verify
 
-1. Open a PR — the sticky coverage comment should appear when the PR token is allowed to write
-   comments; otherwise the action warns and continues.
+1. Open a PR — the sticky coverage comment should appear for same-repo PRs.
 2. Push another commit to the same PR — the existing comment updates (no spam).
-3. Merge to main — the gist updates with the badge JSON, and the README badge reflects the new
-   coverage percentage.
+3. Merge to main — the gist updates with the four badge JSON files, and the README badges reflect
+   the new coverage percentages.
+4. Expect `not found` badges until the first successful push to the default branch populates the
+   gist files.
 
 #### Python and Java repos
 

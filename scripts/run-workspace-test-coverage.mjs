@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 const workspaceRoots = ['apps', 'packages']
@@ -40,10 +40,18 @@ function findCoverageWorkspaces() {
 }
 
 const workspaces = findCoverageWorkspaces()
+const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+const coverageDirs = JSON.stringify(
+  workspaces.map((workspace) => `${workspace.path}/coverage`)
+)
 
 if (workspaces.length === 0) {
   console.error('No workspaces define a test:coverage script.')
   process.exit(1)
+}
+
+if (process.env.GITHUB_OUTPUT) {
+  appendFileSync(process.env.GITHUB_OUTPUT, `coverage_dirs=${coverageDirs}\n`)
 }
 
 const failedWorkspaces = []
@@ -52,7 +60,7 @@ for (const workspace of workspaces) {
   console.log(`\n==> Running coverage for ${workspace.path} (${workspace.name})`)
 
   const result = spawnSync(
-    'npm',
+    npmExecutable,
     ['run', 'test:coverage', '--workspace', workspace.path],
     {
       cwd: process.cwd(),
