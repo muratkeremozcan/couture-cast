@@ -1,5 +1,10 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  createGuardianProfileFixture,
+  createTeenProfileFixture,
+  resetCleanupRegistry,
+} from '../../../test/factories.js'
 import type { AuthService } from './auth.service'
 import { AuthController } from './auth.controller'
 import type { RequestAuthContext } from './security.types'
@@ -14,17 +19,23 @@ const createController = () => {
 }
 
 describe('AuthController', () => {
+  const guardian = createGuardianProfileFixture()
+  const teen = createTeenProfileFixture()
   const guardianAuthContext: RequestAuthContext = {
     token: 'token-123',
-    userId: 'guardian-7',
+    userId: guardian.id,
     role: 'guardian',
   }
+
+  afterEach(() => {
+    resetCleanupRegistry()
+  })
 
   it('records guardian consent for valid payloads', () => {
     const { controller, grantGuardianConsent } = createController()
     const payload = {
-      guardianId: 'guardian-7',
-      teenId: 'teen-4',
+      guardianId: guardian.id,
+      teenId: teen.id,
       consentLevel: 'full',
       timestamp: '2026-03-04T10:00:00.000Z',
     }
@@ -41,7 +52,7 @@ describe('AuthController', () => {
     expect(() =>
       controller.grantGuardianConsent(guardianAuthContext, {
         guardianId: '',
-        teenId: 'teen-4',
+        teenId: teen.id,
         consentLevel: 'full',
       })
     ).toThrow(BadRequestException)
@@ -54,7 +65,7 @@ describe('AuthController', () => {
     expect(() =>
       controller.grantGuardianConsent(guardianAuthContext, {
         guardianId: 'guardian-999',
-        teenId: 'teen-4',
+        teenId: teen.id,
         consentLevel: 'full',
       })
     ).toThrow(ForbiddenException)
@@ -65,7 +76,7 @@ describe('AuthController', () => {
     const { controller, grantGuardianConsent } = createController()
     const payload = {
       guardianId: 'guardian-999',
-      teenId: 'teen-4',
+      teenId: teen.id,
       consentLevel: 'full',
       timestamp: '2026-03-04T10:00:00.000Z',
     }

@@ -1,48 +1,38 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  buildUserProfileResponse,
+  createTeenProfileFixture,
+  resetCleanupRegistry,
+} from '../../../test/factories.js'
 import { UserController } from './user.controller'
 import type { UserService } from './user.service'
 
 const createController = () => {
-  const getProfile = vi.fn().mockResolvedValue({
-    user: {
-      id: 'teen-4',
-      email: 'teen4@example.com',
-      displayName: 'Taylor Brooks',
-      birthdate: '2009-03-04T00:00:00.000Z',
-      role: 'teen',
-    },
-    linkedGuardians: [],
-    linkedTeens: [],
-  })
+  const teen = createTeenProfileFixture()
+  const getProfile = vi.fn().mockResolvedValue(buildUserProfileResponse(teen, [], []))
   const service = {
     getProfile,
   } as unknown as UserService
 
-  return { controller: new UserController(service), getProfile }
+  return { controller: new UserController(service), getProfile, teen }
 }
 
 describe('UserController', () => {
+  afterEach(() => {
+    resetCleanupRegistry()
+  })
+
   it('returns the authenticated profile from the service layer', async () => {
-    const { controller, getProfile } = createController()
+    const { controller, getProfile, teen } = createController()
     const auth = {
       token: 'teen-token',
-      userId: 'teen-4',
+      userId: teen.id,
       role: 'teen' as const,
     }
 
     const result = await controller.getProfile(auth)
 
     expect(getProfile).toHaveBeenCalledWith(auth)
-    expect(result).toEqual({
-      user: {
-        id: 'teen-4',
-        email: 'teen4@example.com',
-        displayName: 'Taylor Brooks',
-        birthdate: '2009-03-04T00:00:00.000Z',
-        role: 'teen',
-      },
-      linkedGuardians: [],
-      linkedTeens: [],
-    })
+    expect(result).toEqual(buildUserProfileResponse(teen, [], []))
   })
 })

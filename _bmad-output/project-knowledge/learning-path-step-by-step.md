@@ -1,7 +1,8 @@
 # Couture Cast Learning Path (step by step)
 
 Updated: 2026-04-15 - Step 2 now reflects the shared cleanup/template helpers in
-`packages/testing` and the CLI/IDE lint alignment for templates
+`packages/testing`, the CLI/IDE lint alignment for templates, and the test review
+checklist/testing-standards references
 
 ## LLM collaborator prompt
 
@@ -209,6 +210,10 @@ Current repo note:
 - **Testing workspace boundary:** `packages/testing` now owns shared factories, cleanup helpers, and
   starter templates; its workspace lint/typecheck scripts intentionally include both `src` and
   `templates` so the CLI reports the same red files the IDE does.
+- **Test review baseline:** PRs that touch automated tests should use the shared checklist in
+  `.github/PULL_REQUEST_TEMPLATE.md` and the expectations in
+  `_bmad-output/test-artifacts/testing-standards.md`; default to `@couture/testing` fixtures and
+  reset or clean up any registered entities in `afterEach`.
 
 Architecture diagram:
 

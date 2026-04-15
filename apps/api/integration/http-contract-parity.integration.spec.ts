@@ -14,6 +14,14 @@ import {
   unauthorizedHttpErrorSchema,
   userProfileResponseSchema,
 } from '@couture/api-client/contracts/http'
+import {
+  buildLinkedGuardianResponse,
+  buildLinkedGuardianRole,
+  buildPrismaUserProfileFixture,
+  createGuardianProfileFixture,
+  createTeenProfileFixture,
+  resetCleanupRegistry,
+} from '../test/factories.js'
 import { queueConfigs } from '../src/config/queues'
 import { ApiHealthController } from '../src/controllers/api-health.controller'
 import { HealthController } from '../src/controllers/health.controller'
@@ -89,6 +97,8 @@ describe('HTTP contract parity (integration)', () => {
       await app.close()
       app = undefined
     }
+
+    resetCleanupRegistry()
   })
 
   it('validates the API health route against the shared health schema', async () => {
@@ -147,31 +157,25 @@ describe('HTTP contract parity (integration)', () => {
   })
 
   it('validates the authenticated profile route against the shared user schema', async () => {
-    prismaUserFindUniqueMock.mockResolvedValue({
-      id: 'teen-4',
-      email: 'teen4@example.com',
-      profile: {
-        display_name: 'Taylor Brooks',
-        birthdate: new Date('2009-03-04T00:00:00.000Z'),
-      },
-      teen_roles: [
-        {
-          guardian_id: 'guardian-2',
-          status: 'granted',
-          consent_granted_at: new Date('2026-03-04T10:00:00.000Z'),
-        },
-      ],
-      guardian_roles: [],
+    const teen = createTeenProfileFixture()
+    const guardian = createGuardianProfileFixture({
+      id: 'guardian-2',
+      email: 'guardian2@example.com',
+      displayName: 'Jordan Casey',
     })
+    prismaUserFindUniqueMock.mockResolvedValue(
+      buildPrismaUserProfileFixture(teen, [buildLinkedGuardianRole(guardian)], [])
+    )
 
     const response = await request(getHttpServer())
       .get('/api/v1/user/profile')
-      .set(createHeaders('teen-4', 'teen'))
+      .set(createHeaders(teen.id, 'teen'))
 
     expect(response.status).toBe(200)
     const body = userProfileResponseSchema.parse(response.body)
-    expect(body.user.id).toBe('teen-4')
+    expect(body.user.id).toBe(teen.id)
     expect(body.linkedGuardians).toHaveLength(1)
+    expect(body.linkedGuardians[0]).toEqual(buildLinkedGuardianResponse(guardian))
   })
 
   it('validates missing profiles against the shared not-found schema', async () => {

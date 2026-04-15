@@ -17,6 +17,13 @@
 
 <!-- Describe what you ran or what was verified manually -->
 
+## Test Quality Checklist
+
+- [ ] No hardcoded test data (use factories)
+- [ ] Tests clean up created entities (registerForCleanup)
+- [ ] Factories used for all test fixtures
+- [ ] Test data is deterministic (no random data in assertions)
+
 ## Risk
 
 <!-- Note rollout risk, migration impact, or why this is low risk -->

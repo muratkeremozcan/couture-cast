@@ -2,6 +2,39 @@
 
 Shared fixture factories and cleanup helpers for CoutureCast tests.
 
+## Starter template
+
+The starter example lives in
+[`packages/testing/templates/test-template.spec.ts`](./templates/test-template.spec.ts). Use the
+package root for factories and `@couture/testing/cleanup` for manual cleanup registration:
+
+```ts
+import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, createTeenUser, createWardrobeItem } from '@couture/testing'
+import { registerForCleanup } from '@couture/testing/cleanup'
+
+afterEach(async () => {
+  await cleanup({ prisma })
+})
+
+it('creates a wardrobe item for a teen', async () => {
+  const teen = await createTeenUser(
+    { age: 15, email: 'template-teen@example.com' },
+    { persist: true, prisma }
+  )
+
+  const item = await createWardrobeItem(
+    { userId: teen.id, category: 'top' },
+    { persist: true, prisma }
+  )
+
+  // Manual registration still exists for direct Prisma setup.
+  // registerForCleanup('users', customUser.id)
+
+  expect(item.userId).toBe(teen.id)
+})
+```
+
 ## Factory philosophy
 
 Factories in this package are pure data builders first. A factory call should give the test a fresh
@@ -116,8 +149,8 @@ import {
   cleanup,
   createTeenUser,
   createWardrobeItem,
-  registerForCleanup,
 } from '@couture/testing'
+import { registerForCleanup } from '@couture/testing/cleanup'
 
 afterEach(async () => {
   await cleanup({ prisma })
@@ -165,3 +198,20 @@ The cleanup helper deletes in reverse dependency order:
 - Shared mutable fixture objects reused between tests.
 - Random values in assertions without overriding the asserted fields first.
 - Direct Prisma setup with no cleanup registration when the factory can express the same setup.
+
+## Pattern lineage
+
+These helpers were shaped by the local `../playwright-utils` reference set:
+
+- `../playwright-utils/playwright/support/utils/movie-factories.ts` reinforced the plain-object
+  builder approach: generate a full fixture, then let each test override only the fields it cares
+  about.
+- `../playwright-utils/playwright/support/fixtures/crud-helper-fixture.ts` reinforced keeping test
+  setup and teardown behind reusable helpers instead of scattering ad hoc cleanup in each suite.
+
+CoutureCast intentionally diverges in two places:
+
+- Factories can optionally persist through Prisma because many tests need schema-valid nested create
+  payloads, not just in-memory objects.
+- Cleanup deletes in reverse dependency order and clears the registry in `finally` because Prisma
+  relations make teardown stricter than the generic API-helper flow in `playwright-utils`.

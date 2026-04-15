@@ -1,6 +1,6 @@
 # Story 0.10: Implement test fixture factories and seed data
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -213,8 +213,8 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
 
   - [x] Document anti-patterns: hardcoded test data, shared mutable state
 
-- [ ] Task 8: Create test template (AC: #4)
-  - [ ] Create ` ```typescript
+- [x] Task 8: Create test template (AC: #4)
+  - [x] Create ` ```typescript
         import { afterEach, describe, expect, it } from 'vitest';
         import {
         cleanup,
@@ -251,16 +251,16 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
 
     ```
 
-  - [ ] Add template to docs (`packages/testing/README.md`) and keep the starter file in
+  - [x] Add template to docs (`packages/testing/README.md`) and keep the starter file in
         `packages/testing/templates/test-template.spec.ts`
 
-- [ ] Task 9: Reference playwright-utils patterns (AC: #1)
-  - [ ] Review `playwright-utils` factory patterns from baseline reference
-  - [ ] Adapt `movie-factories.ts` pattern for CoutureCast entities
-  - [ ] Reference playwright-utils cleanup patterns
-  - [ ] Document learnings in `
-- [ ] Task 10: Create code review checklist (AC: #5)
-  - [ ] Add to `.github/PULL_REQUEST_TEMPLATE.md`:
+- [x] Task 9: Reference playwright-utils patterns (AC: #1)
+  - [x] Review `playwright-utils` factory patterns from baseline reference
+  - [x] Adapt `movie-factories.ts` pattern for CoutureCast entities
+  - [x] Reference playwright-utils cleanup patterns
+  - [x] Document learnings in `packages/testing/README.md`
+- [x] Task 10: Create code review checklist (AC: #5)
+  - [x] Add to `.github/PULL_REQUEST_TEMPLATE.md`:
 
     ```markdown
     ## Test Quality Checklist
@@ -271,21 +271,21 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
     - [ ] Test data is deterministic (no random data in assertions)
     ```
 
-  - [ ] Document in `_bmad-output/test-artifacts/testing-standards.md`
-  - [ ] Add to team onboarding docs
+  - [x] Document in `_bmad-output/test-artifacts/testing-standards.md`
+  - [x] Add to team onboarding docs
 
-- [ ] Task 11: Write factory tests (AC: #1, #2)
-  - [ ] Test user factory creates valid user
-  - [ ] Test teen factory sets correct age range
-  - [ ] Test wardrobe factory generates valid items
-  - [ ] Test cleanup removes all registered entities
-  - [ ] Test factory override merges correctly
+- [x] Task 11: Write factory tests (AC: #1, #2)
+  - [x] Test user factory creates valid user
+  - [x] Test teen factory sets correct age range
+  - [x] Test wardrobe factory generates valid items
+  - [x] Test cleanup removes all registered entities
+  - [x] Test factory override merges correctly
 
-- [ ] Task 12: Integrate factories in existing tests (AC: #5)
-  - [ ] Refactor any existing tests to use factories
-  - [ ] Remove hardcoded test data
-  - [ ] Add cleanup to all test suites
-  - [ ] Verify tests still pass
+- [x] Task 12: Integrate factories in existing tests (AC: #5)
+  - [x] Refactor any existing tests to use factories
+  - [x] Remove hardcoded test data
+  - [x] Add cleanup to all test suites
+  - [x] Verify tests still pass
 
 ## Dev Notes
 
@@ -429,6 +429,27 @@ _bmad-output/
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run db:seed --workspace @couture/db`
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { PrismaClient } from '@prisma/client'; (async () => { const prisma = new PrismaClient(); const counts = await Promise.all([prisma.user.count(), prisma.guardianConsent.count(), prisma.garmentItem.count(), prisma.outfitRecommendation.count(), prisma.weatherSnapshot.count(), prisma.featureFlag.count()]); console.log(JSON.stringify({ users: counts[0], guardianConsents: counts[1], garments: counts[2], outfits: counts[3], weatherSnapshots: counts[4], featureFlags: counts[5] })); await prisma.$disconnect(); })();"`
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { PrismaClient } from '@prisma/client'; (async () => { const prisma = new PrismaClient(); const profiles = await prisma.userProfile.findMany({ select: { preferences: true } }); const counts = profiles.reduce((acc, profile) => { const role = typeof profile.preferences === 'object' && profile.preferences && !Array.isArray(profile.preferences) && 'role' in profile.preferences ? String((profile.preferences as Record<string, unknown>).role) : 'unknown'; acc[role] = (acc[role] ?? 0) + 1; return acc; }, {} as Record<string, number>); console.log(JSON.stringify(counts)); await prisma.$disconnect(); })();"`
+- `sed -n '1,220p' ../playwright-utils/playwright/support/utils/movie-factories.ts`
+- `sed -n '1,260p' ../playwright-utils/playwright/support/fixtures/crud-helper-fixture.ts`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm install --workspace api`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run test --workspace @couture/testing`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run typecheck --workspace @couture/testing`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run lint --workspace @couture/testing`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run lint --workspace api`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run typecheck --workspace api`
+- Targeted API spec run:
+
+  ```bash
+  source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run test --workspace api -- \
+    src/modules/user/user.service.spec.ts \
+    src/modules/user/user.controller.spec.ts \
+    src/modules/auth/auth.service.spec.ts \
+    src/modules/auth/auth.controller.spec.ts \
+    integration/http-contract-parity.integration.spec.ts \
+    integration/analytics-tracking.integration.spec.ts
+  ```
+
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run test --workspace api`
 
 ### Completion Notes List
 
@@ -450,6 +471,12 @@ _bmad-output/
 - Added a local CommonJS interop helper for `tsx` seed execution so `packages/db` can consume shared source modules from `packages/testing` and `packages/config` without requiring prebuilt artifacts.
 - Verified the seed flow end to end with `@couture/db` lint, typecheck, `prisma migrate deploy`, `npm run db:seed`, and database count checks confirming 5 teens, 3 guardians, 50 garments, 20 outfits, 10 weather snapshots, and 8 feature flags.
 - Implemented task 7 by expanding `packages/testing/README.md` into the factory usage guide with philosophy, per-factory examples, cleanup guidance, best practices, and anti-patterns.
+- Implemented task 8 by aligning the starter template with the public import pattern and documenting the template workflow in `packages/testing/README.md`.
+- Implemented task 9 by reviewing the adjacent `playwright-utils` movie factory and helper-fixture patterns, then documenting the adapted factory-builder and cleanup-helper learnings in `packages/testing/README.md`.
+- Implemented task 10 by adding the shared Test Quality Checklist to the PR template, writing the testing standards doc, and linking the checklist expectations from the team learning path.
+- Implemented task 11 by wiring Vitest into `@couture/testing` and adding coverage for factory overrides, user fixtures, wardrobe fixtures, and cleanup ordering.
+- Implemented task 12 by refactoring existing `apps/api` auth/user/http-contract/analytics specs to use shared factories and reset cleanup state after each suite.
+- Verified the new checklist/docs plus `@couture/testing` and `apps/api` changes with workspace lint, typecheck, targeted API spec runs, and a full `apps/api` test pass.
 
 ### File List
 
@@ -472,6 +499,7 @@ _bmad-output/
 - New: `packages/testing/tsconfig.build.tsbuildinfo`
 - New: `packages/testing/tsconfig.tsbuildinfo`
 - Modified: `package-lock.json`
+- Modified: `_bmad-output/implementation-artifacts/0-10-implement-test-fixture-factories-and-seed-data.md`
 - Modified: `_bmad-output/project-knowledge/learning-path-step-by-step.md`
 - Modified: `packages/db/tsconfig.json`
 - Modified: `packages/db/prisma/seeds/index.ts`
@@ -483,17 +511,37 @@ _bmad-output/
 - Modified: `packages/db/prisma/seeds/rituals.ts`
 - Modified: `packages/testing/package.json`
 - Modified: `packages/testing/src/index.ts`
+- Modified: `packages/testing/src/factories/factory.ts`
 - Modified: `packages/testing/src/factories/index.ts`
+- Modified: `packages/testing/templates/test-template.spec.ts`
+- Modified: `.github/PULL_REQUEST_TEMPLATE.md`
+- Modified: `_bmad-output/test-artifacts/testing-standards.md`
+- New: `packages/testing/vitest.config.ts`
+- New: `packages/testing/test/factory.spec.ts`
+- New: `packages/testing/test/user.factory.spec.ts`
+- New: `packages/testing/test/wardrobe-item.factory.spec.ts`
+- New: `packages/testing/test/cleanup.spec.ts`
+- Modified: `packages/testing/tsconfig.typecheck.json`
+- Modified: `apps/api/package.json`
+- New: `apps/api/test/factories.ts`
+- Modified: `apps/api/src/modules/user/user.service.spec.ts`
+- Modified: `apps/api/src/modules/user/user.controller.spec.ts`
+- Modified: `apps/api/src/modules/auth/auth.service.spec.ts`
+- Modified: `apps/api/src/modules/auth/auth.controller.spec.ts`
+- Modified: `apps/api/integration/http-contract-parity.integration.spec.ts`
+- Modified: `apps/api/integration/analytics-tracking.integration.spec.ts`
 
 ## Change Log
 
-| Date       | Author             | Change                                                                                                       |
-| ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------ |
-| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.10 acceptance criteria                                                       |
-| 2026-04-13 | Codex (Dev Agent)  | Implemented tasks 1-2 for shared factory infrastructure and the user factory in `@couture/testing`           |
-| 2026-04-13 | Codex (Dev Agent)  | Implemented task 3 with a wardrobe item factory and Prisma persistence/export wiring                         |
-| 2026-04-13 | Codex (Dev Agent)  | Implemented task 4 with ritual/weather factories and schema-aware persistence helpers                        |
-| 2026-04-13 | Codex (Dev Agent)  | Removed redundant default generation in wardrobe, ritual, and weather factory composition                    |
-| 2026-04-15 | Codex (Dev Agent)  | Implemented task 5 with cleanup helpers, package exports, README guidance, and a cleanup template            |
-| 2026-04-15 | Codex (Dev Agent)  | Implemented task 6 with factory-backed Prisma seeds, local CJS interop for `tsx`, and verified seeded counts |
-| 2026-04-15 | Codex (Dev Agent)  | Implemented task 7 by turning `packages/testing/README.md` into the factory usage guide for tests            |
+| Date       | Author             | Change                                                                                                                                        |
+| ---------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.10 acceptance criteria                                                                                        |
+| 2026-04-13 | Codex (Dev Agent)  | Implemented tasks 1-2 for shared factory infrastructure and the user factory in `@couture/testing`                                            |
+| 2026-04-13 | Codex (Dev Agent)  | Implemented task 3 with a wardrobe item factory and Prisma persistence/export wiring                                                          |
+| 2026-04-13 | Codex (Dev Agent)  | Implemented task 4 with ritual/weather factories and schema-aware persistence helpers                                                         |
+| 2026-04-13 | Codex (Dev Agent)  | Removed redundant default generation in wardrobe, ritual, and weather factory composition                                                     |
+| 2026-04-15 | Codex (Dev Agent)  | Implemented task 5 with cleanup helpers, package exports, README guidance, and a cleanup template                                             |
+| 2026-04-15 | Codex (Dev Agent)  | Implemented task 6 with factory-backed Prisma seeds, local CJS interop for `tsx`, and verified seeded counts                                  |
+| 2026-04-15 | Codex (Dev Agent)  | Implemented task 7 by turning `packages/testing/README.md` into the factory usage guide for tests                                             |
+| 2026-04-15 | Codex (Dev Agent)  | Implemented tasks 8-9 by tightening the starter template and documenting the playwright-utils pattern lineage                                 |
+| 2026-04-15 | Codex (Dev Agent)  | Implemented tasks 10-12 with the test review checklist, `@couture/testing` Vitest coverage, and shared factory adoption in existing API tests |

@@ -53,7 +53,7 @@ development_status:
   0-7-configure-posthog-opentelemetry-and-grafana-cloud: done
   0-8-document-env-and-secret-management-workflow: done
   0-9-initialize-openapi-spec-generation-and-api-client-sdk: done
-  0-10-implement-test-fixture-factories-and-seed-data: in-progress
+  0-10-implement-test-fixture-factories-and-seed-data: review
   0-11-implement-guardian-consent-flow-and-rls-policies: drafted
   0-12-provision-test-environments-and-harness-services: drafted
   0-14-expand-test-infra-auth-contract-performance: drafted

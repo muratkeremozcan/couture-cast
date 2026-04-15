@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { cleanup, createUser, createWardrobeItem } from '../src/index.js'
+import { cleanup, createTeenUser, createWardrobeItem } from '../src/index.js'
 import { registerForCleanup } from '../src/cleanup.js'
 
 type DeleteManyRecorder = {
@@ -28,9 +28,11 @@ describe('example factory suite', () => {
     await cleanup({ prisma })
   })
 
-  it('builds fixtures without hardcoded literals', () => {
-    const teen = createUser({ role: 'teen', age: 15 })
+  it('demonstrates the shared starter template pattern', () => {
+    const teen = createTeenUser({ age: 15, email: 'template-teen@example.com' })
     const top = createWardrobeItem({ userId: teen.id, category: 'top' })
+
+    // Direct Prisma setup can still opt into the shared teardown flow.
     registerForCleanup('wardrobeItems', top.id)
     registerForCleanup('users', teen.id)
 
