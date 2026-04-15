@@ -37,13 +37,16 @@ it('creates a wardrobe item for a teen', async () => {
 
 ## Factory philosophy
 
-Factories in this package are pure data builders first. A factory call should give the test a fresh
-fixture object that can be asserted on, modified, or persisted without mutating shared state.
+Factories in this package are pure data builders first. Each call should return a fresh fixture
+that the test can assert on, modify, or persist without mutating shared state.
 
-- Use overrides to express the scenario the test cares about.
-- Keep persistence explicit by passing `{ persist: true, prisma }`.
-- Prefer specialized factories like `createTeenUser()` over broad one-off object literals.
-- Set IDs, timestamps, and other asserted values explicitly when a test depends on them.
+| Principle                    | Guidance                                                      |
+| ---------------------------- | ------------------------------------------------------------- |
+| Pure data builders           | Return fresh fixtures on every call                           |
+| Use overrides                | Express only the scenario the test cares about                |
+| Keep persistence explicit    | Persist only through `{ persist: true, prisma }`              |
+| Prefer specialized factories | Use helpers like `createTeenUser()` over broad inline objects |
+| Override asserted values     | Set IDs, timestamps, and other checked fields explicitly      |
 
 ## Basic usage
 

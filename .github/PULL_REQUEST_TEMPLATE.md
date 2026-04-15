@@ -17,7 +17,7 @@
 
 <!-- Describe what you ran or what was verified manually -->
 
-## Test Quality Checklist
+## Test quality checklist
 
 - [ ] No hardcoded test data (use factories)
 - [ ] Tests clean up created entities (registerForCleanup)

@@ -31,6 +31,8 @@ type LinkedTeenResponse = {
   consentGrantedAt: string | null
 }
 
+export const DEFAULT_CONSENT_GRANTED_AT = new Date('2026-03-04T10:00:00.000Z')
+
 export function createTeenProfileFixture(
   overrides: UserVariantOverrides = {}
 ): UserFixture {
@@ -59,7 +61,7 @@ export function createGuardianProfileFixture(
 
 export function buildLinkedGuardianRole(
   guardian: UserFixture,
-  consentGrantedAt = new Date('2026-03-04T10:00:00.000Z')
+  consentGrantedAt: Date | null = null
 ): LinkedGuardianRole {
   return {
     guardian_id: guardian.id,
@@ -70,12 +72,12 @@ export function buildLinkedGuardianRole(
 
 export function buildLinkedGuardianResponse(
   guardian: UserFixture,
-  consentGrantedAt = new Date('2026-03-04T10:00:00.000Z')
+  consentGrantedAt: Date | null = null
 ): LinkedGuardianResponse {
   return {
     guardianId: guardian.id,
     status: 'granted',
-    consentGrantedAt: consentGrantedAt.toISOString(),
+    consentGrantedAt: consentGrantedAt ? consentGrantedAt.toISOString() : null,
   }
 }
 

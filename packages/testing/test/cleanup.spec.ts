@@ -65,6 +65,17 @@ describe('cleanup', () => {
       'userProfile',
       'user',
     ])
+    expect(calls.find((call) => call.delegate === 'garmentItem')?.where).toMatchObject({
+      OR: [{ id: { in: ['garment-1'] } }, { user_id: { in: ['user-1'] } }],
+    })
+    expect(
+      calls.find((call) => call.delegate === 'weatherSnapshot')?.where
+    ).toMatchObject({
+      id: { in: ['weather-1'] },
+    })
+    expect(calls.find((call) => call.delegate === 'user')?.where).toMatchObject({
+      id: { in: ['user-1'] },
+    })
     expect(registry.snapshot()).toEqual({
       users: [],
       wardrobeItems: [],

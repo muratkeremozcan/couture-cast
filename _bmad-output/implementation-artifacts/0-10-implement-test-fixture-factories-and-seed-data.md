@@ -429,8 +429,8 @@ _bmad-output/
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run db:seed --workspace @couture/db`
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { PrismaClient } from '@prisma/client'; (async () => { const prisma = new PrismaClient(); const counts = await Promise.all([prisma.user.count(), prisma.guardianConsent.count(), prisma.garmentItem.count(), prisma.outfitRecommendation.count(), prisma.weatherSnapshot.count(), prisma.featureFlag.count()]); console.log(JSON.stringify({ users: counts[0], guardianConsents: counts[1], garments: counts[2], outfits: counts[3], weatherSnapshots: counts[4], featureFlags: counts[5] })); await prisma.$disconnect(); })();"`
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { PrismaClient } from '@prisma/client'; (async () => { const prisma = new PrismaClient(); const profiles = await prisma.userProfile.findMany({ select: { preferences: true } }); const counts = profiles.reduce((acc, profile) => { const role = typeof profile.preferences === 'object' && profile.preferences && !Array.isArray(profile.preferences) && 'role' in profile.preferences ? String((profile.preferences as Record<string, unknown>).role) : 'unknown'; acc[role] = (acc[role] ?? 0) + 1; return acc; }, {} as Record<string, number>); console.log(JSON.stringify(counts)); await prisma.$disconnect(); })();"`
-- `sed -n '1,220p' ../playwright-utils/playwright/support/utils/movie-factories.ts`
-- `sed -n '1,260p' ../playwright-utils/playwright/support/fixtures/crud-helper-fixture.ts`
+- Upstream reference repo reviewed: `https://github.com/seontechnologies/playwright-utils`
+- Upstream reference paths reviewed: `playwright/support/utils/movie-factories.ts` and `playwright/support/fixtures/crud-helper-fixture.ts`
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm install --workspace api`
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run test --workspace @couture/testing`
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run typecheck --workspace @couture/testing`

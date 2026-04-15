@@ -20,6 +20,11 @@ const createController = () => {
 
 describe('AuthController', () => {
   const guardian = createGuardianProfileFixture()
+  const alternateGuardian = createGuardianProfileFixture({
+    id: 'guardian-9',
+    email: 'guardian9@example.com',
+    displayName: 'Morgan Blake',
+  })
   const teen = createTeenProfileFixture()
   const guardianAuthContext: RequestAuthContext = {
     token: 'token-123',
@@ -64,7 +69,7 @@ describe('AuthController', () => {
 
     expect(() =>
       controller.grantGuardianConsent(guardianAuthContext, {
-        guardianId: 'guardian-999',
+        guardianId: alternateGuardian.id,
         teenId: teen.id,
         consentLevel: 'full',
       })
@@ -75,7 +80,7 @@ describe('AuthController', () => {
   it('allows admin to record consent on behalf of guardian', () => {
     const { controller, grantGuardianConsent } = createController()
     const payload = {
-      guardianId: 'guardian-999',
+      guardianId: alternateGuardian.id,
       teenId: teen.id,
       consentLevel: 'full',
       timestamp: '2026-03-04T10:00:00.000Z',

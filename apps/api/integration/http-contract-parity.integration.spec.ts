@@ -15,6 +15,7 @@ import {
   userProfileResponseSchema,
 } from '@couture/api-client/contracts/http'
 import {
+  DEFAULT_CONSENT_GRANTED_AT,
   buildLinkedGuardianResponse,
   buildLinkedGuardianRole,
   buildPrismaUserProfileFixture,
@@ -164,7 +165,11 @@ describe('HTTP contract parity (integration)', () => {
       displayName: 'Jordan Casey',
     })
     prismaUserFindUniqueMock.mockResolvedValue(
-      buildPrismaUserProfileFixture(teen, [buildLinkedGuardianRole(guardian)], [])
+      buildPrismaUserProfileFixture(
+        teen,
+        [buildLinkedGuardianRole(guardian, DEFAULT_CONSENT_GRANTED_AT)],
+        []
+      )
     )
 
     const response = await request(getHttpServer())
@@ -175,7 +180,9 @@ describe('HTTP contract parity (integration)', () => {
     const body = userProfileResponseSchema.parse(response.body)
     expect(body.user.id).toBe(teen.id)
     expect(body.linkedGuardians).toHaveLength(1)
-    expect(body.linkedGuardians[0]).toEqual(buildLinkedGuardianResponse(guardian))
+    expect(body.linkedGuardians[0]).toEqual(
+      buildLinkedGuardianResponse(guardian, DEFAULT_CONSENT_GRANTED_AT)
+    )
   })
 
   it('validates missing profiles against the shared not-found schema', async () => {

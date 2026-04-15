@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common'
 import type { PrismaClient } from '@prisma/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  DEFAULT_CONSENT_GRANTED_AT,
   buildLinkedGuardianResponse,
   buildLinkedGuardianRole,
   buildPrismaUserProfileFixture,
@@ -32,7 +33,10 @@ describe('UserService', () => {
       email: 'guardian2@example.com',
       displayName: 'Jordan Casey',
     })
-    const linkedGuardianRole = buildLinkedGuardianRole(guardian)
+    const linkedGuardianRole = buildLinkedGuardianRole(
+      guardian,
+      DEFAULT_CONSENT_GRANTED_AT
+    )
     const findUnique = vi
       .fn()
       .mockResolvedValue(buildPrismaUserProfileFixture(teen, [linkedGuardianRole], []))
@@ -53,7 +57,11 @@ describe('UserService', () => {
       },
     })
     expect(result).toEqual(
-      buildUserProfileResponse(teen, [buildLinkedGuardianResponse(guardian)], [])
+      buildUserProfileResponse(
+        teen,
+        [buildLinkedGuardianResponse(guardian, DEFAULT_CONSENT_GRANTED_AT)],
+        []
+      )
     )
   })
 
