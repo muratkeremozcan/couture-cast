@@ -215,35 +215,44 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
 
 - [ ] Task 8: Create test template (AC: #4)
   - [ ] Create ` ```typescript
-        import { describe, it, expect, afterEach } from 'vitest';
-        import { cleanup, registerForCleanup } from '@couture-cast/testing/cleanup';
-        import { createUser, createWardrobeItem } from '@couture-cast/testing/**factories**';
-        import { prisma } from '@couture-cast/db';
+        import { afterEach, describe, expect, it } from 'vitest';
+        import {
+        cleanup,
+        createTeenUser,
+        createWardrobeItem,
+        } from '@couture/testing';
+        import { registerForCleanup } from '@couture/testing/cleanup';
+        import { prisma } from '@couture/db';
 
-    describe('Example Test Suite', () => {
-    afterEach(async () => {
-    await cleanup();
-    });
+        describe('Example Test Suite', () => {
+          afterEach(async () => {
+            await cleanup({ prisma });
+          });
 
-    it('should demonstrate factory usage', async () => {
-    const user = await prisma.user.create({ data: createUser() });
-    registerForCleanup('users', user.id);
+          it('should demonstrate factory usage', async () => {
+            const teen = await createTeenUser(
+              { age: 15, email: 'template-teen@example.com' },
+              { persist: true, prisma }
+            );
 
-        const item = await prisma.wardrobeItem.create({
-          data: createWardrobeItem({ userId: user.id }),
+            const item = await createWardrobeItem(
+              { userId: teen.id, category: 'top' },
+              { persist: true, prisma }
+            );
+
+            // Manual registration still exists for direct Prisma setup.
+            // registerForCleanup('users', customUser.id);
+
+            expect(item.userId).toBe(teen.id);
+          });
         });
-        registerForCleanup('wardrobeItems', item.id);
-
-        expect(item.userId).toBe(user.id);
-
-    });
-    });
 
     ```
 
     ```
 
-  - [ ] Add template to docs
+  - [ ] Add template to docs (`packages/testing/README.md`) and keep the starter file in
+        `packages/testing/templates/test-template.spec.ts`
 
 - [ ] Task 9: Reference playwright-utils patterns (AC: #1)
   - [ ] Review `playwright-utils` factory patterns from baseline reference

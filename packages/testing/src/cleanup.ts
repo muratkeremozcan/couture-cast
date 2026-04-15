@@ -162,100 +162,102 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const garmentItemWhere = buildDeleteWhere(wardrobeItemIds, userIds)
   const paletteInsightWhere = buildPaletteInsightWhere(wardrobeItemIds, userIds)
 
-  if (userIds.length > 0) {
-    await prisma.engagementEvent.deleteMany({
-      where: buildUserFilter(userIds),
-    })
-  }
+  try {
+    if (userIds.length > 0) {
+      await prisma.engagementEvent.deleteMany({
+        where: buildUserFilter(userIds),
+      })
+    }
 
-  if (userIds.length > 0) {
-    await prisma.lookbookPost.deleteMany({
-      where: buildUserFilter(userIds),
-    })
-  }
+    if (userIds.length > 0) {
+      await prisma.lookbookPost.deleteMany({
+        where: buildUserFilter(userIds),
+      })
+    }
 
-  if (userIds.length > 0) {
-    await prisma.auditLog.deleteMany({
-      where: buildUserFilter(userIds),
-    })
-  }
+    if (userIds.length > 0) {
+      await prisma.auditLog.deleteMany({
+        where: buildUserFilter(userIds),
+      })
+    }
 
-  if (userIds.length > 0) {
-    await prisma.pushToken.deleteMany({
-      where: buildUserFilter(userIds),
-    })
-  }
+    if (userIds.length > 0) {
+      await prisma.pushToken.deleteMany({
+        where: buildUserFilter(userIds),
+      })
+    }
 
-  if (outfitRecommendationWhere) {
-    await prisma.outfitRecommendation.deleteMany({
-      where: outfitRecommendationWhere,
-    })
-  }
+    if (outfitRecommendationWhere) {
+      await prisma.outfitRecommendation.deleteMany({
+        where: outfitRecommendationWhere,
+      })
+    }
 
-  if (paletteInsightWhere) {
-    await prisma.paletteInsights.deleteMany({
-      where: paletteInsightWhere,
-    })
-  }
+    if (paletteInsightWhere) {
+      await prisma.paletteInsights.deleteMany({
+        where: paletteInsightWhere,
+      })
+    }
 
-  if (garmentItemWhere) {
-    await prisma.garmentItem.deleteMany({
-      where: garmentItemWhere,
-    })
-  }
+    if (garmentItemWhere) {
+      await prisma.garmentItem.deleteMany({
+        where: garmentItemWhere,
+      })
+    }
 
-  if (weatherSnapshotIds.length > 0) {
-    await prisma.forecastSegment.deleteMany({
-      where: {
-        weather_snapshot_id: {
-          in: weatherSnapshotIds,
+    if (weatherSnapshotIds.length > 0) {
+      await prisma.forecastSegment.deleteMany({
+        where: {
+          weather_snapshot_id: {
+            in: weatherSnapshotIds,
+          },
         },
-      },
-    })
-  }
+      })
+    }
 
-  if (weatherSnapshotIds.length > 0) {
-    await prisma.weatherSnapshot.deleteMany({
-      where: buildIdFilter(weatherSnapshotIds),
-    })
-  }
+    if (weatherSnapshotIds.length > 0) {
+      await prisma.weatherSnapshot.deleteMany({
+        where: buildIdFilter(weatherSnapshotIds),
+      })
+    }
 
-  if (userIds.length > 0) {
-    await prisma.guardianConsent.deleteMany({
-      where: {
-        OR: [
-          {
-            guardian_id: {
-              in: userIds,
+    if (userIds.length > 0) {
+      await prisma.guardianConsent.deleteMany({
+        where: {
+          OR: [
+            {
+              guardian_id: {
+                in: userIds,
+              },
             },
-          },
-          {
-            teen_id: {
-              in: userIds,
+            {
+              teen_id: {
+                in: userIds,
+              },
             },
-          },
-        ],
-      },
-    })
-  }
+          ],
+        },
+      })
+    }
 
-  if (userIds.length > 0) {
-    await prisma.comfortPreferences.deleteMany({
-      where: buildUserFilter(userIds),
-    })
-  }
+    if (userIds.length > 0) {
+      await prisma.comfortPreferences.deleteMany({
+        where: buildUserFilter(userIds),
+      })
+    }
 
-  if (userIds.length > 0) {
-    await prisma.userProfile.deleteMany({
-      where: buildUserFilter(userIds),
-    })
-  }
+    if (userIds.length > 0) {
+      await prisma.userProfile.deleteMany({
+        where: buildUserFilter(userIds),
+      })
+    }
 
-  if (userIds.length > 0) {
-    await prisma.user.deleteMany({
-      where: buildIdFilter(userIds),
-    })
+    if (userIds.length > 0) {
+      await prisma.user.deleteMany({
+        where: buildIdFilter(userIds),
+      })
+    }
+  } finally {
+    registry.clear()
   }
-
-  registry.clear()
 }

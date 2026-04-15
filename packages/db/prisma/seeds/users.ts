@@ -14,115 +14,119 @@ export type SeededUsers = {
 
 const seededAt = new Date('2026-01-15T08:00:00.000Z')
 
-const guardianFixtures = [
-  createGuardianUser({
-    id: 'guardian-1',
-    email: 'guardian1@example.com',
-    displayName: 'Alex Rivera',
-    age: 39,
-    createdAt: seededAt,
-    updatedAt: seededAt,
-    profilePreferences: {
-      feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
-      role: 'guardian',
-      style_persona: 'planner',
-    },
-  }),
-  createGuardianUser({
-    id: 'guardian-2',
-    email: 'guardian2@example.com',
-    displayName: 'Jordan Casey',
-    age: 43,
-    createdAt: seededAt,
-    updatedAt: seededAt,
-    profilePreferences: {
-      feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
-      role: 'guardian',
-      style_persona: 'commuter',
-    },
-  }),
-  createGuardianUser({
-    id: 'guardian-3',
-    email: 'guardian3@example.com',
-    displayName: 'Morgan Blake',
-    age: 47,
-    createdAt: seededAt,
-    updatedAt: seededAt,
-    profilePreferences: {
-      feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
-      role: 'guardian',
-      style_persona: 'outdoor',
-    },
-  }),
-]
+function getGuardianFixtures(): UserFixture[] {
+  return [
+    createGuardianUser({
+      id: 'guardian-1',
+      email: 'guardian1@example.com',
+      displayName: 'Alex Rivera',
+      age: 39,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'guardian',
+        style_persona: 'planner',
+      },
+    }),
+    createGuardianUser({
+      id: 'guardian-2',
+      email: 'guardian2@example.com',
+      displayName: 'Jordan Casey',
+      age: 43,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'guardian',
+        style_persona: 'commuter',
+      },
+    }),
+    createGuardianUser({
+      id: 'guardian-3',
+      email: 'guardian3@example.com',
+      displayName: 'Morgan Blake',
+      age: 47,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'guardian',
+        style_persona: 'outdoor',
+      },
+    }),
+  ]
+}
 
-const teenFixtures = [
-  createTeenUser({
-    id: 'teen-1',
-    email: 'teen1@example.com',
-    displayName: 'Riley Chen',
-    age: 13,
-    createdAt: seededAt,
-    updatedAt: seededAt,
-    profilePreferences: {
-      feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
-      role: 'teen',
-      style_persona: 'school',
-    },
-  }),
-  createTeenUser({
-    id: 'teen-2',
-    email: 'teen2@example.com',
-    displayName: 'Samira Patel',
-    age: 14,
-    createdAt: seededAt,
-    updatedAt: seededAt,
-    profilePreferences: {
-      feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
-      role: 'teen',
-      style_persona: 'creative',
-    },
-  }),
-  createTeenUser({
-    id: 'teen-3',
-    email: 'teen3@example.com',
-    displayName: 'Drew Kim',
-    age: 15,
-    createdAt: seededAt,
-    updatedAt: seededAt,
-    profilePreferences: {
-      feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
-      role: 'teen',
-      style_persona: 'sporty',
-    },
-  }),
-  createTeenUser({
-    id: 'teen-4',
-    email: 'teen4@example.com',
-    displayName: 'Taylor Brooks',
-    age: 16,
-    createdAt: seededAt,
-    updatedAt: seededAt,
-    profilePreferences: {
-      feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
-      role: 'teen',
-      style_persona: 'minimal',
-    },
-  }),
-  createTeenUser({
-    id: 'teen-5',
-    email: 'teen5@example.com',
-    displayName: 'Quinn Morales',
-    age: 17,
-    createdAt: seededAt,
-    updatedAt: seededAt,
-    profilePreferences: {
-      feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
-      role: 'teen',
-      style_persona: 'layered',
-    },
-  }),
-]
+function getTeenFixtures(): UserFixture[] {
+  return [
+    createTeenUser({
+      id: 'teen-1',
+      email: 'teen1@example.com',
+      displayName: 'Riley Chen',
+      age: 13,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'teen',
+        style_persona: 'school',
+      },
+    }),
+    createTeenUser({
+      id: 'teen-2',
+      email: 'teen2@example.com',
+      displayName: 'Samira Patel',
+      age: 14,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'teen',
+        style_persona: 'creative',
+      },
+    }),
+    createTeenUser({
+      id: 'teen-3',
+      email: 'teen3@example.com',
+      displayName: 'Drew Kim',
+      age: 15,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'teen',
+        style_persona: 'sporty',
+      },
+    }),
+    createTeenUser({
+      id: 'teen-4',
+      email: 'teen4@example.com',
+      displayName: 'Taylor Brooks',
+      age: 16,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'teen',
+        style_persona: 'minimal',
+      },
+    }),
+    createTeenUser({
+      id: 'teen-5',
+      email: 'teen5@example.com',
+      displayName: 'Quinn Morales',
+      age: 17,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'teen',
+        style_persona: 'layered',
+      },
+    }),
+  ]
+}
 
 function createUserProfileInput(fixture: UserFixture) {
   return {
@@ -193,6 +197,9 @@ async function upsertUserSeed(
 }
 
 export async function seedUsers(prisma: PrismaClient): Promise<SeededUsers> {
+  const guardianFixtures = getGuardianFixtures()
+  const teenFixtures = getTeenFixtures()
+
   const createdGuardians = await Promise.all(
     guardianFixtures.map((guardian) => upsertUserSeed(prisma, guardian))
   )
@@ -228,6 +235,7 @@ export async function seedUsers(prisma: PrismaClient): Promise<SeededUsers> {
         guardian_id: consent.guardian_id,
         teen_id: consent.teen_id,
         status: ConsentStatus.granted,
+        consent_granted_at: seededAt,
         ip_address: `10.10.0.${consentPairs.indexOf(consent) + 10}`,
       },
     })

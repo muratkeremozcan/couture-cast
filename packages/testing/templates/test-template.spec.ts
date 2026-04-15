@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { cleanup, createUser, createWardrobeItem } from '../src/index.js'
+import { registerForCleanup } from '../src/cleanup.js'
 
 type DeleteManyRecorder = {
   deleteMany: (args: unknown) => Promise<{ count: number }>
@@ -30,6 +31,8 @@ describe('example factory suite', () => {
   it('builds fixtures without hardcoded literals', () => {
     const teen = createUser({ role: 'teen', age: 15 })
     const top = createWardrobeItem({ userId: teen.id, category: 'top' })
+    registerForCleanup('wardrobeItems', top.id)
+    registerForCleanup('users', teen.id)
 
     expect(top.userId).toBe(teen.id)
   })

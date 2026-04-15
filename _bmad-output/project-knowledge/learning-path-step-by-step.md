@@ -1,6 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-15 - Step 2 now reflects the shared cleanup/template helpers in `packages/testing` and the CLI/IDE lint alignment for templates
+Updated: 2026-04-15 - Step 2 now reflects the shared cleanup/template helpers in
+`packages/testing` and the CLI/IDE lint alignment for templates
 
 ## LLM collaborator prompt
 

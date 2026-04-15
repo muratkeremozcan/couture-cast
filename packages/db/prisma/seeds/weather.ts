@@ -1,5 +1,5 @@
 // Step 3 step 3 owner: searchable owner anchor
-import type { Prisma, PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import * as weatherFactories from '../../../testing/src/factories/weather.factory.ts'
 
 import { unwrapCjsNamespace } from './interop.js'
@@ -73,7 +73,7 @@ export async function seedWeather(prisma: PrismaClient): Promise<SeededWeather> 
   const segmentOffsets = [0, 6]
 
   const results = await Promise.all(
-    weatherSeeds.map(async (seed) => {
+    weatherSeeds.map(async (seed, seedIndex) => {
       const fixture = createWeatherSnapshot({
         id: seed.id,
         location: seed.location,
@@ -91,7 +91,7 @@ export async function seedWeather(prisma: PrismaClient): Promise<SeededWeather> 
           condition: fixture.conditions,
           alerts: fixture.alerts
             ? (fixture.alerts as unknown as Prisma.InputJsonArray)
-            : undefined,
+            : Prisma.JsonNull,
         },
         create: {
           id: fixture.id,
@@ -100,7 +100,7 @@ export async function seedWeather(prisma: PrismaClient): Promise<SeededWeather> 
           condition: fixture.conditions,
           alerts: fixture.alerts
             ? (fixture.alerts as unknown as Prisma.InputJsonArray)
-            : undefined,
+            : Prisma.JsonNull,
         },
       })
 
@@ -110,8 +110,8 @@ export async function seedWeather(prisma: PrismaClient): Promise<SeededWeather> 
           const segmentCondition =
             offset === 0
               ? fixture.conditions
-              : (weatherSeeds[(offset + seed.id.length) % weatherSeeds.length]
-                  ?.condition ?? fixture.conditions)
+              : (weatherSeeds[(offset + seedIndex) % weatherSeeds.length]?.condition ??
+                fixture.conditions)
           return prisma.forecastSegment
             .upsert({
               where: { id: segmentId },
