@@ -14,6 +14,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./cleanup": {
+      "types": "./dist/cleanup.d.ts",
+      "default": "./dist/cleanup.js"
+    },
     "./factories": {
       "types": "./dist/factories/index.d.ts",
       "default": "./dist/factories/index.js"
@@ -26,8 +30,8 @@
   "scripts": {
     "build": "rm -rf dist tsconfig.build.tsbuildinfo && npm exec --yes --package=typescript@5.9.3 -- tsc -p tsconfig.build.json",
     "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
-    "lint": "eslint --max-warnings=0 --ext .ts src",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint --max-warnings=0 --ext .ts src templates",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "test": "node -e \"console.log('@couture/testing: no unit tests configured')\""
   },
   "dependencies": {

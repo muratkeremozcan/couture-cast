@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-13 - Step 2 now includes the shared testing workspace and the Node 24 workspace-install constraint
+Updated: 2026-04-15 - Step 2 now reflects the shared cleanup/template helpers in `packages/testing` and the CLI/IDE lint alignment for templates
 
 ## LLM collaborator prompt
 
@@ -205,6 +205,9 @@ Current repo note:
   duplication.”
 - **Workspace install baseline:** Use Node 24 from `.nvmrc` when adding or reconciling workspaces.
   The root preinstall guard fails fast on older runtimes before npm can update the workspace graph.
+- **Testing workspace boundary:** `packages/testing` now owns shared factories, cleanup helpers, and
+  starter templates; its workspace lint/typecheck scripts intentionally include both `src` and
+  `templates` so the CLI reports the same red files the IDE does.
 
 Architecture diagram:
 

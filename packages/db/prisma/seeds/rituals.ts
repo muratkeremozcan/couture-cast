@@ -1,7 +1,11 @@
-import type { PrismaClient } from '@prisma/client'
+import type { Prisma, PrismaClient } from '@prisma/client'
+import * as ritualFactories from '../../../testing/src/factories/ritual.factory.ts'
 
+import { unwrapCjsNamespace } from './interop.js'
 import type { SeededGarment } from './wardrobe.js'
 import type { SeededWeather } from './weather.js'
+
+const { RITUAL_SCENARIOS, createRitual } = unwrapCjsNamespace(ritualFactories)
 
 export async function seedRituals(
   prisma: PrismaClient,
@@ -20,23 +24,33 @@ export async function seedRituals(
     const garmentSliceStart = (i * 2) % garments.length
     const garmentSelection = garments.slice(garmentSliceStart, garmentSliceStart + 3)
     const garmentIds = garmentSelection.map((g) => g.id)
+    const fixture = createRitual({
+      id: `outfit-${i + 1}`,
+      userId: user.id,
+      forecastSegmentId: segmentId ?? null,
+      scenario: RITUAL_SCENARIOS[i % RITUAL_SCENARIOS.length] ?? 'morning',
+      garmentIds,
+      reasoningBadges: [{ label: 'layered' }, { label: 'weather-aware' }],
+    })
 
     return prisma.outfitRecommendation.upsert({
-      where: { id: `outfit-${i + 1}` },
+      where: { id: fixture.id },
       update: {
-        scenario: i % 3 === 0 ? 'morning' : i % 3 === 1 ? 'midday' : 'evening',
-        garment_ids: garmentIds,
-        reasoning_badges: [{ label: 'layered' }, { label: 'weather-aware' }],
-        forecast_segment: segmentId ? { connect: { id: segmentId } } : undefined,
-        user: { connect: { id: user.id } },
+        scenario: fixture.scenario,
+        garment_ids: fixture.garmentIds,
+        reasoning_badges: fixture.reasoningBadges as unknown as Prisma.InputJsonArray,
+        forecast_segment: fixture.forecastSegmentId
+          ? { connect: { id: fixture.forecastSegmentId } }
+          : undefined,
+        user: { connect: { id: fixture.userId } },
       },
       create: {
-        id: `outfit-${i + 1}`,
-        user_id: user.id,
-        forecast_segment_id: segmentId,
-        scenario: i % 3 === 0 ? 'morning' : i % 3 === 1 ? 'midday' : 'evening',
-        garment_ids: garmentIds,
-        reasoning_badges: [{ label: 'layered' }, { label: 'weather-aware' }],
+        id: fixture.id,
+        user_id: fixture.userId,
+        forecast_segment_id: fixture.forecastSegmentId,
+        scenario: fixture.scenario,
+        garment_ids: fixture.garmentIds,
+        reasoning_badges: fixture.reasoningBadges as unknown as Prisma.InputJsonArray,
       },
     })
   }).filter((promise): promise is ReturnType<typeof prisma.outfitRecommendation.upsert> =>
