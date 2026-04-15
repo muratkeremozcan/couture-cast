@@ -1,18 +1,25 @@
 // Step 3 step 2 owner: searchable owner anchor
 import { PrismaClient } from '@prisma/client'
+import * as factoryModule from '../../../testing/src/factories/factory.ts'
 
+import { seedFeatureFlags } from './feature-flags.js'
+import { unwrapCjsNamespace } from './interop.js'
 import { seedRituals } from './rituals.js'
 import { seedUsers } from './users.js'
-import { seedWardrobe } from './wardrobe.js'
+import { seedWardrobeItems } from './wardrobe.js'
 import { seedWeather } from './weather.js'
 
 const prisma = new PrismaClient()
+const { faker } = unwrapCjsNamespace(factoryModule)
 
 async function main() {
+  faker.seed(4242)
+
   const users = await seedUsers(prisma)
-  const garments = await seedWardrobe(prisma, users.teens)
+  const garments = await seedWardrobeItems(prisma, users.teens)
   const weather = await seedWeather(prisma)
   await seedRituals(prisma, users.teens, garments, weather)
+  await seedFeatureFlags(prisma)
 }
 
 main()

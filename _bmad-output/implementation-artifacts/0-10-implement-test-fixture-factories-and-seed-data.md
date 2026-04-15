@@ -88,8 +88,8 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
     }))
     ```
 
-- [ ] Task 5: Implement cleanup discipline (AC: #2)
-  - [ ] Create ` ```typescript
+- [x] Task 5: Implement cleanup discipline (AC: #2)
+  - [x] Create ` ```typescript
         type CleanupRegistry = {
         users: string[];
         wardrobeItems: string[];
@@ -123,11 +123,12 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
 
     ```
 
-  - [ ] Create test template with cleanup in ` - [ ] Document cleanup pattern in`
+  - [x] Create test template with cleanup in `packages/testing/templates/test-template.spec.ts`
+  - [x] Document cleanup pattern in `packages/testing/README.md`
 
-- [ ] Task 6: Create Prisma seed scripts (AC: #3)
-  - [ ] Create ` directory
-  - [ ] Create ` ```typescript
+- [x] Task 6: Create Prisma seed scripts (AC: #3)
+  - [x] Create ` directory
+  - [x] Create ` ```typescript
         import { PrismaClient } from '@prisma/client';
         import { createTeenUser, createGuardianUser } from '@couture-cast/testing/**factories**';
 
@@ -148,8 +149,8 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
 
     ```
 
-  - [ ] Create seed scripts for wardrobe (50 items), rituals (20), weather (10), feature flags (8)
-  - [ ] Create master seed script ` ```typescript
+  - [x] Create seed scripts for wardrobe (50 items), rituals (20), weather (10), feature flags (8)
+  - [x] Create master seed script ` ```typescript
         import { PrismaClient } from '@prisma/client';
         import { seedUsers } from './seeds/users.seed';
         import { seedWardrobeItems } from './seeds/wardrobe.seed';
@@ -180,7 +181,7 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
 
     ```
 
-  - [ ] Add seed script to ` ```json
+  - [x] Add seed script to ` ```json
         {
         "scripts": {
         "seed": "tsx prisma/seed.ts"
@@ -191,13 +192,13 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
 
     ```
 
-- [ ] Task 7: Document factory usage (AC: #4)
-  - [ ] Create ` with sections:
+- [x] Task 7: Document factory usage (AC: #4)
+  - [x] Create ` with sections:
     - Factory philosophy (pure functions, composition)
     - Basic usage examples
     - Cleanup discipline
     - Best practices
-  - [ ] Add examples for each factory:
+  - [x] Add examples for each factory:
 
     ```typescript
     // Create teen user with specific age
@@ -210,39 +211,48 @@ so that tests don't hardcode data and become brittle, and seed data is consisten
     const persistedUser = await prisma.user.create({ data: createUser() })
     ```
 
-  - [ ] Document anti-patterns: hardcoded test data, shared mutable state
+  - [x] Document anti-patterns: hardcoded test data, shared mutable state
 
 - [ ] Task 8: Create test template (AC: #4)
   - [ ] Create ` ```typescript
-        import { describe, it, expect, afterEach } from 'vitest';
-        import { cleanup, registerForCleanup } from '@couture-cast/testing/cleanup';
-        import { createUser, createWardrobeItem } from '@couture-cast/testing/**factories**';
-        import { prisma } from '@couture-cast/db';
+        import { afterEach, describe, expect, it } from 'vitest';
+        import {
+        cleanup,
+        createTeenUser,
+        createWardrobeItem,
+        } from '@couture/testing';
+        import { registerForCleanup } from '@couture/testing/cleanup';
+        import { prisma } from '@couture/db';
 
-    describe('Example Test Suite', () => {
-    afterEach(async () => {
-    await cleanup();
-    });
+        describe('Example Test Suite', () => {
+          afterEach(async () => {
+            await cleanup({ prisma });
+          });
 
-    it('should demonstrate factory usage', async () => {
-    const user = await prisma.user.create({ data: createUser() });
-    registerForCleanup('users', user.id);
+          it('should demonstrate factory usage', async () => {
+            const teen = await createTeenUser(
+              { age: 15, email: 'template-teen@example.com' },
+              { persist: true, prisma }
+            );
 
-        const item = await prisma.wardrobeItem.create({
-          data: createWardrobeItem({ userId: user.id }),
+            const item = await createWardrobeItem(
+              { userId: teen.id, category: 'top' },
+              { persist: true, prisma }
+            );
+
+            // Manual registration still exists for direct Prisma setup.
+            // registerForCleanup('users', customUser.id);
+
+            expect(item.userId).toBe(teen.id);
+          });
         });
-        registerForCleanup('wardrobeItems', item.id);
-
-        expect(item.userId).toBe(user.id);
-
-    });
-    });
 
     ```
 
     ```
 
-  - [ ] Add template to docs
+  - [ ] Add template to docs (`packages/testing/README.md`) and keep the starter file in
+        `packages/testing/templates/test-template.spec.ts`
 
 - [ ] Task 9: Reference playwright-utils patterns (AC: #1)
   - [ ] Review `playwright-utils` factory patterns from baseline reference
@@ -412,6 +422,13 @@ _bmad-output/
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { buildUserCreateInput, createGuardianUser, createTeenUser } from './packages/testing/src/factories/user.factory.ts'; const teen = createTeenUser({ age: 14 }); const guardian = createGuardianUser(); const teenInput = buildUserCreateInput(teen); console.log(JSON.stringify({ teenRole: teen.role, teenAge: teen.age, guardianRole: guardian.role, teenProfileRole: teenInput.profile.create.preferences.role }))"`
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { buildWardrobeItemCreateInput, createWardrobeItem } from './packages/testing/src/factories/wardrobe-item.factory.ts'; const fixture = createWardrobeItem({ userId: 'user-123', category: 'top' }); const input = buildWardrobeItemCreateInput(fixture); console.log(JSON.stringify({ category: fixture.category, userId: fixture.userId, connectId: input.user.connect.id, paletteSize: fixture.colorPalette.length }))"`
 - `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { buildRitualCreateInput, createRitual } from './packages/testing/src/factories/ritual.factory.ts'; import { buildWeatherSnapshotCreateInput, createWeatherSnapshot } from './packages/testing/src/factories/weather.factory.ts'; const ritual = createRitual({ userId: 'user-123', forecastSegmentId: 'segment-456' }); const ritualInput = buildRitualCreateInput(ritual); const weather = createWeatherSnapshot({ location: 'Chicago, IL', conditions: 'snow' }); const weatherInput = buildWeatherSnapshotCreateInput(weather); console.log(JSON.stringify({ ritualScenario: ritual.scenario, ritualConnectId: ritualInput.user.connect.id, ritualSegmentId: ritualInput.forecast_segment?.connect?.id, weatherLocation: weatherInput.location, weatherCondition: weatherInput.condition, weatherHasAlerts: Boolean(weatherInput.alerts) }))"`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { cleanup, registerForCleanup, resetCleanupRegistry } from './packages/testing/src/cleanup.ts'; void (async () => { const calls = []; const stub = Object.fromEntries(['engagementEvent','lookbookPost','auditLog','pushToken','outfitRecommendation','paletteInsights','garmentItem','forecastSegment','weatherSnapshot','guardianConsent','comfortPreferences','userProfile','user'].map((name) => [name, { deleteMany: async () => { calls.push(name); return { count: 1 }; } }])); registerForCleanup('users', 'user-1'); registerForCleanup('wardrobeItems', 'garment-1'); registerForCleanup('rituals', 'ritual-1'); registerForCleanup('weatherSnapshots', 'weather-1'); await cleanup({ prisma: stub }); console.log(JSON.stringify(calls)); resetCleanupRegistry(); })();"`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run lint --workspace @couture/db`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run typecheck --workspace @couture/db`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm exec --workspace @couture/db prisma migrate deploy`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npm run db:seed --workspace @couture/db`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { PrismaClient } from '@prisma/client'; (async () => { const prisma = new PrismaClient(); const counts = await Promise.all([prisma.user.count(), prisma.guardianConsent.count(), prisma.garmentItem.count(), prisma.outfitRecommendation.count(), prisma.weatherSnapshot.count(), prisma.featureFlag.count()]); console.log(JSON.stringify({ users: counts[0], guardianConsents: counts[1], garments: counts[2], outfits: counts[3], weatherSnapshots: counts[4], featureFlags: counts[5] })); await prisma.$disconnect(); })();"`
+- `source "$HOME/.nvm/nvm.sh" && nvm use 24 >/dev/null && npx tsx -e "import { PrismaClient } from '@prisma/client'; (async () => { const prisma = new PrismaClient(); const profiles = await prisma.userProfile.findMany({ select: { preferences: true } }); const counts = profiles.reduce((acc, profile) => { const role = typeof profile.preferences === 'object' && profile.preferences && !Array.isArray(profile.preferences) && 'role' in profile.preferences ? String((profile.preferences as Record<string, unknown>).role) : 'unknown'; acc[role] = (acc[role] ?? 0) + 1; return acc; }, {} as Record<string, number>); console.log(JSON.stringify(counts)); await prisma.$disconnect(); })();"`
 
 ### Completion Notes List
 
@@ -424,8 +441,15 @@ _bmad-output/
 - Implemented task 4 with a `createRitual` factory mapped onto `OutfitRecommendation` and a `createWeatherSnapshot` factory mapped onto `WeatherSnapshot`.
 - Kept the weather fixture API richer than the current schema (`feelsLike`, `windSpeed`, `humidity`, `locationId`) while restricting persistence helpers to the columns Prisma currently supports.
 - Verified a Coderabbit nitpick about duplicate default generation in the new factories and removed the redundant default-building pass from wardrobe, ritual, and weather composition.
+- Implemented task 5 with a shared cleanup helper that reuses the tracked-entity registry, accepts an explicit/configured Prisma client, and deletes dependent records in schema-safe reverse order.
+- Added a starter cleanup-aware test template plus README guidance so tests can use `afterEach(async () => cleanup({ prisma }))` without hardcoded fixture setup.
+- Exposed cleanup helpers from the package root and the dedicated `@couture/testing/cleanup` subpath.
 - Updated `package-lock.json` through npm workspace installs run under Node 24.x.
 - Verified the new workspace with targeted `build`, `typecheck`, `lint`, and a runtime smoke check.
+- Implemented task 6 by refactoring Prisma seeds to build deterministic users, garments, rituals, weather snapshots, and feature flags from the shared factory layer.
+- Added a local CommonJS interop helper for `tsx` seed execution so `packages/db` can consume shared source modules from `packages/testing` and `packages/config` without requiring prebuilt artifacts.
+- Verified the seed flow end to end with `@couture/db` lint, typecheck, `prisma migrate deploy`, `npm run db:seed`, and database count checks confirming 5 teens, 3 guardians, 50 garments, 20 outfits, 10 weather snapshots, and 8 feature flags.
+- Implemented task 7 by expanding `packages/testing/README.md` into the factory usage guide with philosophy, per-factory examples, cleanup guidance, best practices, and anti-patterns.
 
 ### File List
 
@@ -440,18 +464,36 @@ _bmad-output/
 - New: `packages/testing/src/factories/wardrobe-item.factory.ts`
 - New: `packages/testing/src/factories/ritual.factory.ts`
 - New: `packages/testing/src/factories/weather.factory.ts`
+- New: `packages/testing/src/cleanup.ts`
+- New: `packages/testing/templates/test-template.spec.ts`
+- New: `packages/testing/README.md`
+- New: `packages/testing/tsconfig.typecheck.json`
 - New: `packages/testing/dist/*`
 - New: `packages/testing/tsconfig.build.tsbuildinfo`
 - New: `packages/testing/tsconfig.tsbuildinfo`
 - Modified: `package-lock.json`
+- Modified: `_bmad-output/project-knowledge/learning-path-step-by-step.md`
+- Modified: `packages/db/tsconfig.json`
+- Modified: `packages/db/prisma/seeds/index.ts`
+- New: `packages/db/prisma/seeds/interop.ts`
+- New: `packages/db/prisma/seeds/feature-flags.ts`
+- Modified: `packages/db/prisma/seeds/users.ts`
+- Modified: `packages/db/prisma/seeds/wardrobe.ts`
+- Modified: `packages/db/prisma/seeds/weather.ts`
+- Modified: `packages/db/prisma/seeds/rituals.ts`
+- Modified: `packages/testing/package.json`
+- Modified: `packages/testing/src/index.ts`
 - Modified: `packages/testing/src/factories/index.ts`
 
 ## Change Log
 
-| Date       | Author             | Change                                                                                             |
-| ---------- | ------------------ | -------------------------------------------------------------------------------------------------- |
-| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.10 acceptance criteria                                             |
-| 2026-04-13 | Codex (Dev Agent)  | Implemented tasks 1-2 for shared factory infrastructure and the user factory in `@couture/testing` |
-| 2026-04-13 | Codex (Dev Agent)  | Implemented task 3 with a wardrobe item factory and Prisma persistence/export wiring               |
-| 2026-04-13 | Codex (Dev Agent)  | Implemented task 4 with ritual/weather factories and schema-aware persistence helpers              |
-| 2026-04-13 | Codex (Dev Agent)  | Removed redundant default generation in wardrobe, ritual, and weather factory composition          |
+| Date       | Author             | Change                                                                                                       |
+| ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.10 acceptance criteria                                                       |
+| 2026-04-13 | Codex (Dev Agent)  | Implemented tasks 1-2 for shared factory infrastructure and the user factory in `@couture/testing`           |
+| 2026-04-13 | Codex (Dev Agent)  | Implemented task 3 with a wardrobe item factory and Prisma persistence/export wiring                         |
+| 2026-04-13 | Codex (Dev Agent)  | Implemented task 4 with ritual/weather factories and schema-aware persistence helpers                        |
+| 2026-04-13 | Codex (Dev Agent)  | Removed redundant default generation in wardrobe, ritual, and weather factory composition                    |
+| 2026-04-15 | Codex (Dev Agent)  | Implemented task 5 with cleanup helpers, package exports, README guidance, and a cleanup template            |
+| 2026-04-15 | Codex (Dev Agent)  | Implemented task 6 with factory-backed Prisma seeds, local CJS interop for `tsx`, and verified seeded counts |
+| 2026-04-15 | Codex (Dev Agent)  | Implemented task 7 by turning `packages/testing/README.md` into the factory usage guide for tests            |

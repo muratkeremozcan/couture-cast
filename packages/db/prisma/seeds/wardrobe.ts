@@ -1,68 +1,75 @@
 import type { PrismaClient } from '@prisma/client'
+import * as wardrobeFactories from '../../../testing/src/factories/wardrobe-item.factory.ts'
+
+import { unwrapCjsNamespace } from './interop.js'
+
+const {
+  WARDROBE_CATEGORIES,
+  WARDROBE_COMFORT_RANGES,
+  WARDROBE_MATERIALS,
+  createWardrobeItem,
+} = unwrapCjsNamespace(wardrobeFactories)
 
 export type SeededGarment = { id: string; userId: string }
 
-export async function seedWardrobe(
+const seededPaletteCycle = [
+  ['#111111', '#C9A14A', '#7E889A'],
+  ['#0D6F62', '#F29BA8', '#8C5331'],
+  ['#1F4E79', '#C9A14A', '#F29BA8'],
+  ['#111111', '#0D6F62', '#1F4E79'],
+] as const
+
+export async function seedWardrobeItems(
   prisma: PrismaClient,
   teens: { id: string; email: string }[]
 ): Promise<SeededGarment[]> {
   const garments: SeededGarment[] = []
   const garmentUpserts: Promise<unknown>[] = []
 
-  const categories = [
-    'jacket',
-    'coat',
-    'hoodie',
-    'dress',
-    'jeans',
-    'sneakers',
-    'boots',
-    'scarf',
-    'hat',
-    'gloves',
-  ]
-  const materials = ['cotton', 'wool', 'cashmere', 'denim', 'nylon', 'merino']
-  const comfortRanges = ['cold', 'cool', 'mild', 'warm', 'hot']
-
   for (const teen of teens) {
     for (let i = 0; i < 10; i++) {
       if (!teen.id) {
         continue
       }
+
       const id = `${teen.id}-garment-${i + 1}`
-      const category = categories[(i + garments.length) % categories.length] ?? 'category'
-      const material = materials[(i + 2) % materials.length] ?? 'material'
-      const comfort = comfortRanges[(i + 3) % comfortRanges.length] ?? 'comfort'
-      const palette = [
-        '#111111',
-        '#C9A14A',
-        '#7E889A',
-        '#B1683A',
-        '#0D6F62',
-        '#F29BA8',
-        '#8C5331',
-        '#1F4E79',
-      ].slice(0, 3)
+      const category =
+        WARDROBE_CATEGORIES[(i + garments.length) % WARDROBE_CATEGORIES.length] ?? 'top'
+      const material = WARDROBE_MATERIALS[(i + 2) % WARDROBE_MATERIALS.length] ?? 'cotton'
+      const comfort =
+        WARDROBE_COMFORT_RANGES[(i + 3) % WARDROBE_COMFORT_RANGES.length] ?? 'mild'
+      const palette =
+        seededPaletteCycle[(i + garments.length) % seededPaletteCycle.length] ??
+        seededPaletteCycle[0]
+      const fixture = createWardrobeItem({
+        id,
+        userId: teen.id,
+        category,
+        material,
+        comfortRange: comfort,
+        colorPalette: [...palette],
+        imageUrl: `https://picsum.photos/seed/${id}/640/640`,
+      })
 
       garments.push({ id, userId: teen.id })
       garmentUpserts.push(
         prisma.garmentItem.upsert({
           where: { id },
           update: {
-            category,
-            material,
-            comfort_range: comfort,
-            color_palette: palette,
-            image_url: `https://picsum.photos/seed/${id}/640/640`,
+            category: fixture.category,
+            material: fixture.material,
+            comfort_range: fixture.comfortRange,
+            color_palette: fixture.colorPalette,
+            image_url: fixture.imageUrl,
           },
           create: {
-            id,
-            user_id: teen.id,
-            category,
-            material,
-            comfort_range: comfort,
-            color_palette: palette,
-            image_url: `https://picsum.photos/seed/${id}/640/640`,
+            id: fixture.id,
+            user_id: fixture.userId,
+            category: fixture.category,
+            material: fixture.material,
+            comfort_range: fixture.comfortRange,
+            color_palette: fixture.colorPalette,
+            image_url: fixture.imageUrl,
           },
         })
       )
@@ -102,3 +109,5 @@ export async function seedWardrobe(
 
   return garments
 }
+
+export const seedWardrobe = seedWardrobeItems

@@ -1,137 +1,211 @@
-import { faker } from '@faker-js/faker'
-import type { PrismaClient } from '@prisma/client'
-import {
-  ComfortRun,
-  ConsentStatus,
-  PrecipPreparedness,
-  WindTolerance,
-} from '@prisma/client'
+import { ConsentStatus, type Prisma, type PrismaClient } from '@prisma/client'
+import * as userFactories from '../../../testing/src/factories/user.factory.ts'
+import type { UserFixture } from '../../../testing/src/factories/user.factory.ts'
+
+import { unwrapCjsNamespace } from './interop.js'
+import { SEEDED_PROFILE_FEATURE_FLAGS } from './feature-flags.js'
+
+const { createGuardianUser, createTeenUser } = unwrapCjsNamespace(userFactories)
 
 export type SeededUsers = {
   guardians: { id: string; email: string }[]
   teens: { id: string; email: string }[]
 }
 
-const FEATURE_FLAGS = [
-  { key: 'premium_themes', enabled: true },
-  { key: 'weekly_planner', enabled: true },
-  { key: 'lookbook_import', enabled: false },
-  { key: 'guardian_audit', enabled: true },
-  { key: 'widget_quick_swap', enabled: true },
-  { key: 'ritual_share', enabled: false },
-  { key: 'palette_analysis', enabled: true },
-  { key: 'experiment_ab', enabled: false },
-]
+const seededAt = new Date('2026-01-15T08:00:00.000Z')
+
+function getGuardianFixtures(): UserFixture[] {
+  return [
+    createGuardianUser({
+      id: 'guardian-1',
+      email: 'guardian1@example.com',
+      displayName: 'Alex Rivera',
+      age: 39,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'guardian',
+        style_persona: 'planner',
+      },
+    }),
+    createGuardianUser({
+      id: 'guardian-2',
+      email: 'guardian2@example.com',
+      displayName: 'Jordan Casey',
+      age: 43,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'guardian',
+        style_persona: 'commuter',
+      },
+    }),
+    createGuardianUser({
+      id: 'guardian-3',
+      email: 'guardian3@example.com',
+      displayName: 'Morgan Blake',
+      age: 47,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'guardian',
+        style_persona: 'outdoor',
+      },
+    }),
+  ]
+}
+
+function getTeenFixtures(): UserFixture[] {
+  return [
+    createTeenUser({
+      id: 'teen-1',
+      email: 'teen1@example.com',
+      displayName: 'Riley Chen',
+      age: 13,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'teen',
+        style_persona: 'school',
+      },
+    }),
+    createTeenUser({
+      id: 'teen-2',
+      email: 'teen2@example.com',
+      displayName: 'Samira Patel',
+      age: 14,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'teen',
+        style_persona: 'creative',
+      },
+    }),
+    createTeenUser({
+      id: 'teen-3',
+      email: 'teen3@example.com',
+      displayName: 'Drew Kim',
+      age: 15,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'teen',
+        style_persona: 'sporty',
+      },
+    }),
+    createTeenUser({
+      id: 'teen-4',
+      email: 'teen4@example.com',
+      displayName: 'Taylor Brooks',
+      age: 16,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'teen',
+        style_persona: 'minimal',
+      },
+    }),
+    createTeenUser({
+      id: 'teen-5',
+      email: 'teen5@example.com',
+      displayName: 'Quinn Morales',
+      age: 17,
+      createdAt: seededAt,
+      updatedAt: seededAt,
+      profilePreferences: {
+        feature_flags: SEEDED_PROFILE_FEATURE_FLAGS,
+        role: 'teen',
+        style_persona: 'layered',
+      },
+    }),
+  ]
+}
+
+function createUserProfileInput(fixture: UserFixture) {
+  return {
+    display_name: fixture.displayName,
+    birthdate: fixture.birthdate,
+    preferences: fixture.profilePreferences as Prisma.InputJsonObject,
+  }
+}
+
+function createComfortPreferencesInput(fixture: UserFixture) {
+  return {
+    runs_cold_warm: fixture.comfortPreferences.runsColdWarm,
+    wind_tolerance: fixture.comfortPreferences.windTolerance,
+    precip_preparedness: fixture.comfortPreferences.precipPreparedness,
+  }
+}
+
+async function upsertUserSeed(
+  prisma: PrismaClient,
+  fixture: UserFixture
+): Promise<{ id: string; email: string }> {
+  const profileInput = createUserProfileInput(fixture)
+  const comfortInput = createComfortPreferencesInput(fixture)
+
+  await prisma.user.upsert({
+    where: { id: fixture.id },
+    update: {
+      email: fixture.email,
+    },
+    create: {
+      id: fixture.id,
+      email: fixture.email,
+    },
+  })
+
+  await Promise.all([
+    prisma.userProfile.upsert({
+      where: { user_id: fixture.id },
+      update: {
+        display_name: profileInput.display_name,
+        birthdate: profileInput.birthdate,
+        preferences: profileInput.preferences,
+      },
+      create: {
+        user_id: fixture.id,
+        display_name: profileInput.display_name,
+        birthdate: profileInput.birthdate,
+        preferences: profileInput.preferences,
+      },
+    }),
+    prisma.comfortPreferences.upsert({
+      where: { user_id: fixture.id },
+      update: {
+        runs_cold_warm: comfortInput.runs_cold_warm,
+        wind_tolerance: comfortInput.wind_tolerance,
+        precip_preparedness: comfortInput.precip_preparedness,
+      },
+      create: {
+        user_id: fixture.id,
+        runs_cold_warm: comfortInput.runs_cold_warm,
+        wind_tolerance: comfortInput.wind_tolerance,
+        precip_preparedness: comfortInput.precip_preparedness,
+      },
+    }),
+  ])
+
+  return { id: fixture.id, email: fixture.email }
+}
 
 export async function seedUsers(prisma: PrismaClient): Promise<SeededUsers> {
-  faker.seed(4242)
-
-  const guardians = [
-    { id: 'guardian-1', email: 'guardian1@example.com', displayName: 'Alex Rivera' },
-    { id: 'guardian-2', email: 'guardian2@example.com', displayName: 'Jordan Casey' },
-    { id: 'guardian-3', email: 'guardian3@example.com', displayName: 'Morgan Blake' },
-  ]
-
-  const teens = [
-    { id: 'teen-1', email: 'teen1@example.com', displayName: 'Riley Chen', age: 13 },
-    { id: 'teen-2', email: 'teen2@example.com', displayName: 'Samira Patel', age: 14 },
-    { id: 'teen-3', email: 'teen3@example.com', displayName: 'Drew Kim', age: 15 },
-    { id: 'teen-4', email: 'teen4@example.com', displayName: 'Taylor Brooks', age: 16 },
-    { id: 'teen-5', email: 'teen5@example.com', displayName: 'Quinn Morales', age: 17 },
-  ]
+  const guardianFixtures = getGuardianFixtures()
+  const teenFixtures = getTeenFixtures()
 
   const createdGuardians = await Promise.all(
-    guardians.map(async (guardian) => {
-      const user = await prisma.user.upsert({
-        where: { email: guardian.email },
-        update: { email: guardian.email },
-        create: {
-          id: guardian.id,
-          email: guardian.email,
-        },
-      })
-
-      await Promise.all([
-        prisma.userProfile.upsert({
-          where: { user_id: user.id },
-          update: {
-            display_name: guardian.displayName,
-            preferences: { feature_flags: FEATURE_FLAGS, role: 'guardian' },
-          },
-          create: {
-            user_id: user.id,
-            display_name: guardian.displayName,
-            birthdate: faker.date.birthdate({ min: 35, max: 48, mode: 'age' }),
-            preferences: { feature_flags: FEATURE_FLAGS, role: 'guardian' },
-          },
-        }),
-        prisma.comfortPreferences.upsert({
-          where: { user_id: user.id },
-          update: {
-            runs_cold_warm: ComfortRun.neutral,
-            wind_tolerance: WindTolerance.medium,
-            precip_preparedness: PrecipPreparedness.medium,
-          },
-          create: {
-            user_id: user.id,
-            runs_cold_warm: ComfortRun.neutral,
-            wind_tolerance: WindTolerance.medium,
-            precip_preparedness: PrecipPreparedness.medium,
-          },
-        }),
-      ])
-
-      return { id: user.id, email: user.email }
-    })
+    guardianFixtures.map((guardian) => upsertUserSeed(prisma, guardian))
   )
 
   const createdTeens = await Promise.all(
-    teens.map(async (teen) => {
-      const user = await prisma.user.upsert({
-        where: { email: teen.email },
-        update: { email: teen.email },
-        create: {
-          id: teen.id,
-          email: teen.email,
-        },
-      })
-
-      await Promise.all([
-        prisma.userProfile.upsert({
-          where: { user_id: user.id },
-          update: {
-            display_name: teen.displayName,
-            preferences: { feature_flags: FEATURE_FLAGS, role: 'teen' },
-          },
-          create: {
-            user_id: user.id,
-            display_name: teen.displayName,
-            birthdate: faker.date.birthdate({
-              min: teen.age,
-              max: teen.age,
-              mode: 'age',
-            }),
-            preferences: { feature_flags: FEATURE_FLAGS, role: 'teen' },
-          },
-        }),
-        prisma.comfortPreferences.upsert({
-          where: { user_id: user.id },
-          update: {
-            runs_cold_warm: ComfortRun.warm,
-            wind_tolerance: WindTolerance.medium,
-            precip_preparedness: PrecipPreparedness.medium,
-          },
-          create: {
-            user_id: user.id,
-            runs_cold_warm: ComfortRun.warm,
-            wind_tolerance: WindTolerance.medium,
-            precip_preparedness: PrecipPreparedness.medium,
-          },
-        }),
-      ])
-
-      return { id: user.id, email: user.email }
-    })
+    teenFixtures.map((teen) => upsertUserSeed(prisma, teen))
   )
 
   const consentPairs = [
@@ -155,13 +229,14 @@ export async function seedUsers(prisma: PrismaClient): Promise<SeededUsers> {
       },
       update: {
         status: ConsentStatus.granted,
-        consent_granted_at: new Date(),
+        consent_granted_at: seededAt,
       },
       create: {
         guardian_id: consent.guardian_id,
         teen_id: consent.teen_id,
         status: ConsentStatus.granted,
-        ip_address: faker.internet.ipv4(),
+        consent_granted_at: seededAt,
+        ip_address: `10.10.0.${consentPairs.indexOf(consent) + 10}`,
       },
     })
   }
