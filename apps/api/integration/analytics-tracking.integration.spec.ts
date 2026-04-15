@@ -14,6 +14,11 @@ import {
   createAnalyticsEventExpectations,
   type MemoryTrackedAnalyticsEvent,
 } from '@couture/api-client/testing/analytics-event-assertions'
+import {
+  createGuardianProfileFixture,
+  createTeenProfileFixture,
+  resetCleanupRegistry,
+} from '../test/factories.js'
 import { AuthModule } from '../src/modules/auth/auth.module'
 import { ModerationModule } from '../src/modules/moderation/moderation.module'
 
@@ -64,6 +69,21 @@ vi.mock('@prisma/client', () => {
  */
 describe('Analytics tracking endpoints (integration)', () => {
   let app: INestApplication | undefined
+  const guardian = createGuardianProfileFixture({
+    id: 'guardian-1',
+    email: 'guardian1@example.com',
+  })
+  const alternateGuardian = createGuardianProfileFixture({
+    id: 'guardian-2',
+    email: 'guardian2@example.com',
+    displayName: 'Jordan Casey',
+  })
+  const teen = createTeenProfileFixture({
+    id: 'teen-1',
+    email: 'teen1@example.com',
+    age: 13,
+    birthdate: new Date('2013-03-04T00:00:00.000Z'),
+  })
   const originalEnv = { ...process.env }
   const eventExpectations = createAnalyticsEventExpectations(trackedEvents, expect)
   const createHeaders = (userId: string, role: 'guardian' | 'moderator' | 'admin') => ({
@@ -102,6 +122,7 @@ describe('Analytics tracking endpoints (integration)', () => {
     }
 
     process.env = { ...originalEnv }
+    resetCleanupRegistry()
   })
 
   // Flow ref S0.7/T3/1: exercise both authorized and unauthorized HTTP paths.
@@ -109,8 +130,8 @@ describe('Analytics tracking endpoints (integration)', () => {
     const response = await request(getHttpServer())
       .post('/api/v1/auth/guardian-consent')
       .send({
-        guardianId: 'guardian-1',
-        teenId: 'teen-1',
+        guardianId: guardian.id,
+        teenId: teen.id,
         consentLevel: 'full',
       })
 
@@ -124,9 +145,9 @@ describe('Analytics tracking endpoints (integration)', () => {
   it('returns 400 for guardian consent when payload fails the shared contract', async () => {
     const response = await request(getHttpServer())
       .post('/api/v1/auth/guardian-consent')
-      .set(createHeaders('guardian-1', 'guardian'))
+      .set(createHeaders(guardian.id, 'guardian'))
       .send({
-        guardianId: 'guardian-1',
+        guardianId: guardian.id,
       })
 
     expect(response.status).toBe(400)
@@ -139,8 +160,8 @@ describe('Analytics tracking endpoints (integration)', () => {
       .post('/api/v1/auth/guardian-consent')
       .set(createHeaders('mod-1', 'moderator'))
       .send({
-        guardianId: 'guardian-1',
-        teenId: 'teen-1',
+        guardianId: guardian.id,
+        teenId: teen.id,
         consentLevel: 'full',
       })
 
@@ -152,10 +173,10 @@ describe('Analytics tracking endpoints (integration)', () => {
   it('returns 403 for guardian consent when authenticated guardian does not match payload', async () => {
     const response = await request(getHttpServer())
       .post('/api/v1/auth/guardian-consent')
-      .set(createHeaders('guardian-2', 'guardian'))
+      .set(createHeaders(alternateGuardian.id, 'guardian'))
       .send({
-        guardianId: 'guardian-1',
-        teenId: 'teen-1',
+        guardianId: guardian.id,
+        teenId: teen.id,
         consentLevel: 'full',
       })
 
@@ -168,10 +189,10 @@ describe('Analytics tracking endpoints (integration)', () => {
     const eventCursor = eventExpectations.createCursor()
     const response = await request(getHttpServer())
       .post('/api/v1/auth/guardian-consent')
-      .set(createHeaders('guardian-1', 'guardian'))
+      .set(createHeaders(guardian.id, 'guardian'))
       .send({
-        guardianId: 'guardian-1',
-        teenId: 'teen-1',
+        guardianId: guardian.id,
+        teenId: teen.id,
         consentLevel: 'full',
         timestamp: '2026-03-04T10:00:00.000Z',
       })
@@ -181,15 +202,15 @@ describe('Analytics tracking endpoints (integration)', () => {
     const trackedEvent = eventExpectations.expectEventTracked(
       'guardian_consent_granted',
       {
-        guardian_id: 'guardian-1',
-        teen_id: 'teen-1',
+        guardian_id: guardian.id,
+        teen_id: teen.id,
         consent_level: 'full',
         timestamp: '2026-03-04T10:00:00.000Z',
         consent_timestamp: '2026-03-04T10:00:00.000Z',
       },
       { afterIndex: eventCursor, count: 1 }
     )
-    expect(trackedEvent.distinctId).toBe('guardian-1')
+    expect(trackedEvent.distinctId).toBe(guardian.id)
   })
 
   it('returns 401 for moderation action when auth headers are missing', async () => {
@@ -223,7 +244,7 @@ describe('Analytics tracking endpoints (integration)', () => {
   it('returns 403 for moderation action when role is not permitted', async () => {
     const response = await request(getHttpServer())
       .post('/api/v1/moderation/actions')
-      .set(createHeaders('guardian-1', 'guardian'))
+      .set(createHeaders(guardian.id, 'guardian'))
       .send({
         moderatorId: 'mod-1',
         targetId: 'post-1',

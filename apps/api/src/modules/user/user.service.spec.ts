@@ -1,6 +1,16 @@
 import { NotFoundException } from '@nestjs/common'
 import type { PrismaClient } from '@prisma/client'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  DEFAULT_CONSENT_GRANTED_AT,
+  buildLinkedGuardianResponse,
+  buildLinkedGuardianRole,
+  buildPrismaUserProfileFixture,
+  buildUserProfileResponse,
+  createGuardianProfileFixture,
+  createTeenProfileFixture,
+  resetCleanupRegistry,
+} from '../../../test/factories.js'
 import { UserService } from './user.service'
 
 const createService = (findUnique = vi.fn()) => {
@@ -12,56 +22,47 @@ const createService = (findUnique = vi.fn()) => {
 }
 
 describe('UserService', () => {
+  afterEach(() => {
+    resetCleanupRegistry()
+  })
+
   it('maps the authenticated user and guardian links through the shared response schema', async () => {
-    const findUnique = vi.fn().mockResolvedValue({
-      id: 'teen-4',
-      email: 'teen4@example.com',
-      profile: {
-        display_name: 'Taylor Brooks',
-        birthdate: new Date('2009-03-04T00:00:00.000Z'),
-      },
-      teen_roles: [
-        {
-          guardian_id: 'guardian-2',
-          status: 'granted',
-          consent_granted_at: new Date('2026-03-04T10:00:00.000Z'),
-        },
-      ],
-      guardian_roles: [],
+    const teen = createTeenProfileFixture()
+    const guardian = createGuardianProfileFixture({
+      id: 'guardian-2',
+      email: 'guardian2@example.com',
+      displayName: 'Jordan Casey',
     })
+    const linkedGuardianRole = buildLinkedGuardianRole(
+      guardian,
+      DEFAULT_CONSENT_GRANTED_AT
+    )
+    const findUnique = vi
+      .fn()
+      .mockResolvedValue(buildPrismaUserProfileFixture(teen, [linkedGuardianRole], []))
     const { service } = createService(findUnique)
 
     const result = await service.getProfile({
       token: 'teen-token',
-      userId: 'teen-4',
+      userId: teen.id,
       role: 'teen',
     })
 
     expect(findUnique).toHaveBeenCalledWith({
-      where: { id: 'teen-4' },
+      where: { id: teen.id },
       include: {
         profile: true,
         guardian_roles: true,
         teen_roles: true,
       },
     })
-    expect(result).toEqual({
-      user: {
-        id: 'teen-4',
-        email: 'teen4@example.com',
-        displayName: 'Taylor Brooks',
-        birthdate: '2009-03-04T00:00:00.000Z',
-        role: 'teen',
-      },
-      linkedGuardians: [
-        {
-          guardianId: 'guardian-2',
-          status: 'granted',
-          consentGrantedAt: '2026-03-04T10:00:00.000Z',
-        },
-      ],
-      linkedTeens: [],
-    })
+    expect(result).toEqual(
+      buildUserProfileResponse(
+        teen,
+        [buildLinkedGuardianResponse(guardian, DEFAULT_CONSENT_GRANTED_AT)],
+        []
+      )
+    )
   })
 
   it('throws when the authenticated user cannot be found', async () => {
