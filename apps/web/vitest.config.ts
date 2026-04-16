@@ -11,22 +11,6 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: /^@couture\/api-client$/,
-        replacement: path.resolve(__dirname, '../../packages/api-client/src/index.ts'),
-      },
-      {
-        find: /^@couture\/api-client\/testing\/(.*)$/,
-        replacement: path.resolve(__dirname, '../../packages/api-client/src/testing/$1'),
-      },
-      {
-        find: /^@couture\/api-client\/realtime\/(.*)$/,
-        replacement: path.resolve(__dirname, '../../packages/api-client/src/realtime/$1'),
-      },
-      {
-        find: /^@couture\/api-client\/types\/(.*)$/,
-        replacement: path.resolve(__dirname, '../../packages/api-client/src/types/$1'),
-      },
-      {
         find: '@',
         replacement: path.resolve(__dirname, './src'),
       },

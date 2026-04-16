@@ -20,6 +20,24 @@ export const guardianConsentInputSchema = z.object({
   timestamp: isoTimestampSchema.optional(),
 })
 
+const birthdateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+const accountStatusSchema = z.enum(['active', 'pending_guardian_consent'])
+
+export const signupInputSchema = z.object({
+  email: z.string().email(),
+  birthdate: birthdateSchema,
+})
+
+export const signupResponseSchema = z.object({
+  userId: nonEmptyStringSchema,
+  age: z.number().int().min(13),
+  accountStatus: accountStatusSchema,
+  guardianConsentRequired: z.boolean(),
+})
+
+export type SignupInput = z.infer<typeof signupInputSchema>
+export type SignupResponse = z.infer<typeof signupResponseSchema>
+
 export type GuardianConsentInput = z.infer<typeof guardianConsentInputSchema>
 
 export const guardianConsentResponseSchema = trackedResponseSchema
@@ -30,10 +48,60 @@ export function registerAuthContracts(
   registry: OpenAPIRegistry,
   commonSchemas: RegisteredCommonHttpSchemas
 ) {
+  const registeredSignupInputSchema = registry.register('SignupInput', signupInputSchema)
+  const registeredSignupResponseSchema = registry.register(
+    'SignupResponse',
+    signupResponseSchema
+  )
   const registeredGuardianConsentInputSchema = registry.register(
     'GuardianConsentInput',
     guardianConsentInputSchema
   )
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/auth/signup',
+    tags: ['auth'],
+    summary: 'Create an account with age verification',
+    description:
+      'Evaluates the submitted birthdate, blocks signups for children under 13, and flags 13-15 year olds for guardian consent.',
+    request: {
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: registeredSignupInputSchema,
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: 'Account created successfully',
+        content: {
+          'application/json': {
+            schema: registeredSignupResponseSchema,
+          },
+        },
+      },
+      400: {
+        description: 'Signup payload failed validation or email is already registered',
+        content: {
+          'application/json': {
+            schema: commonSchemas.badRequestHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Birthdate indicates a child younger than thirteen',
+        content: {
+          'application/json': {
+            schema: commonSchemas.forbiddenHttpErrorSchema,
+          },
+        },
+      },
+    },
+  })
 
   registry.registerPath({
     method: 'post',

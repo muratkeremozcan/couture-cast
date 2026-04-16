@@ -1,6 +1,6 @@
 # Story 0.11: Implement guardian consent flow and RLS policies
 
-Status: drafted
+Status: in-progress
 
 ## Story
 
@@ -22,9 +22,9 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement age verification on signup (AC: #1)
-  - [ ] Add birthdate field to signup form (Expo and Next.js)
-  - [ ] Create age calculation utility: `packages/utils/age.ts`:
+- [x] Task 1: Implement age verification on signup (AC: #1)
+  - [x] Add birthdate field to signup form (Expo and Next.js)
+  - [x] Create age calculation utility: `packages/utils/age.ts`:
     ```typescript
     export function calculateAge(birthdate: Date): number {
       const today = new Date()
@@ -36,7 +36,7 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
       return age
     }
     ```
-  - [ ] Implement age gate in signup endpoint:
+  - [x] Implement age gate in signup endpoint:
     ```typescript
     const age = calculateAge(birthdate)
     if (age < 13) throw new ForbiddenException('Must be 13 or older')
@@ -45,7 +45,7 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
       user.status = 'pending_guardian_consent'
     }
     ```
-  - [ ] Add UI messaging: "You must be 13 or older" for <13, "Guardian consent required" for 13-15
+  - [x] Add UI messaging: "You must be 13 or older" for <13, "Guardian consent required" for 13-15
 
 - [ ] Task 2: Create guardian_consent table migration (AC: #2)
   - [ ] Add to Prisma schema:
@@ -356,22 +356,69 @@ _bmad-output/
 
 ### Agent Model Used
 
-<!-- Will be filled by dev agent -->
+GPT-5 Codex
 
 ### Debug Log References
 
-<!-- Will be filled by dev agent during implementation -->
+- `npm install --ignore-scripts --no-progress`
+- `npm run generate:http-openapi`
+- `npm run typecheck --workspace @couture/utils && npm run test --workspace @couture/utils`
+- `npm run typecheck --workspace api && npm run test --workspace api -- src/modules/auth/auth.controller.spec.ts src/modules/auth/auth.service.spec.ts`
+- `npm run typecheck --workspace web && npm run test --workspace web -- src/app/signup/signup-form.test.tsx`
+- `npm run typecheck --workspace mobile && npm run test --workspace mobile -- src/features/signup/signup-screen.test.tsx`
+- `npm run typecheck --workspace @couture/api-client && npm run test --workspace @couture/api-client -- testing/http-openapi.spec.ts`
+- `npx tsc --noEmit -p playwright/tsconfig.json`
+- `npx eslint --max-warnings=0 playwright/tests/api/auth-signup-age-gate.spec.ts`
+- `TEST_ENV=local npx playwright test playwright/tests/api/auth-signup-age-gate.spec.ts --list`
 
 ### Completion Notes List
 
-<!-- Will be filled by dev agent upon completion -->
+- Added a new shared `@couture/utils` workspace package with `calculateAge`, `parseBirthdateInput`, and reusable age-gate evaluation logic.
+- Added `POST /api/v1/auth/signup` plus shared contract definitions, OpenAPI registration, and API tests for under-13 blocking, 13-15 pending guardian consent, and 16+ eligibility.
+- Added minimal Next.js and Expo signup flows with birthdate inputs and inline messaging for the COPPA age-gate states.
+- Added a focused Playwright API contract spec for signup age-gating and duplicate-email handling without expanding this PR into browser/mobile E2E churn.
 
 ### File List
 
-<!-- Will be filled by dev agent with NEW/MODIFIED/DELETED files -->
+- NEW `packages/utils/package.json`
+- NEW `packages/utils/tsconfig.json`
+- NEW `packages/utils/tsconfig.build.json`
+- NEW `packages/utils/vitest.config.ts`
+- NEW `packages/utils/src/index.ts`
+- NEW `packages/utils/src/age.ts`
+- NEW `packages/utils/src/age.spec.ts`
+- MODIFIED `package-lock.json`
+- MODIFIED `packages/api-client/src/contracts/http/auth.ts`
+- MODIFIED `packages/api-client/testing/http-openapi.spec.ts`
+- MODIFIED `packages/api-client/docs/http.openapi.json`
+- MODIFIED `apps/api/package.json`
+- MODIFIED `apps/api/src/contracts/http.ts`
+- MODIFIED `apps/api/src/modules/auth/auth.controller.ts`
+- MODIFIED `apps/api/src/modules/auth/auth.service.ts`
+- MODIFIED `apps/api/src/modules/auth/auth.module.ts`
+- MODIFIED `apps/api/src/modules/auth/auth.controller.spec.ts`
+- MODIFIED `apps/api/src/modules/auth/auth.service.spec.ts`
+- MODIFIED `apps/web/package.json`
+- MODIFIED `apps/web/tsconfig.json`
+- MODIFIED `apps/web/vitest.config.ts`
+- MODIFIED `apps/web/src/app/page.tsx`
+- NEW `apps/web/src/lib/signup.ts`
+- NEW `apps/web/src/app/signup/page.tsx`
+- NEW `apps/web/src/app/signup/signup-form.tsx`
+- NEW `apps/web/src/app/signup/signup-form.test.tsx`
+- MODIFIED `apps/mobile/package.json`
+- MODIFIED `apps/mobile/tsconfig.json`
+- MODIFIED `apps/mobile/vitest.config.ts`
+- MODIFIED `apps/mobile/app/(tabs)/index.tsx`
+- NEW `apps/mobile/app/signup.tsx`
+- NEW `apps/mobile/src/lib/signup.ts`
+- NEW `apps/mobile/src/features/signup/signup-screen.tsx`
+- NEW `apps/mobile/src/features/signup/signup-screen.test.tsx`
+- NEW `playwright/tests/api/auth-signup-age-gate.spec.ts`
 
 ## Change Log
 
-| Date       | Author             | Change                                                 |
-| ---------- | ------------------ | ------------------------------------------------------ |
-| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.11 acceptance criteria |
+| Date       | Author             | Change                                                                                                                            |
+| ---------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.11 acceptance criteria                                                                            |
+| 2026-04-16 | Codex              | Completed Task 1 age verification across API, web, mobile, shared utils, OpenAPI docs, and added targeted Playwright API coverage |

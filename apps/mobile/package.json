@@ -3,6 +3,13 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "prepare:shared-deps": "npm run build --workspace @couture/utils && npm run build --workspace @couture/api-client",
+    "preandroid": "npm run prepare:shared-deps",
+    "preios": "npm run prepare:shared-deps",
+    "pretypecheck": "npm run prepare:shared-deps",
+    "pretest": "npm run prepare:shared-deps",
+    "prestart": "npm run prepare:shared-deps",
+    "preweb": "npm run prepare:shared-deps",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint --max-warnings=0 --ext .ts,.tsx .",
     "vitest:run": "vitest run --config vitest.config.ts",
@@ -16,6 +23,7 @@
   },
   "dependencies": {
     "@couture/api-client": "file:../../packages/api-client",
+    "@couture/utils": "file:../../packages/utils",
     "@expo/vector-icons": "15.0.3",
     "@react-navigation/native": "7.1.20",
     "expo": "~54.0.33",

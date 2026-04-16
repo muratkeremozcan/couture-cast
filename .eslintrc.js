@@ -14,6 +14,7 @@ module.exports = {
   settings: {
     'import/resolver': {
       typescript: {
+        noWarnOnMultipleProjects: true,
         project: [
           './tsconfig.json',
           './apps/mobile/tsconfig.eslint.json',

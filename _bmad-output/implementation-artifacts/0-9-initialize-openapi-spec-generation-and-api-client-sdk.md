@@ -1,6 +1,6 @@
 # Story 0.9: Initialize OpenAPI spec generation and API client SDK
 
-Status: in-progress
+Status: done
 
 ## Story
 

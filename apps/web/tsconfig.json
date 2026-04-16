@@ -9,12 +9,7 @@
     "allowJs": true,
     "incremental": true,
     "baseUrl": ".",
-    "paths": {
-      "@couture/api-client": ["../../packages/api-client/src/index.ts"],
-      "@couture/api-client/testing/*": ["../../packages/api-client/src/testing/*"],
-      "@couture/api-client/realtime/*": ["../../packages/api-client/src/realtime/*"],
-      "@couture/api-client/types/*": ["../../packages/api-client/src/types/*"]
-    },
+    "paths": {},
     "plugins": [
       {
         "name": "next"

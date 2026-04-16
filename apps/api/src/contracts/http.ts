@@ -6,8 +6,12 @@
 // package surface directly instead of redefining request/response shapes inside controller code.
 export {
   type GuardianConsentInput,
+  type SignupInput,
+  type SignupResponse,
   guardianConsentInputSchema,
   guardianConsentResponseSchema,
+  signupInputSchema,
+  signupResponseSchema,
   apiHealthResponseSchema,
   eventsPollInvalidSinceResponseSchema,
   eventsPollQuerySchema,

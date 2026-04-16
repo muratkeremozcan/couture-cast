@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { AnalyticsEventActions } from './components/analytics-event-actions'
 import { PostHogClickTracker } from './components/posthog-click-tracker'
 
@@ -59,6 +60,14 @@ export default function Home() {
             insight to recommend looks that respect the commute, the meeting, and the
             vibe.
           </p>
+          <div>
+            <Link
+              href="/signup"
+              className="inline-flex rounded-full border border-amber-300 px-5 py-3 text-sm font-semibold uppercase tracking-[0.24em] text-amber-200 transition hover:bg-amber-300 hover:text-black"
+            >
+              Start signup
+            </Link>
+          </div>
           <AnalyticsEventActions />
         </section>
 

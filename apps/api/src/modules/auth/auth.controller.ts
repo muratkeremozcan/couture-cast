@@ -8,7 +8,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common'
-import { guardianConsentInputSchema } from '../../contracts/http'
+import { guardianConsentInputSchema, signupInputSchema } from '../../contracts/http'
 import { AuthService } from './auth.service'
 import { AuthContext, Roles } from './security.decorators'
 import { RequestAuthGuard, RolesGuard } from './security.guards'
@@ -17,6 +17,16 @@ import type { RequestAuthContext } from './security.types'
 @Controller('/api/v1/auth')
 export class AuthController {
   constructor(@Inject(AuthService) private readonly authService: AuthService) {}
+
+  @Post('signup')
+  signUp(@Body() payload: unknown) {
+    const parsed = signupInputSchema.safeParse(payload)
+    if (!parsed.success) {
+      throw new BadRequestException('Invalid signup payload')
+    }
+
+    return this.authService.signUp(parsed.data)
+  }
 
   @Post('guardian-consent')
   @HttpCode(200)

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Pressable, StyleSheet } from 'react-native'
+import { Link } from 'expo-router'
 import * as FileSystem from 'expo-file-system'
 import * as ImagePicker from 'expo-image-picker'
 
@@ -78,6 +79,11 @@ export default function TabOneScreen() {
       />
       <EditScreenInfo path="app/(tabs)/index.tsx" />
       <View style={styles.actions}>
+        <Link href={'/signup' as never} asChild>
+          <Pressable style={styles.actionButton}>
+            <Text style={styles.actionText}>Open signup flow</Text>
+          </Pressable>
+        </Link>
         <Pressable style={styles.actionButton} onPress={handleGenerateOutfit}>
           <Text style={styles.actionText}>Generate outfit ritual</Text>
         </Pressable>

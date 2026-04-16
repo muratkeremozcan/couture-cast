@@ -10,12 +10,14 @@ import { AuthController } from './auth.controller'
 import type { RequestAuthContext } from './security.types'
 
 const createController = () => {
+  const signUp = vi.fn()
   const grantGuardianConsent = vi.fn().mockReturnValue({ tracked: true })
   const service = {
+    signUp,
     grantGuardianConsent,
   } as unknown as AuthService
 
-  return { controller: new AuthController(service), grantGuardianConsent }
+  return { controller: new AuthController(service), signUp, grantGuardianConsent }
 }
 
 describe('AuthController', () => {
@@ -34,6 +36,42 @@ describe('AuthController', () => {
 
   afterEach(() => {
     resetCleanupRegistry()
+  })
+
+  it('passes valid signup payloads through to the auth service', () => {
+    const payload = {
+      email: 'new-user@example.com',
+      birthdate: '2010-04-15',
+    }
+    const { controller, signUp } = createController()
+    signUp.mockReturnValue({
+      userId: 'user-1',
+      age: 16,
+      accountStatus: 'active',
+      guardianConsentRequired: false,
+    })
+
+    const result = controller.signUp(payload)
+
+    expect(signUp).toHaveBeenCalledWith(payload)
+    expect(result).toEqual({
+      userId: 'user-1',
+      age: 16,
+      accountStatus: 'active',
+      guardianConsentRequired: false,
+    })
+  })
+
+  it('rejects invalid signup payloads', () => {
+    const { controller, signUp } = createController()
+
+    expect(() =>
+      controller.signUp({
+        email: 'not-an-email',
+        birthdate: '04/15/2010',
+      })
+    ).toThrow(BadRequestException)
+    expect(signUp).not.toHaveBeenCalled()
   })
 
   it('records guardian consent for valid payloads', () => {
