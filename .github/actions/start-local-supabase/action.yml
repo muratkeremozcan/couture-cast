@@ -1,0 +1,50 @@
+name: Start local Supabase
+description: Start local Supabase services with retry/backoff for transient registry pull failures.
+
+inputs:
+  max-attempts:
+    description: Maximum number of startup attempts
+    required: false
+    default: '4'
+  base-delay-seconds:
+    description: Base delay in seconds used for linear backoff between attempts
+    required: false
+    default: '20'
+
+runs:
+  using: composite
+  steps:
+    - name: Start local Supabase with retry
+      shell: bash
+      run: |
+        set -u -o pipefail
+
+        max_attempts='${{ inputs.max-attempts }}'
+        base_delay='${{ inputs.base-delay-seconds }}'
+        attempt=1
+
+        while [ "$attempt" -le "$max_attempts" ]; do
+          echo "::group::Start local Supabase (attempt ${attempt}/${max_attempts})"
+
+          if npx supabase start; then
+            echo "Supabase services started successfully."
+            npx supabase status || true
+            echo "::endgroup::"
+            exit 0
+          fi
+
+          exit_code=$?
+          echo "Supabase startup failed with exit code ${exit_code}."
+          npx supabase status || true
+          echo "::endgroup::"
+
+          if [ "$attempt" -eq "$max_attempts" ]; then
+            echo "::error::Failed to start local Supabase after ${max_attempts} attempts."
+            exit "$exit_code"
+          fi
+
+          sleep_seconds=$(( base_delay * attempt ))
+          echo "Retrying Supabase startup in ${sleep_seconds}s..."
+          sleep "$sleep_seconds"
+          attempt=$(( attempt + 1 ))
+        done

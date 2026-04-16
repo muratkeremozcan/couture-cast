@@ -1,4 +1,17 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@couture/api-client": ["../../packages/api-client/src/index.ts"],
+      "@couture/api-client/contracts/http": [
+        "../../packages/api-client/src/contracts/http/index.ts"
+      ],
+      "@couture/api-client/realtime/*": ["../../packages/api-client/src/realtime/*"],
+      "@couture/api-client/types/*": ["../../packages/api-client/src/types/*"],
+      "@couture/utils": ["../../packages/utils/src/index.ts"]
+    }
+  },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
 }

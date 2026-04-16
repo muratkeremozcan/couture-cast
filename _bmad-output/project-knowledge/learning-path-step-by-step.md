@@ -1,8 +1,8 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-15 - Step 2 now reflects the shared cleanup/template helpers in
-`packages/testing`, the CLI/IDE lint alignment for templates, and the test review
-checklist/testing-standards references
+Updated: 2026-04-16 - Steps 2, 12, 14, and 15 now reflect the shared `packages/utils`
+age-gate utility, the signup auth contract path, and the thin Playwright API coverage
+used for the new age-verification boundary
 
 ## LLM collaborator prompt
 
@@ -152,8 +152,8 @@ Key takeaways:
 1. Boundary clarity: `apps/web`, `apps/mobile`, and `apps/api` are separate runtime surfaces with
    distinct entrypoints.
 2. Shared contracts and test primitives: common logic/types flow through workspace packages (not
-   cross-app direct imports), especially `packages/api-client`, `packages/db`, and
-   `packages/testing`.
+   cross-app direct imports), especially `packages/api-client`, `packages/db`,
+   `packages/testing`, and `packages/utils`.
 3. Monorepo operations: root npm workspaces + `turbo.json` coordinate consistent `dev`, `test`,
    and `build` behavior.
 4. **Runtime and app-owned deps:** Anything an app or package **imports** or any **script in that
@@ -188,8 +188,8 @@ Sequence to follow:
 
 1. Start at the root workspace and task graph in the repo root.
 2. Open the web, mobile, and API entrypoints to see each runtime boundary.
-3. Trace shared contracts through `packages/api-client`, `packages/db`, and `packages/testing`
-   instead of cross-app imports.
+3. Trace shared contracts and utilities through `packages/api-client`, `packages/db`,
+   `packages/testing`, and `packages/utils` instead of cross-app imports.
 
 Task owner map:
 
@@ -197,7 +197,7 @@ Task owner map:
 - Step 2 step 2 owner: define the web runtime boundary in `apps/web/src/app/layout.tsx`
 - Step 2 step 3 owner: define the mobile runtime boundary in `apps/mobile/app/_layout.tsx` and `apps/mobile/app/(tabs)/_layout.tsx`
 - Step 2 step 4 owner: define the API runtime boundary in `apps/api/src/main.ts`
-- Step 2 step 5 owner: define shared package boundaries in `packages/api-client/package.json`, `packages/db/package.json`, and `packages/testing/package.json`
+- Step 2 step 5 owner: define shared package boundaries in `packages/api-client/package.json`, `packages/db/package.json`, `packages/testing/package.json`, and `packages/utils/package.json`
 
 Current repo note:
 
@@ -210,6 +210,10 @@ Current repo note:
 - **Testing workspace boundary:** `packages/testing` now owns shared factories, cleanup helpers, and
   starter templates; its workspace lint/typecheck scripts intentionally include both `src` and
   `templates` so the CLI reports the same red files the IDE does.
+- **Pure shared logic boundary:** `packages/utils` is where small runtime-safe policy helpers should
+  live when web, mobile, and API all need the same answer. The current example is the signup
+  age-gate flow: parse birthdates once, calculate age once, and let app-specific adapters reuse the
+  same behavior instead of cloning that logic per surface.
 - **Test review baseline:** PRs that touch automated tests should use the shared checklist in
   `.github/PULL_REQUEST_TEMPLATE.md` and the expectations in
   `_bmad-output/test-artifacts/testing-standards.md`; default to `@couture/testing` fixtures and
@@ -228,6 +232,7 @@ flowchart TD
   ROOT --> APICLIENT[packages/api-client<br/>shared API/event contracts]
   ROOT --> DB[packages/db<br/>Prisma schema + client]
   ROOT --> TESTING[packages/testing<br/>shared fixture factories + cleanup registry]
+  ROOT --> UTILS[packages/utils<br/>shared pure runtime helpers]
   ROOT --> ESLINT[packages/eslint-config]
 
   ROOT --> TURBO
@@ -236,9 +241,12 @@ flowchart TD
   TURBO --> API
 
   WEB --> APICLIENT
+  WEB --> UTILS
   MOBILE --> APICLIENT
+  MOBILE --> UTILS
   APICLIENT --> API
   API --> DB
+  API --> UTILS
 ```
 
 ## Step 3 - Data model and deterministic seeds
@@ -1218,7 +1226,8 @@ Key takeaways:
 1. Cross-surface execution is standardized at the root: Playwright (`test:pw-local`) and Maestro
    (`test:mobile:e2e`) run from shared workspace scripts.
 2. Smoke coverage is purpose-built by surface: web validates API health, core hero rendering, and
-   accessibility; mobile validates Expo launch/connect and basic tab navigation flow.
+   accessibility; Playwright API specs validate boundary-critical backend contracts such as auth and
+   moderation; mobile validates Expo launch/connect and basic tab navigation flow.
 3. Confidence comes from artifacts plus policy: Playwright HTML/trace outputs and Maestro
    screenshots/logs support fast triage, while web is PR-gated and mobile remains manual/local by
    default.
@@ -1249,11 +1258,20 @@ Sequence to follow:
 Task owner map:
 
 - Step 12 step 1 owner: define shared Playwright harness behavior in `playwright/config/base.config.ts` and `playwright/config/local.config.ts`
-- Step 12 step 2 owner: define the core web smoke flows in `playwright/tests/home.spec.ts` and `playwright/tests/web-health-sha.spec.ts`
+- Step 12 step 2 owner: define the core web and API smoke flows in `playwright/tests/home.spec.ts`, `playwright/tests/web-health-sha.spec.ts`, `playwright/tests/api/auth-moderation-security.spec.ts`, and `playwright/tests/api/auth-signup-age-gate.spec.ts`
 - Step 12 step 3 owner: define the mobile smoke flow in `maestro/sanity.yaml`
 - Step 12 step 4 owner: orchestrate the mobile test harness in `scripts/run-maestro.mjs` and `scripts/start-mobile-server.sh`
 - Step 12 step 5 owner: keep the mobile fallback runtime behavior aligned in `apps/mobile/src/realtime/mobile-fallback-controller.ts`
 - Step 12 step 6 owner: connect web and mobile E2E execution to CI in `.github/workflows/pr-pw-e2e-local.yml` and `.github/workflows/pr-mobile-e2e.yml`
+
+Current repo note:
+
+- Playwright is intentionally doing two different jobs now: thin browser smoke for stable
+  user-visible pages and thin API contract coverage for boundary-critical write paths. The signup
+  age-gate check in `playwright/tests/api/auth-signup-age-gate.spec.ts` is the pattern to copy
+  when the real risk is backend policy enforcement, not a long multi-page browser journey.
+- Keep these API specs time-stable and isolated: use dynamic dates for age boundaries, unique IDs
+  or emails for create flows, and skip production for tests that mutate real state.
 
 Architecture diagram:
 
@@ -1405,6 +1423,9 @@ Key takeaways:
    work. They are adapters, not contract authors.
 5. The first migrated slice is only the proof point. The architecture is not finished until every
    public REST endpoint used by web/mobile follows the same model.
+6. Keep pure business-policy helpers separate from the contract layer. Shared policy logic such as
+   age calculation belongs in `packages/utils`; the contract layer still owns request/response
+   schemas, inferred types, and OpenAPI metadata.
 
 Story/Task mapping:
 
@@ -1447,11 +1468,13 @@ Task owner map:
 Current repo note:
 
 - Health, polling, auth, moderation, and the first authenticated user profile slice now follow
-  this model. The remaining work is to migrate later public REST endpoints as they land so every
-  web/mobile-facing API starts in the same shared-contract path. Task 6 also proved that shared
-  Zod modules are not enough on their own: parity tests caught real adapter drift in Nest defaults
-  and dependency injection seams, so controller/service wiring still has to be verified against the
-  shared contract at runtime.
+  this model. The auth slice now includes signup age verification as well as guardian consent, with
+  `packages/api-client/src/contracts/http/auth.ts` owning the public request/response contract while
+  `packages/utils/src/age.ts` owns the reusable age-policy calculation. The remaining work is to
+  migrate later public REST endpoints as they land so every web/mobile-facing API starts in the
+  same shared-contract path. Task 6 also proved that shared Zod modules are not enough on their
+  own: parity tests caught real adapter drift in Nest defaults and dependency injection seams, so
+  controller/service wiring still has to be verified against the shared contract at runtime.
 
 Architecture diagram:
 
@@ -1540,11 +1563,12 @@ Current repo note:
   spec sync in `packages/api-client/testing/http-openapi.spec.ts`, API-published OpenAPI parity in
   `apps/api/src/openapi.spec.ts`, representative API integration parity in
   `apps/api/integration/http-contract-parity.integration.spec.ts`, and thin live-endpoint smoke in
-  `playwright/tests/api/*.spec.ts`. The SDK postprocess layer also strips unused generated model
-  imports so repo-level `npm run typecheck`, `npm run lint`, and `npm run test` stay green after
-  regeneration. Task 7 also landed app-local SDK factories plus real web/mobile runtime consumers,
-  so the generated surface now reaches production-facing paths instead of package-only tests. The
-  remaining work is CI diff enforcement and the versioning/regeneration documentation closeout.
+  `playwright/tests/api/*.spec.ts` including signup age-gate coverage. The SDK postprocess layer
+  also strips unused generated model imports so repo-level `npm run typecheck`, `npm run lint`, and
+  `npm run test` stay green after regeneration. Task 7 also landed app-local SDK factories plus
+  real web/mobile runtime consumers, so the generated surface now reaches production-facing paths
+  instead of package-only tests. The remaining work is CI diff enforcement and the
+  versioning/regeneration documentation closeout.
 
 Architecture diagram:
 

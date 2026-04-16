@@ -4,6 +4,7 @@
     "baseUrl": ".",
     "paths": {
       "@couture/config": ["../../packages/config/src/index.ts"],
+      "@couture/utils": ["../../packages/utils/src/index.ts"],
       "@couture/api-client": ["../../packages/api-client/src/index.ts"],
       "@couture/api-client/contracts/http": [
         "../../packages/api-client/src/contracts/http/index.ts"

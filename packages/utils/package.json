@@ -1,0 +1,24 @@
+{
+  "name": "@couture/utils",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Shared utility helpers for CoutureCast",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist tsconfig.build.tsbuildinfo && npm exec --yes --package=typescript@5.9.3 -- tsc -p tsconfig.build.json",
+    "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "lint": "eslint --max-warnings=0 --ext .ts src",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --config vitest.config.ts",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage"
+  }
+}

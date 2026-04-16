@@ -1,5 +1,12 @@
 // Step 8 API analytics owner: searchable owner anchor
-import { Injectable } from '@nestjs/common'
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+} from '@nestjs/common'
+import { Prisma, PrismaClient } from '@prisma/client'
+import { evaluateAgeGate, parseBirthdateInput } from '@couture/utils'
 import {
   InjectAnalyticsClient,
   type AnalyticsClient,
@@ -7,14 +14,106 @@ import {
 import {
   guardianConsentInputSchema,
   guardianConsentResponseSchema,
+  signupInputSchema,
+  signupResponseSchema,
   type GuardianConsentInput,
+  type SignupInput,
 } from '../../contracts/http'
+
+type SignUpOptions = {
+  today?: Date
+}
+
+function isUniqueConstraintError(
+  error: unknown
+): error is Prisma.PrismaClientKnownRequestError {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return error.code === 'P2002'
+  }
+
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return false
+  }
+
+  return error.code === 'P2002'
+}
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient
+    @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient,
+    @Inject(PrismaClient) private readonly prisma: PrismaClient
   ) {}
+
+  async signUp(input: SignupInput, options: SignUpOptions = {}) {
+    const parsed = signupInputSchema.safeParse(input)
+    if (!parsed.success) {
+      throw new BadRequestException('Invalid signup payload')
+    }
+
+    let birthdate: Date
+    try {
+      birthdate = parseBirthdateInput(parsed.data.birthdate)
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Invalid signup payload'
+      )
+    }
+
+    const gate = evaluateAgeGate(birthdate, options.today ?? new Date())
+
+    if (!gate.allowed) {
+      throw new ForbiddenException(gate.message)
+    }
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: parsed.data.email },
+      select: { id: true },
+    })
+
+    if (existingUser) {
+      throw new BadRequestException('Email already registered')
+    }
+
+    const accountStatus = gate.requiresGuardian ? 'pending_guardian_consent' : 'active'
+
+    let user: { id: string }
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          email: parsed.data.email,
+          profile: {
+            create: {
+              birthdate,
+              preferences: {
+                compliance: {
+                  accountStatus,
+                  guardianConsentRequired: gate.requiresGuardian,
+                },
+              },
+            },
+          },
+          comfort_profile: {
+            create: {},
+          },
+        },
+        select: { id: true },
+      })
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new BadRequestException('Email already registered')
+      }
+
+      throw error
+    }
+
+    return signupResponseSchema.parse({
+      userId: user.id,
+      age: gate.age,
+      accountStatus,
+      guardianConsentRequired: gate.requiresGuardian,
+    })
+  }
 
   /** Story 0.7 support file: API-side analytics boundary for guardian consent.
    * Why typed validation exists here: API callers are external to UI wrappers, so we enforce schema before capture.

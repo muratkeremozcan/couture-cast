@@ -38,6 +38,12 @@ test('writes a valid HTTP OpenAPI document for the initial contract slice', asyn
     }
 
     expect(paths['/api/health']).toBeDefined()
+    expect(paths['/api/v1/auth/signup']).toBeDefined()
+    expect(paths['/api/v1/auth/signup']?.post).toBeDefined()
+    expect(paths['/api/v1/auth/signup']?.post?.summary).toBe(
+      'Create an account with age verification'
+    )
+    expect(paths['/api/v1/auth/signup']?.post?.responses?.['201']).toBeDefined()
     expect(paths['/api/v1/auth/guardian-consent']).toBeDefined()
     expect(paths['/api/v1/health/queues']).toBeDefined()
     expect(paths['/api/v1/events/poll']).toBeDefined()

@@ -143,6 +143,52 @@
           "error"
         ]
       },
+      "SignupInput": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "birthdate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        },
+        "required": [
+          "email",
+          "birthdate"
+        ]
+      },
+      "SignupResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 13
+          },
+          "accountStatus": {
+            "type": "string",
+            "enum": [
+              "active",
+              "pending_guardian_consent"
+            ]
+          },
+          "guardianConsentRequired": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "userId",
+          "age",
+          "accountStatus",
+          "guardianConsentRequired"
+        ]
+      },
       "GuardianConsentInput": {
         "type": "object",
         "properties": {
@@ -604,6 +650,57 @@
     "parameters": {}
   },
   "paths": {
+    "/api/v1/auth/signup": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create an account with age verification",
+        "description": "Evaluates the submitted birthdate, blocks signups for children under 13, and flags 13-15 year olds for guardian consent.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Signup payload failed validation or email is already registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Birthdate indicates a child younger than thirteen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/guardian-consent": {
       "post": {
         "tags": [
