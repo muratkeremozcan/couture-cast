@@ -71,7 +71,7 @@ jobs:
 
       - name: Start local Supabase services
         if: inputs.test_env == 'local'
-        run: npm run supabase:start
+        uses: ./.github/actions/start-local-supabase
 
       - name: Reset local E2E database
         if: inputs.test_env == 'local'

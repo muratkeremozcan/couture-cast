@@ -99,7 +99,7 @@ jobs:
 
       - name: Start local Supabase services
         if: steps.detect-changed.outputs.changed == 'true'
-        run: npm run supabase:start
+        uses: ./.github/actions/start-local-supabase
 
       - name: Reset local burn-in database
         if: steps.detect-changed.outputs.changed == 'true'
