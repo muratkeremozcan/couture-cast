@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   AGE_GATE_MESSAGES,
   calculateAge,
+  evaluateBirthdateInput,
   evaluateAgeGate,
+  INVALID_BIRTHDATE_MESSAGE,
   parseBirthdateInput,
 } from './age'
 
@@ -11,6 +13,12 @@ describe('age utilities', () => {
     const parsed = parseBirthdateInput('2012-04-03')
 
     expect(parsed.toISOString()).toBe('2012-04-03T12:00:00.000Z')
+  })
+
+  it('rejects impossible calendar dates instead of normalizing them', () => {
+    expect(() => parseBirthdateInput('2021-02-30')).toThrow(
+      'Birthdate must be a valid date'
+    )
   })
 
   it('calculates age using the current year minus birth year when birthday passed', () => {
@@ -73,6 +81,14 @@ describe('age utilities', () => {
       requiresGuardian: false,
       accountStatus: 'active',
       message: null,
+    })
+  })
+
+  it('returns a shared invalid message for malformed birthdates', () => {
+    expect(evaluateBirthdateInput('2026-02-31')).toEqual({
+      kind: 'invalid',
+      gate: null,
+      message: INVALID_BIRTHDATE_MESSAGE,
     })
   })
 })

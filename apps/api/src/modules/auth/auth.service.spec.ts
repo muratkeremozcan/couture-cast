@@ -9,6 +9,8 @@ import {
 import type { AnalyticsClient } from '../../analytics/analytics.service'
 import { AuthService } from './auth.service'
 
+const FIXED_TODAY = new Date('2026-04-16T12:00:00.000Z')
+
 const createService = (findUnique = vi.fn(), create = vi.fn()) => {
   const capture = vi.fn()
   const analyticsClient = {
@@ -39,10 +41,13 @@ describe('AuthService', () => {
     const { service, findUnique, create } = createService()
 
     await expect(
-      service.signUp({
-        email: 'kid@example.com',
-        birthdate: '2016-04-16',
-      })
+      service.signUp(
+        {
+          email: 'kid@example.com',
+          birthdate: '2016-04-16',
+        },
+        { today: FIXED_TODAY }
+      )
     ).rejects.toThrow(ForbiddenException)
 
     expect(findUnique).not.toHaveBeenCalled()
@@ -56,10 +61,13 @@ describe('AuthService', () => {
     )
 
     await expect(
-      service.signUp({
-        email: 'adult-teen@example.com',
-        birthdate: '2010-04-15',
-      })
+      service.signUp(
+        {
+          email: 'adult-teen@example.com',
+          birthdate: '2010-04-15',
+        },
+        { today: FIXED_TODAY }
+      )
     ).resolves.toEqual({
       userId: 'user-16',
       age: 16,
@@ -100,10 +108,13 @@ describe('AuthService', () => {
     )
 
     await expect(
-      service.signUp({
-        email: 'teen@example.com',
-        birthdate: '2011-04-15',
-      })
+      service.signUp(
+        {
+          email: 'teen@example.com',
+          birthdate: '2011-04-15',
+        },
+        { today: FIXED_TODAY }
+      )
     ).resolves.toEqual({
       userId: 'user-guardian',
       age: 15,
@@ -140,13 +151,52 @@ describe('AuthService', () => {
     )
 
     await expect(
-      service.signUp({
-        email: 'guardian@example.com',
-        birthdate: '2009-04-15',
-      })
+      service.signUp(
+        {
+          email: 'guardian@example.com',
+          birthdate: '2009-04-15',
+        },
+        { today: FIXED_TODAY }
+      )
     ).rejects.toThrow(BadRequestException)
 
     expect(create).not.toHaveBeenCalled()
+  })
+
+  it('rejects impossible birthdates with a bad request error', async () => {
+    const { service, findUnique, create } = createService()
+
+    await expect(
+      service.signUp(
+        {
+          email: 'invalid-date@example.com',
+          birthdate: '2026-02-31',
+        },
+        { today: FIXED_TODAY }
+      )
+    ).rejects.toThrow(BadRequestException)
+
+    expect(findUnique).not.toHaveBeenCalled()
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('maps unique constraint races during create to duplicate email errors', async () => {
+    const { service, create } = createService(
+      vi.fn().mockResolvedValue(null),
+      vi.fn().mockRejectedValue({ code: 'P2002' })
+    )
+
+    await expect(
+      service.signUp(
+        {
+          email: 'race@example.com',
+          birthdate: '2009-04-15',
+        },
+        { today: FIXED_TODAY }
+      )
+    ).rejects.toThrow(BadRequestException)
+
+    expect(create).toHaveBeenCalledOnce()
   })
 
   it('tracks guardian_consent_granted with normalized properties', () => {

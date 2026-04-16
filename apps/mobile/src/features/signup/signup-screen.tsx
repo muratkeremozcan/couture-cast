@@ -1,25 +1,16 @@
 import { useState } from 'react'
 import { Pressable, StyleSheet, TextInput } from 'react-native'
 import type { SignupInput, SignupResponse } from '@couture/api-client/contracts/http'
-import { AGE_GATE_MESSAGES, evaluateAgeGate, parseBirthdateInput } from '@couture/utils'
+import {
+  AGE_GATE_MESSAGES,
+  evaluateBirthdateInput,
+  INVALID_BIRTHDATE_MESSAGE,
+} from '@couture/utils'
 import { Text, View } from '@/components/themed'
 import { submitMobileSignup } from '@/src/lib/signup'
 
 type SignupScreenProps = {
   submitSignup?: (input: SignupInput) => Promise<SignupResponse>
-}
-
-function toInlineMessage(birthdate: string) {
-  if (!birthdate) {
-    return null
-  }
-
-  try {
-    const gate = evaluateAgeGate(parseBirthdateInput(birthdate))
-    return gate.message
-  } catch {
-    return 'Enter your birthdate as YYYY-MM-DD'
-  }
 }
 
 export function SignupScreen({ submitSignup = submitMobileSignup }: SignupScreenProps) {
@@ -29,20 +20,19 @@ export function SignupScreen({ submitSignup = submitMobileSignup }: SignupScreen
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const inlineMessage = toInlineMessage(birthdate)
+  const birthdateEvaluation = evaluateBirthdateInput(birthdate)
+  const inlineMessage = birthdateEvaluation.message
 
   async function handleSubmit() {
     setErrorMessage(null)
     setSuccessMessage(null)
 
-    let gate = null
-
-    try {
-      gate = evaluateAgeGate(parseBirthdateInput(birthdate))
-    } catch {
-      setErrorMessage('Enter your birthdate as YYYY-MM-DD')
+    if (birthdateEvaluation.kind !== 'valid') {
+      setErrorMessage(INVALID_BIRTHDATE_MESSAGE)
       return
     }
+
+    const { gate } = birthdateEvaluation
 
     if (!gate.allowed) {
       setErrorMessage(AGE_GATE_MESSAGES.underage)

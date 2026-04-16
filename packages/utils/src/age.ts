@@ -3,6 +3,8 @@ export const AGE_GATE_MESSAGES = {
   guardianRequired: 'Guardian consent required',
 } as const
 
+export const INVALID_BIRTHDATE_MESSAGE = 'Enter your birthdate as YYYY-MM-DD' as const
+
 export type AgeGateAccountStatus =
   | 'blocked_underage'
   | 'active'
@@ -16,14 +18,48 @@ export interface AgeGateResult {
   message: (typeof AGE_GATE_MESSAGES)[keyof typeof AGE_GATE_MESSAGES] | null
 }
 
-export function parseBirthdateInput(input: string): Date {
-  const trimmed = input.trim()
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+export type BirthdateAgeGateEvaluation =
+  | {
+      kind: 'empty'
+      gate: null
+      message: null
+    }
+  | {
+      kind: 'invalid'
+      gate: null
+      message: typeof INVALID_BIRTHDATE_MESSAGE
+    }
+  | {
+      kind: 'valid'
+      gate: AgeGateResult
+      message: AgeGateResult['message']
+    }
+
+function parseBirthdateParts(input: string) {
+  const match = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/.exec(input)
+  if (!match?.groups) {
     throw new Error('Birthdate must use YYYY-MM-DD format')
   }
 
+  return {
+    year: Number(match.groups.year),
+    month: Number(match.groups.month),
+    day: Number(match.groups.day),
+  }
+}
+
+export function parseBirthdateInput(input: string): Date {
+  const trimmed = input.trim()
+  const { year, month, day } = parseBirthdateParts(trimmed)
+
   const date = new Date(`${trimmed}T12:00:00.000Z`)
-  if (Number.isNaN(date.getTime())) {
+  const isCalendarDate =
+    !Number.isNaN(date.getTime()) &&
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() + 1 === month &&
+    date.getUTCDate() === day
+
+  if (!isCalendarDate) {
     throw new Error('Birthdate must be a valid date')
   }
 
@@ -70,5 +106,33 @@ export function evaluateAgeGate(birthdate: Date, today = new Date()): AgeGateRes
     requiresGuardian: false,
     accountStatus: 'active',
     message: null,
+  }
+}
+
+export function evaluateBirthdateInput(
+  input: string,
+  today = new Date()
+): BirthdateAgeGateEvaluation {
+  if (!input.trim()) {
+    return {
+      kind: 'empty',
+      gate: null,
+      message: null,
+    }
+  }
+
+  try {
+    const gate = evaluateAgeGate(parseBirthdateInput(input), today)
+    return {
+      kind: 'valid',
+      gate,
+      message: gate.message,
+    }
+  } catch {
+    return {
+      kind: 'invalid',
+      gate: null,
+      message: INVALID_BIRTHDATE_MESSAGE,
+    }
   }
 }

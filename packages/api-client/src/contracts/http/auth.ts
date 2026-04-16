@@ -7,6 +7,25 @@ import {
   trackedResponseSchema,
 } from './common'
 
+function isValidCalendarBirthdate(input: string) {
+  const match = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/.exec(input)
+  if (!match?.groups) {
+    return false
+  }
+
+  const year = Number(match.groups.year)
+  const month = Number(match.groups.month)
+  const day = Number(match.groups.day)
+  const candidate = new Date(Date.UTC(year, month - 1, day, 12))
+
+  return (
+    !Number.isNaN(candidate.getTime()) &&
+    candidate.getUTCFullYear() === year &&
+    candidate.getUTCMonth() + 1 === month &&
+    candidate.getUTCDate() === day
+  )
+}
+
 // Story 0.9 Task 5 step 1 owner:
 // define the shared auth REST contracts here before controller code parses or returns them.
 //
@@ -20,7 +39,10 @@ export const guardianConsentInputSchema = z.object({
   timestamp: isoTimestampSchema.optional(),
 })
 
-const birthdateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+const birthdateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+  .refine(isValidCalendarBirthdate, 'Birthdate must be a valid date')
 const accountStatusSchema = z.enum(['active', 'pending_guardian_consent'])
 
 export const signupInputSchema = z.object({
@@ -28,12 +50,24 @@ export const signupInputSchema = z.object({
   birthdate: birthdateSchema,
 })
 
-export const signupResponseSchema = z.object({
-  userId: nonEmptyStringSchema,
-  age: z.number().int().min(13),
-  accountStatus: accountStatusSchema,
-  guardianConsentRequired: z.boolean(),
-})
+export const signupResponseSchema = z
+  .object({
+    userId: nonEmptyStringSchema,
+    age: z.number().int().min(13),
+    accountStatus: accountStatusSchema,
+    guardianConsentRequired: z.boolean(),
+  })
+  .superRefine((value, ctx) => {
+    const expectedGuardianConsent = value.accountStatus === 'pending_guardian_consent'
+    if (value.guardianConsentRequired !== expectedGuardianConsent) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'guardianConsentRequired must match the selected accountStatus invariant',
+        path: ['guardianConsentRequired'],
+      })
+    }
+  })
 
 export type SignupInput = z.infer<typeof signupInputSchema>
 export type SignupResponse = z.infer<typeof signupResponseSchema>

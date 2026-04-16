@@ -2,24 +2,15 @@
 
 import { useState, type FormEvent } from 'react'
 import type { SignupInput, SignupResponse } from '@couture/api-client/contracts/http'
-import { AGE_GATE_MESSAGES, evaluateAgeGate, parseBirthdateInput } from '@couture/utils'
+import {
+  AGE_GATE_MESSAGES,
+  evaluateBirthdateInput,
+  INVALID_BIRTHDATE_MESSAGE,
+} from '@couture/utils'
 import { submitWebSignup } from '../../lib/signup'
 
 type SignupFormProps = {
   submitSignup?: (input: SignupInput) => Promise<SignupResponse>
-}
-
-function toInlineMessage(birthdate: string) {
-  if (!birthdate) {
-    return null
-  }
-
-  try {
-    const gate = evaluateAgeGate(parseBirthdateInput(birthdate))
-    return gate.message
-  } catch {
-    return 'Enter your birthdate as YYYY-MM-DD'
-  }
 }
 
 export function SignupForm({ submitSignup = submitWebSignup }: SignupFormProps) {
@@ -29,21 +20,20 @@ export function SignupForm({ submitSignup = submitWebSignup }: SignupFormProps) 
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const inlineMessage = toInlineMessage(birthdate)
+  const birthdateEvaluation = evaluateBirthdateInput(birthdate)
+  const inlineMessage = birthdateEvaluation.message
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setErrorMessage(null)
     setSuccessMessage(null)
 
-    let gate = null
-
-    try {
-      gate = evaluateAgeGate(parseBirthdateInput(birthdate))
-    } catch {
-      setErrorMessage('Enter your birthdate as YYYY-MM-DD')
+    if (birthdateEvaluation.kind !== 'valid') {
+      setErrorMessage(INVALID_BIRTHDATE_MESSAGE)
       return
     }
+
+    const { gate } = birthdateEvaluation
 
     if (!gate.allowed) {
       setErrorMessage(AGE_GATE_MESSAGES.underage)

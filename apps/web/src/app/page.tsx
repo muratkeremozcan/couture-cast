@@ -64,6 +64,9 @@ export default function Home() {
             <Link
               href="/signup"
               className="inline-flex rounded-full border border-amber-300 px-5 py-3 text-sm font-semibold uppercase tracking-[0.24em] text-amber-200 transition hover:bg-amber-300 hover:text-black"
+              data-ph-event="cta_clicked"
+              data-ph-cta-label="Start signup"
+              data-ph-cta-type="primary"
             >
               Start signup
             </Link>
