@@ -13,6 +13,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { EventsModule } from './modules/events/events.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module'
+import { GuardianModule } from './modules/guardian/guardian.module'
 import { ModerationModule } from './modules/moderation/moderation.module'
 import { UserModule } from './modules/user/user.module'
 
@@ -27,6 +28,7 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     NotificationsModule,
     EventsModule,
     AuthModule,
+    GuardianModule,
     FeatureFlagsModule,
     ModerationModule,
     UserModule,

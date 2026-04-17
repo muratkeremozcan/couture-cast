@@ -64,4 +64,53 @@ describe('SignupScreen', () => {
       'Account created. You can continue to onboarding.'
     )
   })
+
+  it('shows the guardian invitation step after teen signup and sends the invite', async () => {
+    const submitSignup = vi.fn().mockResolvedValue({
+      userId: 'teen-guardian-step',
+      age: 15,
+      accountStatus: 'pending_guardian_consent',
+      guardianConsentRequired: true,
+    })
+    const inviteGuardian = vi.fn().mockResolvedValue({
+      invitationId: 'invitation-1',
+      teenId: 'teen-guardian-step',
+      guardianEmail: 'guardian@example.com',
+      consentLevel: 'full_access',
+      expiresAt: '2026-04-24T00:00:00.000Z',
+      invitationLink: 'https://app.couturecast.test/guardian/accept?token=abc',
+      deliveryQueued: true,
+    })
+
+    render(<SignupScreen submitSignup={submitSignup} inviteGuardian={inviteGuardian} />)
+
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'teen@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText('Birthdate'), {
+      target: { value: '2011-04-15' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Guardian invitation')).toBeTruthy()
+    })
+
+    fireEvent.change(screen.getByLabelText('Guardian email'), {
+      target: { value: 'guardian@example.com' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Full access consent' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send guardian invite' }))
+
+    await waitFor(() => {
+      expect(inviteGuardian).toHaveBeenCalledWith({
+        teenId: 'teen-guardian-step',
+        guardianEmail: 'guardian@example.com',
+        consentLevel: 'full_access',
+      })
+    })
+    expect(screen.getByTestId('guardian-invite-link').textContent).toBe(
+      'https://app.couturecast.test/guardian/accept?token=abc'
+    )
+  })
 })

@@ -18,6 +18,11 @@ enum ConsentStatus {
   revoked
 }
 
+enum ConsentLevel {
+  read_only
+  full_access
+}
+
 enum ComfortRun {
   cold
   neutral
@@ -51,6 +56,8 @@ model User {
   audit_logs         AuditLog[]
   guardian_roles     GuardianConsent[]      @relation("GuardianRole")
   teen_roles         GuardianConsent[]      @relation("TeenRole")
+  sent_guardian_invitations GuardianInvitation[] @relation("TeenGuardianInvitations")
+  accepted_guardian_invitations GuardianInvitation[] @relation("AcceptedGuardianInvitations")
   moderation_flags   ModerationEvent[]      @relation("FlaggedByRelation")
   moderation_reviews ModerationEvent[]      @relation("ReviewedByRelation")
   push_tokens        PushToken[]
@@ -74,7 +81,9 @@ model GuardianConsent {
   guardian_id        String
   teen               User          @relation("TeenRole", fields: [teen_id], references: [id])
   teen_id            String
+  consent_level      ConsentLevel  @default(read_only)
   consent_granted_at DateTime      @default(now())
+  revoked_at         DateTime?
   ip_address         String?
   status             ConsentStatus @default(pending)
   created_at         DateTime      @default(now())
@@ -82,6 +91,24 @@ model GuardianConsent {
   @@unique([guardian_id, teen_id])
   @@index([guardian_id])
   @@index([teen_id])
+}
+
+model GuardianInvitation {
+  id                  String        @id @default(cuid())
+  teen                User          @relation("TeenGuardianInvitations", fields: [teen_id], references: [id])
+  teen_id             String
+  guardian_email      String
+  consent_level       ConsentLevel  @default(read_only)
+  expires_at          DateTime
+  accepted_at         DateTime?
+  accepted_guardian   User?         @relation("AcceptedGuardianInvitations", fields: [accepted_guardian_id], references: [id])
+  accepted_guardian_id String?
+  created_at          DateTime      @default(now())
+  updated_at          DateTime      @updatedAt
+
+  @@index([teen_id])
+  @@index([guardian_email])
+  @@index([accepted_guardian_id])
 }
 
 model WeatherSnapshot {

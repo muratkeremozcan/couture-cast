@@ -18,6 +18,7 @@ export interface CleanupPrismaClient {
   forecastSegment: CleanupDelegate
   garmentItem: CleanupDelegate
   guardianConsent: CleanupDelegate
+  guardianInvitation: CleanupDelegate
   lookbookPost: CleanupDelegate
   outfitRecommendation: CleanupDelegate
   paletteInsights: CleanupDelegate
@@ -148,6 +149,19 @@ function buildPaletteInsightWhere(
   return { OR: filters }
 }
 
+async function deleteByUserIds(
+  userIds: readonly string[],
+  deletes: (() => Promise<unknown>)[]
+): Promise<void> {
+  if (userIds.length === 0) {
+    return
+  }
+
+  for (const remove of deletes) {
+    await remove()
+  }
+}
+
 export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const prisma = resolveCleanupPrisma(options.prisma)
   const registry = options.registry ?? factoryRegistry
@@ -163,29 +177,24 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const paletteInsightWhere = buildPaletteInsightWhere(wardrobeItemIds, userIds)
 
   try {
-    if (userIds.length > 0) {
-      await prisma.engagementEvent.deleteMany({
-        where: buildUserFilter(userIds),
-      })
-    }
-
-    if (userIds.length > 0) {
-      await prisma.lookbookPost.deleteMany({
-        where: buildUserFilter(userIds),
-      })
-    }
-
-    if (userIds.length > 0) {
-      await prisma.auditLog.deleteMany({
-        where: buildUserFilter(userIds),
-      })
-    }
-
-    if (userIds.length > 0) {
-      await prisma.pushToken.deleteMany({
-        where: buildUserFilter(userIds),
-      })
-    }
+    await deleteByUserIds(userIds, [
+      () =>
+        prisma.engagementEvent.deleteMany({
+          where: buildUserFilter(userIds),
+        }),
+      () =>
+        prisma.lookbookPost.deleteMany({
+          where: buildUserFilter(userIds),
+        }),
+      () =>
+        prisma.auditLog.deleteMany({
+          where: buildUserFilter(userIds),
+        }),
+      () =>
+        prisma.pushToken.deleteMany({
+          where: buildUserFilter(userIds),
+        }),
+    ])
 
     if (outfitRecommendationWhere) {
       await prisma.outfitRecommendation.deleteMany({
@@ -222,6 +231,25 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
     }
 
     if (userIds.length > 0) {
+      await prisma.guardianInvitation.deleteMany({
+        where: {
+          OR: [
+            {
+              teen_id: {
+                in: userIds,
+              },
+            },
+            {
+              accepted_guardian_id: {
+                in: userIds,
+              },
+            },
+          ],
+        },
+      })
+    }
+
+    if (userIds.length > 0) {
       await prisma.guardianConsent.deleteMany({
         where: {
           OR: [
@@ -240,23 +268,20 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
       })
     }
 
-    if (userIds.length > 0) {
-      await prisma.comfortPreferences.deleteMany({
-        where: buildUserFilter(userIds),
-      })
-    }
-
-    if (userIds.length > 0) {
-      await prisma.userProfile.deleteMany({
-        where: buildUserFilter(userIds),
-      })
-    }
-
-    if (userIds.length > 0) {
-      await prisma.user.deleteMany({
-        where: buildIdFilter(userIds),
-      })
-    }
+    await deleteByUserIds(userIds, [
+      () =>
+        prisma.comfortPreferences.deleteMany({
+          where: buildUserFilter(userIds),
+        }),
+      () =>
+        prisma.userProfile.deleteMany({
+          where: buildUserFilter(userIds),
+        }),
+      () =>
+        prisma.user.deleteMany({
+          where: buildIdFilter(userIds),
+        }),
+    ])
   } finally {
     registry.clear()
   }

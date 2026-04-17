@@ -29,6 +29,8 @@ Updated: 2026-03-27 - replaced third-party secret-manager plan with the existing
 - Store runtime secrets in the platform that consumes them.
 - Avoid duplicating secrets across systems unless a deployment target requires it.
 - Keep least-privilege keys for each runtime surface.
+- For the guardian invitation flow, use `_bmad-output/project-knowledge/guardian-invitation-env-setup.md`
+  as the system-specific runbook for local, Vercel, and CI placement.
 
 ## Rotation policy
 

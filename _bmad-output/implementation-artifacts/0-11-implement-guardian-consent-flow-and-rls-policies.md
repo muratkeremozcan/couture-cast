@@ -47,8 +47,8 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
     ```
   - [x] Add UI messaging: "You must be 13 or older" for <13, "Guardian consent required" for 13-15
 
-- [ ] Task 2: Create guardian_consent table migration (AC: #2)
-  - [ ] Add to Prisma schema:
+- [x] Task 2: Create guardian_consent table migration (AC: #2)
+  - [x] Add to Prisma schema:
     ```prisma
     model GuardianConsent {
       id          String   @id @default(uuid())
@@ -63,21 +63,38 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
       @@unique([guardianId, teenId])
     }
     ```
-  - [ ] Create migration: `npx prisma migrate dev --name add_guardian_consent`
-  - [ ] Add indexes for performance: `@@index([teenId])`, `@@index([guardianId])`
+  - [x] Create migration: `npx prisma migrate dev --name add_guardian_consent`
+  - [x] Add indexes for performance: `@@index([teenId])`, `@@index([guardianId])`
 
-- [ ] Task 3: Implement guardian invitation flow (AC: #2)
-  - [ ] Create `apps/api/src/modules/guardian/guardian.service.ts`
-  - [ ] Implement `inviteGuardian(teenId: string, guardianEmail: string)`:
+- [x] Task 3: Implement guardian invitation flow (AC: #2)
+  - [x] Create `apps/api/src/modules/guardian/guardian.service.ts`
+  - [x] Implement `inviteGuardian(teenId: string, guardianEmail: string)`:
     - Generate invitation token (JWT with 7-day expiration)
     - Send email with invitation link: `/guardian/accept?token=...`
     - Store invitation in `guardian_invitations` table
-  - [ ] Implement `acceptInvitation(token: string)`:
+  - [x] Implement `acceptInvitation(token: string)`:
     - Validate token
     - Create or link guardian account
     - Record consent in `guardian_consent` table with IP address
     - Send confirmation email to teen and guardian
-  - [ ] Add invitation UI in mobile and web apps
+  - [x] Add invitation UI in mobile and web apps
+
+- [ ] Task 3.5: Propagate guardian invitation env vars to hosted runtimes
+  - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.dev` into Vercel
+        project `couture-cast-api` Preview environment variables
+  - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.prod` into Vercel
+        project `couture-cast-api` Production environment variables
+  - [ ] Copy the variable name `GUARDIAN_INVITE_WEB_BASE_URL` into Vercel project
+        `couture-cast-api` Preview environment variables and set it to the intended web origin
+        for preview invitation links
+  - [x] Copy the variable name `GUARDIAN_INVITE_WEB_BASE_URL` into Vercel project
+        `couture-cast-api` Production environment variables and set it to the production web
+        origin used in guardian invitation links
+  - [x] Do not copy guardian invitation secrets into `couture-cast-web`, GitHub Actions,
+        Supabase, Upstash Redis, Expo EAS, or markdown docs unless a later deployment path
+        explicitly requires them
+  - [x] Keep real values only in gitignored local `.env*` files and provider secret stores; never
+        paste secret values into the repository
 
 - [ ] Task 4: Implement RLS policies in Supabase (AC: #3)
   - [ ] Prerequisite: deploy Prisma schema to Supabase dev/prod (once available from Story 0.2) so tables exist for RLS
@@ -370,6 +387,16 @@ GPT-5 Codex
 - `npx tsc --noEmit -p playwright/tsconfig.json`
 - `npx eslint --max-warnings=0 playwright/tests/api/auth-signup-age-gate.spec.ts`
 - `TEST_ENV=local npx playwright test playwright/tests/api/auth-signup-age-gate.spec.ts --list`
+- `npm run db:generate --workspace packages/db`
+- `npm run typecheck --workspace packages/db`
+- `npm run test --workspace api -- src/modules/auth/auth.service.spec.ts src/modules/user/user.service.spec.ts`
+- `npm run test --workspace @couture/testing -- test/cleanup.spec.ts`
+- `npm run test --workspace api -- src/modules/guardian/guardian.controller.spec.ts src/modules/guardian/guardian.service.spec.ts`
+- `npm run test --workspace web -- src/app/signup/signup-form.test.tsx src/app/guardian/accept/guardian-accept-view.test.tsx`
+- `npm run test --workspace mobile -- src/features/signup/signup-screen.test.tsx src/features/guardian/guardian-accept-screen.test.tsx`
+- `npm run typecheck --workspace api`
+- `npm run typecheck --workspace web`
+- `npm run typecheck --workspace mobile`
 
 ### Completion Notes List
 
@@ -377,6 +404,12 @@ GPT-5 Codex
 - Added `POST /api/v1/auth/signup` plus shared contract definitions, OpenAPI registration, and API tests for under-13 blocking, 13-15 pending guardian consent, and 16+ eligibility.
 - Added minimal Next.js and Expo signup flows with birthdate inputs and inline messaging for the COPPA age-gate states.
 - Added a focused Playwright API contract spec for signup age-gating and duplicate-email handling without expanding this PR into browser/mobile E2E churn.
+- Extended the existing `GuardianConsent` Prisma model with `consent_level` and `revoked_at`, preserving the repo's existing snake_case naming and current callers.
+- Added a forward SQL migration that backfills revoked rows, keeps existing guardian/teen lookup indexes in place, and prepares the table for later invitation/RLS work.
+- Added a `GuardianInvitation` Prisma model and migration, wired cleanup helpers for invitation records, and exposed shared guardian invitation/accept contracts in the API client.
+- Implemented an API guardian module with invitation token signing/verification, teen compliance-state checks, consent persistence, guardian account linking, and analytics capture on successful consent.
+- Queued guardian invitation and confirmation emails through `event_envelope` records so the flow integrates with the repo's existing outbound-event pattern without introducing a parallel mailer stack.
+- Added web and mobile guardian invitation UX for pending teen accounts plus guardian acceptance screens backed by the shared guardian contracts.
 
 ### File List
 
@@ -415,10 +448,36 @@ GPT-5 Codex
 - NEW `apps/mobile/src/features/signup/signup-screen.tsx`
 - NEW `apps/mobile/src/features/signup/signup-screen.test.tsx`
 - NEW `playwright/tests/api/auth-signup-age-gate.spec.ts`
+- MODIFIED `packages/db/prisma/schema.prisma`
+- NEW `packages/db/prisma/migrations/20260417020000_extend_guardian_consent_for_levels_and_revocation/migration.sql`
+- MODIFIED `.env.example`
+- MODIFIED `apps/api/src/app.module.ts`
+- MODIFIED `apps/api/src/contracts/http.ts`
+- NEW `apps/api/src/modules/guardian/guardian.module.ts`
+- NEW `apps/api/src/modules/guardian/guardian.controller.ts`
+- NEW `apps/api/src/modules/guardian/guardian.controller.spec.ts`
+- NEW `apps/api/src/modules/guardian/guardian.service.ts`
+- NEW `apps/api/src/modules/guardian/guardian.service.spec.ts`
+- NEW `apps/web/src/lib/guardian.ts`
+- NEW `apps/web/src/app/guardian/accept/page.tsx`
+- NEW `apps/web/src/app/guardian/accept/guardian-accept-view.tsx`
+- NEW `apps/web/src/app/guardian/accept/guardian-accept-view.test.tsx`
+- NEW `apps/mobile/src/lib/guardian.ts`
+- NEW `apps/mobile/app/guardian-accept.tsx`
+- NEW `apps/mobile/src/features/guardian/guardian-accept-screen.tsx`
+- NEW `apps/mobile/src/features/guardian/guardian-accept-screen.test.tsx`
+- NEW `packages/api-client/src/contracts/http/guardian.ts`
+- MODIFIED `packages/api-client/src/contracts/http/index.ts`
+- MODIFIED `packages/api-client/src/contracts/http/openapi.ts`
+- MODIFIED `packages/testing/src/cleanup.ts`
+- MODIFIED `packages/testing/test/cleanup.spec.ts`
+- NEW `packages/db/prisma/migrations/20260417030000_add_guardian_invitations/migration.sql`
 
 ## Change Log
 
-| Date       | Author             | Change                                                                                                                            |
-| ---------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.11 acceptance criteria                                                                            |
-| 2026-04-16 | Codex              | Completed Task 1 age verification across API, web, mobile, shared utils, OpenAPI docs, and added targeted Playwright API coverage |
+| Date       | Author             | Change                                                                                                                                           |
+| ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.11 acceptance criteria                                                                                           |
+| 2026-04-16 | Codex              | Completed Task 1 age verification across API, web, mobile, shared utils, OpenAPI docs, and added targeted Playwright API coverage                |
+| 2026-04-17 | Codex              | Completed Task 2 by extending the existing GuardianConsent Prisma model and adding a migration for consent levels and revocation support         |
+| 2026-04-17 | Codex              | Completed Task 3 guardian invitation flow across Prisma, API contracts/module, email event queueing, and web/mobile invitation and acceptance UI |

@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { registerAuthContracts } from './auth'
 import { registerCommonHttpSchemas } from './common'
 import { registerEventsContracts } from './events'
+import { registerGuardianContracts } from './guardian'
 import { registerHealthContracts } from './health'
 import { registerModerationContracts } from './moderation'
 import { registerUserContracts } from './user'
@@ -29,6 +30,7 @@ export function createHttpOpenApiRegistry() {
   registerAuthContracts(registry, commonSchemas)
   registerHealthContracts(registry)
   registerEventsContracts(registry)
+  registerGuardianContracts(registry, commonSchemas)
   registerModerationContracts(registry, commonSchemas)
   registerUserContracts(registry, commonSchemas)
 

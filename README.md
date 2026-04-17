@@ -63,6 +63,11 @@ npm run typecheck:clear-cache
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `npm run dev`                             | Runs all workspace `dev` scripts via Turborepo (parallel).                                                             |
 | `npm run build`                           | Builds all workspaces respecting dependency graph.                                                                     |
+| `npm run verify:api`                      | Runs API lint, typecheck, and tests in sequence without the API lint step auto-fixing files.                           |
+| `npm run verify:web`                      | Runs web lint, typecheck, and tests in sequence.                                                                       |
+| `npm run verify:mobile`                   | Runs mobile lint, typecheck, and tests in sequence.                                                                    |
+| `npm run verify:changed`                  | Detects changed workspaces from `git status` and runs lint, typecheck, and tests for each affected workspace.          |
+| `npm run verify:changed:list`             | Prints which workspaces `verify:changed` would verify, without running the checks.                                     |
 | `npm run typecheck`                       | Composite TypeScript check (per package via Turborepo).                                                                |
 | `npm run typecheck:clear-cache`           | Deletes `*.tsbuildinfo` + TS cache folders.                                                                            |
 | `npm run lint`                            | Runs all workspace lint targets, shared root config, and a Prettier check for `_bmad-output`/config.                   |

@@ -437,6 +437,127 @@
           }
         ]
       },
+      "GuardianInvitationInput": {
+        "type": "object",
+        "properties": {
+          "teenId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "guardianEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "consentLevel": {
+            "type": "string",
+            "enum": [
+              "read_only",
+              "full_access"
+            ],
+            "default": "read_only"
+          }
+        },
+        "required": [
+          "teenId",
+          "guardianEmail"
+        ]
+      },
+      "GuardianInvitationResponse": {
+        "type": "object",
+        "properties": {
+          "invitationId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "teenId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "guardianEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "consentLevel": {
+            "type": "string",
+            "enum": [
+              "read_only",
+              "full_access"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "invitationLink": {
+            "type": "string",
+            "format": "uri"
+          },
+          "deliveryQueued": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "invitationId",
+          "teenId",
+          "guardianEmail",
+          "consentLevel",
+          "expiresAt",
+          "invitationLink",
+          "deliveryQueued"
+        ]
+      },
+      "GuardianInvitationAcceptInput": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "GuardianInvitationAcceptResponse": {
+        "type": "object",
+        "properties": {
+          "teenId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "teenEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "guardianId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "guardianEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "consentLevel": {
+            "type": "string",
+            "enum": [
+              "read_only",
+              "full_access"
+            ]
+          },
+          "grantedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "teenId",
+          "teenEmail",
+          "guardianId",
+          "guardianEmail",
+          "consentLevel",
+          "grantedAt"
+        ]
+      },
       "ModerationActionInput": {
         "type": "object",
         "properties": {
@@ -920,6 +1041,108 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventsPollResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/guardian/invitations": {
+      "post": {
+        "tags": [
+          "guardian"
+        ],
+        "summary": "Invite a guardian for a teen account",
+        "description": "Creates a signed seven-day invitation token, queues an invitation email, and stores the invitation for later acceptance.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardianInvitationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Guardian invitation created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianInvitationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Guardian invitation payload failed validation or the teen is not eligible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Teen account was not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/guardian/accept": {
+      "post": {
+        "tags": [
+          "guardian"
+        ],
+        "summary": "Accept a guardian invitation",
+        "description": "Validates the signed invitation token, links or creates the guardian account, records consent, and queues confirmation emails.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardianInvitationAcceptInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Guardian invitation accepted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianInvitationAcceptResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Guardian invitation token is invalid, expired, or already used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Guardian invitation could not be found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
                 }
               }
             }
