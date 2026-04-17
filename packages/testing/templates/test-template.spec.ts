@@ -14,6 +14,7 @@ const prisma = {
   forecastSegment: { deleteMany: () => Promise.resolve({ count: 0 }) },
   garmentItem: { deleteMany: () => Promise.resolve({ count: 0 }) },
   guardianConsent: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  guardianInvitation: { deleteMany: () => Promise.resolve({ count: 0 }) },
   lookbookPost: { deleteMany: () => Promise.resolve({ count: 0 }) },
   outfitRecommendation: { deleteMany: () => Promise.resolve({ count: 0 }) },
   paletteInsights: { deleteMany: () => Promise.resolve({ count: 0 }) },

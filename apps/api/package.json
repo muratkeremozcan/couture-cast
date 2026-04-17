@@ -53,6 +53,7 @@
     "build:watch": "nest build --watch",
     "format": "prettier --write \"src/**/*.ts\" \"integration/**/*.ts\"",
     "prelint": "npm run prepare:shared-deps",
+    "lint:ci": "eslint --max-warnings=0 \"{src,apps,libs,test,integration}/**/*.ts\"",
     "prestart": "npm run build",
     "start": "node dist/src/main.js",
     "start:dev": "node ../../scripts/start-api-watch.mjs",

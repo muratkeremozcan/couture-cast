@@ -45,6 +45,8 @@ test('writes a valid HTTP OpenAPI document for the initial contract slice', asyn
     )
     expect(paths['/api/v1/auth/signup']?.post?.responses?.['201']).toBeDefined()
     expect(paths['/api/v1/auth/guardian-consent']).toBeDefined()
+    expect(paths['/api/v1/guardian/invitations']).toBeDefined()
+    expect(paths['/api/v1/guardian/accept']).toBeDefined()
     expect(paths['/api/v1/health/queues']).toBeDefined()
     expect(paths['/api/v1/events/poll']).toBeDefined()
     expect(paths['/api/v1/moderation/actions']).toBeDefined()
