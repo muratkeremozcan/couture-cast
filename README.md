@@ -59,50 +59,50 @@ npm run typecheck  # TypeScript project references across every workspace
 npm run typecheck:clear-cache
 ```
 
-| Command                                   | What it does                                                                                                           |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`                             | Runs all workspace `dev` scripts via Turborepo (parallel).                                                             |
-| `npm run build`                           | Builds all workspaces respecting dependency graph.                                                                     |
-| `npm run verify:api`                      | Runs API lint, typecheck, and tests in sequence without the API lint step auto-fixing files.                           |
-| `npm run verify:web`                      | Runs web lint, typecheck, and tests in sequence.                                                                       |
-| `npm run verify:mobile`                   | Runs mobile lint, typecheck, and tests in sequence.                                                                    |
-| `npm run verify:changed`                  | Detects changed workspaces from `git status` and runs lint, typecheck, and tests for each affected workspace.          |
-| `npm run verify:changed:list`             | Prints which workspaces `verify:changed` would verify, without running the checks.                                     |
-| `npm run typecheck`                       | Composite TypeScript check (per package via Turborepo).                                                                |
-| `npm run typecheck:clear-cache`           | Deletes `*.tsbuildinfo` + TS cache folders.                                                                            |
-| `npm run lint`                            | Runs all workspace lint targets, shared root config, and a Prettier check for `_bmad-output`/config.                   |
-| `npm run lint:fix`                        | Runs lint across workspaces + root with `--fix`, then formats via Prettier.                                            |
-| `npm run lint:staged`                     | Lints + formats staged files via `lint-staged`. Wire into your git hooks if desired.                                   |
-| `npm run generate:http-openapi`           | Regenerates the canonical HTTP OpenAPI spec at `packages/api-client/docs/http.openapi.json` from shared Zod contracts. |
-| `npm run generate:api-client`             | Regenerates the canonical HTTP OpenAPI spec, then rebuilds the generated TypeScript SDK surface.                       |
-| `npm run optic:lint`                      | Validates the checked-in canonical HTTP OpenAPI spec with Optic.                                                       |
-| `npm run optic:diff`                      | Compares the canonical HTTP OpenAPI spec against `main` and fails on breaking changes unless versioning is explicit.   |
-| `npm run start:web`                       | Starts the built Next.js app on port 3005 (used by Playwright’s webServer hook).                                       |
-| `npm run start:api`                       | Runs `db:generate` + Prisma migrate deploy, then starts Nest API in watch mode on port 4000.                           |
-| `npm run start:mobile:server`             | Starts Expo dev server on 19000/19001 for Maestro smoke runs.                                                          |
-| `npm run start:mobile:e2e`                | One-shot mobile smoke: boots a simulator (android→iOS), starts Expo, runs Maestro.                                     |
-| `npm run mobile:sim:ios`                  | Boots the default iOS simulator (`IOS_SIM_DEVICE` override) and shows booted devices.                                  |
-| `npm run mobile:sim:android`              | Boots the default Android AVD (`AVD_NAME` override) and waits for `adb` ready.                                         |
-| `npm run mobile:device`                   | Convenience opener for a simulator/emulator (launch one manually if this no-ops).                                      |
-| `npm run mobile:expo-go`                  | Installs Expo Go APK onto the connected emulator/device.                                                               |
-| `npm run start:all`                       | Starts both API + web servers concurrently (mirrors Playwright’s `webServer` config).                                  |
-| `npm run test:pw-local`                   | Convenience wrapper that sets `TEST_ENV=local` and runs the smoke suite.                                               |
-| `npm run test:pw-dev`                     | Targets the dev deployment (`TEST_ENV=dev`).                                                                           |
-| `npm run test:pw-prod`                    | Targets the prod deployment (`TEST_ENV=prod`).                                                                         |
-| `npm run test:pw:burn-in`                 | Burn-in all specs locally (`PW_BURN_IN=true`, repeat-each=3, retries=0).                                               |
-| `npm run test:pw:burn-in-changed-classic` | Playwright built-in `--only-changed` burn-in vs main (3x, retries=0) — can overrun.                                    |
-| `npm run test:pw:burn-in-changed`         | Smart burn-in via `@seontechnologies/playwright-utils` (config-driven, respects skip/percentage).                      |
-| `npm run maestro:install`                 | Installs the Maestro CLI (brew/curl on macOS; npx fallback on CI).                                                     |
-| `npm run test:mobile:e2e`                 | Starts Expo (if needed) and runs the Maestro smoke flow against the dev server it spawns.                              |
-| `npm run test:mobile:e2e:ios`             | Boots the default iOS simulator and runs the Maestro smoke flow against Expo dev server.                               |
-| `npm run validate`                        | Runs `typecheck`, then `lint`, then `test` sequentially via `npm-run-all`.                                             |
-| `npm run clean`                           | Cleans each workspace’s build outputs.                                                                                 |
-| `npm run clean:install`                   | Nukes every `node_modules` (root/apps/packages) and performs a fresh `npm install`.                                    |
-| `npm run db:migrate`                      | Runs Prisma migrate in `packages/db` (requires `DATABASE_URL`).                                                        |
-| `npm run db:seed`                         | Runs Prisma seed in `packages/db` (requires `DATABASE_URL`).                                                           |
-| `npm run db:reset`                        | Resets DB (migrate reset + seed) in `packages/db` (requires `DATABASE_URL`).                                           |
-| `npm run supabase:start`                  | Starts local Supabase stack (Postgres/auth/storage/Studio) via Docker.                                                 |
-| `npm run supabase:stop`                   | Stops the local Supabase stack.                                                                                        |
+| Command                                   | What it does                                                                                                               |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                             | Runs all workspace `dev` scripts via Turborepo (parallel).                                                                 |
+| `npm run build`                           | Builds all workspaces respecting dependency graph.                                                                         |
+| `npm run verify:api`                      | Runs API lint, typecheck, tests, and build in sequence without the API lint step auto-fixing files.                        |
+| `npm run verify:web`                      | Runs web lint, typecheck, tests, and build in sequence.                                                                    |
+| `npm run verify:mobile`                   | Runs mobile lint, typecheck, and tests in sequence; mobile has no workspace build script.                                  |
+| `npm run verify:changed`                  | Detects changed workspaces from `git status` and runs each workspace’s local non-E2E gate, including build when available. |
+| `npm run verify:changed:list`             | Prints which workspaces `verify:changed` would verify, without running the checks.                                         |
+| `npm run typecheck`                       | Composite TypeScript check (per package via Turborepo).                                                                    |
+| `npm run typecheck:clear-cache`           | Deletes `*.tsbuildinfo` + TS cache folders.                                                                                |
+| `npm run lint`                            | Runs all workspace lint targets, shared root config, and a Prettier check for `_bmad-output`/config.                       |
+| `npm run lint:fix`                        | Runs lint across workspaces + root with `--fix`, then formats via Prettier.                                                |
+| `npm run lint:staged`                     | Lints + formats staged files via `lint-staged`. Wire into your git hooks if desired.                                       |
+| `npm run generate:http-openapi`           | Regenerates the canonical HTTP OpenAPI spec at `packages/api-client/docs/http.openapi.json` from shared Zod contracts.     |
+| `npm run generate:api-client`             | Regenerates the canonical HTTP OpenAPI spec, then rebuilds the generated TypeScript SDK surface.                           |
+| `npm run optic:lint`                      | Validates the checked-in canonical HTTP OpenAPI spec with Optic.                                                           |
+| `npm run optic:diff`                      | Compares the canonical HTTP OpenAPI spec against `main` and fails on breaking changes unless versioning is explicit.       |
+| `npm run start:web`                       | Starts the built Next.js app on port 3005 (used by Playwright’s webServer hook).                                           |
+| `npm run start:api`                       | Runs `db:generate` + Prisma migrate deploy, then starts Nest API in watch mode on port 4000.                               |
+| `npm run start:mobile:server`             | Starts Expo dev server on 19000/19001 for Maestro smoke runs.                                                              |
+| `npm run start:mobile:e2e`                | One-shot mobile smoke: boots a simulator (android→iOS), starts Expo, runs Maestro.                                         |
+| `npm run mobile:sim:ios`                  | Boots the default iOS simulator (`IOS_SIM_DEVICE` override) and shows booted devices.                                      |
+| `npm run mobile:sim:android`              | Boots the default Android AVD (`AVD_NAME` override) and waits for `adb` ready.                                             |
+| `npm run mobile:device`                   | Convenience opener for a simulator/emulator (launch one manually if this no-ops).                                          |
+| `npm run mobile:expo-go`                  | Installs Expo Go APK onto the connected emulator/device.                                                                   |
+| `npm run start:all`                       | Starts both API + web servers concurrently (mirrors Playwright’s `webServer` config).                                      |
+| `npm run test:pw-local`                   | Convenience wrapper that sets `TEST_ENV=local` and runs the smoke suite.                                                   |
+| `npm run test:pw-dev`                     | Targets the dev deployment (`TEST_ENV=dev`).                                                                               |
+| `npm run test:pw-prod`                    | Targets the prod deployment (`TEST_ENV=prod`).                                                                             |
+| `npm run test:pw:burn-in`                 | Burn-in all specs locally (`PW_BURN_IN=true`, repeat-each=3, retries=0).                                                   |
+| `npm run test:pw:burn-in-changed-classic` | Playwright built-in `--only-changed` burn-in vs main (3x, retries=0) — can overrun.                                        |
+| `npm run test:pw:burn-in-changed`         | Smart burn-in via `@seontechnologies/playwright-utils` (config-driven, respects skip/percentage).                          |
+| `npm run maestro:install`                 | Installs the Maestro CLI (brew/curl on macOS; npx fallback on CI).                                                         |
+| `npm run test:mobile:e2e`                 | Starts Expo (if needed) and runs the Maestro smoke flow against the dev server it spawns.                                  |
+| `npm run test:mobile:e2e:ios`             | Boots the default iOS simulator and runs the Maestro smoke flow against Expo dev server.                                   |
+| `npm run validate`                        | Runs `typecheck`, then `lint`, then `test`, then `build` sequentially. This is the full local non-E2E gate.                |
+| `npm run clean`                           | Cleans each workspace’s build outputs.                                                                                     |
+| `npm run clean:install`                   | Nukes every `node_modules` (root/apps/packages) and performs a fresh `npm install`.                                        |
+| `npm run db:migrate`                      | Runs Prisma migrate in `packages/db` (requires `DATABASE_URL`).                                                            |
+| `npm run db:seed`                         | Runs Prisma seed in `packages/db` (requires `DATABASE_URL`).                                                               |
+| `npm run db:reset`                        | Resets DB (migrate reset + seed) in `packages/db` (requires `DATABASE_URL`).                                               |
+| `npm run supabase:start`                  | Starts local Supabase stack (Postgres/auth/storage/Studio) via Docker.                                                     |
+| `npm run supabase:stop`                   | Stops the local Supabase stack.                                                                                            |
 
 > Pre-commit guardrails: `.husky/pre-commit` already runs `npm run lint` and `npm run lint:staged`. Extend that file if you need extra checks.
 

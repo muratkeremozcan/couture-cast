@@ -42,13 +42,31 @@ function buildReadonlyApiLintCommand(workspaceDir) {
   return {
     label: 'lint',
     command: 'npm',
-    args: ['exec', '--yes', '--', 'eslint', '--max-warnings=0', '--ext', '.ts', ...candidateDirs],
+    args: [
+      'exec',
+      '--yes',
+      '--',
+      'eslint',
+      '--max-warnings=0',
+      '--ext',
+      '.ts',
+      ...candidateDirs,
+    ],
   }
 }
 
-function buildWorkspaceCommands(workspaceDir) {
+function buildWorkspaceCommands(workspaceDir, packageJson) {
+  const buildCommand =
+    packageJson.scripts?.build
+      ? {
+          label: 'build',
+          command: 'npm',
+          args: ['run', 'build', '--workspace', workspaceDir],
+        }
+      : null
+
   if (workspaceDir === 'apps/api') {
-    return [
+    const commands = [
       buildReadonlyApiLintCommand(workspaceDir),
       {
         label: 'typecheck',
@@ -61,13 +79,25 @@ function buildWorkspaceCommands(workspaceDir) {
         args: ['run', 'test', '--workspace', workspaceDir],
       },
     ]
+
+    if (buildCommand) {
+      commands.push(buildCommand)
+    }
+
+    return commands
   }
 
-  return ['lint', 'typecheck', 'test'].map((scriptName) => ({
+  const commands = ['lint', 'typecheck', 'test'].map((scriptName) => ({
     label: scriptName,
     command: 'npm',
     args: ['run', scriptName, '--workspace', workspaceDir],
   }))
+
+  if (buildCommand) {
+    commands.push(buildCommand)
+  }
+
+  return commands
 }
 
 const rawWorkspaceDir = process.argv[2]
@@ -88,7 +118,7 @@ const workspaceLabel = `${packageJson.name} (${workspaceDir})`
 
 console.log(`Verifying ${workspaceLabel}`)
 
-for (const command of buildWorkspaceCommands(workspaceDir)) {
+for (const command of buildWorkspaceCommands(workspaceDir, packageJson)) {
   console.log(`\n[${workspaceLabel}] ${command.label}`)
   run(command.command, command.args)
 }

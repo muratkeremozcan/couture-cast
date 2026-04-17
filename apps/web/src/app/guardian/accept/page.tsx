@@ -1,10 +1,18 @@
-'use client'
-
-import { useSearchParams } from 'next/navigation'
 import { GuardianAcceptView } from './guardian-accept-view'
 
-export default function GuardianAcceptPage() {
-  const searchParams = useSearchParams()
+type GuardianAcceptPageProps = {
+  searchParams?: Promise<{
+    token?: string | string[]
+  }>
+}
 
-  return <GuardianAcceptView initialToken={searchParams.get('token')} />
+export default async function GuardianAcceptPage({
+  searchParams,
+}: GuardianAcceptPageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {}
+  const token = Array.isArray(resolvedSearchParams.token)
+    ? resolvedSearchParams.token[0]
+    : resolvedSearchParams.token
+
+  return <GuardianAcceptView initialToken={token ?? null} />
 }
