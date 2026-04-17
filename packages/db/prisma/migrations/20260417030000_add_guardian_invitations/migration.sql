@@ -21,6 +21,10 @@ ON "GuardianInvitation"("guardian_email");
 CREATE INDEX "GuardianInvitation_accepted_guardian_id_idx"
 ON "GuardianInvitation"("accepted_guardian_id");
 
+CREATE UNIQUE INDEX "GuardianInvitation_open_teen_email_uniq"
+ON "GuardianInvitation"("teen_id", "guardian_email")
+WHERE "accepted_at" IS NULL;
+
 ALTER TABLE "GuardianInvitation"
 ADD CONSTRAINT "GuardianInvitation_teen_id_fkey"
 FOREIGN KEY ("teen_id") REFERENCES "User"("id")

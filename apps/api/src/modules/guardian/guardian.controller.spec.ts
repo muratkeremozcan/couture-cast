@@ -1,11 +1,26 @@
 import { BadRequestException } from '@nestjs/common'
 import { describe, expect, it, vi } from 'vitest'
+import type {
+  ConsentLevel,
+  GuardianInvitationAcceptResponse,
+  GuardianInvitationResponse,
+} from '../../contracts/http'
 import { GuardianController } from './guardian.controller'
 import type { GuardianService } from './guardian.service'
 
 const createController = () => {
-  const inviteGuardian = vi.fn()
-  const acceptInvitation = vi.fn()
+  const inviteGuardian =
+    vi.fn<
+      (
+        teenId: string,
+        guardianEmail: string,
+        consentLevel: ConsentLevel
+      ) => Promise<GuardianInvitationResponse>
+    >()
+  const acceptInvitation =
+    vi.fn<
+      (token: string, ipAddress?: string) => Promise<GuardianInvitationAcceptResponse>
+    >()
   const guardianService = {
     inviteGuardian,
     acceptInvitation,
@@ -68,20 +83,44 @@ describe('GuardianController', () => {
       grantedAt: '2026-04-17T06:00:00.000Z',
     })
 
-    const result = await controller.acceptInvitation(
-      { token: 'signed-token' },
-      '203.0.113.44'
-    )
+    const result = await controller.acceptInvitation({ token: 'signed-token' }, {
+      headers: {},
+      ip: '203.0.113.44',
+    } as never)
 
     expect(acceptInvitation).toHaveBeenCalledWith('signed-token', '203.0.113.44')
     expect(result.guardianId).toBe('guardian-2')
   })
 
+  it('prefers the leftmost forwarded IP when present', async () => {
+    const { controller, acceptInvitation } = createController()
+    acceptInvitation.mockResolvedValue({
+      teenId: 'teen-2',
+      teenEmail: 'teen2@example.com',
+      guardianId: 'guardian-2',
+      guardianEmail: 'guardian2@example.com',
+      consentLevel: 'full_access',
+      grantedAt: '2026-04-17T06:00:00.000Z',
+    })
+
+    await controller.acceptInvitation({ token: 'signed-token' }, {
+      headers: {
+        'x-forwarded-for': '198.51.100.10, 203.0.113.44',
+      },
+      ip: '10.0.0.1',
+    } as never)
+
+    expect(acceptInvitation).toHaveBeenCalledWith('signed-token', '198.51.100.10')
+  })
+
   it('rejects invalid accept payloads', () => {
     const { controller } = createController()
 
-    expect(() => controller.acceptInvitation({ token: '' }, '127.0.0.1')).toThrow(
-      BadRequestException
-    )
+    expect(() =>
+      controller.acceptInvitation({ token: '' }, {
+        headers: {},
+        ip: '127.0.0.1',
+      } as never)
+    ).toThrow(BadRequestException)
   })
 })

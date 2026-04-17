@@ -48,18 +48,18 @@ class InMemoryGuardianPrisma {
   user = {
     findUnique: vi.fn(({ where }: { where: { id?: string; email?: string } }) => {
       if (where.id) {
-        return this.users.get(where.id) ?? null
+        return Promise.resolve(this.users.get(where.id) ?? null)
       }
 
       if (where.email) {
-        return (
+        return Promise.resolve(
           [...this.users.values()].find(
             (user) => user.email.toLowerCase() === where.email?.toLowerCase()
           ) ?? null
         )
       }
 
-      return null
+      return Promise.resolve(null)
     }),
     create: vi.fn(({ data }: { data: { email: string } }) => {
       const id = `guardian-created-${this.users.size + 1}`

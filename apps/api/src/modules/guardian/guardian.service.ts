@@ -17,6 +17,7 @@ import {
   guardianInvitationResponseSchema,
   type ConsentLevel,
 } from '../../contracts/http'
+import { z } from 'zod'
 
 type InvitationTokenPayload = {
   sub: string
@@ -30,6 +31,15 @@ type InvitationTokenPayload = {
 
 const GUARDIAN_INVITATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const DEVELOPMENT_INVITATION_SECRET = 'guardian-invite-development-secret'
+const invitationTokenPayloadSchema = z.object({
+  sub: z.string().min(1),
+  teenId: z.string().min(1),
+  guardianEmail: z.string().email(),
+  consentLevel: consentLevelSchema,
+  type: z.literal('guardian_invitation'),
+  iat: z.number().int(),
+  exp: z.number().int(),
+})
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -50,26 +60,27 @@ function resolveInvitationBaseUrl() {
 }
 
 function resolveInvitationSecret() {
-  const configuredSecret =
-    process.env.GUARDIAN_INVITE_JWT_SECRET ?? process.env.JWT_SECRET
-
+  const configuredSecret = process.env.GUARDIAN_INVITE_JWT_SECRET
   if (configuredSecret?.trim()) {
     return configuredSecret.trim()
   }
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.ALLOW_DEV_GUARDIAN_SECRET === 'true'
+  ) {
     return DEVELOPMENT_INVITATION_SECRET
   }
 
-  throw new Error('GUARDIAN_INVITE_JWT_SECRET is required in production')
+  throw new Error('GUARDIAN_INVITE_JWT_SECRET is required for guardian invitation tokens')
 }
 
 function encodeBase64Url(value: string) {
   return Buffer.from(value).toString('base64url')
 }
 
-function decodeBase64Url<T>(value: string): T {
-  return JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as T
+function decodeBase64Url(value: string) {
+  return Buffer.from(value, 'base64url').toString('utf8')
 }
 
 function signJwt(payload: InvitationTokenPayload, secret: string) {
@@ -102,15 +113,19 @@ function verifyJwt(token: string, secret: string) {
     throw new BadRequestException('Guardian invitation token is invalid')
   }
 
-  const payload = decodeBase64Url<InvitationTokenPayload>(body)
+  let parsedBody: unknown
+  try {
+    parsedBody = JSON.parse(decodeBase64Url(body))
+  } catch {
+    throw new BadRequestException('Guardian invitation token is malformed')
+  }
 
-  if (payload.type !== 'guardian_invitation') {
+  const parsedPayload = invitationTokenPayloadSchema.safeParse(parsedBody)
+  if (!parsedPayload.success) {
     throw new BadRequestException('Guardian invitation token is invalid')
   }
 
-  if (!consentLevelSchema.safeParse(payload.consentLevel).success) {
-    throw new BadRequestException('Guardian invitation token is invalid')
-  }
+  const payload: InvitationTokenPayload = parsedPayload.data
 
   if (payload.exp * 1000 <= Date.now()) {
     throw new BadRequestException('Guardian invitation token has expired')
@@ -198,42 +213,51 @@ export class GuardianService {
     }
 
     const expiresAt = new Date(Date.now() + GUARDIAN_INVITATION_TOKEN_TTL_MS)
-    const invitation = await this.prisma.guardianInvitation.create({
-      data: {
-        teen_id: teen.id,
-        guardian_email: normalizedGuardianEmail,
-        consent_level: parsed.consentLevel,
-        expires_at: expiresAt,
-      },
-    })
-    const token = signJwt(
-      {
-        sub: invitation.id,
-        teenId: teen.id,
-        guardianEmail: normalizedGuardianEmail,
-        consentLevel: parsed.consentLevel,
-        type: 'guardian_invitation',
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(expiresAt.getTime() / 1000),
-      },
-      resolveInvitationSecret()
-    )
-    const invitationLink = `${resolveInvitationBaseUrl()}/guardian/accept?token=${encodeURIComponent(token)}`
-
-    await this.prisma.eventEnvelope.create({
-      data: {
-        channel: 'email.guardian-invitation',
-        user_id: teen.id,
-        payload: {
-          to: normalizedGuardianEmail,
-          teenId: teen.id,
-          teenEmail: teen.email,
-          invitationId: invitation.id,
-          invitationLink,
-          consentLevel: parsed.consentLevel,
-          expiresAt: expiresAt.toISOString(),
+    const invitationSecret = resolveInvitationSecret()
+    const invitationBaseUrl = resolveInvitationBaseUrl()
+    const { invitation, invitationLink } = await this.prisma.$transaction(async (tx) => {
+      const createdInvitation = await tx.guardianInvitation.create({
+        data: {
+          teen_id: teen.id,
+          guardian_email: normalizedGuardianEmail,
+          consent_level: parsed.consentLevel,
+          expires_at: expiresAt,
         },
-      },
+      })
+      const token = signJwt(
+        {
+          sub: createdInvitation.id,
+          teenId: teen.id,
+          guardianEmail: normalizedGuardianEmail,
+          consentLevel: parsed.consentLevel,
+          type: 'guardian_invitation',
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(expiresAt.getTime() / 1000),
+        },
+        invitationSecret
+      )
+      const nextInvitationLink = `${invitationBaseUrl}/guardian/accept?token=${encodeURIComponent(token)}`
+
+      await tx.eventEnvelope.create({
+        data: {
+          channel: 'email.guardian-invitation',
+          user_id: teen.id,
+          payload: {
+            to: normalizedGuardianEmail,
+            teenId: teen.id,
+            teenEmail: teen.email,
+            invitationId: createdInvitation.id,
+            invitationLink: nextInvitationLink,
+            consentLevel: parsed.consentLevel,
+            expiresAt: expiresAt.toISOString(),
+          },
+        },
+      })
+
+      return {
+        invitation: createdInvitation,
+        invitationLink: nextInvitationLink,
+      }
     })
 
     return guardianInvitationResponseSchema.parse({

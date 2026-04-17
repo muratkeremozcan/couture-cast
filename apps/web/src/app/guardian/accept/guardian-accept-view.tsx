@@ -63,6 +63,7 @@ export function GuardianAcceptView({
         <p
           data-testid="guardian-accept-error"
           className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+          aria-live="assertive"
         >
           {errorMessage}
         </p>
@@ -72,6 +73,7 @@ export function GuardianAcceptView({
         <p
           data-testid="guardian-accept-success"
           className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+          aria-live="polite"
         >
           {successMessage}
         </p>

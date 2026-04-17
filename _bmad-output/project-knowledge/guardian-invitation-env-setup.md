@@ -23,8 +23,10 @@ The API reads them in this order:
 and:
 
 1. `GUARDIAN_INVITE_JWT_SECRET`
-2. `JWT_SECRET`
-3. a development-only fallback secret outside production
+2. fallback `guardian-invite-development-secret` only when `NODE_ENV === 'test'`
+3. fallback `guardian-invite-development-secret` only when
+   `ALLOW_DEV_GUARDIAN_SECRET=true`
+4. otherwise the API throws and refuses to mint or accept invitation tokens
 
 ## Local files on this machine
 
@@ -107,7 +109,7 @@ Optional only if you want shared origin metadata across projects:
 - `NEXT_PUBLIC_APP_URL`
 - `APP_URL`
 
-These are fallback inputs in the API code, but they are not required if
+These are fallback inputs for invitation link base URL, but they are not required if
 `GUARDIAN_INVITE_WEB_BASE_URL` is set correctly on the API project.
 
 ### GitHub Actions

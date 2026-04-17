@@ -92,7 +92,13 @@ describe('SignupScreen', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
 
+    expect(screen.queryByText('Guardian invitation')).toBeNull()
+
     await waitFor(() => {
+      expect(submitSignup).toHaveBeenCalledWith({
+        email: 'teen@example.com',
+        birthdate: '2011-04-15',
+      })
       expect(screen.getByText('Guardian invitation')).toBeTruthy()
     })
 

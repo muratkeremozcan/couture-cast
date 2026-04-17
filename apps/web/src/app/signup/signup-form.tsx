@@ -7,6 +7,7 @@ import type {
   SignupInput,
   SignupResponse,
 } from '@couture/api-client/contracts/http'
+import { guardianInvitationInputSchema } from '@couture/api-client/contracts/http'
 import {
   AGE_GATE_MESSAGES,
   evaluateBirthdateInput,
@@ -84,8 +85,18 @@ export function SignupForm({
       return
     }
 
+    const guardianEmailValidation =
+      guardianInvitationInputSchema.shape.guardianEmail.safeParse(guardianEmail)
+    if (!guardianEmailValidation.success) {
+      setErrorMessage('Enter a valid guardian email address.')
+      setSuccessMessage(null)
+      setInviteLink(null)
+      return
+    }
+
     setErrorMessage(null)
     setSuccessMessage(null)
+    setInviteLink(null)
     setIsInviting(true)
 
     try {
@@ -99,6 +110,7 @@ export function SignupForm({
         `Guardian invitation sent to ${response.guardianEmail}. Share the link below if they do not see the email.`
       )
     } catch (error) {
+      setInviteLink(null)
       setErrorMessage(
         error instanceof Error ? error.message : 'Guardian invitation failed'
       )

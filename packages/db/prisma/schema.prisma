@@ -106,6 +106,8 @@ model GuardianInvitation {
   created_at          DateTime      @default(now())
   updated_at          DateTime      @updatedAt
 
+  // Prisma cannot express the filtered unique index for open invitations; the raw SQL
+  // migration enforces one outstanding invite per teen/email while still allowing history.
   @@index([teen_id])
   @@index([guardian_email])
   @@index([accepted_guardian_id])

@@ -20,6 +20,13 @@ function run(command, args, options = {}) {
     shell: options.shell ?? false,
   })
 
+  if (result.error) {
+    const exitCode =
+      typeof result.error.code === 'number' ? result.error.code : 1
+    console.error(result.error.stack ?? result.error.message)
+    process.exit(exitCode)
+  }
+
   if (result.status !== 0) {
     process.exit(result.status ?? 1)
   }
@@ -42,16 +49,7 @@ function buildReadonlyApiLintCommand(workspaceDir) {
   return {
     label: 'lint',
     command: 'npm',
-    args: [
-      'exec',
-      '--yes',
-      '--',
-      'eslint',
-      '--max-warnings=0',
-      '--ext',
-      '.ts',
-      ...candidateDirs,
-    ],
+    args: ['run', 'lint:ci', '--workspace', workspaceDir],
   }
 }
 

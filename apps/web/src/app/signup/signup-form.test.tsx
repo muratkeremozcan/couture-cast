@@ -92,7 +92,13 @@ describe('SignupForm', () => {
     })
     fireEvent.submit(screen.getByRole('button', { name: 'Create account' }))
 
+    expect(screen.queryByText('Guardian invitation')).not.toBeInTheDocument()
+
     await waitFor(() => {
+      expect(submitSignup).toHaveBeenCalledWith({
+        email: 'teen@example.com',
+        birthdate: '2011-04-15',
+      })
       expect(screen.getByText('Guardian invitation')).toBeInTheDocument()
     })
 

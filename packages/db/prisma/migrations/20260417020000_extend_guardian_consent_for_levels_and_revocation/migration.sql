@@ -11,7 +11,7 @@ ADD COLUMN "revoked_at" TIMESTAMP(3);
 -- Preserve revoked state for any historical rows that were already marked
 -- revoked before the dedicated timestamp existed.
 UPDATE "GuardianConsent"
-SET "revoked_at" = COALESCE("consent_granted_at", CURRENT_TIMESTAMP)
+SET "revoked_at" = "consent_granted_at"
 WHERE "status" = 'revoked'
   AND "revoked_at" IS NULL;
 

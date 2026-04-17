@@ -28,7 +28,9 @@ describe('GuardianAcceptScreen', () => {
   })
 
   it('shows an error when the token is missing', async () => {
-    render(<GuardianAcceptScreen token={null} acceptInvitation={vi.fn()} />)
+    const acceptInvitation = vi.fn()
+
+    render(<GuardianAcceptScreen token={null} acceptInvitation={acceptInvitation} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Accept invitation' }))
 
@@ -37,5 +39,6 @@ describe('GuardianAcceptScreen', () => {
         'Invitation token is missing from this link.'
       )
     })
+    expect(acceptInvitation).not.toHaveBeenCalled()
   })
 })

@@ -38,19 +38,28 @@ function run(command, args, options = {}) {
   return result
 }
 
-function parseChangedPaths(output) {
-  return output
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .filter(Boolean)
-    .map((line) => {
-      const entry = line.slice(3)
-      const renamedTarget = entry.includes(' -> ')
-        ? entry.slice(entry.lastIndexOf(' -> ') + 4)
-        : entry
+function parseChangedPathsNul(output) {
+  const records = output.split('\0').filter(Boolean)
+  const changedPaths = []
 
-      return renamedTarget.replace(/^"+|"+$/g, '')
-    })
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index]
+    const status = record.slice(0, 2)
+    const entry = record.slice(3)
+
+    if (status.includes('R') || status.includes('C')) {
+      const renamedTarget = records[index + 1]
+      if (renamedTarget) {
+        changedPaths.push(renamedTarget)
+        index += 1
+        continue
+      }
+    }
+
+    changedPaths.push(entry)
+  }
+
+  return changedPaths
 }
 
 function findWorkspaceDirs() {
@@ -87,8 +96,8 @@ function isIgnoredNonWorkspaceFile(filePath) {
   )
 }
 
-const gitStatusResult = run('git', ['status', '--porcelain'])
-const changedPaths = [...new Set(parseChangedPaths(gitStatusResult.stdout ?? ''))]
+const gitStatusResult = run('git', ['status', '--porcelain', '-z'])
+const changedPaths = [...new Set(parseChangedPathsNul(gitStatusResult.stdout ?? ''))]
 const workspaceDirs = findWorkspaceDirs()
 
 const changedWorkspaceDirs = new Set()
