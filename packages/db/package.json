@@ -12,7 +12,7 @@
     "db:generate": "prisma generate",
     "lint": "eslint --max-warnings=0 --ext .ts prisma/seeds",
     "typecheck": "prisma generate && tsc --noEmit -p tsconfig.json",
-    "test": "node -e \"console.log('@couture/db: no unit tests configured')\""
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@faker-js/faker": "10.1.0",
