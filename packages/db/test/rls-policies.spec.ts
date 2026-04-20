@@ -42,11 +42,12 @@ type SeededScenario = {
   consentFullId: string
 }
 
-let scenario: SeededScenario
+let scenario: SeededScenario | undefined
 
 const buildClaims = (email: string, role: string) => ({
   sub: randomUUID(),
   email,
+  email_verified: true,
   role: 'authenticated',
   app_metadata: {
     role,
@@ -73,7 +74,11 @@ const withRole = async <T>(
 
     return await run(client)
   } finally {
-    await client.query('ROLLBACK')
+    try {
+      await client.query('ROLLBACK')
+    } catch {
+      // Ignore rollback failures so the pooled client is still released.
+    }
     client.release()
   }
 }
@@ -251,17 +256,27 @@ const cleanupScenario = async (seeded: SeededScenario | undefined) => {
 
 describe.sequential('guardian-aware RLS policies', () => {
   beforeAll(async () => {
-    const client = await adminPool.connect()
+    let client: PoolClient | undefined
 
     try {
+      client = await adminPool.connect()
       await client.query('SELECT 1 FROM public."GuardianInvitation" LIMIT 1')
+    } catch (error) {
+      throw new Error(
+        'Guardian-aware RLS tests require a migrated target database. Run `npx prisma migrate deploy --schema packages/db/prisma/schema.prisma` against the RLS test DB before running this suite.',
+        { cause: error }
+      )
     } finally {
-      client.release()
+      client?.release()
     }
   })
 
   afterEach(async () => {
-    await cleanupScenario(scenario)
+    try {
+      await cleanupScenario(scenario)
+    } finally {
+      scenario = undefined
+    }
   })
 
   afterAll(async () => {
@@ -466,10 +481,35 @@ describe.sequential('guardian-aware RLS policies', () => {
       async (client) => {
         const teenPosts = await client.query(
           'SELECT "id" FROM public."LookbookPost" WHERE "user_id" = $1',
-          [scenario.teenId]
+          [scenario!.teenId]
         )
 
         expect(teenPosts.rows).toHaveLength(0)
+      }
+    )
+  })
+
+  it('does not trust unverified email claims for cross-account access', async () => {
+    scenario = await seedScenario()
+
+    await withRole(
+      'authenticated',
+      {
+        sub: randomUUID(),
+        email: scenario.teenEmail,
+        email_verified: false,
+        role: 'authenticated',
+        app_metadata: {
+          role: 'guardian',
+        },
+      },
+      async (client) => {
+        const garmentRows = await client.query(
+          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+          [scenario.teenId]
+        )
+
+        expect(garmentRows.rows).toHaveLength(0)
       }
     )
   })
@@ -499,6 +539,36 @@ describe.sequential('guardian-aware RLS policies', () => {
         code: '42501',
       })
     })
+  })
+
+  it('does not grant access from user_metadata identity or role claims', async () => {
+    scenario = await seedScenario()
+
+    await withRole(
+      'authenticated',
+      {
+        sub: randomUUID(),
+        email: scenario.outsiderGuardianEmail,
+        email_verified: true,
+        role: 'authenticated',
+        app_metadata: {
+          role: 'guardian',
+        },
+        user_metadata: {
+          app_user_id: scenario.teenId,
+          app_role: 'admin',
+          role: 'admin',
+        },
+      },
+      async (client) => {
+        const garmentRows = await client.query(
+          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+          [scenario.teenId]
+        )
+
+        expect(garmentRows.rows).toHaveLength(0)
+      }
+    )
   })
 
   it('allows admin claims to inspect and update teen wardrobe rows without service role bypass', async () => {

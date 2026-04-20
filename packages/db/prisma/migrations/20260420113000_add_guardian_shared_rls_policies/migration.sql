@@ -4,7 +4,8 @@
 -- The current application schema still uses text/cuid identifiers for "User".id,
 -- while Supabase Auth emits UUID subjects. Until the auth bridge starts minting a
 -- dedicated app_user_id claim, policies resolve the current app user through JWT
--- claims first and then fall back to the signed email claim.
+-- claims first and then fall back to a verified signed email claim. Never trust
+-- user_metadata for identity or role because the client can mutate it.
 
 CREATE SCHEMA IF NOT EXISTS private;
 
@@ -22,13 +23,17 @@ AS $$
   SELECT COALESCE(
     NULLIF(auth.jwt() ->> 'app_user_id', ''),
     NULLIF(auth.jwt() -> 'app_metadata' ->> 'app_user_id', ''),
-    NULLIF(auth.jwt() -> 'user_metadata' ->> 'app_user_id', ''),
-    (
-      SELECT "id"
-      FROM public."User"
-      WHERE lower("email") = lower(NULLIF(auth.jwt() ->> 'email', ''))
-      LIMIT 1
-    ),
+    -- TODO(CC-0.11): replace this verified-email fallback with an auth-hook or
+    -- ownership invariant that refreshes app_user_id on email reassignment.
+    CASE
+      WHEN lower(COALESCE(auth.jwt() ->> 'email_verified', 'false')) = 'true' THEN (
+        SELECT "id"
+        FROM public."User"
+        WHERE lower("email") = lower(NULLIF(auth.jwt() ->> 'email', ''))
+        LIMIT 1
+      )
+      ELSE NULL
+    END,
     NULLIF(auth.jwt() ->> 'sub', '')
   );
 $$;
@@ -44,10 +49,7 @@ AS $$
     COALESCE(
       NULLIF(auth.jwt() ->> 'app_role', ''),
       NULLIF(auth.jwt() -> 'app_metadata' ->> 'app_role', ''),
-      NULLIF(auth.jwt() -> 'app_metadata' ->> 'role', ''),
-      NULLIF(auth.jwt() -> 'user_metadata' ->> 'app_role', ''),
-      NULLIF(auth.jwt() -> 'user_metadata' ->> 'role', ''),
-      NULLIF(auth.jwt() ->> 'role', '')
+      NULLIF(auth.jwt() -> 'app_metadata' ->> 'role', '')
     )
   );
 $$;

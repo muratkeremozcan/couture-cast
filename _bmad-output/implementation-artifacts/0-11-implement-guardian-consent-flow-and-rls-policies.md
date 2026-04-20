@@ -132,6 +132,12 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
     );
     ```
 
+  - Note: the shipped migration applies this same guardian-aware pattern to
+    `GarmentItem`, `OutfitRecommendation`, `UserProfile`, `ComfortPreferences`,
+    and `PaletteInsights`. Use
+    `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`
+    and `packages/db/test/rls-policies.spec.ts` as the authoritative source for
+    the real table and policy names.
   - [x] Apply RLS policies to all user-scoped tables (rituals, preferences, etc.)
   - [x] Test RLS policies with different user roles
 
