@@ -96,9 +96,9 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
   - [x] Keep real values only in gitignored local `.env*` files and provider secret stores; never
         paste secret values into the repository
 
-- [ ] Task 4: Implement RLS policies in Supabase (AC: #3)
-  - [ ] Prerequisite: deploy Prisma schema to Supabase dev/prod (once available from Story 0.2) so tables exist for RLS
-  - [ ] Create RLS policy for `wardrobe_items` table:
+- [x] Task 4: Implement RLS policies in Supabase (AC: #3)
+  - [x] Prerequisite: deploy Prisma schema to Supabase dev/prod (once available from Story 0.2) so tables exist for RLS
+  - [x] Create RLS policy for `wardrobe_items` table:
 
     ```sql
     -- Teen can access own wardrobe
@@ -132,8 +132,14 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
     );
     ```
 
-  - [ ] Apply RLS policies to all user-scoped tables (rituals, preferences, etc.)
-  - [ ] Test RLS policies with different user roles
+  - Note: the shipped migration applies this same guardian-aware pattern to
+    `GarmentItem`, `OutfitRecommendation`, `UserProfile`, `ComfortPreferences`,
+    and `PaletteInsights`. Use
+    `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`
+    and `packages/db/test/rls-policies.spec.ts` as the authoritative source for
+    the real table and policy names.
+  - [x] Apply RLS policies to all user-scoped tables (rituals, preferences, etc.)
+  - [x] Test RLS policies with different user roles
 
 - [ ] Task 5: Create audit log for consent events (AC: #4)
   - [ ] Add `consent_event` type to `audit_log` table:
@@ -397,6 +403,11 @@ GPT-5 Codex
 - `npm run typecheck --workspace api`
 - `npm run typecheck --workspace web`
 - `npm run typecheck --workspace mobile`
+- `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres npx prisma migrate deploy --schema packages/db/prisma/schema.prisma`
+- `npm run test --workspace packages/db`
+- `npx eslint --max-warnings=0 packages/db/test/rls-policies.spec.ts packages/db/vitest.config.ts`
+- `set -a; source .env.dev; set +a; npx prisma migrate deploy --schema packages/db/prisma/schema.prisma`
+- `set -a; source .env.prod; set +a; npx prisma migrate deploy --schema packages/db/prisma/schema.prisma`
 
 ### Completion Notes List
 
@@ -410,6 +421,8 @@ GPT-5 Codex
 - Implemented an API guardian module with invitation token signing/verification, teen compliance-state checks, consent persistence, guardian account linking, and analytics capture on successful consent.
 - Queued guardian invitation and confirmation emails through `event_envelope` records so the flow integrates with the repo's existing outbound-event pattern without introducing a parallel mailer stack.
 - Added web and mobile guardian invitation UX for pending teen accounts plus guardian acceptance screens backed by the shared guardian contracts.
+- Added a guardian-aware RLS migration that bridges Supabase JWT claims to the repo's current text user IDs, centralizes guardian/admin access helpers in the private schema, and protects wardrobe-domain tables plus self-only community tables.
+- Added database-level Vitest coverage for teen, guardian read-only, guardian full-access, admin, anonymous, and cross-account denial scenarios, then deployed the RLS migration set to local, dev, and prod Supabase databases.
 
 ### File List
 
@@ -450,6 +463,10 @@ GPT-5 Codex
 - NEW `playwright/tests/api/auth-signup-age-gate.spec.ts`
 - MODIFIED `packages/db/prisma/schema.prisma`
 - NEW `packages/db/prisma/migrations/20260417020000_extend_guardian_consent_for_levels_and_revocation/migration.sql`
+- NEW `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`
+- MODIFIED `packages/db/package.json`
+- NEW `packages/db/vitest.config.ts`
+- NEW `packages/db/test/rls-policies.spec.ts`
 - MODIFIED `.env.example`
 - MODIFIED `apps/api/src/app.module.ts`
 - MODIFIED `apps/api/src/contracts/http.ts`
@@ -481,3 +498,4 @@ GPT-5 Codex
 | 2026-04-16 | Codex              | Completed Task 1 age verification across API, web, mobile, shared utils, OpenAPI docs, and added targeted Playwright API coverage                |
 | 2026-04-17 | Codex              | Completed Task 2 by extending the existing GuardianConsent Prisma model and adding a migration for consent levels and revocation support         |
 | 2026-04-17 | Codex              | Completed Task 3 guardian invitation flow across Prisma, API contracts/module, email event queueing, and web/mobile invitation and acceptance UI |
+| 2026-04-20 | Codex              | Completed Task 4 with guardian-aware RLS policies, database persona tests, and migration deploys to local/dev/prod Supabase environments         |

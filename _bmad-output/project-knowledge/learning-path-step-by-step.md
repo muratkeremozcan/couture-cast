@@ -1,8 +1,8 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-16 - Steps 2, 12, 14, and 15 now reflect the shared `packages/utils`
-age-gate utility, the signup auth contract path, and the thin Playwright API coverage
-used for the new age-verification boundary
+Updated: 2026-04-20 - Step 4 and Step 14 now reflect the completed guardian-aware
+RLS rollout, the auth-to-database enforcement path, and the DB-level policy test
+coverage that now backs guardian consent
 
 ## LLM collaborator prompt
 
@@ -334,16 +334,21 @@ Key takeaways:
 
 1. Supabase env isolation is explicit: local/CI stacks plus cloud `couturecast-dev` and
    `couturecast-prod`, with staging deferred until plan/budget allows.
-2. Reliability depends on env-aware operations: `npx supabase start/link/db push`, pool targets
+2. Reliability depends on env-aware operations: `npx supabase start/link/db push`,
+   `npx prisma migrate deploy --schema packages/db/prisma/schema.prisma`, pool targets
    (dev 50, prod 100), and plan-gated PITR/backups.
 3. Config hygiene is a core skill: keep `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
    `SUPABASE_SERVICE_KEY`, and `DATABASE_URL` aligned across `.env.local`, `.env.dev`, `.env.prod`,
    and secrets manager.
+4. Auth is not finished at signup. Supabase JWT claims still have to resolve to the app's text
+   `User.id` model before guardian-aware RLS can safely protect teen wardrobe data.
 
 Story/Task mapping:
 
 - Story 0.3
 - Task 3 (Supabase CLI), Task 4 (pooling/backups), Task 5 (env configuration)
+- Story 0.11
+- Task 4 (guardian-aware RLS migration rollout and validation)
 
 Story reference:
 
@@ -352,19 +357,34 @@ Story reference:
 Cross-links:
 
 - Step 3 defines the schema and seeds these environments must run.
+- Step 14 explains why signup age-verification and guardian-consent rules must also land at the
+  database policy layer, not only in the HTTP contract.
 - Step 7 carries the same environment contract into CI and deployment automation.
 
 Sequence to follow:
 
 1. Identify the active environment names and which ones are intentionally deferred.
 2. Trace how Supabase CLI and Prisma target those environments.
-3. Keep datasource and secret names aligned across local, CI, and hosted environments.
+3. Read the guardian-aware RLS migration and understand the JWT-claim bridge from Supabase Auth to
+   the repo's text `User.id` values.
+4. Verify teen, guardian, outsider, anon, and admin policy behavior in DB-level tests before
+   deploying to shared environments.
+5. Keep datasource and secret names aligned across local, CI, and hosted environments.
 
 Task owner map:
 
 - Step 4 step 1 owner: anchor the application datasource and database contract in `packages/db/prisma/schema.prisma`
 - Step 4 step 2 owner: define Supabase environment and operational rules in `_bmad-output/implementation-artifacts/0-3-set-up-supabase-projects-dev-staging-prod.md`
 - Step 4 step 3 owner: keep local, CI, and hosted environment naming aligned in `_bmad-output/implementation-artifacts/0-3-set-up-supabase-projects-dev-staging-prod.md`
+- Story 0.11 Task 4 owner: enforce guardian-aware RLS and the auth-claim bridge in `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`
+
+Current repo note:
+
+- Step 4 now includes the first real Supabase policy rollout, not only environment scaffolding.
+  `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`
+  applies guardian-aware access rules across the private wardrobe tables, and
+  `packages/db/test/rls-policies.spec.ts` proves the resulting teen/guardian/admin personas
+  against a live Postgres policy surface before deploy.
 
 Architecture diagram:
 
@@ -379,7 +399,7 @@ flowchart TD
   CLI --> PRODSB[Supabase cloud<br/>couturecast-prod]
   CLI -. deferred .-> STAGE[staging env]
 
-  DEVSB --> AUTH[Auth + RLS scaffolding]
+  DEVSB --> AUTH[Auth + guardian-aware RLS]
   PRODSB --> AUTH
   DEVSB --> BUCKETS[Storage buckets<br/>wardrobe-images derived-assets community-uploads]
   PRODSB --> BUCKETS
@@ -1470,10 +1490,14 @@ Current repo note:
 - Health, polling, auth, moderation, and the first authenticated user profile slice now follow
   this model. The auth slice now includes signup age verification as well as guardian consent, with
   `packages/api-client/src/contracts/http/auth.ts` owning the public request/response contract while
-  `packages/utils/src/age.ts` owns the reusable age-policy calculation. The remaining work is to
-  migrate later public REST endpoints as they land so every web/mobile-facing API starts in the
-  same shared-contract path. Task 6 also proved that shared Zod modules are not enough on their
-  own: parity tests caught real adapter drift in Nest defaults and dependency injection seams, so
+  `packages/utils/src/age.ts` owns the reusable age-policy calculation. That contract path is now
+  backed by guardian-aware DB enforcement in
+  `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`,
+  including the Supabase-JWT-to-app-user bridge required by the repo's text `User.id` model, plus
+  persona coverage in `packages/db/test/rls-policies.spec.ts`. The remaining work is to migrate
+  later public REST endpoints as they land so every web/mobile-facing API starts in the same
+  shared-contract path. Task 6 also proved that shared Zod modules are not enough on their own:
+  parity tests caught real adapter drift in Nest defaults and dependency injection seams, so
   controller/service wiring still has to be verified against the shared contract at runtime.
 
 Architecture diagram:
