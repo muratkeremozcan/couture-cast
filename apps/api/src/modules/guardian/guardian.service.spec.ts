@@ -30,19 +30,29 @@ type StoredInvitation = {
 }
 
 type StoredConsent = {
+  id?: string
   guardian_id: string
   teen_id: string
   consent_level: 'read_only' | 'full_access'
   consent_granted_at: Date
   revoked_at: Date | null
   ip_address: string | null
-  status: 'granted'
+  status: 'granted' | 'revoked'
+}
+
+type StoredAuditLog = {
+  user_id: string
+  event_type: string
+  event_data: Record<string, unknown> | null
+  timestamp: Date
+  ip_address: string | null
 }
 
 class InMemoryGuardianPrisma {
   users = new Map<string, StoredUser>()
   invitations = new Map<string, StoredInvitation>()
   consents = new Map<string, StoredConsent>()
+  auditLogs: StoredAuditLog[] = []
   eventEnvelopes: { channel: string; user_id?: string | null; payload: unknown }[] = []
 
   user = {
@@ -143,6 +153,42 @@ class InMemoryGuardianPrisma {
   }
 
   guardianConsent = {
+    findFirst: vi.fn(
+      ({
+        where,
+      }: {
+        where: {
+          guardian_id: string
+          teen_id: string
+          status: 'granted'
+          revoked_at: null
+        }
+      }) => {
+        const consent = [...this.consents.values()].find(
+          (candidate) =>
+            candidate.guardian_id === where.guardian_id &&
+            candidate.teen_id === where.teen_id &&
+            candidate.status === where.status &&
+            candidate.revoked_at === where.revoked_at
+        )
+
+        if (!consent) {
+          return Promise.resolve(null)
+        }
+
+        const teen = this.users.get(consent.teen_id)
+        const guardian = this.users.get(consent.guardian_id)
+        if (!teen || !guardian) {
+          return Promise.resolve(null)
+        }
+
+        return Promise.resolve({
+          ...consent,
+          teen,
+          guardian,
+        })
+      }
+    ),
     upsert: vi.fn(
       ({
         where,
@@ -158,6 +204,53 @@ class InMemoryGuardianPrisma {
         this.consents.set(key, next)
         return Promise.resolve(next)
       }
+    ),
+    update: vi.fn(
+      ({
+        where,
+        data,
+      }: {
+        where: { guardian_id_teen_id: { guardian_id: string; teen_id: string } }
+        data: {
+          revoked_at: Date
+          status: 'revoked'
+          ip_address: string | null
+        }
+      }) => {
+        const key = `${where.guardian_id_teen_id.guardian_id}:${where.guardian_id_teen_id.teen_id}`
+        const existing = this.consents.get(key)
+        if (!existing) {
+          throw new Error('Consent not found')
+        }
+
+        const updated = {
+          ...existing,
+          revoked_at: data.revoked_at,
+          status: data.status,
+          ip_address: data.ip_address,
+        }
+        this.consents.set(key, updated)
+        return Promise.resolve(updated)
+      }
+    ),
+    count: vi.fn(
+      ({
+        where,
+      }: {
+        where: {
+          teen_id: string
+          status: 'granted'
+          revoked_at: null
+        }
+      }) =>
+        Promise.resolve(
+          [...this.consents.values()].filter(
+            (candidate) =>
+              candidate.teen_id === where.teen_id &&
+              candidate.status === where.status &&
+              candidate.revoked_at === where.revoked_at
+          ).length
+        )
     ),
   }
 
@@ -196,6 +289,25 @@ class InMemoryGuardianPrisma {
       ({ data }: { data: { channel: string; user_id?: string; payload: unknown }[] }) => {
         this.eventEnvelopes.push(...data)
         return Promise.resolve({ count: data.length })
+      }
+    ),
+  }
+
+  auditLog = {
+    create: vi.fn(
+      ({
+        data,
+      }: {
+        data: {
+          user_id: string
+          event_type: string
+          event_data: Record<string, unknown> | null
+          timestamp: Date
+          ip_address: string | null
+        }
+      }) => {
+        this.auditLogs.push(data)
+        return Promise.resolve(data)
       }
     ),
   }
@@ -346,6 +458,18 @@ describe('GuardianService', () => {
     const invitation = [...prisma.invitations.values()][0]
     expect(invitation?.accepted_at).toBeInstanceOf(Date)
     expect(invitation?.accepted_guardian_id).toBeTruthy()
+    expect(prisma.auditLogs).toHaveLength(1)
+    expect(prisma.auditLogs[0]).toMatchObject({
+      user_id: teen.id,
+      event_type: 'consent_granted',
+      ip_address: '203.0.113.44',
+      event_data: {
+        guardian_id: accepted.guardianId,
+        teen_id: teen.id,
+        consent_level: 'full_access',
+        ip_address: '203.0.113.44',
+      },
+    })
     expect(prisma.eventEnvelopes).toHaveLength(3)
     expect(capture).toHaveBeenCalledOnce()
   })
@@ -391,5 +515,169 @@ describe('GuardianService', () => {
     await expect(service.acceptInvitation(token, '198.51.100.10')).rejects.toThrow(
       /already been accepted/
     )
+  })
+
+  it('revokes the last active guardian consent, queues a notification, and invalidates teen access', async () => {
+    const teen = createTeenProfileFixture({
+      id: 'teen-revoke',
+      email: 'teen.revoke@example.com',
+      age: 14,
+    })
+    const guardian = createGuardianProfileFixture({
+      id: 'guardian-revoke',
+      email: 'guardian.revoke@example.com',
+    })
+    const { prisma, service } = createService()
+
+    prisma.users.set(teen.id, {
+      id: teen.id,
+      email: teen.email,
+      profile: {
+        user_id: teen.id,
+        preferences: {
+          compliance: {
+            accountStatus: 'active',
+            guardianConsentRequired: false,
+            guardianConsentGrantedAt: '2026-04-17T06:00:00.000Z',
+          },
+        },
+      },
+    })
+    prisma.users.set(guardian.id, {
+      id: guardian.id,
+      email: guardian.email,
+      profile: null,
+    })
+    prisma.consents.set(`${guardian.id}:${teen.id}`, {
+      guardian_id: guardian.id,
+      teen_id: teen.id,
+      consent_level: 'full_access',
+      consent_granted_at: new Date('2026-04-17T06:00:00.000Z'),
+      revoked_at: null,
+      ip_address: '198.51.100.10',
+      status: 'granted',
+    })
+
+    const result = await service.revokeConsent(guardian.id, teen.id, '203.0.113.99')
+
+    expect(result).toMatchObject({
+      guardianId: guardian.id,
+      teenId: teen.id,
+      remainingActiveGuardians: 0,
+      sessionInvalidated: true,
+      notificationQueued: true,
+    })
+
+    const revokedConsent = prisma.consents.get(`${guardian.id}:${teen.id}`)
+    expect(revokedConsent).toMatchObject({
+      status: 'revoked',
+      ip_address: '203.0.113.99',
+    })
+    expect(revokedConsent?.revoked_at).toBeInstanceOf(Date)
+
+    const compliance = prisma.users.get(teen.id)?.profile?.preferences?.compliance as
+      | Record<string, unknown>
+      | undefined
+    expect(compliance).toMatchObject({
+      accountStatus: 'pending_guardian_consent',
+      guardianConsentRequired: true,
+      guardianConsentGrantedAt: null,
+    })
+
+    expect(prisma.eventEnvelopes).toHaveLength(1)
+    expect(prisma.eventEnvelopes[0]).toMatchObject({
+      channel: 'email.guardian-consent-revoked',
+      user_id: teen.id,
+    })
+
+    expect(prisma.auditLogs.at(-1)).toMatchObject({
+      user_id: teen.id,
+      event_type: 'consent_revoked',
+      ip_address: '203.0.113.99',
+      event_data: {
+        guardian_id: guardian.id,
+        teen_id: teen.id,
+        consent_level: 'full_access',
+      },
+    })
+  })
+
+  it('keeps teen access active when another guardian consent remains', async () => {
+    const teen = createTeenProfileFixture({
+      id: 'teen-multi',
+      email: 'teen.multi@example.com',
+      age: 14,
+    })
+    const revokingGuardian = createGuardianProfileFixture({
+      id: 'guardian-a',
+      email: 'guardian.a@example.com',
+    })
+    const remainingGuardian = createGuardianProfileFixture({
+      id: 'guardian-b',
+      email: 'guardian.b@example.com',
+    })
+    const { prisma, service } = createService()
+
+    prisma.users.set(teen.id, {
+      id: teen.id,
+      email: teen.email,
+      profile: {
+        user_id: teen.id,
+        preferences: {
+          compliance: {
+            accountStatus: 'active',
+            guardianConsentRequired: false,
+          },
+        },
+      },
+    })
+    prisma.users.set(revokingGuardian.id, {
+      id: revokingGuardian.id,
+      email: revokingGuardian.email,
+      profile: null,
+    })
+    prisma.users.set(remainingGuardian.id, {
+      id: remainingGuardian.id,
+      email: remainingGuardian.email,
+      profile: null,
+    })
+    prisma.consents.set(`${revokingGuardian.id}:${teen.id}`, {
+      guardian_id: revokingGuardian.id,
+      teen_id: teen.id,
+      consent_level: 'read_only',
+      consent_granted_at: new Date('2026-04-17T06:00:00.000Z'),
+      revoked_at: null,
+      ip_address: '198.51.100.10',
+      status: 'granted',
+    })
+    prisma.consents.set(`${remainingGuardian.id}:${teen.id}`, {
+      guardian_id: remainingGuardian.id,
+      teen_id: teen.id,
+      consent_level: 'full_access',
+      consent_granted_at: new Date('2026-04-18T06:00:00.000Z'),
+      revoked_at: null,
+      ip_address: '198.51.100.11',
+      status: 'granted',
+    })
+
+    const result = await service.revokeConsent(
+      revokingGuardian.id,
+      teen.id,
+      '203.0.113.100'
+    )
+
+    expect(result).toMatchObject({
+      remainingActiveGuardians: 1,
+      sessionInvalidated: false,
+    })
+
+    const compliance = prisma.users.get(teen.id)?.profile?.preferences?.compliance as
+      | Record<string, unknown>
+      | undefined
+    expect(compliance).toMatchObject({
+      accountStatus: 'active',
+      guardianConsentRequired: false,
+    })
+    expect(compliance?.guardianConsentRevokedAt).toBeUndefined()
   })
 })

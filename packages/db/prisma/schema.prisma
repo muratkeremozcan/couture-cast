@@ -299,6 +299,7 @@ model AuditLog {
   ip_address String?
 
   @@index([user_id])
+  @@index([event_type, timestamp])
 }
 
 /// Task 8 step 4 persistence: stores the last known typed value for each

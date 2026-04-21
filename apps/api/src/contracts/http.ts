@@ -7,6 +7,8 @@
 export {
   type ConsentLevel,
   type GuardianConsentInput,
+  type GuardianConsentRevokeInput,
+  type GuardianConsentRevokeResponse,
   type GuardianInvitationAcceptInput,
   type GuardianInvitationAcceptResponse,
   type GuardianInvitationInput,
@@ -15,6 +17,8 @@ export {
   type SignupResponse,
   consentLevelSchema,
   guardianConsentInputSchema,
+  guardianConsentRevokeInputSchema,
+  guardianConsentRevokeResponseSchema,
   guardianConsentResponseSchema,
   guardianInvitationAcceptInputSchema,
   guardianInvitationAcceptResponseSchema,

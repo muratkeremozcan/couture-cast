@@ -12,6 +12,7 @@ import {
 } from '../../analytics/analytics.service'
 import {
   consentLevelSchema,
+  guardianConsentRevokeResponseSchema,
   guardianInvitationAcceptResponseSchema,
   guardianInvitationInputSchema,
   guardianInvitationResponseSchema,
@@ -27,6 +28,15 @@ type InvitationTokenPayload = {
   type: 'guardian_invitation'
   iat: number
   exp: number
+}
+
+type ConsentAuditEvent = {
+  eventType: 'consent_granted' | 'consent_revoked' | 'guardian_deleted'
+  teenId: string
+  guardianId: string
+  consentLevel?: ConsentLevel
+  ipAddress?: string | null
+  timestamp: Date
 }
 
 const GUARDIAN_INVITATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -167,9 +177,44 @@ function buildUpdatedPreferences(
   nextCompliance.accountStatus = 'active'
   nextCompliance.guardianConsentRequired = false
   nextCompliance.guardianConsentGrantedAt = grantedAt.toISOString()
+  nextCompliance.guardianConsentRevokedAt = null
   nextPreferences.compliance = nextCompliance
 
   return nextPreferences as Prisma.InputJsonValue
+}
+
+function buildRevokedPreferences(
+  preferences: Prisma.JsonValue | null | undefined,
+  revokedAt: Date
+): Prisma.InputJsonValue {
+  const nextPreferences =
+    preferences && typeof preferences === 'object' && !Array.isArray(preferences)
+      ? { ...(preferences as Record<string, unknown>) }
+      : {}
+  const nextCompliance =
+    nextPreferences.compliance &&
+    typeof nextPreferences.compliance === 'object' &&
+    !Array.isArray(nextPreferences.compliance)
+      ? { ...(nextPreferences.compliance as Record<string, unknown>) }
+      : {}
+
+  nextCompliance.accountStatus = 'pending_guardian_consent'
+  nextCompliance.guardianConsentRequired = true
+  nextCompliance.guardianConsentGrantedAt = null
+  nextCompliance.guardianConsentRevokedAt = revokedAt.toISOString()
+  nextPreferences.compliance = nextCompliance
+
+  return nextPreferences as Prisma.InputJsonValue
+}
+
+function buildConsentAuditPayload(event: ConsentAuditEvent): Prisma.InputJsonValue {
+  return {
+    guardian_id: event.guardianId,
+    teen_id: event.teenId,
+    consent_level: event.consentLevel ?? null,
+    ip_address: event.ipAddress ?? null,
+    timestamp: event.timestamp.toISOString(),
+  } satisfies Record<string, string | null>
 }
 
 @Injectable()
@@ -178,6 +223,18 @@ export class GuardianService {
     @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient,
     @Inject(PrismaClient) private readonly prisma: PrismaClient
   ) {}
+
+  private logConsentAuditEvent(tx: Prisma.TransactionClient, event: ConsentAuditEvent) {
+    return tx.auditLog.create({
+      data: {
+        user_id: event.teenId,
+        event_type: event.eventType,
+        event_data: buildConsentAuditPayload(event),
+        timestamp: event.timestamp,
+        ip_address: event.ipAddress ?? null,
+      },
+    })
+  }
 
   async inviteGuardian(
     teenId: string,
@@ -409,6 +466,15 @@ export class GuardianService {
         ],
       })
 
+      await this.logConsentAuditEvent(tx, {
+        eventType: 'consent_granted',
+        teenId: invitation.teen.id,
+        guardianId: guardian.id,
+        consentLevel: invitation.consent_level,
+        ipAddress: normalizedIpAddress,
+        timestamp: acceptedAt,
+      })
+
       return {
         teenId: invitation.teen.id,
         teenEmail: invitation.teen.email,
@@ -432,5 +498,105 @@ export class GuardianService {
     })
 
     return guardianInvitationAcceptResponseSchema.parse(result)
+  }
+
+  async revokeConsent(guardianId: string, teenId: string, ipAddress?: string) {
+    const revokedAt = new Date()
+    const normalizedIpAddress = ipAddress?.trim() || null
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const consent = await tx.guardianConsent.findFirst({
+        where: {
+          guardian_id: guardianId,
+          teen_id: teenId,
+          status: 'granted',
+          revoked_at: null,
+        },
+        include: {
+          guardian: true,
+          teen: {
+            include: {
+              profile: true,
+            },
+          },
+        },
+      })
+
+      if (!consent) {
+        throw new NotFoundException('Active guardian consent not found')
+      }
+
+      await tx.guardianConsent.update({
+        where: {
+          guardian_id_teen_id: {
+            guardian_id: guardianId,
+            teen_id: teenId,
+          },
+        },
+        data: {
+          revoked_at: revokedAt,
+          status: 'revoked',
+          ip_address: normalizedIpAddress,
+        },
+      })
+
+      const remainingActiveGuardians = await tx.guardianConsent.count({
+        where: {
+          teen_id: teenId,
+          status: 'granted',
+          revoked_at: null,
+        },
+      })
+
+      const sessionInvalidated = remainingActiveGuardians === 0
+      if (sessionInvalidated && consent.teen.profile) {
+        await tx.userProfile.update({
+          where: { user_id: teenId },
+          data: {
+            preferences: buildRevokedPreferences(
+              consent.teen.profile.preferences,
+              revokedAt
+            ),
+          },
+        })
+      }
+
+      await tx.eventEnvelope.create({
+        data: {
+          channel: 'email.guardian-consent-revoked',
+          user_id: teenId,
+          payload: {
+            to: consent.teen.email,
+            teenId,
+            teenEmail: consent.teen.email,
+            guardianId,
+            guardianEmail: consent.guardian.email,
+            revokedAt: revokedAt.toISOString(),
+            remainingActiveGuardians,
+            sessionInvalidated,
+          },
+        },
+      })
+
+      await this.logConsentAuditEvent(tx, {
+        eventType: 'consent_revoked',
+        teenId,
+        guardianId,
+        consentLevel: consent.consent_level,
+        ipAddress: normalizedIpAddress,
+        timestamp: revokedAt,
+      })
+
+      return {
+        guardianId,
+        teenId,
+        revokedAt: revokedAt.toISOString(),
+        remainingActiveGuardians,
+        sessionInvalidated,
+        notificationQueued: true,
+      }
+    })
+
+    return guardianConsentRevokeResponseSchema.parse(result)
   }
 }

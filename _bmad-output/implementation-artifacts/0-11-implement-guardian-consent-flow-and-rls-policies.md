@@ -142,7 +142,7 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
   - [x] Test RLS policies with different user roles
 
 - [ ] Task 5: Create audit log for consent events (AC: #4)
-  - [ ] Add `consent_event` type to `audit_log` table:
+  - [x] Add `consent_event` type to `audit_log` table:
     ```prisma
     model AuditLog {
       id        String   @id @default(uuid())
@@ -153,17 +153,17 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
       @@index([eventType, timestamp])
     }
     ```
-  - [ ] Log consent grant: `auditLog.create({ eventType: 'consent_granted', ... })`
-  - [ ] Log consent revoke: `auditLog.create({ eventType: 'consent_revoked', ... })`
-  - [ ] Make audit log immutable: no DELETE or UPDATE policies
+  - [x] Log consent grant: `auditLog.create({ eventType: 'consent_granted', ... })`
+  - [x] Log consent revoke: `auditLog.create({ eventType: 'consent_revoked', ... })`
+  - [x] Make audit log immutable: no DELETE or UPDATE policies
 
-- [ ] Task 6: Implement consent revocation (AC: #5)
-  - [ ] Create `revokeConsent(guardianId: string, teenId: string)` endpoint
-  - [ ] Update `guardian_consent` table: set `revokedAt = NOW()`
-  - [ ] Invalidate teen's active sessions (JWT blacklist or short expiration)
-  - [ ] Send notification to teen: "Guardian consent revoked"
-  - [ ] Log revocation event to audit log
-  - [ ] Test: teen cannot access wardrobe after revocation
+- [x] Task 6: Implement consent revocation (AC: #5)
+  - [x] Create `revokeConsent(guardianId: string, teenId: string)` endpoint
+  - [x] Update `guardian_consent` table: set `revokedAt = NOW()`
+  - [x] Invalidate teen's active sessions (JWT blacklist or short expiration)
+  - [x] Send notification to teen: "Guardian consent revoked"
+  - [x] Log revocation event to audit log
+  - [x] Test: teen cannot access wardrobe after revocation
 
 - [ ] Task 7: Handle teen turning 18 (AC: #6)
   - [ ] Create cron job to check birthdays daily
@@ -408,6 +408,13 @@ GPT-5 Codex
 - `npx eslint --max-warnings=0 packages/db/test/rls-policies.spec.ts packages/db/vitest.config.ts`
 - `set -a; source .env.dev; set +a; npx prisma migrate deploy --schema packages/db/prisma/schema.prisma`
 - `set -a; source .env.prod; set +a; npx prisma migrate deploy --schema packages/db/prisma/schema.prisma`
+- `npm run test --workspace api -- src/modules/guardian/guardian.service.spec.ts`
+- `npm run typecheck --workspace packages/db`
+- `npm run test --workspace packages/db -- test/audit-log-immutability.spec.ts`
+- `npm run test --workspace api -- src/modules/guardian/guardian.controller.spec.ts src/modules/guardian/guardian.service.spec.ts src/modules/auth/security.guards.spec.ts`
+- `npm run generate:http-openapi`
+- `npm run test --workspace @couture/api-client -- testing/http-openapi.spec.ts`
+- `npm run test --workspace packages/db -- test/rls-policies.spec.ts test/audit-log-immutability.spec.ts`
 
 ### Completion Notes List
 
@@ -423,6 +430,12 @@ GPT-5 Codex
 - Added web and mobile guardian invitation UX for pending teen accounts plus guardian acceptance screens backed by the shared guardian contracts.
 - Added a guardian-aware RLS migration that bridges Supabase JWT claims to the repo's current text user IDs, centralizes guardian/admin access helpers in the private schema, and protects wardrobe-domain tables plus self-only community tables.
 - Added database-level Vitest coverage for teen, guardian read-only, guardian full-access, admin, anonymous, and cross-account denial scenarios, then deployed the RLS migration set to local, dev, and prod Supabase databases.
+- Added immutable audit-log hardening with an event-type/timestamp index, consent-grant writes in the guardian acceptance transaction, and a database-level spec that proves direct `UPDATE`/`DELETE` attempts fail.
+- Extended the guardian consent audit helper to accept revoke/delete event types so Task 6 can reuse the same payload shape when the revocation endpoint lands.
+- Added `POST /api/v1/guardian/revoke` plus shared revoke contracts so guardians/admins can revoke one teen consent link with the caller IP recorded at the API boundary.
+- Revocation now updates `GuardianConsent`, queues a teen notification email, records a `consent_revoked` audit log row, and only flips the teen back to `pending_guardian_consent` when no active guardian remains.
+- Added teen compliance enforcement in `RequestAuthGuard` and a follow-on RLS migration so revoked teens lose authenticated self-access today instead of waiting for the future session-store rollout in Story 0.14.
+- Added focused coverage for revoke controller/service behavior, blocked teen auth requests, refreshed OpenAPI output, and database-level proof that revoked teens can no longer read or mutate wardrobe rows.
 
 ### File List
 
@@ -444,6 +457,8 @@ GPT-5 Codex
 - MODIFIED `apps/api/src/modules/auth/auth.module.ts`
 - MODIFIED `apps/api/src/modules/auth/auth.controller.spec.ts`
 - MODIFIED `apps/api/src/modules/auth/auth.service.spec.ts`
+- MODIFIED `apps/api/src/modules/auth/security.guards.ts`
+- NEW `apps/api/src/modules/auth/security.guards.spec.ts`
 - MODIFIED `apps/web/package.json`
 - MODIFIED `apps/web/tsconfig.json`
 - MODIFIED `apps/web/vitest.config.ts`
@@ -489,6 +504,9 @@ GPT-5 Codex
 - MODIFIED `packages/testing/src/cleanup.ts`
 - MODIFIED `packages/testing/test/cleanup.spec.ts`
 - NEW `packages/db/prisma/migrations/20260417030000_add_guardian_invitations/migration.sql`
+- NEW `packages/db/prisma/migrations/20260420160000_harden_audit_log_immutability/migration.sql`
+- NEW `packages/db/prisma/migrations/20260421090000_block_revoked_teens_from_self_access/migration.sql`
+- NEW `packages/db/test/audit-log-immutability.spec.ts`
 
 ## Change Log
 
@@ -499,3 +517,5 @@ GPT-5 Codex
 | 2026-04-17 | Codex              | Completed Task 2 by extending the existing GuardianConsent Prisma model and adding a migration for consent levels and revocation support         |
 | 2026-04-17 | Codex              | Completed Task 3 guardian invitation flow across Prisma, API contracts/module, email event queueing, and web/mobile invitation and acceptance UI |
 | 2026-04-20 | Codex              | Completed Task 4 with guardian-aware RLS policies, database persona tests, and migration deploys to local/dev/prod Supabase environments         |
+| 2026-04-20 | Codex              | Advanced Task 5 with immutable audit-log storage, consent-grant persistence, and database coverage for blocked audit row mutations               |
+| 2026-04-21 | Codex              | Completed Task 6 with guardian revoke contracts/API flow, teen compliance/session blocking, and RLS coverage for revoked self-access             |
