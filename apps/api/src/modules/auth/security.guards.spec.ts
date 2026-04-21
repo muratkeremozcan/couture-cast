@@ -1,7 +1,7 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common'
 import type { ExecutionContext } from '@nestjs/common'
-import type { PrismaClient } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
+import type { GuardianConsentStateService } from './guardian-consent-state.service'
 import { RequestAuthGuard } from './security.guards'
 
 function createExecutionContext(headers: Record<string, string>) {
@@ -14,25 +14,21 @@ function createExecutionContext(headers: Record<string, string>) {
   } as ExecutionContext
 }
 
-function createGuard(preferences: unknown = null) {
-  const findUnique = vi.fn().mockResolvedValue({
-    profile: preferences === undefined ? null : { preferences },
-  })
-  const prisma = {
-    user: {
-      findUnique,
-    },
-  } as unknown as PrismaClient
+function createGuard(teenAccessAllowed = true) {
+  const canTeenAccess = vi.fn().mockResolvedValue(teenAccessAllowed)
+  const guardianConsentStateService = {
+    canTeenAccess,
+  } as unknown as GuardianConsentStateService
 
   return {
-    guard: new RequestAuthGuard(prisma),
-    findUnique,
+    canTeenAccess,
+    guard: new RequestAuthGuard(guardianConsentStateService),
   }
 }
 
 describe('RequestAuthGuard', () => {
   it('attaches authenticated guardian context from request headers', async () => {
-    const { guard, findUnique } = createGuard(undefined)
+    const { guard, canTeenAccess } = createGuard()
     const context = createExecutionContext({
       authorization: 'Bearer guardian-token',
       'x-user-id': 'guardian-1',
@@ -40,16 +36,11 @@ describe('RequestAuthGuard', () => {
     })
 
     await expect(guard.canActivate(context)).resolves.toBe(true)
-    expect(findUnique).not.toHaveBeenCalled()
+    expect(canTeenAccess).not.toHaveBeenCalled()
   })
 
   it('blocks teen requests when guardian consent is still required', async () => {
-    const { guard } = createGuard({
-      compliance: {
-        accountStatus: 'pending_guardian_consent',
-        guardianConsentRequired: true,
-      },
-    })
+    const { guard, canTeenAccess } = createGuard(false)
     const context = createExecutionContext({
       authorization: 'Bearer teen-token',
       'x-user-id': 'teen-1',
@@ -57,15 +48,11 @@ describe('RequestAuthGuard', () => {
     })
 
     await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException)
+    expect(canTeenAccess).toHaveBeenCalledWith('teen-1')
   })
 
   it('allows teen requests once guardian consent is no longer required', async () => {
-    const { guard, findUnique } = createGuard({
-      compliance: {
-        accountStatus: 'active',
-        guardianConsentRequired: false,
-      },
-    })
+    const { guard, canTeenAccess } = createGuard(true)
     const context = createExecutionContext({
       authorization: 'Bearer teen-token',
       'x-user-id': 'teen-1',
@@ -73,16 +60,7 @@ describe('RequestAuthGuard', () => {
     })
 
     await expect(guard.canActivate(context)).resolves.toBe(true)
-    expect(findUnique).toHaveBeenCalledWith({
-      where: { id: 'teen-1' },
-      select: {
-        profile: {
-          select: {
-            preferences: true,
-          },
-        },
-      },
-    })
+    expect(canTeenAccess).toHaveBeenCalledWith('teen-1')
   })
 
   it('rejects requests with missing authentication headers', async () => {

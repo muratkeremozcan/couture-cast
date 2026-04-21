@@ -631,6 +631,24 @@ describe.sequential('guardian-aware RLS policies', () => {
     )
   })
 
+  it('does not allow authenticated callers to execute the guardian-consent helper directly', async () => {
+    scenario = await seedScenario()
+
+    await withRole(
+      'authenticated',
+      buildClaims(scenario.teenEmail, 'teen'),
+      async (client) => {
+        await expect(
+          client.query('SELECT private.user_requires_guardian_consent($1)', [
+            scenario!.teenId,
+          ])
+        ).rejects.toMatchObject({
+          code: '42501',
+        })
+      }
+    )
+  })
+
   it('allows admin claims to inspect and update teen wardrobe rows without service role bypass', async () => {
     scenario = await seedScenario()
 

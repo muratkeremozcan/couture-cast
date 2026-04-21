@@ -219,6 +219,14 @@ export function registerGuardianContracts(
           },
         },
       },
+      401: {
+        description: 'Authentication headers are missing or invalid',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
       403: {
         description: 'Authenticated guardian does not match the requested guardianId',
         content: {

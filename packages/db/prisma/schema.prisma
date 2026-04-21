@@ -85,6 +85,7 @@ model GuardianConsent {
   consent_granted_at DateTime      @default(now())
   revoked_at         DateTime?
   ip_address         String?
+  revoked_ip_address String?
   status             ConsentStatus @default(pending)
   created_at         DateTime      @default(now())
 

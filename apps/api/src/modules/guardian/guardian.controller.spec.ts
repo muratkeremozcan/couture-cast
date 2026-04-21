@@ -206,4 +206,35 @@ describe('GuardianController', () => {
     ).toThrow(ForbiddenException)
     expect(revokeConsent).not.toHaveBeenCalled()
   })
+
+  it('allows admins to revoke consent for a different guardian id', async () => {
+    const { controller, revokeConsent } = createController()
+    revokeConsent.mockResolvedValue({
+      guardianId: 'guardian-2',
+      teenId: 'teen-9',
+      revokedAt: '2026-04-21T13:00:00.000Z',
+      remainingActiveGuardians: 0,
+      sessionInvalidated: true,
+      notificationQueued: true,
+    })
+
+    const result = await controller.revokeConsent(
+      {
+        token: 'admin-token',
+        userId: 'admin-1',
+        role: 'admin',
+      },
+      {
+        guardianId: 'guardian-2',
+        teenId: 'teen-9',
+      },
+      {
+        headers: {},
+        ip: '203.0.113.88',
+      } as never
+    )
+
+    expect(revokeConsent).toHaveBeenCalledWith('guardian-2', 'teen-9', '203.0.113.88')
+    expect(result.sessionInvalidated).toBe(true)
+  })
 })

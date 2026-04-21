@@ -2,13 +2,12 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { Prisma, PrismaClient } from '@prisma/client'
 import { updateRequestContext } from '../../logger/request-context'
+import { GuardianConsentStateService } from './guardian-consent-state.service'
 import { API_ROLES_KEY } from './security.decorators'
 import { API_ROLES, type ApiRole, type AuthenticatedRequest } from './security.types'
 
@@ -51,33 +50,11 @@ const parseRole = (headerValue: string | string[] | undefined): ApiRole | undefi
   return API_ROLES.find((role) => role === value)
 }
 
-function extractComplianceState(
-  preferences: Prisma.JsonValue | null | undefined
-): Record<string, unknown> {
-  if (!preferences || typeof preferences !== 'object' || Array.isArray(preferences)) {
-    return {}
-  }
-
-  const compliance = (preferences as Record<string, unknown>).compliance
-  if (!compliance || typeof compliance !== 'object' || Array.isArray(compliance)) {
-    return {}
-  }
-
-  return compliance as Record<string, unknown>
-}
-
-function requiresGuardianConsent(preferences: Prisma.JsonValue | null | undefined) {
-  const compliance = extractComplianceState(preferences)
-  return (
-    compliance.accountStatus === 'pending_guardian_consent' &&
-    (compliance.guardianConsentRequired === true ||
-      compliance.guardianConsentRequired === 'true')
-  )
-}
-
 @Injectable()
 export class RequestAuthGuard implements CanActivate {
-  constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly guardianConsentStateService: GuardianConsentStateService
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>()
@@ -92,21 +69,11 @@ export class RequestAuthGuard implements CanActivate {
     request.auth = { token, userId, role }
     updateRequestContext({ userId })
 
-    if (role === 'teen') {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          profile: {
-            select: {
-              preferences: true,
-            },
-          },
-        },
-      })
-
-      if (requiresGuardianConsent(user?.profile?.preferences)) {
-        throw new ForbiddenException('Guardian consent required before continuing')
-      }
+    if (
+      role === 'teen' &&
+      !(await this.guardianConsentStateService.canTeenAccess(userId))
+    ) {
+      throw new ForbiddenException('Guardian consent required before continuing')
     }
 
     return true

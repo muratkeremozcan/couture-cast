@@ -6,6 +6,8 @@ import {
   resetCleanupRegistry,
 } from '../../../test/factories.js'
 import type { AnalyticsClient } from '../../analytics/analytics.service'
+import type { GuardianConsentStateService } from '../auth/guardian-consent-state.service'
+import type { UserSessionService } from '../auth/user-session.service'
 import { GuardianService } from './guardian.service'
 
 type StoredUser = {
@@ -37,6 +39,7 @@ type StoredConsent = {
   consent_granted_at: Date
   revoked_at: Date | null
   ip_address: string | null
+  revoked_ip_address: string | null
   status: 'granted' | 'revoked'
 }
 
@@ -46,6 +49,12 @@ type StoredAuditLog = {
   event_data: Record<string, unknown> | null
   timestamp: Date
   ip_address: string | null
+}
+
+type AnalyticsCapturePayload = {
+  distinctId: string
+  event: string
+  properties?: Record<string, unknown>
 }
 
 class InMemoryGuardianPrisma {
@@ -214,7 +223,7 @@ class InMemoryGuardianPrisma {
         data: {
           revoked_at: Date
           status: 'revoked'
-          ip_address: string | null
+          revoked_ip_address: string | null
         }
       }) => {
         const key = `${where.guardian_id_teen_id.guardian_id}:${where.guardian_id_teen_id.teen_id}`
@@ -227,7 +236,7 @@ class InMemoryGuardianPrisma {
           ...existing,
           revoked_at: data.revoked_at,
           status: data.status,
-          ip_address: data.ip_address,
+          revoked_ip_address: data.revoked_ip_address,
         }
         this.consents.set(key, updated)
         return Promise.resolve(updated)
@@ -312,19 +321,46 @@ class InMemoryGuardianPrisma {
     ),
   }
 
-  $transaction = vi.fn(async <T>(callback: (tx: InMemoryGuardianPrisma) => Promise<T>) =>
-    callback(this)
+  $transaction = vi.fn(
+    async <T>(
+      callback: (tx: InMemoryGuardianPrisma) => Promise<T>,
+      options?: unknown
+    ) => {
+      void options
+      return callback(this)
+    }
   )
 }
 
 const createService = (prisma = new InMemoryGuardianPrisma()) => {
-  const capture = vi.fn()
+  const capture = vi.fn<(payload: AnalyticsCapturePayload) => void>()
   const analyticsClient = { capture } as unknown as AnalyticsClient
+  const markTeenAccessGranted = vi.fn()
+  const markTeenAccessRevoked = vi.fn()
+  const invalidateTeenAccess = vi.fn()
+  const guardianConsentStateService = {
+    canTeenAccess: vi.fn(),
+    markTeenAccessGranted,
+    markTeenAccessRevoked,
+    invalidateTeenAccess,
+  } as unknown as GuardianConsentStateService
+  const invalidateUserSessions = vi.fn().mockResolvedValue(undefined)
+  const userSessionService = {
+    invalidateUserSessions,
+  } as unknown as UserSessionService
 
   return {
     prisma,
     capture,
-    service: new GuardianService(analyticsClient, prisma as unknown as PrismaClient),
+    invalidateUserSessions,
+    markTeenAccessGranted,
+    markTeenAccessRevoked,
+    service: new GuardianService(
+      analyticsClient,
+      prisma as unknown as PrismaClient,
+      guardianConsentStateService,
+      userSessionService
+    ),
   }
 }
 
@@ -408,7 +444,7 @@ describe('GuardianService', () => {
       email: 'teen.consent@example.com',
       age: 14,
     })
-    const { prisma, capture, service } = createService()
+    const { prisma, capture, markTeenAccessGranted, service } = createService()
     prisma.users.set(teen.id, {
       id: teen.id,
       email: teen.email,
@@ -445,6 +481,7 @@ describe('GuardianService', () => {
       teen_id: teen.id,
       consent_level: 'full_access',
       ip_address: '203.0.113.44',
+      revoked_ip_address: null,
       status: 'granted',
     })
 
@@ -472,6 +509,7 @@ describe('GuardianService', () => {
     })
     expect(prisma.eventEnvelopes).toHaveLength(3)
     expect(capture).toHaveBeenCalledOnce()
+    expect(markTeenAccessGranted).toHaveBeenCalledWith(teen.id)
   })
 
   it('rejects invitations that were already accepted', async () => {
@@ -527,7 +565,8 @@ describe('GuardianService', () => {
       id: 'guardian-revoke',
       email: 'guardian.revoke@example.com',
     })
-    const { prisma, service } = createService()
+    const { prisma, capture, invalidateUserSessions, markTeenAccessRevoked, service } =
+      createService()
 
     prisma.users.set(teen.id, {
       id: teen.id,
@@ -555,6 +594,7 @@ describe('GuardianService', () => {
       consent_granted_at: new Date('2026-04-17T06:00:00.000Z'),
       revoked_at: null,
       ip_address: '198.51.100.10',
+      revoked_ip_address: null,
       status: 'granted',
     })
 
@@ -571,7 +611,8 @@ describe('GuardianService', () => {
     const revokedConsent = prisma.consents.get(`${guardian.id}:${teen.id}`)
     expect(revokedConsent).toMatchObject({
       status: 'revoked',
-      ip_address: '203.0.113.99',
+      ip_address: '198.51.100.10',
+      revoked_ip_address: '203.0.113.99',
     })
     expect(revokedConsent?.revoked_at).toBeInstanceOf(Date)
 
@@ -600,6 +641,21 @@ describe('GuardianService', () => {
         consent_level: 'full_access',
       },
     })
+    expect(invalidateUserSessions).toHaveBeenCalledWith(teen.id)
+    expect(markTeenAccessRevoked).toHaveBeenCalledWith(teen.id)
+    expect(capture).toHaveBeenCalledOnce()
+    const analyticsEvent = capture.mock.calls[0]?.[0]
+    expect(analyticsEvent).toMatchObject({
+      distinctId: guardian.id,
+      event: 'guardian_consent_revoked',
+    })
+    expect(analyticsEvent?.properties).toMatchObject({
+      guardian_id: guardian.id,
+      teen_id: teen.id,
+      consent_level: 'full_access',
+      remainingActiveGuardians: 0,
+      sessionInvalidated: true,
+    })
   })
 
   it('keeps teen access active when another guardian consent remains', async () => {
@@ -616,7 +672,8 @@ describe('GuardianService', () => {
       id: 'guardian-b',
       email: 'guardian.b@example.com',
     })
-    const { prisma, service } = createService()
+    const { prisma, invalidateUserSessions, markTeenAccessGranted, service } =
+      createService()
 
     prisma.users.set(teen.id, {
       id: teen.id,
@@ -648,6 +705,7 @@ describe('GuardianService', () => {
       consent_granted_at: new Date('2026-04-17T06:00:00.000Z'),
       revoked_at: null,
       ip_address: '198.51.100.10',
+      revoked_ip_address: null,
       status: 'granted',
     })
     prisma.consents.set(`${remainingGuardian.id}:${teen.id}`, {
@@ -657,6 +715,7 @@ describe('GuardianService', () => {
       consent_granted_at: new Date('2026-04-18T06:00:00.000Z'),
       revoked_at: null,
       ip_address: '198.51.100.11',
+      revoked_ip_address: null,
       status: 'granted',
     })
 
@@ -679,5 +738,74 @@ describe('GuardianService', () => {
       guardianConsentRequired: false,
     })
     expect(compliance?.guardianConsentRevokedAt).toBeUndefined()
+    expect(invalidateUserSessions).not.toHaveBeenCalled()
+    expect(markTeenAccessGranted).toHaveBeenCalledWith(teen.id)
+  })
+
+  it('retries revokeConsent when the serializable transaction hits a write conflict', async () => {
+    const teen = createTeenProfileFixture({
+      id: 'teen-retry',
+      email: 'teen.retry@example.com',
+      age: 14,
+    })
+    const guardian = createGuardianProfileFixture({
+      id: 'guardian-retry',
+      email: 'guardian.retry@example.com',
+    })
+    const { prisma, service } = createService()
+
+    prisma.users.set(teen.id, {
+      id: teen.id,
+      email: teen.email,
+      profile: {
+        user_id: teen.id,
+        preferences: {
+          compliance: {
+            accountStatus: 'active',
+            guardianConsentRequired: false,
+          },
+        },
+      },
+    })
+    prisma.users.set(guardian.id, {
+      id: guardian.id,
+      email: guardian.email,
+      profile: null,
+    })
+    prisma.consents.set(`${guardian.id}:${teen.id}`, {
+      guardian_id: guardian.id,
+      teen_id: teen.id,
+      consent_level: 'read_only',
+      consent_granted_at: new Date('2026-04-18T06:00:00.000Z'),
+      revoked_at: null,
+      ip_address: '198.51.100.15',
+      revoked_ip_address: null,
+      status: 'granted',
+    })
+
+    const originalTransaction = prisma.$transaction
+    let attempts = 0
+    prisma.$transaction = vi.fn(async (callback, options) => {
+      attempts += 1
+      expect(options).toMatchObject({
+        isolationLevel: 'Serializable',
+      })
+
+      if (attempts === 1) {
+        throw Object.assign(new Error('serialization failure'), { code: 'P2034' })
+      }
+
+      return originalTransaction(callback, options)
+    })
+
+    await expect(
+      service.revokeConsent(guardian.id, teen.id, '203.0.113.101')
+    ).resolves.toMatchObject({
+      guardianId: guardian.id,
+      teenId: teen.id,
+      remainingActiveGuardians: 0,
+    })
+
+    expect(attempts).toBe(2)
   })
 })

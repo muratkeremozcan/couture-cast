@@ -1,6 +1,6 @@
 import type { TestInfo } from '@playwright/test'
 
-export type ApiRole = 'guardian' | 'moderator' | 'admin'
+export type ApiRole = 'guardian' | 'teen' | 'moderator' | 'admin'
 
 type ResolveApiBaseUrlOptions = {
   overrideEnvVar?: string

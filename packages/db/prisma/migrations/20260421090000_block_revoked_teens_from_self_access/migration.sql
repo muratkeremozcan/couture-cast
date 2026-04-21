@@ -23,7 +23,7 @@ AS $$
 $$;
 
 REVOKE ALL ON FUNCTION private.user_requires_guardian_consent(TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION private.user_requires_guardian_consent(TEXT) TO authenticated;
+REVOKE EXECUTE ON FUNCTION private.user_requires_guardian_consent(TEXT) FROM authenticated;
 
 CREATE OR REPLACE FUNCTION private.can_read_shared_user_row(target_user_id TEXT)
 RETURNS BOOLEAN

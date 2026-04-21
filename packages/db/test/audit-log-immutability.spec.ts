@@ -71,7 +71,7 @@ describe.sequential('audit log immutability', () => {
     }
   })
 
-  it('blocks direct UPDATE and DELETE statements against persisted audit rows', async () => {
+  it('blocks direct UPDATE, DELETE, and TRUNCATE statements against persisted audit rows', async () => {
     const client = await adminPool.connect()
     const suffix = randomUUID()
     const userId = `audit-user-${suffix}`
@@ -119,6 +119,12 @@ describe.sequential('audit log immutability', () => {
         code: '42501',
       })
       await client.query('ROLLBACK TO SAVEPOINT audit_before_delete')
+
+      await client.query('SAVEPOINT audit_before_truncate')
+      await expect(client.query('TRUNCATE public."AuditLog"')).rejects.toMatchObject({
+        code: '42501',
+      })
+      await client.query('ROLLBACK TO SAVEPOINT audit_before_truncate')
     } finally {
       await client.query('ROLLBACK')
       client.release()

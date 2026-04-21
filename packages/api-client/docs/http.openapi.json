@@ -1240,6 +1240,16 @@
               }
             }
           },
+          "401": {
+            "description": "Authentication headers are missing or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Authenticated guardian does not match the requested guardianId",
             "content": {

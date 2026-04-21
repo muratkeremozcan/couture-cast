@@ -32,6 +32,12 @@ BEFORE DELETE ON public."AuditLog"
 FOR EACH ROW
 EXECUTE FUNCTION private.block_audit_log_mutation();
 
+DROP TRIGGER IF EXISTS audit_log_block_truncate ON public."AuditLog";
+CREATE TRIGGER audit_log_block_truncate
+BEFORE TRUNCATE ON public."AuditLog"
+FOR EACH STATEMENT
+EXECUTE FUNCTION private.block_audit_log_mutation();
+
 GRANT SELECT ON TABLE public."AuditLog" TO authenticated;
 ALTER TABLE public."AuditLog" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."AuditLog" FORCE ROW LEVEL SECURITY;
