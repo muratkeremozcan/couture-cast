@@ -13,6 +13,7 @@ const vercelPreviewSmokeWorkflow = path.join(
 const mobileWorkflow = path.join(repoRoot, '.github', 'workflows', 'deploy-mobile.yml')
 const vercelConfig = path.join(repoRoot, 'apps', 'api', 'vercel.json')
 const apiHandler = path.join(repoRoot, 'apps', 'api', 'api', 'index.ts')
+const apiPackageJson = path.join(repoRoot, 'apps', 'api', 'package.json')
 const rootPackageJson = path.join(repoRoot, 'package.json')
 
 describe('deployment workflows', () => {
@@ -55,5 +56,16 @@ describe('deployment workflows', () => {
       scripts?: { prepare?: string }
     }
     expect(pkg.scripts?.prepare).toBe('node .husky/install.mjs')
+  })
+
+  it('api vercel build applies committed Prisma migrations before building', () => {
+    expect(fs.existsSync(apiPackageJson)).toBe(true)
+    const pkg = JSON.parse(fs.readFileSync(apiPackageJson, 'utf8')) as {
+      scripts?: { 'vercel:build'?: string }
+    }
+
+    expect(pkg.scripts?.['vercel:build']).toContain(
+      'node scripts/prisma-migrate-deploy.mjs'
+    )
   })
 })

@@ -37,6 +37,20 @@ export const guardianInvitationAcceptResponseSchema = z.object({
   grantedAt: isoTimestampSchema,
 })
 
+export const guardianConsentRevokeInputSchema = z.object({
+  guardianId: nonEmptyStringSchema,
+  teenId: nonEmptyStringSchema,
+})
+
+export const guardianConsentRevokeResponseSchema = z.object({
+  guardianId: nonEmptyStringSchema,
+  teenId: nonEmptyStringSchema,
+  revokedAt: isoTimestampSchema,
+  remainingActiveGuardians: z.number().int().min(0),
+  sessionInvalidated: z.boolean(),
+  notificationQueued: z.boolean(),
+})
+
 export type ConsentLevel = z.infer<typeof consentLevelSchema>
 export type GuardianInvitationInput = z.infer<typeof guardianInvitationInputSchema>
 export type GuardianInvitationResponse = z.infer<typeof guardianInvitationResponseSchema>
@@ -45,6 +59,10 @@ export type GuardianInvitationAcceptInput = z.infer<
 >
 export type GuardianInvitationAcceptResponse = z.infer<
   typeof guardianInvitationAcceptResponseSchema
+>
+export type GuardianConsentRevokeInput = z.infer<typeof guardianConsentRevokeInputSchema>
+export type GuardianConsentRevokeResponse = z.infer<
+  typeof guardianConsentRevokeResponseSchema
 >
 
 export function registerGuardianContracts(
@@ -66,6 +84,14 @@ export function registerGuardianContracts(
   const registeredGuardianInvitationAcceptResponseSchema = registry.register(
     'GuardianInvitationAcceptResponse',
     guardianInvitationAcceptResponseSchema
+  )
+  const registeredGuardianConsentRevokeInputSchema = registry.register(
+    'GuardianConsentRevokeInput',
+    guardianConsentRevokeInputSchema
+  )
+  const registeredGuardianConsentRevokeResponseSchema = registry.register(
+    'GuardianConsentRevokeResponse',
+    guardianConsentRevokeResponseSchema
   )
 
   registry.registerPath({
@@ -150,6 +176,67 @@ export function registerGuardianContracts(
       },
       404: {
         description: 'Guardian invitation could not be found',
+        content: {
+          'application/json': {
+            schema: commonSchemas.notFoundHttpErrorSchema,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/guardian/revoke',
+    tags: ['guardian'],
+    summary: 'Revoke guardian consent for a teen account',
+    description:
+      'Revokes one guardian-to-teen consent link, queues a teen notification, invalidates the teen access state when no active guardian remains, and records an audit entry.',
+    request: {
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: registeredGuardianConsentRevokeInputSchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Guardian consent revoked successfully',
+        content: {
+          'application/json': {
+            schema: registeredGuardianConsentRevokeResponseSchema,
+          },
+        },
+      },
+      400: {
+        description: 'Guardian revoke payload failed validation',
+        content: {
+          'application/json': {
+            schema: commonSchemas.badRequestHttpErrorSchema,
+          },
+        },
+      },
+      401: {
+        description: 'Authentication headers are missing or invalid',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Authenticated guardian does not match the requested guardianId',
+        content: {
+          'application/json': {
+            schema: commonSchemas.forbiddenHttpErrorSchema,
+          },
+        },
+      },
+      404: {
+        description: 'Active guardian consent could not be found',
         content: {
           'application/json': {
             schema: commonSchemas.notFoundHttpErrorSchema,

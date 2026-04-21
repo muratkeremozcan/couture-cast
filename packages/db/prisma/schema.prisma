@@ -85,6 +85,7 @@ model GuardianConsent {
   consent_granted_at DateTime      @default(now())
   revoked_at         DateTime?
   ip_address         String?
+  revoked_ip_address String?
   status             ConsentStatus @default(pending)
   created_at         DateTime      @default(now())
 
@@ -299,6 +300,7 @@ model AuditLog {
   ip_address String?
 
   @@index([user_id])
+  @@index([event_type, timestamp])
 }
 
 /// Task 8 step 4 persistence: stores the last known typed value for each

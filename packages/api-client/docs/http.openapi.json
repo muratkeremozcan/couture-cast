@@ -558,6 +558,58 @@
           "grantedAt"
         ]
       },
+      "GuardianConsentRevokeInput": {
+        "type": "object",
+        "properties": {
+          "guardianId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "teenId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "guardianId",
+          "teenId"
+        ]
+      },
+      "GuardianConsentRevokeResponse": {
+        "type": "object",
+        "properties": {
+          "guardianId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "teenId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revokedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "remainingActiveGuardians": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sessionInvalidated": {
+            "type": "boolean"
+          },
+          "notificationQueued": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "guardianId",
+          "teenId",
+          "revokedAt",
+          "remainingActiveGuardians",
+          "sessionInvalidated",
+          "notificationQueued"
+        ]
+      },
       "ModerationActionInput": {
         "type": "object",
         "properties": {
@@ -1139,6 +1191,77 @@
           },
           "404": {
             "description": "Guardian invitation could not be found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/guardian/revoke": {
+      "post": {
+        "tags": [
+          "guardian"
+        ],
+        "summary": "Revoke guardian consent for a teen account",
+        "description": "Revokes one guardian-to-teen consent link, queues a teen notification, invalidates the teen access state when no active guardian remains, and records an audit entry.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardianConsentRevokeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Guardian consent revoked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianConsentRevokeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Guardian revoke payload failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication headers are missing or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated guardian does not match the requested guardianId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Active guardian consent could not be found",
             "content": {
               "application/json": {
                 "schema": {

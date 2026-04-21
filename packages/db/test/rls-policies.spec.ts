@@ -133,7 +133,8 @@ const seedScenario = async (): Promise<SeededScenario> => {
         'Teen Wardrobe Owner',
         JSON.stringify({
           compliance: {
-            accountStatus: 'pending_guardian_consent',
+            accountStatus: 'active',
+            guardianConsentRequired: false,
           },
         }),
       ]
@@ -567,6 +568,83 @@ describe.sequential('guardian-aware RLS policies', () => {
         )
 
         expect(garmentRows.rows).toHaveLength(0)
+      }
+    )
+  })
+
+  it('blocks teen self access after the last guardian consent is revoked', async () => {
+    scenario = await seedScenario()
+
+    const client = await adminPool.connect()
+
+    try {
+      await client.query('BEGIN')
+      await client.query(
+        `UPDATE public."GuardianConsent"
+         SET "revoked_at" = NOW(), "status" = 'revoked'
+         WHERE "teen_id" = $1`,
+        [scenario.teenId]
+      )
+      await client.query(
+        `UPDATE public."UserProfile"
+         SET "preferences" = $2::jsonb, "updated_at" = NOW()
+         WHERE "user_id" = $1`,
+        [
+          scenario.teenId,
+          JSON.stringify({
+            compliance: {
+              accountStatus: 'pending_guardian_consent',
+              guardianConsentRequired: true,
+            },
+          }),
+        ]
+      )
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally {
+      client.release()
+    }
+
+    await withRole(
+      'authenticated',
+      buildClaims(scenario.teenEmail, 'teen'),
+      async (guardedClient) => {
+        const garmentRows = await guardedClient.query(
+          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+          [scenario!.teenId]
+        )
+
+        expect(garmentRows.rows).toHaveLength(0)
+
+        const updateResult = await guardedClient.query(
+          `UPDATE public."GarmentItem"
+           SET "category" = $1, "updated_at" = NOW()
+           WHERE "id" = $2
+           RETURNING "id"`,
+          ['restored-without-consent', scenario!.garmentId]
+        )
+
+        expect(updateResult.rowCount).toBe(0)
+      }
+    )
+  })
+
+  it('does not allow authenticated callers to execute the guardian-consent helper directly', async () => {
+    scenario = await seedScenario()
+
+    await withRole(
+      'authenticated',
+      buildClaims(scenario.teenEmail, 'teen'),
+      async (client) => {
+        await expect(
+          client.query('SELECT private.user_requires_guardian_consent($1)', [
+            scenario!.teenId,
+          ])
+        ).rejects.toMatchObject({
+          code: '42501',
+        })
       }
     )
   })

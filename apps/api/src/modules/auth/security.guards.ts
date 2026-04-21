@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { updateRequestContext } from '../../logger/request-context'
+import { GuardianConsentStateService } from './guardian-consent-state.service'
 import { API_ROLES_KEY } from './security.decorators'
 import { API_ROLES, type ApiRole, type AuthenticatedRequest } from './security.types'
 
@@ -51,7 +52,11 @@ const parseRole = (headerValue: string | string[] | undefined): ApiRole | undefi
 
 @Injectable()
 export class RequestAuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  constructor(
+    private readonly guardianConsentStateService: GuardianConsentStateService
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>()
     const token = parseBearerToken(request.headers.authorization)
     const userId = normalizeHeaderValue(request.headers[USER_ID_HEADER])
@@ -63,6 +68,14 @@ export class RequestAuthGuard implements CanActivate {
 
     request.auth = { token, userId, role }
     updateRequestContext({ userId })
+
+    if (
+      role === 'teen' &&
+      !(await this.guardianConsentStateService.canTeenAccess(userId))
+    ) {
+      throw new ForbiddenException('Guardian consent required before continuing')
+    }
+
     return true
   }
 }

@@ -1,8 +1,9 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-20 - Step 4 and Step 14 now reflect the completed guardian-aware
-RLS rollout, the auth-to-database enforcement path, and the DB-level policy test
-coverage that now backs guardian consent
+Updated: 2026-04-21 - Step 4 and Step 14 now reflect the completed guardian-aware
+RLS rollout, the revoke-consent enforcement path, the shared guardian revoke
+contract surface, and the DB-level policy test coverage that now backs guardian
+consent
 
 ## LLM collaborator prompt
 
@@ -384,7 +385,9 @@ Current repo note:
   `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`
   applies guardian-aware access rules across the private wardrobe tables, and
   `packages/db/test/rls-policies.spec.ts` proves the resulting teen/guardian/admin personas
-  against a live Postgres policy surface before deploy.
+  against a live Postgres policy surface before deploy. Task 6 then extends that model with
+  `packages/db/prisma/migrations/20260421090000_block_revoked_teens_from_self_access/migration.sql`,
+  which blocks teen self-access again when the last active guardian consent is revoked.
 
 Architecture diagram:
 
@@ -1490,15 +1493,19 @@ Current repo note:
 - Health, polling, auth, moderation, and the first authenticated user profile slice now follow
   this model. The auth slice now includes signup age verification as well as guardian consent, with
   `packages/api-client/src/contracts/http/auth.ts` owning the public request/response contract while
-  `packages/utils/src/age.ts` owns the reusable age-policy calculation. That contract path is now
-  backed by guardian-aware DB enforcement in
+  `packages/utils/src/age.ts` owns the reusable age-policy calculation. Guardian invitation and
+  revoke flows now live in `packages/api-client/src/contracts/http/guardian.ts`, with the generated
+  `packages/api-client/docs/http.openapi.json` publishing the matching `/api/v1/guardian/*`
+  endpoints. That contract path is now backed by guardian-aware DB enforcement in
   `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`,
   including the Supabase-JWT-to-app-user bridge required by the repo's text `User.id` model, plus
-  persona coverage in `packages/db/test/rls-policies.spec.ts`. The remaining work is to migrate
+  the revoke-specific follow-up in
+  `packages/db/prisma/migrations/20260421090000_block_revoked_teens_from_self_access/migration.sql`
+  and persona coverage in `packages/db/test/rls-policies.spec.ts`. The remaining work is to migrate
   later public REST endpoints as they land so every web/mobile-facing API starts in the same
-  shared-contract path. Task 6 also proved that shared Zod modules are not enough on their own:
-  parity tests caught real adapter drift in Nest defaults and dependency injection seams, so
-  controller/service wiring still has to be verified against the shared contract at runtime.
+  shared-contract path. Task 6 also reinforced that shared Zod modules are not enough on their
+  own: parity tests and runtime guard checks were both needed to make revoked-consent behavior real
+  at the Nest adapter boundary.
 
 Architecture diagram:
 

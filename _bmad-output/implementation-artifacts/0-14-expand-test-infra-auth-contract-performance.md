@@ -1,6 +1,6 @@
 # Story 0.14: Expand test infrastructure for auth-session, burn-in, contracts, performance, and PR review automation
 
-Updated: 2026-04-14 — add Task 7 for unit test coverage reporting, PR comments, and badges
+Updated: 2026-04-21 — record preview deploy-parity debt for guardian write-path Playwright coverage
 
 Status: in progress
 
@@ -84,6 +84,10 @@ without blocking current feature delivery.
   - [ ] Add Pact provider verification path for backend contract conformance.
   - [ ] Publish contract validation artifacts and failure diagnostics.
   - [ ] Start as non-blocking, then promote to blocking after stability threshold.
+  - [ ] Resolve preview deploy-path parity for write-path API E2E before promoting
+        `playwright/tests/api/guardian-consent-lifecycle.spec.ts` beyond local-only runs:
+        verify preview API deploys apply Prisma migrations and surface compatible env/schema
+        state for guardian invitation flows.
 
 - [ ] Task 4: Performance baseline harness (AC: #4)
   - [ ] Add baseline k6 scenarios for critical API endpoints and queue load.
@@ -138,6 +142,11 @@ without blocking current feature delivery.
 - Current partial implementation status for Task 6:
   repo-side config/workflow/template work is complete; GitHub App installation still requires
   authenticated GitHub interaction before the first live review can be verified.
+- Current preview debt for Task 3:
+  guardian consent lifecycle Playwright coverage remains local-only because preview PR deploys
+  still return `500` on `POST /api/v1/guardian/invitations` even after local CI burn-in passes.
+  Treat preview deploy-path verification (migration execution plus runtime parity) as a separate
+  contract-infra follow-up before re-enabling preview gating for this write-path journey.
 
 ## Change Log
 
@@ -148,3 +157,4 @@ without blocking current feature delivery.
 | 2026-03-27 | Codex                  | Recorded partial completion of Task 6: added `.coderabbit.yaml`, PR template, CI/CD notes, and PR `#42`                                        |
 | 2026-03-27 | Codex                  | Removed redundant CodeRabbit ready-for-review workflow after review feedback; automatic review remains configured in `.coderabbit.yaml`        |
 | 2026-04-14 | Murat + Claude         | Added Task 7: unit test coverage reporting — composite action, monorepo coverage merge, sticky PR comments, shields.io badge via gist          |
+| 2026-04-21 | Codex                  | Recorded preview deploy-parity debt for guardian write-path Playwright coverage and kept the lifecycle contract spec local-only                |

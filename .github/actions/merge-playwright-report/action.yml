@@ -26,6 +26,9 @@ outputs:
   report-url:
     description: 'Download URL for merged report artifact'
     value: ${{ steps.resolve-url.outputs.report_url }}
+  report-artifact-url:
+    description: 'Direct artifact URL for merged report'
+    value: ${{ steps.upload-report.outputs.artifact-url }}
 
 runs:
   using: composite
@@ -60,24 +63,27 @@ runs:
         github-token: ${{ env.GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         script: |
           const artifactName = '${{ inputs.report-name }}';
-          let reportUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-          try {
-            const { data } = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-            });
-            const artifact = data.artifacts.find((a) => a.name === artifactName);
-            if (artifact?.archive_download_url) {
-              const res = await fetch(artifact.archive_download_url, {
-                method: 'GET',
-                headers: { Authorization: `token ${process.env.GITHUB_TOKEN}` },
-                redirect: 'manual',
+          const uploadedArtifactUrl = '${{ steps.upload-report.outputs.artifact-url }}';
+          let reportUrl = uploadedArtifactUrl || `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          if (!uploadedArtifactUrl) {
+            try {
+              const { data } = await github.rest.actions.listWorkflowRunArtifacts({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: context.runId,
               });
-              const loc = res.headers.get('location');
-              if (loc) reportUrl = loc;
+              const artifact = data.artifacts.find((a) => a.name === artifactName);
+              if (artifact?.archive_download_url) {
+                const res = await fetch(artifact.archive_download_url, {
+                  method: 'GET',
+                  headers: { Authorization: `token ${process.env.GITHUB_TOKEN}` },
+                  redirect: 'manual',
+                });
+                const loc = res.headers.get('location');
+                if (loc) reportUrl = loc;
+              }
+            } catch (e) {
+              core.warning(`Could not resolve report URL: ${e.message}`);
             }
-          } catch (e) {
-            core.warning(`Could not resolve report URL: ${e.message}`);
           }
           core.setOutput('report_url', reportUrl);

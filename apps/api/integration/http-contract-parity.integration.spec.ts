@@ -2,7 +2,11 @@ import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import type { INestApplication } from '@nestjs/common'
+import {
+  ForbiddenException,
+  type INestApplication,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 import request from 'supertest'
 import {
@@ -26,6 +30,7 @@ import {
 import { queueConfigs } from '../src/config/queues'
 import { ApiHealthController } from '../src/controllers/api-health.controller'
 import { HealthController } from '../src/controllers/health.controller'
+import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards'
 import { EventsController } from '../src/modules/events/events.controller'
 import { EventsRepository } from '../src/modules/events/events.repository'
@@ -33,10 +38,12 @@ import { EventsService } from '../src/modules/events/events.service'
 import { UserController } from '../src/modules/user/user.controller'
 import { UserService } from '../src/modules/user/user.service'
 
-const { prismaEventFindManyMock, prismaUserFindUniqueMock } = vi.hoisted(() => ({
-  prismaEventFindManyMock: vi.fn(),
-  prismaUserFindUniqueMock: vi.fn(),
-}))
+const { guardianCanTeenAccessMock, prismaEventFindManyMock, prismaUserFindUniqueMock } =
+  vi.hoisted(() => ({
+    guardianCanTeenAccessMock: vi.fn(),
+    prismaEventFindManyMock: vi.fn(),
+    prismaUserFindUniqueMock: vi.fn(),
+  }))
 
 type RequestRole = 'guardian' | 'teen' | 'moderator' | 'admin'
 
@@ -58,6 +65,42 @@ describe('HTTP contract parity (integration)', () => {
   }
 
   beforeEach(async () => {
+    vi.spyOn(RequestAuthGuard.prototype, 'canActivate').mockImplementation(
+      async (context) => {
+        const request = context.switchToHttp().getRequest<{
+          auth?: { token: string; userId: string; role: RequestRole }
+          headers: Record<string, string | string[] | undefined>
+        }>()
+        const authorization = request.headers.authorization
+        const userId = request.headers['x-user-id']
+        const role = request.headers['x-user-role']
+
+        if (
+          typeof authorization !== 'string' ||
+          !authorization.startsWith('Bearer ') ||
+          typeof userId !== 'string' ||
+          userId.trim().length === 0 ||
+          typeof role !== 'string' ||
+          !['guardian', 'teen', 'moderator', 'admin'].includes(role)
+        ) {
+          throw new UnauthorizedException('Missing or invalid authentication headers')
+        }
+
+        request.auth = {
+          token: authorization.slice('Bearer '.length).trim(),
+          userId,
+          role: role as RequestRole,
+        }
+
+        if (role === 'teen' && !(await guardianCanTeenAccessMock(userId))) {
+          throw new ForbiddenException('Guardian consent required before continuing')
+        }
+
+        return true
+      }
+    )
+    guardianCanTeenAccessMock.mockReset()
+    guardianCanTeenAccessMock.mockResolvedValue(true)
     prismaEventFindManyMock.mockReset()
     prismaUserFindUniqueMock.mockReset()
     const prisma = {
@@ -81,10 +124,21 @@ describe('HTTP contract parity (integration)', () => {
         EventsRepository,
         EventsService,
         UserService,
-        RequestAuthGuard,
         {
           provide: PrismaClient,
           useValue: prisma,
+        },
+        {
+          provide: GuardianConsentStateService,
+          useValue: {
+            canTeenAccess: guardianCanTeenAccessMock,
+          },
+        },
+        {
+          provide: RequestAuthGuard,
+          useFactory: (guardianConsentStateService: GuardianConsentStateService) =>
+            new RequestAuthGuard(guardianConsentStateService),
+          inject: [GuardianConsentStateService],
         },
       ],
     }).compile()
@@ -94,6 +148,8 @@ describe('HTTP contract parity (integration)', () => {
   })
 
   afterEach(async () => {
+    vi.restoreAllMocks()
+
     if (app) {
       await app.close()
       app = undefined

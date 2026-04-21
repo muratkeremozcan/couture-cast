@@ -10,8 +10,11 @@ import {
   InjectAnalyticsClient,
   type AnalyticsClient,
 } from '../../analytics/analytics.service'
+import { GuardianConsentStateService } from '../auth/guardian-consent-state.service'
+import { UserSessionService } from '../auth/user-session.service'
 import {
   consentLevelSchema,
+  guardianConsentRevokeResponseSchema,
   guardianInvitationAcceptResponseSchema,
   guardianInvitationInputSchema,
   guardianInvitationResponseSchema,
@@ -29,8 +32,18 @@ type InvitationTokenPayload = {
   exp: number
 }
 
+type ConsentAuditEvent = {
+  eventType: 'consent_granted' | 'consent_revoked' | 'guardian_deleted'
+  teenId: string
+  guardianId: string
+  consentLevel?: ConsentLevel
+  ipAddress?: string | null
+  timestamp: Date
+}
+
 const GUARDIAN_INVITATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const DEVELOPMENT_INVITATION_SECRET = 'guardian-invite-development-secret'
+const MAX_REVOKE_CONSENT_TRANSACTION_RETRIES = 3
 const invitationTokenPayloadSchema = z.object({
   sub: z.string().min(1),
   teenId: z.string().min(1),
@@ -167,17 +180,120 @@ function buildUpdatedPreferences(
   nextCompliance.accountStatus = 'active'
   nextCompliance.guardianConsentRequired = false
   nextCompliance.guardianConsentGrantedAt = grantedAt.toISOString()
+  nextCompliance.guardianConsentRevokedAt = null
   nextPreferences.compliance = nextCompliance
 
   return nextPreferences as Prisma.InputJsonValue
+}
+
+function buildRevokedPreferences(
+  preferences: Prisma.JsonValue | null | undefined,
+  revokedAt: Date
+): Prisma.InputJsonValue {
+  const nextPreferences =
+    preferences && typeof preferences === 'object' && !Array.isArray(preferences)
+      ? { ...(preferences as Record<string, unknown>) }
+      : {}
+  const nextCompliance =
+    nextPreferences.compliance &&
+    typeof nextPreferences.compliance === 'object' &&
+    !Array.isArray(nextPreferences.compliance)
+      ? { ...(nextPreferences.compliance as Record<string, unknown>) }
+      : {}
+
+  nextCompliance.accountStatus = 'pending_guardian_consent'
+  nextCompliance.guardianConsentRequired = true
+  nextCompliance.guardianConsentGrantedAt = null
+  nextCompliance.guardianConsentRevokedAt = revokedAt.toISOString()
+  nextPreferences.compliance = nextCompliance
+
+  return nextPreferences as Prisma.InputJsonValue
+}
+
+function buildConsentAuditPayload(event: ConsentAuditEvent): Prisma.InputJsonValue {
+  return {
+    guardian_id: event.guardianId,
+    teen_id: event.teenId,
+    consent_level: event.consentLevel ?? null,
+    ip_address: event.ipAddress ?? null,
+    timestamp: event.timestamp.toISOString(),
+  } satisfies Record<string, string | null>
+}
+
+function extractPrismaSerializationCode(error: Prisma.PrismaClientKnownRequestError) {
+  if (error.code === 'P2034') {
+    return error.code
+  }
+
+  if (typeof error.meta?.code === 'string') {
+    return error.meta.code
+  }
+
+  if (typeof error.meta?.sqlstate === 'string') {
+    return error.meta.sqlstate
+  }
+
+  return undefined
+}
+
+function extractObjectSerializationCode(error: object) {
+  if ('code' in error && typeof error.code === 'string') {
+    return error.code
+  }
+
+  const meta = 'meta' in error ? error.meta : undefined
+  if (meta && typeof meta === 'object') {
+    if ('code' in meta && typeof meta.code === 'string') {
+      return meta.code
+    }
+
+    if ('sqlstate' in meta && typeof meta.sqlstate === 'string') {
+      return meta.sqlstate
+    }
+  }
+
+  return 'message' in error && typeof error.message === 'string'
+    ? error.message
+    : undefined
+}
+
+function extractRetryableSerializationCode(error: unknown): string | undefined {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return extractPrismaSerializationCode(error)
+  }
+
+  if (typeof error !== 'object' || error === null) {
+    return undefined
+  }
+
+  return extractObjectSerializationCode(error)
+}
+
+function isRetryableSerializationFailure(error: unknown) {
+  const code = extractRetryableSerializationCode(error)
+  return code === 'P2034' || code === '40001' || code?.includes('40001') === true
 }
 
 @Injectable()
 export class GuardianService {
   constructor(
     @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient,
-    @Inject(PrismaClient) private readonly prisma: PrismaClient
+    @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    private readonly guardianConsentStateService: GuardianConsentStateService,
+    private readonly userSessionService: UserSessionService
   ) {}
+
+  private logConsentAuditEvent(tx: Prisma.TransactionClient, event: ConsentAuditEvent) {
+    return tx.auditLog.create({
+      data: {
+        user_id: event.teenId,
+        event_type: event.eventType,
+        event_data: buildConsentAuditPayload(event),
+        timestamp: event.timestamp,
+        ip_address: event.ipAddress ?? null,
+      },
+    })
+  }
 
   async inviteGuardian(
     teenId: string,
@@ -345,6 +461,7 @@ export class GuardianService {
           consent_granted_at: acceptedAt,
           revoked_at: null,
           ip_address: normalizedIpAddress,
+          revoked_ip_address: null,
           status: 'granted',
         },
         create: {
@@ -354,6 +471,7 @@ export class GuardianService {
           consent_granted_at: acceptedAt,
           revoked_at: null,
           ip_address: normalizedIpAddress,
+          revoked_ip_address: null,
           status: 'granted',
         },
       })
@@ -409,6 +527,15 @@ export class GuardianService {
         ],
       })
 
+      await this.logConsentAuditEvent(tx, {
+        eventType: 'consent_granted',
+        teenId: invitation.teen.id,
+        guardianId: guardian.id,
+        consentLevel: invitation.consent_level,
+        ipAddress: normalizedIpAddress,
+        timestamp: acceptedAt,
+      })
+
       return {
         teenId: invitation.teen.id,
         teenEmail: invitation.teen.email,
@@ -431,6 +558,168 @@ export class GuardianService {
       },
     })
 
+    this.guardianConsentStateService.markTeenAccessGranted(result.teenId)
     return guardianInvitationAcceptResponseSchema.parse(result)
+  }
+
+  async revokeConsent(guardianId: string, teenId: string, ipAddress?: string) {
+    const revokedAt = new Date()
+    const normalizedIpAddress = ipAddress?.trim() || null
+
+    let result:
+      | {
+          guardianId: string
+          teenId: string
+          revokedAt: string
+          consentLevel: ConsentLevel
+          remainingActiveGuardians: number
+          sessionInvalidated: boolean
+          notificationQueued: true
+        }
+      | undefined
+
+    for (
+      let attempt = 1;
+      attempt <= MAX_REVOKE_CONSENT_TRANSACTION_RETRIES;
+      attempt += 1
+    ) {
+      try {
+        result = await this.prisma.$transaction(
+          async (tx) => {
+            const consent = await tx.guardianConsent.findFirst({
+              where: {
+                guardian_id: guardianId,
+                teen_id: teenId,
+                status: 'granted',
+                revoked_at: null,
+              },
+              include: {
+                guardian: true,
+                teen: {
+                  include: {
+                    profile: true,
+                  },
+                },
+              },
+            })
+
+            if (!consent) {
+              throw new NotFoundException('Active guardian consent not found')
+            }
+
+            await tx.guardianConsent.update({
+              where: {
+                guardian_id_teen_id: {
+                  guardian_id: guardianId,
+                  teen_id: teenId,
+                },
+              },
+              data: {
+                revoked_at: revokedAt,
+                revoked_ip_address: normalizedIpAddress,
+                status: 'revoked',
+              },
+            })
+
+            const remainingActiveGuardians = await tx.guardianConsent.count({
+              where: {
+                teen_id: teenId,
+                status: 'granted',
+                revoked_at: null,
+              },
+            })
+
+            const sessionInvalidated = remainingActiveGuardians === 0
+            if (sessionInvalidated && consent.teen.profile) {
+              await tx.userProfile.update({
+                where: { user_id: teenId },
+                data: {
+                  preferences: buildRevokedPreferences(
+                    consent.teen.profile.preferences,
+                    revokedAt
+                  ),
+                },
+              })
+            }
+
+            await tx.eventEnvelope.create({
+              data: {
+                channel: 'email.guardian-consent-revoked',
+                user_id: teenId,
+                payload: {
+                  to: consent.teen.email,
+                  teenId,
+                  teenEmail: consent.teen.email,
+                  guardianId,
+                  guardianEmail: consent.guardian.email,
+                  revokedAt: revokedAt.toISOString(),
+                  remainingActiveGuardians,
+                  sessionInvalidated,
+                },
+              },
+            })
+
+            await this.logConsentAuditEvent(tx, {
+              eventType: 'consent_revoked',
+              teenId,
+              guardianId,
+              consentLevel: consent.consent_level,
+              ipAddress: normalizedIpAddress,
+              timestamp: revokedAt,
+            })
+
+            return {
+              guardianId,
+              teenId,
+              revokedAt: revokedAt.toISOString(),
+              consentLevel: consent.consent_level,
+              remainingActiveGuardians,
+              sessionInvalidated,
+              notificationQueued: true as const,
+            }
+          },
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          }
+        )
+        break
+      } catch (error) {
+        if (
+          attempt < MAX_REVOKE_CONSENT_TRANSACTION_RETRIES &&
+          isRetryableSerializationFailure(error)
+        ) {
+          continue
+        }
+
+        throw error
+      }
+    }
+
+    if (!result) {
+      throw new Error('Failed to revoke guardian consent after retrying the transaction')
+    }
+
+    if (result.sessionInvalidated) {
+      await this.userSessionService.invalidateUserSessions(result.teenId)
+      this.guardianConsentStateService.markTeenAccessRevoked(result.teenId)
+    } else {
+      this.guardianConsentStateService.markTeenAccessGranted(result.teenId)
+    }
+
+    this.analyticsClient.capture({
+      distinctId: result.guardianId,
+      event: 'guardian_consent_revoked',
+      properties: {
+        guardian_id: result.guardianId,
+        teen_id: result.teenId,
+        consent_level: result.consentLevel,
+        timestamp: result.revokedAt,
+        consent_timestamp: result.revokedAt,
+        remainingActiveGuardians: result.remainingActiveGuardians,
+        sessionInvalidated: result.sessionInvalidated,
+      },
+    })
+
+    return guardianConsentRevokeResponseSchema.parse(result)
   }
 }
