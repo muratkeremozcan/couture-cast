@@ -57,9 +57,9 @@ type RequestJsonParams = {
   headers?: Record<string, string>
 }
 
-function isProdEnvironment(testInfo: TestInfo): boolean {
+function isNonLocalEnvironment(testInfo: TestInfo): boolean {
   const metadata = (testInfo.project.metadata ?? {}) as Record<string, string>
-  return metadata.environment === 'prod'
+  return metadata.environment !== 'local'
 }
 
 function createBirthdate(yearsAgo: number): string {
@@ -119,10 +119,11 @@ async function requestJson(
 test.describe('Guardian consent lifecycle API contracts', () => {
   test.beforeEach(({}, testInfo) => {
     // This journey creates users, invitations, consent links, queue records,
-    // and audit rows. Keep it out of prod until dedicated cleanup/isolation exists.
+    // and audit rows. Keep it local-only until preview deploy-path parity is
+    // proven for write-path schema/env behavior.
     test.skip(
-      isProdEnvironment(testInfo),
-      'Skipping guardian consent lifecycle write-path contract tests in production.'
+      isNonLocalEnvironment(testInfo),
+      'Skipping guardian consent lifecycle write-path contract tests outside local runs.'
     )
   })
 
