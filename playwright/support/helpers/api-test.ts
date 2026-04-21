@@ -48,5 +48,13 @@ function slugify(value: string): string {
 }
 
 export function buildUniqueId(prefix: string, testInfo: TestInfo): string {
-  return `${prefix}-${runStamp}-${testInfo.parallelIndex}-${testInfo.retry}-${slugify(testInfo.title)}`
+  return [
+    prefix,
+    runStamp,
+    `w${testInfo.workerIndex}`,
+    `p${testInfo.parallelIndex}`,
+    `r${testInfo.repeatEachIndex}`,
+    `retry${testInfo.retry}`,
+    slugify(testInfo.title),
+  ].join('-')
 }

@@ -62,6 +62,15 @@ function isProdEnvironment(testInfo: TestInfo): boolean {
   return metadata.environment === 'prod'
 }
 
+function isLocalEnvironment(testInfo: TestInfo): boolean {
+  const metadata = (testInfo.project.metadata ?? {}) as Record<string, string>
+  return metadata.environment === 'local'
+}
+
+function allowRemoteGuardianWritePaths(): boolean {
+  return process.env.PW_ALLOW_REMOTE_GUARDIAN_WRITE_PATHS === 'true'
+}
+
 function createBirthdate(yearsAgo: number): string {
   const today = new Date()
   const birthdate = new Date(
@@ -119,10 +128,12 @@ async function requestJson(
 test.describe('Guardian consent lifecycle API contracts', () => {
   test.beforeEach(({}, testInfo) => {
     // This journey creates users, invitations, consent links, queue records,
-    // and audit rows. Keep it out of prod until dedicated cleanup/isolation exists.
+    // and audit rows. Keep it local by default until remote preview environments
+    // guarantee isolated, fully migrated databases for write-path E2E coverage.
     test.skip(
-      isProdEnvironment(testInfo),
-      'Skipping guardian consent lifecycle write-path contract tests in production.'
+      (!isLocalEnvironment(testInfo) && !allowRemoteGuardianWritePaths()) ||
+        isProdEnvironment(testInfo),
+      'Skipping guardian consent lifecycle write-path contract tests outside local unless PW_ALLOW_REMOTE_GUARDIAN_WRITE_PATHS=true.'
     )
   })
 

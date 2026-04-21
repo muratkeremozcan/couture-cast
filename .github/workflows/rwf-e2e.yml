@@ -42,6 +42,8 @@ on:
         required: false
       DATABASE_URL_PROD:
         required: false
+      GUARDIAN_INVITE_JWT_SECRET:
+        required: false
 
 jobs:
   e2e:
@@ -121,6 +123,7 @@ jobs:
           TEST_ENV: ${{ inputs.test_env }}
           DATABASE_URL_DEV: ${{ secrets.DATABASE_URL_DEV }}
           DATABASE_URL_PROD: ${{ secrets.DATABASE_URL_PROD }}
+          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
           EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.expected_sha.outputs.sha }}
           GH_TOKEN: ${{ github.token }}

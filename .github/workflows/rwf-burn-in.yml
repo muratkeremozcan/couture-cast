@@ -23,6 +23,8 @@ on:
     secrets:
       DATABASE_URL_DEV:
         required: false
+      GUARDIAN_INVITE_JWT_SECRET:
+        required: false
 
 jobs:
   burn-in:
@@ -142,6 +144,7 @@ jobs:
           GITHUB_SHA: ${{ steps.git-sha.outputs.sha }}
           TEST_ENV: local
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
 
       - name: Upload burn-in failure artifacts
         id: upload-burn-in-artifacts
@@ -161,19 +164,22 @@ jobs:
         with:
           script: |
             const artifactName = 'playwright-report';
-            let reportUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            try {
-              const { data } = await github.rest.actions.listWorkflowRunArtifacts({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id: context.runId,
-              });
-              const artifact = data.artifacts.find((candidate) => candidate.name === artifactName);
-              if (artifact?.id) {
-                reportUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts/${artifact.id}`;
+            const uploadedArtifactUrl = '${{ steps.upload-burn-in-artifacts.outputs.artifact-url }}';
+            let reportUrl = uploadedArtifactUrl || `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            if (!uploadedArtifactUrl) {
+              try {
+                const { data } = await github.rest.actions.listWorkflowRunArtifacts({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: context.runId,
+                });
+                const artifact = data.artifacts.find((candidate) => candidate.name === artifactName);
+                if (artifact?.id) {
+                  reportUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts/${artifact.id}`;
+                }
+              } catch (error) {
+                core.warning(`Could not resolve burn-in report URL: ${error instanceof Error ? error.message : String(error)}`);
               }
-            } catch (error) {
-              core.warning(`Could not resolve burn-in report URL: ${error instanceof Error ? error.message : String(error)}`);
             }
             core.setOutput('report_url', reportUrl);
 

@@ -109,6 +109,7 @@ jobs:
         run: npm run test:pw-local -- --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --reporter=blob
         env:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
 
       - name: Copy trace files to blob-report
         if: always()
