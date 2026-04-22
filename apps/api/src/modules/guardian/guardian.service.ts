@@ -10,6 +10,7 @@ import {
   InjectAnalyticsClient,
   type AnalyticsClient,
 } from '../../analytics/analytics.service'
+import { createBaseLogger } from '../../logger/pino.config'
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service'
 import { UserSessionService } from '../auth/user-session.service'
 import {
@@ -356,6 +357,8 @@ function isRetryableSerializationFailure(error: unknown) {
 
 @Injectable()
 export class GuardianService {
+  private readonly logger = createBaseLogger().child({ feature: 'guardian-consent' })
+
   constructor(
     @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient,
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
@@ -776,6 +779,15 @@ export class GuardianService {
           attempt < MAX_REVOKE_CONSENT_TRANSACTION_RETRIES &&
           isRetryableSerializationFailure(error)
         ) {
+          this.logger.warn(
+            {
+              attempt,
+              guardianId,
+              teenId,
+              maxRetries: MAX_REVOKE_CONSENT_TRANSACTION_RETRIES,
+            },
+            'guardian_consent_revoke_retrying_serializable_transaction'
+          )
           continue
         }
 
@@ -873,128 +885,170 @@ export class GuardianService {
       }
 
       const emancipatedAt = new Date(now)
-      const result = await this.prisma.$transaction(
-        async (tx) => {
-          const teen = await tx.user.findUnique({
-            where: { id: candidate.id },
-            include: {
-              profile: true,
-              teen_roles: {
-                where: {
-                  status: 'granted',
-                  revoked_at: null,
-                },
+      let result:
+        | {
+            teenId: string
+            revokedConsentCount: number
+          }
+        | null
+        | undefined
+
+      for (
+        let attempt = 1;
+        attempt <= MAX_REVOKE_CONSENT_TRANSACTION_RETRIES;
+        attempt += 1
+      ) {
+        try {
+          result = await this.prisma.$transaction(
+            async (tx) => {
+              const teen = await tx.user.findUnique({
+                where: { id: candidate.id },
                 include: {
-                  guardian: true,
+                  profile: true,
+                  teen_roles: {
+                    where: {
+                      status: 'granted',
+                      revoked_at: null,
+                    },
+                    include: {
+                      guardian: true,
+                    },
+                  },
                 },
-              },
-            },
-          })
+              })
 
-          if (!teen?.profile) {
-            return null
-          }
+              if (!teen?.profile) {
+                return null
+              }
 
-          if (!hasReachedAgeOfMajority(teen.profile.birthdate, now)) {
-            return null
-          }
+              if (!hasReachedAgeOfMajority(teen.profile.birthdate, now)) {
+                return null
+              }
 
-          if (hasGuardianConsentAgedOut(teen.profile.preferences)) {
-            return null
-          }
+              if (hasGuardianConsentAgedOut(teen.profile.preferences)) {
+                return null
+              }
 
-          const activeGuardianConsents = teen.teen_roles
-          const stillRequiresGuardian = requiresGuardianComplianceState(
-            teen.profile.preferences
-          )
+              const activeGuardianConsents = teen.teen_roles
+              const stillRequiresGuardian = requiresGuardianComplianceState(
+                teen.profile.preferences
+              )
 
-          if (!stillRequiresGuardian && activeGuardianConsents.length === 0) {
-            return null
-          }
+              if (!stillRequiresGuardian && activeGuardianConsents.length === 0) {
+                return null
+              }
 
-          if (revokeActiveConsents && activeGuardianConsents.length > 0) {
-            await tx.guardianConsent.updateMany({
-              where: {
-                teen_id: teen.id,
-                status: 'granted',
-                revoked_at: null,
-              },
-              data: {
-                status: 'revoked',
-                revoked_at: emancipatedAt,
-                revoked_ip_address: null,
-              },
-            })
+              if (revokeActiveConsents && activeGuardianConsents.length > 0) {
+                await tx.guardianConsent.updateMany({
+                  where: {
+                    teen_id: teen.id,
+                    status: 'granted',
+                    revoked_at: null,
+                  },
+                  data: {
+                    status: 'revoked',
+                    revoked_at: emancipatedAt,
+                    revoked_ip_address: null,
+                  },
+                })
 
-            for (const consent of activeGuardianConsents) {
+                for (const consent of activeGuardianConsents) {
+                  await this.logConsentAuditEvent(tx, {
+                    eventType: 'consent_revoked',
+                    teenId: teen.id,
+                    guardianId: consent.guardian_id,
+                    consentLevel: consent.consent_level,
+                    ipAddress: null,
+                    timestamp: emancipatedAt,
+                  })
+                }
+              }
+
+              await tx.userProfile.update({
+                where: { user_id: teen.id },
+                data: {
+                  preferences: buildEmancipatedPreferences(
+                    teen.profile.preferences,
+                    emancipatedAt,
+                    revokeActiveConsents && activeGuardianConsents.length > 0
+                      ? emancipatedAt
+                      : null
+                  ),
+                },
+              })
+
+              await tx.eventEnvelope.create({
+                data: {
+                  channel: 'email.guardian-consent-aged-out',
+                  user_id: teen.id,
+                  payload: {
+                    to: teen.email,
+                    teenId: teen.id,
+                    teenEmail: teen.email,
+                    emancipatedAt: emancipatedAt.toISOString(),
+                    message: 'You no longer require guardian consent',
+                    activeGuardianCount: activeGuardianConsents.length,
+                    revokedGuardianCount: revokeActiveConsents
+                      ? activeGuardianConsents.length
+                      : 0,
+                    revokedGuardianAccess: revokeActiveConsents,
+                  },
+                },
+              })
+
               await this.logConsentAuditEvent(tx, {
-                eventType: 'consent_revoked',
+                eventType: 'guardian_consent_aged_out',
                 teenId: teen.id,
-                guardianId: consent.guardian_id,
-                consentLevel: consent.consent_level,
+                guardianId: null,
+                consentLevel: null,
                 ipAddress: null,
                 timestamp: emancipatedAt,
+                metadata: {
+                  active_guardian_count: activeGuardianConsents.length,
+                  revoked_guardian_count: revokeActiveConsents
+                    ? activeGuardianConsents.length
+                    : 0,
+                  revoked_guardian_access: revokeActiveConsents,
+                },
               })
-            }
-          }
 
-          await tx.userProfile.update({
-            where: { user_id: teen.id },
-            data: {
-              preferences: buildEmancipatedPreferences(
-                teen.profile.preferences,
-                emancipatedAt,
-                revokeActiveConsents && activeGuardianConsents.length > 0
-                  ? emancipatedAt
-                  : null
-              ),
-            },
-          })
-
-          await tx.eventEnvelope.create({
-            data: {
-              channel: 'email.guardian-consent-aged-out',
-              user_id: teen.id,
-              payload: {
-                to: teen.email,
+              return {
                 teenId: teen.id,
-                teenEmail: teen.email,
-                emancipatedAt: emancipatedAt.toISOString(),
-                message: 'You no longer require guardian consent',
-                activeGuardianCount: activeGuardianConsents.length,
-                revokedGuardianCount: revokeActiveConsents
+                revokedConsentCount: revokeActiveConsents
                   ? activeGuardianConsents.length
                   : 0,
-                revokedGuardianAccess: revokeActiveConsents,
+              }
+            },
+            {
+              isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            }
+          )
+          break
+        } catch (error) {
+          if (
+            attempt < MAX_REVOKE_CONSENT_TRANSACTION_RETRIES &&
+            isRetryableSerializationFailure(error)
+          ) {
+            this.logger.warn(
+              {
+                attempt,
+                teenId: candidate.id,
+                maxRetries: MAX_REVOKE_CONSENT_TRANSACTION_RETRIES,
               },
-            },
-          })
-
-          await this.logConsentAuditEvent(tx, {
-            eventType: 'guardian_consent_aged_out',
-            teenId: teen.id,
-            guardianId: null,
-            consentLevel: null,
-            ipAddress: null,
-            timestamp: emancipatedAt,
-            metadata: {
-              active_guardian_count: activeGuardianConsents.length,
-              revoked_guardian_count: revokeActiveConsents
-                ? activeGuardianConsents.length
-                : 0,
-              revoked_guardian_access: revokeActiveConsents,
-            },
-          })
-
-          return {
-            teenId: teen.id,
-            revokedConsentCount: revokeActiveConsents ? activeGuardianConsents.length : 0,
+              'guardian_consent_emancipation_retrying_serializable_transaction'
+            )
+            continue
           }
-        },
-        {
-          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+
+          throw error
         }
-      )
+      }
+
+      if (result === undefined) {
+        throw new Error(
+          'Failed to emancipate eligible teen after retrying the transaction'
+        )
+      }
 
       if (!result) {
         continue

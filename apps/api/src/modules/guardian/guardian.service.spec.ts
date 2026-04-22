@@ -1038,6 +1038,56 @@ describe('GuardianService', () => {
     expect(markTeenAccessGranted).toHaveBeenCalledWith(teen.id)
   })
 
+  it('retries emancipation when the serializable transaction hits a write conflict', async () => {
+    const today = new Date('2026-04-22T03:00:00.000Z')
+    const teen = createTeenProfileFixture({
+      id: 'teen-emancipation-retry',
+      email: 'teen.emancipation.retry@example.com',
+      age: 18,
+      birthdate: new Date('2008-04-22T12:00:00.000Z'),
+    })
+    const { prisma, service } = createService()
+
+    prisma.users.set(teen.id, {
+      id: teen.id,
+      email: teen.email,
+      profile: {
+        user_id: teen.id,
+        birthdate: teen.birthdate,
+        preferences: {
+          compliance: {
+            accountStatus: 'pending_guardian_consent',
+            guardianConsentRequired: true,
+          },
+        },
+      },
+    })
+
+    const originalTransaction = prisma.$transaction
+    let attempts = 0
+    prisma.$transaction = vi.fn(async (callback, options) => {
+      attempts += 1
+      expect(options).toMatchObject({
+        isolationLevel: 'Serializable',
+      })
+
+      if (attempts === 1) {
+        throw Object.assign(new Error('serialization failure'), { code: 'P2034' })
+      }
+
+      return originalTransaction(callback, options)
+    })
+
+    await expect(service.emancipateEligibleTeens(today)).resolves.toEqual({
+      processed: 1,
+      teenIds: [teen.id],
+      revokedConsentCount: 0,
+      notificationsQueued: 1,
+    })
+
+    expect(attempts).toBe(2)
+  })
+
   it('revokes active guardian links by default when a teen ages out of consent', async () => {
     const today = new Date('2026-04-22T03:00:00.000Z')
     const teen = createTeenProfileFixture({

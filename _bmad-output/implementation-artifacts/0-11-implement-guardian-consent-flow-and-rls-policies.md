@@ -415,7 +415,8 @@ GPT-5 Codex
 - `npm run generate:http-openapi`
 - `npm run test --workspace @couture/api-client -- testing/http-openapi.spec.ts`
 - `npm run test --workspace packages/db -- test/rls-policies.spec.ts test/audit-log-immutability.spec.ts`
-- `npm run test --workspace api -- src/modules/guardian/guardian.service.spec.ts src/modules/guardian/guardian.cron.spec.ts`
+- `npm run test --workspace api -- src/modules/guardian/guardian.service.spec.ts src/modules/guardian/guardian.cron.spec.ts integration/guardian-emancipation.integration.spec.ts`
+- `npx eslint --max-warnings=0 apps/api/integration/guardian-emancipation.integration.spec.ts`
 - `npm run typecheck --workspace api`
 
 ### Completion Notes List
@@ -439,7 +440,7 @@ GPT-5 Codex
 - Added teen compliance enforcement in `RequestAuthGuard` and a follow-on RLS migration so revoked teens lose authenticated self-access today instead of waiting for the future session-store rollout in Story 0.14.
 - Added focused coverage for revoke controller/service behavior, blocked teen auth requests, refreshed OpenAPI output, and database-level proof that revoked teens can no longer read or mutate wardrobe rows.
 - Added a daily UTC guardian cron sweep that emancipates 18+ teens, flips pending accounts to active, queues adulthood notifications, records `guardian_consent_aged_out` audit entries, and can revoke guardian links by default via config.
-- Hardened guardian invitations so adult accounts cannot still gain or regain guardian-linked access through delayed acceptance, and added focused unit coverage for the 18th-birthday transition path.
+- Hardened guardian invitations so adult accounts cannot still gain or regain guardian-linked access through delayed acceptance, and added focused unit plus integration coverage for the 18th-birthday transition path.
 
 ### File List
 
@@ -513,6 +514,7 @@ GPT-5 Codex
 - NEW `packages/db/test/audit-log-immutability.spec.ts`
 - NEW `apps/api/src/modules/guardian/guardian.cron.ts`
 - NEW `apps/api/src/modules/guardian/guardian.cron.spec.ts`
+- NEW `apps/api/integration/guardian-emancipation.integration.spec.ts`
 
 ## Change Log
 
