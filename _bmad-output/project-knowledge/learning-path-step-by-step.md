@@ -1,9 +1,10 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-21 - Step 4 and Step 14 now reflect the completed guardian-aware
-RLS rollout, the revoke-consent enforcement path, the shared guardian revoke
-contract surface, and the DB-level policy test coverage that now backs guardian
-consent
+Updated: 2026-04-22 - Step 4 and Step 14 reflect the completed guardian-aware
+RLS rollout, revoke-consent enforcement, the shared guardian contract surface,
+the DB-level policy coverage that now backs guardian consent, and Step 12 now
+captures when a local API integration test is a better fit than browser E2E
+for cron-driven policy transitions
 
 ## LLM collaborator prompt
 
@@ -1293,6 +1294,10 @@ Current repo note:
   user-visible pages and thin API contract coverage for boundary-critical write paths. The signup
   age-gate check in `playwright/tests/api/auth-signup-age-gate.spec.ts` is the pattern to copy
   when the real risk is backend policy enforcement, not a long multi-page browser journey.
+- Do not force browser E2E onto scheduled backend state changes. The guardian adulthood sweep in
+  `apps/api/integration/guardian-emancipation.integration.spec.ts` is the better pattern when the
+  risk sits at the Nest guard/controller boundary plus a cron-driven policy transition; without a
+  deterministic trigger or injectable clock, browser coverage adds more flake than signal.
 - Keep these API specs time-stable and isolated: use dynamic dates for age boundaries, unique IDs
   or emails for create flows, and skip production for tests that mutate real state.
 
