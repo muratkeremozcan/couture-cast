@@ -16,6 +16,7 @@ type StoredUser = {
   profile: {
     user_id: string
     preferences: Record<string, unknown> | null
+    birthdate?: Date | null
   } | null
 }
 
@@ -64,22 +65,122 @@ class InMemoryGuardianPrisma {
   auditLogs: StoredAuditLog[] = []
   eventEnvelopes: { channel: string; user_id?: string | null; payload: unknown }[] = []
 
+  private buildTeenRoles(teenId: string, includeGuardian = false) {
+    return [...this.consents.values()]
+      .filter(
+        (candidate) =>
+          candidate.teen_id === teenId &&
+          candidate.status === 'granted' &&
+          candidate.revoked_at === null
+      )
+      .map((consent) => {
+        if (!includeGuardian) {
+          return { ...consent }
+        }
+
+        return {
+          ...consent,
+          guardian: this.users.get(consent.guardian_id) ?? null,
+        }
+      })
+  }
+
+  private hydrateUser(
+    user: StoredUser,
+    include?: {
+      profile?: boolean
+      teen_roles?: {
+        include?: {
+          guardian?: boolean
+        }
+      }
+    }
+  ) {
+    const nextUser: Record<string, unknown> = {
+      ...user,
+      profile: user.profile ? { ...user.profile } : null,
+    }
+
+    if (include?.teen_roles) {
+      nextUser.teen_roles = this.buildTeenRoles(
+        user.id,
+        include.teen_roles.include?.guardian === true
+      )
+    }
+
+    return nextUser
+  }
+
   user = {
-    findUnique: vi.fn(({ where }: { where: { id?: string; email?: string } }) => {
-      if (where.id) {
-        return Promise.resolve(this.users.get(where.id) ?? null)
-      }
+    findUnique: vi.fn(
+      ({
+        where,
+        include,
+      }: {
+        where: { id?: string; email?: string }
+        include?: {
+          profile?: boolean
+          teen_roles?: {
+            include?: {
+              guardian?: boolean
+            }
+          }
+        }
+      }) => {
+        if (where.id) {
+          const user = this.users.get(where.id)
+          return Promise.resolve(user ? this.hydrateUser(user, include) : null)
+        }
 
-      if (where.email) {
-        return Promise.resolve(
-          [...this.users.values()].find(
-            (user) => user.email.toLowerCase() === where.email?.toLowerCase()
-          ) ?? null
-        )
-      }
+        if (where.email) {
+          const user = [...this.users.values()].find(
+            (candidate) => candidate.email.toLowerCase() === where.email?.toLowerCase()
+          )
+          return Promise.resolve(user ? this.hydrateUser(user, include) : null)
+        }
 
-      return Promise.resolve(null)
-    }),
+        return Promise.resolve(null)
+      }
+    ),
+    findMany: vi.fn(
+      ({
+        where,
+        include,
+      }: {
+        where?: {
+          profile?: {
+            is?: {
+              birthdate?: {
+                not?: null
+                lte?: Date
+              }
+            }
+          }
+        }
+        include?: {
+          profile?: boolean
+          teen_roles?: {
+            include?: {
+              guardian?: boolean
+            }
+          }
+        }
+      }) => {
+        const birthdateLte = where?.profile?.is?.birthdate?.lte
+        const users = [...this.users.values()].filter((user) => {
+          if (!(birthdateLte instanceof Date)) {
+            return true
+          }
+
+          const birthdate = user.profile?.birthdate
+          return (
+            birthdate instanceof Date && birthdate.getTime() <= birthdateLte.getTime()
+          )
+        })
+
+        return Promise.resolve(users.map((user) => this.hydrateUser(user, include)))
+      }
+    ),
     create: vi.fn(({ data }: { data: { email: string } }) => {
       const id = `guardian-created-${this.users.size + 1}`
       const user: StoredUser = {
@@ -242,6 +343,42 @@ class InMemoryGuardianPrisma {
         return Promise.resolve(updated)
       }
     ),
+    updateMany: vi.fn(
+      ({
+        where,
+        data,
+      }: {
+        where: {
+          teen_id: string
+          status: 'granted'
+          revoked_at: null
+        }
+        data: {
+          revoked_at: Date
+          revoked_ip_address: string | null
+          status: 'revoked'
+        }
+      }) => {
+        let count = 0
+        for (const [key, consent] of this.consents.entries()) {
+          if (
+            consent.teen_id === where.teen_id &&
+            consent.status === where.status &&
+            consent.revoked_at === where.revoked_at
+          ) {
+            this.consents.set(key, {
+              ...consent,
+              revoked_at: data.revoked_at,
+              revoked_ip_address: data.revoked_ip_address,
+              status: data.status,
+            })
+            count += 1
+          }
+        }
+
+        return Promise.resolve({ count })
+      }
+    ),
     count: vi.fn(
       ({
         where,
@@ -373,6 +510,8 @@ describe('GuardianService', () => {
   afterEach(() => {
     delete process.env.GUARDIAN_INVITE_JWT_SECRET
     delete process.env.GUARDIAN_INVITE_WEB_BASE_URL
+    delete process.env.GUARDIAN_EMANCIPATION_REVOKE_CONSENTS
+    vi.useRealTimers()
     resetCleanupRegistry()
   })
 
@@ -807,5 +946,266 @@ describe('GuardianService', () => {
     })
 
     expect(attempts).toBe(2)
+  })
+
+  it('rejects guardian invitations once the teen has reached adulthood', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-22T03:00:00.000Z'))
+
+    const teen = createTeenProfileFixture({
+      id: 'teen-adult',
+      email: 'teen.adult@example.com',
+      age: 18,
+      birthdate: new Date('2008-04-22T12:00:00.000Z'),
+    })
+    const { prisma, service } = createService()
+
+    prisma.users.set(teen.id, {
+      id: teen.id,
+      email: teen.email,
+      profile: {
+        user_id: teen.id,
+        birthdate: teen.birthdate,
+        preferences: {
+          compliance: {
+            accountStatus: 'pending_guardian_consent',
+            guardianConsentRequired: true,
+          },
+        },
+      },
+    })
+
+    await expect(
+      service.inviteGuardian(teen.id, 'guardian.adult@example.com', 'read_only')
+    ).rejects.toThrow(/no longer required for adult accounts/)
+  })
+
+  it('emancipates pending teens on their eighteenth birthday and grants access', async () => {
+    const today = new Date('2026-04-22T03:00:00.000Z')
+    const teen = createTeenProfileFixture({
+      id: 'teen-birthday',
+      email: 'teen.birthday@example.com',
+      age: 18,
+      birthdate: new Date('2008-04-22T12:00:00.000Z'),
+    })
+    const { markTeenAccessGranted, prisma, service } = createService()
+
+    prisma.users.set(teen.id, {
+      id: teen.id,
+      email: teen.email,
+      profile: {
+        user_id: teen.id,
+        birthdate: teen.birthdate,
+        preferences: {
+          compliance: {
+            accountStatus: 'pending_guardian_consent',
+            guardianConsentRequired: true,
+          },
+        },
+      },
+    })
+
+    const result = await service.emancipateEligibleTeens(today)
+
+    expect(result).toEqual({
+      processed: 1,
+      teenIds: [teen.id],
+      revokedConsentCount: 0,
+      notificationsQueued: 1,
+    })
+
+    const compliance = prisma.users.get(teen.id)?.profile?.preferences?.compliance as
+      | Record<string, unknown>
+      | undefined
+    expect(compliance).toMatchObject({
+      accountStatus: 'active',
+      guardianConsentRequired: false,
+      guardianConsentAgedOutAt: today.toISOString(),
+    })
+    expect(prisma.eventEnvelopes[0]).toMatchObject({
+      channel: 'email.guardian-consent-aged-out',
+      user_id: teen.id,
+    })
+    expect(prisma.auditLogs.at(-1)).toMatchObject({
+      user_id: teen.id,
+      event_type: 'guardian_consent_aged_out',
+      event_data: {
+        teen_id: teen.id,
+        revoked_guardian_access: true,
+        revoked_guardian_count: 0,
+      },
+    })
+    expect(markTeenAccessGranted).toHaveBeenCalledWith(teen.id)
+  })
+
+  it('revokes active guardian links by default when a teen ages out of consent', async () => {
+    const today = new Date('2026-04-22T03:00:00.000Z')
+    const teen = createTeenProfileFixture({
+      id: 'teen-emancipated',
+      email: 'teen.emancipated@example.com',
+      age: 18,
+      birthdate: new Date('2008-04-22T12:00:00.000Z'),
+    })
+    const guardian = createGuardianProfileFixture({
+      id: 'guardian-emancipated',
+      email: 'guardian.emancipated@example.com',
+    })
+    const { markTeenAccessGranted, prisma, service } = createService()
+
+    prisma.users.set(teen.id, {
+      id: teen.id,
+      email: teen.email,
+      profile: {
+        user_id: teen.id,
+        birthdate: teen.birthdate,
+        preferences: {
+          compliance: {
+            accountStatus: 'active',
+            guardianConsentRequired: false,
+            guardianConsentGrantedAt: '2026-04-15T03:00:00.000Z',
+          },
+        },
+      },
+    })
+    prisma.users.set(guardian.id, {
+      id: guardian.id,
+      email: guardian.email,
+      profile: null,
+    })
+    prisma.consents.set(`${guardian.id}:${teen.id}`, {
+      guardian_id: guardian.id,
+      teen_id: teen.id,
+      consent_level: 'full_access',
+      consent_granted_at: new Date('2026-04-15T03:00:00.000Z'),
+      revoked_at: null,
+      ip_address: '198.51.100.10',
+      revoked_ip_address: null,
+      status: 'granted',
+    })
+
+    const result = await service.emancipateEligibleTeens(today)
+
+    expect(result).toEqual({
+      processed: 1,
+      teenIds: [teen.id],
+      revokedConsentCount: 1,
+      notificationsQueued: 1,
+    })
+
+    const consent = prisma.consents.get(`${guardian.id}:${teen.id}`)
+    expect(consent).toMatchObject({
+      status: 'revoked',
+      revoked_at: today,
+      revoked_ip_address: null,
+    })
+
+    const compliance = prisma.users.get(teen.id)?.profile?.preferences?.compliance as
+      | Record<string, unknown>
+      | undefined
+    expect(compliance).toMatchObject({
+      accountStatus: 'active',
+      guardianConsentRequired: false,
+      guardianConsentAgedOutAt: today.toISOString(),
+      guardianConsentRevokedAt: today.toISOString(),
+    })
+    const revokedAuditLog = prisma.auditLogs.find(
+      (entry) => entry.user_id === teen.id && entry.event_type === 'consent_revoked'
+    )
+    expect(revokedAuditLog).toBeDefined()
+    if (!revokedAuditLog?.event_data) {
+      throw new Error('Expected consent_revoked audit log with event data')
+    }
+    expect(revokedAuditLog.event_data).toMatchObject({
+      guardian_id: guardian.id,
+      teen_id: teen.id,
+      consent_level: 'full_access',
+    })
+
+    const agedOutAuditLog = prisma.auditLogs.find(
+      (entry) =>
+        entry.user_id === teen.id && entry.event_type === 'guardian_consent_aged_out'
+    )
+    expect(agedOutAuditLog).toBeDefined()
+    if (!agedOutAuditLog?.event_data) {
+      throw new Error('Expected guardian_consent_aged_out audit log with event data')
+    }
+    expect(agedOutAuditLog.event_data).toMatchObject({
+      teen_id: teen.id,
+      revoked_guardian_access: true,
+      revoked_guardian_count: 1,
+    })
+    expect(markTeenAccessGranted).toHaveBeenCalledWith(teen.id)
+  })
+
+  it('can keep guardian links after emancipation when the config disables auto-revocation', async () => {
+    process.env.GUARDIAN_EMANCIPATION_REVOKE_CONSENTS = 'false'
+
+    const today = new Date('2026-04-22T03:00:00.000Z')
+    const teen = createTeenProfileFixture({
+      id: 'teen-configurable',
+      email: 'teen.configurable@example.com',
+      age: 18,
+      birthdate: new Date('2008-04-22T12:00:00.000Z'),
+    })
+    const guardian = createGuardianProfileFixture({
+      id: 'guardian-configurable',
+      email: 'guardian.configurable@example.com',
+    })
+    const { prisma, service } = createService()
+
+    prisma.users.set(teen.id, {
+      id: teen.id,
+      email: teen.email,
+      profile: {
+        user_id: teen.id,
+        birthdate: teen.birthdate,
+        preferences: {
+          compliance: {
+            accountStatus: 'active',
+            guardianConsentRequired: false,
+          },
+        },
+      },
+    })
+    prisma.users.set(guardian.id, {
+      id: guardian.id,
+      email: guardian.email,
+      profile: null,
+    })
+    prisma.consents.set(`${guardian.id}:${teen.id}`, {
+      guardian_id: guardian.id,
+      teen_id: teen.id,
+      consent_level: 'read_only',
+      consent_granted_at: new Date('2026-04-12T03:00:00.000Z'),
+      revoked_at: null,
+      ip_address: '198.51.100.20',
+      revoked_ip_address: null,
+      status: 'granted',
+    })
+
+    const result = await service.emancipateEligibleTeens(today)
+
+    expect(result).toEqual({
+      processed: 1,
+      teenIds: [teen.id],
+      revokedConsentCount: 0,
+      notificationsQueued: 1,
+    })
+
+    const consent = prisma.consents.get(`${guardian.id}:${teen.id}`)
+    expect(consent).toMatchObject({
+      status: 'granted',
+      revoked_at: null,
+    })
+    expect(prisma.auditLogs.at(-1)).toMatchObject({
+      user_id: teen.id,
+      event_type: 'guardian_consent_aged_out',
+      event_data: {
+        teen_id: teen.id,
+        active_guardian_count: 1,
+        revoked_guardian_access: false,
+        revoked_guardian_count: 0,
+      },
+    })
   })
 })
