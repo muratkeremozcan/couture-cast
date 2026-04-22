@@ -10,6 +10,7 @@ import {
   InjectAnalyticsClient,
   type AnalyticsClient,
 } from '../../analytics/analytics.service'
+import { createBaseLogger } from '../../logger/pino.config'
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service'
 import { UserSessionService } from '../auth/user-session.service'
 import {
@@ -20,6 +21,7 @@ import {
   guardianInvitationResponseSchema,
   type ConsentLevel,
 } from '../../contracts/http'
+import { calculateAge } from '@couture/utils'
 import { z } from 'zod'
 
 type InvitationTokenPayload = {
@@ -33,17 +35,32 @@ type InvitationTokenPayload = {
 }
 
 type ConsentAuditEvent = {
-  eventType: 'consent_granted' | 'consent_revoked' | 'guardian_deleted'
+  eventType:
+    | 'consent_granted'
+    | 'consent_revoked'
+    | 'guardian_deleted'
+    | 'guardian_consent_aged_out'
   teenId: string
-  guardianId: string
-  consentLevel?: ConsentLevel
+  guardianId?: string | null
+  consentLevel?: ConsentLevel | null
   ipAddress?: string | null
   timestamp: Date
+  metadata?: Record<string, string | number | boolean | null>
+}
+
+type EmancipateEligibleTeensResult = {
+  processed: number
+  teenIds: string[]
+  revokedConsentCount: number
+  notificationsQueued: number
 }
 
 const GUARDIAN_INVITATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const DEVELOPMENT_INVITATION_SECRET = 'guardian-invite-development-secret'
 const MAX_REVOKE_CONSENT_TRANSACTION_RETRIES = 3
+const AGE_OF_MAJORITY = 18
+const GUARDIAN_CONSENT_NO_LONGER_REQUIRED_MESSAGE =
+  'Guardian consent is no longer required for adult accounts'
 const invitationTokenPayloadSchema = z.object({
   sub: z.string().min(1),
   teenId: z.string().min(1),
@@ -60,6 +77,13 @@ function normalizeEmail(email: string) {
 
 function normalizeBaseUrl(baseUrl: string) {
   return baseUrl.replace(/\/+$/, '')
+}
+
+function resolveAdultConsentRevocationSetting() {
+  const normalizedValue =
+    process.env.GUARDIAN_EMANCIPATION_REVOKE_CONSENTS?.trim().toLowerCase() ?? ''
+
+  return !['0', 'false', 'no', 'off'].includes(normalizedValue)
 }
 
 function resolveInvitationBaseUrl() {
@@ -162,6 +186,33 @@ function extractComplianceState(
   return compliance as Record<string, unknown>
 }
 
+function hasGuardianConsentAgedOut(preferences: Prisma.JsonValue | null | undefined) {
+  const compliance = extractComplianceState(preferences)
+  const agedOutAt = compliance.guardianConsentAgedOutAt
+
+  return typeof agedOutAt === 'string' && agedOutAt.trim().length > 0
+}
+
+function requiresGuardianComplianceState(
+  preferences: Prisma.JsonValue | null | undefined
+) {
+  const compliance = extractComplianceState(preferences)
+
+  return (
+    compliance.accountStatus === 'pending_guardian_consent' ||
+    compliance.guardianConsentRequired === true ||
+    compliance.guardianConsentRequired === 'true'
+  )
+}
+
+function hasReachedAgeOfMajority(birthdate: Date | null | undefined, today = new Date()) {
+  if (!(birthdate instanceof Date)) {
+    return false
+  }
+
+  return calculateAge(birthdate, today) >= AGE_OF_MAJORITY
+}
+
 function buildUpdatedPreferences(
   preferences: Prisma.JsonValue | null | undefined,
   grantedAt: Date
@@ -210,14 +261,44 @@ function buildRevokedPreferences(
   return nextPreferences as Prisma.InputJsonValue
 }
 
+function buildEmancipatedPreferences(
+  preferences: Prisma.JsonValue | null | undefined,
+  emancipatedAt: Date,
+  consentRevokedAt?: Date | null
+): Prisma.InputJsonValue {
+  const nextPreferences =
+    preferences && typeof preferences === 'object' && !Array.isArray(preferences)
+      ? { ...(preferences as Record<string, unknown>) }
+      : {}
+  const nextCompliance =
+    nextPreferences.compliance &&
+    typeof nextPreferences.compliance === 'object' &&
+    !Array.isArray(nextPreferences.compliance)
+      ? { ...(nextPreferences.compliance as Record<string, unknown>) }
+      : {}
+
+  nextCompliance.accountStatus = 'active'
+  nextCompliance.guardianConsentRequired = false
+  nextCompliance.guardianConsentAgedOutAt = emancipatedAt.toISOString()
+
+  if (consentRevokedAt) {
+    nextCompliance.guardianConsentRevokedAt = consentRevokedAt.toISOString()
+  }
+
+  nextPreferences.compliance = nextCompliance
+
+  return nextPreferences as Prisma.InputJsonValue
+}
+
 function buildConsentAuditPayload(event: ConsentAuditEvent): Prisma.InputJsonValue {
   return {
-    guardian_id: event.guardianId,
+    guardian_id: event.guardianId ?? null,
     teen_id: event.teenId,
     consent_level: event.consentLevel ?? null,
     ip_address: event.ipAddress ?? null,
     timestamp: event.timestamp.toISOString(),
-  } satisfies Record<string, string | null>
+    ...(event.metadata ?? {}),
+  } satisfies Record<string, string | number | boolean | null>
 }
 
 function extractPrismaSerializationCode(error: Prisma.PrismaClientKnownRequestError) {
@@ -276,6 +357,8 @@ function isRetryableSerializationFailure(error: unknown) {
 
 @Injectable()
 export class GuardianService {
+  private readonly logger = createBaseLogger().child({ feature: 'guardian-consent' })
+
   constructor(
     @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient,
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
@@ -326,6 +409,10 @@ export class GuardianService {
       throw new BadRequestException(
         'Guardian invitations are only available for teen accounts awaiting consent'
       )
+    }
+
+    if (hasReachedAgeOfMajority(teen.profile?.birthdate)) {
+      throw new BadRequestException(GUARDIAN_CONSENT_NO_LONGER_REQUIRED_MESSAGE)
     }
 
     const expiresAt = new Date(Date.now() + GUARDIAN_INVITATION_TOKEN_TTL_MS)
@@ -429,6 +516,10 @@ export class GuardianService {
         throw new BadRequestException(
           'Guardian email must differ from the teen account email'
         )
+      }
+
+      if (hasReachedAgeOfMajority(invitation.teen.profile?.birthdate, acceptedAt)) {
+        throw new BadRequestException(GUARDIAN_CONSENT_NO_LONGER_REQUIRED_MESSAGE)
       }
 
       let guardian = await tx.user.findUnique({
@@ -688,6 +779,15 @@ export class GuardianService {
           attempt < MAX_REVOKE_CONSENT_TRANSACTION_RETRIES &&
           isRetryableSerializationFailure(error)
         ) {
+          this.logger.warn(
+            {
+              attempt,
+              guardianId,
+              teenId,
+              maxRetries: MAX_REVOKE_CONSENT_TRANSACTION_RETRIES,
+            },
+            'guardian_consent_revoke_retrying_serializable_transaction'
+          )
           continue
         }
 
@@ -721,5 +821,250 @@ export class GuardianService {
     })
 
     return guardianConsentRevokeResponseSchema.parse(result)
+  }
+
+  async emancipateEligibleTeens(
+    now = new Date()
+  ): Promise<EmancipateEligibleTeensResult> {
+    const adulthoodCutoff = new Date(
+      Date.UTC(
+        now.getUTCFullYear() - AGE_OF_MAJORITY,
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        23,
+        59,
+        59,
+        999
+      )
+    )
+    const revokeActiveConsents = resolveAdultConsentRevocationSetting()
+    const candidates = await this.prisma.user.findMany({
+      where: {
+        profile: {
+          is: {
+            birthdate: {
+              not: null,
+              lte: adulthoodCutoff,
+            },
+          },
+        },
+      },
+      include: {
+        profile: true,
+        teen_roles: {
+          where: {
+            status: 'granted',
+            revoked_at: null,
+          },
+          include: {
+            guardian: true,
+          },
+        },
+      },
+    })
+
+    const teenIds: string[] = []
+    let revokedConsentCount = 0
+    let notificationsQueued = 0
+
+    for (const candidate of candidates) {
+      if (!candidate.profile) {
+        continue
+      }
+
+      if (hasGuardianConsentAgedOut(candidate.profile.preferences)) {
+        continue
+      }
+
+      const hasActiveGuardianConsent = candidate.teen_roles.length > 0
+      if (
+        !requiresGuardianComplianceState(candidate.profile.preferences) &&
+        !hasActiveGuardianConsent
+      ) {
+        continue
+      }
+
+      const emancipatedAt = new Date(now)
+      let result:
+        | {
+            teenId: string
+            revokedConsentCount: number
+          }
+        | null
+        | undefined
+
+      for (
+        let attempt = 1;
+        attempt <= MAX_REVOKE_CONSENT_TRANSACTION_RETRIES;
+        attempt += 1
+      ) {
+        try {
+          result = await this.prisma.$transaction(
+            async (tx) => {
+              const teen = await tx.user.findUnique({
+                where: { id: candidate.id },
+                include: {
+                  profile: true,
+                  teen_roles: {
+                    where: {
+                      status: 'granted',
+                      revoked_at: null,
+                    },
+                    include: {
+                      guardian: true,
+                    },
+                  },
+                },
+              })
+
+              if (!teen?.profile) {
+                return null
+              }
+
+              if (!hasReachedAgeOfMajority(teen.profile.birthdate, now)) {
+                return null
+              }
+
+              if (hasGuardianConsentAgedOut(teen.profile.preferences)) {
+                return null
+              }
+
+              const activeGuardianConsents = teen.teen_roles
+              const stillRequiresGuardian = requiresGuardianComplianceState(
+                teen.profile.preferences
+              )
+
+              if (!stillRequiresGuardian && activeGuardianConsents.length === 0) {
+                return null
+              }
+
+              if (revokeActiveConsents && activeGuardianConsents.length > 0) {
+                await tx.guardianConsent.updateMany({
+                  where: {
+                    teen_id: teen.id,
+                    status: 'granted',
+                    revoked_at: null,
+                  },
+                  data: {
+                    status: 'revoked',
+                    revoked_at: emancipatedAt,
+                    revoked_ip_address: null,
+                  },
+                })
+
+                for (const consent of activeGuardianConsents) {
+                  await this.logConsentAuditEvent(tx, {
+                    eventType: 'consent_revoked',
+                    teenId: teen.id,
+                    guardianId: consent.guardian_id,
+                    consentLevel: consent.consent_level,
+                    ipAddress: null,
+                    timestamp: emancipatedAt,
+                  })
+                }
+              }
+
+              await tx.userProfile.update({
+                where: { user_id: teen.id },
+                data: {
+                  preferences: buildEmancipatedPreferences(
+                    teen.profile.preferences,
+                    emancipatedAt,
+                    revokeActiveConsents && activeGuardianConsents.length > 0
+                      ? emancipatedAt
+                      : null
+                  ),
+                },
+              })
+
+              await tx.eventEnvelope.create({
+                data: {
+                  channel: 'email.guardian-consent-aged-out',
+                  user_id: teen.id,
+                  payload: {
+                    to: teen.email,
+                    teenId: teen.id,
+                    teenEmail: teen.email,
+                    emancipatedAt: emancipatedAt.toISOString(),
+                    message: 'You no longer require guardian consent',
+                    activeGuardianCount: activeGuardianConsents.length,
+                    revokedGuardianCount: revokeActiveConsents
+                      ? activeGuardianConsents.length
+                      : 0,
+                    revokedGuardianAccess: revokeActiveConsents,
+                  },
+                },
+              })
+
+              await this.logConsentAuditEvent(tx, {
+                eventType: 'guardian_consent_aged_out',
+                teenId: teen.id,
+                guardianId: null,
+                consentLevel: null,
+                ipAddress: null,
+                timestamp: emancipatedAt,
+                metadata: {
+                  active_guardian_count: activeGuardianConsents.length,
+                  revoked_guardian_count: revokeActiveConsents
+                    ? activeGuardianConsents.length
+                    : 0,
+                  revoked_guardian_access: revokeActiveConsents,
+                },
+              })
+
+              return {
+                teenId: teen.id,
+                revokedConsentCount: revokeActiveConsents
+                  ? activeGuardianConsents.length
+                  : 0,
+              }
+            },
+            {
+              isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            }
+          )
+          break
+        } catch (error) {
+          if (
+            attempt < MAX_REVOKE_CONSENT_TRANSACTION_RETRIES &&
+            isRetryableSerializationFailure(error)
+          ) {
+            this.logger.warn(
+              {
+                attempt,
+                teenId: candidate.id,
+                maxRetries: MAX_REVOKE_CONSENT_TRANSACTION_RETRIES,
+              },
+              'guardian_consent_emancipation_retrying_serializable_transaction'
+            )
+            continue
+          }
+
+          throw error
+        }
+      }
+
+      if (result === undefined) {
+        throw new Error(
+          'Failed to emancipate eligible teen after retrying the transaction'
+        )
+      }
+
+      if (!result) {
+        continue
+      }
+
+      teenIds.push(result.teenId)
+      revokedConsentCount += result.revokedConsentCount
+      notificationsQueued += 1
+      this.guardianConsentStateService.markTeenAccessGranted(result.teenId)
+    }
+
+    return {
+      processed: teenIds.length,
+      teenIds,
+      revokedConsentCount,
+      notificationsQueued,
+    }
   }
 }

@@ -165,14 +165,14 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
   - [x] Log revocation event to audit log
   - [x] Test: teen cannot access wardrobe after revocation
 
-- [ ] Task 7: Handle teen turning 18 (AC: #6)
-  - [ ] Create cron job to check birthdays daily
-  - [ ] When teen turns 18:
+- [x] Task 7: Handle teen turning 18 (AC: #6)
+  - [x] Create cron job to check birthdays daily
+  - [x] When teen turns 18:
     - Update user status: `pending_guardian_consent` → `active`
     - Send notification: "You no longer require guardian consent"
     - Optionally revoke guardian consent (configurable)
     - Log event to audit log
-  - [ ] Test: teen gains full access on 18th birthday
+  - [x] Test: teen gains full access on 18th birthday
 
 - [ ] Task 8: Write test cases (AC: #6)
   - [ ] Test: Single guardian happy path
@@ -415,6 +415,9 @@ GPT-5 Codex
 - `npm run generate:http-openapi`
 - `npm run test --workspace @couture/api-client -- testing/http-openapi.spec.ts`
 - `npm run test --workspace packages/db -- test/rls-policies.spec.ts test/audit-log-immutability.spec.ts`
+- `npm run test --workspace api -- src/modules/guardian/guardian.service.spec.ts src/modules/guardian/guardian.cron.spec.ts integration/guardian-emancipation.integration.spec.ts`
+- `npx eslint --max-warnings=0 apps/api/integration/guardian-emancipation.integration.spec.ts`
+- `npm run typecheck --workspace api`
 
 ### Completion Notes List
 
@@ -436,6 +439,8 @@ GPT-5 Codex
 - Revocation now updates `GuardianConsent`, queues a teen notification email, records a `consent_revoked` audit log row, and only flips the teen back to `pending_guardian_consent` when no active guardian remains.
 - Added teen compliance enforcement in `RequestAuthGuard` and a follow-on RLS migration so revoked teens lose authenticated self-access today instead of waiting for the future session-store rollout in Story 0.14.
 - Added focused coverage for revoke controller/service behavior, blocked teen auth requests, refreshed OpenAPI output, and database-level proof that revoked teens can no longer read or mutate wardrobe rows.
+- Added a daily UTC guardian cron sweep that emancipates 18+ teens, flips pending accounts to active, queues adulthood notifications, records `guardian_consent_aged_out` audit entries, and can revoke guardian links by default via config.
+- Hardened guardian invitations so adult accounts cannot still gain or regain guardian-linked access through delayed acceptance, and added focused unit plus integration coverage for the 18th-birthday transition path.
 
 ### File List
 
@@ -507,15 +512,19 @@ GPT-5 Codex
 - NEW `packages/db/prisma/migrations/20260420160000_harden_audit_log_immutability/migration.sql`
 - NEW `packages/db/prisma/migrations/20260421090000_block_revoked_teens_from_self_access/migration.sql`
 - NEW `packages/db/test/audit-log-immutability.spec.ts`
+- NEW `apps/api/src/modules/guardian/guardian.cron.ts`
+- NEW `apps/api/src/modules/guardian/guardian.cron.spec.ts`
+- NEW `apps/api/integration/guardian-emancipation.integration.spec.ts`
 
 ## Change Log
 
-| Date       | Author             | Change                                                                                                                                           |
-| ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.11 acceptance criteria                                                                                           |
-| 2026-04-16 | Codex              | Completed Task 1 age verification across API, web, mobile, shared utils, OpenAPI docs, and added targeted Playwright API coverage                |
-| 2026-04-17 | Codex              | Completed Task 2 by extending the existing GuardianConsent Prisma model and adding a migration for consent levels and revocation support         |
-| 2026-04-17 | Codex              | Completed Task 3 guardian invitation flow across Prisma, API contracts/module, email event queueing, and web/mobile invitation and acceptance UI |
-| 2026-04-20 | Codex              | Completed Task 4 with guardian-aware RLS policies, database persona tests, and migration deploys to local/dev/prod Supabase environments         |
-| 2026-04-20 | Codex              | Advanced Task 5 with immutable audit-log storage, consent-grant persistence, and database coverage for blocked audit row mutations               |
-| 2026-04-21 | Codex              | Completed Task 6 with guardian revoke contracts/API flow, teen compliance/session blocking, and RLS coverage for revoked self-access             |
+| Date       | Author             | Change                                                                                                                                                   |
+| ---------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.11 acceptance criteria                                                                                                   |
+| 2026-04-16 | Codex              | Completed Task 1 age verification across API, web, mobile, shared utils, OpenAPI docs, and added targeted Playwright API coverage                        |
+| 2026-04-17 | Codex              | Completed Task 2 by extending the existing GuardianConsent Prisma model and adding a migration for consent levels and revocation support                 |
+| 2026-04-17 | Codex              | Completed Task 3 guardian invitation flow across Prisma, API contracts/module, email event queueing, and web/mobile invitation and acceptance UI         |
+| 2026-04-20 | Codex              | Completed Task 4 with guardian-aware RLS policies, database persona tests, and migration deploys to local/dev/prod Supabase environments                 |
+| 2026-04-20 | Codex              | Advanced Task 5 with immutable audit-log storage, consent-grant persistence, and database coverage for blocked audit row mutations                       |
+| 2026-04-21 | Codex              | Completed Task 6 with guardian revoke contracts/API flow, teen compliance/session blocking, and RLS coverage for revoked self-access                     |
+| 2026-04-22 | Codex              | Completed Task 7 with daily adulthood emancipation cron coverage, configurable guardian-link revocation, audit/notification writes, and invite hardening |
