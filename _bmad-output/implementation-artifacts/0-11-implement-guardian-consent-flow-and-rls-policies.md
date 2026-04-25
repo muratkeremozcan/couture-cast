@@ -4,39 +4,53 @@ Status: in-progress
 
 ## Story
 
-As Compliance,
-I need guardian consent enforcement for under-16 users,
-so that CoutureCast satisfies COPPA requirements and age-gating obligations.
+As Compliance, I need guardian consent enforcement for under-16 users, so that
+CoutureCast satisfies COPPA requirements and age-gating obligations.
 
 ## Acceptance Criteria
 
-1. Implement age verification on signup: users enter birthdate → calculate age → block if <13, flag if 13-15 (requires guardian), allow if 16+.
-2. Create guardian invitation flow: teen account created in "pending consent" state → guardian receives email invite → guardian accepts → consent timestamp recorded in `guardian_consent` table with `guardian_id`, `teen_id`, `timestamp`, `ip_address`.
-3. Implement RLS policies per ADR-004 and test-design-system.md Guardian Consent Flow Edge Cases:
+1. Implement age verification on signup: users enter birthdate → calculate age →
+   block if <13, flag if 13-15 (requires guardian), allow if 16+.
+2. Create guardian invitation flow: teen account created in "pending consent"
+   state → guardian receives email invite → guardian accepts → consent timestamp
+   recorded in `guardian_consent` table with `guardian_id`, `teen_id`,
+   `timestamp`, `ip_address`.
+3. Implement RLS policies per ADR-004 and test-design-system.md Guardian Consent
+   Flow Edge Cases:
    - Teen can only access own wardrobe unless guardian linked
-   - Guardian can access linked teen's wardrobe (read-only or full access based on consent level)
+   - Guardian can access linked teen's wardrobe (read-only or full access based
+     on consent level)
    - Cross-account access denial enforced
-4. Create immutable audit log entries for all consent events (grant, revoke, guardian deleted) per test-design-system.md Audit Log Verification.
-5. Implement consent revocation: guardian revokes → teen session invalidated → wardrobe inaccessible → audit log records revocation.
-6. Add test coverage per test-design-system.md: single guardian happy path, revocation mid-session, multiple guardians, teen turns 18, consent audit trail, age verification failure (7 test cases).
+4. Create immutable audit log entries for all consent events (grant, revoke,
+   guardian deleted) per test-design-system.md Audit Log Verification.
+5. Implement consent revocation: guardian revokes → teen session invalidated →
+   wardrobe inaccessible → audit log records revocation.
+6. Add test coverage per test-design-system.md: single guardian happy path,
+   revocation mid-session, multiple guardians, teen turns 18, consent audit
+   trail, age verification failure (7 test cases).
 
 ## Tasks / Subtasks
 
 - [x] Task 1: Implement age verification on signup (AC: #1)
   - [x] Add birthdate field to signup form (Expo and Next.js)
   - [x] Create age calculation utility: `packages/utils/age.ts`:
+
     ```typescript
     export function calculateAge(birthdate: Date): number {
       const today = new Date()
       let age = today.getFullYear() - birthdate.getFullYear()
       const monthDiff = today.getMonth() - birthdate.getMonth()
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthdate.getDate())) {
+      const hasNotReachedBirthday =
+        monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthdate.getDate())
+      if (hasNotReachedBirthday) {
         age--
       }
       return age
     }
     ```
+
   - [x] Implement age gate in signup endpoint:
+
     ```typescript
     const age = calculateAge(birthdate)
     if (age < 13) throw new ForbiddenException('Must be 13 or older')
@@ -45,10 +59,13 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
       user.status = 'pending_guardian_consent'
     }
     ```
-  - [x] Add UI messaging: "You must be 13 or older" for <13, "Guardian consent required" for 13-15
+
+  - [x] Add UI messaging: "You must be 13 or older" for <13, "Guardian consent
+        required" for 13-15
 
 - [x] Task 2: Create guardian_consent table migration (AC: #2)
   - [x] Add to Prisma schema:
+
     ```prisma
     model GuardianConsent {
       id          String   @id @default(uuid())
@@ -58,13 +75,23 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
       grantedAt   DateTime @default(now())
       revokedAt   DateTime?
       ipAddress   String
-      guardian    User     @relation("Guardian", fields: [guardianId], references: [id])
-      teen        User     @relation("Teen", fields: [teenId], references: [id])
+      guardian    User     @relation(
+        "Guardian",
+        fields: [guardianId],
+        references: [id]
+      )
+      teen        User     @relation(
+        "Teen",
+        fields: [teenId],
+        references: [id]
+      )
       @@unique([guardianId, teenId])
     }
     ```
+
   - [x] Create migration: `npx prisma migrate dev --name add_guardian_consent`
-  - [x] Add indexes for performance: `@@index([teenId])`, `@@index([guardianId])`
+  - [x] Add indexes for performance: `@@index([teenId])`,
+        `@@index([guardianId])`
 
 - [x] Task 3: Implement guardian invitation flow (AC: #2)
   - [x] Create `apps/api/src/modules/guardian/guardian.service.ts`
@@ -80,24 +107,25 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
   - [x] Add invitation UI in mobile and web apps
 
 - [ ] Task 3.5: Propagate guardian invitation env vars to hosted runtimes
-  - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.dev` into Vercel
-        project `couture-cast-api` Preview environment variables
-  - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.prod` into Vercel
-        project `couture-cast-api` Production environment variables
-  - [ ] Copy the variable name `GUARDIAN_INVITE_WEB_BASE_URL` into Vercel project
-        `couture-cast-api` Preview environment variables and set it to the intended web origin
-        for preview invitation links
-  - [x] Copy the variable name `GUARDIAN_INVITE_WEB_BASE_URL` into Vercel project
-        `couture-cast-api` Production environment variables and set it to the production web
-        origin used in guardian invitation links
-  - [x] Do not copy guardian invitation secrets into `couture-cast-web`, GitHub Actions,
-        Supabase, Upstash Redis, Expo EAS, or markdown docs unless a later deployment path
-        explicitly requires them
-  - [x] Keep real values only in gitignored local `.env*` files and provider secret stores; never
-        paste secret values into the repository
+  - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.dev`
+        into Vercel project `couture-cast-api` Preview environment variables
+  - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.prod`
+        into Vercel project `couture-cast-api` Production environment variables
+  - [ ] Copy the variable name `GUARDIAN_INVITE_WEB_BASE_URL` into Vercel
+        project `couture-cast-api` Preview environment variables and set it to
+        the intended web origin for preview invitation links
+  - [x] Copy the variable name `GUARDIAN_INVITE_WEB_BASE_URL` into Vercel
+        project `couture-cast-api` Production environment variables and set it
+        to the production web origin used in guardian invitation links
+  - [x] Do not copy guardian invitation secrets into `couture-cast-web`, GitHub
+        Actions, Supabase, Upstash Redis, Expo EAS, or markdown docs unless a
+        later deployment path explicitly requires them
+  - [x] Keep real values only in gitignored local `.env*` files and provider
+        secret stores; never paste secret values into the repository
 
 - [x] Task 4: Implement RLS policies in Supabase (AC: #3)
-  - [x] Prerequisite: deploy Prisma schema to Supabase dev/prod (once available from Story 0.2) so tables exist for RLS
+  - [x] Prerequisite: deploy Prisma schema to Supabase dev/prod (once available
+        from Story 0.2) so tables exist for RLS
   - [x] Create RLS policy for `wardrobe_items` table:
 
     ```sql
@@ -138,11 +166,13 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
     `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`
     and `packages/db/test/rls-policies.spec.ts` as the authoritative source for
     the real table and policy names.
-  - [x] Apply RLS policies to all user-scoped tables (rituals, preferences, etc.)
+  - [x] Apply RLS policies to all user-scoped tables (rituals, preferences,
+        etc.)
   - [x] Test RLS policies with different user roles
 
 - [ ] Task 5: Create audit log for consent events (AC: #4)
   - [x] Add `consent_event` type to `audit_log` table:
+
     ```prisma
     model AuditLog {
       id        String   @id @default(uuid())
@@ -153,8 +183,11 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
       @@index([eventType, timestamp])
     }
     ```
-  - [x] Log consent grant: `auditLog.create({ eventType: 'consent_granted', ... })`
-  - [x] Log consent revoke: `auditLog.create({ eventType: 'consent_revoked', ... })`
+
+  - [x] Log consent grant:
+        `auditLog.create({ eventType: 'consent_granted', ... })`
+  - [x] Log consent revoke:
+        `auditLog.create({ eventType: 'consent_revoked', ... })`
   - [x] Make audit log immutable: no DELETE or UPDATE policies
 
 - [x] Task 6: Implement consent revocation (AC: #5)
@@ -204,44 +237,51 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
   - [x] Test: Cross-account access denial
     - Teen A cannot access Teen B's wardrobe
     - Guardian A cannot access unlinked teen
-  - [x] Follow-up boundary: auth-session rollout is implemented in Story 0.14 Task 2 only
-        after login/session-backed journeys are stable; keep 401/403 negative contract tests
-        unauthenticated.
+  - [x] Follow-up boundary: auth-session rollout is implemented in Story 0.14
+        Task 2 only after login/session-backed journeys are stable; keep 401/403
+        negative contract tests unauthenticated.
   - Evidence map:
-    - Single guardian happy path: `playwright/tests/api/guardian-consent-lifecycle.spec.ts`
-      covers signup, invitation, acceptance, and restored teen profile access;
-      `apps/api/src/modules/guardian/guardian.service.spec.ts` asserts `consent_granted`
-      audit persistence; `packages/db/test/rls-policies.spec.ts` now asserts wardrobe
-      access from a single active guardian consent row.
-    - Revocation mid-session: `playwright/tests/api/guardian-consent-lifecycle.spec.ts`
-      asserts revoke response `sessionInvalidated: true` and teen `403` after revoke;
-      `apps/api/src/modules/guardian/guardian.service.spec.ts` asserts revocation side
-      effects; `packages/db/test/rls-policies.spec.ts` asserts revoked teens lose
-      wardrobe access.
-    - Multiple guardians: `apps/api/src/modules/guardian/guardian.service.spec.ts`
-      asserts one guardian can revoke while another active consent remains;
-      `packages/db/test/rls-policies.spec.ts` now asserts the revoked guardian loses
-      wardrobe access while the remaining full-access guardian can still read and
-      update teen wardrobe rows.
-    - Teen turns 18: `apps/api/src/modules/guardian/guardian.service.spec.ts` covers
-      pending teen emancipation, default guardian-link revocation, and configurable
-      keep-link behavior; `apps/api/integration/guardian-emancipation.integration.spec.ts`
-      covers the Nest guard/controller boundary before and after the sweep.
-    - Consent audit trail: `apps/api/src/modules/guardian/guardian.service.spec.ts`
-      asserts grant, revoke, and age-out audit rows;
-      `packages/db/test/audit-log-immutability.spec.ts` asserts admin-only read policy
-      and blocked `UPDATE`, `DELETE`, and `TRUNCATE`.
+    - Single guardian happy path:
+      `playwright/tests/api/guardian-consent-lifecycle.spec.ts` covers signup,
+      invitation, acceptance, and restored teen profile access;
+      `apps/api/src/modules/guardian/guardian.service.spec.ts` asserts
+      `consent_granted` audit persistence;
+      `packages/db/test/rls-policies.spec.ts` now asserts wardrobe access from a
+      single active guardian consent row.
+    - Revocation mid-session:
+      `playwright/tests/api/guardian-consent-lifecycle.spec.ts` asserts revoke
+      response `sessionInvalidated: true` and teen `403` after revoke;
+      `apps/api/src/modules/guardian/guardian.service.spec.ts` asserts
+      revocation side effects; `packages/db/test/rls-policies.spec.ts` asserts
+      revoked teens lose wardrobe access.
+    - Multiple guardians:
+      `apps/api/src/modules/guardian/guardian.service.spec.ts` asserts one
+      guardian can revoke while another active consent remains;
+      `packages/db/test/rls-policies.spec.ts` now asserts the revoked guardian
+      loses wardrobe access while the remaining full-access guardian can still
+      read and update teen wardrobe rows.
+    - Teen turns 18: `apps/api/src/modules/guardian/guardian.service.spec.ts`
+      covers pending teen emancipation, default guardian-link revocation, and
+      configurable keep-link behavior;
+      `apps/api/integration/guardian-emancipation.integration.spec.ts` covers
+      the Nest guard/controller boundary before and after the sweep.
+    - Consent audit trail:
+      `apps/api/src/modules/guardian/guardian.service.spec.ts` asserts grant,
+      revoke, and age-out audit rows;
+      `packages/db/test/audit-log-immutability.spec.ts` asserts admin-only read
+      policy and blocked `UPDATE`, `DELETE`, and `TRUNCATE`.
     - Age verification failure: `packages/utils/src/age.spec.ts`,
       `apps/api/src/modules/auth/auth.service.spec.ts`, and
       `playwright/tests/api/auth-signup-age-gate.spec.ts` cover <13 blocked,
       13-15 pending guardian consent, and 16+ active.
-    - Cross-account access denial: `packages/db/test/rls-policies.spec.ts` now asserts
-      Teen A cannot read Teen B wardrobe, and continues to assert unrelated guardians,
-      anonymous actors, unverified email claims, and user-metadata escalation cannot
-      access teen wardrobe data.
+    - Cross-account access denial: `packages/db/test/rls-policies.spec.ts` now
+      asserts Teen A cannot read Teen B wardrobe, and continues to assert
+      unrelated guardians, anonymous actors, unverified email claims, and
+      user-metadata escalation cannot access teen wardrobe data.
 
 - [ ] Task 9: Create guardian consent UI (AC: #2)
-  - [ ] Teen signup flow: add birthdate picker, show guardian invitation screen if 13-15
+  - [ ] Teen signup flow: add birthdate picker, show guardian invitation screen
+        if 13-15
   - [ ] Guardian invitation email template with accept link
   - [ ] Guardian accept page: create account or login, confirm consent
   - [ ] Teen dashboard: show guardian consent status, list guardians
@@ -272,9 +312,11 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
 **Security Architecture (lines 175-181):**
 
 - Supabase Auth + RLS enforce tenant isolation
-- Guardian consent stored and checked before enabling uploads for under-16 accounts
+- Guardian consent stored and checked before enabling uploads for under-16
+  accounts
 - Postgres `pgcrypto` encrypts sensitive guardian/contact fields
-- Audit logging writes immutable entries for authentication changes, moderation decisions, data exports
+- Audit logging writes immutable entries for authentication changes, moderation
+  decisions, data exports
 
 **Data Architecture (line 161):**
 
@@ -305,7 +347,10 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
 **Age Verification Pattern:**
 
 ```typescript
-function validateAge(birthdate: Date): { allowed: boolean; requiresGuardian: boolean } {
+function validateAge(birthdate: Date): {
+  allowed: boolean
+  requiresGuardian: boolean
+} {
   const age = calculateAge(birthdate)
   if (age < 13) return { allowed: false, requiresGuardian: false }
   if (age < 16) return { allowed: true, requiresGuardian: true }
@@ -357,7 +402,7 @@ async function logConsentEvent(event: ConsentEvent) {
 
 **New Directories:**
 
-```
+```text
 apps/api/src/modules/guardian/
 ├── guardian.module.ts
 ├── guardian.service.ts
@@ -415,78 +460,188 @@ GPT-5 Codex
 
 ### Debug Log References
 
-- `npm install --ignore-scripts --no-progress`
-- `npm run generate:http-openapi`
-- `npm run typecheck --workspace @couture/utils && npm run test --workspace @couture/utils`
-- `npm run typecheck --workspace api && npm run test --workspace api -- src/modules/auth/auth.controller.spec.ts src/modules/auth/auth.service.spec.ts`
-- `npm run typecheck --workspace web && npm run test --workspace web -- src/app/signup/signup-form.test.tsx`
-- `npm run typecheck --workspace mobile && npm run test --workspace mobile -- src/features/signup/signup-screen.test.tsx`
-- `npm run typecheck --workspace @couture/api-client && npm run test --workspace @couture/api-client -- testing/http-openapi.spec.ts`
-- `npx tsc --noEmit -p playwright/tsconfig.json`
-- `npx eslint --max-warnings=0 playwright/tests/api/auth-signup-age-gate.spec.ts`
-- `TEST_ENV=local npx playwright test playwright/tests/api/auth-signup-age-gate.spec.ts --list`
-- `npm run db:generate --workspace packages/db`
-- `npm run typecheck --workspace packages/db`
-- `npm run test --workspace api -- src/modules/auth/auth.service.spec.ts src/modules/user/user.service.spec.ts`
-- `npm run test --workspace @couture/testing -- test/cleanup.spec.ts`
-- `npm run test --workspace api -- src/modules/guardian/guardian.controller.spec.ts src/modules/guardian/guardian.service.spec.ts`
-- `npm run test --workspace web -- src/app/signup/signup-form.test.tsx src/app/guardian/accept/guardian-accept-view.test.tsx`
-- `npm run test --workspace mobile -- src/features/signup/signup-screen.test.tsx src/features/guardian/guardian-accept-screen.test.tsx`
-- `npm run typecheck --workspace api`
-- `npm run typecheck --workspace web`
-- `npm run typecheck --workspace mobile`
-- `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres npx prisma migrate deploy --schema packages/db/prisma/schema.prisma`
-- `npm run test --workspace packages/db`
-- `npx eslint --max-warnings=0 packages/db/test/rls-policies.spec.ts packages/db/vitest.config.ts`
-- `set -a; source .env.dev; set +a; npx prisma migrate deploy --schema packages/db/prisma/schema.prisma`
-- `set -a; source .env.prod; set +a; npx prisma migrate deploy --schema packages/db/prisma/schema.prisma`
-- `npm run test --workspace api -- src/modules/guardian/guardian.service.spec.ts`
-- `npm run typecheck --workspace packages/db`
-- `npm run test --workspace packages/db -- test/audit-log-immutability.spec.ts`
-- `npm run test --workspace api -- src/modules/guardian/guardian.controller.spec.ts src/modules/guardian/guardian.service.spec.ts src/modules/auth/security.guards.spec.ts`
-- `npm run generate:http-openapi`
-- `npm run test --workspace @couture/api-client -- testing/http-openapi.spec.ts`
-- `npm run test --workspace packages/db -- test/rls-policies.spec.ts test/audit-log-immutability.spec.ts`
-- `npm run test --workspace api -- src/modules/guardian/guardian.service.spec.ts src/modules/guardian/guardian.cron.spec.ts integration/guardian-emancipation.integration.spec.ts`
-- `npx eslint --max-warnings=0 apps/api/integration/guardian-emancipation.integration.spec.ts`
-- `npm run typecheck --workspace api`
-- `npm run test --workspace api -- src/modules/guardian/guardian.service.spec.ts src/modules/guardian/guardian.controller.spec.ts src/modules/auth/security.guards.spec.ts src/modules/auth/guardian-consent-state.service.spec.ts integration/guardian-emancipation.integration.spec.ts`
-- `npm run test --workspace packages/db -- test/rls-policies.spec.ts test/audit-log-immutability.spec.ts`
-- `npx playwright test playwright/tests/api/auth-signup-age-gate.spec.ts playwright/tests/api/guardian-consent-lifecycle.spec.ts --list`
-- `TEST_ENV=local npx playwright test playwright/tests/api/auth-signup-age-gate.spec.ts playwright/tests/api/guardian-consent-lifecycle.spec.ts`
-- `npx tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --noUncheckedIndexedAccess --skipLibCheck --types node packages/db/test/rls-policies.spec.ts`
-- `npm run typecheck --workspace packages/db`
-- `npm run lint`
-- `npm run typecheck`
+- Install and generated contracts:
+
+  ```bash
+  npm install --ignore-scripts --no-progress
+  npm run generate:http-openapi
+  ```
+
+- Shared package checks:
+
+  ```bash
+  npm run typecheck --workspace @couture/utils
+  npm run test --workspace @couture/utils
+  npm run typecheck --workspace @couture/api-client
+  npm run test --workspace @couture/api-client -- \
+    testing/http-openapi.spec.ts
+  ```
+
+- App typechecks and focused signup tests:
+
+  ```bash
+  npm run typecheck --workspace api
+  npm run typecheck --workspace web
+  npm run typecheck --workspace mobile
+  npm run test --workspace web -- src/app/signup/signup-form.test.tsx
+  npm run test --workspace mobile -- \
+    src/features/signup/signup-screen.test.tsx
+  ```
+
+- API auth and guardian suites:
+
+  ```bash
+  npm run test --workspace api -- \
+    src/modules/auth/auth.controller.spec.ts \
+    src/modules/auth/auth.service.spec.ts
+  npm run test --workspace api -- \
+    src/modules/auth/auth.service.spec.ts \
+    src/modules/user/user.service.spec.ts
+  npm run test --workspace api -- \
+    src/modules/guardian/guardian.controller.spec.ts \
+    src/modules/guardian/guardian.service.spec.ts
+  npm run test --workspace api -- \
+    src/modules/guardian/guardian.service.spec.ts \
+    src/modules/guardian/guardian.controller.spec.ts \
+    src/modules/auth/security.guards.spec.ts \
+    src/modules/auth/guardian-consent-state.service.spec.ts \
+    integration/guardian-emancipation.integration.spec.ts
+  ```
+
+- Web/mobile guardian acceptance suites:
+
+  ```bash
+  npm run test --workspace web -- \
+    src/app/signup/signup-form.test.tsx \
+    src/app/guardian/accept/guardian-accept-view.test.tsx
+  npm run test --workspace mobile -- \
+    src/features/signup/signup-screen.test.tsx \
+    src/features/guardian/guardian-accept-screen.test.tsx
+  ```
+
+- Database generation, migration, and checks:
+
+  ```bash
+  npm run db:generate --workspace packages/db
+  npm run typecheck --workspace packages/db
+  npm run test --workspace packages/db
+  npm run test --workspace packages/db -- \
+    test/rls-policies.spec.ts \
+    test/audit-log-immutability.spec.ts
+  npx eslint --max-warnings=0 \
+    packages/db/test/rls-policies.spec.ts \
+    packages/db/vitest.config.ts
+  ```
+
+- Supabase migration deploys:
+
+  ```bash
+  DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+    npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+  set -a
+  source .env.dev
+  set +a
+  npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+  set -a
+  source .env.prod
+  set +a
+  npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+  ```
+
+- Playwright and standalone checks:
+
+  ```bash
+  npx tsc --noEmit -p playwright/tsconfig.json
+  npx eslint --max-warnings=0 \
+    playwright/tests/api/auth-signup-age-gate.spec.ts
+  TEST_ENV=local npx playwright test \
+    playwright/tests/api/auth-signup-age-gate.spec.ts \
+    --list
+  npx playwright test \
+    playwright/tests/api/auth-signup-age-gate.spec.ts \
+    playwright/tests/api/guardian-consent-lifecycle.spec.ts \
+    --list
+  TEST_ENV=local npx playwright test \
+    playwright/tests/api/auth-signup-age-gate.spec.ts \
+    playwright/tests/api/guardian-consent-lifecycle.spec.ts
+  npx tsc --noEmit --target ES2022 --module NodeNext \
+    --moduleResolution NodeNext --strict --noUncheckedIndexedAccess \
+    --skipLibCheck --types node packages/db/test/rls-policies.spec.ts
+  ```
+
+- Root checks:
+
+  ```bash
+  npm run lint
+  npm run typecheck
+  ```
 
 ### Completion Notes List
 
-- Added a new shared `@couture/utils` workspace package with `calculateAge`, `parseBirthdateInput`, and reusable age-gate evaluation logic.
-- Added `POST /api/v1/auth/signup` plus shared contract definitions, OpenAPI registration, and API tests for under-13 blocking, 13-15 pending guardian consent, and 16+ eligibility.
-- Added minimal Next.js and Expo signup flows with birthdate inputs and inline messaging for the COPPA age-gate states.
-- Added a focused Playwright API contract spec for signup age-gating and duplicate-email handling without expanding this PR into browser/mobile E2E churn.
-- Extended the existing `GuardianConsent` Prisma model with `consent_level` and `revoked_at`, preserving the repo's existing snake_case naming and current callers.
-- Added a forward SQL migration that backfills revoked rows, keeps existing guardian/teen lookup indexes in place, and prepares the table for later invitation/RLS work.
-- Added a `GuardianInvitation` Prisma model and migration, wired cleanup helpers for invitation records, and exposed shared guardian invitation/accept contracts in the API client.
-- Implemented an API guardian module with invitation token signing/verification, teen compliance-state checks, consent persistence, guardian account linking, and analytics capture on successful consent.
-- Queued guardian invitation and confirmation emails through `event_envelope` records so the flow integrates with the repo's existing outbound-event pattern without introducing a parallel mailer stack.
-- Added web and mobile guardian invitation UX for pending teen accounts plus guardian acceptance screens backed by the shared guardian contracts.
-- Added a guardian-aware RLS migration that bridges Supabase JWT claims to the repo's current text user IDs, centralizes guardian/admin access helpers in the private schema, and protects wardrobe-domain tables plus self-only community tables.
-- Added database-level Vitest coverage for teen, guardian read-only, guardian full-access, admin, anonymous, and cross-account denial scenarios, then deployed the RLS migration set to local, dev, and prod Supabase databases.
-- Added immutable audit-log hardening with an event-type/timestamp index, consent-grant writes in the guardian acceptance transaction, and a database-level spec that proves direct `UPDATE`/`DELETE` attempts fail.
-- Extended the guardian consent audit helper to accept revoke/delete event types so Task 6 can reuse the same payload shape when the revocation endpoint lands.
-- Added `POST /api/v1/guardian/revoke` plus shared revoke contracts so guardians/admins can revoke one teen consent link with the caller IP recorded at the API boundary.
-- Revocation now updates `GuardianConsent`, queues a teen notification email, records a `consent_revoked` audit log row, and only flips the teen back to `pending_guardian_consent` when no active guardian remains.
-- Added teen compliance enforcement in `RequestAuthGuard` and a follow-on RLS migration so revoked teens lose authenticated self-access today instead of waiting for the future session-store rollout in Story 0.14.
-- Added focused coverage for revoke controller/service behavior, blocked teen auth requests, refreshed OpenAPI output, and database-level proof that revoked teens can no longer read or mutate wardrobe rows.
-- Added a daily UTC guardian cron sweep that emancipates 18+ teens, flips pending accounts to active, queues adulthood notifications, records `guardian_consent_aged_out` audit entries, and can revoke guardian links by default via config.
-- Hardened guardian invitations so adult accounts cannot still gain or regain guardian-linked access through delayed acceptance, and added focused unit plus integration coverage for the 18th-birthday transition path.
-- Added Task 8 AC #6 evidence mapping and closed the remaining RLS traceability gaps for
-  single active-consent wardrobe access, multiple-guardian revocation, and teen
-  cross-account wardrobe denial.
-- Broadened terminal lint/typecheck coverage so DB tests plus package/app config files
-  and the shared JS ESLint config package are checked by the normal root commands
-  instead of only by IDE diagnostics.
+- Added a new shared `@couture/utils` workspace package with `calculateAge`,
+  `parseBirthdateInput`, and reusable age-gate evaluation logic.
+- Added `POST /api/v1/auth/signup` plus shared contract definitions, OpenAPI
+  registration, and API tests for under-13 blocking, 13-15 pending guardian
+  consent, and 16+ eligibility.
+- Added minimal Next.js and Expo signup flows with birthdate inputs and inline
+  messaging for the COPPA age-gate states.
+- Added a focused Playwright API contract spec for signup age-gating and
+  duplicate-email handling without expanding this PR into browser/mobile E2E
+  churn.
+- Extended the existing `GuardianConsent` Prisma model with `consent_level` and
+  `revoked_at`, preserving the repo's existing snake_case naming and current
+  callers.
+- Added a forward SQL migration that backfills revoked rows, keeps existing
+  guardian/teen lookup indexes in place, and prepares the table for later
+  invitation/RLS work.
+- Added a `GuardianInvitation` Prisma model and migration, wired cleanup helpers
+  for invitation records, and exposed shared guardian invitation/accept
+  contracts in the API client.
+- Implemented an API guardian module with invitation token signing/verification,
+  teen compliance-state checks, consent persistence, guardian account linking,
+  and analytics capture on successful consent.
+- Queued guardian invitation and confirmation emails through `event_envelope`
+  records so the flow integrates with the repo's existing outbound-event pattern
+  without introducing a parallel mailer stack.
+- Added web and mobile guardian invitation UX for pending teen accounts plus
+  guardian acceptance screens backed by the shared guardian contracts.
+- Added a guardian-aware RLS migration that bridges Supabase JWT claims to the
+  repo's current text user IDs, centralizes guardian/admin access helpers in the
+  private schema, and protects wardrobe-domain tables plus self-only community
+  tables.
+- Added database-level Vitest coverage for teen, guardian read-only, guardian
+  full-access, admin, anonymous, and cross-account denial scenarios, then
+  deployed the RLS migration set to local, dev, and prod Supabase databases.
+- Added immutable audit-log hardening with an event-type/timestamp index,
+  consent-grant writes in the guardian acceptance transaction, and a
+  database-level spec that proves direct `UPDATE`/`DELETE` attempts fail.
+- Extended the guardian consent audit helper to accept revoke/delete event types
+  so Task 6 can reuse the same payload shape when the revocation endpoint lands.
+- Added `POST /api/v1/guardian/revoke` plus shared revoke contracts so
+  guardians/admins can revoke one teen consent link with the caller IP recorded
+  at the API boundary.
+- Revocation now updates `GuardianConsent`, queues a teen notification email,
+  records a `consent_revoked` audit log row, and only flips the teen back to
+  `pending_guardian_consent` when no active guardian remains.
+- Added teen compliance enforcement in `RequestAuthGuard` and a follow-on RLS
+  migration so revoked teens lose authenticated self-access today instead of
+  waiting for the future session-store rollout in Story 0.14.
+- Added focused coverage for revoke controller/service behavior, blocked teen
+  auth requests, refreshed OpenAPI output, and database-level proof that revoked
+  teens can no longer read or mutate wardrobe rows.
+- Added a daily UTC guardian cron sweep that emancipates 18+ teens, flips
+  pending accounts to active, queues adulthood notifications, records
+  `guardian_consent_aged_out` audit entries, and can revoke guardian links by
+  default via config.
+- Hardened guardian invitations so adult accounts cannot still gain or regain
+  guardian-linked access through delayed acceptance, and added focused unit plus
+  integration coverage for the 18th-birthday transition path.
+- Added Task 8 AC #6 evidence mapping and closed the remaining RLS traceability
+  gaps for single active-consent wardrobe access, multiple-guardian revocation,
+  and teen cross-account wardrobe denial.
+- Broadened terminal lint/typecheck coverage so DB tests plus package/app config
+  files and the shared JS ESLint config package are checked by the normal root
+  commands instead of only by IDE diagnostics.
 
 ### File List
 
@@ -528,8 +683,10 @@ GPT-5 Codex
 - NEW `apps/mobile/src/features/signup/signup-screen.test.tsx`
 - NEW `playwright/tests/api/auth-signup-age-gate.spec.ts`
 - MODIFIED `packages/db/prisma/schema.prisma`
-- NEW `packages/db/prisma/migrations/20260417020000_extend_guardian_consent_for_levels_and_revocation/migration.sql`
-- NEW `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`
+- NEW
+  `packages/db/prisma/migrations/20260417020000_extend_guardian_consent_for_levels_and_revocation/migration.sql`
+- NEW
+  `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`
 - MODIFIED `packages/db/package.json`
 - NEW `packages/db/vitest.config.ts`
 - NEW `packages/db/test/rls-policies.spec.ts`
@@ -554,14 +711,18 @@ GPT-5 Codex
 - MODIFIED `packages/api-client/src/contracts/http/openapi.ts`
 - MODIFIED `packages/testing/src/cleanup.ts`
 - MODIFIED `packages/testing/test/cleanup.spec.ts`
-- NEW `packages/db/prisma/migrations/20260417030000_add_guardian_invitations/migration.sql`
-- NEW `packages/db/prisma/migrations/20260420160000_harden_audit_log_immutability/migration.sql`
-- NEW `packages/db/prisma/migrations/20260421090000_block_revoked_teens_from_self_access/migration.sql`
+- NEW
+  `packages/db/prisma/migrations/20260417030000_add_guardian_invitations/migration.sql`
+- NEW
+  `packages/db/prisma/migrations/20260420160000_harden_audit_log_immutability/migration.sql`
+- NEW
+  `packages/db/prisma/migrations/20260421090000_block_revoked_teens_from_self_access/migration.sql`
 - NEW `packages/db/test/audit-log-immutability.spec.ts`
 - NEW `apps/api/src/modules/guardian/guardian.cron.ts`
 - NEW `apps/api/src/modules/guardian/guardian.cron.spec.ts`
 - NEW `apps/api/integration/guardian-emancipation.integration.spec.ts`
-- MODIFIED `_bmad-output/implementation-artifacts/0-11-implement-guardian-consent-flow-and-rls-policies.md`
+- MODIFIED
+  `_bmad-output/implementation-artifacts/0-11-implement-guardian-consent-flow-and-rls-policies.md`
 - MODIFIED `apps/api/package.json`
 - MODIFIED `apps/mobile/package.json`
 - MODIFIED `packages/api-client/package.json`
@@ -574,18 +735,22 @@ GPT-5 Codex
 - MODIFIED `packages/eslint-config/package.json`
 - MODIFIED `packages/utils/package.json`
 - NEW `packages/utils/tsconfig.typecheck.json`
+- MODIFIED `.github/workflows/schema-validation.yml`
 
 ## Change Log
 
-| Date       | Author             | Change                                                                                                                                                   |
-| ---------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.11 acceptance criteria                                                                                                   |
-| 2026-04-16 | Codex              | Completed Task 1 age verification across API, web, mobile, shared utils, OpenAPI docs, and added targeted Playwright API coverage                        |
-| 2026-04-17 | Codex              | Completed Task 2 by extending the existing GuardianConsent Prisma model and adding a migration for consent levels and revocation support                 |
-| 2026-04-17 | Codex              | Completed Task 3 guardian invitation flow across Prisma, API contracts/module, email event queueing, and web/mobile invitation and acceptance UI         |
-| 2026-04-20 | Codex              | Completed Task 4 with guardian-aware RLS policies, database persona tests, and migration deploys to local/dev/prod Supabase environments                 |
-| 2026-04-20 | Codex              | Advanced Task 5 with immutable audit-log storage, consent-grant persistence, and database coverage for blocked audit row mutations                       |
-| 2026-04-21 | Codex              | Completed Task 6 with guardian revoke contracts/API flow, teen compliance/session blocking, and RLS coverage for revoked self-access                     |
-| 2026-04-22 | Codex              | Completed Task 7 with daily adulthood emancipation cron coverage, configurable guardian-link revocation, audit/notification writes, and invite hardening |
-| 2026-04-25 | Codex              | Completed Task 8 with AC #6 evidence mapping plus focused RLS coverage for active consent, multi-guardian revocation, and teen cross-account denial      |
-| 2026-04-25 | Codex              | Broadened root lint/typecheck coverage so terminal checks catch IDE-visible diagnostics in tests and package/app config files                            |
+- 2025-11-13 - Bob (Scrum Master): Story drafted from Epic 0 and CC-0.11 ACs.
+- 2026-04-16 - Codex: Completed Task 1 age verification and Playwright API
+  coverage.
+- 2026-04-17 - Codex: Completed Task 2 consent levels and revocation migration.
+- 2026-04-17 - Codex: Completed Task 3 guardian invitation flow across API and
+  UI.
+- 2026-04-20 - Codex: Completed Task 4 guardian-aware RLS and DB persona tests.
+- 2026-04-20 - Codex: Advanced Task 5 immutable audit-log storage and coverage.
+- 2026-04-21 - Codex: Completed Task 6 revoke API and revoked self-access
+  coverage.
+- 2026-04-22 - Codex: Completed Task 7 adulthood cron and invitation hardening.
+- 2026-04-25 - Codex: Completed Task 8 evidence mapping and focused RLS
+  coverage.
+- 2026-04-25 - Codex: Broadened terminal lint/typecheck for IDE-visible
+  diagnostics.

@@ -38,3 +38,5 @@ npm-debug.log*
 maestro/artifacts
 
 *.tsbuildinfo
+.agents
+_bmad
