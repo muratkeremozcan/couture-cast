@@ -364,25 +364,25 @@ describe.sequential('guardian-aware RLS policies', () => {
           id: string
           category: string
         }>('SELECT "id", "category" FROM public."GarmentItem" WHERE "user_id" = $1', [
-          scenario.teenId,
+          scenario!.teenId,
         ])
 
         expect(garmentRows.rows).toEqual([
           {
-            id: scenario.garmentId,
+            id: scenario!.garmentId,
             category: 'top',
           },
         ])
 
         await client.query(
           'UPDATE public."GarmentItem" SET "category" = $1, "updated_at" = NOW() WHERE "id" = $2',
-          ['outerwear', scenario.garmentId]
+          ['outerwear', scenario!.garmentId]
         )
 
         const updatedProfile = await client.query<{
           display_name: string
         }>('SELECT "display_name" FROM public."UserProfile" WHERE "user_id" = $1', [
-          scenario.teenId,
+          scenario!.teenId,
         ])
 
         expect(updatedProfile.rows[0]?.display_name).toBe('Teen Wardrobe Owner')
@@ -400,7 +400,7 @@ describe.sequential('guardian-aware RLS policies', () => {
         const garmentRows = await client.query<{
           id: string
         }>('SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1', [
-          scenario.teenId,
+          scenario!.teenId,
         ])
 
         expect(garmentRows.rows).toHaveLength(1)
@@ -408,20 +408,60 @@ describe.sequential('guardian-aware RLS policies', () => {
         const consentRows = await client.query<{
           teen_id: string
         }>('SELECT "teen_id" FROM public."GuardianConsent" WHERE "guardian_id" = $1', [
-          scenario.guardianReadOnlyId,
+          scenario!.guardianReadOnlyId,
         ])
 
-        expect(consentRows.rows).toEqual([{ teen_id: scenario.teenId }])
+        expect(consentRows.rows).toEqual([{ teen_id: scenario!.teenId }])
 
         const updateResult = await client.query(
           `UPDATE public."GarmentItem"
            SET "category" = $1, "updated_at" = NOW()
            WHERE "id" = $2
            RETURNING "id"`,
-          ['coat', scenario.garmentId]
+          ['coat', scenario!.garmentId]
         )
 
         expect(updateResult.rowCount).toBe(0)
+      }
+    )
+  })
+
+  it('grants wardrobe access from a single active guardian consent row', async () => {
+    scenario = await seedScenario()
+
+    const client = await adminPool.connect()
+
+    try {
+      await client.query('DELETE FROM public."GuardianConsent" WHERE "id" = $1', [
+        scenario.consentFullId,
+      ])
+    } finally {
+      client.release()
+    }
+
+    await withRole(
+      'authenticated',
+      buildClaims(scenario.teenEmail, 'teen'),
+      async (client) => {
+        const teenGarments = await client.query(
+          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+          [scenario!.teenId]
+        )
+
+        expect(teenGarments.rows).toEqual([{ id: scenario!.garmentId }])
+      }
+    )
+
+    await withRole(
+      'authenticated',
+      buildClaims(scenario.guardianReadOnlyEmail, 'guardian'),
+      async (client) => {
+        const guardianGarments = await client.query(
+          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+          [scenario!.teenId]
+        )
+
+        expect(guardianGarments.rows).toEqual([{ id: scenario!.garmentId }])
       }
     )
   })
@@ -440,7 +480,7 @@ describe.sequential('guardian-aware RLS policies', () => {
            SET "category" = $1, "updated_at" = NOW()
            WHERE "id" = $2
            RETURNING "category"`,
-          ['jacket', scenario.garmentId]
+          ['jacket', scenario!.garmentId]
         )
 
         expect(updateResult.rows).toEqual([{ category: 'jacket' }])
@@ -452,10 +492,63 @@ describe.sequential('guardian-aware RLS policies', () => {
             ("id", "user_id", "scenario", "updated_at")
            VALUES ($1, $2, $3, NOW())
            RETURNING "id"`,
-          [`guardian-created-outfit-${randomUUID()}`, scenario.teenId, 'school-run']
+          [`guardian-created-outfit-${randomUUID()}`, scenario!.teenId, 'school-run']
         )
 
         expect(insertResult.rows).toHaveLength(1)
+      }
+    )
+  })
+
+  it('keeps remaining guardian wardrobe access after one guardian revokes consent', async () => {
+    scenario = await seedScenario()
+
+    const adminClient = await adminPool.connect()
+
+    try {
+      await adminClient.query(
+        `UPDATE public."GuardianConsent"
+         SET "revoked_at" = NOW(), "status" = 'revoked'
+         WHERE "id" = $1`,
+        [scenario.consentReadOnlyId]
+      )
+    } finally {
+      adminClient.release()
+    }
+
+    await withRole(
+      'authenticated',
+      buildClaims(scenario.guardianReadOnlyEmail, 'guardian'),
+      async (client) => {
+        const revokedGuardianRows = await client.query(
+          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+          [scenario!.teenId]
+        )
+
+        expect(revokedGuardianRows.rows).toHaveLength(0)
+      }
+    )
+
+    await withRole(
+      'authenticated',
+      buildClaims(scenario.guardianFullAccessEmail, 'guardian'),
+      async (client) => {
+        const remainingGuardianRows = await client.query(
+          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+          [scenario!.teenId]
+        )
+
+        expect(remainingGuardianRows.rows).toEqual([{ id: scenario!.garmentId }])
+
+        const updateResult = await client.query(
+          `UPDATE public."GarmentItem"
+           SET "category" = $1, "updated_at" = NOW()
+           WHERE "id" = $2
+           RETURNING "category"`,
+          ['remaining-guardian-reviewed', scenario!.garmentId]
+        )
+
+        expect(updateResult.rows).toEqual([{ category: 'remaining-guardian-reviewed' }])
       }
     )
   })
@@ -469,7 +562,7 @@ describe.sequential('guardian-aware RLS policies', () => {
       async (client) => {
         const ownPosts = await client.query(
           'SELECT "id" FROM public."LookbookPost" WHERE "user_id" = $1',
-          [scenario.teenId]
+          [scenario!.teenId]
         )
 
         expect(ownPosts.rows).toHaveLength(1)
@@ -490,6 +583,48 @@ describe.sequential('guardian-aware RLS policies', () => {
     )
   })
 
+  it('denies teens from reading another teen wardrobe', async () => {
+    scenario = await seedScenario()
+
+    const otherTeenId = `other-teen-${randomUUID()}`
+    const otherGarmentId = `other-garment-${randomUUID()}`
+    const client = await adminPool.connect()
+
+    try {
+      await client.query('BEGIN')
+      await insertUser(client, otherTeenId, `${otherTeenId}@example.com`)
+      await client.query(
+        `INSERT INTO public."GarmentItem"
+          ("id", "user_id", "category", "updated_at")
+         VALUES ($1, $2, $3, NOW())`,
+        [otherGarmentId, otherTeenId, 'dress']
+      )
+      await client.query('COMMIT')
+
+      await withRole(
+        'authenticated',
+        buildClaims(scenario.teenEmail, 'teen'),
+        async (guardedClient) => {
+          const otherTeenRows = await guardedClient.query(
+            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+            [otherTeenId]
+          )
+
+          expect(otherTeenRows.rows).toHaveLength(0)
+        }
+      )
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined)
+      throw error
+    } finally {
+      await client.query('DELETE FROM public."GarmentItem" WHERE "id" = $1', [
+        otherGarmentId,
+      ])
+      await client.query('DELETE FROM public."User" WHERE "id" = $1', [otherTeenId])
+      client.release()
+    }
+  })
+
   it('does not trust unverified email claims for cross-account access', async () => {
     scenario = await seedScenario()
 
@@ -507,7 +642,7 @@ describe.sequential('guardian-aware RLS policies', () => {
       async (client) => {
         const garmentRows = await client.query(
           'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [scenario.teenId]
+          [scenario!.teenId]
         )
 
         expect(garmentRows.rows).toHaveLength(0)
@@ -524,7 +659,7 @@ describe.sequential('guardian-aware RLS policies', () => {
       async (client) => {
         const garmentRows = await client.query(
           'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [scenario.teenId]
+          [scenario!.teenId]
         )
 
         expect(garmentRows.rows).toHaveLength(0)
@@ -534,7 +669,7 @@ describe.sequential('guardian-aware RLS policies', () => {
     await withRole('anon', null, async (client) => {
       await expect(
         client.query('SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1', [
-          scenario.teenId,
+          scenario!.teenId,
         ])
       ).rejects.toMatchObject({
         code: '42501',
@@ -564,7 +699,7 @@ describe.sequential('guardian-aware RLS policies', () => {
       async (client) => {
         const garmentRows = await client.query(
           'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [scenario.teenId]
+          [scenario!.teenId]
         )
 
         expect(garmentRows.rows).toHaveLength(0)
@@ -658,7 +793,7 @@ describe.sequential('guardian-aware RLS policies', () => {
       async (client) => {
         const garmentRows = await client.query(
           'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [scenario.teenId]
+          [scenario!.teenId]
         )
 
         expect(garmentRows.rows).toHaveLength(1)
@@ -668,7 +803,7 @@ describe.sequential('guardian-aware RLS policies', () => {
            SET "category" = $1, "updated_at" = NOW()
            WHERE "id" = $2
            RETURNING "category"`,
-          ['admin-reviewed', scenario.garmentId]
+          ['admin-reviewed', scenario!.garmentId]
         )
 
         expect(updateResult.rows).toEqual([{ category: 'admin-reviewed' }])

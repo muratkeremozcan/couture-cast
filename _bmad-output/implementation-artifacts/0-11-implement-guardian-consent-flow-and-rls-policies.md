@@ -174,39 +174,71 @@ so that CoutureCast satisfies COPPA requirements and age-gating obligations.
     - Log event to audit log
   - [x] Test: teen gains full access on 18th birthday
 
-- [ ] Task 8: Write test cases (AC: #6)
-  - [ ] Test: Single guardian happy path
+- [x] Task 8: Write test cases (AC: #6)
+  - [x] Test: Single guardian happy path
     - Teen signs up (age 14)
     - Guardian receives invitation
     - Guardian accepts
     - Teen can access wardrobe
-  - [ ] Test: Revocation mid-session
+  - [x] Test: Revocation mid-session
     - Teen logged in
     - Guardian revokes consent
     - Teen session invalidated
     - Teen cannot access wardrobe
-  - [ ] Test: Multiple guardians
+  - [x] Test: Multiple guardians
     - Teen has 2 guardians
     - Both can access wardrobe
     - One revokes, other still has access
-  - [ ] Test: Teen turns 18
+  - [x] Test: Teen turns 18
     - Teen turns 18
     - Status updated to active
     - Guardian consent optional
-  - [ ] Test: Consent audit trail
+  - [x] Test: Consent audit trail
     - Grant, revoke, multiple guardians
     - All events logged
     - Audit log immutable
-  - [ ] Test: Age verification failure
+  - [x] Test: Age verification failure
     - User <13 blocked
     - User 13-15 requires guardian
     - User 16+ no guardian needed
-  - [ ] Test: Cross-account access denial
+  - [x] Test: Cross-account access denial
     - Teen A cannot access Teen B's wardrobe
     - Guardian A cannot access unlinked teen
-  - [ ] Follow-up boundary: auth-session rollout is implemented in Story 0.14 Task 2 only
+  - [x] Follow-up boundary: auth-session rollout is implemented in Story 0.14 Task 2 only
         after login/session-backed journeys are stable; keep 401/403 negative contract tests
         unauthenticated.
+  - Evidence map:
+    - Single guardian happy path: `playwright/tests/api/guardian-consent-lifecycle.spec.ts`
+      covers signup, invitation, acceptance, and restored teen profile access;
+      `apps/api/src/modules/guardian/guardian.service.spec.ts` asserts `consent_granted`
+      audit persistence; `packages/db/test/rls-policies.spec.ts` now asserts wardrobe
+      access from a single active guardian consent row.
+    - Revocation mid-session: `playwright/tests/api/guardian-consent-lifecycle.spec.ts`
+      asserts revoke response `sessionInvalidated: true` and teen `403` after revoke;
+      `apps/api/src/modules/guardian/guardian.service.spec.ts` asserts revocation side
+      effects; `packages/db/test/rls-policies.spec.ts` asserts revoked teens lose
+      wardrobe access.
+    - Multiple guardians: `apps/api/src/modules/guardian/guardian.service.spec.ts`
+      asserts one guardian can revoke while another active consent remains;
+      `packages/db/test/rls-policies.spec.ts` now asserts the revoked guardian loses
+      wardrobe access while the remaining full-access guardian can still read and
+      update teen wardrobe rows.
+    - Teen turns 18: `apps/api/src/modules/guardian/guardian.service.spec.ts` covers
+      pending teen emancipation, default guardian-link revocation, and configurable
+      keep-link behavior; `apps/api/integration/guardian-emancipation.integration.spec.ts`
+      covers the Nest guard/controller boundary before and after the sweep.
+    - Consent audit trail: `apps/api/src/modules/guardian/guardian.service.spec.ts`
+      asserts grant, revoke, and age-out audit rows;
+      `packages/db/test/audit-log-immutability.spec.ts` asserts admin-only read policy
+      and blocked `UPDATE`, `DELETE`, and `TRUNCATE`.
+    - Age verification failure: `packages/utils/src/age.spec.ts`,
+      `apps/api/src/modules/auth/auth.service.spec.ts`, and
+      `playwright/tests/api/auth-signup-age-gate.spec.ts` cover <13 blocked,
+      13-15 pending guardian consent, and 16+ active.
+    - Cross-account access denial: `packages/db/test/rls-policies.spec.ts` now asserts
+      Teen A cannot read Teen B wardrobe, and continues to assert unrelated guardians,
+      anonymous actors, unverified email claims, and user-metadata escalation cannot
+      access teen wardrobe data.
 
 - [ ] Task 9: Create guardian consent UI (AC: #2)
   - [ ] Teen signup flow: add birthdate picker, show guardian invitation screen if 13-15
@@ -418,6 +450,14 @@ GPT-5 Codex
 - `npm run test --workspace api -- src/modules/guardian/guardian.service.spec.ts src/modules/guardian/guardian.cron.spec.ts integration/guardian-emancipation.integration.spec.ts`
 - `npx eslint --max-warnings=0 apps/api/integration/guardian-emancipation.integration.spec.ts`
 - `npm run typecheck --workspace api`
+- `npm run test --workspace api -- src/modules/guardian/guardian.service.spec.ts src/modules/guardian/guardian.controller.spec.ts src/modules/auth/security.guards.spec.ts src/modules/auth/guardian-consent-state.service.spec.ts integration/guardian-emancipation.integration.spec.ts`
+- `npm run test --workspace packages/db -- test/rls-policies.spec.ts test/audit-log-immutability.spec.ts`
+- `npx playwright test playwright/tests/api/auth-signup-age-gate.spec.ts playwright/tests/api/guardian-consent-lifecycle.spec.ts --list`
+- `TEST_ENV=local npx playwright test playwright/tests/api/auth-signup-age-gate.spec.ts playwright/tests/api/guardian-consent-lifecycle.spec.ts`
+- `npx tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --noUncheckedIndexedAccess --skipLibCheck --types node packages/db/test/rls-policies.spec.ts`
+- `npm run typecheck --workspace packages/db`
+- `npm run lint`
+- `npm run typecheck`
 
 ### Completion Notes List
 
@@ -441,6 +481,12 @@ GPT-5 Codex
 - Added focused coverage for revoke controller/service behavior, blocked teen auth requests, refreshed OpenAPI output, and database-level proof that revoked teens can no longer read or mutate wardrobe rows.
 - Added a daily UTC guardian cron sweep that emancipates 18+ teens, flips pending accounts to active, queues adulthood notifications, records `guardian_consent_aged_out` audit entries, and can revoke guardian links by default via config.
 - Hardened guardian invitations so adult accounts cannot still gain or regain guardian-linked access through delayed acceptance, and added focused unit plus integration coverage for the 18th-birthday transition path.
+- Added Task 8 AC #6 evidence mapping and closed the remaining RLS traceability gaps for
+  single active-consent wardrobe access, multiple-guardian revocation, and teen
+  cross-account wardrobe denial.
+- Broadened terminal lint/typecheck coverage so DB tests plus package/app config files
+  and the shared JS ESLint config package are checked by the normal root commands
+  instead of only by IDE diagnostics.
 
 ### File List
 
@@ -515,6 +561,19 @@ GPT-5 Codex
 - NEW `apps/api/src/modules/guardian/guardian.cron.ts`
 - NEW `apps/api/src/modules/guardian/guardian.cron.spec.ts`
 - NEW `apps/api/integration/guardian-emancipation.integration.spec.ts`
+- MODIFIED `_bmad-output/implementation-artifacts/0-11-implement-guardian-consent-flow-and-rls-policies.md`
+- MODIFIED `apps/api/package.json`
+- MODIFIED `apps/mobile/package.json`
+- MODIFIED `packages/api-client/package.json`
+- MODIFIED `packages/api-client/tsconfig.json`
+- MODIFIED `packages/config/package.json`
+- NEW `packages/config/tsconfig.typecheck.json`
+- MODIFIED `packages/db/package.json`
+- MODIFIED `packages/db/tsconfig.json`
+- NEW `packages/eslint-config/.eslintrc.cjs`
+- MODIFIED `packages/eslint-config/package.json`
+- MODIFIED `packages/utils/package.json`
+- NEW `packages/utils/tsconfig.typecheck.json`
 
 ## Change Log
 
@@ -528,3 +587,5 @@ GPT-5 Codex
 | 2026-04-20 | Codex              | Advanced Task 5 with immutable audit-log storage, consent-grant persistence, and database coverage for blocked audit row mutations                       |
 | 2026-04-21 | Codex              | Completed Task 6 with guardian revoke contracts/API flow, teen compliance/session blocking, and RLS coverage for revoked self-access                     |
 | 2026-04-22 | Codex              | Completed Task 7 with daily adulthood emancipation cron coverage, configurable guardian-link revocation, audit/notification writes, and invite hardening |
+| 2026-04-25 | Codex              | Completed Task 8 with AC #6 evidence mapping plus focused RLS coverage for active consent, multi-guardian revocation, and teen cross-account denial      |
+| 2026-04-25 | Codex              | Broadened root lint/typecheck coverage so terminal checks catch IDE-visible diagnostics in tests and package/app config files                            |

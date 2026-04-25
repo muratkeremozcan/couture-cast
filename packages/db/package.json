@@ -10,7 +10,7 @@
     "db:reset": "prisma migrate reset --force --skip-seed && prisma db seed",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
-    "lint": "eslint --max-warnings=0 --ext .ts prisma/seeds",
+    "lint": "eslint --max-warnings=0 --ext .ts prisma/seeds test vitest.config.ts",
     "typecheck": "prisma generate && tsc --noEmit -p tsconfig.json",
     "test": "vitest run --config vitest.config.ts"
   },

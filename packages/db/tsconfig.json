@@ -8,5 +8,5 @@
     "moduleResolution": "NodeNext",
     "types": ["node"]
   },
-  "include": ["prisma/**/*.ts"]
+  "include": ["prisma/**/*.ts", "test/**/*.ts", "vitest.config.ts"]
 }
