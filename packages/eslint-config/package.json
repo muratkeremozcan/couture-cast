@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "typecheck": "node -e \"console.log('@couture/eslint-config: no typecheck step')\"",
-    "lint": "node -e \"console.log('@couture/eslint-config: no lint step')\" --",
+    "lint": "eslint --max-warnings=0 index.js",
     "test": "node -e \"console.log('@couture/eslint-config: no unit tests configured')\""
   }
 }

@@ -11,7 +11,7 @@
     "prestart": "npm run prepare:shared-deps",
     "preweb": "npm run prepare:shared-deps",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "eslint --max-warnings=0 --ext .ts,.tsx .",
+    "lint": "cd ../.. && eslint --max-warnings=0 --ext .ts,.tsx apps/mobile",
     "vitest:run": "vitest run --config vitest.config.ts",
     "vitest:open": "vitest --config vitest.config.ts --ui",
     "test": "npm run vitest:run",
