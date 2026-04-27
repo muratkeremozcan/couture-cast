@@ -8,6 +8,8 @@ import { test, expect } from '../../support/fixtures/merged-fixtures'
 import {
   authHeaders,
   buildUniqueId,
+  extractErrorMessage,
+  isProdEnvironment,
   resolveApiBaseUrl,
 } from '../../support/helpers/api-test'
 
@@ -25,51 +27,6 @@ type ModerationActionPayload = {
   reason: string
   contentType: string
   timestamp: string
-}
-
-type ApiResponsePayload = {
-  status: number
-  body: unknown
-}
-
-type ApiRequestFixture = (params: {
-  method: 'POST'
-  path: string
-  baseUrl: string
-  body: unknown
-  headers?: Record<string, string>
-  retryConfig: { maxRetries: number }
-}) => Promise<ApiResponsePayload>
-
-function isProdEnvironment(testInfo: TestInfo): boolean {
-  const metadata = (testInfo.project.metadata ?? {}) as Record<string, string>
-  return metadata.environment === 'prod'
-}
-
-function extractErrorMessage(body: unknown): string {
-  if (!body || typeof body !== 'object') return ''
-  const message = (body as { message?: unknown }).message
-  return typeof message === 'string' ? message : ''
-}
-
-async function postContract(
-  apiRequest: unknown,
-  baseUrl: string,
-  path: string,
-  payload: unknown,
-  headers?: Record<string, string>
-): Promise<ApiResponsePayload> {
-  const request = apiRequest as ApiRequestFixture
-
-  return request({
-    method: 'POST',
-    path,
-    baseUrl,
-    body: payload,
-    headers,
-    // Disable retries so expected 401/403 contracts are asserted immediately.
-    retryConfig: { maxRetries: 0 },
-  })
 }
 
 type ContractPayload = GuardianConsentPayload | ModerationActionPayload
@@ -149,12 +106,12 @@ test.describe('Auth and moderation endpoint security contracts', () => {
         validateSchema,
       }, testInfo) => {
         const payload = createScenarioPayload(scenario, testInfo)
-        const { status, body } = await postContract(
-          apiRequest,
-          resolveApiBaseUrl(testInfo),
-          scenario.path,
-          payload
-        )
+        const { status, body } = await apiRequest({
+          method: 'POST',
+          path: scenario.path,
+          baseUrl: resolveApiBaseUrl(testInfo),
+          body: payload,
+        })
 
         expect(status).toBe(401)
         await validateSchema(unauthorizedHttpErrorSchema, body, {
@@ -171,13 +128,13 @@ test.describe('Auth and moderation endpoint security contracts', () => {
       }, testInfo) => {
         const payload = createScenarioPayload(scenario, testInfo)
         const actorId = scenario.getActorId(payload)
-        const { status, body } = await postContract(
-          apiRequest,
-          resolveApiBaseUrl(testInfo),
-          scenario.path,
-          payload,
-          authHeaders(actorId, scenario.wrongRole)
-        )
+        const { status, body } = await apiRequest({
+          method: 'POST',
+          path: scenario.path,
+          baseUrl: resolveApiBaseUrl(testInfo),
+          body: payload,
+          headers: authHeaders(actorId, scenario.wrongRole),
+        })
 
         expect(status).toBe(403)
         await validateSchema(forbiddenHttpErrorSchema, body, {
@@ -197,13 +154,13 @@ test.describe('Auth and moderation endpoint security contracts', () => {
           buildUniqueId(`${scenario.actorRole}-mismatch`, testInfo)
         )
 
-        const { status, body } = await postContract(
-          apiRequest,
-          resolveApiBaseUrl(testInfo),
-          scenario.path,
-          mismatchedPayload,
-          authHeaders(actorId, scenario.actorRole)
-        )
+        const { status, body } = await apiRequest({
+          method: 'POST',
+          path: scenario.path,
+          baseUrl: resolveApiBaseUrl(testInfo),
+          body: mismatchedPayload,
+          headers: authHeaders(actorId, scenario.actorRole),
+        })
 
         expect(status).toBe(403)
         await validateSchema(forbiddenHttpErrorSchema, body, {
@@ -218,13 +175,13 @@ test.describe('Auth and moderation endpoint security contracts', () => {
       }, testInfo) => {
         const payload = createScenarioPayload(scenario, testInfo)
         const actorId = scenario.getActorId(payload)
-        const { status, body } = await postContract(
-          apiRequest,
-          resolveApiBaseUrl(testInfo),
-          scenario.path,
-          payload,
-          authHeaders(actorId, scenario.actorRole)
-        )
+        const { status, body } = await apiRequest({
+          method: 'POST',
+          path: scenario.path,
+          baseUrl: resolveApiBaseUrl(testInfo),
+          body: payload,
+          headers: authHeaders(actorId, scenario.actorRole),
+        })
 
         expect(status).toBe(200)
         await validateSchema(trackedResponseSchema, body, {

@@ -1,3 +1,5 @@
+// Builds collision-safe user and outfit fixtures for Playwright specs that need
+// realistic data without depending on static fixture JSON.
 import { faker } from '@faker-js/faker'
 
 export type MembershipTier = 'free' | 'pro' | 'studio'
