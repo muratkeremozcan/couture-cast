@@ -46,6 +46,8 @@ describe('GuardianDashboardScreen', () => {
       expect(screen.getByText('teen-4')).toBeTruthy()
     })
 
+    // React Native Pressable is rendered through the mobile DOM test setup here;
+    // user-event is not available in this workspace, so fireEvent exercises it.
     fireEvent.click(screen.getByRole('button', { name: 'Revoke consent for teen-4' }))
 
     await waitFor(() => {

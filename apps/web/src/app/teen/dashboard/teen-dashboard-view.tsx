@@ -8,6 +8,10 @@ type TeenDashboardViewProps = {
   loadProfile?: () => Promise<UserProfileResponse>
 }
 
+type ProfileWithOptionalGuardians = Omit<UserProfileResponse, 'linkedGuardians'> & {
+  linkedGuardians?: UserProfileResponse['linkedGuardians']
+}
+
 function formatConsentDate(value: string | null) {
   if (!value) {
     return 'Awaiting consent'
@@ -19,11 +23,16 @@ function formatConsentDate(value: string | null) {
   }).format(new Date(value))
 }
 
-function getConsentStatus(profile: UserProfileResponse) {
-  const hasGrantedGuardian = profile.linkedGuardians.some(
+function getLinkedGuardians(profile: ProfileWithOptionalGuardians) {
+  return profile.linkedGuardians ?? []
+}
+
+function getConsentStatus(profile: ProfileWithOptionalGuardians) {
+  const linkedGuardians = getLinkedGuardians(profile)
+  const hasGrantedGuardian = linkedGuardians.some(
     (guardian) => guardian.status === 'granted'
   )
-  const hasRevokedGuardian = profile.linkedGuardians.some(
+  const hasRevokedGuardian = linkedGuardians.some(
     (guardian) => guardian.status === 'revoked'
   )
 
@@ -84,6 +93,8 @@ export function TeenDashboardView({
     )
   }
 
+  const linkedGuardians = getLinkedGuardians(profile)
+
   return (
     <section className="space-y-6 rounded-2xl border border-white/10 bg-white/5 p-6">
       <div className="space-y-2">
@@ -105,9 +116,9 @@ export function TeenDashboardView({
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-300">
           Linked guardians
         </h2>
-        {profile.linkedGuardians.length > 0 ? (
+        {linkedGuardians.length > 0 ? (
           <ul className="divide-y divide-white/10 rounded-xl border border-white/10">
-            {profile.linkedGuardians.map((guardian) => (
+            {linkedGuardians.map((guardian) => (
               <li
                 key={guardian.guardianId}
                 className="grid gap-2 px-4 py-3 text-sm text-neutral-100 sm:grid-cols-3"
