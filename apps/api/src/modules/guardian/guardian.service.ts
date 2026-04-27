@@ -55,12 +55,27 @@ type EmancipateEligibleTeensResult = {
   notificationsQueued: number
 }
 
+type GuardianInvitationEmailTemplateInput = {
+  teenEmail: string
+  guardianEmail: string
+  consentLevel: ConsentLevel
+  invitationLink: string
+  expiresAt: Date
+}
+
 const GUARDIAN_INVITATION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const DEVELOPMENT_INVITATION_SECRET = 'guardian-invite-development-secret'
 const MAX_REVOKE_CONSENT_TRANSACTION_RETRIES = 3
 const AGE_OF_MAJORITY = 18
 const GUARDIAN_CONSENT_NO_LONGER_REQUIRED_MESSAGE =
   'Guardian consent is no longer required for adult accounts'
+const HTML_ESCAPE_REPLACEMENTS: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  [String.fromCharCode(39)]: '&#39;',
+}
 const invitationTokenPayloadSchema = z.object({
   sub: z.string().min(1),
   teenId: z.string().min(1),
@@ -77,6 +92,39 @@ function normalizeEmail(email: string) {
 
 function normalizeBaseUrl(baseUrl: string) {
   return baseUrl.replace(/\/+$/, '')
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    return HTML_ESCAPE_REPLACEMENTS[character] ?? character
+  })
+}
+
+export function buildGuardianInvitationEmailTemplate(
+  input: GuardianInvitationEmailTemplateInput
+) {
+  const consentLabel =
+    input.consentLevel === 'full_access' ? 'full access' : 'read-only access'
+  const expiresAt = input.expiresAt.toISOString()
+
+  return {
+    templateId: 'guardian-consent-invitation',
+    subject: 'CoutureCast guardian consent invitation',
+    previewText: `${input.teenEmail} invited you to approve CoutureCast wardrobe access.`,
+    text: [
+      'CoutureCast guardian consent invitation',
+      '',
+      `${input.teenEmail} invited ${input.guardianEmail} to approve ${consentLabel} for their CoutureCast wardrobe account.`,
+      `Accept invitation: ${input.invitationLink}`,
+      `This invitation expires at ${expiresAt}.`,
+    ].join('\n'),
+    html: [
+      '<h1>CoutureCast guardian consent invitation</h1>',
+      `<p>${escapeHtml(input.teenEmail)} invited ${escapeHtml(input.guardianEmail)} to approve ${escapeHtml(consentLabel)} for their CoutureCast wardrobe account.</p>`,
+      `<p><a href="${escapeHtml(input.invitationLink)}">Accept guardian invitation</a></p>`,
+      `<p>This invitation expires at ${escapeHtml(expiresAt)}.</p>`,
+    ].join(''),
+  }
 }
 
 function resolveAdultConsentRevocationSetting() {
@@ -453,6 +501,13 @@ export class GuardianService {
             invitationLink: nextInvitationLink,
             consentLevel: parsed.consentLevel,
             expiresAt: expiresAt.toISOString(),
+            template: buildGuardianInvitationEmailTemplate({
+              teenEmail: teen.email,
+              guardianEmail: normalizedGuardianEmail,
+              consentLevel: parsed.consentLevel,
+              invitationLink: nextInvitationLink,
+              expiresAt,
+            }),
           },
         },
       })

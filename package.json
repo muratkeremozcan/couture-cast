@@ -119,14 +119,12 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
+      "sh -c \"npm run build --workspace @couture/utils && npm run build --workspace @couture/api-client\"",
       "eslint --max-warnings=0 --cache --cache-location node_modules/.cache/eslint --fix --no-ignore",
       "prettier --write"
     ],
     "*.{json,md}": [
       "prettier --write"
-    ],
-    "*": [
-      "sh -c \"npm run lint:fix\""
     ]
   },
   "dependencies": {

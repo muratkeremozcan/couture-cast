@@ -1,8 +1,12 @@
 import {
   guardianInvitationAcceptInputSchema,
   guardianInvitationAcceptResponseSchema,
+  guardianConsentRevokeInputSchema,
+  guardianConsentRevokeResponseSchema,
   guardianInvitationInputSchema,
   guardianInvitationResponseSchema,
+  type GuardianConsentRevokeInput,
+  type GuardianConsentRevokeResponse,
   type GuardianInvitationAcceptInput,
   type GuardianInvitationAcceptResponse,
   type GuardianInvitationInput,
@@ -62,4 +66,25 @@ export async function acceptGuardianInvitationFromWeb(
   }
 
   return guardianInvitationAcceptResponseSchema.parse(await response.json())
+}
+
+export async function revokeGuardianConsentFromWeb(
+  input: GuardianConsentRevokeInput,
+  fetchImpl: typeof fetch = fetch
+): Promise<GuardianConsentRevokeResponse> {
+  const payload = guardianConsentRevokeInputSchema.parse(input)
+  const response = await fetchImpl(`${resolveWebApiBaseUrl()}/api/v1/guardian/revoke`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response))
+  }
+
+  return guardianConsentRevokeResponseSchema.parse(await response.json())
 }
