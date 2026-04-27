@@ -52,6 +52,16 @@ type StoredAuditLog = {
   ip_address: string | null
 }
 
+type GuardianInvitationEmailEventPayload = {
+  to: string
+  template: {
+    templateId: string
+    subject: string
+    text: string
+    html: string
+  }
+}
+
 type AnalyticsCapturePayload = {
   distinctId: string
   event: string
@@ -549,6 +559,15 @@ describe('GuardianService', () => {
     expect(prisma.invitations.size).toBe(1)
     expect(prisma.eventEnvelopes).toHaveLength(1)
     expect(prisma.eventEnvelopes[0]?.channel).toBe('email.guardian-invitation')
+    const invitationEmailPayload = prisma.eventEnvelopes[0]
+      ?.payload as GuardianInvitationEmailEventPayload
+    expect(invitationEmailPayload.to).toBe('guardian.pending@example.com')
+    expect(invitationEmailPayload.template.templateId).toBe('guardian-consent-invitation')
+    expect(invitationEmailPayload.template.subject).toBe(
+      'CoutureCast guardian consent invitation'
+    )
+    expect(invitationEmailPayload.template.text).toContain(result.invitationLink)
+    expect(invitationEmailPayload.template.html).toContain(result.invitationLink)
   })
 
   it('rejects guardian invitations for teens that are not awaiting guardian consent', async () => {

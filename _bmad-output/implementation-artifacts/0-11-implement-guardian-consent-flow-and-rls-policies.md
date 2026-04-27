@@ -279,25 +279,40 @@ CoutureCast satisfies COPPA requirements and age-gating obligations.
       unrelated guardians, anonymous actors, unverified email claims, and
       user-metadata escalation cannot access teen wardrobe data.
 
-- [ ] Task 9: Create guardian consent UI (AC: #2)
-  - [ ] Teen signup flow: add birthdate picker, show guardian invitation screen
+- [x] Task 9: Create guardian consent UI (AC: #2)
+  - [x] Teen signup flow: add birthdate picker, show guardian invitation screen
         if 13-15
-  - [ ] Guardian invitation email template with accept link
-  - [ ] Guardian accept page: create account or login, confirm consent
-  - [ ] Teen dashboard: show guardian consent status, list guardians
-  - [ ] Guardian dashboard: show linked teens, manage consent
-  - [ ] Add UI to revoke consent
+  - [x] Guardian invitation email template with accept link
+  - [x] Guardian accept page: create account or login, confirm consent
+  - [x] Teen dashboard: show guardian consent status, list guardians
+  - [x] Guardian dashboard: show linked teens, manage consent
+  - [x] Add UI to revoke consent
 
-- [ ] Task 10: Document COPPA compliance (AC: #1-#6)
-  - [ ] Create `_bmad-output/project-knowledge/coppa-compliance.md`:
+- [ ] Task 9.5: Add guardian consent browser E2E smoke coverage (AC: #2, #5,
+      #6)
+  - [ ] Add a Playwright browser/API hybrid spec for the guardian consent UI
+        path: teen 13-15 signup shows guardian invitation UI → invitation is
+        created → guardian accept link records consent
+  - [ ] Add a guardian dashboard browser assertion for linked teen visibility
+        and revoke consent UI feedback
+  - [ ] Use API setup/postconditions where possible, browser assertions only for
+        user-visible UI behavior, and resilient role/text/test-id locators
+  - [ ] Keep the test local/preview-safe with isolated generated identities and
+        cleanup; skip production write paths unless a dedicated seeded fixture
+        exists
+  - [ ] Document remaining limitations if full auth/session-backed browser
+        coverage still depends on Story 0.14
+
+- [x] Task 10: Document COPPA compliance (AC: #1-#6)
+  - [x] Create `_bmad-output/project-knowledge/coppa-compliance.md`:
     - Age verification strategy
     - Guardian consent requirements
     - Consent revocation process
     - Audit logging
     - Data retention policies
     - Privacy policy updates
-  - [ ] Add COPPA section to Terms of Service
-  - [ ] Document for legal review
+  - [x] Add COPPA section to Terms of Service
+  - [x] Document for legal review
 
 ## Dev Notes
 
@@ -576,6 +591,63 @@ GPT-5 Codex
   npm run typecheck
   ```
 
+- Task 9 guardian consent UI and email-template checks:
+
+  ```bash
+  npm run test --workspace web -- \
+    src/app/teen/dashboard/teen-dashboard-view.test.tsx \
+    src/app/guardian/dashboard/guardian-dashboard-view.test.tsx \
+    src/app/signup/signup-form.test.tsx \
+    src/app/guardian/accept/guardian-accept-view.test.tsx
+  npm run test --workspace mobile -- \
+    src/features/teen/teen-dashboard-screen.test.tsx \
+    src/features/guardian/guardian-dashboard-screen.test.tsx \
+    src/features/signup/signup-screen.test.tsx \
+    src/features/guardian/guardian-accept-screen.test.tsx
+  npm run test --workspace api -- src/modules/guardian/guardian.service.spec.ts
+  npm run typecheck --workspace web
+  npm run typecheck --workspace mobile
+  npm run typecheck --workspace api
+  npm run test --workspace web
+  npm run test --workspace mobile
+  npm run test --workspace api
+  npm run lint --workspace web
+  npm run lint --workspace mobile
+  npm run lint --workspace api
+  ```
+
+- Task 10 COPPA documentation checks:
+
+  ```bash
+  npx prettier --check \
+    _bmad-output/project-knowledge/coppa-compliance.md \
+    _bmad-output/project-knowledge/terms-of-service.md \
+    _bmad-output/implementation-artifacts/0-11-implement-guardian-consent-flow-and-rls-policies.md
+  git diff --check
+  ```
+
+- Task 9 CodeRabbit dashboard comment checks:
+
+  ```bash
+  npm run test --workspace web -- \
+    src/app/guardian/dashboard/guardian-dashboard-view.test.tsx \
+    src/app/teen/dashboard/teen-dashboard-view.test.tsx
+  npm run test --workspace mobile -- \
+    src/features/guardian/guardian-dashboard-screen.test.tsx
+  npx prettier --check \
+    apps/mobile/src/features/guardian/guardian-dashboard-screen.test.tsx \
+    apps/web/src/app/guardian/dashboard/guardian-dashboard-view.test.tsx \
+    apps/web/src/app/teen/dashboard/teen-dashboard-view.test.tsx \
+    apps/web/src/app/teen/dashboard/teen-dashboard-view.tsx
+  npx eslint --max-warnings=0 \
+    apps/mobile/src/features/guardian/guardian-dashboard-screen.test.tsx \
+    apps/web/src/app/guardian/dashboard/guardian-dashboard-view.test.tsx \
+    apps/web/src/app/teen/dashboard/teen-dashboard-view.test.tsx \
+    apps/web/src/app/teen/dashboard/teen-dashboard-view.tsx
+  git diff --check
+  npm run typecheck --workspace web
+  ```
+
 ### Completion Notes List
 
 - Added a new shared `@couture/utils` workspace package with `calculateAge`,
@@ -642,6 +714,27 @@ GPT-5 Codex
 - Broadened terminal lint/typecheck coverage so DB tests plus package/app config
   files and the shared JS ESLint config package are checked by the normal root
   commands instead of only by IDE diagnostics.
+- Added profile-backed guardian consent dashboards on web and mobile: teen views
+  now show consent status plus linked guardians, and guardian views show linked
+  teens with revoke controls backed by the existing revoke API contract.
+- Added web/mobile user-profile fetch helpers and guardian revoke client helpers
+  so dashboard UI uses the shared Zod contracts for profile and consent-revoke
+  responses.
+- Added a structured guardian invitation email template payload containing the
+  accept link, consent level, expiration, text copy, and HTML copy on the queued
+  `email.guardian-invitation` event envelope.
+- Added Task 9 unit coverage for teen dashboards, guardian dashboards, revoke UI
+  state updates, and the invitation email-template accept link; full web,
+  mobile, and API workspace tests/lint/typechecks passed.
+- Replaced the placeholder COPPA compliance note with a legal-review draft that
+  documents the Story 0.11 operating model: age verification, guardian consent,
+  revocation, audit logging, retention, privacy-policy updates, and AC evidence.
+- Added a draft Terms of Service document with COPPA/guardian-consent language
+  and explicit legal-review checkpoints.
+- Addressed verified Task 9 CodeRabbit dashboard comments by expanding guardian
+  and teen dashboard tests, documenting the mobile `fireEvent` choice for the
+  React Native test setup, and making teen consent-status rendering tolerate
+  missing guardian-link arrays at runtime.
 
 ### File List
 
@@ -736,6 +829,26 @@ GPT-5 Codex
 - MODIFIED `packages/utils/package.json`
 - NEW `packages/utils/tsconfig.typecheck.json`
 - MODIFIED `.github/workflows/schema-validation.yml`
+- NEW `apps/web/src/lib/user.ts`
+- MODIFIED `apps/web/src/lib/guardian.ts`
+- NEW `apps/web/src/app/teen/dashboard/page.tsx`
+- NEW `apps/web/src/app/teen/dashboard/teen-dashboard-view.tsx`
+- NEW `apps/web/src/app/teen/dashboard/teen-dashboard-view.test.tsx`
+- NEW `apps/web/src/app/guardian/dashboard/page.tsx`
+- NEW `apps/web/src/app/guardian/dashboard/guardian-dashboard-view.tsx`
+- NEW `apps/web/src/app/guardian/dashboard/guardian-dashboard-view.test.tsx`
+- NEW `apps/mobile/src/lib/user.ts`
+- MODIFIED `apps/mobile/src/lib/guardian.ts`
+- NEW `apps/mobile/app/teen-dashboard.tsx`
+- NEW `apps/mobile/app/guardian-dashboard.tsx`
+- NEW `apps/mobile/src/features/teen/teen-dashboard-screen.tsx`
+- NEW `apps/mobile/src/features/teen/teen-dashboard-screen.test.tsx`
+- NEW `apps/mobile/src/features/guardian/guardian-dashboard-screen.tsx`
+- NEW `apps/mobile/src/features/guardian/guardian-dashboard-screen.test.tsx`
+- MODIFIED `apps/api/src/modules/guardian/guardian.service.ts`
+- MODIFIED `apps/api/src/modules/guardian/guardian.service.spec.ts`
+- MODIFIED `_bmad-output/project-knowledge/coppa-compliance.md`
+- NEW `_bmad-output/project-knowledge/terms-of-service.md`
 
 ## Change Log
 
@@ -754,3 +867,9 @@ GPT-5 Codex
   coverage.
 - 2026-04-25 - Codex: Broadened terminal lint/typecheck for IDE-visible
   diagnostics.
+- 2026-04-27 - Codex: Completed Task 9 guardian consent UI, dashboard revoke
+  controls, and invitation email template payload.
+- 2026-04-27 - Codex: Completed Task 10 COPPA compliance documentation and
+  Terms of Service draft for legal review.
+- 2026-04-27 - Codex: Addressed Task 9 CodeRabbit dashboard test coverage and
+  teen consent-status guard comments.

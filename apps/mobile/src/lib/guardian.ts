@@ -1,8 +1,12 @@
 import {
   guardianInvitationAcceptInputSchema,
   guardianInvitationAcceptResponseSchema,
+  guardianConsentRevokeInputSchema,
+  guardianConsentRevokeResponseSchema,
   guardianInvitationInputSchema,
   guardianInvitationResponseSchema,
+  type GuardianConsentRevokeInput,
+  type GuardianConsentRevokeResponse,
   type GuardianInvitationAcceptInput,
   type GuardianInvitationAcceptResponse,
   type GuardianInvitationInput,
@@ -63,4 +67,27 @@ export async function acceptGuardianInvitationFromMobile(
   }
 
   return guardianInvitationAcceptResponseSchema.parse(await response.json())
+}
+
+export async function revokeGuardianConsentFromMobile(
+  input: GuardianConsentRevokeInput,
+  fetchImpl: typeof fetch = fetch
+): Promise<GuardianConsentRevokeResponse> {
+  const payload = guardianConsentRevokeInputSchema.parse(input)
+  const response = await fetchImpl(
+    `${resolveMobileApiBaseUrl()}/api/v1/guardian/revoke`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response))
+  }
+
+  return guardianConsentRevokeResponseSchema.parse(await response.json())
 }
