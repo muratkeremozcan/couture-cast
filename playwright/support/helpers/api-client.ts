@@ -1,3 +1,5 @@
+// Lightweight raw Playwright API helper for specs that need APIRequestContext access
+// outside the playwright-utils fixture contract.
 import type { APIRequestContext, APIResponse } from '@playwright/test'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'

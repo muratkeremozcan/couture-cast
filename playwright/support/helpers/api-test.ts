@@ -1,6 +1,27 @@
+// Centralizes Playwright API-test environment, identity, and payload helpers so specs
+// do not duplicate environment guards or generated user data.
 import type { TestInfo } from '@playwright/test'
 
 export type ApiRole = 'guardian' | 'teen' | 'moderator' | 'admin'
+export type ApiRequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+export type ApiResponsePayload<TBody = unknown> = {
+  status: number
+  body: TBody
+}
+
+export type ApiRequestFixture = (params: {
+  method: ApiRequestMethod
+  path: string
+  baseUrl: string
+  body?: unknown
+  headers?: Record<string, string>
+}) => Promise<ApiResponsePayload>
+
+export type SignupPayload = {
+  email: string
+  birthdate: string
+}
 
 type ResolveApiBaseUrlOptions = {
   overrideEnvVar?: string
@@ -8,11 +29,23 @@ type ResolveApiBaseUrlOptions = {
   requireValue?: boolean
 }
 
+export function projectMetadata(testInfo: TestInfo): Record<string, string> {
+  return (testInfo.project.metadata ?? {}) as Record<string, string>
+}
+
+export function isProdEnvironment(testInfo: TestInfo): boolean {
+  return projectMetadata(testInfo).environment === 'prod'
+}
+
+export function isNonLocalEnvironment(testInfo: TestInfo): boolean {
+  return projectMetadata(testInfo).environment !== 'local'
+}
+
 export function resolveApiBaseUrl(
   testInfo: TestInfo,
   options: ResolveApiBaseUrlOptions = {}
 ): string {
-  const metadata = (testInfo.project.metadata ?? {}) as Record<string, string>
+  const metadata = projectMetadata(testInfo)
   const envOverride = options.overrideEnvVar
     ? process.env[options.overrideEnvVar]?.trim()
     : undefined
@@ -57,4 +90,58 @@ export function buildUniqueId(prefix: string, testInfo: TestInfo): string {
     `retry${testInfo.retry}`,
     slugify(testInfo.title),
   ].join('-')
+}
+
+export function createBirthdate(yearsAgo: number, today = new Date()): string {
+  const birthdate = new Date(
+    Date.UTC(
+      today.getUTCFullYear() - yearsAgo,
+      today.getUTCMonth(),
+      today.getUTCDate(),
+      12
+    )
+  )
+
+  return birthdate.toISOString().slice(0, 10)
+}
+
+export function createSignupPayload(
+  testInfo: TestInfo,
+  age: number,
+  prefix: string
+): SignupPayload {
+  return {
+    email: `${buildUniqueId(prefix, testInfo)}@example.com`,
+    birthdate: createBirthdate(age),
+  }
+}
+
+export function createTeenSignupPayload(
+  testInfo: TestInfo,
+  prefix: string,
+  age = 15
+): SignupPayload {
+  return createSignupPayload(testInfo, age, prefix)
+}
+
+export function createGuardianEmail(testInfo: TestInfo, prefix: string): string {
+  return `${buildUniqueId(prefix, testInfo)}@example.com`
+}
+
+export function extractErrorMessage(body: unknown): string {
+  if (!body || typeof body !== 'object') {
+    return ''
+  }
+
+  const message = (body as { message?: unknown }).message
+  return typeof message === 'string' ? message : ''
+}
+
+export function extractInvitationToken(invitationLink: string): string {
+  const token = new URL(invitationLink).searchParams.get('token')
+  if (!token) {
+    throw new Error('Guardian invitation link did not contain a token')
+  }
+
+  return token
 }

@@ -1,4 +1,3 @@
-import type { TestInfo } from '@playwright/test'
 import {
   forbiddenHttpErrorSchema,
   guardianConsentRevokeResponseSchema,
@@ -11,14 +10,13 @@ import { log } from '@seontechnologies/playwright-utils/log'
 import { test, expect } from '../../support/fixtures/merged-fixtures'
 import {
   authHeaders,
-  buildUniqueId,
+  createGuardianEmail,
+  createTeenSignupPayload,
+  extractErrorMessage,
+  extractInvitationToken,
+  isNonLocalEnvironment,
   resolveApiBaseUrl,
 } from '../../support/helpers/api-test'
-
-type SignupPayload = {
-  email: string
-  birthdate: string
-}
 
 type GuardianInvitationPayload = {
   teenId: string
@@ -33,87 +31,6 @@ type GuardianAcceptPayload = {
 type GuardianRevokePayload = {
   guardianId: string
   teenId: string
-}
-
-type ApiResponsePayload = {
-  status: number
-  body: unknown
-}
-
-type ApiRequestFixture = (params: {
-  method: 'GET' | 'POST'
-  path: string
-  baseUrl: string
-  body?: unknown
-  headers?: Record<string, string>
-  retryConfig: { maxRetries: number }
-}) => Promise<ApiResponsePayload>
-
-type RequestJsonParams = {
-  method: 'GET' | 'POST'
-  path: string
-  baseUrl: string
-  body?: unknown
-  headers?: Record<string, string>
-}
-
-function isNonLocalEnvironment(testInfo: TestInfo): boolean {
-  const metadata = (testInfo.project.metadata ?? {}) as Record<string, string>
-  return metadata.environment !== 'local'
-}
-
-function createBirthdate(yearsAgo: number): string {
-  const today = new Date()
-  const birthdate = new Date(
-    Date.UTC(
-      today.getUTCFullYear() - yearsAgo,
-      today.getUTCMonth(),
-      today.getUTCDate(),
-      12
-    )
-  )
-
-  return birthdate.toISOString().slice(0, 10)
-}
-
-function createTeenSignupPayload(testInfo: TestInfo): SignupPayload {
-  return {
-    email: `${buildUniqueId('guardian-lifecycle-teen', testInfo)}@example.com`,
-    birthdate: createBirthdate(15),
-  }
-}
-
-function createGuardianEmail(testInfo: TestInfo): string {
-  return `${buildUniqueId('guardian-lifecycle-guardian', testInfo)}@example.com`
-}
-
-function extractErrorMessage(body: unknown): string {
-  if (!body || typeof body !== 'object') {
-    return ''
-  }
-
-  const message = (body as { message?: unknown }).message
-  return typeof message === 'string' ? message : ''
-}
-
-function extractInvitationToken(invitationLink: string): string {
-  const token = new URL(invitationLink).searchParams.get('token')
-  if (!token) {
-    throw new Error('Guardian invitation link did not contain a token')
-  }
-
-  return token
-}
-
-async function requestJson(
-  apiRequest: unknown,
-  params: RequestJsonParams
-): Promise<ApiResponsePayload> {
-  const request = apiRequest as ApiRequestFixture
-  return request({
-    ...params,
-    retryConfig: { maxRetries: 0 },
-  })
 }
 
 test.describe('Guardian consent lifecycle API contracts', () => {
@@ -132,10 +49,10 @@ test.describe('Guardian consent lifecycle API contracts', () => {
     validateSchema,
   }, testInfo) => {
     const baseUrl = resolveApiBaseUrl(testInfo)
-    const teenSignupPayload = createTeenSignupPayload(testInfo)
+    const teenSignupPayload = createTeenSignupPayload(testInfo, 'guardian-lifecycle-teen')
 
     await log.step('Arrange: create a teen account that requires guardian consent.')
-    const signupResponse = await requestJson(apiRequest, {
+    const signupResponse = await apiRequest({
       method: 'POST',
       path: '/api/v1/auth/signup',
       baseUrl,
@@ -154,12 +71,12 @@ test.describe('Guardian consent lifecycle API contracts', () => {
 
     const invitationPayload: GuardianInvitationPayload = {
       teenId: signupBody.userId,
-      guardianEmail: createGuardianEmail(testInfo),
+      guardianEmail: createGuardianEmail(testInfo, 'guardian-lifecycle-guardian'),
       consentLevel: 'full_access',
     }
 
     await log.step('Act: create a guardian invitation for the teen account.')
-    const invitationResponse = await requestJson(apiRequest, {
+    const invitationResponse = await apiRequest({
       method: 'POST',
       path: '/api/v1/guardian/invitations',
       baseUrl,
@@ -182,7 +99,7 @@ test.describe('Guardian consent lifecycle API contracts', () => {
     }
 
     await log.step('Act: accept the guardian invitation from the generated token.')
-    const acceptResponse = await requestJson(apiRequest, {
+    const acceptResponse = await apiRequest({
       method: 'POST',
       path: '/api/v1/guardian/accept',
       baseUrl,
@@ -202,7 +119,7 @@ test.describe('Guardian consent lifecycle API contracts', () => {
     await log.step(
       'Assert: teen profile access is restored once guardian consent has been granted.'
     )
-    const grantedTeenProfileResponse = await requestJson(apiRequest, {
+    const grantedTeenProfileResponse = await apiRequest({
       method: 'GET',
       path: '/api/v1/user/profile',
       baseUrl,
@@ -235,7 +152,7 @@ test.describe('Guardian consent lifecycle API contracts', () => {
     }
 
     await log.step('Act: revoke guardian consent as the linked guardian.')
-    const revokeResponse = await requestJson(apiRequest, {
+    const revokeResponse = await apiRequest({
       method: 'POST',
       path: '/api/v1/guardian/revoke',
       baseUrl,
@@ -259,7 +176,7 @@ test.describe('Guardian consent lifecycle API contracts', () => {
     await log.step(
       'Assert: teen profile access is blocked again after the last guardian revokes.'
     )
-    const revokedTeenProfileResponse = await requestJson(apiRequest, {
+    const revokedTeenProfileResponse = await apiRequest({
       method: 'GET',
       path: '/api/v1/user/profile',
       baseUrl,
