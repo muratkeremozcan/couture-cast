@@ -151,7 +151,7 @@ export async function cleanupGuardianConsentTestData(
     // the block_audit_log_mutation trigger added in the harden_audit_log_immutability
     // migration. The postgres superuser (used by local DATABASE_URL) has this privilege.
     await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SET session_replication_role = 'replica'`
+      await tx.$executeRaw`SET LOCAL session_replication_role = 'replica'`
       await tx.eventEnvelope.deleteMany({ where: { user_id: { in: userIds } } })
       await tx.auditLog.deleteMany({ where: { user_id: { in: userIds } } })
       await tx.guardianConsent.deleteMany({
