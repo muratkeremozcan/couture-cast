@@ -55,7 +55,7 @@ development_status:
   0-9-initialize-openapi-spec-generation-and-api-client-sdk: done
   0-10-implement-test-fixture-factories-and-seed-data: done
   0-11-implement-guardian-consent-flow-and-rls-policies: done
-  0-12-provision-test-environments-and-harness-services: in-progress
+  0-12-provision-test-environments-and-harness-services: done
   0-14-expand-test-infra-auth-contract-performance: drafted
   epic-0-retrospective: optional
 

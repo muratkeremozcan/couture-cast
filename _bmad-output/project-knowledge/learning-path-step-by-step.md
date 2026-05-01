@@ -330,17 +330,16 @@ User/business impact:
 
 Disciplined Supabase environment and secret management reduces auth, storage, and database
 misconfiguration issues that users experience as outages or login failures. The business gets more
-reliable deployments and cleaner recovery operations across dev and prod.
+reliable deployments and cleaner recovery operations across Preview and Production.
 
 Key takeaways:
 
-1. Supabase env isolation is explicit: local/CI stacks plus cloud `couturecast-dev` and
-   `couturecast-prod`, with staging deferred until plan/budget allows.
+1. Supabase env isolation is explicit: local/CI stacks plus cloud Preview and Production projects.
 2. Reliability depends on env-aware operations: `npx supabase start/link/db push`,
    `npx prisma migrate deploy --schema packages/db/prisma/schema.prisma`, pool targets
-   (dev 50, prod 100), and plan-gated PITR/backups.
+   (Preview 50, Production 100), and plan-gated PITR/backups.
 3. Config hygiene is a core skill: keep `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
-   `SUPABASE_SERVICE_KEY`, and `DATABASE_URL` aligned across `.env.local`, `.env.dev`, `.env.prod`,
+   `SUPABASE_SERVICE_KEY`, and `DATABASE_URL` aligned across `.env.local`, `.env.preview`, `.env.prod`,
    and secrets manager.
 4. Auth is not finished at signup. Supabase JWT claims still have to resolve to the app's text
    `User.id` model before guardian-aware RLS can safely protect teen wardrobe data.
@@ -394,16 +393,15 @@ Architecture diagram:
 
 ```mermaid
 flowchart TD
-  DEV[Developer + CI] --> ENV[Env files and secrets<br/>.env.local .env.dev .env.prod]
+  ENGINEER[Engineer + CI] --> ENV[Env files and secrets<br/>.env.local .env.preview .env.prod]
   ENV --> CLI[Supabase CLI<br/>start link db push]
   CLI --> LOCAL[Local Supabase stack]
   LOCAL --> PRISMA[Prisma schema + seeds]
 
-  CLI --> DEVSB[Supabase cloud<br/>couturecast-dev]
+  CLI --> PREVIEWSB[Supabase cloud<br/>Preview]
   CLI --> PRODSB[Supabase cloud<br/>couturecast-prod]
-  CLI -. deferred .-> STAGE[staging env]
 
-  DEVSB --> AUTH[Auth + guardian-aware RLS]
+  PREVIEWSB --> AUTH[Auth + guardian-aware RLS]
   PRODSB --> AUTH
   DEVSB --> BUCKETS[Storage buckets<br/>wardrobe-images derived-assets community-uploads]
   PRODSB --> BUCKETS
@@ -996,8 +994,8 @@ flowchart TD
   mobile["Mobile tracking wrappers"] --> contracts
   api_services["API tracking services auth and moderation"] --> contracts
   contracts --> wrappers["Track helpers\nsnake_case mapping"]
-  wrappers --> ph_dev["PostHog dev project"]
-  wrappers --> ph_prod["PostHog prod project"]
+  wrappers --> ph_preview["PostHog Preview project"]
+  wrappers --> ph_prod["PostHog Production project"]
   tests["Analytics integration tests"] --> contracts
   tests --> wrappers
 ```
@@ -1017,7 +1015,7 @@ Key takeaways:
 2. Guardrails prevent noisy telemetry: missing `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, or
    `GRAFANA_API_KEY`, `NODE_ENV=test`, `OTEL_SDK_DISABLED=true`, or prior SDK init all no-op
    safely.
-3. Root env loading is part of the local contract: the API now reads root `.env.local`, `.env.dev`
+3. Root env loading is part of the local contract: the API now reads root `.env.local`, `.env.preview`
    / `.env.prod`, and `.env` before OTEL startup, so env changes require a full API restart.
    Hosted Vercel deployments do not read those repo files at runtime; they must be configured in
    Vercel project environment variables separately.
@@ -1136,7 +1134,7 @@ Task owner map:
 - Step 10 step 2 owner: provide the local verification endpoint in `apps/api/src/controllers/health.controller.ts`
 - Step 10 step 3 owner: define the first queue-related telemetry inventory targets in `apps/api/src/config/queues.ts` and `apps/api/src/admin/admin.service.ts`
 - Step 10 step 4 owner: define the realtime telemetry inventory target in `apps/api/src/modules/gateway/connection-manager.service.ts`
-- Step 10 step 5 owner: keep local and hosted Grafana credentials aligned in `.env.local`, `.env.dev`, and `.env.prod`
+- Step 10 step 5 owner: keep local and hosted Grafana credentials aligned in `.env.local`, `.env.preview`, and `.env.prod`
 - Step 10 support owner: document the manual verification workflow in `_bmad-output/project-knowledge/observability.md`
 
 Architecture diagram:
@@ -1147,13 +1145,13 @@ flowchart TD
   stack --> configure["Stack Configure page"]
   configure --> endpoint["Copy OTLP endpoint"]
   configure --> token["Create stack-scoped access policy token"]
-  endpoint --> envfiles[".env.local .env.dev .env.prod"]
+  endpoint --> envfiles[".env.local .env.preview .env.prod"]
   id --> envfiles
   token --> envfiles
   endpoint --> gh["GitHub Actions secret: GRAFANA_OTLP_ENDPOINT"]
   id["GRAFANA_INSTANCE_ID"] --> gh2["GitHub Actions secret: GRAFANA_INSTANCE_ID"]
   token --> gh3["GitHub Actions secret: GRAFANA_API_KEY"]
-  endpoint --> vercelPreview["Vercel Preview env vars<br/>mirrors .env.dev"]
+  endpoint --> vercelPreview["Vercel Preview env vars<br/>mirrors .env.preview"]
   id --> vercelPreview
   token --> vercelPreview
   endpoint --> vercelProd["Vercel Production env vars<br/>mirrors .env.prod"]

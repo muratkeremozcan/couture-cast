@@ -21,7 +21,7 @@ NestJS API E2E coverage.
    in `playwright/support/config/environments.ts`.
 3. `npx playwright install --with-deps`
 4. `npm run test:pw-local` (automatically sets `TEST_ENV=local`)
-5. Use the other helpers, `npm run test:pw-dev` or
+5. Use the other helpers, `npm run test:pw-preview` or
    `npm run test:pw-prod`, when remote deployments are ready, or run
    `TEST_ENV=<env> npm run test:pw` directly to target a custom
    environment.
@@ -92,7 +92,7 @@ playwright/
 
 - `support/config/environments.ts` centralizes environment metadata for
   web and API origins, auth defaults, and headers.
-- `TEST_ENV` chooses between `local`, `dev`, and `prod`; missing or
+- `TEST_ENV` chooses between `local`, `preview`, and `prod`; missing or
   invalid values throw early.
 - `.env` holds all environment URLs and credentials so helpers and
   fixtures remain stateless functional helpers.

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Cross-platform wrapper: resolves the dev Preview URL and runs the given command with DEV_WEB_E2E_BASE_URL and TEST_ENV=dev set.
+// Cross-platform wrapper: resolves the Vercel Preview URL and runs a command
+// with PREVIEW_* URL variables and TEST_ENV=preview set.
 import { execFileSync } from 'node:child_process'
 import process from 'node:process'
-import fs from 'node:fs'
 import path from 'node:path'
 import { config as loadEnv } from 'dotenv'
 
@@ -12,8 +12,11 @@ function fail(message) {
 }
 
 function resolveWebUrl() {
-  const manual = process.env.DEV_WEB_E2E_BASE_URL || process.env.DEV_WEB_BASE_URL
+  const manual =
+    process.env.PREVIEW_WEB_E2E_BASE_URL ||
+    process.env.PREVIEW_WEB_BASE_URL
   if (manual) return manual
+
   try {
     const output = execFileSync(
       process.execPath,
@@ -31,11 +34,11 @@ function resolveWebUrl() {
 }
 
 function resolveApiUrl() {
-  // Check for manual override first
-  const manual = process.env.DEV_API_BASE_URL || process.env.VERCEL_API_BASE_URL
+  const manual =
+    process.env.PREVIEW_API_BASE_URL ||
+    process.env.VERCEL_API_BASE_URL
   if (manual) return manual
 
-  // Query Vercel API directly (web and API have different deployment hashes)
   try {
     const output = execFileSync(
       process.execPath,
@@ -56,15 +59,17 @@ function resolveApiUrl() {
   }
 }
 
+function loadPreviewEnv() {
+  const previewEnvPath = path.resolve(process.cwd(), '.env.preview')
+  loadEnv({ path: previewEnvPath, quiet: true })
+}
+
 function main() {
-  const envPath = path.resolve(process.cwd(), '.env.dev')
-  if (fs.existsSync(envPath)) {
-    loadEnv({ path: envPath })
-  }
+  loadPreviewEnv()
 
   const command = process.argv.slice(2).join(' ')
   if (!command) {
-    fail('Usage: node scripts/set-dev-web-e2e-base-url.mjs "<command to run>"')
+    fail('Usage: node scripts/set-preview-e2e-base-url.mjs "<command to run>"')
   }
 
   const url = resolveWebUrl()
@@ -72,7 +77,6 @@ function main() {
     fail('Failed to resolve Preview URL (empty output)')
   }
 
-  // Resolve API preview URL by querying Vercel API (not deriving from web URL)
   const apiPreviewUrl = resolveApiUrl()
   if (process.env.DEBUG && apiPreviewUrl) {
     console.error(`Resolved API URL: ${apiPreviewUrl}`)
@@ -80,16 +84,17 @@ function main() {
 
   const env = {
     ...process.env,
-    DEV_WEB_E2E_BASE_URL: url,
+    PREVIEW_WEB_E2E_BASE_URL: url,
     ...(apiPreviewUrl
       ? {
-          DEV_API_BASE_URL: apiPreviewUrl,
+          PREVIEW_API_BASE_URL: apiPreviewUrl,
           VERCEL_API_BASE_URL: apiPreviewUrl,
           VERCEL_API_BRANCH_URL: apiPreviewUrl,
         }
       : {}),
-    TEST_ENV: 'dev',
+    TEST_ENV: 'preview',
   }
+
   try {
     execFileSync(command.split(' ')[0], command.split(' ').slice(1), {
       stdio: 'inherit',

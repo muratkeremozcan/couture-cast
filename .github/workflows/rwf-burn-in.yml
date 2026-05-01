@@ -21,7 +21,7 @@ on:
         description: Whether downstream E2E should run
         value: ${{ jobs.burn-in.outputs.runE2E }}
     secrets:
-      DATABASE_URL_DEV:
+      DATABASE_URL_PREVIEW:
         required: false
       GUARDIAN_INVITE_JWT_SECRET:
         required: false

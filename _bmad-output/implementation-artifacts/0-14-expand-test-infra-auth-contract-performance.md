@@ -120,9 +120,9 @@ without blocking current feature delivery.
   - [x] Add PR/rollout support artifacts for the advisory-first setup:
         `.github/PULL_REQUEST_TEMPLATE.md` and CI/CD documentation notes in
         `_bmad-output/test-artifacts/ci-cd-pipeline.md`.
-  - [ ] Install/enable the CodeRabbit GitHub App on `muratkeremozcan/couture-cast` and verify the
-        first live review on PR `#42`.
-  - [ ] Document promotion criteria for stricter review policy after initial noise tuning.
+  - [x] CodeRabbit GitHub App status: installed/enabled on `muratkeremozcan/couture-cast`;
+        first live review verified on PR `#42`.
+  - [x] Document promotion criteria for stricter review policy after initial noise tuning.
 
 - [x] Task 7: Unit test coverage reporting and badges (AC: #7)
   - [x] Create `unit-test-coverage-comment` composite action in `.github/actions/` with security
@@ -135,8 +135,8 @@ without blocking current feature delivery.
   - [x] Create GitHub gist for shields.io dynamic badge
         ([`64348ebdc6e662b93ade9f40bdc03442`](https://gist.github.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442)).
   - [x] Add coverage badge to `README.md`.
-  - [ ] Configure `COVERAGE_GIST_TOKEN` repo secret for badge updates on push to main.
-  - [ ] Verify badge updates after first merge to main.
+  - [x] Configure `COVERAGE_GIST_TOKEN` repo secret for badge updates on push to main.
+  - [x] Verify badge updates after first merge to main.
 
 - [ ] Task 8: Rotate Vercel-exposed secrets and document exact cross-vendor scope (AC: #8)
   - [ ] Build the authoritative incident inventory for every Vercel variable currently in scope
@@ -165,12 +165,12 @@ without blocking current feature delivery.
   - [ ] Rotate Expo credentials in the Expo dashboard:
         create a new robot/access token for `EXPO_TOKEN`, update the mirror locations in
         Vercel env vars (where present), GitHub Actions repo secrets, and local
-        `.env.local/.env.dev/.env.prod`, then revoke the old Expo token.
-  - [ ] Rotate Supabase privileged credentials in both dev and prod Supabase projects:
+        `.env.local/.env.preview/.env.prod`, then revoke the old Expo token.
+  - [ ] Rotate Supabase privileged credentials in both Preview and Production Supabase projects:
         update `SUPABASE_SERVICE_ROLE_KEY` and rotate any Vercel-hosted `DATABASE_URL` values by
         changing the underlying database password/connection secret, then update the mirrored
-        values in Vercel API env vars, GitHub Actions secrets (`DATABASE_URL_DEV`,
-        `DATABASE_URL_PROD`), local `.env.local/.env.dev/.env.prod`, and `packages/db/.env`.
+        values in Vercel API env vars, GitHub Actions secrets (`DATABASE_URL_PREVIEW`,
+        `DATABASE_URL_PROD`), local `.env.local/.env.preview/.env.prod`, and `packages/db/.env`.
   - [ ] Record the legacy-Supabase-key coupling risk explicitly:
         this repo still uses legacy `anon` / `service_role` keys, so if the chosen Supabase
         rotation path requires JWT-secret rotation or a migration to publishable/secret keys,
@@ -179,11 +179,11 @@ without blocking current feature delivery.
   - [ ] Rotate Redis / Upstash credentials:
         change the upstream Upstash/Redis password or token so `REDIS_URL` is replaced, generate a
         new `UPSTASH_REDIS_REST_TOKEN`, update the mirrors in Vercel Preview/Production and local
-        `.env.dev/.env.prod` (plus any GitHub secret store if added later), and leave
+        `.env.preview/.env.prod` (plus any GitHub secret store if added later), and leave
         `UPSTASH_REDIS_REST_URL` untouched unless the provider issues a new endpoint.
   - [ ] Rotate Grafana Cloud credentials:
         create a new `GRAFANA_API_KEY`, update its mirrors in Vercel env vars, GitHub Actions
-        secrets, and local `.env.local/.env.dev/.env.prod`, and confirm `GRAFANA_INSTANCE_ID` and
+        secrets, and local `.env.local/.env.preview/.env.prod`, and confirm `GRAFANA_INSTANCE_ID` and
         `GRAFANA_OTLP_ENDPOINT` remain unchanged identifiers/endpoints.
   - [ ] Rotate the app-local signing secret:
         mint unique replacement values for `GUARDIAN_INVITE_JWT_SECRET` in local `.env*`, GitHub
@@ -211,11 +211,10 @@ without blocking current feature delivery.
   executed in the same sprint window.
 - Mobile native E2E remains Maestro-first; Playwright stays web/API-focused.
 - CodeRabbit rollout starts advisory-first to avoid blocking delivery while path rules stabilize.
+- CodeRabbit GitHub App status: installed/enabled on `muratkeremozcan/couture-cast`; first live
+  review verified on PR `#42`.
 - Task 7 coverage action is a local composite action in `.github/actions/unit-test-coverage-comment/`.
   Monorepo coverage merging sums workspace-level `coverage-summary.json` files into one aggregate.
-- Current partial implementation status for Task 6:
-  repo-side config/workflow/template work is complete; GitHub App installation still requires
-  authenticated GitHub interaction before the first live review can be verified.
 - Current preview debt for Task 3:
   guardian consent lifecycle Playwright coverage remains local-only because preview PR deploys
   still return `500` on `POST /api/v1/guardian/invitations` even after local CI burn-in passes.

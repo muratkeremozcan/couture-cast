@@ -107,7 +107,7 @@ CoutureCast satisfies COPPA requirements and age-gating obligations.
   - [x] Add invitation UI in mobile and web apps
 
 - [ ] Task 3.5: Propagate guardian invitation env vars to hosted runtimes
-  - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.dev`
+  - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.preview`
         into Vercel project `couture-cast-api` Preview environment variables
   - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.prod`
         into Vercel project `couture-cast-api` Production environment variables
@@ -124,7 +124,7 @@ CoutureCast satisfies COPPA requirements and age-gating obligations.
         secret stores; never paste secret values into the repository
 
 - [x] Task 4: Implement RLS policies in Supabase (AC: #3)
-  - [x] Prerequisite: deploy Prisma schema to Supabase dev/prod (once available
+  - [x] Prerequisite: deploy Prisma schema to Supabase Preview/Production (once available
         from Story 0.2) so tables exist for RLS
   - [x] Create RLS policy for `wardrobe_items` table:
 
@@ -554,7 +554,7 @@ GPT-5 Codex
   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
     npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
   set -a
-  source .env.dev
+  source .env.preview
   set +a
   npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
   set -a

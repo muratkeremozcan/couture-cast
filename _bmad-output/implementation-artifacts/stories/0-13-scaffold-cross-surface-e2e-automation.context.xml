@@ -20,7 +20,7 @@
       <step>Install @playwright/test at the repo root and add playwright/config/*.config.ts (base + per-environment) that pull WEB_E2E_BASE_URL (default http://localhost:3005), enforce Chromium-only runs, headless mode, and global action/navigation timeouts.</step>
       <step>Encode lint rules (forbid waitForTimeout / sleep) and shared reporter settings so HTML + trace artifacts land under playwright/playwright-report for CI uploads.</step>
       <step>Create playwright/tests/home.spec.ts that pings the Nest API health endpoint, loads apps/web on /, asserts hero copy/nav landmarks, and plugs in axe-core checks from _bmad-output/test-artifacts/test-design-system.md.</step>
-      <step>Add npm run test:pw-local, npm run test:pw-dev, etc., and a helper start script that the Playwright webServer hook calls so smoke runs consistently locally and in CI.</step>
+      <step>Add npm run test:pw-local, npm run test:pw-preview, etc., and a helper start script that the Playwright webServer hook calls so smoke runs consistently locally and in CI.</step>
     </steps>
   </task>
   <task id="T2" ac="AC3">

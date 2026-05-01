@@ -89,7 +89,7 @@ function isIgnoredNonWorkspaceFile(filePath) {
     filePath === 'README.md' ||
     filePath === '.env.example' ||
     filePath === '.env.local' ||
-    filePath === '.env.dev' ||
+    filePath === '.env.preview' ||
     filePath === '.env.prod' ||
     filePath.startsWith('_bmad-output/') ||
     filePath.startsWith('docs/')

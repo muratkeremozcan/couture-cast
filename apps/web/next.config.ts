@@ -6,7 +6,7 @@ import { resolveGitMetadata } from './git-metadata'
 const rootDir = path.resolve(__dirname, '../..')
 const rootEnvFiles = [
   '.env.local',
-  process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.dev',
+  process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.preview',
   '.env',
 ]
 
@@ -48,12 +48,18 @@ for (const file of rootEnvFiles) {
 const { gitSha: buildGitSha, gitBranch: buildGitBranch } = resolveGitMetadata()
 const posthogKey = process.env.POSTHOG_API_KEY || ''
 const posthogHost = process.env.POSTHOG_HOST || 'https://us.i.posthog.com'
-const apiProxyBaseUrl =
-  process.env.API_BASE_URL ||
-  process.env.DEV_API_BASE_URL ||
-  process.env.PROD_API_BASE_URL ||
-  process.env.VERCEL_API_BASE_URL ||
-  process.env.VERCEL_API_BRANCH_URL
+const isProductionRuntime = process.env.NODE_ENV === 'production'
+const apiProxyBaseUrl = isProductionRuntime
+  ? process.env.PROD_API_BASE_URL ||
+    process.env.VERCEL_API_BASE_URL ||
+    process.env.VERCEL_API_BRANCH_URL ||
+    process.env.API_BASE_URL ||
+    process.env.PREVIEW_API_BASE_URL
+  : process.env.API_BASE_URL ||
+    process.env.PREVIEW_API_BASE_URL ||
+    process.env.VERCEL_API_BASE_URL ||
+    process.env.VERCEL_API_BRANCH_URL ||
+    process.env.PROD_API_BASE_URL
 const posthogAssetsHost = posthogHost.includes('.i.posthog.com')
   ? posthogHost.replace('.i.posthog.com', '-assets.i.posthog.com')
   : 'https://us-assets.i.posthog.com'

@@ -87,7 +87,7 @@ npm run typecheck:clear-cache
 | `npm run mobile:expo-go`                  | Installs Expo Go APK onto the connected emulator/device.                                                                                        |
 | `npm run start:all`                       | Starts both API + web servers concurrently (mirrors Playwright’s `webServer` config).                                                           |
 | `npm run test:pw-local`                   | Convenience wrapper that sets `TEST_ENV=local` and runs the smoke suite.                                                                        |
-| `npm run test:pw-dev`                     | Targets the dev deployment (`TEST_ENV=dev`).                                                                                                    |
+| `npm run test:pw-preview`                 | Targets the current Vercel Preview deployment (`TEST_ENV=preview`).                                                                             |
 | `npm run test:pw-prod`                    | Targets the prod deployment (`TEST_ENV=prod`).                                                                                                  |
 | `npm run test:pw:burn-in`                 | Burn-in all specs locally (`PW_BURN_IN=true`, repeat-each=3, retries=0).                                                                        |
 | `npm run test:pw:burn-in-changed-classic` | Playwright built-in `--only-changed` burn-in vs main (3x, retries=0) — can overrun.                                                             |
@@ -128,15 +128,15 @@ Local E2E with clean DB:
 
 - Supabase CLI (`npm run supabase:start/stop`) brings up the local stack (Postgres + auth + storage + Studio) via Docker.
 - Prisma and the `db:*` scripts still own schema/migrations/seeds; Supabase is just the Postgres host (local via CLI, cloud via project refs).
-- Env files: `.env.local` for local Supabase, `.env.dev`/`.env.prod` for cloud. Playwright auto-loads `.env.<TEST_ENV>` if present.
+- Env files: `.env.local` for local Supabase, `.env.preview`/`.env.prod` for cloud. Playwright auto-loads `.env.<TEST_ENV>` if present.
 
 ### Queues & cache (BullMQ/Redis)
 
-- Upstash: managed Redis for dev/prod; we use it to back BullMQ queues and the cache without running our own Redis in cloud environments.
+- Upstash: managed Redis for Preview/Production; we use it to back BullMQ queues and the cache without running our own Redis in cloud environments.
 - Why: Offload slow/CPU-bound or rate-limited work (weather ingest, alert fan-out, color extraction, moderation) from HTTP requests; retry with backoff; keep a dead-letter trail.
 - Components: BullMQ queues/workers using Redis; DLQ persisted to Postgres (`job_failures`); Redis cache for short-lived personalization payloads.
 - Local: `docker-compose up redis` then `npm run start:workers` (apps/api) to run workers. Redis defaults to `redis://localhost:6379` (see `.env.example`).
-- Cloud: Upstash Redis for dev/prod (`REDIS_URL`, `REDIS_TLS=true`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`); store real tokens in gitignored env files and CI/deployment secret stores.
+- Cloud: Upstash Redis for Preview/Production (`REDIS_URL`, `REDIS_TLS=true`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`); store real tokens in gitignored env files and CI/deployment secret stores.
 
 ### Common local flow (DX)
 
@@ -144,7 +144,7 @@ Local E2E with clean DB:
 2. Start local Supabase: `npm run supabase:start` (Docker; first run pulls images).
 3. Env: set `TEST_ENV=local` (Playwright uses `.env.local`) or copy `.env.local` → `.env`.
 4. Run tests: `npm run test:pw-local`.
-5. Schema changes: use Prisma (`db:migrate`/`db:seed`), then `supabase db push --local` to sync into the local Supabase DB. Push to dev cloud later via `supabase db push`.
+5. Schema changes: use Prisma (`db:migrate`/`db:seed`), then `supabase db push --local` to sync into the local Supabase DB. Push to the Preview cloud project later via `supabase db push`.
 
 ## E2E smoke (Playwright + Maestro)
 
@@ -194,26 +194,24 @@ Local E2E with clean DB:
 | `.github/workflows/schema-validation.yml`        | Canonical OpenAPI generation + Optic lint/diff        | Separate schema gate modeled after the reference repo. Generates `packages/api-client/docs/http.openapi.json`, fetches `main`, then runs Optic.     |
 | `.github/workflows/pr-checks.yml`                | Typecheck → Lint → Build → Tests (workspace graph)    | Required on PRs; matches Node 24 baseline.                                                                                                          |
 | `.github/workflows/pr-pw-e2e-local.yml`          | Playwright smoke (Chromium) with HTML/trace artifacts | Web-only e2e gate; uses webServer hook on port 3005.                                                                                                |
-| `.github/workflows/pr-pw-e2e-vercel-preview.yml` | Playwright smoke against Vercel Preview               | Triggered by Vercel `deployment_status`; runs `npm run test:pw-dev` against the Preview URL via `DEV_WEB_E2E_BASE_URL`.                             |
+| `.github/workflows/pr-pw-e2e-vercel-preview.yml` | Playwright smoke against Vercel Preview               | Triggered by Vercel `deployment_status`; runs `npm run test:pw-preview` against the Preview URL via `PREVIEW_WEB_E2E_BASE_URL`.                     |
 | `.github/workflows/pr-mobile-e2e.yml`            | Manual-only Maestro Android smoke (build + emulator)  | Not run on PRs: GitHub-hosted Android emulators are slow/flaky (30–40m, boot failures). Trigger via `workflow_dispatch` or run locally/self-hosted. |
 
 **Playwright coverage:** web landing smoke with API health ping, hero/nav assertions, axe-core check, traces/artifacts uploaded in CI.  
 **Mobile e2e:** Maestro sanity (Expo tabs) is local-only; CI disabled due to GitHub-hosted emulator instability and long runtimes. Run via `npm run test:mobile:e2e` on your machine or on a self-hosted/device cloud runner if needed.
 
-### Vercel Preview = "dev" for `test:pw-dev`
+### Vercel Preview testing
 
-On our current Vercel setup (Hobby plan), `main` is the Production branch and PR branches get Preview deployments. In CI we treat Vercel
-Preview URLs as the "dev" target: `pr-pw-e2e-vercel-preview.yml` reads the Preview URL from the GitHub `deployment_status` event and sets
-`DEV_WEB_E2E_BASE_URL`, so `npm run test:pw-dev` runs against that Preview deployment.
+On our current Vercel setup (Hobby plan), `main` is the Production branch and PR branches get Preview deployments. In CI, `pr-pw-e2e-vercel-preview.yml` reads the Preview URL from the GitHub `deployment_status` event and sets `PREVIEW_WEB_E2E_BASE_URL`, so `npm run test:pw-preview` runs against that Preview deployment.
 
-If your Preview deployments are protected (health check returns 401), set `VERCEL_AUTOMATION_BYPASS_SECRET` locally (in `.env.dev`) and
+If your Preview deployments are protected (health check returns 401), set `VERCEL_AUTOMATION_BYPASS_SECRET` locally (in `.env.preview`) and
 in CI (GitHub repo secret). See `_bmad-output/test-artifacts/ci-cd-pipeline.md`.
 
 #### Local Preview testing
 
-`npm run test:pw-preview-dev` automatically resolves Preview URLs and runs Playwright against them. The resolution chain:
+`npm run test:pw-preview` automatically resolves Preview URLs and runs Playwright against them. The resolution chain:
 
-1. **Manual override** (highest priority): Set `DEV_WEB_E2E_BASE_URL` and/or `DEV_API_BASE_URL` in `.env.dev`
+1. **Manual override** (highest priority): Set `PREVIEW_WEB_E2E_BASE_URL` and/or `PREVIEW_API_BASE_URL` in `.env.preview`
 2. **Vercel REST API**: Queries Vercel deployments API for your branch's latest READY deployment
 3. **GitHub Deployments API**: Queries GitHub for deployment URLs (fallback if Vercel API fails)
 4. **Deterministic URL**: Constructs `https://{project}-git-{branch-slug}-{team}.vercel.app` as last resort
@@ -222,7 +220,7 @@ in CI (GitHub repo secret). See `_bmad-output/test-artifacts/ci-cd-pipeline.md`.
 
 - Branch is pushed to GitHub (Vercel needs to create deployments)
 - `gh` CLI installed and authenticated (`gh auth status`)
-- `.env.dev` with Vercel access:
+- `.env.preview` with Vercel access:
   ```bash
   VERCEL_TOKEN=your_token_here                          # Team token from Vercel dashboard
   VERCEL_WEB_PROJECT_SLUG=couture-cast-web              # Web app project
@@ -237,9 +235,9 @@ in CI (GitHub repo secret). See `_bmad-output/test-artifacts/ci-cd-pipeline.md`.
 
 ```bash
 # Find your Preview URLs in Vercel dashboard → Deployments, then:
-echo 'DEV_WEB_E2E_BASE_URL=https://couture-cast-web-git-...' >> .env.dev
-echo 'DEV_API_BASE_URL=https://couture-cast-api-git-...' >> .env.dev
-npm run test:pw-preview-dev
+echo 'PREVIEW_WEB_E2E_BASE_URL=https://couture-cast-web-git-...' >> .env.preview
+echo 'PREVIEW_API_BASE_URL=https://couture-cast-api-git-...' >> .env.preview
+npm run test:pw-preview
 ```
 
 **Troubleshooting preview URL resolution:**
@@ -247,7 +245,7 @@ npm run test:pw-preview-dev
 | Problem                                  | Solution                                                                                                                                                                          |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **"No deployment found"**                | Push your branch first! Vercel only creates deployments for pushed branches. `git push` then wait ~30s for Vercel to build.                                                       |
-| **404 / DEPLOYMENT_NOT_FOUND**           | The resolved URL points to an old/deleted deployment. Check Vercel dashboard → find your branch → copy the actual Preview URL → set `DEV_WEB_E2E_BASE_URL` manually.              |
+| **404 / DEPLOYMENT_NOT_FOUND**           | The resolved URL points to an old/deleted deployment. Check Vercel dashboard → find your branch → copy the actual Preview URL → set `PREVIEW_WEB_E2E_BASE_URL` manually.          |
 | **403 Forbidden from Vercel API**        | `VERCEL_TOKEN` doesn't have team access. Create a new token in Vercel dashboard → Team Settings → Tokens (not personal tokens).                                                   |
 | **ENOTFOUND / DNS errors**               | URL is wrong or deployment doesn't exist. Verify the URL in your browser first. Check branch name matches (slugified: `test/foo` → `test-foo`).                                   |
 | **"Could not resolve team ID"**          | `VERCEL_TEAM_SLUG` is wrong or token lacks access. Verify slug matches your Vercel team URL: `vercel.com/teams/<this-slug>`.                                                      |
@@ -258,9 +256,9 @@ npm run test:pw-preview-dev
 
 ```bash
 # Open Vercel dashboard, find your Preview URLs, then:
-DEV_WEB_E2E_BASE_URL=https://your-web-url.vercel.app \
-DEV_API_BASE_URL=https://your-api-url.vercel.app \
-npm run test:pw-dev
+PREVIEW_WEB_E2E_BASE_URL=https://your-web-url.vercel.app \
+PREVIEW_API_BASE_URL=https://your-api-url.vercel.app \
+npm run test:pw-preview
 ```
 
 ## Helpful references

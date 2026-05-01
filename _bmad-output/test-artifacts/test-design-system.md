@@ -104,13 +104,12 @@ The 45/35/20 split keeps most validation at deterministic layers while reserving
 
 ### Environment Promotion Pipeline
 
-| Environment        | Purpose                                    | Data Strategy                                                                                                     | Test Strategy                                                                                       | Promotion Criteria                       |
-| ------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| **Local**          | Developer workstations                     | Docker Compose (Postgres, Redis, Supabase local); Prisma seed scripts reset on demand                             | Unit + Integration tests run pre-commit; Playwright smoke tests run manually                        | N/A (individual dev flow)                |
-| **CI (Ephemeral)** | GitHub Actions per-PR                      | Testcontainers (Postgres, Redis); Supabase CLI for local instance; weather provider stub; no real external APIs   | Full test suite: unit (45%) → integration (35%) → E2E (20%); burn-in for @p0 tests (3x repeat)      | All tests pass + coverage thresholds met |
-| **Dev (Shared)**   | Integration testing; bleeding-edge deploys | Supabase dev project (wiped weekly); seeded with factories; real OpenWeather (test API key)                       | Synthetic Playwright monitors (hourly cron); E2E smoke suite post-deploy                            | Deploy succeeds + smoke tests pass       |
-| **Staging**        | Pre-production validation; client demos    | Anonymized prod-like data (refreshed weekly); full RLS enforcement; real third-party integrations (non-prod keys) | Full regression suite (smoke + extended E2E); k6 load tests; Maestro mobile flows                   | Regression passes + load tests meet SLA  |
-| **Production**     | Live user traffic                          | Real user data; backups + PITR enabled                                                                            | Synthetic monitors (5 min intervals); real user monitoring (RUM) via PostHog; Sentry error tracking | N/A (deployment target)                  |
+| Environment        | Purpose                | Data Strategy                                                                                                   | Test Strategy                                                                                       | Promotion Criteria                       |
+| ------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **Local**          | Engineer workstations  | Docker Compose (Postgres, Redis, Supabase local); Prisma seed scripts reset on demand                           | Unit + Integration tests run pre-commit; Playwright smoke tests run manually                        | N/A (individual local flow)              |
+| **CI (Ephemeral)** | GitHub Actions per-PR  | Testcontainers (Postgres, Redis); Supabase CLI for local instance; weather provider stub; no real external APIs | Full test suite: unit (45%) → integration (35%) → E2E (20%); burn-in for @p0 tests (3x repeat)      | All tests pass + coverage thresholds met |
+| **Preview**        | PR deployed validation | Supabase Preview project with non-production data; seeded with factories; approved non-production provider keys | Preview smoke/E2E after branch deploys; exact web/API SHA checks                                    | Required PR gates pass                   |
+| **Production**     | Live user traffic      | Real user data; backups + PITR enabled                                                                          | Synthetic monitors (5 min intervals); real user monitoring (RUM) via PostHog; Sentry error tracking | N/A (deployment target)                  |
 
 ### Database Migration Testing Strategy
 
@@ -131,13 +130,13 @@ The 45/35/20 split keeps most validation at deterministic layers while reserving
 
 **Per-Environment Config Testing:**
 
-| Secret/Config          | Local          | CI             | Dev              | Staging          | Production       | Test Strategy                                                     |
-| ---------------------- | -------------- | -------------- | ---------------- | ---------------- | ---------------- | ----------------------------------------------------------------- |
-| `DATABASE_URL`         | Docker Compose | Testcontainers | Supabase Dev     | Supabase Staging | Supabase Prod    | Connection pooling tests (max connections); failover tests        |
-| `WEATHER_API_KEY`      | Stub (no key)  | Stub           | OpenWeather Test | OpenWeather Test | OpenWeather Prod | Rate limit handling (429); invalid key error handling (401)       |
-| `REDIS_URL`            | Docker Compose | Testcontainers | Upstash Dev      | Upstash Staging  | Upstash Prod     | Eviction policy tests; connection timeout handling                |
-| `LAUNCHDARKLY_SDK_KEY` | Offline mode   | Offline mode   | LD Test          | LD Test          | LD Prod          | Fallback to defaults when LD unavailable; flag evaluation tests   |
-| `SUPABASE_SERVICE_KEY` | Local CLI      | Local CLI      | Supabase Dev     | Supabase Staging | Supabase Prod    | RLS bypass validation (service key should bypass); rotation tests |
+| Secret/Config          | Local          | CI             | Preview          | Production         | Test Strategy                                                     |
+| ---------------------- | -------------- | -------------- | ---------------- | ------------------ | ----------------------------------------------------------------- |
+| `DATABASE_URL`         | Docker Compose | Testcontainers | Supabase Preview | Supabase Prod      | Connection pooling tests (max connections); failover tests        |
+| `WEATHER_API_KEY`      | Stub (no key)  | Stub           | OpenWeather Test | OpenWeather Prod   | Rate limit handling (429); invalid key error handling (401)       |
+| `REDIS_URL`            | Docker Compose | Testcontainers | Upstash Preview  | Upstash Prod       | Eviction policy tests; connection timeout handling                |
+| `POSTHOG_API_KEY`      | Offline mode   | Offline mode   | PostHog Preview  | PostHog Production | Flag evaluation, offline fallback, and API error/rate-limit tests |
+| `SUPABASE_SERVICE_KEY` | Local CLI      | Local CLI      | Supabase Preview | Supabase Prod      | RLS bypass validation (service key should bypass); rotation tests |
 
 **Environment Secret Integration:**
 
@@ -217,7 +216,7 @@ The 45/35/20 split keeps most validation at deterministic layers while reserving
 
 **Test vs Production Sentry Projects:**
 
-- CI/Dev/Staging → Sentry Test Project (separate from prod)
+- CI/Preview -> Sentry Test Project (separate from prod)
 - Production → Sentry Production Project
 - Test Strategy: Verify error grouping works correctly (similar errors grouped, not duplicated)
 
@@ -261,7 +260,7 @@ The 45/35/20 split keeps most validation at deterministic layers while reserving
 **Email Delivery Testing:**
 
 - **Local/CI:** Email stub service captures emails in memory; tests extract magic link from email body
-- **Staging:** Real email (test addresses like `test+{uuid}@couture-cast.dev`); automated inbox polling
+- **Preview:** Real email (test addresses like `test+{uuid}@couture-cast.test`); automated inbox polling
 - **Production:** Real email; monitor delivery rates via SendGrid/Postmark metrics
 
 ### Email Delivery Testing
@@ -278,7 +277,7 @@ The 45/35/20 split keeps most validation at deterministic layers while reserving
 **Tooling:**
 
 - **CI/Local:** [Mailhog](https://github.com/mailhog/MailHog) captures SMTP; Playwright queries Mailhog API
-- **Staging:** Real email provider (SendGrid test account); automated inbox polling via IMAP
+- **Preview:** Real email provider (SendGrid test account); automated inbox polling via IMAP
 
 ---
 
@@ -426,9 +425,9 @@ The 45/35/20 split keeps most validation at deterministic layers while reserving
 | Strategy                      | When to Use                                             | Ownership                                                    | Versioning                     | Example                                              |
 | ----------------------------- | ------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------ | ---------------------------------------------------- |
 | **Factory Functions**         | Unit + Integration tests; create minimal valid entities | Dev team; factories live with source code (`__factories__/`) | Git versioned; reviewed in PRs | `createUser({ role: 'teen', age: 15 })`              |
-| **Prisma Seed Scripts**       | Local dev + CI; baseline data for E2E tests             | Platform team; seeds in `prisma/seeds/`                      | Git versioned; migration-aware | `npm run db:seed` → 10 users, 50 wardrobe items      |
+| **Prisma Seed Scripts**       | Local + CI; baseline data for E2E tests                 | Platform team; seeds in `prisma/seeds/`                      | Git versioned; migration-aware | `npm run db:seed` -> 10 users, 50 wardrobe items     |
 | **API Setup Calls**           | E2E tests needing specific scenarios                    | Test authors; setup in test files or fixtures                | Git versioned test code        | `await api.setupGuardianWithTeen({ consent: true })` |
-| **Anonymized Prod Snapshots** | Staging only; realistic data shapes                     | Data team; refreshed weekly                                  | Timestamped snapshots          | `staging-snapshot-2025-11-13.sql`                    |
+| **Anonymized Prod Snapshots** | Not part of the current deployment topology             | Data team; add only with a future approved environment tier  | Timestamped snapshots          | `snapshot-2025-11-13.sql`                            |
 
 **Data Cleanup Discipline:**
 
@@ -480,9 +479,9 @@ describe('Wardrobe Upload', () => {
 | Data Type                | Allowed in Tests?   | Anonymization Strategy                         | Storage                        |
 | ------------------------ | ------------------- | ---------------------------------------------- | ------------------------------ |
 | **Production User Data** | ❌ NEVER            | N/A - use synthetic only                       | N/A                            |
-| **Anonymized Snapshots** | ✅ Staging only     | Hash emails; mask names; shuffle relationships | Encrypted S3; 30-day retention |
+| **Anonymized Snapshots** | Not currently used  | Hash emails; mask names; shuffle relationships | Encrypted S3; 30-day retention |
 | **Synthetic Data**       | ✅ All environments | Faker.js; realistic but fake                   | Git (factories); DB (seeds)    |
-| **Test Account Data**    | ✅ Dev/Staging/CI   | `test+uuid@example.com`; obvious test names    | Cleaned up after 7 days        |
+| **Test Account Data**    | ✅ Preview/CI       | `test+uuid@example.com`; obvious test names    | Cleaned up after 7 days        |
 
 **GDPR Test Scenarios:**
 
@@ -499,12 +498,11 @@ describe('Wardrobe Upload', () => {
 
 1. **Ownership:** Platform team owns `prisma/seeds/`; changes reviewed in PRs
 2. **Migration Coupling:** Every schema migration triggers seed update review; CI enforces compatibility
-3. **Environment Parity:** Same seed scripts run in Local, CI, Dev; Staging uses anonymized snapshots
+3. **Environment Parity:** Same seed scripts run in Local, CI, and Preview.
 4. **Refresh Cadence:**
    - Local: On-demand (`npm run db:reset`)
    - CI: Every test run (ephemeral DB)
-   - Dev: Weekly automated wipe + reseed
-   - Staging: Weekly snapshot refresh
+   - Preview: Scheduled wipe + reseed when Preview data policy requires it
 
 **Seed Data Coverage:**
 
@@ -698,9 +696,8 @@ stages:
 **Promotion Rules:**
 
 - **PR Merge:** @p0 + @p1 must pass; @p2/@p3 don't block
-- **Deploy to Dev:** @p0 smoke tests run post-deploy; rollback if fail
-- **Deploy to Staging:** @p0 + @p1 + load tests must pass
-- **Deploy to Production:** All staging tests + manual QA sign-off
+- **Deploy to Preview:** @p0 smoke tests run post-deploy; block merge if they fail
+- **Deploy to Production:** Required PR gates pass before merge; add manual QA sign-off for high-risk changes
 
 ### Artifact Retention & Storage Budget
 
@@ -929,7 +926,7 @@ describe('Upload Tests', () => {
 
 1. **Document ADRs:** Create missing Architecture Decision Records in `_bmad-output/project-knowledge/architecture/decisions/` for all 8 patterns documented in ADR mapping table
 2. **Stand Up Test Environments:** Provision Supabase test project, weather provider harness, BullMQ/Redis sandbox, and media pipeline lab per Test Environment Requirements section
-3. **Configure Environment Promotion:** Implement environment promotion pipeline (Local → CI → Dev → Staging → Prod) with documented promotion criteria
+3. **Configure Environment Promotion:** Implement environment promotion pipeline (Local -> CI -> Preview -> Production) with documented promotion criteria
 4. **Secrets Management:** Document the `.env` plus GitHub/provider-secrets workflow with per-environment testing strategy; implement pre-commit hooks for secret scanning
 
 **Test Data & Fixtures (BLOCKERS):** 5. **Build Fixture Factories:** Implement factory pattern for all core entities (User, WardrobeItem, Ritual, Weather) using `fixture-architecture` knowledge fragment 6. **Seed Data Creation:** Create Prisma seed scripts with coverage per Seed Data Coverage table (5 teens, 3 guardians, 50 wardrobe items, etc.) 7. **Weather API Stub:** Implement `IWeatherProvider` adapter pattern with stub implementation for deterministic E2E tests 8. **Cleanup Discipline:** Establish cleanup patterns in test templates; enforce in code review checklist

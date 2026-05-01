@@ -10,7 +10,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: vercel-preview-dev-${{ github.event.pull_request.number }}
+  group: vercel-preview-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -41,9 +41,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_WEB_PROJECT_SLUG: couture-cast-web
-          VERCEL_API_PROJECT_SLUG: couture-cast-api
-          VERCEL_TEAM_SLUG: muratkeremozcans-projects
+          VERCEL_WEB_PROJECT_SLUG: ${{ vars.VERCEL_WEB_PROJECT_SLUG || 'couture-cast-web' }}
+          VERCEL_API_PROJECT_SLUG: ${{ vars.VERCEL_API_PROJECT_SLUG || 'couture-cast-api' }}
+          VERCEL_TEAM_SLUG: ${{ vars.VERCEL_TEAM_SLUG || 'muratkeremozcans-projects' }}
           VERCEL_GIT_COMMIT_REF: ${{ github.head_ref }}
           GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
@@ -106,8 +106,8 @@ jobs:
     needs: [resolve-url, wait-web, wait-api]
     uses: ./.github/workflows/rwf-e2e.yml
     with:
-      test_env: dev
-      test_command: npm run test:pw-preview-dev
+      test_env: preview
+      test_command: npm run test:pw-preview
       gh_ref: ${{ github.event.pull_request.head.sha }}
       deployment_ref: ${{ github.head_ref }}
       custom_base_url: ${{ needs.resolve-url.outputs.web_url }}

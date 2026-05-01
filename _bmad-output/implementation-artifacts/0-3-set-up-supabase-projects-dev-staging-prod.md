@@ -1,7 +1,7 @@
 <!-- Step 4 step 2 owner: searchable owner anchor -->
 <!-- Step 4 step 3 owner: searchable owner anchor -->
 
-# Story 0.3: Set up Supabase projects (dev/prod)
+# Story 0.3: Set up Supabase projects (Preview/Production)
 
 Status: done
 
@@ -13,23 +13,24 @@ so that developers can test locally and deploy to production with proper isolati
 
 ## Acceptance Criteria
 
-1. Create two Supabase projects: dev (wiped weekly) and prod (live user data); staging deferred due to free plan limits. Use Americas region.
+1. Create two Supabase projects: Preview (resettable non-production data) and Production (live user data). Use Americas region.
 2. Configure Storage buckets: `wardrobe-images`, `derived-assets`, `community-uploads` with RLS policies per ADR-004.
 3. Set up Supabase local development via Supabase CLI (`npx supabase start`); document access in README.
-4. Configure database connection pooling (max 100 connections per environment) and backups (PITR enabled for prod).
+4. Configure database connection pooling (max 100 connections per environment) and backups (PITR
+   enabled for Production).
 5. Document environment URLs, service keys, and access credentials in gitignored `.env` files for local development and GitHub/provider-native secret stores for CI/deployments.
 
 ## Tasks / Subtasks
 
 - [x] Task 1: Create Supabase cloud projects (AC: #1)
   - [x] Sign up for Supabase account at https://supabase.com
-  - [x] Create two projects: `couturecast-dev` (Free, auto-pause after 1 week) and `couturecast-prod` (Pro preferred; Free if budget-constrained)
+  - [x] Create two projects: Preview (Free, auto-pause after 1 week) and Production (Pro preferred; Free if budget-constrained)
   - [x] Configure project settings: region Americas (closest to target users), pricing tier per above
   - [x] Document project URLs and ref IDs in project documentation and secrets manager
-  - [x] Staging deferred due to free plan limits; add when an extra slot is available or upgraded
+  - [x] Additional project tiers deferred due to free plan limits; add when an extra slot is available or upgraded
 
 - [x] Task 2: Configure Storage buckets (AC: #2)
-  - [x] Create `wardrobe-images` bucket in dev and prod (private, 10MB, JPEG/PNG only)
+  - [x] Create `wardrobe-images` bucket in Preview and Production (private, 10MB, JPEG/PNG only)
   - [x] Create `derived-assets` bucket (private, for color extraction outputs)
   - [x] Create `community-uploads` bucket (private, 5MB limit)
   - [x] Enable RLS on all buckets (users can only access own files)
@@ -45,11 +46,11 @@ so that developers can test locally and deploy to production with proper isolati
   - [x] Configure `supabase/config.toml` with local development settings
   - [x] Run `npx supabase start` to start local Supabase stack (Postgres, Auth, Storage, Studio)
   - [x] Verify local services accessible: Studio at http://localhost:54323, Postgres at localhost:54322
-  - [x] Link local to dev project: `npx supabase link --project-ref {dev-project-ref}`
+  - [x] Link local to the Preview project: `npx supabase link --project-ref {preview-project-ref}`
   - [x] Test migration sync: `npx supabase db push` applies Prisma schema to local instance
 
 - [x] Task 4: Configure database connection pooling and backups (AC: #4)
-  - [x] Set connection pooling targets: dev 50 connections, prod 100 connections (within free defaults; no dashboard change)
+  - [x] Set connection pooling targets: Preview 50 connections, Production 100 connections (within free defaults; no dashboard change)
   - [x] Pool mode: transaction pooling for API/serverless; session pooling reserved for long-lived/admin connections
   - [x] Enable PITR/backups: not available on Free; requires Pro plan (deferred)
   - [x] Configure automated backups: not available on Free; requires Pro plan (deferred)
@@ -71,12 +72,14 @@ so that developers can test locally and deploy to production with proper isolati
 
 - [x] Task 6: Configure Supabase Auth settings
   - [x] Enable email/password authentication in Supabase Auth settings
-  - [x] Configure redirect URLs for dev/prod/local environments
+  - [x] Configure redirect URLs for Preview/Production/local environments
   - [x] Refresh token reuse interval set to 604800 seconds (7 days); access token uses Supabase default (1 hour) on Free plan
-  - [x] Magic link template left at default (no branding); invite/magic link email tested (uses current Site URL)
+  - [ ] Confirm each Supabase project's Site URL matches its hosted Preview or Production web
+        origin; email action setup is incomplete while a project still points to localhost.
+  - [ ] Re-verify invite/magic-link email actions after Site URL values are updated.
 
 - [x] Task 7: Set up RLS scaffolding (partial - full policies in CC-0.11)
-  - [x] Documented that app-table RLS and placeholder policies will be handled in Story 0.11 after schema deploy to dev/prod (schema not deployed yet)
+  - [x] Documented that app-table RLS and placeholder policies will be handled in Story 0.11 after schema deploy to Preview/Production (schema not deployed yet)
 
 - [x] Task 8: Validation and testing
   - [x] Verify local Supabase stack starts with `npx supabase start`
@@ -84,7 +87,7 @@ so that developers can test locally and deploy to production with proper isolati
   - [x] Verify seed data loads: `prisma db seed` to local stack
   - [x] Test Storage bucket upload (manual via Supabase Studio)
   - [x] Test Auth magic link (send test email, verify link works)
-  - [x] Verify dev/prod project dashboards are accessible
+  - [x] Verify Preview/Production project dashboards are accessible
 
 ## Dev Notes
 
@@ -111,7 +114,7 @@ so that developers can test locally and deploy to production with proper isolati
 **Deployment Architecture (Section: Deployment Architecture):**
 
 - Custom domain: `couturecast.app` with `app.` (Vercel) and `api.` (Fly) subdomains
-- Supabase projects: dev (auto-pause after 1 week), prod (live users); staging deferred due to free plan limits
+- Supabase projects: Preview (auto-pause after 1 week) and Production (live users)
 
 ### Testing Context
 
@@ -121,13 +124,12 @@ so that developers can test locally and deploy to production with proper isolati
 
 - **Local:** Docker Compose (Postgres, Redis, Supabase local); Prisma seed scripts reset on demand
 - **CI (Ephemeral):** Testcontainers + Supabase CLI for local instance
-- **Dev (Shared):** Supabase dev project (wiped weekly), seeded with factories
-- **Staging:** Deferred until free slot/upgrade available
+- **Preview:** Supabase Preview project with non-production data, seeded with factories
 - **Production:** Real user data, backups + PITR enabled
 
 **Secrets & Configuration Management:**
 
-- **SUPABASE_SERVICE_KEY:** Local CLI / Supabase Dev / Supabase Staging / Supabase Prod
+- **SUPABASE_SERVICE_KEY:** Local CLI / Supabase Preview / Supabase Production
 - **Test Strategy:** RLS bypass validation (service key should bypass); rotation tests
 
 **Test Environment Requirements:**
@@ -140,7 +142,7 @@ so that developers can test locally and deploy to production with proper isolati
 
 - Full RLS policies will be implemented in CC-0.11 (Guardian consent flow)
 - This story establishes RLS-enabled tables and placeholder policies
-- Service key bypass for initial development (non-prod environments only)
+- Service key bypass for initial development (non-production environments only)
 
 **Storage Security:**
 
@@ -165,9 +167,9 @@ supabase/
 
 **Supabase Projects:**
 
-- Dev: https://ckmpgfjwsthgtkfqez.supabase.co (ref: ckmpgfjwsthgtkfqez, tier: Free, region: Americas, auto-pause after 1 week)
-- Prod: https://kxypzmbqwpuhfnbrdpmc.supabase.co (ref: kxypzmbqwpuhfnbrdpmc, tier: Free now; upgrade to Pro recommended, region: Americas)
-- Staging: Deferred until free slot/upgrade available (plan for anonymized data)
+- Preview: https://ckmpgfjwsthgtkfqez.supabase.co (ref: ckmpgfjwsthgtkfqez, tier: Free, region: Americas, auto-pause after 1 week)
+- Production: https://kxypzmbqwpuhfnbrdpmc.supabase.co (ref: kxypzmbqwpuhfnbrdpmc, tier: Free now; upgrade to Pro recommended, region: Americas)
+- Additional project tier: Deferred until free slot/upgrade available
 
 ### References
 
@@ -216,15 +218,19 @@ supabase/
 
 ### Completion Notes List
 
-- Documented Supabase dev/prod projects and environment files for AC #1 (dev/prod only, staging deferred)
-- Connection pooling targets set (dev 50, prod 100); PITR/backups pending Pro plan upgrade
-- Auth: email/password enabled; redirect URLs added (localhost 3005/4000, dev/prod domains); refresh reuse interval 7 days; access token default (1h). CLI login via `npx supabase login`.
-- Magic link invite email tested (template branded with button); Site URL currently set to http://localhost:3000 (update per environment as needed)
+- Documented Supabase Preview/Production projects and environment files for AC #1.
+- Connection pooling targets set (Preview 50, Production 100); PITR/backups pending Pro plan upgrade
+- Auth: email/password enabled; redirect URLs added (localhost 3005/4000, Preview/Production
+  domains); refresh reuse interval 7 days; access token default (1h). CLI login via
+  `npx supabase login`.
+- Supabase Site URL confirmation remains incomplete until each project points at its Preview or
+  Production web origin instead of `http://localhost:3000`; hosted email action verification must
+  be repeated after that dashboard update.
 - RLS scaffolding for app tables deferred until Prisma schema is deployed to Supabase; policies to be added in CC-0.11
 
 ### File List
 
-- NEW: .env.dev
+- NEW: .env.preview
 - NEW: .env.prod
 - MODIFIED: .env.local
 - MODIFIED: .env.example
@@ -234,8 +240,8 @@ supabase/
 
 ## Change Log
 
-| Date       | Author             | Change                                                                            |
-| ---------- | ------------------ | --------------------------------------------------------------------------------- |
-| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.3 acceptance criteria                             |
-| 2025-11-25 | Amelia (Dev Agent) | Updated scope to dev/prod only due to Supabase free plan limits; staging deferred |
-| 2025-11-29 | Amelia (Dev Agent) | Completed Supabase setup, auth, buckets, and env scaffolding; marked story done   |
+| Date       | Author             | Change                                                                          |
+| ---------- | ------------------ | ------------------------------------------------------------------------------- |
+| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.3 acceptance criteria                           |
+| 2025-11-25 | Amelia (Dev Agent) | Updated scope to Preview/Production only due to Supabase free plan limits       |
+| 2025-11-29 | Amelia (Dev Agent) | Completed Supabase setup, auth, buckets, and env scaffolding; marked story done |

@@ -2,7 +2,7 @@ import { config as dotenvConfig } from 'dotenv'
 import path from 'node:path'
 import type { PlaywrightTestConfig } from '@playwright/test'
 import localConfig from './playwright/config/local.config'
-import devConfig from './playwright/config/preview-dev.config'
+import previewConfig from './playwright/config/preview.config'
 import prodConfig from './playwright/config/prod.config'
 
 dotenvConfig({
@@ -11,7 +11,7 @@ dotenvConfig({
 
 const envConfigMap: Record<string, PlaywrightTestConfig> = {
   local: localConfig,
-  dev: devConfig,
+  preview: previewConfig,
   prod: prodConfig,
 }
 

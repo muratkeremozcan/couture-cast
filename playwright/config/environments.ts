@@ -3,8 +3,10 @@ import path from 'node:path'
 import { resolveGitMetadata } from '../../apps/web/git-metadata'
 import { config as loadEnv } from 'dotenv'
 
-// Load environment file based on TEST_ENV (falls back to .env)
-const envSuffix = (process.env.TEST_ENV ?? process.env.NODE_ENV ?? 'local').toLowerCase()
+// Load environment file based on TEST_ENV (falls back to .env).
+const envSuffix = (
+  process.env.TEST_ENV ?? (process.env.NODE_ENV === 'production' ? 'prod' : 'local')
+).toLowerCase()
 const envFiles = [`.env.${envSuffix}`, '.env']
 for (const file of envFiles) {
   const envPath = path.resolve(process.cwd(), file)
@@ -16,7 +18,7 @@ for (const file of envFiles) {
   }
 }
 
-export type EnvironmentName = 'local' | 'dev' | 'prod'
+export type EnvironmentName = 'local' | 'preview' | 'prod'
 
 type Credentials = {
   email: string
@@ -116,21 +118,21 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
         }
       : {},
   },
-  dev: (() => {
+  preview: (() => {
     const webBaseUrl = firstDefined(
-      env('DEV_WEB_E2E_BASE_URL'),
-      env('DEV_WEB_BASE_URL'),
+      env('PREVIEW_WEB_E2E_BASE_URL'),
+      env('PREVIEW_WEB_BASE_URL'),
       env('VERCEL_BRANCH_URL') ? `https://${env('VERCEL_BRANCH_URL')}` : undefined,
       resolveLocalVercelPreviewUrl(),
-      'https://dev.couturecast.app'
+      'https://preview.couturecast.app'
     )
 
     const apiBaseUrl = firstDefined(
-      env('DEV_API_BASE_URL'),
+      env('PREVIEW_API_BASE_URL'),
       env('VERCEL_API_BASE_URL'),
       env('VERCEL_API_BRANCH_URL'),
       resolveLocalVercelApiPreviewUrl(),
-      'https://dev-api.couturecast.app'
+      'https://preview-api.couturecast.app'
     )
 
     return {
@@ -138,8 +140,8 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
       apiBaseUrl,
       credentials: {
         defaultUser: {
-          email: process.env.DEV_AUTH_USERNAME ?? 'dev.tester@couturecast.app',
-          password: process.env.DEV_AUTH_PASSWORD ?? 'dev-password',
+          email: process.env.PREVIEW_AUTH_USERNAME ?? 'preview.tester@couturecast.app',
+          password: process.env.PREVIEW_AUTH_PASSWORD ?? 'preview-password',
         },
       },
       apiHeaders:
@@ -192,17 +194,17 @@ function isEnvironmentName(value: string): value is EnvironmentName {
 
 export function resolveEnvironmentConfig(value?: string): EnvironmentConfig {
   const fallback = (process.env.TEST_ENV ?? 'local').toLowerCase()
-  const normalized = (value ?? fallback).toLowerCase()
+  const requested = (value ?? fallback).toLowerCase()
 
-  if (!isEnvironmentName(normalized)) {
+  if (!isEnvironmentName(requested)) {
     const supported = Object.keys(environmentConfigs).join(', ')
-    throw new Error(`Unknown TEST_ENV "${value}". Supported options: ${supported}`)
+    throw new Error(`Unknown TEST_ENV "${requested}". Supported options: ${supported}`)
   }
 
-  const config = environmentConfigs[normalized]
+  const config = environmentConfigs[requested]
 
   return {
-    name: normalized,
+    name: requested,
     ...config,
   }
 }

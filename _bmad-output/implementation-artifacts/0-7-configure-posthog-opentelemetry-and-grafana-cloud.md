@@ -10,7 +10,7 @@ so that we can track success metrics and monitor system health across all enviro
 
 ## Acceptance Criteria
 
-1. Create PostHog projects: test (CI/dev) and production; configure SDK integration in Expo,
+1. Create PostHog projects: Preview/CI and Production; configure SDK integration in Expo,
    Next.js, and API apps.
 2. Implement event schema per test-design-system.md Analytics Validation Strategy: `ritual_created`, `wardrobe_upload_started`, `alert_received`, `moderation_action`, `guardian_consent_granted`.
 3. Set up OpenTelemetry exporters in NestJS (Pino logs → OTLP → Grafana Cloud) with structured logging (timestamp, requestId, userId, feature).
@@ -21,7 +21,7 @@ so that we can track success metrics and monitor system health across all enviro
 
 - [x] Task 1: Create PostHog projects and configure SDKs (AC: #1)
   - [x] Sign up for PostHog Cloud
-  - [x] Create two projects: `couturecast-dev` (dev/CI), `couturecast-prod`
+  - [x] Create two projects for Preview/CI and Production
   - [x] Install PostHog SDK for Expo: `npm install posthog-react-native --workspace apps/mobile`
   - [x] Install PostHog SDK for Next.js: `npm install posthog-js --workspace apps/web`
   - [x] Install PostHog SDK for API: `npm install posthog-node --workspace apps/api`
@@ -31,42 +31,43 @@ so that we can track success metrics and monitor system health across all enviro
     - `apps/api/src/posthog/posthog.service.ts`
   - [x] Initialize PostHog in Expo app: `PostHogProvider` wrapper in `apps/mobile/app/_layout.tsx`
   - [x] Initialize PostHog in Next.js via `apps/web/instrumentation-client.ts` + `apps/web/next.config.ts` ingest rewrites
-  - [x] Centralize PostHog env vars at repo root `.env.local/.env.dev/.env.prod`: `POSTHOG_API_KEY`, `POSTHOG_HOST`
+  - [x] Centralize PostHog env vars at repo root `.env.local/.env.preview/.env.prod`: `POSTHOG_API_KEY`, `POSTHOG_HOST`
   - [x] Add `POSTHOG_API_KEY` and `POSTHOG_HOST` as GitHub Actions repository secrets
   - [x] Supabase DB password note:
     - `[YOUR-PASSWORD]` is the Supabase DB password (not `SUPABASE_ANON_KEY` or `SUPABASE_SERVICE_ROLE_KEY`)
     - If password is unknown, open Supabase `Connect` modal and click `Database Settings` link under "Reset your database password", then set a new password
-    - Save DB passwords to env files: `SUPABASE_DB_DEV_PW`, `SUPABASE_DB_PROD_PW`
+    - Save DB passwords to env files: `SUPABASE_DB_PREVIEW_PW`, `SUPABASE_DB_PROD_PW`
     - Save DB passwords to GitHub Actions secrets with matching names
-  - [x] Link Supabase data warehouse source to `couturecast-dev`:
-    - In PostHog `couturecast-dev`: `Import data` -> `Supabase`
-    - In Supabase dev project: `Settings` -> `Database` -> `Connection string`
+  - [x] Link Supabase data warehouse source to the Preview PostHog project:
+    - In the Preview PostHog project: `Import data` -> `Supabase`
+    - In the Supabase Preview project: `Settings` -> `Database` -> `Connection string`
     - In Supabase `Connect` modal: choose `Connection String` tab, `Type=URI`, and use `Method=Session Pooler` if `Direct connection` shows not IPv4 compatible
     - Copy Postgres URI, replace `[YOUR-PASSWORD]` with the Supabase DB password, and paste into PostHog `Connection string`
     - Set `Schema=public`, `Use SSH tunnel=off`, `Table prefix=sb_dev`, then click `Next`
-  - [x] Link Supabase data warehouse source to `couturecast-prod`:
-    - In PostHog `couturecast-prod`: `Import data` -> `Supabase`
-    - In Supabase prod project: `Settings` -> `Database` -> `Connection string`
+  - [x] Link Supabase data warehouse source to the Production PostHog project:
+    - In the Production PostHog project: `Import data` -> `Supabase`
+    - In the Supabase Production project: `Settings` -> `Database` -> `Connection string`
     - In Supabase `Connect` modal: choose `Connection String` tab, `Type=URI`, and use `Method=Session Pooler` if `Direct connection` shows not IPv4 compatible
     - Copy Postgres URI, replace `[YOUR-PASSWORD]` with the Supabase DB password, and paste into PostHog `Connection string`
     - Set `Schema=public`, `Use SSH tunnel=off`, `Table prefix=sb_prod`, then click `Next`
   - [x] Verify import health in both PostHog projects:
     - Confirm connection succeeds
     - Confirm at least one Supabase table appears under data warehouse sources
-  - [x] Environment scope note: this repository uses `dev` and `prod` only (no staging)
+  - [x] Environment scope note: this repository uses Preview and Production as deployed
+        environments.
   - [x] Prisma migration scripts used before PostHog import (copy/paste):
 
     ```bash
-    # Dev (Session Pooler, one line, URL-encoded password)
-    DATABASE_URL='postgresql://postgres.ckmgpxfjvuthsgtkfqez:<DEV_DB_PASSWORD_URLENCODED>@aws-1-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require' npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+    # Preview (Session Pooler, one line, URL-encoded password)
+    DATABASE_URL='postgresql://postgres.ckmgpxfjvuthsgtkfqez:<PREVIEW_DB_PASSWORD_URLENCODED>@aws-1-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require' npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
 
-    # Prod (Session Pooler, one line, URL-encoded password)
-    DATABASE_URL='postgresql://postgres.kxypzmbqwpuhfnbrdpmc:<PROD_DB_PASSWORD_URLENCODED>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require' npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+    # Production (Session Pooler, one line, URL-encoded password)
+    DATABASE_URL='postgresql://postgres.kxypzmbqwpuhfnbrdpmc:<PRODUCTION_DB_PASSWORD_URLENCODED>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require' npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
     ```
 
     - Keep each `DATABASE_URL` on a single line (no line wraps/newlines)
     - URL-encode special password characters (example: `!` -> `%21`)
-    1. Set up analytics for your app (PostHog) for both dev and prod.
+    1. Set up analytics for your app (PostHog) for both Preview and Production.
     2. Connected your app code (web, mobile, API) so it can send analytics data.
     3. Connected Supabase databases to PostHog so DB tables can be queried in PostHog.
     4. Applied database schema migrations so tables actually exist.
@@ -111,7 +112,7 @@ so that we can track success metrics and monitor system health across all enviro
   - [x] Configure OTLP exporters to Grafana Cloud endpoint
   - [x] Set up trace context propagation (B3 or W3C Trace Context)
   - [x] Add OpenTelemetry initialization to `main.ts` (before NestJS bootstrap)
-  - [x] Load root `.env.local`, `.env.dev` / `.env.prod`, and `.env` before OTEL + Nest bootstrap
+  - [x] Load root `.env.local`, `.env.preview` / `.env.prod`, and `.env` before OTEL + Nest bootstrap
 
 - [x] Task 5: Configure Pino structured logging (AC: #3)
   - [x] Install Pino: `npm install pino pino-http pino-pretty --workspace apps/api`
@@ -119,7 +120,8 @@ so that we can track success metrics and monitor system health across all enviro
   - [x] Configure structured log format: { timestamp, requestId, userId, feature, level, message }
   - [x] Set up request ID generation middleware (UUID v4)
   - [x] Integrate Pino with OpenTelemetry: correlate logs with traces
-  - [x] Configure log levels per environment: debug (local), info (dev), warn (prod)
+  - [x] Configure log levels per environment: debug for local/Preview paths, warn for
+        Production, and info for the local API watch runtime when it reports `development`.
   - [x] Add Pino HTTP middleware to log all requests/responses
 
 - [x] Task 6: Set up Grafana Cloud account (AC: #4)
@@ -145,7 +147,7 @@ so that we can track success metrics and monitor system health across all enviro
       stay enabled if you plan to export logs later
     - Save the token immediately when Grafana shows it; Grafana tokens are shown once
   - [x] Add credentials to root env files, GitHub Actions, and Vercel
-    - Open the root `.env.local`, `.env.dev`, and `.env.prod` files
+    - Open the root `.env.local`, `.env.preview`, and `.env.prod` files
     - Set `GRAFANA_OTLP_ENDPOINT=https://otlp-gateway-prod-us-east-2.grafana.net/otlp`
     - Set `GRAFANA_INSTANCE_ID=1555123`
     - Set `GRAFANA_API_KEY` to the API token you just generated in Grafana Cloud
@@ -166,10 +168,9 @@ so that we can track success metrics and monitor system health across all enviro
     - Set GitHub Actions secret `GRAFANA_API_KEY` to the same API token you just generated in
       Grafana Cloud
     - In the Vercel API project, add the same three keys as project environment variables
-    - Use Vercel `All Pre-Production Environments` for values that mirror `.env.dev`
+    - Use Vercel `All Pre-Production Environments` for values that mirror `.env.preview`
     - Use Vercel `Production` for values that mirror `.env.prod`
-    - This repo currently uses Vercel Preview for PRs and Vercel Production for `main`; it does
-      not keep a separate hosted Vercel Development environment in sync
+    - This repo currently uses Vercel Preview for PRs and Vercel Production for `main`
   - [x] Verify connection from the local NestJS app before touching dashboards
     - Start the API with the Grafana env vars loaded:
       `npm run start:dev --workspace api`
@@ -615,10 +616,10 @@ _bmad-output/
 
 - `POSTHOG_API_KEY`: PostHog project key (root `.env` files + GitHub Actions secret + Vercel env var)
 - `POSTHOG_HOST`: PostHog host URL (`https://us.i.posthog.com`)
-- `SUPABASE_DB_DEV_PW`: Supabase dev database password (`[YOUR-PASSWORD]` in dev URI)
-- `SUPABASE_DB_PROD_PW`: Supabase prod database password (`[YOUR-PASSWORD]` in prod URI)
-- `DATABASE_URL`: Prisma Postgres connection URL in `.env.local` / `.env.dev` / `.env.prod`
-- `DATABASE_URL_DEV`, `DATABASE_URL_PROD`: GitHub Actions secrets for CI jobs
+- `SUPABASE_DB_PREVIEW_PW`: Supabase Preview database password (`[YOUR-PASSWORD]` in Preview URI)
+- `SUPABASE_DB_PROD_PW`: Supabase Production database password (`[YOUR-PASSWORD]` in Production URI)
+- `DATABASE_URL`: Prisma Postgres connection URL in `.env.local` / `.env.preview` / `.env.prod`
+- `DATABASE_URL_PREVIEW`, `DATABASE_URL_PROD`: GitHub Actions secrets for CI jobs
 - `GRAFANA_OTLP_ENDPOINT`: Grafana OTLP endpoint URL (local env files + GitHub Actions + Vercel env var)
 - `GRAFANA_INSTANCE_ID`: Grafana OTLP instance ID used as the Basic auth username
 - `GRAFANA_API_KEY`: Grafana OTLP API token used as the Basic auth password
@@ -794,7 +795,7 @@ _bmad-output/
     selection, and one-time init semantics.
 - Updated `apps/api/src/main.ts` to initialize OpenTelemetry before NestJS bootstrap.
 - Added `apps/api/src/load-env.ts` so the API loads root env files before OTEL + Nest startup, and
-  added `apps/api/src/load-env.spec.ts` coverage for dev/prod env file selection.
+  added `apps/api/src/load-env.spec.ts` coverage for Preview/Production env file selection.
   - Revalidated workspace quality gates: `npm run lint`, `npm run typecheck`, `npm run test`.
 - Completed Task 5 Pino structured logging in API:
   - Added `apps/api/src/logger/pino.config.ts` for shared Pino config with ISO timestamps,
@@ -846,7 +847,7 @@ _bmad-output/
     (`/v1/traces`, `/v1/metrics`) while keeping the base endpoint in env/docs.
   - Updated Task 6, learning-path guidance, and environment-management docs so local env files and
     GitHub Actions and Vercel now use `GRAFANA_OTLP_ENDPOINT`, `GRAFANA_INSTANCE_ID`, and
-    `GRAFANA_API_KEY`, with Vercel Preview mirroring `.env.dev` and Vercel Production mirroring
+    `GRAFANA_API_KEY`, with Vercel Preview mirroring `.env.preview` and Vercel Production mirroring
     `.env.prod`.
   - Revalidated the OTLP setup with targeted API tests, API typecheck, and API lint.
 - Completed Task 8 feature flags:
@@ -859,9 +860,8 @@ _bmad-output/
     sync so the API evaluates PostHog first and refreshes Postgres fallback values on a schedule.
   - Extended `apps/api/src/posthog/posthog.service.ts` with boolean flag evaluation support and
     added unit coverage for SDK-backed flag reads plus service/cron coverage for the fallback path.
-  - Created the four Story 0.7 Task 8 boolean flags in both PostHog projects:
-    `couturecast-dev` and `couturecast-prod`, with the repo defaults mirrored as `0%` or `100%`
-    rollouts.
+  - Created the four Story 0.7 Task 8 boolean flags in both Preview and Production PostHog
+    projects, with the repo defaults mirrored as `0%` or `100%` rollouts.
 - Applied review fixes to Task 8:
   - `apps/api/src/modules/feature-flags/feature-flags.service.ts` now preserves the last known
     Postgres-backed value when PostHog cannot resolve a boolean during sync, instead of overwriting
@@ -928,7 +928,7 @@ _bmad-output/
     and a stronger troubleshooting guide for missing traces, metrics, and structured logs.
   - Marked Grafana dashboard screenshots as intentionally skipped by operator decision while
     keeping dashboard JSON exports and manual Grafana validation as the source of truth.
-- Closed the remaining local observability dev-loop debt:
+- Closed the remaining local observability feedback-loop debt:
   - Added `infra/grafana/local/` as a repo-owned LGTM stack with generated local dashboard copies
     so the same checked-in dashboard JSON can run against both Grafana Cloud exports and local
     provisioning.
@@ -1054,7 +1054,7 @@ _bmad-output/
 | 2026-03-14 | Amelia (Developer Agent)            | Started Task 7 by adding four Grafana dashboard JSON exports to the repo, using real API metrics where confirmed and Text panels where instrumentation is still missing                                                                              |
 | 2026-03-14 | Amelia (Developer Agent)            | Updated the API dashboard request-rate query to the Grafana-validated `increase(...[5m]) / 5` form so the checked-in JSON matches the working local panel                                                                                            |
 | 2026-03-14 | Amelia (Developer Agent)            | Replaced the API dashboard's unused 5xx placeholder with a working outbound HTTP client latency panel derived from confirmed `http_client_*` metrics                                                                                                 |
-| 2026-03-14 | Amelia (Developer Agent)            | Completed Task 8 by adding the shared feature-flag registry, Postgres fallback table + cron sync in `apps/api`, unit coverage, and the four matching PostHog flags in both `couturecast-dev` and `couturecast-prod`                                  |
+| 2026-03-14 | Amelia (Developer Agent)            | Completed Task 8 by adding the shared feature-flag registry, Postgres fallback table + cron sync in `apps/api`, unit coverage, and the four matching PostHog flags in both Preview and Production projects                                           |
 | 2026-03-14 | Amelia (Developer Agent)            | Fixed Task 8 review defects by preserving last-known fallback values on PostHog sync misses and warming the fallback cache on module init before the scheduled cron cadence                                                                          |
 | 2026-03-15 | Amelia (Developer Agent)            | Completed Task 8.5 by introducing repo-local analytics and remote-flag interfaces across API, web, and mobile, moving PostHog behind those seams, adding targeted facade coverage, and fixing API lint workspace resolution for `@couture/config`    |
 | 2026-03-20 | Amelia (Developer Agent)            | Completed Task 9 by adding in-memory PostHog analytics assertions with exact new-event count checks, provider-boundary web/API integration coverage for `ritual_created` and `guardian_consent_granted`, and final package/web/api validation passes |

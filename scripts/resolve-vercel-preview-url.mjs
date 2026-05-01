@@ -12,10 +12,10 @@ import path from 'node:path'
 import { execFileSync, execSync } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 
-// Load env (prefer .env.<TEST_ENV>, then .env) - optional for local dev
+// Load env for local Preview runs; CI passes env vars directly.
 try {
   const { default: dotenv } = await import('dotenv')
-  const envSuffix = (process.env.TEST_ENV ?? 'dev').toLowerCase()
+  const envSuffix = (process.env.TEST_ENV ?? 'preview').toLowerCase()
   const envFiles = [`.env.${envSuffix}`, '.env']
   for (const file of envFiles) {
     const full = path.resolve(process.cwd(), file)
@@ -365,7 +365,7 @@ function getAnyPreviewDeployments(owner, repo) {
 
 async function main() {
   const manual =
-    env('DEV_WEB_E2E_BASE_URL') ??
+    env('PREVIEW_WEB_E2E_BASE_URL') ??
     env('VERCEL_PREVIEW_URL') ??
     env('VERCEL_BRANCH_ALIAS_URL')
   if (manual) {
@@ -441,7 +441,7 @@ async function main() {
         'Provide one of:',
         '- VERCEL_BRANCH_ALIAS_URL=https://<your-preview>.vercel.app',
         '- VERCEL_PREVIEW_URL=https://<your-preview>.vercel.app',
-        '- DEV_WEB_E2E_BASE_URL=https://<your-preview>.vercel.app',
+        '- PREVIEW_WEB_E2E_BASE_URL=https://<your-preview>.vercel.app',
         'Or disable strict mode by unsetting VERCEL_PREVIEW_STRICT.',
       ].join('\n')
     )
