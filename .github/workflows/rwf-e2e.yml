@@ -6,11 +6,11 @@ on:
     inputs:
       test_env:
         type: string
-        description: "Test environment (local|dev|prod)"
+        description: "Test environment (local|preview|prod)"
         required: true
       test_command:
         type: string
-        description: "Playwright command to run (e.g., npm run test:pw-dev)"
+        description: "Playwright command to run (e.g., npm run test:pw-preview)"
         required: true
       gh_ref:
         type: string
@@ -38,7 +38,7 @@ on:
         required: false
       VERCEL_TEAM_SLUG:
         required: false
-      DATABASE_URL_DEV:
+      DATABASE_URL_PREVIEW:
         required: false
       DATABASE_URL_PROD:
         required: false
@@ -121,7 +121,7 @@ jobs:
         shell: bash
         env:
           TEST_ENV: ${{ inputs.test_env }}
-          DATABASE_URL_DEV: ${{ secrets.DATABASE_URL_DEV }}
+          DATABASE_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
           DATABASE_URL_PROD: ${{ secrets.DATABASE_URL_PROD }}
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
           EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
@@ -140,7 +140,11 @@ jobs:
           case "$TEST_ENV" in
             local) export DATABASE_URL="${LOCAL_DATABASE_URL}" ;;
             prod) export DATABASE_URL="${DATABASE_URL_PROD}" ;;
-            *) export DATABASE_URL="${DATABASE_URL_DEV}" ;;
+            preview) export DATABASE_URL="${DATABASE_URL_PREVIEW}" ;;
+            *)
+              echo "Unsupported TEST_ENV=$TEST_ENV. Expected local, preview, or prod."
+              exit 1
+              ;;
           esac
 
           if [ -z "$DATABASE_URL" ]; then
@@ -154,7 +158,9 @@ jobs:
           if [ -n "$custom_base_url" ]; then
             case "${{ inputs.test_env }}" in
               local) export WEB_E2E_BASE_URL="$custom_base_url" ;;
-              dev) export DEV_WEB_E2E_BASE_URL="$custom_base_url" ;;
+              preview)
+                export PREVIEW_WEB_E2E_BASE_URL="$custom_base_url"
+                ;;
               prod) export PROD_WEB_E2E_BASE_URL="$custom_base_url" ;;
             esac
           fi
@@ -162,26 +168,24 @@ jobs:
           if [ -n "$custom_api_base_url" ]; then
             case "${{ inputs.test_env }}" in
               local) export API_BASE_URL="$custom_api_base_url" ;;
-              dev)
-                export DEV_API_BASE_URL="$custom_api_base_url"
+              preview)
+                export PREVIEW_API_BASE_URL="$custom_api_base_url"
                 export VERCEL_API_BASE_URL="$custom_api_base_url"
                 export VERCEL_API_BRANCH_URL="$custom_api_base_url"
                 ;;
               prod) export PROD_API_BASE_URL="$custom_api_base_url" ;;
             esac
-          elif [ "${{ inputs.test_env }}" = "dev" ] && [ -z "$DEV_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
+          elif [ "${{ inputs.test_env }}" = "preview" ] && [ -z "$PREVIEW_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
             # Fallback path: if the caller did not pin an API preview URL, resolve one
             # here so preview tests still have an API origin to target.
             echo "Resolving API URL via Vercel REST API..."
-            api_url=$(node scripts/resolve-api-preview-url.mjs 2>&1)
-            if [ $? -eq 0 ] && [ -n "$api_url" ]; then
+            if api_url=$(node scripts/resolve-api-preview-url.mjs) && [ -n "$api_url" ]; then
               echo "Resolved API URL: $api_url"
-              export DEV_API_BASE_URL="$api_url"
+              export PREVIEW_API_BASE_URL="$api_url"
               export VERCEL_API_BASE_URL="$api_url"
               export VERCEL_API_BRANCH_URL="$api_url"
             else
               echo "Warning: Could not resolve API URL from Vercel API"
-              echo "Error output: $api_url"
             fi
           fi
 

@@ -5,7 +5,7 @@ import path from 'node:path'
 const rootDir = path.resolve(__dirname, '../..')
 const rootEnvFiles = [
   '.env.local',
-  process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.dev',
+  process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.preview',
   '.env',
 ]
 

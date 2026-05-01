@@ -10,7 +10,7 @@ so that personalization and alerts scale efficiently with retry logic and monito
 
 ## Acceptance Criteria
 
-1. Provision Upstash Redis instances: local (Docker Compose), CI (Testcontainers), dev/prod (Upstash cloud).
+1. Provision Upstash Redis instances: local (Docker Compose), CI (Testcontainers), Preview/Production (Upstash cloud).
 2. Configure BullMQ queues: `weather-ingestion`, `alert-fanout`, `color-extraction`, `moderation-review` with 3x retry policy (1s, 5s, 25s exponential backoff).
 3. Set concurrency limits per ADR-003: max 5 workers per queue; dead-letter queue for failed jobs stored in Postgres.
 4. Implement worker process group in NestJS with graceful shutdown handling.
@@ -20,11 +20,11 @@ so that personalization and alerts scale efficiently with retry logic and monito
 
 - [x] Task 1: Provision Upstash Redis instances (AC: #1)
   - [x] Sign up for Upstash account at https://upstash.com
-  - [x] Create Redis databases: `couturecast-dev` (Free tier), `couturecast-prod` (Pay-as-you-go, 1GB capacity)
+  - [x] Create Redis databases for Preview (Free tier) and Production (Pay-as-you-go, 1GB capacity)
   - [x] Configure eviction policy: LRU (Least Recently Used) for cache pressure scenarios
-  - [x] Document connection URLs and tokens (dev/prod Upstash URLs/tokens in gitignored .env.dev/.env.prod; Upstash noted in README)
+  - [x] Document connection URLs and tokens (Preview/Production Upstash URLs/tokens in gitignored .env.preview/.env.prod; Upstash noted in README)
   - [x] For local development: add Redis to `docker-compose.yml` (redis:7-alpine image, port 6379)
-  - [x] For CI: (removed testcontainers wiring per scope; Playwright uses local/dev/prod Redis directly)
+  - [x] For CI: (removed testcontainers wiring per scope; Playwright uses local/Preview/Production Redis directly)
 
 - [x] Task 2: Configure BullMQ queues (AC: #2)
   - [x] Install BullMQ in API app: `npm install bullmq --workspace apps/api`
@@ -203,7 +203,7 @@ packages/db/prisma/schema.prisma  # Add job_failures table
 
 **Expected Outputs:**
 
-- Supabase projects created (dev/prod)
+- Supabase projects created (Preview/Production)
 - Postgres DATABASE_URL available for each environment
 - Connection pooling configured (max 100 connections)
 
@@ -229,7 +229,7 @@ packages/db/prisma/schema.prisma  # Add job_failures table
 
 ### Completion Notes List
 
-- Added local Redis via docker-compose; env placeholders for dev/prod/local (Upstash provisioning still manual)
+- Added local Redis via docker-compose; env placeholders for Preview/Production/local (Upstash provisioning still manual)
 - Added BullMQ queue configs, workers bootstrap with concurrency/timeouts/backoff, and DLQ persistence to `job_failures` table
 - Added Prisma migration for job_failures; seeds/migrations applied locally
 - Added Redis cache service with TTL helpers; invalidation hooks and admin/DLQ endpoints deferred

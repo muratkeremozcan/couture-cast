@@ -33,7 +33,7 @@ and:
 These local gitignored files were updated:
 
 - `.env.local`
-- `.env.dev`
+- `.env.preview`
 - `.env.prod`
 
 What was added:

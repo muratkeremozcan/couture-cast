@@ -1,399 +1,186 @@
-# Story 0.12: Provision test environments and harness services
+# Story 0.12: Validate Preview-based test environment and E2E harness
 
-Status: drafted
+<!-- markdownlint-configure-file {"MD013": false} -->
+
+Updated: 2026-05-01 - Rewrite around Vercel Preview as the PR validation target and
+remove unsupported extra deployment scope.
+
+Status: in progress
 
 ## Story
 
-As a test engineer,
-I need isolated test environments,
-so that tests run deterministically without affecting production and all test infrastructure is ready for feature development.
+As an engineering team,
+we need a documented and verified test environment model using Local, Vercel Preview, and
+Production,
+so that PR-level E2E validation runs against realistic non-production services without inventing
+unsupported staging infrastructure.
 
 ## Acceptance Criteria
 
-1. Provision 6 test environments per test-design-system.md Test Environment Requirements:
-   - Supabase test project with anonymized fixtures and RLS parity
-   - Weather provider harness (stub service replaying OpenWeather payloads, emitting 429/500 on demand)
-   - BullMQ/Redis sandbox (synthetic jobs, no prod queue access)
-   - Media pipeline lab (Sharp/ONNX with GPU fallback for CI)
-   - Cross-surface device matrix (Playwright browsers, Expo simulators, watch emulator)
-   - Localization snapshot suite (locale bundles, disclosure templates)
-2. Document access/runbooks for each environment in `_bmad-output/test-artifacts/test-environments.md`.
-3. Implement weather harness as `with fixture loading from`4. Configure CI to use stub provider (no real API calls); dev/staging use real OpenWeather test API key.
-4. Validate environment readiness: run smoke tests in each environment and confirm pass.
+1. Document the supported test/deployment topology in
+   `_bmad-output/test-artifacts/test-environments.md`:
+   - Local development and local CI use local services for fast, resettable validation.
+   - Vercel Preview is the PR deployed validation target.
+   - Vercel Production is created from `main` after required PR gates pass.
+   - Only Vercel Preview and Vercel Production are deployed by Vercel in the current plan.
+   - Mobile deployment remains manual unless a later story changes that posture.
+2. Confirm existing Local and Preview E2E entry points and document their purpose:
+   - `npm run test:pw-local` validates the local app/services path.
+   - `npm run test:pw-preview` validates the active Vercel Preview URL.
+   - `npm run test:pw-prod` validates Production with smoke-safe specs only.
+   - `.github/workflows/pr-pw-e2e-local.yml` remains the local PR E2E gate.
+   - `.github/workflows/pr-pw-e2e-vercel-preview.yml` remains the Preview smoke/E2E gate.
+3. Preview E2E runs against real non-production services by default, without broad stubbing, with
+   documented risk controls:
+   - Preview must not target production Supabase, production Redis, production storage, or
+     production write-capable secrets.
+   - Test users, fixtures, and generated data must be synthetic, anonymized, or otherwise safe.
+   - Tests that create data must be idempotent, namespaced, or have cleanup guidance.
+   - Destructive or data-mutating flows that are not Preview-safe stay local-only until parity is
+     proven.
+   - External integrations are stubbed only when unsafe, costly, rate-limited, flaky, or outside
+     team control.
+4. Review and document Preview/Production secret boundaries:
+   - Preview uses non-production credentials and provider keys.
+   - Production uses production credentials only.
+   - No shared write-capable production secret is exposed to Preview or local PR CI.
+   - Any Vercel protection bypass secret is documented as Preview access control, not an app
+     runtime credential.
+5. Capture current readiness evidence and remaining gaps in the story and the environment
+   runbook:
+   - Already satisfied workflow/script evidence is listed with file references.
+   - Remaining gaps are explicit tasks, not hidden behind the old six-environment model.
+   - Known Preview/Production parity risks are recorded with ownership or follow-up story links.
+6. Keep Story 0.12 scoped to environment model validation and E2E harness hardening:
+   - Do not add OpenAPI/schema, Pact, formal contract gates, k6, load testing, or performance
+     thresholds here.
+   - Do not add broad Grafana/dashboard work here.
+   - Defer contract/performance expansion to Story 0.14.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Provision Supabase test project (AC: #1)
-  - [ ] Create new Supabase project: `couturecast-dev`
-  - [ ] Apply Prisma schema migrations
-  - [ ] Seed with anonymized test data (from CC-0.10 factories)
-  - [ ] Configure RLS policies (identical to prod)
-  - [ ] Set up Storage buckets with test data
-  - [ ] Document connection details in the secrets-management guide and configure matching GitHub/provider secrets for the test environment
-  - [ ] Configure weekly reset job to wipe/reseed test database
+- [x] Task 1: Audit and record already-satisfied Local/Preview E2E evidence (AC: #2, #5)
+  - [x] Reference root scripts in `package.json`:
+        `test:pw-local`, `test:pw-preview`, and `test:pw-prod`.
+  - [x] Reference `.github/workflows/pr-pw-e2e-local.yml` as the sharded local PR E2E gate
+        with burn-in.
+  - [x] Reference `.github/workflows/pr-pw-e2e-vercel-preview.yml` as the Vercel Preview
+        validation gate that resolves exact web/API Preview URLs and waits for matching SHAs.
+  - [x] Reference `.github/workflows/rwf-e2e.yml` as the reusable Playwright runner that maps
+        `TEST_ENV=preview` to Preview and `TEST_ENV=prod` to Production.
+  - [x] Reference `playwright/config/preview.config.ts` and
+        `playwright/config/environments.ts` for Preview base URL and API URL resolution.
 
-- [ ] Task 2: Create weather provider harness (AC: #1, #3)
-  - [ ] Create ` directory
-  - [ ] Implement stub HTTP server using Express:
+- [x] Task 2: Rewrite `_bmad-output/test-artifacts/test-environments.md` around current topology
+      (AC: #1, #3, #4, #5)
+  - [x] Define Local, Vercel Preview, and Production as the supported topology.
+  - [x] State explicitly that `TEST_ENV=preview` is the Playwright target for Vercel Preview.
+  - [x] Document which workflows run against Local, Preview, and Production.
+  - [x] Document mobile E2E/manual deployment posture and link Story 0.14 Task 5 for Maestro
+        analytics journey expansion.
+  - [x] Add a quick reference table for base URL variables:
+        `WEB_E2E_BASE_URL`, `PREVIEW_WEB_E2E_BASE_URL`, `PREVIEW_API_BASE_URL`,
+        `PROD_WEB_E2E_BASE_URL`, and `PROD_API_BASE_URL`.
 
-    ```typescript
-    import express from 'express'
-    import { loadFixtures } from './fixtures'
+- [ ] Task 3: Verify non-production resource and secret boundaries (AC: #3, #4)
+  - [ ] Confirm Preview Vercel env vars point to non-production Supabase/database resources.
+  - [ ] Confirm Preview does not expose production write-capable Supabase, Redis, storage, or
+        provider secrets.
+  - [x] Document required GitHub secrets for Preview E2E:
+        `VERCEL_TOKEN`, Vercel project slugs/team slug, and optional
+        `VERCEL_AUTOMATION_BYPASS_SECRET`.
+  - [x] Document any local `.env.preview` requirements without storing secret values in the repo.
+  - [x] Record unresolved or unverifiable secret-boundary items as follow-up risks.
 
-    const app = express()
-    const fixtures = loadFixtures()
+- [x] Task 4: Define Preview fixture, data, and cleanup policy (AC: #3, #5)
+  - [x] Prefer synthetic or factory-created users and fixture data for Preview E2E.
+  - [x] Require generated test data to be idempotent, namespaced by test run, or safe to leave
+        until scheduled cleanup.
+  - [x] Keep destructive/data-mutating tests local-only unless Preview parity and cleanup are
+        proven.
+  - [x] Reference `packages/testing` factories and cleanup standards where applicable.
+  - [x] Document how existing local-only write-path tests are intentionally scoped.
 
-    app.get('/weather/current', (req, res) => {
-      const locationId = req.query.locationId
-      res.json(fixtures.current[locationId] || fixtures.current.default)
-    })
+- [x] Task 5: Clarify real-service vs stub policy (AC: #3, #6)
+  - [x] State that Preview E2E may use real non-production services by default.
+  - [x] Define when stubs are required: unsafe side effects, paid/rate-limited providers,
+        unstable third-party systems, or missing/non-deterministic dependencies.
+  - [x] Record the weather-provider posture for current tests:
+        Preview can use approved non-production weather behavior; deterministic provider
+        contracts and broader consumer-driven coverage belong to Story 0.14.
+  - [x] Remove the old requirement that all CI/Preview testing must use a weather harness by
+        default.
 
-    app.get('/weather/forecast', (req, res) => {
-      // Simulate rate limit if requested
-      if (req.query.simulateError === '429') {
-        return res.status(429).json({ error: 'Rate limit exceeded' })
-      }
-      // Simulate server error
-      if (req.query.simulateError === '500') {
-        return res.status(500).json({ error: 'Internal server error' })
-      }
-      const locationId = req.query.locationId
-      res.json(fixtures.forecast[locationId] || fixtures.forecast.default)
-    })
+- [x] Task 6: Confirm minimal Preview smoke/regression coverage (AC: #2, #5)
+  - [x] Confirm `playwright/tests/web-health-sha.spec.ts` verifies Preview health and deployed
+        SHA.
+  - [x] Confirm at least one representative data-backed or API-backed flow is covered in local
+        E2E.
+  - [x] Identify which flows are intentionally skipped outside local runs and why.
+  - [x] Add only the smallest missing Preview-safe smoke check if the audit finds no
+        representative Preview coverage beyond health/SHA.
 
-    export default app
-    ```
-
-  - [ ] Create ` with sample responses
-  - [ ] Add harness startup to test setup: `beforeAll(() => harness.start())`
-
-- [ ] Task 3: Set up BullMQ/Redis sandbox (AC: #1)
-  - [ ] Create isolated Redis instance for tests (Testcontainers or local Docker)
-  - [ ] Configure BullMQ queues in test mode (separate namespace)
-  - [ ] Create synthetic jobs for testing:
-    ```typescript
-    export function createSyntheticJob(queueName: string, data: any) {
-      return testQueue.add(queueName, data)
-    }
-    ```
-  - [ ] Document job lifecycle testing patterns
-  - [ ] Ensure tests clean up queues after each run
-
-- [ ] Task 4: Set up media pipeline lab (AC: #1)
-  - [ ] Create ` directory
-  - [ ] Configure Sharp for image processing in tests
-  - [ ] Install ONNX runtime for color analysis tests
-  - [ ] Create GPU fallback for CI (CPU-only mode):
-    ```typescript
-    const useCPU = process.env.CI === 'true'
-    const session = await ort.InferenceSession.create(modelPath, {
-      executionProviders: useCPU ? ['cpu'] : ['cuda', 'cpu'],
-    })
-    ```
-  - [ ] Add test fixtures: sample garment images, expected color palettes
-  - [ ] Document media processing test patterns
-
-- [ ] Task 5: Configure cross-surface device matrix (AC: #1)
-  - [ ] Configure Playwright browsers in CI:
-    ```typescript
-    // playwright.config.ts
-    projects: [
-      { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-      { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-      { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-      { name: 'mobile-chrome', use: { ...devices['Pixel 5'] } },
-      { name: 'mobile-safari', use: { ...devices['iPhone 12'] } },
-    ]
-    ```
-  - [ ] Set up Expo simulator matrix (iOS 16+, Android 12+)
-  - [ ] Configure watch emulator (Apple Watch simulator)
-  - [ ] Document device matrix in `_bmad-output/test-artifacts/test-environments.md`
-  - [ ] Add device matrix to CI workflow (AC: #4)
-
-- [ ] Task 6: Create localization snapshot suite (AC: #1)
-  - [ ] Create ` directory
-  - [ ] Generate snapshot bundles for each locale:
-    - EN (US/CA)
-    - ES (LatAm)
-    - FR (CA/EU)
-  - [ ] Create disclosure templates for each locale (COPPA, privacy policy)
-  - [ ] Implement snapshot tests:
-    ```typescript
-    it('should render EN locale correctly', () => {
-      const rendered = renderComponent({ locale: 'en-US' })
-      expect(rendered).toMatchSnapshot()
-    })
-    ```
-  - [ ] Document localization testing in `_bmad-output/test-artifacts/test-environments.md`
-
-- [ ] Task 7: Document environment access (AC: #2)
-  - [ ] Create `_bmad-output/test-artifacts/test-environments.md` with sections:
-    - **Supabase Test Project**: connection URL, credentials, reset schedule
-    - **Weather Harness**: how to start, simulate errors, add fixtures
-    - **BullMQ/Redis Sandbox**: queue names, job lifecycle, cleanup
-    - **Media Pipeline Lab**: Sharp config, ONNX models, GPU fallback
-    - **Device Matrix**: browsers, simulators, emulators
-    - **Localization Suite**: locale bundles, snapshot testing
-  - [ ] Add runbooks for common tasks:
-    - Reset test database
-    - Add new weather fixture
-    - Simulate rate limit error
-    - Test on specific device
-  - [ ] Document troubleshooting for each environment
-
-- [ ] Task 8: Configure CI to use harness (AC: #4)
-  - [ ] Update `.github/workflows/test.yml` to start weather harness:
-    ```yaml
-    - name: Start weather harness
-      run: npm run test:weather-harness:start &
-    - name: Wait for harness
-      run: npx wait-on http://localhost:3002/health
-    - name: Run tests
-      run: npm test
-      env:
-        WEATHER_API_URL: http://localhost:3002
-        USE_WEATHER_HARNESS: true
-    ```
-  - [ ] Add environment variable: `USE_WEATHER_HARNESS=true` for CI, `false` for dev/staging
-  - [ ] Verify no real API calls in CI (check network logs)
-
-- [ ] Task 9: Create smoke tests for environment validation (AC: #5)
-  - [ ] Create ` directory
-  - [ ] Write smoke tests for each environment:
-
-    ```typescript
-    describe('Test Environment Smoke Tests', () => {
-      it('should connect to Supabase test project', async () => {
-        const { data, error } = await supabase.from('users').select('count')
-        expect(error).toBeNull()
-      })
-
-      it('should fetch weather from harness', async () => {
-        const response = await weatherClient.getCurrent('test-location')
-        expect(response.status).toBe(200)
-      })
-
-      it('should process jobs in BullMQ sandbox', async () => {
-        const job = await testQueue.add('test-job', { data: 'test' })
-        await job.waitUntilFinished(queueEvents)
-        expect(job.isCompleted()).toBe(true)
-      })
-
-      it('should process images in media lab', async () => {
-        const result = await processImage('test-image.jpg')
-        expect(result).toBeDefined()
-      })
-
-      it('should run on all device matrix browsers', async () => {
-        // Playwright auto-runs on all configured projects
-        expect(true).toBe(true)
-      })
-
-      it('should render all locales', async () => {
-        const locales = ['en-US', 'es-419', 'fr-CA']
-        for (const locale of locales) {
-          const rendered = renderComponent({ locale })
-          expect(rendered).toBeDefined()
-        }
-      })
-    })
-    ```
-
-  - [ ] Run smoke tests in CI before main test suite
-  - [ ] Fail fast if smoke tests fail
-  - [ ] Follow-up: mobile analytics journey assertions (ritual/upload/alerts) remain
-        Maestro-first and are tracked in Story 0.14 Task 5.
-
-- [ ] Task 10: Create environment teardown scripts (AC: #5)
-  - [ ] Create ` - Stop weather harness
-    - Clean up Redis queues
-    - Close Supabase connections
-    - Stop Playwright servers
-  - [ ] Add to `afterAll` hooks in test setup
-  - [ ] Document teardown procedures in `_bmad-output/test-artifacts/test-environments.md`
-
-- [ ] Task 11: Set up test data anonymization (AC: #1)
-  - [ ] Create ` - Export prod data
-    - Anonymize PII (emails, names, IP addresses)
-    - Import to test project
-  - [ ] Document data anonymization procedures
-  - [ ] Schedule monthly anonymization job (GitHub Actions cron)
-
-- [ ] Task 12: Create environment health dashboard (AC: #5)
-  - [ ] Create Grafana dashboard: "Test Environment Health"
-    - Panel: Test database size
-    - Panel: Weather harness uptime
-    - Panel: Redis queue depth (test queues)
-    - Panel: Smoke test pass rate
-  - [ ] Set up alerts for environment issues
-  - [ ] Document dashboard access in `_bmad-output/test-artifacts/test-environments.md`
+- [x] Task 7: Record follow-up boundaries for Story 0.14 (AC: #6)
+  - [x] Link Story 0.14 for OpenAPI/schema validation and Pact consumer/provider verification.
+  - [x] Link Story 0.14 for performance baseline, k6 scenarios, and threshold reporting.
+  - [x] Link Story 0.14 for Maestro analytics journey expansion and promotion criteria.
+  - [x] Link Story 0.14 for known Preview deploy-path parity debt on write-path API E2E.
 
 ## Dev Notes
 
-### Architecture Context
+### Test-deployment stance
 
-**Source: \_bmad-output/planning-artifacts/architecture.md**
+Preview tests without broad stubs are acceptable when Preview is bounded to non-production
+resources. The control is not "stub everything." The control is that Preview must be disposable,
+non-production, and unable to trigger irreversible production side effects.
 
-**Testing (lines 114-116):**
+Use stubs where they lower real risk: unsafe writes, paid/rate-limited dependencies, flaky external
+providers, or unavailable services. Prefer real non-production services for Preview E2E when they
+increase confidence without risking production data or accounts.
 
-- Turborepo + npm workspaces
-- Vitest for unit/integration
-- Playwright for web E2E, Maestro for mobile E2E
+### Current evidence to preserve
 
-**Integration Points (lines 119-120):**
+- `README.md` documents that `npm run test:pw-preview` targets Vercel Preview, while `main`
+  deploys to Production.
+- `_bmad-output/test-artifacts/ci-cd-pipeline.md` documents the current CI/CD topology:
+  PR branches to Vercel Preview and `main` to Vercel Production.
+- `package.json` maps `test:pw-preview` to Preview URL resolution before running Playwright.
+- `.github/workflows/pr-pw-e2e-local.yml` runs local Playwright E2E with local Supabase services,
+  database reset, sharding, and burn-in behavior.
+- `.github/workflows/pr-pw-e2e-vercel-preview.yml` resolves exact web/API Preview URLs, waits for
+  matching deployed SHAs, and passes those URLs to the reusable E2E runner.
+- `.github/workflows/rwf-e2e.yml` maps `TEST_ENV=preview` to Preview URL variables and `TEST_ENV=prod`
+  to production URL variables.
+- `playwright/tests/web-health-sha.spec.ts` validates health metadata and deployed SHA for Preview
+  and Production-style targets.
+- `playwright/tests/api/guardian-consent-lifecycle.spec.ts` intentionally skips non-local runs
+  because the write-path creates users, invitations, queue records, and audit rows until Preview
+  deploy-path parity is proven.
 
-- Weather provider (OpenWeather or chosen API) ingested hourly via NestJS Cron + BullMQ jobs
+### Explicitly removed from this story
 
-**Development Environment (lines 199-214):**
+The previous draft described a six-environment provisioning effort and included malformed
+placeholder paths. That model is no longer accurate for the current Vercel setup.
 
-- Prerequisites: Node 20 LTS, npm 10+, Docker, Supabase CLI, Fly CLI, Vercel CLI, Expo CLI
-- Setup commands: npm install, npm run db:migrate, npm run dev:web/mobile/api
+Removed/deferred scope:
 
-### Testing Context
+- Any additional hosted deployment tier beyond Vercel Preview and Production.
+- Mandatory weather harness for every CI/Preview run.
+- Broad Expo/watch emulator matrix as a Story 0.12 deliverable.
+- Health dashboard creation.
+- Formal OpenAPI/schema/Pact contract gates.
+- k6/performance baseline and thresholds.
 
-**6 Test Environments (AC: #1):**
-
-1. Supabase test project - Database and auth testing
-2. Weather harness - API simulation and error injection
-3. BullMQ/Redis sandbox - Job queue testing
-4. Media pipeline lab - Image processing testing
-5. Device matrix - Cross-platform E2E testing
-6. Localization suite - i18n testing
-
-**Environment Isolation:**
-
-- Each environment isolated from production
-- Tests do not call real external APIs
-- Data anonymized for privacy
-- Environments reset regularly to prevent pollution
-
-### Implementation Patterns
-
-**Weather Harness Pattern:**
-
-```typescript
-// import express from 'express';
-import { weatherFixtures } from '../weather/__fixtures__'
-
-export function createWeatherHarness(port: number = 3002) {
-  const app = express()
-
-  app.get('/current', (req, res) => {
-    const locationId = req.query.locationId as string
-    res.json(weatherFixtures.current[locationId] || weatherFixtures.default)
-  })
-
-  return app.listen(port)
-}
-```
-
-**Smoke Test Pattern:**
-
-```typescript
-// import { test, expect } from '@playwright/test';
-
-test.describe('Environment Smoke Tests', () => {
-  test('Supabase connection', async () => {
-    // Verify database connection
-  })
-
-  test('Weather harness responds', async () => {
-    // Verify harness is running
-  })
-})
-```
-
-**CI Environment Config:**
-
-```yaml
-# .github/workflows/test.yml
-env:
-  USE_WEATHER_HARNESS: true
-  WEATHER_API_URL: http://localhost:3002
-  SUPABASE_URL: ${{ secrets.SUPABASE_TEST_URL }}
-  REDIS_URL: redis://localhost:6379/1
-```
-
-### Project Structure Notes
-
-**New Directories:**
-
-```
-├── weather-harness/
-│   ├── server.ts
-│   ├── fixtures.ts
-│   └── health.ts
-├── media-lab/
-│   ├── sharp.config.ts
-│   ├── onnx.config.ts
-│   └── fixtures/
-│       ├── test-garment.jpg
-│       └── expected-palettes.json
-├── localization/
-│   ├── snapshots/
-│   │   ├── en-US/
-│   │   ├── es-419/
-│   │   └── fr-CA/
-│   └── templates/
-│       ├── coppa-disclosure.md
-│       └── privacy-policy.md
-├── smoke/
-│   └── environment.smoke.spec.ts
-└── scripts/
-    ├── teardown.ts
-    └── anonymize-prod-data.ts
-└── openweather-responses.json
-_bmad-output/
-└── test-artifacts/
-    └── test-environments.md
-```
-
-**Environment Variables (Test):**
-
-- `USE_WEATHER_HARNESS`: true (CI), false (dev/staging)
-- `WEATHER_API_URL`: harness URL or real API URL
-- `SUPABASE_URL`: test project URL
-- `REDIS_URL`: test Redis instance
-- `GPU_ENABLED`: false (CI), true (local)
+Story 0.14 owns contract testing, performance baseline, Maestro analytics expansion, and current
+Preview deploy-path parity debt.
 
 ### References
 
-- [Architecture: Testing](../planning-artifacts/architecture.md#technology-stack-details)
-- [Architecture: Integration Points](../planning-artifacts/architecture.md#integration-points)
-- [Architecture: Development Environment](../planning-artifacts/architecture.md#development-environment)
-- [Epics: Epic 0 Story CC-0.12](../planning-artifacts/epics.md#epic-0--platform-foundation--infrastructure-sprint-0)
-- [Testcontainers](https://testcontainers.com/)
-- [Playwright Device Emulation](https://playwright.dev/docs/emulation)
-
-### Learnings from Previous Stories
-
-**From CC-0.3 (Supabase):**
-
-- Test project requires same schema as production
-- RLS policies must match for realistic testing
-
-**From CC-0.4 (Redis/BullMQ):**
-
-- Test queues must be isolated
-- Job cleanup critical to prevent pollution
-
-**From CC-0.6 (CI/CD):**
-
-- CI needs deterministic, fast environments
-- No external API calls in CI
-
-**From CC-0.10 (Test fixtures):**
-
-- Anonymized data for test project
-- Factory-based seed data
-
-**For this story:**
-
-- Test environments enable deterministic tests
-- Weather harness eliminates external API dependency
-- Device matrix ensures cross-platform compatibility
-- Smoke tests validate environment readiness
-- Documentation critical for team adoption
+- [CI/CD pipeline](../test-artifacts/ci-cd-pipeline.md)
+- [Test design system](../test-artifacts/test-design-system.md)
+- [Testing standards](../test-artifacts/testing-standards.md)
+- [Story 0.14](0-14-expand-test-infra-auth-contract-performance.md)
+- [README](../../README.md)
 
 ## Dev Agent Record
 
@@ -403,22 +190,67 @@ _bmad-output/
 
 ### Agent Model Used
 
-<!-- Will be filled by dev agent -->
+Codex GPT-5
 
 ### Debug Log References
 
-<!-- Will be filled by dev agent during implementation -->
+- `sed -n '1,260p' _bmad-output/implementation-artifacts/0-12-provision-test-environments-and-harness-services.md`
+- `sed -n '1,220p' _bmad-output/test-artifacts/test-environments.md`
+- `sed -n '35,70p' package.json`
+- `sed -n '1,180p' .github/workflows/pr-pw-e2e-vercel-preview.yml`
+- `sed -n '1,230p' .github/workflows/pr-pw-e2e-local.yml`
+- `sed -n '1,240p' .github/workflows/rwf-e2e.yml`
+- `sed -n '1,180p' playwright/tests/web-health-sha.spec.ts`
+- `sed -n '1,180p' playwright/tests/api/guardian-consent-lifecycle.spec.ts`
 
 ### Completion Notes List
 
-<!-- Will be filled by dev agent upon completion -->
+- Replaced the placeholder test-environments runbook with the supported Local, Vercel Preview,
+  Production, and Mobile test topology.
+- Documented that `TEST_ENV=preview` and `npm run test:pw-preview` target Vercel Preview, not a
+  separate hosted deployment target.
+- Captured current repo evidence for local PR E2E, Preview E2E, reusable E2E environment mapping,
+  Preview URL resolution, deployed SHA checks, and local-only write-path guardrails.
+- Documented Preview fixture/data policy and the real-service-vs-stub stance: Preview can use real
+  non-production services, while stubs are reserved for unsafe, costly, flaky, rate-limited, or
+  unavailable dependencies.
+- Renamed Playwright Preview conventions to `TEST_ENV=preview`, `test:pw-preview`,
+  `PREVIEW_WEB_E2E_BASE_URL`, `PREVIEW_API_BASE_URL`, and `DATABASE_URL_PREVIEW`.
+- Removed the obsolete compatibility wrappers and environment fallbacks from scripts, workflows,
+  and Playwright configuration.
+- Left live secret-store confirmation open because this implementation did not inspect Vercel,
+  GitHub, Supabase, Redis, storage, or provider dashboard secret values.
 
 ### File List
 
-<!-- Will be filled by dev agent with NEW/MODIFIED/DELETED files -->
+- ADDED: `playwright/config/preview.config.ts`
+- ADDED: `scripts/set-preview-e2e-base-url.mjs`
+- MODIFIED:
+  `_bmad-output/implementation-artifacts/0-12-provision-test-environments-and-harness-services.md`
+- MODIFIED: `_bmad-output/test-artifacts/ci-cd-pipeline.md`
+- MODIFIED: `_bmad-output/test-artifacts/test-environments.md`
+- MODIFIED: `.env.example`
+- MODIFIED: `.github/workflows/pr-checks.yml`
+- MODIFIED: `.github/workflows/pr-pw-e2e-local.yml`
+- MODIFIED: `.github/workflows/pr-pw-e2e-vercel-preview.yml`
+- MODIFIED: `.github/workflows/pw-e2e-trigger.yml`
+- MODIFIED: `.github/workflows/rwf-burn-in.yml`
+- MODIFIED: `.github/workflows/rwf-e2e.yml`
+- MODIFIED: `README.md`
+- MODIFIED: `package.json`
+- MODIFIED: `playwright.config.ts`
+- MODIFIED: `playwright/README.md`
+- MODIFIED: `playwright/config/environments.ts`
+- MODIFIED: `scripts/prisma-migrate-deploy.mjs`
+- MODIFIED: `scripts/resolve-api-preview-url.mjs`
+- MODIFIED: `scripts/resolve-vercel-preview-url.mjs`
+- MODIFIED: `scripts/verify-changed.mjs`
 
 ## Change Log
 
-| Date       | Author             | Change                                                 |
-| ---------- | ------------------ | ------------------------------------------------------ |
-| 2025-11-13 | Bob (Scrum Master) | Story drafted from Epic 0, CC-0.12 acceptance criteria |
+| Date       | Author                         | Change                                                                                   |
+| ---------- | ------------------------------ | ---------------------------------------------------------------------------------------- |
+| 2025-11-13 | Bob (Scrum Master)             | Story drafted from Epic 0, CC-0.12 acceptance criteria                                   |
+| 2026-05-01 | Murat (Test Architect) + Codex | Rewrote around Preview validation and removed stale scope                                |
+| 2026-05-01 | Codex                          | Implemented runbook and checked off repo-evidenced Story 0.12 tasks                      |
+| 2026-05-01 | Codex                          | Standardized Playwright Preview terminology and removed obsolete compatibility fallbacks |

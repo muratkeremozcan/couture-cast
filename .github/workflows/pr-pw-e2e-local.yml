@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       SKIP_BURN_IN: ${{ steps.check_skip_label.outputs.SKIP_BURN_IN || 'false' }}
-      test_env: dev
+      test_env: local
       test_command: npm run test:pw-local --
       install_command: npm ci
     steps:

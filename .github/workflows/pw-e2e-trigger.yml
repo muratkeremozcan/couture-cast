@@ -9,7 +9,7 @@ on:
         description: "Test Environment"
         required: true
         options:
-          - dev
+          - preview
           - prod
       custom_base_url:
         description: "Custom base URL (optional override)"
@@ -22,12 +22,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  run-dev-tests:
-    if: inputs.test_env == 'dev'
+  run-preview-tests:
+    if: inputs.test_env == 'preview'
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: ${{ inputs.test_env }}
-      test_command: "npm run test:pw-dev"
+      test_command: "npm run test:pw-preview"
       gh_ref: ${{ github.ref_name }}
       custom_base_url: ${{ inputs.custom_base_url }}
     secrets: inherit

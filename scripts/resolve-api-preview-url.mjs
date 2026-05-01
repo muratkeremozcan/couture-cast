@@ -19,10 +19,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 
-// Load env (optional for local dev) - CI passes env vars directly
+// Load env for local Preview runs; CI passes env vars directly.
 try {
   const { config } = await import('dotenv')
-  const envSuffix = (process.env.TEST_ENV ?? 'dev').toLowerCase()
+  const envSuffix = (process.env.TEST_ENV ?? 'preview').toLowerCase()
   const envFiles = [`.env.${envSuffix}`, '.env']
   for (const file of envFiles) {
     const full = path.resolve(process.cwd(), file)
@@ -192,7 +192,7 @@ function deterministicUrl(projectSlug, branchSlug, teamSlug) {
 }
 
 async function main() {
-  const manual = env('DEV_API_BASE_URL') ?? env('VERCEL_API_BASE_URL')
+  const manual = env('PREVIEW_API_BASE_URL') ?? env('VERCEL_API_BASE_URL')
   if (manual) {
     logDebug(`Using manual API URL: ${manual}`)
     process.stdout.write(manual)

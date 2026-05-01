@@ -3,9 +3,8 @@ import { defineConfig } from '@playwright/test'
 import { baseConfig } from './base.config'
 import { resolveEnvironmentConfig } from './environments'
 
-const environment = resolveEnvironmentConfig('dev')
+const environment = resolveEnvironmentConfig('preview')
 
-// NOTE: In CI, "dev" is typically a Vercel Preview deployment URL passed via `DEV_WEB_E2E_BASE_URL`.
 export default defineConfig(
   merge({}, baseConfig, {
     use: {

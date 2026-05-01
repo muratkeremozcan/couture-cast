@@ -123,7 +123,7 @@ so that all apps use consistent data models and database changes are trackable.
 - **Seed Data Coverage:** 5 teens (ages 13-17), 3 guardians (1:1, 1:2, 1:3 ratios), 50 wardrobe items, 20 rituals, 10 weather snapshots, 8 feature flags
 - **Ownership:** Platform team owns `prisma/seeds/`; changes reviewed in PRs
 - **Migration Coupling:** Every schema migration triggers seed update review; CI enforces compatibility
-- **Environment Parity:** Same seed scripts run in Local, CI, Dev; Staging uses anonymized snapshots
+- **Environment Parity:** Same seed scripts run in Local, CI, and Preview
 
 **Database Migration Testing Strategy:**
 

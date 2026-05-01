@@ -16,7 +16,7 @@ permissions:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
+  DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW }}
   COVERAGE_GIST_ID: 64348ebdc6e662b93ade9f40bdc03442
 
 jobs:

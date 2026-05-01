@@ -37,7 +37,7 @@ function findRepoRoot() {
     while (true) {
       if (
         existsSync(path.join(current, '.env.local')) ||
-        existsSync(path.join(current, '.env.dev')) ||
+        existsSync(path.join(current, '.env.preview')) ||
         existsSync(path.join(current, '.env.prod'))
       ) {
         return current
@@ -55,7 +55,7 @@ function findRepoRoot() {
 const repoRoot = findRepoRoot()
 const rootEnvFiles = [
   '.env.local',
-  process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.dev',
+  process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.preview',
   '.env',
 ]
 const shouldForceLocalEnv = (process.env.TEST_ENV ?? '').toLowerCase() === 'local'

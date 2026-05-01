@@ -6,7 +6,7 @@ import { resolveGitMetadata } from './git-metadata'
 const rootDir = path.resolve(__dirname, '../..')
 const rootEnvFiles = [
   '.env.local',
-  process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.dev',
+  process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.preview',
   '.env',
 ]
 
@@ -50,7 +50,7 @@ const posthogKey = process.env.POSTHOG_API_KEY || ''
 const posthogHost = process.env.POSTHOG_HOST || 'https://us.i.posthog.com'
 const apiProxyBaseUrl =
   process.env.API_BASE_URL ||
-  process.env.DEV_API_BASE_URL ||
+  process.env.PREVIEW_API_BASE_URL ||
   process.env.PROD_API_BASE_URL ||
   process.env.VERCEL_API_BASE_URL ||
   process.env.VERCEL_API_BRANCH_URL

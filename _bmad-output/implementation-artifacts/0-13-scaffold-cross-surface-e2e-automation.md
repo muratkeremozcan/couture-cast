@@ -21,7 +21,7 @@ so that web and mobile journeys are validated end-to-end before feature teams br
   - [x] Install `@playwright/test@latest` at the workspace root and add `playwright/config/*.config.ts` with a base + local environment split.
   - [x] Configure Chromium-only project with retries=0, reporter=`['line',{ reporter: 'html', outputFolder: 'playwright/playwright-report' }]`, trace on first retry, and baseURL driven by `WEB_E2E_BASE_URL`.
   - [x] Create smoke spec (e.g., `playwright/tests/home.spec.ts`) that warms up the Nest API health endpoint, loads `/`, verifies couture hero copy, nav tabs, and `data-testid` instrumentation.
-  - [x] Add scripts `test:pw-local`, `test:pw-dev`, `test:pw-stage`, and helper commands to the root package.json; document how they build once and rely on Playwright's `webServer` hook to launch the app headlessly.
+  - [x] Add scripts `test:pw-local`, `test:pw-preview`, `test:pw-prod`, and helper commands to the root package.json; document how they build once and rely on Playwright's `webServer` hook to launch the app headlessly.
 
 - [x] Task 2: Maestro harness (AC: #3)
   - [x] Add `maestro/sanity.yaml` that starts the Expo app via dev server, backs out of modals, and captures a smoke screenshot (lightweight sanity).

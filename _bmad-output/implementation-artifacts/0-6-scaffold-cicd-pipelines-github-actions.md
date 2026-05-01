@@ -59,14 +59,13 @@ Notes against ACs
   - [x] Generate GitHub Actions summary with test results
 
 - [x] Task 4: Set up deployment workflows (AC: #3)
-  - [x] Web: deployed via Vercel project (`apps/web` root) with HUSKY=0 install and lint/TS skipped; Preview + Production env vars set from `.env.dev`/`.env.prod`. Removed unused GH deploy workflows.
+  - [x] Web: deployed via Vercel project (`apps/web` root) with HUSKY=0 install and lint/TS skipped; Preview + Production env vars set from `.env.preview`/`.env.prod`. Removed unused GH deploy workflows.
   - [x] API moved to Vercel serverless (Nest adapter) instead of Fly; added `apps/api/vercel.json` + `apps/api/api/index.ts` handler (ready to deploy if/when API project is created).
   - Web (Vercel):
     - [x] Sign up/login to Vercel and create a team/project for web.
     - [x] Install Vercel CLI: `npm i -g vercel`.
-    - [x] Configure env vars directly in Vercel so Preview mirrors `.env.dev` and Production
-          mirrors `.env.prod`, set `HUSKY=0`, `NODE_VERSION=24`. No separate hosted Vercel
-          Development environment is in active use.
+    - [x] Configure env vars directly in Vercel so Preview mirrors `.env.preview` and Production
+          mirrors `.env.prod`, set `HUSKY=0`, `NODE_VERSION=24`.
     - [x] Build runs on main via Vercel (no GH Actions deploy).
     - [x] Optional: add PR comment with preview URL after deploy.
   - API (Vercel serverless, Nest adapter):
@@ -117,7 +116,7 @@ Notes against ACs
 - [x] Task 10: Add Vercel deployment smoke checks (AC: #3)
   - [x] Add `/api/health` endpoint that returns status + git SHA/branch from Vercel env vars.
   - [x] Add a playwright api e2e test for the health endpoint and SHA.
-  - [x] Run Playwright smoke (`playwright/tests/web-health-sha.spec.ts`) after dev and prod deploys, targeting the deployment URL.
+  - [x] Run Playwright smoke (`playwright/tests/web-health-sha.spec.ts`) after Preview and Production deploys, targeting the deployment URL.
   - [x] SHA validation: `web-health-sha.spec.ts` compares `/api/health.gitSha` to `EXPECTED_SHA` from checked-out ref.
   - [x] Optional dev alias: set repo variable `VERCEL_DEV_DOMAIN` to alias main deploys to a stable dev domain.
 
@@ -130,9 +129,9 @@ Notes against ACs
 
 - [x] Task 12: Run Playwright smoke against Vercel Preview deployments (PRs) (AC: #3)
   - [x] Add `.github/workflows/pr-pw-e2e-vercel-preview.yml` triggered by `deployment_status` (Preview, success)
-  - [x] Pass Vercel Preview URL to Playwright via `custom_base_url` → `DEV_WEB_E2E_BASE_URL`
+  - [x] Pass Vercel Preview URL to Playwright via `custom_base_url` → `PREVIEW_WEB_E2E_BASE_URL`
   - [x] Support protected Preview deploys via `VERCEL_AUTOMATION_BYPASS_SECRET` (bypass headers for `/api/health`)
-  - [x] Add local helper: `npm run test:pw-preview-dev` resolves current branch's Preview URL (GitHub deployments → Vercel CLI fallback →
+  - [x] Add local helper: `npm run test:pw-preview` resolves current branch's Preview URL (GitHub deployments → Vercel CLI fallback →
         manual alias env) and runs Playwright against it; provide `VERCEL_TOKEN`, `VERCEL_WEB_PROJECT_SLUG`, `VERCEL_TEAM_SLUG`, or set
         `VERCEL_BRANCH_ALIAS_URL` when branch hostnames are shortened.
   - [x] Vercel Dashboard: ensure Git integration has `deployment_status` events enabled (Project → Settings → Git)

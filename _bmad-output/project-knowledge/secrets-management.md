@@ -5,7 +5,7 @@ Updated: 2026-03-27 - replaced third-party secret-manager plan with the existing
 ## Decision
 
 - No standalone secret manager is required for CoutureCast.
-- Local development uses gitignored `.env` files such as `.env`, `.env.local`, `.env.dev`, and `.env.prod`.
+- Local development uses gitignored `.env` files such as `.env`, `.env.local`, `.env.preview`, and `.env.prod`.
 - CI uses GitHub Actions secrets.
 - Hosted environments use provider-native secret stores such as Vercel, Expo EAS, Supabase, Upstash, and other service dashboards.
 - `.env.example` remains the canonical list of required variable names without real values.

@@ -1,6 +1,8 @@
 # CI/CD pipeline
 
-Updated: 2026-03-27 — add CodeRabbit advisory PR review notes
+<!-- markdownlint-configure-file {"MD013": false} -->
+
+Updated: 2026-05-01 - document Preview and Production as the deployed Vercel targets
 
 ## Overview
 
@@ -9,9 +11,8 @@ This repo uses GitHub Actions for CI and uses Vercel Git integration for web dep
 - PR branches → Vercel Preview deployments
 - `main` → Vercel Production deployments
 
-In CI, we treat Vercel Preview URLs as the "dev" target for `npm run test:pw-dev`.
-That is Playwright naming only. This setup does not maintain a separate hosted Vercel
-Development environment; PRs use Preview and `main` uses Production.
+In CI, Vercel Preview URLs are the `preview` Playwright target. PRs use Preview and `main` uses
+Production.
 
 ```mermaid
 flowchart TD
@@ -28,8 +29,7 @@ flowchart TD
 
 Playwright environment selection uses `TEST_ENV`:
 
-- `TEST_ENV=dev` uses `DEV_WEB_E2E_BASE_URL` (CI sets this to the Vercel Preview URL; it does not
-  mean Vercel Development)
+- `TEST_ENV=preview` uses `PREVIEW_WEB_E2E_BASE_URL` (CI sets this to the Vercel Preview URL)
 - `TEST_ENV=prod` uses `PROD_WEB_E2E_BASE_URL` (set to your production domain)
 
 ## Workflows
@@ -75,7 +75,7 @@ Playwright environment selection uses `TEST_ENV`:
 
 ### Manual E2E
 
-- `.github/workflows/pw-e2e-trigger.yml`: manual dispatch for `dev`/`prod` E2E runs.
+- `.github/workflows/pw-e2e-trigger.yml`: manual dispatch for `preview`/`prod` E2E runs.
 
 ## Vercel configuration (manual)
 
@@ -101,12 +101,12 @@ GitHub repo secrets:
 - Preview smoke workflow never runs: confirm `deployment_status Events` is enabled in Vercel Git settings.
 - Health check returns 401: set `VERCEL_AUTOMATION_BYPASS_SECRET` or disable Preview protection in Vercel.
 - SHA mismatch: `/api/health.gitSha` must match the deployed commit (`VERCEL_GIT_COMMIT_SHA`).
-- Playwright hits the wrong base URL: set `DEV_WEB_E2E_BASE_URL` / `PROD_WEB_E2E_BASE_URL`, or run `npm run test:pw-preview-dev` to
+- Playwright hits the wrong base URL: set `PREVIEW_WEB_E2E_BASE_URL` / `PROD_WEB_E2E_BASE_URL`, or run `npm run test:pw-preview` to
   auto-resolve the current branch's Preview URL (requires branch pushed, `gh` auth, and Vercel CLI token). If Vercel uses a shortened or
   custom preview hostname, set `VERCEL_BRANCH_ALIAS_URL=https://<your-preview>.vercel.app` to force it.
 
 ## Run locally
 
 - CI checks: `npm run validate`
-- Playwright smoke (dev): `TEST_ENV=dev npx playwright test playwright/tests/web-health-sha.spec.ts`
+- Playwright smoke (preview): `TEST_ENV=preview npx playwright test playwright/tests/web-health-sha.spec.ts`
 - Playwright smoke (prod): `TEST_ENV=prod npx playwright test playwright/tests/web-health-sha.spec.ts`
