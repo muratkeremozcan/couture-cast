@@ -54,9 +54,10 @@ Preview; after merge, `main` deploys to Production. Playwright names those targe
 | `DATABASE_URL_PREVIEW`            | Reusable E2E workflow                | Non-production database URL for Preview-oriented tests.                    |
 | `DATABASE_URL_PROD`               | Reusable E2E workflow                | Production database URL; never use for destructive or data-mutating tests. |
 
-Local `.env.preview` may contain Preview secrets and Vercel discovery variables such as
-`VERCEL_TOKEN`, `VERCEL_WEB_PROJECT_SLUG`, `VERCEL_API_PROJECT_SLUG`, and `VERCEL_TEAM_SLUG`.
-Keep values gitignored and never paste secret values into this document.
+Local `.env.preview` may contain Preview secrets and Vercel discovery configuration. `VERCEL_TOKEN`
+and `VERCEL_AUTOMATION_BYPASS_SECRET` are secrets. `VERCEL_WEB_PROJECT_SLUG`,
+`VERCEL_API_PROJECT_SLUG`, and `VERCEL_TEAM_SLUG` are non-secret project identifiers used for URL
+resolution. Keep secret values gitignored and never paste them into this document.
 
 ## Secret and resource boundaries
 
@@ -174,10 +175,11 @@ Use smoke-safe specs only. Do not run destructive or data-mutating suites agains
 ### Troubleshoot Preview URL resolution
 
 1. Confirm the branch is pushed and Vercel has built both web and API Preview deployments.
-2. Confirm `VERCEL_TOKEN`, `VERCEL_WEB_PROJECT_SLUG`, `VERCEL_API_PROJECT_SLUG`, and
-   `VERCEL_TEAM_SLUG` are available in the relevant local or CI secret store.
-3. If Preview protection returns `401`, configure `VERCEL_AUTOMATION_BYPASS_SECRET`.
-4. If the wrong deployment is selected, set `PREVIEW_WEB_E2E_BASE_URL` and `PREVIEW_API_BASE_URL`
+2. Confirm `VERCEL_TOKEN` is available in the relevant local or CI secret store.
+3. Confirm `VERCEL_WEB_PROJECT_SLUG`, `VERCEL_API_PROJECT_SLUG`, and `VERCEL_TEAM_SLUG` are
+   available as local env vars or reusable workflow inputs.
+4. If Preview protection returns `401`, configure `VERCEL_AUTOMATION_BYPASS_SECRET`.
+5. If the wrong deployment is selected, set `PREVIEW_WEB_E2E_BASE_URL` and `PREVIEW_API_BASE_URL`
    manually for the current run.
 
 ### Add a Preview-safe smoke test

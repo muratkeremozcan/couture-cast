@@ -10,7 +10,8 @@ so that personalization and alerts scale efficiently with retry logic and monito
 
 ## Acceptance Criteria
 
-1. Provision Upstash Redis instances: local (Docker Compose), CI (Testcontainers), Preview/Production (Upstash cloud).
+1. Provision Redis access for local (Docker Compose), CI (configured `REDIS_URL` or local
+   default), and Preview/Production (Upstash cloud).
 2. Configure BullMQ queues: `weather-ingestion`, `alert-fanout`, `color-extraction`, `moderation-review` with 3x retry policy (1s, 5s, 25s exponential backoff).
 3. Set concurrency limits per ADR-003: max 5 workers per queue; dead-letter queue for failed jobs stored in Postgres.
 4. Implement worker process group in NestJS with graceful shutdown handling.
@@ -24,7 +25,8 @@ so that personalization and alerts scale efficiently with retry logic and monito
   - [x] Configure eviction policy: LRU (Least Recently Used) for cache pressure scenarios
   - [x] Document connection URLs and tokens (Preview/Production Upstash URLs/tokens in gitignored .env.preview/.env.prod; Upstash noted in README)
   - [x] For local development: add Redis to `docker-compose.yml` (redis:7-alpine image, port 6379)
-  - [x] For CI: (removed testcontainers wiring per scope; Playwright uses local/Preview/Production Redis directly)
+  - [x] For CI: no Testcontainers Redis hook is wired in this repo; tests use the configured
+        `REDIS_URL` or the local Redis default.
 
 - [x] Task 2: Configure BullMQ queues (AC: #2)
   - [x] Install BullMQ in API app: `npm install bullmq --workspace apps/api`
@@ -235,7 +237,8 @@ packages/db/prisma/schema.prisma  # Add job_failures table
 - Added Redis cache service with TTL helpers; invalidation hooks and admin/DLQ endpoints deferred
 - Follow-up backlog (outside this story scope): Upstash creation hardening, extended load/concurrency testing, and additional operational tuning.
 - Split migrations: `job_failures` table isolated; separate migration for `ForecastSegment` index to keep history clean
-- CI: added Testcontainers Redis setup hooks for Vitest (starts/stops redis:7-alpine, sets REDIS_URL)
+- CI: no Testcontainers Redis setup hook is wired; Vitest/API paths use the configured
+  `REDIS_URL` or the local Redis default.
 - Admin: failed-jobs endpoint with retry; daily prune of job_failures older than 30 days
 - start:api now runs prisma generate (db:generate) before boot to avoid missing client in CI
 

@@ -130,13 +130,13 @@ The 45/35/20 split keeps most validation at deterministic layers while reserving
 
 **Per-Environment Config Testing:**
 
-| Secret/Config          | Local          | CI             | Preview          | Production       | Test Strategy                                                     |
-| ---------------------- | -------------- | -------------- | ---------------- | ---------------- | ----------------------------------------------------------------- |
-| `DATABASE_URL`         | Docker Compose | Testcontainers | Supabase Preview | Supabase Prod    | Connection pooling tests (max connections); failover tests        |
-| `WEATHER_API_KEY`      | Stub (no key)  | Stub           | OpenWeather Test | OpenWeather Prod | Rate limit handling (429); invalid key error handling (401)       |
-| `REDIS_URL`            | Docker Compose | Testcontainers | Upstash Preview  | Upstash Prod     | Eviction policy tests; connection timeout handling                |
-| `LAUNCHDARKLY_SDK_KEY` | Offline mode   | Offline mode   | LD Test          | LD Prod          | Fallback to defaults when LD unavailable; flag evaluation tests   |
-| `SUPABASE_SERVICE_KEY` | Local CLI      | Local CLI      | Supabase Preview | Supabase Prod    | RLS bypass validation (service key should bypass); rotation tests |
+| Secret/Config          | Local          | CI             | Preview          | Production         | Test Strategy                                                     |
+| ---------------------- | -------------- | -------------- | ---------------- | ------------------ | ----------------------------------------------------------------- |
+| `DATABASE_URL`         | Docker Compose | Testcontainers | Supabase Preview | Supabase Prod      | Connection pooling tests (max connections); failover tests        |
+| `WEATHER_API_KEY`      | Stub (no key)  | Stub           | OpenWeather Test | OpenWeather Prod   | Rate limit handling (429); invalid key error handling (401)       |
+| `REDIS_URL`            | Docker Compose | Testcontainers | Upstash Preview  | Upstash Prod       | Eviction policy tests; connection timeout handling                |
+| `POSTHOG_API_KEY`      | Offline mode   | Offline mode   | PostHog Preview  | PostHog Production | Flag evaluation, offline fallback, and API error/rate-limit tests |
+| `SUPABASE_SERVICE_KEY` | Local CLI      | Local CLI      | Supabase Preview | Supabase Prod      | RLS bypass validation (service key should bypass); rotation tests |
 
 **Environment Secret Integration:**
 

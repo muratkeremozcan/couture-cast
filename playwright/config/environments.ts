@@ -198,7 +198,7 @@ export function resolveEnvironmentConfig(value?: string): EnvironmentConfig {
 
   if (!isEnvironmentName(requested)) {
     const supported = Object.keys(environmentConfigs).join(', ')
-    throw new Error(`Unknown TEST_ENV "${value}". Supported options: ${supported}`)
+    throw new Error(`Unknown TEST_ENV "${requested}". Supported options: ${supported}`)
   }
 
   const config = environmentConfigs[requested]

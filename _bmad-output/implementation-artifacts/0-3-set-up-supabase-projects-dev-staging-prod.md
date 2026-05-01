@@ -16,7 +16,8 @@ so that developers can test locally and deploy to production with proper isolati
 1. Create two Supabase projects: Preview (resettable non-production data) and Production (live user data). Use Americas region.
 2. Configure Storage buckets: `wardrobe-images`, `derived-assets`, `community-uploads` with RLS policies per ADR-004.
 3. Set up Supabase local development via Supabase CLI (`npx supabase start`); document access in README.
-4. Configure database connection pooling (max 100 connections per environment) and backups (PITR enabled for prod).
+4. Configure database connection pooling (max 100 connections per environment) and backups (PITR
+   enabled for Production).
 5. Document environment URLs, service keys, and access credentials in gitignored `.env` files for local development and GitHub/provider-native secret stores for CI/deployments.
 
 ## Tasks / Subtasks
@@ -73,7 +74,9 @@ so that developers can test locally and deploy to production with proper isolati
   - [x] Enable email/password authentication in Supabase Auth settings
   - [x] Configure redirect URLs for Preview/Production/local environments
   - [x] Refresh token reuse interval set to 604800 seconds (7 days); access token uses Supabase default (1 hour) on Free plan
-  - [x] Magic link template left at default (no branding); invite/magic link email tested (uses current Site URL)
+  - [ ] Confirm each Supabase project's Site URL matches its hosted Preview or Production web
+        origin; email action setup is incomplete while a project still points to localhost.
+  - [ ] Re-verify invite/magic-link email actions after Site URL values are updated.
 
 - [x] Task 7: Set up RLS scaffolding (partial - full policies in CC-0.11)
   - [x] Documented that app-table RLS and placeholder policies will be handled in Story 0.11 after schema deploy to Preview/Production (schema not deployed yet)
@@ -111,7 +114,7 @@ so that developers can test locally and deploy to production with proper isolati
 **Deployment Architecture (Section: Deployment Architecture):**
 
 - Custom domain: `couturecast.app` with `app.` (Vercel) and `api.` (Fly) subdomains
-- Supabase projects: dev (auto-pause after 1 week), prod (live users); staging deferred due to free plan limits
+- Supabase projects: Preview (auto-pause after 1 week) and Production (live users)
 
 ### Testing Context
 
@@ -139,7 +142,7 @@ so that developers can test locally and deploy to production with proper isolati
 
 - Full RLS policies will be implemented in CC-0.11 (Guardian consent flow)
 - This story establishes RLS-enabled tables and placeholder policies
-- Service key bypass for initial development (non-prod environments only)
+- Service key bypass for initial development (non-production environments only)
 
 **Storage Security:**
 
@@ -164,8 +167,8 @@ supabase/
 
 **Supabase Projects:**
 
-- Dev: https://ckmpgfjwsthgtkfqez.supabase.co (ref: ckmpgfjwsthgtkfqez, tier: Free, region: Americas, auto-pause after 1 week)
-- Prod: https://kxypzmbqwpuhfnbrdpmc.supabase.co (ref: kxypzmbqwpuhfnbrdpmc, tier: Free now; upgrade to Pro recommended, region: Americas)
+- Preview: https://ckmpgfjwsthgtkfqez.supabase.co (ref: ckmpgfjwsthgtkfqez, tier: Free, region: Americas, auto-pause after 1 week)
+- Production: https://kxypzmbqwpuhfnbrdpmc.supabase.co (ref: kxypzmbqwpuhfnbrdpmc, tier: Free now; upgrade to Pro recommended, region: Americas)
 - Additional project tier: Deferred until free slot/upgrade available
 
 ### References
@@ -217,8 +220,12 @@ supabase/
 
 - Documented Supabase Preview/Production projects and environment files for AC #1.
 - Connection pooling targets set (Preview 50, Production 100); PITR/backups pending Pro plan upgrade
-- Auth: email/password enabled; redirect URLs added (localhost 3005/4000, Preview/Production domains); refresh reuse interval 7 days; access token default (1h). CLI login via `npx supabase login`.
-- Magic link invite email tested (template branded with button); Site URL currently set to http://localhost:3000 (update per environment as needed)
+- Auth: email/password enabled; redirect URLs added (localhost 3005/4000, Preview/Production
+  domains); refresh reuse interval 7 days; access token default (1h). CLI login via
+  `npx supabase login`.
+- Supabase Site URL confirmation remains incomplete until each project points at its Preview or
+  Production web origin instead of `http://localhost:3000`; hosted email action verification must
+  be repeated after that dashboard update.
 - RLS scaffolding for app tables deferred until Prisma schema is deployed to Supabase; policies to be added in CC-0.11
 
 ### File List

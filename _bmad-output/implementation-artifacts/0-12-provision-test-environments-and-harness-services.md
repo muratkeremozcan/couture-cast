@@ -87,8 +87,9 @@ unsupported staging infrastructure.
   - [ ] Confirm Preview does not expose production write-capable Supabase, Redis, storage, or
         provider secrets.
   - [x] Document required GitHub secrets for Preview E2E:
-        `VERCEL_TOKEN`, Vercel project slugs/team slug, and optional
-        `VERCEL_AUTOMATION_BYPASS_SECRET`.
+        `VERCEL_TOKEN` and optional `VERCEL_AUTOMATION_BYPASS_SECRET`.
+  - [x] Document Vercel project/team slugs as non-secret Preview URL resolution
+        configuration.
   - [x] Document any local `.env.preview` requirements without storing secret values in the repo.
   - [x] Record unresolved or unverifiable secret-boundary items as follow-up risks.
 

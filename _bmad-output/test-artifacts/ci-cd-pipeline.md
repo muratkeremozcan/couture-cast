@@ -94,7 +94,11 @@ GitHub repo secrets:
 
 - `EXPO_TOKEN` (mobile deploy)
 - `VERCEL_AUTOMATION_BYPASS_SECRET` (optional; only needed if Preview deployments are protected)
-- `VERCEL_TOKEN`, `VERCEL_WEB_PROJECT_SLUG`, `VERCEL_TEAM_SLUG` (for local Vercel CLI preview resolution)
+- `VERCEL_TOKEN` (for Vercel API Preview resolution)
+
+Vercel project/team slugs are non-secret configuration. The reusable E2E workflow accepts
+`vercel_web_project_slug`, `vercel_api_project_slug`, and `vercel_team_slug` inputs with repo
+defaults.
 
 ## Troubleshooting
 

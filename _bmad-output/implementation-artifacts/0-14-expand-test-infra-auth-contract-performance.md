@@ -120,8 +120,8 @@ without blocking current feature delivery.
   - [x] Add PR/rollout support artifacts for the advisory-first setup:
         `.github/PULL_REQUEST_TEMPLATE.md` and CI/CD documentation notes in
         `_bmad-output/test-artifacts/ci-cd-pipeline.md`.
-  - [x] Install/enable the CodeRabbit GitHub App on `muratkeremozcan/couture-cast` and verify the
-        first live review on PR `#42`.
+  - [x] CodeRabbit GitHub App status: installed/enabled on `muratkeremozcan/couture-cast`;
+        first live review verified on PR `#42`.
   - [x] Document promotion criteria for stricter review policy after initial noise tuning.
 
 - [x] Task 7: Unit test coverage reporting and badges (AC: #7)
@@ -211,11 +211,10 @@ without blocking current feature delivery.
   executed in the same sprint window.
 - Mobile native E2E remains Maestro-first; Playwright stays web/API-focused.
 - CodeRabbit rollout starts advisory-first to avoid blocking delivery while path rules stabilize.
+- CodeRabbit GitHub App status: installed/enabled on `muratkeremozcan/couture-cast`; first live
+  review verified on PR `#42`.
 - Task 7 coverage action is a local composite action in `.github/actions/unit-test-coverage-comment/`.
   Monorepo coverage merging sums workspace-level `coverage-summary.json` files into one aggregate.
-- Current partial implementation status for Task 6:
-  repo-side config/workflow/template work is complete; GitHub App installation still requires
-  authenticated GitHub interaction before the first live review can be verified.
 - Current preview debt for Task 3:
   guardian consent lifecycle Playwright coverage remains local-only because preview PR deploys
   still return `500` on `POST /api/v1/guardian/invitations` even after local CI burn-in passes.

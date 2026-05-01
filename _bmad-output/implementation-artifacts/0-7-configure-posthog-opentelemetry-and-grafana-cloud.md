@@ -53,15 +53,16 @@ so that we can track success metrics and monitor system health across all enviro
   - [x] Verify import health in both PostHog projects:
     - Confirm connection succeeds
     - Confirm at least one Supabase table appears under data warehouse sources
-  - [x] Environment scope note: this repository uses `dev` and `prod` only (no staging)
+  - [x] Environment scope note: this repository uses Preview and Production as deployed
+        environments.
   - [x] Prisma migration scripts used before PostHog import (copy/paste):
 
     ```bash
     # Preview (Session Pooler, one line, URL-encoded password)
     DATABASE_URL='postgresql://postgres.ckmgpxfjvuthsgtkfqez:<PREVIEW_DB_PASSWORD_URLENCODED>@aws-1-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require' npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
 
-    # Prod (Session Pooler, one line, URL-encoded password)
-    DATABASE_URL='postgresql://postgres.kxypzmbqwpuhfnbrdpmc:<PROD_DB_PASSWORD_URLENCODED>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require' npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+    # Production (Session Pooler, one line, URL-encoded password)
+    DATABASE_URL='postgresql://postgres.kxypzmbqwpuhfnbrdpmc:<PRODUCTION_DB_PASSWORD_URLENCODED>@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require' npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
     ```
 
     - Keep each `DATABASE_URL` on a single line (no line wraps/newlines)
@@ -119,7 +120,8 @@ so that we can track success metrics and monitor system health across all enviro
   - [x] Configure structured log format: { timestamp, requestId, userId, feature, level, message }
   - [x] Set up request ID generation middleware (UUID v4)
   - [x] Integrate Pino with OpenTelemetry: correlate logs with traces
-  - [x] Configure log levels per environment: debug (local), info (dev), warn (prod)
+  - [x] Configure log levels per environment: debug for local/Preview paths, warn for
+        Production, and info for the local API watch runtime when it reports `development`.
   - [x] Add Pino HTTP middleware to log all requests/responses
 
 - [x] Task 6: Set up Grafana Cloud account (AC: #4)
@@ -926,7 +928,7 @@ _bmad-output/
     and a stronger troubleshooting guide for missing traces, metrics, and structured logs.
   - Marked Grafana dashboard screenshots as intentionally skipped by operator decision while
     keeping dashboard JSON exports and manual Grafana validation as the source of truth.
-- Closed the remaining local observability dev-loop debt:
+- Closed the remaining local observability feedback-loop debt:
   - Added `infra/grafana/local/` as a repo-owned LGTM stack with generated local dashboard copies
     so the same checked-in dashboard JSON can run against both Grafana Cloud exports and local
     provisioning.

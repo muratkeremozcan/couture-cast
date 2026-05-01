@@ -41,9 +41,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_WEB_PROJECT_SLUG: couture-cast-web
-          VERCEL_API_PROJECT_SLUG: couture-cast-api
-          VERCEL_TEAM_SLUG: muratkeremozcans-projects
+          VERCEL_WEB_PROJECT_SLUG: ${{ vars.VERCEL_WEB_PROJECT_SLUG || 'couture-cast-web' }}
+          VERCEL_API_PROJECT_SLUG: ${{ vars.VERCEL_API_PROJECT_SLUG || 'couture-cast-api' }}
+          VERCEL_TEAM_SLUG: ${{ vars.VERCEL_TEAM_SLUG || 'muratkeremozcans-projects' }}
           VERCEL_GIT_COMMIT_REF: ${{ github.head_ref }}
           GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}

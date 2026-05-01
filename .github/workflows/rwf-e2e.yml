@@ -29,14 +29,25 @@ on:
         type: string
         description: "Git ref from deployment event (branch name)"
         required: false
+      vercel_web_project_slug:
+        type: string
+        description: "Vercel web project slug used for Preview URL resolution"
+        required: false
+        default: couture-cast-web
+      vercel_api_project_slug:
+        type: string
+        description: "Vercel API project slug used for Preview URL resolution"
+        required: false
+        default: couture-cast-api
+      vercel_team_slug:
+        type: string
+        description: "Vercel team slug used for Preview URL resolution"
+        required: false
+        default: muratkeremozcans-projects
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET:
         required: false
       VERCEL_TOKEN:
-        required: false
-      VERCEL_API_PROJECT_SLUG:
-        required: false
-      VERCEL_TEAM_SLUG:
         required: false
       DATABASE_URL_PREVIEW:
         required: false
@@ -129,9 +140,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_WEB_PROJECT_SLUG: couture-cast-web
-          VERCEL_API_PROJECT_SLUG: couture-cast-api
-          VERCEL_TEAM_SLUG: muratkeremozcans-projects
+          VERCEL_WEB_PROJECT_SLUG: ${{ inputs.vercel_web_project_slug }}
+          VERCEL_API_PROJECT_SLUG: ${{ inputs.vercel_api_project_slug }}
+          VERCEL_TEAM_SLUG: ${{ inputs.vercel_team_slug }}
           # Pass resolved branch name for URL construction
           VERCEL_GIT_COMMIT_REF: ${{ steps.resolve_branch.outputs.branch }}
           # Enable debug logging for URL resolution scripts
