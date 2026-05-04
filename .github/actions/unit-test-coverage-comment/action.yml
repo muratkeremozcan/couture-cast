@@ -88,6 +88,22 @@ inputs:
     description: 'JSON array of workspace coverage dirs for monorepo merge (e.g. ["apps/api/coverage","apps/web/coverage"]). Omit for single-repo.'
     required: false
     default: ''
+  diff-coverage-threshold:
+    description: |
+      Minimum line coverage % required for new/changed lines in this PR.
+      Fails the action after posting the PR comment if diff coverage drops below this floor.
+      Defaults to 50. Pass empty string '' to report without enforcing.
+      Only evaluated on pull_request events when lcov.info is present.
+    required: false
+    default: '50'
+  lcov-path:
+    description: 'Path to lcov.info for diff coverage. Auto-discovered at {coverage-path}/lcov.info when omitted.'
+    required: false
+    default: ''
+  base-branch:
+    description: 'Base branch for diff coverage git diff. Auto-detected from GITHUB_BASE_REF on pull_request events. Override only if needed.'
+    required: false
+    default: ''
 outputs:
   report-url:
     description: 'URL to download the coverage artifact'
@@ -104,6 +120,18 @@ outputs:
   lines:
     description: 'Lines coverage percentage'
     value: ${{ steps.parse-coverage.outputs.lines }}
+  diff-lines-pct:
+    description: 'New/changed code line coverage percentage (PR only, requires lcov.info)'
+    value: ${{ steps.diff-coverage.outputs.diff_lines_pct }}
+  diff-lines-covered:
+    description: 'Number of covered instrumentable lines in the diff'
+    value: ${{ steps.diff-coverage.outputs.diff_lines_covered }}
+  diff-lines-total:
+    description: 'Total instrumentable lines in the diff'
+    value: ${{ steps.diff-coverage.outputs.diff_lines_total }}
+  diff-threshold-valid:
+    description: 'Whether the diff-coverage-threshold input is a valid number'
+    value: ${{ steps.diff-coverage.outputs.diff_threshold_valid }}
 runs:
   using: composite
   steps:
@@ -151,6 +179,54 @@ runs:
         console.log('Merged ' + (dirs.length - missing.length) + '/' + dirs.length + ' workspaces');
         console.log('Merged coverage:', JSON.stringify(result.total, null, 2));
         "
+    - name: Merge workspace lcov files
+      if: ${{ inputs.workspace-dirs != '' && inputs.lcov-path == '' }}
+      shell: bash
+      env:
+        WORKSPACE_DIRS: ${{ inputs.workspace-dirs }}
+        COVERAGE_PATH: ${{ inputs.coverage-path }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$COVERAGE_PATH"
+        node -e "
+        const fs = require('fs');
+        const path = require('path');
+        const dirs = JSON.parse(process.env.WORKSPACE_DIRS);
+        const merged = process.env.COVERAGE_PATH + '/lcov.info';
+        const repoRoot = process.cwd() + path.sep;
+        let count = 0;
+        let out = '';
+
+        for (const dir of dirs) {
+          const file = path.join(dir, 'lcov.info');
+          if (!fs.existsSync(file)) continue;
+
+          // workspace root = parent of the coverage dir (e.g. 'apps/api/coverage' → 'apps/api')
+          const workspaceRoot = path.dirname(dir);
+
+          const lines = fs.readFileSync(file, 'utf8').split('\n');
+          for (const line of lines) {
+            if (line.startsWith('SF:')) {
+              let sfPath = line.slice(3).trim();
+              if (path.isAbsolute(sfPath)) {
+                // Absolute path from CI runner — strip repo root prefix
+                if (sfPath.startsWith(repoRoot)) sfPath = sfPath.slice(repoRoot.length);
+              } else if (!sfPath.startsWith(workspaceRoot + '/') && sfPath !== '') {
+                // Workspace-relative (e.g. src/foo.ts) — prepend workspace root
+                sfPath = workspaceRoot + '/' + sfPath;
+              }
+              out += 'SF:' + sfPath + '\n';
+            } else {
+              out += line + '\n';
+            }
+          }
+          count++;
+          console.log('merged lcov: ' + file + ' (workspace root: ' + workspaceRoot + ')');
+        }
+
+        fs.writeFileSync(merged, out);
+        console.log('Merged ' + count + '/' + dirs.length + ' workspace lcov files into ' + merged);
+        "
     - name: Upload coverage report
       id: upload-report
       uses: actions/upload-artifact@v4
@@ -196,6 +272,161 @@ runs:
         else
           echo "report_url=" >> "$GITHUB_OUTPUT"
         fi
+    # Diff coverage: measures what % of the lines added/modified in THIS PR are covered.
+    # Distinct from cumulative coverage — answers "did you test the code you just wrote?"
+    # Mechanism:
+    #   1. Parse the merged lcov.info (SF: paths already normalized to repo-relative).
+    #   2. git diff BASE...HEAD --unified=0 → extract added/modified line ranges per file.
+    #   3. Cross-reference: only count DA (Data Annotation) entries in lcov.
+    #      Blank lines, comments, type-only declarations have no DA entry and are excluded.
+    #      (Add coverage.include to vitest configs so all source files appear in lcov.)
+    #   4. If diff-coverage-threshold is valid and pct < threshold → fail after posting comment.
+    #   5. Fails closed (diff_threshold_failed=true) when git diff errors and a threshold is set.
+    - name: Compute diff coverage
+      id: diff-coverage
+      if: ${{ github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        COVERAGE_PATH: ${{ inputs.coverage-path }}
+        INPUT_LCOV_PATH: ${{ inputs.lcov-path }}
+        INPUT_BASE_BRANCH: ${{ inputs.base-branch }}
+        INPUT_DIFF_THRESHOLD: ${{ inputs.diff-coverage-threshold }}
+        GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      run: |
+        set -euo pipefail
+
+        LCOV_FILE="${INPUT_LCOV_PATH:-}"
+        if [ -z "$LCOV_FILE" ]; then
+          LCOV_FILE="${COVERAGE_PATH}/lcov.info"
+        fi
+
+        # With fetch-depth: 0 in the checkout this is already available, but fetch the
+        # base SHA explicitly as a fallback for shallow clones in other callers.
+        BASE_REF="${GITHUB_BASE_SHA:-}"
+        if [ -n "$BASE_REF" ]; then
+          git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null || git fetch --depth=1 origin "$BASE_REF" 2>/dev/null || BASE_REF=""
+        fi
+        if [ -z "$BASE_REF" ]; then
+          BASE_BR="${INPUT_BASE_BRANCH:-${GITHUB_BASE_REF:-}}"
+          if [ -z "$BASE_BR" ]; then
+            echo '::notice::Could not determine base branch — diff coverage skipped'
+            printf 'diff_lines_pct=\ndiff_lines_covered=\ndiff_lines_total=\ndiff_threshold_failed=false\ndiff_threshold_valid=false\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch origin "$BASE_BR" 2>/dev/null || {
+            echo '::notice::Could not fetch base — diff coverage skipped'
+            printf 'diff_lines_pct=\ndiff_lines_covered=\ndiff_lines_total=\ndiff_threshold_failed=false\ndiff_threshold_valid=false\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          BASE_REF="origin/$BASE_BR"
+        fi
+
+        LCOV_FILE="$LCOV_FILE" BASE_REF="$BASE_REF" node -e "
+        const fs = require('fs');
+        const { spawnSync } = require('child_process');
+
+        const lcovPath = process.env.LCOV_FILE;
+        const baseRef = process.env.BASE_REF;
+        const rawThresh = process.env.INPUT_DIFF_THRESHOLD;
+        const threshold = rawThresh ? Number(rawThresh) : NaN;
+        const hasValidThreshold = rawThresh !== '' && Number.isFinite(threshold);
+        const out = process.env.GITHUB_OUTPUT;
+
+        if (rawThresh && !hasValidThreshold) {
+          console.log('::warning::diff-coverage-threshold \"' + rawThresh + '\" is not a valid number — enforcement and display disabled');
+        }
+
+        function setOutput(k, v) { fs.appendFileSync(out, k + '=' + v + '\n'); }
+
+        function skip(msg) {
+          console.log('::notice::' + msg + ' — diff coverage skipped');
+          setOutput('diff_lines_pct', '');
+          setOutput('diff_lines_covered', '');
+          setOutput('diff_lines_total', '');
+          setOutput('diff_threshold_failed', 'false');
+          setOutput('diff_threshold_valid', String(hasValidThreshold));
+          process.exit(0);
+        }
+
+        function failClosed(msg) {
+          console.log('::notice::' + msg);
+          setOutput('diff_lines_pct', '');
+          setOutput('diff_lines_covered', '');
+          setOutput('diff_lines_total', '');
+          setOutput('diff_threshold_failed', hasValidThreshold ? 'true' : 'false');
+          setOutput('diff_threshold_valid', String(hasValidThreshold));
+          process.exit(0);
+        }
+
+        if (!fs.existsSync(lcovPath)) skip('lcov.info not found at ' + lcovPath);
+
+        // lcov SF: paths are already normalized to repo-relative by the merge step
+        const fileCov = {};
+        let curFile = null;
+        for (const line of fs.readFileSync(lcovPath, 'utf8').split('\n')) {
+          if (line.startsWith('SF:')) {
+            curFile = line.slice(3).trim();
+            fileCov[curFile] = {};
+          } else if (line.startsWith('DA:') && curFile) {
+            const comma = line.indexOf(',', 3);
+            const ln = parseInt(line.slice(3, comma), 10);
+            const cnt = parseInt(line.slice(comma + 1), 10);
+            if (!isNaN(ln) && !isNaN(cnt)) fileCov[curFile][ln] = cnt;
+          }
+        }
+
+        const result = spawnSync('git', [
+          'diff', baseRef + '...HEAD',
+          '--unified=0', '--diff-filter=AMR', '--find-renames'
+        ], { encoding: 'utf8' });
+        if (result.error || result.status !== 0) failClosed('git diff failed — failing closed: ' + (result.stderr || ''));
+        const diffOut = result.stdout;
+
+        const changed = {};
+        let diffFile = null;
+        for (const line of diffOut.split('\n')) {
+          if (line.startsWith('+++ b/')) {
+            diffFile = line.slice(6).trim();
+            if (!changed[diffFile]) changed[diffFile] = new Set();
+          } else if (line.startsWith('@@ ') && diffFile) {
+            const m = line.match(/@@ [^+]*\+(\d+)(?:,(\d+))? @@/);
+            if (!m) continue;
+            const start = parseInt(m[1], 10);
+            const count = m[2] !== undefined ? parseInt(m[2], 10) : 1;
+            if (count === 0) continue;
+            for (let i = 0; i < count; i++) changed[diffFile].add(start + i);
+          }
+        }
+
+        let total = 0, covered = 0;
+        for (const [file, lines] of Object.entries(changed)) {
+          const cov = fileCov[file];
+          if (!cov) continue;
+          for (const ln of lines) {
+            if (ln in cov) { total++; if (cov[ln] > 0) covered++; }
+          }
+        }
+
+        setOutput('diff_threshold_valid', String(hasValidThreshold));
+
+        if (total === 0) {
+          setOutput('diff_lines_pct', '');
+          setOutput('diff_lines_covered', '0');
+          setOutput('diff_lines_total', '0');
+          setOutput('diff_threshold_failed', 'false');
+          console.log('No instrumentable changed lines — diff coverage not applicable');
+        } else {
+          const pct = Math.round(covered / total * 1000) / 10;
+          const failed = hasValidThreshold && pct < threshold;
+          setOutput('diff_lines_pct', String(pct));
+          setOutput('diff_lines_covered', String(covered));
+          setOutput('diff_lines_total', String(total));
+          setOutput('diff_threshold_failed', String(failed));
+          const threshMsg = hasValidThreshold ? ' (threshold: ' + threshold + '%)' : '';
+          console.log('Diff coverage: ' + pct + '% — ' + covered + '/' + total + ' lines covered' + threshMsg);
+        }
+        "
+
     - name: Generate step summary
       shell: bash
       env:
@@ -207,6 +438,12 @@ runs:
         LINES: ${{ steps.parse-coverage.outputs.lines }}
         REPORT_URL: ${{ steps.build-url.outputs.report_url }}
         THRESHOLDS: ${{ inputs.thresholds }}
+        DIFF_LINES_PCT: ${{ steps.diff-coverage.outputs.diff_lines_pct }}
+        DIFF_LINES_COVERED: ${{ steps.diff-coverage.outputs.diff_lines_covered }}
+        DIFF_LINES_TOTAL: ${{ steps.diff-coverage.outputs.diff_lines_total }}
+        DIFF_THRESHOLD_FAILED: ${{ steps.diff-coverage.outputs.diff_threshold_failed }}
+        DIFF_THRESHOLD: ${{ inputs.diff-coverage-threshold }}
+        DIFF_THRESHOLD_VALID: ${{ steps.diff-coverage.outputs.diff_threshold_valid }}
       run: |
         set -euo pipefail
         echo "## 🧪 ${LABEL} Coverage" >> "$GITHUB_STEP_SUMMARY"
@@ -236,6 +473,19 @@ runs:
           echo "| Functions | ${FUNCTIONS}% |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Lines | ${LINES}% |" >> "$GITHUB_STEP_SUMMARY"
         fi
+        if [ -n "${DIFF_LINES_PCT:-}" ] && [ -n "${DIFF_LINES_TOTAL:-}" ] && [ "${DIFF_LINES_TOTAL:-0}" != "0" ]; then
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${DIFF_THRESHOLD_VALID:-false}" = "true" ]; then
+            if [ "${DIFF_THRESHOLD_FAILED:-false}" = "true" ]; then
+              DIFF_ICON="❌"
+            else
+              DIFF_ICON="✅"
+            fi
+            echo "📝 **New/changed code (this PR):** ${DIFF_ICON} **${DIFF_LINES_PCT}%** · ${DIFF_LINES_COVERED}/${DIFF_LINES_TOTAL} lines _(threshold: ${DIFF_THRESHOLD}%)_" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "📝 **New/changed code (this PR):** **${DIFF_LINES_PCT}%** · ${DIFF_LINES_COVERED}/${DIFF_LINES_TOTAL} lines" >> "$GITHUB_STEP_SUMMARY"
+          fi
+        fi
         if [ -n "$REPORT_URL" ]; then
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "📦 **[Download Full Report](${REPORT_URL})**" >> "$GITHUB_STEP_SUMMARY"
@@ -252,6 +502,12 @@ runs:
         INPUT_FUNCTIONS: ${{ steps.parse-coverage.outputs.functions }}
         INPUT_LINES: ${{ steps.parse-coverage.outputs.lines }}
         INPUT_THRESHOLDS: ${{ inputs.thresholds }}
+        INPUT_DIFF_LINES_PCT: ${{ steps.diff-coverage.outputs.diff_lines_pct }}
+        INPUT_DIFF_LINES_COVERED: ${{ steps.diff-coverage.outputs.diff_lines_covered }}
+        INPUT_DIFF_LINES_TOTAL: ${{ steps.diff-coverage.outputs.diff_lines_total }}
+        INPUT_DIFF_THRESHOLD_FAILED: ${{ steps.diff-coverage.outputs.diff_threshold_failed }}
+        INPUT_DIFF_THRESHOLD: ${{ inputs.diff-coverage-threshold }}
+        INPUT_DIFF_THRESHOLD_VALID: ${{ steps.diff-coverage.outputs.diff_threshold_valid }}
       with:
         script: |
           if (context.payload.pull_request && context.payload.pull_request.head.repo.full_name !== context.payload.pull_request.base.repo.full_name) {
@@ -311,6 +567,20 @@ runs:
             '',
             ...tableRows,
           ];
+          const diffPct = process.env.INPUT_DIFF_LINES_PCT;
+          const diffCovered = process.env.INPUT_DIFF_LINES_COVERED;
+          const diffTotal = process.env.INPUT_DIFF_LINES_TOTAL;
+          const diffThresholdFailed = process.env.INPUT_DIFF_THRESHOLD_FAILED === 'true';
+          const diffThresholdValid = process.env.INPUT_DIFF_THRESHOLD_VALID === 'true';
+          const diffThreshold = process.env.INPUT_DIFF_THRESHOLD;
+          if (diffPct && diffTotal && parseInt(diffTotal) > 0) {
+            const icon = diffThresholdValid
+              ? (diffThresholdFailed ? '❌' : '✅')
+              : '';
+            const threshPart = diffThresholdValid ? ` _(threshold: ${diffThreshold}%)_` : '';
+            const prefix = icon ? `${icon} ` : '';
+            bodyParts.push('', `📝 **New/changed code (this PR):** ${prefix}**${diffPct}%** line coverage · ${diffCovered}/${diffTotal} lines${threshPart}`);
+          }
           if (reportUrl) {
             bodyParts.push('', `📦 **[Download Full Report](${reportUrl})**`);
           }
@@ -381,3 +651,14 @@ runs:
           -d "$payload" \
           "https://api.github.com/gists/${GIST_ID}" > /dev/null
         echo "Updated 4 badge files in gist ${GIST_ID} with prefix ${PREFIX}"
+    - name: Fail if diff coverage below threshold
+      if: ${{ steps.diff-coverage.outputs.diff_threshold_failed == 'true' }}
+      shell: bash
+      env:
+        DIFF_PCT: ${{ steps.diff-coverage.outputs.diff_lines_pct }}
+        DIFF_COVERED: ${{ steps.diff-coverage.outputs.diff_lines_covered }}
+        DIFF_TOTAL: ${{ steps.diff-coverage.outputs.diff_lines_total }}
+        THRESHOLD: ${{ inputs.diff-coverage-threshold }}
+      run: |
+        echo "::error::New/changed code coverage ${DIFF_PCT}% (${DIFF_COVERED}/${DIFF_TOTAL} lines) is below the configured threshold ${THRESHOLD}%"
+        exit 1

@@ -32,6 +32,7 @@ export default defineConfig({
     clearMocks: true,
     coverage: {
       reporter: ['text', 'json-summary', 'lcov'],
+      include: ['app/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}', 'src/**/*.{ts,tsx}'],
     },
   },
 })

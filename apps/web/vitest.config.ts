@@ -24,6 +24,7 @@ export default defineConfig({
     clearMocks: true,
     coverage: {
       reporter: ['text', 'json-summary', 'lcov'],
+      include: ['src/**/*.{ts,tsx}'],
     },
   },
 })
