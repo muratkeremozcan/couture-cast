@@ -43,7 +43,7 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && needs.vars.outputs.SKIP_BURN_IN != 'true' }}
     uses: ./.github/workflows/rwf-burn-in.yml
     with:
-      base-ref: ${{ github.base_ref || 'main' }}
+      base-ref: ${{ github.event.pull_request.base.sha || github.base_ref || 'main' }}
       test-directory: 'playwright/'
       install-command: ${{ needs.vars.outputs.install_command }}
     secrets: inherit

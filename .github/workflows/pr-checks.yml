@@ -27,6 +27,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - name: Setup Node environment
         uses: ./.github/actions/setup-node-env
@@ -57,7 +58,8 @@ jobs:
           coverage-summary-path: ./coverage/coverage-summary.json
           report-name: coverage-report-${{ github.event.pull_request.number || github.sha }}
           test-outcome: ${{ steps.tests.outcome }}
-          workspace-dirs: '["apps/api/coverage","apps/web/coverage","apps/mobile/coverage","packages/api-client/coverage","packages/config/coverage"]'
+          workspace-dirs: ${{ steps.tests.outputs.coverage_dirs }}
+          diff-coverage-threshold: '50'
           badge-gist-id: ${{ env.COVERAGE_GIST_ID }}
           badge-filename-prefix: couture-cast
           badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}

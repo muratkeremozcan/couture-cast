@@ -64,7 +64,6 @@ outputs:
 runs:
   using: composite
   steps:
-
     - name: Download shard reports
       uses: actions/download-artifact@v4
       continue-on-error: true
@@ -104,6 +103,7 @@ runs:
 
     - name: Resolve report download URL
       id: resolve-url
+      if: ${{ always() }}
       uses: actions/github-script@v7
       with:
         github-token: ${{ inputs.github-token || github.token }}
@@ -175,99 +175,76 @@ runs:
         if [ -n "${DEPLOY_URL}" ]; then
           echo "- Deployment: ${DEPLOY_URL}" >> $GITHUB_STEP_SUMMARY
         fi
-
-    - name: Build PR comment body
-      id: pr-comment-body
-      if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
-      shell: bash
-      env:
-        BURN_IN_RESULT: ${{ inputs.burn-in-result }}
-        ENVIRONMENT: ${{ inputs.environment }}
-        E2E_RESULT: ${{ inputs.e2e-result }}
-        REPORT_URL: ${{ steps.resolve-url.outputs.report_url }}
-        RUN_URL: ${{ steps.resolve-url.outputs.run_url }}
-        HAS_REPORT: ${{ steps.resolve-url.outputs.has_report }}
-      run: |
-        E2E_NORM="$(echo "${E2E_RESULT}" | tr '[:upper:]' '[:lower:]')"
-        BURN_IN_NORM="$(echo "${BURN_IN_RESULT}" | tr '[:upper:]' '[:lower:]')"
-        if [ "${E2E_NORM}" = "success" ] && [ "${BURN_IN_NORM}" != "failure" ] && [ "${BURN_IN_NORM}" != "failed" ]; then
-          STATUS_EMOJI="✅"
-          STATUS_TEXT="SUCCESS"
-        else
-          STATUS_EMOJI="❌"
-          STATUS_TEXT="FAILURE"
-        fi
-
-        case "${BURN_IN_NORM}" in
-          success|passed) BURN_IN_DISPLAY="passed" ;;
-          failure|failed) BURN_IN_DISPLAY="failed" ;;
-          *) BURN_IN_DISPLAY="skipped" ;;
-        esac
-
-        if [ "${HAS_REPORT}" = "true" ]; then
-          REPORT_LINK="${REPORT_URL}"
-        else
-          REPORT_LINK="${RUN_URL}"
-        fi
-
-        {
-          echo "body<<EOF"
-          echo "<!-- playwright-e2e-report -->"
-          echo "## 🎭 Playwright E2E: ${STATUS_EMOJI} **${STATUS_TEXT}**"
-          echo
-          echo "| Metric | Value |"
-          echo "|--------|-------|"
-          echo "| Environment | ${ENVIRONMENT} |"
-          echo "| Burn-in | ${BURN_IN_DISPLAY} |"
-          echo
-          echo "📦 **[Download Report & Traces](${REPORT_LINK})**"
-          echo "_Includes HTML report and trace files for debugging failures_"
-          echo "EOF"
-        } >> "$GITHUB_OUTPUT"
-
-    - name: Cleanup legacy burn-in gate PR comment
-      if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
+    - name: Comment Playwright E2E result on PR
+      if: ${{ always() && github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
       uses: actions/github-script@v7
+      env:
+        INPUT_BURN_IN_RESULT: ${{ inputs.burn-in-result }}
+        INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        INPUT_E2E_RESULT: ${{ inputs.e2e-result }}
+        INPUT_REPORT_URL: ${{ steps.resolve-url.outputs.report_url }}
+        INPUT_RUN_URL: ${{ steps.resolve-url.outputs.run_url }}
+        INPUT_HAS_REPORT: ${{ steps.resolve-url.outputs.has_report }}
       with:
         github-token: ${{ inputs.github-token || github.token }}
         script: |
-          const marker = '<!-- burn-in-gate-status -->';
-          const issueNumber = context.payload.pull_request.number;
+          const e2eResult = process.env.INPUT_E2E_RESULT.toLowerCase();
+          const burnInResult = process.env.INPUT_BURN_IN_RESULT.toLowerCase();
+          const environment = process.env.INPUT_ENVIRONMENT;
+          const hasReport = process.env.INPUT_HAS_REPORT === 'true';
+          const reportUrl = process.env.INPUT_REPORT_URL;
+          const runUrl = process.env.INPUT_RUN_URL;
+
+          const isSuccess = e2eResult === 'success' && burnInResult !== 'failure' && burnInResult !== 'failed';
+          const statusEmoji = isSuccess ? '✅' : '❌';
+          const statusText = isSuccess ? 'SUCCESS' : 'FAILURE';
+
+          const burnInDisplay = ['success', 'passed'].includes(burnInResult) ? 'passed'
+            : ['failure', 'failed'].includes(burnInResult) ? 'failed'
+            : 'skipped';
+
+          const reportLink = hasReport ? reportUrl : runUrl;
+          const marker = '<!-- playwright-e2e-report -->';
+
+          const body = [
+            marker,
+            `## 🎭 Playwright E2E: ${statusEmoji} **${statusText}**`,
+            '',
+            `| Metric | Value |`,
+            `|--------|-------|`,
+            `| Environment | ${environment} |`,
+            `| Burn-in | ${burnInDisplay} |`,
+            '',
+            `📦 **[Download Report & Traces](${reportLink})**`,
+            '_Includes HTML report and trace files for debugging failures_',
+          ].join('\n');
+
           const comments = await github.paginate(github.rest.issues.listComments, {
             owner: context.repo.owner,
             repo: context.repo.repo,
-            issue_number: issueNumber,
+            issue_number: context.issue.number,
             per_page: 100,
           });
-          let deleted = 0;
-          for (const comment of comments) {
-            if (comment.body?.includes(marker)) {
-              await github.rest.issues.deleteComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: comment.id,
-              });
-              deleted += 1;
-            }
+
+          const existing = comments.find((c) =>
+            c.user?.login === 'github-actions[bot]' &&
+            c.body?.includes(marker)
+          );
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+            core.info(`Updated existing Playwright E2E comment (id: ${existing.id})`);
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+            core.info('Created new Playwright E2E comment');
           }
-          core.info(`Deleted ${deleted} legacy burn-in comment(s).`);
-
-    - name: Find existing Playwright PR comment
-      id: find-pr-comment
-      if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
-      uses: peter-evans/find-comment@v3
-      with:
-        issue-number: ${{ github.event.pull_request.number }}
-        body-includes: '<!-- playwright-e2e-report -->'
-        comment-author: 'github-actions[bot]'
-        token: ${{ inputs.github-token || github.token }}
-
-    - name: Upsert Playwright PR comment
-      if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
-      uses: peter-evans/create-or-update-comment@v4
-      with:
-        issue-number: ${{ github.event.pull_request.number }}
-        comment-id: ${{ steps.find-pr-comment.outputs.comment-id }}
-        body: ${{ steps.pr-comment-body.outputs.body }}
-        edit-mode: replace
-        token: ${{ inputs.github-token || github.token }}
