@@ -88,8 +88,9 @@ without blocking current feature delivery.
         on PR-changed lines only; PR comment and step summary updated to show diff % with threshold badge;
         `Fail if diff coverage below threshold` step enforces the gate.
   - [x] Wire `diff-coverage-threshold: '50'` in `pr-checks.yml` to activate the new gate.
-  - [x] All 5 workspace vitest configs (`apps/api`, `apps/web`, `apps/mobile`, `packages/api-client`,
-        `packages/config`) already emit `lcov` reporter — no changes needed.
+  - [x] Added `coverage.include` to all 5 workspace Vitest configs (`apps/api`, `apps/web`,
+        `apps/mobile`, `packages/api-client`, `packages/config`) so untested source files appear
+        in `lcov`.
 
 - [ ] Task 2: Roll out auth-session where real auth exists (AC: #2)
   - [ ] Add auth-session provider/fixture wiring for login-backed Playwright specs only.

@@ -192,14 +192,29 @@ runs:
         const fs = require('fs');
         const path = require('path');
         const dirs = JSON.parse(process.env.WORKSPACE_DIRS);
-        const merged = process.env.COVERAGE_PATH + '/lcov.info';
         const repoRoot = process.cwd() + path.sep;
+        const missing = [];
         let count = 0;
         let out = '';
 
         for (const dir of dirs) {
           const file = path.join(dir, 'lcov.info');
-          if (!fs.existsSync(file)) continue;
+          if (!fs.existsSync(file)) {
+            missing.push({ dir, file });
+          }
+        }
+
+        if (missing.length > 0) {
+          for (const item of missing) {
+            console.error('::error::Expected lcov.info for workspace coverage dir ' + item.dir + ' was not found at ' + item.file);
+          }
+          process.exit(1);
+        }
+
+        const merged = path.join(process.env.COVERAGE_PATH, 'lcov.info');
+
+        for (const dir of dirs) {
+          const file = path.join(dir, 'lcov.info');
 
           // workspace root = parent of the coverage dir (e.g. 'apps/api/coverage' → 'apps/api')
           const workspaceRoot = path.dirname(dir);
@@ -302,6 +317,25 @@ runs:
 
         # With fetch-depth: 0 in the checkout this is already available, but fetch the
         # base SHA explicitly as a fallback for shallow clones in other callers.
+        RAW_DIFF_THRESHOLD="${INPUT_DIFF_THRESHOLD:-}"
+        DIFF_THRESHOLD_VALID=false
+        if [ -n "$RAW_DIFF_THRESHOLD" ]; then
+          if node -e "const threshold = Number(process.env.INPUT_DIFF_THRESHOLD); process.exit(Number.isFinite(threshold) ? 0 : 1);" >/dev/null 2>&1; then
+            DIFF_THRESHOLD_VALID=true
+          fi
+        fi
+
+        handle_base_resolution_failure() {
+          local message="$1"
+          echo "::notice::${message} — diff coverage skipped"
+          if [ -n "$RAW_DIFF_THRESHOLD" ]; then
+            printf 'diff_lines_pct=\ndiff_lines_covered=\ndiff_lines_total=\ndiff_threshold_failed=true\ndiff_threshold_valid=%s\n' "$DIFF_THRESHOLD_VALID" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          printf 'diff_lines_pct=\ndiff_lines_covered=\ndiff_lines_total=\ndiff_threshold_failed=false\ndiff_threshold_valid=false\n' >> "$GITHUB_OUTPUT"
+          exit 0
+        }
+
         BASE_REF="${GITHUB_BASE_SHA:-}"
         if [ -n "$BASE_REF" ]; then
           git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null || git fetch --depth=1 origin "$BASE_REF" 2>/dev/null || BASE_REF=""
@@ -309,14 +343,10 @@ runs:
         if [ -z "$BASE_REF" ]; then
           BASE_BR="${INPUT_BASE_BRANCH:-${GITHUB_BASE_REF:-}}"
           if [ -z "$BASE_BR" ]; then
-            echo '::notice::Could not determine base branch — diff coverage skipped'
-            printf 'diff_lines_pct=\ndiff_lines_covered=\ndiff_lines_total=\ndiff_threshold_failed=false\ndiff_threshold_valid=false\n' >> "$GITHUB_OUTPUT"
-            exit 0
+            handle_base_resolution_failure 'Could not determine base branch'
           fi
           git fetch origin "$BASE_BR" 2>/dev/null || {
-            echo '::notice::Could not fetch base — diff coverage skipped'
-            printf 'diff_lines_pct=\ndiff_lines_covered=\ndiff_lines_total=\ndiff_threshold_failed=false\ndiff_threshold_valid=false\n' >> "$GITHUB_OUTPUT"
-            exit 0
+            handle_base_resolution_failure 'Could not fetch base'
           }
           BASE_REF="origin/$BASE_BR"
         fi

@@ -64,7 +64,6 @@ outputs:
 runs:
   using: composite
   steps:
-
     - name: Download shard reports
       uses: actions/download-artifact@v4
       continue-on-error: true
@@ -104,6 +103,7 @@ runs:
 
     - name: Resolve report download URL
       id: resolve-url
+      if: ${{ always() }}
       uses: actions/github-script@v7
       with:
         github-token: ${{ inputs.github-token || github.token }}
@@ -175,9 +175,8 @@ runs:
         if [ -n "${DEPLOY_URL}" ]; then
           echo "- Deployment: ${DEPLOY_URL}" >> $GITHUB_STEP_SUMMARY
         fi
-
     - name: Comment Playwright E2E result on PR
-      if: ${{ github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
+      if: ${{ always() && github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
       uses: actions/github-script@v7
       env:
         INPUT_BURN_IN_RESULT: ${{ inputs.burn-in-result }}
