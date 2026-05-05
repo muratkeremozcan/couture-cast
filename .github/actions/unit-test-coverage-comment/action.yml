@@ -407,8 +407,9 @@ runs:
 
         const result = spawnSync('git', [
           'diff', baseRef + '...HEAD',
-          '--unified=0', '--diff-filter=AMR', '--find-renames'
-        ], { encoding: 'utf8' });
+          '--unified=0', '--diff-filter=AMR', '--find-renames',
+          '--', ':(exclude).claude', ':(exclude)_bmad'
+        ], { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 });
         if (result.error || result.status !== 0) failClosed('git diff failed — failing closed: ' + (result.stderr || ''));
         const diffOut = result.stdout;
 

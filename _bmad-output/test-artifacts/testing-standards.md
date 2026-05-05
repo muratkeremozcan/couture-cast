@@ -1,7 +1,6 @@
 # Testing standards
 
-Updated: 2026-05-05 - Made auth-session the standard Playwright fixture path for Story 0.14
-Task 2.
+Updated: 2026-05-05 - Made auth-session the standard Playwright fixture path for Story 0.14 Task 2.
 
 Status: active
 

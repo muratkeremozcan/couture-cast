@@ -3,6 +3,8 @@ import { expect, test } from '../support/fixtures/merged-fixtures'
 const authSessionUserIdentifier = 'guardian-standard-smoke-cookie'
 const webBaseUrl =
   process.env.WEB_E2E_BASE_URL ?? process.env.WEB_BASE_URL ?? 'http://localhost:3005'
+const authSessionCookieName =
+  process.env.AUTH_SESSION_COOKIE_NAME?.trim() || 'couturecast-e2e-auth'
 
 test.describe('Auth-session standard fixture', () => {
   test.use({
@@ -22,7 +24,9 @@ test.describe('Auth-session standard fixture', () => {
     await expect
       .poll(async () => {
         const storageState = await context.storageState()
-        return storageState.cookies.some((cookie) => cookie.value === authToken)
+        return storageState.cookies.some(
+          (cookie) => cookie.name === authSessionCookieName && cookie.value === authToken
+        )
       })
       .toBe(true)
   })
