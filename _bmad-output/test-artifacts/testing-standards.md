@@ -1,7 +1,7 @@
 # Testing standards
 
-Updated: 2026-04-15 - Added shared factory, cleanup, and review-checklist expectations for Story
-0.10.
+Updated: 2026-05-05 - Made auth-session the standard Playwright fixture path for Story 0.14
+Task 2.
 
 Status: active
 
@@ -32,6 +32,17 @@ Detailed guidance:
   must call `registerForCleanup()` and finish with `afterEach(async () => cleanup({ prisma }))`.
 - `Reset shared cleanup state`: Non-persistent suites that import cleanup helpers should still clear
   the registry in `afterEach` so registration cannot leak across tests.
+
+## Playwright auth-session standards
+
+| Scenario                             | Standard                                                       |
+| ------------------------------------ | -------------------------------------------------------------- |
+| Browser specs                        | Use `playwright/support/fixtures/merged-fixtures`              |
+| Signed-out or conflicting auth specs | Use `authSessionEnabled: false` with a comment explaining why  |
+| API/synthetic contracts              | Keep using `authHeaders(...)`; no auth-session opt-out needed  |
+| Alternate persisted users            | Override `authOptions.userIdentifier` in the relevant describe |
+
+Keep `.auth/` and `playwright/.auth/` out of git; never log token contents.
 
 ## Test quality checklist
 

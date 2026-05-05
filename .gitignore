@@ -29,6 +29,8 @@ playwright-report/
 playwright-logs/
 playwright/artifacts/
 playwright/playwright-report/
+playwright/.auth/
+.auth/
 blob-report/
 downloads/
 

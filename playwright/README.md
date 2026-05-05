@@ -78,6 +78,19 @@ playwright/
 - `support/fixtures/merged-fixtures.ts`: composes the base test,
   exposes `test` and `expect`, and keeps fixture imports ergonomic.
 
+## Auth-session
+
+Auth-session is part of `support/fixtures/merged-fixtures.ts`; use the standard
+`test` import. Override `authOptions.userIdentifier` only when a spec needs a
+different persisted user.
+
+Use `authSessionEnabled: false` only for signed-out browser assertions or specs
+that intentionally manage browser auth themselves. Add a short local comment
+when disabling it.
+
+Local runs synthesize `.auth/<environment>/<userIdentifier>/storage-state.json`.
+Add a real provider before enabling auth-session outside `TEST_ENV=local`.
+
 ## Helpers + factories
 
 - `support/helpers/api-client.ts`: pure function for HTTP verbs that
