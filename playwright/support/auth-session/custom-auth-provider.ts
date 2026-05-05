@@ -10,11 +10,57 @@ import {
   type PlaywrightStorageState,
 } from '@seontechnologies/playwright-utils/auth-session'
 import { resolveEnvironmentConfig } from '../../config/environments'
-import { DEFAULT_AUTH_SESSION_COOKIE_NAME, resolveAuthSessionIdentity } from './identity'
+import type { ApiRole } from '../helpers/api-test'
+
+const DEFAULT_AUTH_SESSION_COOKIE_NAME = 'couturecast-e2e-auth'
+
+const ROLE_ALIASES: Record<string, ApiRole> = {
+  admin: 'admin',
+  guardian: 'guardian',
+  moderator: 'moderator',
+  teen: 'teen',
+}
 
 function env(name: string): string | undefined {
   const value = process.env[name]?.trim()
   return value && value.length > 0 ? value : undefined
+}
+
+function slugify(value: string): string {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '')
+
+  return slug || 'default'
+}
+
+function resolveRole(userIdentifier: string): ApiRole {
+  const normalized = slugify(userIdentifier)
+  const leadingRole = normalized.split('-')[0]
+  const role = leadingRole ? ROLE_ALIASES[leadingRole] : undefined
+
+  if (role) {
+    return role
+  }
+
+  return 'guardian'
+}
+
+/**
+ * Resolves the deterministic cookie value used for local auth-session storage.
+ *
+ * The playwright-utils fixture supplies `authOptions.userIdentifier`; this local
+ * provider maps that identifier to the same `test-token-<role>` convention used
+ * by API helpers. It is intentionally provider-private and should disappear once
+ * local E2E auth can call a real login/token endpoint.
+ */
+function resolveLocalAuthSessionToken(options: Partial<AuthOptions> = {}): string {
+  const userIdentifier = options.userIdentifier?.trim() || 'guardian'
+  const role = resolveRole(userIdentifier)
+
+  return `test-token-${role}`
 }
 
 function isStorageState(value: unknown): value is PlaywrightStorageState {
@@ -49,9 +95,9 @@ function getBaseUrl(options: Partial<AuthOptions> = {}) {
 }
 
 function createLocalAuthState(options: Partial<AuthOptions>): PlaywrightStorageState {
-  // Local has no real login endpoint yet; derive a deterministic identity from
-  // authOptions.userIdentifier so auth-session can cache one state per user.
-  const identity = resolveAuthSessionIdentity(options)
+  // Local has no real login endpoint yet. Resolve the synthetic cookie value
+  // here so playwright-utils can cache one storage state per userIdentifier.
+  const token = resolveLocalAuthSessionToken(options)
   const appUrl = new URL(getBaseUrl(options))
   const expires = Math.floor(Date.now() / 1000) + 60 * 60 * 12
 
@@ -65,7 +111,7 @@ function createLocalAuthState(options: Partial<AuthOptions>): PlaywrightStorageS
         path: '/',
         sameSite: 'Lax',
         secure: appUrl.protocol === 'https:',
-        value: identity.token,
+        value: token,
       },
     ],
     origins: [],
