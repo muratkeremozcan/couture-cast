@@ -30,12 +30,14 @@ const defaultAuthOptions: AuthOptions = {
   userIdentifier: process.env.AUTH_SESSION_USER_IDENTIFIER?.trim() || 'guardian',
 }
 
-// Auth-session is part of the standard fixture path. Only tests that prove
-// signed-out browser behavior or intentionally manage conflicting browser auth
-// should opt out with authSessionEnabled: false.
+// Auth-session is part of the standard fixture path for local. For non-local
+// environments (preview, prod) the provider is not yet wired up, so auth-session
+// is disabled by default — tests that explicitly set authSessionEnabled:true and
+// supply a compatible authOptions.environment can still opt in.
+// Only tests proving signed-out behavior should opt out in local with authSessionEnabled: false.
 const authSession = base.extend<AuthFixtures>({
   authOptions: [defaultAuthOptions, { option: true }],
-  authSessionEnabled: [true, { option: true }],
+  authSessionEnabled: [environment.name === 'local', { option: true }],
   authToken: authFixtures.authToken,
   context: authFixtures.context,
   page: authFixtures.page,

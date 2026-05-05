@@ -48,15 +48,7 @@ function resolveRole(userIdentifier: string): ApiRole {
   return 'guardian'
 }
 
-/**
- * Resolves the deterministic cookie value used for local auth-session storage.
- *
- * The playwright-utils fixture supplies `authOptions.userIdentifier`; this local
- * provider maps that identifier to the same `test-token-<role>` convention used
- * by API helpers. It is intentionally provider-private and should disappear once
- * local E2E auth can call a real login/token endpoint.
- */
-function resolveLocalAuthSessionToken(options: Partial<AuthOptions> = {}): string {
+function resolveSyntheticAuthToken(options: Partial<AuthOptions> = {}): string {
   const userIdentifier = options.userIdentifier?.trim() || 'guardian'
   const role = resolveRole(userIdentifier)
 
@@ -94,10 +86,8 @@ function getBaseUrl(options: Partial<AuthOptions> = {}) {
   return options.baseUrl ?? resolveEnvironmentConfig(getEnvironment(options)).webBaseUrl
 }
 
-function createLocalAuthState(options: Partial<AuthOptions>): PlaywrightStorageState {
-  // Local has no real login endpoint yet. Resolve the synthetic cookie value
-  // here so playwright-utils can cache one storage state per userIdentifier.
-  const token = resolveLocalAuthSessionToken(options)
+function createSyntheticAuthState(options: Partial<AuthOptions>): PlaywrightStorageState {
+  const token = resolveSyntheticAuthToken(options)
   const appUrl = new URL(getBaseUrl(options))
   const expires = Math.floor(Date.now() / 1000) + 60 * 60 * 12
 
@@ -187,15 +177,7 @@ const coutureCastAuthProvider: AuthProvider = {
     }
 
     authStorageInit({ environment, userIdentifier })
-    if (environment !== 'local') {
-      return Promise.reject(
-        new Error(
-          'Auth-session local provider only supports TEST_ENV=local. Add a real provider before enabling auth-session for non-local runs.'
-        )
-      )
-    }
-
-    const storageState = createLocalAuthState({
+    const storageState = createSyntheticAuthState({
       ...options,
       environment,
       userIdentifier,

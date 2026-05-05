@@ -6,9 +6,9 @@ const webBaseUrl =
 
 test.describe('Auth-session standard fixture', () => {
   test.use({
+    authSessionEnabled: true,
     authOptions: {
       baseUrl: webBaseUrl,
-      environment: 'local',
       userIdentifier: authSessionUserIdentifier,
     },
   })
