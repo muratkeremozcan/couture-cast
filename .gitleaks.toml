@@ -9,4 +9,5 @@ useDefault = true
 paths = [
   '''_bmad/_config/files-manifest\.csv''',
   '''_bmad/wds/workflows/6-asset-generation/steps-p/step-01-load-context\.md''',
+  '''\.claude/''',
 ]

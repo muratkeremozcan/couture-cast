@@ -92,12 +92,10 @@ without blocking current feature delivery.
         `apps/mobile`, `packages/api-client`, `packages/config`) so untested source files appear
         in `lcov`.
 
-- [ ] Task 2: Roll out auth-session where real auth exists (AC: #2)
-  - [ ] Add auth-session provider/fixture wiring for login-backed Playwright specs only.
-  - [ ] Keep explicit unauthenticated/security-negative specs out of auth-session.
-  - [ ] Add test guidelines: when to use `authSessionEnabled: false` and when to use
-        persisted auth state.
-  - [ ] Add parallel user-isolation pattern for auth-session-driven tests.
+- [x] Task 2: Roll out auth-session as the standard Playwright fixture path (AC: #2)
+  - [x] Add auth-session provider/fixture wiring to the standard merged Playwright fixture.
+  - [x] Keep explicit signed-out/conflicting-browser-auth specs as narrow opt-outs.
+  - [x] Document narrow opt-out and `authOptions.userIdentifier` usage.
 
 - [ ] Task 3: Maestro analytics journey expansion (AC: #5)
   - [ ] Add mobile analytics validation flows for core events (ritual, upload, alerts).
@@ -256,3 +254,4 @@ without blocking current feature delivery.
 | 2026-04-21 | Codex                      | Recorded preview deploy-parity debt for guardian write-path Playwright coverage and kept the lifecycle contract spec local-only                                                                                                                   |
 | 2026-04-22 | Codex                      | Added Task 8 for incident-driven secret classification and cross-vendor rotation after the Vercel April 2026 security bulletin                                                                                                                    |
 | 2026-05-04 | Murat + Claude (Murat/TEA) | Completed Task 1: added `always()` to rwf-burn-in steps, replaced peter-evans actions with inline github-script in playwright-merge-report-comment, added diff coverage feature (lcov merge + git diff gate) to unit-test-coverage-comment action |
+| 2026-05-05 | Codex (Murat/TEA)          | Completed Task 2: auth-session now lives in merged fixtures; opt-outs stay narrow; alternate users use `authOptions.userIdentifier`.                                                                                                              |
