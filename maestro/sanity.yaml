@@ -1,26 +1,31 @@
 # Step 12 step 3 owner: searchable owner anchor
 appId: ${MAESTRO_APP_ID}
-name: "Mobile smoke sanity"
+name: 'Mobile smoke sanity'
 tags:
   - smoke
   - maestro
 env:
-  TAB_TWO_A11Y: "Tab Two, tab, 2 of 2"
-  TAB_TWO_PATH: "app/(tabs)/two.tsx"
+  TAB_TWO_PATH: 'app/(tabs)/two.tsx'
 ---
-
 - launchApp:
     appId: ${MAESTRO_APP_ID}
     clearState: false
     stopApp: false
 
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu if it appears'
+
 - tapOn:
     # Expo Go can render a first-run sheet over the app. This tap dismisses it
     # on iOS while still landing in a harmless area once the sheet is gone.
-    point: "50%,92%"
+    point: '50%,92%'
 
 - tapOn:
-    text: ${TAB_TWO_A11Y}
+    point: '75%,94%'
     retryTapIfNoChange: true
 
 # The screen path text is more stable than the generic "Tab Two" title, which

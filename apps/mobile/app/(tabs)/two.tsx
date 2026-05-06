@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
-import { StyleSheet } from 'react-native'
+import { Pressable, StyleSheet } from 'react-native'
 
 import EditScreenInfo from '@/components/edit-screen-info'
 import { Text, View } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
+import {
+  MobileAnalyticsDiagnosticsPanel,
+  isMobileAnalyticsDiagnosticsEnabled,
+} from '@/src/analytics/mobile-analytics-diagnostics'
+import { trackMobileAlertReceived } from '@/src/analytics/track-events'
 import { loadMobileApiHealth } from '@/src/lib/api-health'
 
 const API_HEALTH_TIMEOUT_MS = 5_000
@@ -17,6 +22,15 @@ export default function TabTwoScreen() {
   useEffect(() => {
     analytics.capture('tab_two_viewed')
   }, [analytics])
+
+  const recordDiagnosticAlert = () => {
+    trackMobileAlertReceived(analytics, {
+      userId: analytics.getDistinctId() || 'mobile-anonymous-user',
+      alertType: 'weather_alert',
+      severity: 'warning',
+      weatherSeverity: 'storm_warning',
+    })
+  }
 
   useEffect(() => {
     let isActive = true
@@ -67,6 +81,12 @@ export default function TabTwoScreen() {
       <Text style={styles.infoText}>
         alert_received tracking is wired to real push notification receipt listeners.
       </Text>
+      {isMobileAnalyticsDiagnosticsEnabled ? (
+        <Pressable style={styles.actionButton} onPress={recordDiagnosticAlert}>
+          <Text style={styles.actionText}>Record weather alert analytics</Text>
+        </Pressable>
+      ) : null}
+      <MobileAnalyticsDiagnosticsPanel />
     </View>
   )
 }
@@ -92,5 +112,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     maxWidth: '80%',
+  },
+  actionButton: {
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#a3a3a3',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 })

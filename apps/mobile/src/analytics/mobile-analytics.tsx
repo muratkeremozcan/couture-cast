@@ -1,6 +1,7 @@
 import { useMemo, type PropsWithChildren } from 'react'
 import { PostHogProvider, usePostHog } from 'posthog-react-native'
 import { posthogProviderClient } from '../config/posthog'
+import { recordMobileAnalyticsEvent } from './mobile-analytics-diagnostics'
 
 type MobileAnalyticsValue =
   | boolean
@@ -46,6 +47,7 @@ export function createMobileAnalyticsClient(
 ): MobileAnalyticsClient {
   return {
     capture(event, properties) {
+      recordMobileAnalyticsEvent(event, properties)
       client.capture(event, properties)
     },
     screen(screenName, properties) {

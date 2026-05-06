@@ -31,5 +31,7 @@ echo "[android-sim] Emulator PID $EMULATOR_PID (log: /tmp/avd-$AVD_NAME.log)"
 
 echo "[android-sim] Waiting for device"
 "$ADB_BIN" wait-for-device
+echo "[android-sim] Waiting for Android boot completion"
+"$ADB_BIN" shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 1; done'
 "$ADB_BIN" shell input keyevent 82 || true
 echo "[android-sim] Device ready"

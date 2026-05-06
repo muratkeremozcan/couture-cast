@@ -97,11 +97,20 @@ without blocking current feature delivery.
   - [x] Keep explicit signed-out/conflicting-browser-auth specs as narrow opt-outs.
   - [x] Document narrow opt-out and `authOptions.userIdentifier` usage.
 
-- [ ] Task 3: Maestro analytics journey expansion (AC: #5)
-  - [ ] Add mobile analytics validation flows for core events (ritual, upload, alerts).
-  - [ ] Capture Maestro logs/screenshots for analytics assertions.
-  - [ ] Define reliability criteria for PR optional gating enablement.
-  - [ ] Keep required gating disabled until criteria are met.
+- [x] Task 3: Maestro analytics journey expansion (AC: #5)
+  - [x] Add mobile analytics validation flows for core events (ritual, upload, alerts):
+        `maestro/analytics.yaml` exercises diagnostics-mode assertions for
+        `ritual_created`, `wardrobe_upload_started`, and `alert_received`.
+  - [x] Capture Maestro logs/screenshots for analytics assertions:
+        `scripts/run-maestro.mjs` now writes JUnit, flow Maestro logs, command JSON, and screenshot
+        artifacts under `maestro/artifacts/` when run with `--ci`; the flow captures screenshots
+        after each core event assertion.
+  - [x] Define reliability criteria for PR optional gating enablement:
+        `_bmad-output/test-artifacts/maestro-analytics-promotion.md` documents repeatability,
+        flake-rate, runtime, artifact, diagnostics, and ownership thresholds.
+  - [x] Keep required gating disabled until criteria are met:
+        `.github/workflows/pr-mobile-e2e.yml` remains `workflow_dispatch`-only with
+        `continue-on-error: true` and a `flow=analytics` advisory run option.
 
 - [ ] Task 4: Contract-testing baseline (AC: #3)
   - [ ] Add API schema contract checks to CI for critical endpoints.
@@ -231,6 +240,16 @@ without blocking current feature delivery.
   still return `500` on `POST /api/v1/guardian/invitations` even after local CI burn-in passes.
   Treat preview deploy-path verification (migration execution plus runtime parity) as a separate
   contract-infra follow-up before re-enabling preview gating for this write-path journey.
+- Maestro analytics Task 3 gate posture:
+  diagnostics-mode mobile analytics coverage now exists for ritual, upload, and alert events, but
+  the gate decision is `CONCERNS` until the flow reaches the documented repeatability thresholds in
+  `_bmad-output/test-artifacts/maestro-analytics-promotion.md`; do not add it to required PR checks
+  before those thresholds are met.
+- Maestro Task 3 local verification:
+  Android emulator runs passed through `npm run test:mobile:e2e:android` after simplifying
+  the npm surface to explicit platform commands, fixing the Android Expo URL, Maestro env
+  injection, Expo Go SDK install pinning, Expo Go notification import behavior, and stable
+  tab selection.
 - Secret-classification baseline for Task 8:
   the repo currently uses a mix of true secrets (`VERCEL_TOKEN`, `EXPO_TOKEN`,
   `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `REDIS_URL`, `UPSTASH_REDIS_REST_TOKEN`,
@@ -255,3 +274,5 @@ without blocking current feature delivery.
 | 2026-04-22 | Codex                      | Added Task 8 for incident-driven secret classification and cross-vendor rotation after the Vercel April 2026 security bulletin                                                                                                                    |
 | 2026-05-04 | Murat + Claude (Murat/TEA) | Completed Task 1: added `always()` to rwf-burn-in steps, replaced peter-evans actions with inline github-script in playwright-merge-report-comment, added diff coverage feature (lcov merge + git diff gate) to unit-test-coverage-comment action |
 | 2026-05-05 | Codex (Murat/TEA)          | Completed Task 2: auth-session now lives in merged fixtures; opt-outs stay narrow; alternate users use `authOptions.userIdentifier`.                                                                                                              |
+| 2026-05-05 | Codex (Murat/TEA)          | Completed Task 3: added diagnostics-mode Maestro analytics flow, local/manual scripts, CI artifact capture, and promotion criteria while keeping mobile analytics gating advisory-only.                                                           |
+| 2026-05-05 | Codex (Murat/TEA)          | Verified and fixed Task 3 Maestro execution on Android emulator: analytics and sanity flows now pass locally with JUnit, command logs, and screenshots.                                                                                           |

@@ -8,6 +8,10 @@ import EditScreenInfo from '@/components/edit-screen-info'
 import { Text, View } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import {
+  MobileAnalyticsDiagnosticsPanel,
+  isMobileAnalyticsDiagnosticsEnabled,
+} from '@/src/analytics/mobile-analytics-diagnostics'
+import {
   trackMobileRitualCreated,
   trackMobileWardrobeUploadStarted,
 } from '@/src/analytics/track-events'
@@ -33,6 +37,17 @@ export default function TabOneScreen() {
   }
 
   const handleWardrobeUpload = async () => {
+    if (isMobileAnalyticsDiagnosticsEnabled) {
+      trackMobileWardrobeUploadStarted(analytics, {
+        userId: analyticsUserId,
+        itemId: 'maestro-analytics-upload',
+        fileSize: 2048,
+        itemCount: 1,
+        uploadSource: 'maestro_diagnostics',
+      })
+      return
+    }
+
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (!permission.granted) {
       return
@@ -96,6 +111,7 @@ export default function TabOneScreen() {
           <Text style={styles.actionText}>Start wardrobe upload</Text>
         </Pressable>
       </View>
+      <MobileAnalyticsDiagnosticsPanel />
     </View>
   )
 }

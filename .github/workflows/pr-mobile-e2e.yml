@@ -6,6 +6,15 @@ name: Mobile e2e (Maestro) – manual only
 # or on a self-hosted runner/device cloud if needed.
 on:
   workflow_dispatch:
+    inputs:
+      flow:
+        description: Maestro flow to run
+        required: true
+        default: sanity
+        type: choice
+        options:
+          - sanity
+          - analytics
 
 concurrency:
   group: mobile-e2e-${{ github.workflow }}-${{ github.ref }}
@@ -13,6 +22,9 @@ concurrency:
 
 env:
   MAESTRO_APP_ID: com.anonymous.mobile
+  MAESTRO_FLOW_PATH: ${{ inputs.flow == 'analytics' && 'maestro/analytics.yaml' || 'maestro/sanity.yaml' }}
+  MOBILE_ANALYTICS_DIAGNOSTICS: ${{ inputs.flow == 'analytics' && '1' || '0' }}
+  EXPO_PUBLIC_MOBILE_ANALYTICS_DIAGNOSTICS: ${{ inputs.flow == 'analytics' && '1' || '0' }}
 
 jobs:
   mobile-e2e-android:
@@ -80,9 +92,18 @@ jobs:
             adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
             mkdir -p maestro/artifacts
-            MOBILE_E2E_SKIP_SERVER=1 npx maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/ || \
-              (sleep 20 && MOBILE_E2E_SKIP_SERVER=1 npx maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/) || \
-              (sleep 60 && MOBILE_E2E_SKIP_SERVER=1 npx maestro test maestro/sanity.yaml --format junit --output maestro/artifacts/)
+            FLOW_PATH="${MAESTRO_FLOW_PATH:-maestro/sanity.yaml}"
+            REPORT_NAME="${FLOW_PATH##*/}"
+            REPORT_PATH="maestro/artifacts/${REPORT_NAME%.yaml}-report.xml"
+            run_maestro() {
+              MOBILE_E2E_SKIP_SERVER=1 npx maestro test \
+                --format junit \
+                --output "$REPORT_PATH" \
+                --test-output-dir maestro/artifacts \
+                --debug-output maestro/artifacts \
+                "$FLOW_PATH"
+            }
+            run_maestro || (sleep 20 && run_maestro) || (sleep 60 && run_maestro)
 
       - uses: actions/upload-artifact@v4
         if: always()
