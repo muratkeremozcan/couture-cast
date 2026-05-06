@@ -19,5 +19,8 @@ export default ({ config }: ConfigContext) => ({
     ...config.extra,
     posthogApiKey: process.env.POSTHOG_API_KEY ?? '',
     posthogHost: process.env.POSTHOG_HOST ?? 'https://us.i.posthog.com',
+    mobileAnalyticsDiagnostics:
+      process.env.MOBILE_ANALYTICS_DIAGNOSTICS === '1' ||
+      process.env.EXPO_PUBLIC_MOBILE_ANALYTICS_DIAGNOSTICS === '1',
   },
 })

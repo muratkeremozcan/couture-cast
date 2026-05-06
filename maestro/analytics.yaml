@@ -1,0 +1,61 @@
+# Story 0.14 Task 3 owner: mobile analytics validation flow.
+appId: ${MAESTRO_APP_ID}
+name: 'Mobile analytics validation'
+tags:
+  - analytics
+  - maestro
+env:
+  TAB_ONE_PATH: 'app/(tabs)/index.tsx'
+  TAB_TWO_PATH: 'app/(tabs)/two.tsx'
+  RITUAL_EVENT: 'Analytics event: ritual_created'
+  UPLOAD_EVENT: 'Analytics event: wardrobe_upload_started'
+  ALERT_EVENT: 'Analytics event: alert_received'
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: false
+    stopApp: false
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu if it appears'
+
+- tapOn:
+    point: '50%,92%'
+
+- tapOn:
+    point: '25%,94%'
+    retryTapIfNoChange: true
+
+- assertVisible: ${TAB_ONE_PATH}
+- assertVisible: 'Mobile analytics diagnostics'
+
+- tapOn:
+    text: 'Generate outfit ritual'
+    retryTapIfNoChange: true
+- assertVisible: ${RITUAL_EVENT}
+- takeScreenshot:
+    path: maestro/artifacts/mobile-analytics-ritual
+
+- tapOn:
+    text: 'Start wardrobe upload'
+    retryTapIfNoChange: true
+- assertVisible: ${UPLOAD_EVENT}
+- takeScreenshot:
+    path: maestro/artifacts/mobile-analytics-upload
+
+- tapOn:
+    point: '75%,94%'
+    retryTapIfNoChange: true
+- assertVisible: ${TAB_TWO_PATH}
+- assertVisible: 'Mobile analytics diagnostics'
+
+- tapOn:
+    text: 'Record weather alert analytics'
+    retryTapIfNoChange: true
+- assertVisible: ${ALERT_EVENT}
+- takeScreenshot:
+    path: maestro/artifacts/mobile-analytics-alert

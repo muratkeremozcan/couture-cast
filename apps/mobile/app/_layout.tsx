@@ -1,8 +1,9 @@
 // Step 2 step 3 owner: searchable owner anchor
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
+import Constants, { AppOwnership } from 'expo-constants'
 import { useFonts } from 'expo-font'
-import * as Notifications from 'expo-notifications'
+import type { Notification } from 'expo-notifications'
 import { Stack, usePathname } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useRef } from 'react'
@@ -77,11 +78,16 @@ function RootLayoutNav() {
   }, [pathname])
 
   useEffect(() => {
-    if (Platform.OS === 'web') {
+    const isExpoGoAndroid =
+      Platform.OS === 'android' && Constants.appOwnership === AppOwnership.Expo
+    if (Platform.OS === 'web' || isExpoGoAndroid) {
       return
     }
 
-    const subscription = Notifications.addNotificationReceivedListener((notification) => {
+    let isActive = true
+    let subscription: { remove: () => void } | undefined
+
+    const handleNotification = (notification: Notification) => {
       const data = notification.request.content.data as Record<string, unknown>
       const severityCandidate = data?.severity
       const severity =
@@ -99,9 +105,24 @@ function RootLayoutNav() {
         weatherSeverity:
           typeof data?.weatherSeverity === 'string' ? data.weatherSeverity : undefined,
       })
-    })
+    }
 
-    return () => subscription.remove()
+    void import('expo-notifications')
+      .then((Notifications) => {
+        if (!isActive) {
+          return
+        }
+
+        subscription = Notifications.addNotificationReceivedListener(handleNotification)
+      })
+      .catch((error: unknown) => {
+        console.warn('[mobile-notifications] listener unavailable', error)
+      })
+
+    return () => {
+      isActive = false
+      subscription?.remove()
+    }
   }, [])
 
   return (

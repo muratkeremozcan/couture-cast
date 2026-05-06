@@ -20,7 +20,9 @@ ARGS=(--clear --port "$METRO_PORT")
 if [[ "${MOBILE_E2E_PLATFORM:-}" == "ios" ]]; then
   ARGS+=(--ios --go)
 elif [[ "${MOBILE_E2E_PLATFORM:-}" == "android" ]]; then
-  ARGS+=(--offline --android --go)
+  # Android Expo Go needs a signed manifest on a fresh machine; offline mode can
+  # fail before Maestro ever reaches the app.
+  ARGS+=(--android --go)
 else
   ARGS+=(--offline)
 fi

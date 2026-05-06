@@ -28,7 +28,7 @@ Thin Turborepo for Couture Cast apps and smoke tests. Keep it lean: shared lint 
 | `apps/web`               | Next.js 15.5.6 App Router surface (React 19.1).                                                            |
 | `apps/mobile`            | Expo Router SDK 54 project (tabs template, React Native 0.81).                                             |
 | `apps/api`               | NestJS 11 monolith wired to Vitest 4.                                                                      |
-| `maestro/`               | Minimal Maestro smoke flow for mobile sanity checks (URL load + screenshot).                               |
+| `maestro/`               | Maestro smoke and analytics advisory flows for mobile sanity checks.                                       |
 | `playwright/`            | Root-level Playwright smoke suite (fixtures + README) shared by web + API teams.                           |
 | `playwright/scripts`     | Utility scripts for Playwright (burn-in variants).                                                         |
 | `packages/eslint-config` | Shared ESLint config consumed across workspaces.                                                           |
@@ -48,7 +48,7 @@ npm run dev       # turbo spins up mobile, web, and api concurrently
 
 **CI**: Mobile e2e is disabled on GitHub-hosted runners due to emulator instability and long runtimes. Use self-hosted/device cloud or trigger the manual workflow if needed.
 
-**Local**: iOS + Android testing supported (see `npm run test:mobile:e2e` and \_bmad-output/implementation-artifacts/0-13-scaffold-cross-surface-e2e-automation.md)
+**Local**: iOS + Android testing supported (see `npm run test:mobile:e2e:android`, `npm run test:mobile:e2e:ios`, and \_bmad-output/implementation-artifacts/0-13-scaffold-cross-surface-e2e-automation.md)
 
 ```bash
 npm run dev        # Turborepo parallel dev servers (Expo / Next / Nest)
@@ -80,10 +80,6 @@ npm run typecheck:clear-cache
 | `npm run start:web`                       | Starts the built Next.js app on port 3005 (used by Playwright’s webServer hook).                                                                |
 | `npm run start:api`                       | Runs `db:generate` + Prisma migrate deploy, then starts Nest API in watch mode on port 4000.                                                    |
 | `npm run start:mobile:server`             | Starts Expo dev server on 19000/19001 for Maestro smoke runs.                                                                                   |
-| `npm run start:mobile:e2e`                | One-shot mobile smoke: boots a simulator (android→iOS), starts Expo, runs Maestro.                                                              |
-| `npm run mobile:sim:ios`                  | Boots the default iOS simulator (`IOS_SIM_DEVICE` override) and shows booted devices.                                                           |
-| `npm run mobile:sim:android`              | Boots the default Android AVD (`AVD_NAME` override) and waits for `adb` ready.                                                                  |
-| `npm run mobile:device`                   | Convenience opener for a simulator/emulator (launch one manually if this no-ops).                                                               |
 | `npm run mobile:expo-go`                  | Installs Expo Go APK onto the connected emulator/device.                                                                                        |
 | `npm run start:all`                       | Starts both API + web servers concurrently (mirrors Playwright’s `webServer` config).                                                           |
 | `npm run test:pw-local`                   | Convenience wrapper that sets `TEST_ENV=local` and runs the smoke suite.                                                                        |
@@ -93,8 +89,8 @@ npm run typecheck:clear-cache
 | `npm run test:pw:burn-in-changed-classic` | Playwright built-in `--only-changed` burn-in vs main (3x, retries=0) — can overrun.                                                             |
 | `npm run test:pw:burn-in-changed`         | Smart burn-in via `@seontechnologies/playwright-utils` (config-driven, respects skip/percentage).                                               |
 | `npm run maestro:install`                 | Installs the Maestro CLI (brew/curl on macOS; npx fallback on CI).                                                                              |
-| `npm run test:mobile:e2e`                 | Starts Expo (if needed) and runs the Maestro smoke flow against the dev server it spawns.                                                       |
-| `npm run test:mobile:e2e:ios`             | Boots the default iOS simulator and runs the Maestro smoke flow against Expo dev server.                                                        |
+| `npm run test:mobile:e2e:android`         | Boots/uses the Android emulator, starts Expo, and runs Maestro sanity + analytics flows.                                                        |
+| `npm run test:mobile:e2e:ios`             | Boots/uses the iOS simulator, starts Expo, and runs Maestro sanity + analytics flows.                                                           |
 | `npm run validate`                        | Runs `typecheck`, then `lint`, then `test`, then `build` sequentially. This is the full local non-E2E gate.                                     |
 | `npm run clean`                           | Cleans each workspace’s build outputs.                                                                                                          |
 | `npm run clean:install`                   | Nukes every `node_modules` (root/apps/packages) and performs a fresh `npm install`.                                                             |
@@ -153,13 +149,20 @@ Local E2E with clean DB:
 - Xcode + CLI tools on macOS (`sudo xcode-select --switch /Applications/Xcode.app`).
 - Android Studio SDK + AVD (e.g., Pixel 8 API 34) booted once.
 - Install Maestro CLI: `npm run maestro:install --silent`.
-- Install Expo Go on your emulator: boot it, then `npm run mobile:expo-go`.
+- Android runs install Expo Go automatically after the emulator is attached. Manual helper:
+  `npm run mobile:expo-go`.
 
-**Per-run defaults:** web `http://localhost:3005`, API `http://localhost:4000`, Expo `exp://127.0.0.1:8081/--/`.
+**Per-run defaults:** web `http://localhost:3005`, API `http://localhost:4000`,
+Expo `exp://10.0.2.2:8081/--/` on Android emulator and `exp://127.0.0.1:8081/--/`
+on iOS simulator.
 
 - Web smoke: `npm run test:pw-local` (overrides: `WEB_E2E_BASE_URL`, `API_BASE_URL`, `TEST_ENV`).
-- Mobile smoke: `npm run start:mobile:e2e` (one-shot: boots simulator, starts Expo if needed, runs Maestro).  
-  Overrides: `AVD_NAME`, `IOS_SIM_DEVICE`, `MOBILE_E2E_APP_URL`, `MOBILE_E2E_HEALTH_URL`, `MAESTRO_DEVICE`, `MAESTRO_CLOUD_*`.
+- Mobile Android: `npm run test:mobile:e2e:android` (boots/uses an Android emulator,
+  starts Expo, runs `maestro/sanity.yaml` and `maestro/analytics.yaml`).
+- Mobile iOS: `npm run test:mobile:e2e:ios` (boots/uses an iOS simulator, starts Expo,
+  runs `maestro/sanity.yaml` and `maestro/analytics.yaml`).
+  Overrides: `AVD_NAME`, `IOS_SIM_DEVICE`, `MOBILE_E2E_APP_URL`,
+  `MOBILE_E2E_HEALTH_URL`, `MAESTRO_CLOUD_*`.
 
 ### Mobile build/deploy (Expo EAS)
 
@@ -198,7 +201,7 @@ Local E2E with clean DB:
 | `.github/workflows/pr-mobile-e2e.yml`            | Manual-only Maestro Android smoke (build + emulator)  | Not run on PRs: GitHub-hosted Android emulators are slow/flaky (30–40m, boot failures). Trigger via `workflow_dispatch` or run locally/self-hosted. |
 
 **Playwright coverage:** web landing smoke with API health ping, hero/nav assertions, axe-core check, traces/artifacts uploaded in CI.  
-**Mobile e2e:** Maestro sanity (Expo tabs) is local-only; CI disabled due to GitHub-hosted emulator instability and long runtimes. Run via `npm run test:mobile:e2e` on your machine or on a self-hosted/device cloud runner if needed.
+**Mobile e2e:** Maestro mobile flows are local-only; CI disabled due to GitHub-hosted emulator instability and long runtimes. Run via `npm run test:mobile:e2e:android` or `npm run test:mobile:e2e:ios` on your machine or on a self-hosted/device cloud runner if needed.
 
 ### Vercel Preview testing
 

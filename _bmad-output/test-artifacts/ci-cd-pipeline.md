@@ -76,6 +76,18 @@ Playwright environment selection uses `TEST_ENV`:
 ### Manual E2E
 
 - `.github/workflows/pw-e2e-trigger.yml`: manual dispatch for `preview`/`prod` E2E runs.
+- `.github/workflows/pr-mobile-e2e.yml`: manual-only Maestro mobile runs. The `flow` dispatch
+  input supports `sanity` and `analytics`; the analytics flow enables
+  `MOBILE_ANALYTICS_DIAGNOSTICS=1`, stores JUnit/debug output under `maestro/artifacts/`, and stays
+  advisory via `continue-on-error: true`.
+
+### Mobile analytics advisory path
+
+- Android command: `npm run test:mobile:e2e:android`.
+- iOS command: `npm run test:mobile:e2e:ios`.
+- Flows: `maestro/sanity.yaml` and `maestro/analytics.yaml`.
+- Promotion criteria: `_bmad-output/test-artifacts/maestro-analytics-promotion.md`.
+- Required PR gating remains disabled until the reliability thresholds in that artifact are met.
 
 ## Vercel configuration (manual)
 

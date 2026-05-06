@@ -5,12 +5,11 @@ import https from 'node:https'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 
-const API_URL = 'https://api.expo.dev/v2/versions/latest'
-const FALLBACK_URL = 'https://github.com/expo/expo-go-releases/releases/download/Expo-Go-54.0.6/Expo-Go-54.0.6.apk'
+const EXPO_GO_SDK_54_URL =
+  'https://github.com/expo/expo-go-releases/releases/download/Expo-Go-54.0.7/Expo-Go-54.0.7.apk'
 const DOWNLOAD_PATH = path.join('/tmp', 'ExpoGo-latest.apk')
 
 const log = (msg) => console.log(`[expo-go] ${msg}`)
-const warn = (msg) => console.warn(`[expo-go] ${msg}`)
 const fail = (msg) => {
   console.error(`[expo-go] ${msg}`)
   process.exit(1)
@@ -18,44 +17,53 @@ const fail = (msg) => {
 
 const getAdb = () => {
   const home = process.env.HOME ?? ''
-  const sdkRoot = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || path.join(home, 'Library', 'Android', 'sdk')
+  const sdkRoot =
+    process.env.ANDROID_HOME ||
+    process.env.ANDROID_SDK_ROOT ||
+    path.join(home, 'Library', 'Android', 'sdk')
   const candidate = path.join(sdkRoot, 'platform-tools', 'adb')
   if (fs.existsSync(candidate)) return candidate
   return 'adb'
 }
 
-const fetchJson = (url) =>
-  new Promise((resolve, reject) => {
-    https
-      .get(url, (res) => {
-        if (res.statusCode && res.statusCode >= 400) {
-          reject(new Error(`HTTP ${res.statusCode}`))
-          return
-        }
-        const chunks = []
-        res.on('data', (d) => chunks.push(d))
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')))
-          } catch (err) {
-            reject(err)
-          }
-        })
-      })
-      .on('error', reject)
-  })
-
-const download = (url, dest) =>
+const download = (url, dest, redirectsRemaining = 5) =>
   new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest)
     https
       .get(url, (res) => {
+        if (
+          res.statusCode &&
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location
+        ) {
+          file.close(() => {
+            fs.unlink(dest, () => undefined)
+            if (redirectsRemaining <= 0) {
+              reject(new Error('Download failed: too many redirects'))
+              return
+            }
+            const redirectedUrl = new URL(res.headers.location, url).toString()
+            download(redirectedUrl, dest, redirectsRemaining - 1).then(resolve, reject)
+          })
+          return
+        }
+
         if (res.statusCode && res.statusCode >= 400) {
           reject(new Error(`Download failed HTTP ${res.statusCode}`))
           return
         }
         res.pipe(file)
-        file.on('finish', () => file.close(resolve))
+        file.on('finish', () => {
+          file.close(() => {
+            const size = fs.statSync(dest).size
+            if (size <= 0) {
+              reject(new Error('Download failed: APK file is empty'))
+              return
+            }
+            resolve()
+          })
+        })
       })
       .on('error', (err) => {
         fs.unlink(dest, () => reject(err))
@@ -83,22 +91,12 @@ const ensureDevice = async (adbPath) => {
     })
     child.on('error', reject)
   })
-  const hasDevice = devices
-    .split('\n')
-    .some((line) => line.trim().endsWith('\tdevice'))
+  const hasDevice = devices.split('\n').some((line) => line.trim().endsWith('\tdevice'))
   if (!hasDevice) fail('No Android emulator/device detected. Boot an emulator first.')
 }
 
 const main = async () => {
-  log('Fetching latest Expo Go URL')
-  let apkUrl = FALLBACK_URL
-  try {
-    const json = await fetchJson(API_URL)
-    const url = json?.data?.androidClientUrl
-    if (url) apkUrl = url
-  } catch (err) {
-    warn(`Falling back to pinned Expo Go APK: ${err.message}`)
-  }
+  const apkUrl = process.env.EXPO_GO_APK_URL || EXPO_GO_SDK_54_URL
 
   log(`Downloading Expo Go from ${apkUrl}`)
   await download(apkUrl, DOWNLOAD_PATH)

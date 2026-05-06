@@ -19,7 +19,7 @@ vi.mock('@/src/lib/api-health', () => ({
   loadMobileApiHealth: loadMobileApiHealthMock,
 }))
 
-import TabTwoScreen from './two'
+import TabTwoScreen from '../../app/(tabs)/two'
 
 describe('TabTwoScreen', () => {
   beforeEach(() => {

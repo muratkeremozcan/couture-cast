@@ -5,10 +5,10 @@
  * Mobile E2E bootstrap for Maestro.
  *
  * Purpose:
- * - Choose a usable mobile target (Android first, iOS fallback on macOS).
+ * - Use the explicitly requested mobile platform.
  * - Start or reuse a healthy Expo/Metro session.
  * - Wait until Expo Go is actually available before running Maestro.
- * - Execute one Maestro flow with the resolved app id and app URL.
+ * - Execute Maestro flows with the resolved app id and app URL.
  *
  * Why this script exists:
  * - `maestro test ...` alone is not enough in this repo because the app under test
@@ -22,17 +22,92 @@ import net from 'node:net'
 import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import os from 'node:os'
-import { URL } from 'node:url'
+import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 
-const FLOW_PATH = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'maestro/sanity.yaml'
-const isCI = process.argv.includes('--ci')
+const scriptDir = path.dirname(fileURLToPath(import.meta.url))
+const projectRoot = path.resolve(scriptDir, '..')
+const cliArgs = process.argv.slice(2)
+let cliPlatform
+const FLOW_PATHS = []
+for (let index = 0; index < cliArgs.length; index += 1) {
+  const arg = cliArgs[index]
+  if (arg === '--platform') {
+    cliPlatform = cliArgs[index + 1]
+    index += 1
+  } else if (arg.startsWith('--platform=')) {
+    cliPlatform = arg.slice('--platform='.length)
+  } else if (!arg.startsWith('--')) {
+    FLOW_PATHS.push(arg)
+  }
+}
+const flowsToRun =
+  FLOW_PATHS.length > 0 ? FLOW_PATHS : ['maestro/sanity.yaml', 'maestro/analytics.yaml']
+const WRITE_ARTIFACTS =
+  process.argv.includes('--ci') ||
+  process.argv.includes('--artifacts') ||
+  process.env.MOBILE_E2E_ARTIFACTS === '1'
+const MAESTRO_ARTIFACT_DIR = process.env.MAESTRO_ARTIFACT_DIR || 'maestro/artifacts'
 
 const START_SERVER = process.env.MOBILE_E2E_SKIP_SERVER !== '1'
-const AUTO_BOOT_IOS = process.env.MOBILE_E2E_AUTO_BOOT_IOS === '1'
+const AUTO_BOOT_ANDROID = process.env.MOBILE_E2E_AUTO_BOOT_ANDROID !== '0'
+const REQUESTED_PLATFORM = process.env.MOBILE_E2E_PLATFORM || cliPlatform
+const EXPECTED_EXPO_GO_VERSION = process.env.MOBILE_E2E_EXPO_GO_VERSION || '54.0.7'
 
 const log = (msg) => console.log(`[maestro:runner] ${msg}`)
 const isMac = os.platform() === 'darwin'
+
+const toPosixPath = (filePath) => filePath.split(path.sep).join('/')
+
+const getFlowName = (flowPath) =>
+  path.basename(flowPath, path.extname(flowPath)) || 'maestro'
+
+const getFlowReportPath = (flowPath) => {
+  const flowName = getFlowName(flowPath)
+  return toPosixPath(path.join(MAESTRO_ARTIFACT_DIR, `${flowName}-report.xml`))
+}
+
+const getFlowLogPath = (flowPath) => {
+  const flowName = getFlowName(flowPath)
+  return path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR, `${flowName}-maestro.log`)
+}
+
+if (flowsToRun.some((flowPath) => getFlowName(flowPath) === 'analytics')) {
+  process.env.MOBILE_ANALYTICS_DIAGNOSTICS = '1'
+  process.env.EXPO_PUBLIC_MOBILE_ANALYTICS_DIAGNOSTICS = '1'
+}
+
+/**
+ * Maestro 2.0.10 still queries local iOS simulators while preparing an Android
+ * run. On developer machines with a broken CoreSimulator install, that can hang
+ * before the Android flow starts. This PATH shim only answers the simulator
+ * inventory query with an empty list and delegates every other xcrun invocation.
+ *
+ * @returns {string}
+ */
+const createAndroidXcrunShim = () => {
+  const shimDir = fs.mkdtempSync(path.join(os.tmpdir(), 'maestro-xcrun-'))
+  const shimPath = path.join(shimDir, 'xcrun')
+  fs.writeFileSync(
+    shimPath,
+    `#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "\${1:-}" == "simctl" && "\${2:-}" == "list" ]]; then
+  for arg in "$@"; do
+    if [[ "$arg" == "-j" ]]; then
+      printf '%s\\n' '{"devicetypes":[],"runtimes":[],"devices":{},"pairs":{}}'
+      exit 0
+    fi
+  done
+fi
+
+exec /usr/bin/xcrun "$@"
+`
+  )
+  fs.chmodSync(shimPath, 0o755)
+  return shimDir
+}
 
 /**
  * Check whether a local TCP port is currently free.
@@ -75,6 +150,14 @@ const chooseMetroPort = async () => {
     if (await isPortFree(port)) return port
   }
   return preferred[preferred.length - 1]
+}
+
+const getLocalAppUrl = (platform, port) => {
+  const host =
+    platform === 'android'
+      ? process.env.MOBILE_E2E_ANDROID_HOST || '10.0.2.2'
+      : '127.0.0.1'
+  return `exp://${host}:${port}/--/`
 }
 
 /**
@@ -152,6 +235,7 @@ const waitForCondition = async (condition, timeoutMs = 60000, intervalMs = 2000)
  * @property {AbortSignal} [signal]
  * @property {NodeJS.ProcessEnv} [env]
  * @property {string} [cwd]
+ * @property {string} [logFile]
  */
 
 /**
@@ -167,8 +251,17 @@ const waitForCondition = async (condition, timeoutMs = 60000, intervalMs = 2000)
  */
 const spawnProcess = (command, args, options = {}) =>
   new Promise((resolve, reject) => {
-    const { timeoutMs, signal, ...spawnOptions } = options
-    const child = spawn(command, args, { stdio: 'inherit', shell: true, ...spawnOptions })
+    const { timeoutMs, signal, logFile, ...spawnOptions } = options
+    let logStream
+    if (logFile) {
+      fs.mkdirSync(path.dirname(logFile), { recursive: true })
+      logStream = fs.createWriteStream(logFile, { flags: 'w' })
+      logStream.write(`\n$ ${command} ${args.join(' ')}\n`)
+    }
+    const child = spawn(command, args, {
+      stdio: logFile ? ['inherit', 'pipe', 'pipe'] : 'inherit',
+      ...spawnOptions,
+    })
     let timedOut = false
     const timeout =
       typeof timeoutMs === 'number'
@@ -178,23 +271,42 @@ const spawnProcess = (command, args, options = {}) =>
           }, timeoutMs)
         : null
 
+    if (logFile && child.stdout && child.stderr && logStream) {
+      child.stdout.on('data', (data) => {
+        process.stdout.write(data)
+        logStream.write(data)
+      })
+      child.stderr.on('data', (data) => {
+        process.stderr.write(data)
+        logStream.write(data)
+      })
+    }
+
+    const finish = (callback) => {
+      if (logStream) {
+        logStream.end(callback)
+        return
+      }
+      callback()
+    }
+
     child.on('exit', (code) => {
       if (timeout) clearTimeout(timeout)
       if (timedOut) {
-        reject(new Error(`${command} timed out after ${timeoutMs}ms`))
+        finish(() => reject(new Error(`${command} timed out after ${timeoutMs}ms`)))
         return
       }
       if (code === 0) {
-        resolve()
+        finish(resolve)
       } else {
         const error = new Error(`${command} exited with code ${code}`)
         error.code = code
-        reject(error)
+        finish(() => reject(error))
       }
     })
     child.on('error', (err) => {
       if (timeout) clearTimeout(timeout)
-      reject(err)
+      finish(() => reject(err))
     })
     if (signal) {
       signal.addEventListener('abort', () => child.kill('SIGINT'))
@@ -216,7 +328,6 @@ const captureProcess = (command, args, options = {}) =>
   new Promise((resolve, reject) => {
     const { timeoutMs, ...spawnOptions } = options
     const child = spawn(command, args, {
-      shell: true,
       ...spawnOptions,
       stdio: ['ignore', 'pipe', 'pipe'],
     })
@@ -269,7 +380,9 @@ const captureProcess = (command, args, options = {}) =>
  */
 const ensureExpoGoOnAndroid = async () => {
   const sdkRoot =
-    process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || path.join(process.env.HOME ?? '', 'Library', 'Android', 'sdk')
+    process.env.ANDROID_HOME ||
+    process.env.ANDROID_SDK_ROOT ||
+    path.join(process.env.HOME ?? '', 'Library', 'Android', 'sdk')
   const adbBinary =
     process.env.ADB_PATH ||
     (sdkRoot && fs.existsSync(path.join(sdkRoot, 'platform-tools', 'adb'))
@@ -292,17 +405,85 @@ const ensureExpoGoOnAndroid = async () => {
   }
 
   try {
-    const packages = await captureProcess(adbBinary, ['shell', 'pm', 'list', 'packages', 'host.exp.exponent'])
+    const packages = await captureProcess(adbBinary, [
+      'shell',
+      'pm',
+      'list',
+      'packages',
+      'host.exp.exponent',
+    ])
     if (packages.stdout.includes('host.exp.exponent')) {
-      log('Expo Go already installed on Android emulator/device')
-      return 'installed'
+      const packageInfo = await captureProcess(adbBinary, [
+        'shell',
+        'dumpsys',
+        'package',
+        'host.exp.exponent',
+      ])
+      const installedVersion = packageInfo.stdout.match(/versionName=([^\s]+)/)?.[1]
+      if (installedVersion === EXPECTED_EXPO_GO_VERSION) {
+        log(`Expo Go ${installedVersion} already installed on Android emulator/device`)
+        return 'installed'
+      }
+
+      log(
+        `Expo Go ${installedVersion ?? 'unknown'} found; expected ${EXPECTED_EXPO_GO_VERSION}`
+      )
+    } else {
+      log('Expo Go not found on Android emulator/device')
     }
   } catch {
-    // fall through to install
+    log('Unable to verify Expo Go version on Android emulator/device')
   }
 
-  log('Expo Go not found on Android emulator/device')
+  if (process.env.MOBILE_E2E_AUTO_INSTALL_EXPO_GO !== '0') {
+    log('Attempting to install Expo Go on the connected Android target')
+    await spawnProcess('node', ['./scripts/install-expo-go.mjs'], {
+      cwd: projectRoot,
+      timeoutMs: 180_000,
+    })
+
+    try {
+      const packages = await captureProcess(adbBinary, [
+        'shell',
+        'pm',
+        'list',
+        'packages',
+        'host.exp.exponent',
+      ])
+      if (packages.stdout.includes('host.exp.exponent')) {
+        const packageInfo = await captureProcess(adbBinary, [
+          'shell',
+          'dumpsys',
+          'package',
+          'host.exp.exponent',
+        ])
+        const installedVersion = packageInfo.stdout.match(/versionName=([^\s]+)/)?.[1]
+        if (installedVersion === EXPECTED_EXPO_GO_VERSION) {
+          log(`Expo Go ${installedVersion} installed on Android emulator/device`)
+          return 'installed'
+        }
+        log(
+          `Expo Go install finished, but version is ${installedVersion ?? 'unknown'}; expected ${EXPECTED_EXPO_GO_VERSION}`
+        )
+      }
+    } catch {
+      // fall through to the explicit missing state
+    }
+  }
+
   return 'missing'
+}
+
+const bootAndroidTarget = async () => {
+  if (!AUTO_BOOT_ANDROID) {
+    return
+  }
+
+  log('No Android target detected. Attempting to boot an Android emulator.')
+  await spawnProcess('bash', ['./scripts/start-android-emulator.sh'], {
+    cwd: projectRoot,
+    timeoutMs: 180_000,
+  })
 }
 
 /**
@@ -314,12 +495,47 @@ const hasBootedIosSimulator = async () => {
   if (!isMac) return false
 
   try {
-    const result = await captureProcess('xcrun', ['simctl', 'list', 'devices', 'booted'], {
-      timeoutMs: 5000,
-    })
+    const result = await captureProcess(
+      'xcrun',
+      ['simctl', 'list', 'devices', 'booted'],
+      {
+        timeoutMs: 5000,
+      }
+    )
     return /\(Booted\)/.test(result.stdout)
   } catch {
     return false
+  }
+}
+
+const ensureIosSimulatorTooling = async () => {
+  if (!isMac) {
+    throw new Error('iOS Maestro runs require macOS with Xcode Simulator installed.')
+  }
+
+  let runtimes
+  try {
+    runtimes = await captureProcess('xcrun', ['simctl', 'list', 'runtimes', '-j'], {
+      timeoutMs: 5_000,
+    })
+  } catch {
+    throw new Error(
+      'Xcode Simulator is not responding to `xcrun simctl list runtimes -j`. Install/repair an iOS Simulator runtime in Xcode before running `npm run test:mobile:e2e:ios`.'
+    )
+  }
+
+  try {
+    const parsed = JSON.parse(runtimes.stdout)
+    const availableRuntimes = Array.isArray(parsed.runtimes)
+      ? parsed.runtimes.filter((runtime) => runtime?.isAvailable !== false)
+      : []
+    if (availableRuntimes.length === 0) {
+      throw new Error('missing runtimes')
+    }
+  } catch {
+    throw new Error(
+      'No available iOS Simulator runtime was found. Install one in Xcode Settings > Platforms before running `npm run test:mobile:e2e:ios`.'
+    )
   }
 }
 
@@ -347,37 +563,43 @@ const hasExpoGoOnIos = async () => {
 }
 
 /**
- * Resolve the mobile target that Maestro should drive.
- *
- * Selection order:
- * 1) use Android when an attached device/emulator with Expo Go is ready,
- * 2) fail fast if Android exists but Expo Go is missing,
- * 3) otherwise fall back to iOS simulator on macOS when allowed,
- * 4) if nothing usable exists, explain exactly what is missing.
+ * Resolve the explicit mobile target that Maestro should drive.
  *
  * @returns {Promise<{ platform: 'android' | 'ios', appId: string, expoGoReady: boolean }>}
  */
 const resolveTarget = async () => {
-  const expoGoStatus = await ensureExpoGoOnAndroid()
-  if (expoGoStatus === 'installed') {
-    return { platform: 'android', appId: 'host.exp.exponent', expoGoReady: true }
-  }
-  if (expoGoStatus === 'missing') {
+  if (REQUESTED_PLATFORM !== 'android' && REQUESTED_PLATFORM !== 'ios') {
     throw new Error(
-      'Expo Go is not installed on the Android emulator/device. Open the emulator, install Expo Go from the Play Store (package: host.exp.exponent), then rerun. You can deep link the Play Store via: adb shell am start -a android.intent.action.VIEW -d "market://details?id=host.exp.exponent".'
+      'Choose a mobile platform explicitly: `npm run test:mobile:e2e:android` or `npm run test:mobile:e2e:ios`.'
     )
   }
 
-  if (!AUTO_BOOT_IOS) {
+  if (REQUESTED_PLATFORM === 'android') {
+    let expoGoStatus = await ensureExpoGoOnAndroid()
+    if (expoGoStatus === 'no-device') {
+      await bootAndroidTarget()
+      expoGoStatus = await ensureExpoGoOnAndroid()
+    }
+
+    if (expoGoStatus === 'installed') {
+      return { platform: 'android', appId: 'host.exp.exponent', expoGoReady: true }
+    }
+
+    if (expoGoStatus === 'missing') {
+      throw new Error(
+        'Expo Go is not installed on the Android emulator/device and automatic install failed. Boot the emulator and run `npm run mobile:expo-go`, then rerun `npm run test:mobile:e2e:android`.'
+      )
+    }
+
     throw new Error(
-      'No Android device/emulator with Expo Go is available. Attach one, or run `npm run test:mobile:e2e:ios` to attempt the iOS simulator path.'
+      'No Android emulator/device is available. Create an AVD or set `AVD_NAME`, then rerun `npm run test:mobile:e2e:android`.'
     )
   }
+
+  await ensureIosSimulatorTooling()
 
   if (await hasBootedIosSimulator()) {
     const expoGoReady = await hasExpoGoOnIos()
-    // iOS is the fallback path on macOS when no Android target is attached.
-    // Expo CLI can install Expo Go for us, so "booted" is enough to continue.
     log(
       expoGoReady
         ? 'Using booted iOS simulator for Maestro run'
@@ -386,23 +608,21 @@ const resolveTarget = async () => {
     return { platform: 'ios', appId: 'host.exp.Exponent', expoGoReady }
   }
 
-  if (isMac) {
-    log('No mobile target detected. Attempting to boot an iOS simulator.')
-    await spawnProcess('bash', ['./scripts/start-ios-simulator.sh'], { timeoutMs: 30000 })
+  log('No iOS simulator detected. Attempting to boot an iOS simulator.')
+  await spawnProcess('bash', ['./scripts/start-ios-simulator.sh'], { timeoutMs: 60_000 })
 
-    if (await hasBootedIosSimulator()) {
-      const expoGoReady = await hasExpoGoOnIos()
-      log(
-        expoGoReady
-          ? 'Booted iOS simulator for Maestro run'
-          : 'Booted iOS simulator; Expo Go will be launched via Expo CLI'
-      )
-      return { platform: 'ios', appId: 'host.exp.Exponent', expoGoReady }
-    }
+  if (await hasBootedIosSimulator()) {
+    const expoGoReady = await hasExpoGoOnIos()
+    log(
+      expoGoReady
+        ? 'Booted iOS simulator for Maestro run'
+        : 'Booted iOS simulator; Expo Go will be launched via Expo CLI'
+    )
+    return { platform: 'ios', appId: 'host.exp.Exponent', expoGoReady }
   }
 
   throw new Error(
-    'No Maestro target is available. Attach an Android device/emulator with Expo Go, or ensure Xcode Simulator is available for the iOS fallback.'
+    'No iOS simulator is available. Ensure Xcode Simulator has an installed runtime/device, then rerun `npm run test:mobile:e2e:ios`.'
   )
 }
 
@@ -420,15 +640,16 @@ const ensureMaestroTarget = async () => {
  * to `npx maestro@latest`.
  *
  * @param {string[]} args
+ * @param {SpawnProcessOptions} [options]
  * @returns {Promise<void>}
  */
-const runMaestroCommand = async (args) => {
+const runMaestroCommand = async (args, options = {}) => {
   try {
-    await spawnProcess('maestro', args)
+    await spawnProcess('maestro', args, options)
   } catch (err) {
     if (err.code === 'ENOENT') {
       log('System maestro command missing, retrying via npx maestro@latest')
-      await spawnProcess('npx', ['--yes', 'maestro@latest', ...args])
+      await spawnProcess('npx', ['--yes', 'maestro@latest', ...args], options)
     } else {
       throw err
     }
@@ -461,11 +682,11 @@ const run = async () => {
       health: process.env.MOBILE_E2E_HEALTH_URL,
     },
     {
-      app: `exp://127.0.0.1:${metroPort}/--/`,
+      app: getLocalAppUrl(target.platform, metroPort),
       health: `http://127.0.0.1:${metroPort}`,
     },
     {
-      app: 'exp://127.0.0.1:8081/--/',
+      app: getLocalAppUrl(target.platform, 8081),
       health: 'http://127.0.0.1:8081',
     },
   ].filter((pair, index, self) => {
@@ -498,7 +719,6 @@ const run = async () => {
       log(`Starting Expo dev server for mobile smoke (metro port ${metroPort})`)
       serverProcess = spawn('npm', ['run', 'start:mobile:server'], {
         stdio: 'inherit',
-        shell: true,
         env: {
           ...process.env,
           MOBILE_E2E_PLATFORM: target.platform,
@@ -528,7 +748,9 @@ const run = async () => {
       log('Skipping Expo dev server start (MOBILE_E2E_SKIP_SERVER=1)')
       resolvedPair = portPairs[0]
       if (!resolvedPair) {
-        throw new Error('No MOBILE_E2E_APP_URL / MOBILE_E2E_HEALTH_URL provided while server skip is enabled')
+        throw new Error(
+          'No MOBILE_E2E_APP_URL / MOBILE_E2E_HEALTH_URL provided while server skip is enabled'
+        )
       }
     }
 
@@ -550,7 +772,11 @@ const run = async () => {
     // the app is ready. Poll briefly so Maestro does not race the install.
     const iosExpoGoReady =
       target.platform !== 'ios' ||
-      (await waitForCondition(() => hasExpoGoOnIos(), target.expoGoReady ? 10_000 : 90_000, 2_000))
+      (await waitForCondition(
+        () => hasExpoGoOnIos(),
+        target.expoGoReady ? 10_000 : 90_000,
+        2_000
+      ))
 
     if (!iosExpoGoReady) {
       throw new Error(
@@ -558,27 +784,62 @@ const run = async () => {
       )
     }
 
-    const maestroArgs = []
-    if (process.env.MAESTRO_CLOUD_API_KEY && process.env.MAESTRO_CLOUD_WORKSPACE) {
-      maestroArgs.push(
-        'cloud',
-        '--workspace',
-        process.env.MAESTRO_CLOUD_WORKSPACE,
-        '--apiKey',
-        process.env.MAESTRO_CLOUD_API_KEY,
-        'test',
-        FLOW_PATH
-      )
-    } else {
-      maestroArgs.push('test', FLOW_PATH)
+    let xcrunShimDir
+    const maestroEnv = { ...process.env }
+    if (
+      target.platform === 'android' &&
+      process.env.MAESTRO_DISABLE_ANDROID_XCRUN_SHIM !== '1'
+    ) {
+      xcrunShimDir = createAndroidXcrunShim()
+      maestroEnv.PATH = `${xcrunShimDir}:${maestroEnv.PATH ?? ''}`
+      log('Using Android-only xcrun shim to avoid broken iOS simulator discovery')
     }
 
-    if (isCI) {
-      maestroArgs.push('--format', 'junit', '--output', 'maestro/artifacts')
-    }
+    try {
+      for (const flowPath of flowsToRun) {
+        const maestroArgs = []
+        let maestroLogFile
+        if (process.env.MAESTRO_CLOUD_API_KEY && process.env.MAESTRO_CLOUD_WORKSPACE) {
+          maestroArgs.push(
+            'cloud',
+            '--workspace',
+            process.env.MAESTRO_CLOUD_WORKSPACE,
+            '--apiKey',
+            process.env.MAESTRO_CLOUD_API_KEY,
+            'test',
+            flowPath
+          )
+        } else {
+          maestroArgs.push('--platform', target.platform, 'test')
+          maestroArgs.push('-e', `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`)
+          maestroArgs.push('-e', `APP_URL=${process.env.APP_URL}`)
+          if (WRITE_ARTIFACTS) {
+            fs.mkdirSync(path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR), {
+              recursive: true,
+            })
+            maestroLogFile = getFlowLogPath(flowPath)
+            maestroArgs.push(
+              '--format',
+              'junit',
+              '--output',
+              getFlowReportPath(flowPath),
+              '--test-output-dir',
+              MAESTRO_ARTIFACT_DIR,
+              '--debug-output',
+              MAESTRO_ARTIFACT_DIR
+            )
+          }
+          maestroArgs.push(flowPath)
+        }
 
-    log(`Running Maestro flow (${maestroArgs.join(' ')})`)
-    await runMaestroCommand(maestroArgs)
+        log(`Running Maestro flow (${maestroArgs.join(' ')})`)
+        await runMaestroCommand(maestroArgs, { env: maestroEnv, logFile: maestroLogFile })
+      }
+    } finally {
+      if (xcrunShimDir) {
+        fs.rmSync(xcrunShimDir, { recursive: true, force: true })
+      }
+    }
   } finally {
     if (serverProcess) {
       log('Stopping Expo dev server')
