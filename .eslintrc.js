@@ -8,6 +8,7 @@ module.exports = {
       './apps/web/tsconfig.json',
       './apps/api/tsconfig.json',
       './playwright/tsconfig.json',
+      './pact/tsconfig.json',
     ],
     tsconfigRootDir: __dirname,
   },
@@ -21,6 +22,7 @@ module.exports = {
           './apps/web/tsconfig.eslint.json',
           './apps/api/tsconfig.eslint.json',
           './playwright/tsconfig.eslint.json',
+          './pact/tsconfig.json',
         ],
       },
     },
@@ -65,6 +67,13 @@ module.exports = {
       files: ['playwright/**/*.{ts,tsx}'],
       parserOptions: {
         project: ['./playwright/tsconfig.eslint.json'],
+        tsconfigRootDir: __dirname,
+      },
+    },
+    {
+      files: ['pact/**/*.{ts,tsx,mts}'],
+      parserOptions: {
+        project: ['./pact/tsconfig.json'],
         tsconfigRootDir: __dirname,
       },
     },

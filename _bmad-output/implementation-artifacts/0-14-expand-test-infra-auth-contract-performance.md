@@ -113,22 +113,39 @@ without blocking current feature delivery.
         `continue-on-error: true` and a `flow=analytics` advisory run option.
 
 - [ ] Task 4: Contract-testing baseline (AC: #3)
-  - [ ] Add API schema contract checks to CI for critical endpoints.
-  - [ ] Set up Pact consumer contracts for Next/BFF-to-API boundaries and critical API
+  - [x] Add API schema contract checks to CI for critical endpoints:
+        `.github/workflows/contract-testing.yml` runs `npm run test:pact`, which
+        executes `generate:http-openapi` plus `optic:lint` before Pact verification.
+  - [x] Set up Pact consumer contracts for Next/BFF-to-API boundaries and critical API
         integrations.
-  - [ ] Add Pact provider verification path for backend contract conformance.
-  - [ ] Publish contract validation artifacts and failure diagnostics.
-  - [ ] Start as non-blocking, then promote to blocking after stability threshold.
-  - [ ] Resolve preview deploy-path parity for write-path API E2E before promoting
-        `playwright/tests/api/guardian-consent-lifecycle.spec.ts` beyond local-only runs:
-        verify preview API deploys apply Prisma migrations and surface compatible env/schema
-        state for guardian invitation flows.
+        `pact/http/consumer/web-api-client.pacttest.ts` and
+        `pact/http/consumer/mobile-api-client.pacttest.ts` define local web and
+        mobile contracts for health and realtime fallback event polling.
+  - [x] Add Pact provider verification path for backend contract conformance:
+        `pact/http/provider/api-provider.pacttest.ts` boots a local Nest provider with
+        mocked infrastructure and verifies the generated web and mobile pact files.
+  - [x] Publish contract validation artifacts and failure diagnostics:
+        the blocking contract workflow uploads OpenAPI output, generated pacts, and
+        `pact/artifacts/` diagnostics on every run.
+  - [x] Start as non-blocking, then promote to blocking after stability threshold:
+        superseded by 2026-05-16 direction to make Pact CI blocking immediately; the
+        workflow now fails on schema or Pact failures.
+  - [x] Add local brokerless Pact runner:
+        root scripts `test:pact`, `test:pact:consumer`, and `test:pact:provider`
+        provide local/CI parity
+        without Pact Broker dependency.
 
 - [ ] Task 5: Performance baseline harness (AC: #4)
   - [ ] Add baseline k6 scenarios for critical API endpoints and queue load.
   - [ ] Define thresholds and output reports for latency/error budgets.
   - [ ] Add workflow trigger (nightly/manual) and artifact retention.
   - [ ] Document promotion criteria from non-blocking to gate.
+
+- [ ] Task 5.5: Resolve write-path preview E2E promotion debt
+  - [ ] Resolve preview deploy-path parity for write-path API E2E before promoting
+        `playwright/tests/api/guardian-consent-lifecycle.spec.ts` beyond local-only runs:
+        verify preview API deploys apply Prisma migrations and surface compatible env/schema
+        state for guardian invitation flows.
 
 - [x] Task 6: Add CodeRabbit PR review automation (AC: #6)
   - [x] Add `.coderabbit.yaml` configuration using the same baseline style as the reference
@@ -250,6 +267,11 @@ without blocking current feature delivery.
   the npm surface to explicit platform commands, fixing the Android Expo URL, Maestro env
   injection, Expo Go SDK install pinning, Expo Go notification import behavior, and stable
   tab selection.
+- Contract Task 4 local verification:
+  `npm run test:pact` passed on 2026-05-16. The command validates the generated
+  OpenAPI document with Optic, runs the Pact consumer determinism gate three times, and
+  verifies the generated local web and mobile pacts against a Nest provider with in-memory
+  state. Pact CI is blocking by explicit implementation direction.
 - Secret-classification baseline for Task 8:
   the repo currently uses a mix of true secrets (`VERCEL_TOKEN`, `EXPO_TOKEN`,
   `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `REDIS_URL`, `UPSTASH_REDIS_REST_TOKEN`,
