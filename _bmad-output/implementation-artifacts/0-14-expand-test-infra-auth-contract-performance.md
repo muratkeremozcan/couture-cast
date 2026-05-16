@@ -112,7 +112,7 @@ without blocking current feature delivery.
         `.github/workflows/pr-mobile-e2e.yml` remains `workflow_dispatch`-only with
         `continue-on-error: true` and a `flow=analytics` advisory run option.
 
-- [ ] Task 4: Contract-testing baseline (AC: #3)
+- [x] Task 4: Contract-testing baseline (AC: #3)
   - [x] Add API schema contract checks to CI for critical endpoints:
         `.github/workflows/contract-testing.yml` runs `npm run test:pact`, which
         executes `generate:http-openapi` plus `optic:lint` before Pact verification.

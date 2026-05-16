@@ -53,13 +53,15 @@ hash_pact_file() {
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
+read -ra CMD_ARRAY <<< "$CMD"
+
 echo "check-pact-determinism: $RUNS runs of [$CMD] against $PACT_DIR"
 
 for run in $(seq 1 "$RUNS"); do
   rm -f "$PACT_DIR"/*.json 2>/dev/null || true
   echo "  run $run/$RUNS..."
 
-  if ! eval "$CMD" >"$TMP_DIR/run-$run.log" 2>&1; then
+  if ! "${CMD_ARRAY[@]}" >"$TMP_DIR/run-$run.log" 2>&1; then
     echo "error: command failed on run $run; log:" >&2
     cat "$TMP_DIR/run-$run.log" >&2
     exit 1
@@ -97,9 +99,9 @@ for name in $ALL_FILES; do
   counts=$(for run in $(seq 1 "$RUNS"); do
     awk -v n="$name" '$1 == n {print $3}' "$TMP_DIR/run-$run.hashes" || true
   done)
-  observed=$(printf '%s\n' $hashes | grep -c . || true)
-  unique=$(printf '%s\n' $hashes | sort -u | grep -c . || true)
-  unique_counts=$(printf '%s\n' $counts | sort -u | tr '\n' ',' | sed 's/,$//')
+  observed=$(printf '%s\n' "$hashes" | grep -c . || true)
+  unique=$(printf '%s\n' "$hashes" | sort -u | grep -c . || true)
+  unique_counts=$(printf '%s\n' "$counts" | sort -u | tr '\n' ',' | sed 's/,$//')
 
   if [ "$observed" -lt "$RUNS" ]; then
     echo "  $name: MISSING in $((RUNS - observed))/$RUNS runs"
