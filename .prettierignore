@@ -13,6 +13,10 @@ _bmad
 coverage
 dist
 build
+.auth
+maestro/artifacts
+pacts
+pact/artifacts
 playwright/artifacts
 playwright/playwright-report
 apps/**/dist

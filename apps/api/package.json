@@ -60,7 +60,7 @@
     "start:debug": "node ../../scripts/start-api-watch.mjs --inspect",
     "start:prod": "node dist/src/main.js",
     "lint": "eslint --max-warnings=0 \"{src,api,test,integration}/**/*.ts\" vitest.config.ts",
-    "pretypecheck": "npm run prepare:shared-deps && prisma generate --schema ../../packages/db/prisma/schema.prisma",
+    "pretypecheck": "npm run prepare:shared-deps",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run prepare:shared-deps",
     "test": "cross-env NODE_OPTIONS=--conditions=development vitest run",
