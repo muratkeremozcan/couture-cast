@@ -14,9 +14,13 @@ import {
   createTeenSignupPayload,
   extractErrorMessage,
   extractInvitationToken,
-  isNonLocalEnvironment,
+  isProdEnvironment,
   resolveApiBaseUrl,
 } from '../../support/helpers/api-test'
+import {
+  cleanupGuardianConsentTestData,
+  type GuardianConsentCleanupTarget,
+} from '../../support/helpers/guardian-consent'
 
 type GuardianInvitationPayload = {
   teenId: string
@@ -34,14 +38,21 @@ type GuardianRevokePayload = {
 }
 
 test.describe('Guardian consent lifecycle API contracts', () => {
+  let cleanupTargets: GuardianConsentCleanupTarget[] = []
+
   test.beforeEach(({}, testInfo) => {
     // This journey creates users, invitations, consent links, queue records,
-    // and audit rows. Keep it local-only until preview deploy-path parity is
-    // proven for write-path schema/env behavior.
+    // and audit rows. Keep production blocked unless a dedicated seeded write
+    // path exists.
     test.skip(
-      isNonLocalEnvironment(testInfo),
-      'Skipping guardian consent lifecycle write-path contract tests outside local runs.'
+      isProdEnvironment(testInfo),
+      'Skipping guardian consent lifecycle write-path contract tests in production.'
     )
+  })
+
+  test.afterEach(async () => {
+    await cleanupGuardianConsentTestData(cleanupTargets)
+    cleanupTargets = []
   })
 
   test('[P0] grants consent, restores teen access, and blocks the teen again after revoke', async ({
@@ -60,6 +71,11 @@ test.describe('Guardian consent lifecycle API contracts', () => {
     })
 
     expect(signupResponse.status).toBe(201)
+    const signupBody = signupResponseSchema.parse(signupResponse.body)
+    cleanupTargets.push({
+      teenEmail: teenSignupPayload.email,
+      teenId: signupBody.userId,
+    })
     await validateSchema(signupResponseSchema, signupResponse.body, {
       shape: {
         age: 15,
@@ -67,13 +83,13 @@ test.describe('Guardian consent lifecycle API contracts', () => {
         guardianConsentRequired: true,
       },
     })
-    const signupBody = signupResponseSchema.parse(signupResponse.body)
 
     const invitationPayload: GuardianInvitationPayload = {
       teenId: signupBody.userId,
       guardianEmail: createGuardianEmail(testInfo, 'guardian-lifecycle-guardian'),
       consentLevel: 'full_access',
     }
+    cleanupTargets.push({ guardianEmail: invitationPayload.guardianEmail })
 
     await log.step('Act: create a guardian invitation for the teen account.')
     const invitationResponse = await apiRequest({
@@ -115,6 +131,7 @@ test.describe('Guardian consent lifecycle API contracts', () => {
       },
     })
     const acceptBody = guardianInvitationAcceptResponseSchema.parse(acceptResponse.body)
+    cleanupTargets.push({ guardianId: acceptBody.guardianId })
 
     await log.step(
       'Assert: teen profile access is restored once guardian consent has been granted.'

@@ -141,8 +141,8 @@ without blocking current feature delivery.
   - [ ] Add workflow trigger (nightly/manual) and artifact retention.
   - [ ] Document promotion criteria from non-blocking to gate.
 
-- [ ] Task 5.5: Resolve write-path preview E2E promotion debt
-  - [ ] Resolve preview deploy-path parity for write-path API E2E before promoting
+- [x] Task 5.5: Resolve write-path preview E2E promotion debt
+  - [x] Resolve preview deploy-path parity for write-path API E2E before promoting
         `playwright/tests/api/guardian-consent-lifecycle.spec.ts` beyond local-only runs:
         verify preview API deploys apply Prisma migrations and surface compatible env/schema
         state for guardian invitation flows.
@@ -252,11 +252,21 @@ without blocking current feature delivery.
   review verified on PR `#42`.
 - Task 7 coverage action is a local composite action in `.github/actions/unit-test-coverage-comment/`.
   Monorepo coverage merging sums workspace-level `coverage-summary.json` files into one aggregate.
-- Current preview debt for Task 3:
-  guardian consent lifecycle Playwright coverage remains local-only because preview PR deploys
-  still return `500` on `POST /api/v1/guardian/invitations` even after local CI burn-in passes.
-  Treat preview deploy-path verification (migration execution plus runtime parity) as a separate
-  contract-infra follow-up before re-enabling preview gating for this write-path journey.
+- Task 5.5 preview write-path promotion evidence:
+  the Vercel API project build command runs `prisma migrate deploy`, and the missing Preview runtime
+  env vars were added to `couture-cast-api` on 2026-05-18:
+  `GUARDIAN_INVITE_JWT_SECRET` (`sensitive`) and `GUARDIAN_INVITE_WEB_BASE_URL` (`plain`).
+  After redeploy of Vercel deployment `dpl_HtVxq1pjsvjKUQnCk8ba7RqTajew`
+  ([dashboard](https://vercel.com/muratkeremozcans-projects/couture-cast-api/HtVxq1pjsvjKUQnCk8ba7RqTajew),
+  created `2026-05-18T15:45:50.082Z`), a targeted Preview probe against
+  `https://couture-cast-api-git-main-muratkeremozcans-projects.vercel.app` returned:
+  health `200` for SHA `6bf10a0832b9623ab7ba11636da23022bf7bfe12`, teen signup `201`,
+  guardian invitation `201`, and invitation accept `200`.
+  `playwright/tests/api/guardian-consent-lifecycle.spec.ts` now runs in Local and Preview while
+  cleaning its guardian lifecycle records and continuing to skip Production write paths.
+  `playwright/global-teardown.ts` now refuses to run
+  `db:reset` unless `TEST_ENV=local` and `DATABASE_URL` points at localhost, preventing remote
+  Preview/Production database resets during local verification.
 - Maestro analytics Task 3 gate posture:
   diagnostics-mode mobile analytics coverage now exists for ritual, upload, and alert events, but
   the gate decision is `CONCERNS` until the flow reaches the documented repeatability thresholds in
@@ -285,16 +295,17 @@ without blocking current feature delivery.
 
 ## Change Log
 
-| Date       | Author                     | Change                                                                                                                                                                                                                                            |
-| ---------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-03-04 | Codex (Test Architect)     | Added follow-up story for deferred testing infrastructure: burn-in hardening, auth-session rollout, contract testing, and performance baseline                                                                                                    |
-| 2026-03-04 | Codex (Test Architect)     | Expanded 0.14 scope with CodeRabbit PR review automation and explicit Pact setup in contract-testing tasks                                                                                                                                        |
-| 2026-03-27 | Codex                      | Recorded partial completion of Task 6: added `.coderabbit.yaml`, PR template, CI/CD notes, and PR `#42`                                                                                                                                           |
-| 2026-03-27 | Codex                      | Removed redundant CodeRabbit ready-for-review workflow after review feedback; automatic review remains configured in `.coderabbit.yaml`                                                                                                           |
-| 2026-04-14 | Murat + Claude             | Added Task 7: unit test coverage reporting — composite action, monorepo coverage merge, sticky PR comments, shields.io badge via gist                                                                                                             |
-| 2026-04-21 | Codex                      | Recorded preview deploy-parity debt for guardian write-path Playwright coverage and kept the lifecycle contract spec local-only                                                                                                                   |
-| 2026-04-22 | Codex                      | Added Task 8 for incident-driven secret classification and cross-vendor rotation after the Vercel April 2026 security bulletin                                                                                                                    |
-| 2026-05-04 | Murat + Claude (Murat/TEA) | Completed Task 1: added `always()` to rwf-burn-in steps, replaced peter-evans actions with inline github-script in playwright-merge-report-comment, added diff coverage feature (lcov merge + git diff gate) to unit-test-coverage-comment action |
-| 2026-05-05 | Codex (Murat/TEA)          | Completed Task 2: auth-session now lives in merged fixtures; opt-outs stay narrow; alternate users use `authOptions.userIdentifier`.                                                                                                              |
-| 2026-05-05 | Codex (Murat/TEA)          | Completed Task 3: added diagnostics-mode Maestro analytics flow, local/manual scripts, CI artifact capture, and promotion criteria while keeping mobile analytics gating advisory-only.                                                           |
-| 2026-05-05 | Codex (Murat/TEA)          | Verified and fixed Task 3 Maestro execution on Android emulator: analytics and sanity flows now pass locally with JUnit, command logs, and screenshots.                                                                                           |
+| Date       | Author                       | Change                                                                                                                                                                                                                                                                                            |
+| ---------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-03-04 | Codex (Test Architect)       | Added follow-up story for deferred testing infrastructure: burn-in hardening, auth-session rollout, contract testing, and performance baseline                                                                                                                                                    |
+| 2026-03-04 | Codex (Test Architect)       | Expanded 0.14 scope with CodeRabbit PR review automation and explicit Pact setup in contract-testing tasks                                                                                                                                                                                        |
+| 2026-03-27 | Codex                        | Recorded partial completion of Task 6: added `.coderabbit.yaml`, PR template, CI/CD notes, and PR `#42`                                                                                                                                                                                           |
+| 2026-03-27 | Codex                        | Removed redundant CodeRabbit ready-for-review workflow after review feedback; automatic review remains configured in `.coderabbit.yaml`                                                                                                                                                           |
+| 2026-04-14 | Murat + Claude               | Added Task 7: unit test coverage reporting — composite action, monorepo coverage merge, sticky PR comments, shields.io badge via gist                                                                                                                                                             |
+| 2026-04-21 | Codex                        | Recorded preview deploy-parity debt for guardian write-path Playwright coverage and kept the lifecycle contract spec local-only                                                                                                                                                                   |
+| 2026-04-22 | Codex                        | Added Task 8 for incident-driven secret classification and cross-vendor rotation after the Vercel April 2026 security bulletin                                                                                                                                                                    |
+| 2026-05-04 | Murat + Claude (Murat/TEA)   | Completed Task 1: added `always()` to rwf-burn-in steps, replaced peter-evans actions with inline github-script in playwright-merge-report-comment, added diff coverage feature (lcov merge + git diff gate) to unit-test-coverage-comment action                                                 |
+| 2026-05-05 | Codex (Murat/TEA)            | Completed Task 2: auth-session now lives in merged fixtures; opt-outs stay narrow; alternate users use `authOptions.userIdentifier`.                                                                                                                                                              |
+| 2026-05-05 | Codex (Murat/TEA)            | Completed Task 3: added diagnostics-mode Maestro analytics flow, local/manual scripts, CI artifact capture, and promotion criteria while keeping mobile analytics gating advisory-only.                                                                                                           |
+| 2026-05-05 | Codex (Murat/TEA)            | Verified and fixed Task 3 Maestro execution on Android emulator: analytics and sanity flows now pass locally with JUnit, command logs, and screenshots.                                                                                                                                           |
+| 2026-05-18 | Codex (Dev + Test Architect) | Completed Task 5.5: added missing API Preview guardian invitation env vars in Vercel, redeployed the API preview, verified signup/invite/accept write-path parity, promoted the lifecycle spec to Preview while keeping Production skipped, and blocked remote `db:reset` in Playwright teardown. |

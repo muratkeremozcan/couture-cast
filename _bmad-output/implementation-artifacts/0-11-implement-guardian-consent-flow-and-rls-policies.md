@@ -106,12 +106,12 @@ CoutureCast satisfies COPPA requirements and age-gating obligations.
     - Send confirmation email to teen and guardian
   - [x] Add invitation UI in mobile and web apps
 
-- [ ] Task 3.5: Propagate guardian invitation env vars to hosted runtimes
+- [x] Task 3.5: Propagate guardian invitation env vars to hosted runtimes
   - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.preview`
         into Vercel project `couture-cast-api` Preview environment variables
   - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.prod`
         into Vercel project `couture-cast-api` Production environment variables
-  - [ ] Copy the variable name `GUARDIAN_INVITE_WEB_BASE_URL` into Vercel
+  - [x] Copy the variable name `GUARDIAN_INVITE_WEB_BASE_URL` into Vercel
         project `couture-cast-api` Preview environment variables and set it to
         the intended web origin for preview invitation links
   - [x] Copy the variable name `GUARDIAN_INVITE_WEB_BASE_URL` into Vercel
@@ -873,3 +873,5 @@ GPT-5 Codex
   Terms of Service draft for legal review.
 - 2026-04-27 - Codex: Addressed Task 9 CodeRabbit dashboard test coverage and
   teen consent-status guard comments.
+- 2026-05-18 - Codex: Completed Task 3.5 Preview web-base env propagation while
+  closing Story 0.14 Task 5.5 preview write-path parity debt.
