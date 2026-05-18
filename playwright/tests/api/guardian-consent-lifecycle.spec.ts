@@ -14,7 +14,7 @@ import {
   createTeenSignupPayload,
   extractErrorMessage,
   extractInvitationToken,
-  isNonLocalEnvironment,
+  isProdEnvironment,
   resolveApiBaseUrl,
 } from '../../support/helpers/api-test'
 
@@ -36,11 +36,11 @@ type GuardianRevokePayload = {
 test.describe('Guardian consent lifecycle API contracts', () => {
   test.beforeEach(({}, testInfo) => {
     // This journey creates users, invitations, consent links, queue records,
-    // and audit rows. Keep it local-only until preview deploy-path parity is
-    // proven for write-path schema/env behavior.
+    // and audit rows. Keep production blocked unless a dedicated seeded write
+    // path or cleanup contract exists.
     test.skip(
-      isNonLocalEnvironment(testInfo),
-      'Skipping guardian consent lifecycle write-path contract tests outside local runs.'
+      isProdEnvironment(testInfo),
+      'Skipping guardian consent lifecycle write-path contract tests in production.'
     )
   })
 

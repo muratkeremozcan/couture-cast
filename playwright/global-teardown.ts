@@ -1,6 +1,15 @@
 import { execSync } from 'node:child_process'
 import path from 'node:path'
 
+function isLocalDatabaseUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return ['127.0.0.1', 'localhost', '0.0.0.0'].includes(url.hostname)
+  } catch {
+    return false
+  }
+}
+
 export default function globalTeardown() {
   const env = { ...process.env }
   // Allow local Postgres path if available (non-fatal if missing)
@@ -13,9 +22,16 @@ export default function globalTeardown() {
     .filter(Boolean)
     .join(path.delimiter)
 
-  if (env.CI || !env.DATABASE_URL || env.PLAYWRIGHT_SKIP_DB_RESET === 'true') {
+  const testEnv = (env.TEST_ENV ?? 'local').toLowerCase()
+  const shouldResetDatabase =
+    testEnv === 'local' &&
+    env.DATABASE_URL !== undefined &&
+    isLocalDatabaseUrl(env.DATABASE_URL) &&
+    env.PLAYWRIGHT_SKIP_DB_RESET !== 'true'
+
+  if (env.CI || !shouldResetDatabase) {
     console.warn(
-      'Skipping db:reset in global teardown (CI, DATABASE_URL missing, or PLAYWRIGHT_SKIP_DB_RESET=true)'
+      'Skipping db:reset in global teardown (CI, non-local TEST_ENV, remote/missing DATABASE_URL, or PLAYWRIGHT_SKIP_DB_RESET=true)'
     )
     return
   }
