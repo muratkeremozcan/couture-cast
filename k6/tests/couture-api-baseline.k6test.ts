@@ -87,8 +87,8 @@ export function testApiHealth() {
       { tags: { name: 'api/health' } }
     )
     expect(status, 'status is 200').to.equal(200)
-    expect(body.status, 'status is ok').to.equal('ok')
-    expect(body.service, 'service name').to.equal('couturecast-api')
+    expect(body?.status, 'status is ok').to.equal('ok')
+    expect(body?.service, 'service name').to.equal('couturecast-api')
   })
 
   sleep(0.2)
@@ -104,9 +104,9 @@ export function testRealtimePoll() {
       { tags: { name: 'api/events-poll' } }
     )
     expect(status, 'status is 200').to.equal(200)
-    expect(body.events, 'events is array').to.be.an('array')
+    expect(body?.events, 'events is array').to.be.an('array')
     expect(
-      body.nextSince === null || typeof body.nextSince === 'string',
+      body != null && (body.nextSince === null || typeof body.nextSince === 'string'),
       'cursor is null or string'
     ).to.equal(true)
   })
@@ -125,10 +125,10 @@ export function testQueueHealth() {
       }
     )
     expect(status, 'status is 200').to.equal(200)
-    expect(body.status, 'status is ok').to.equal('ok')
-    expect(body.queues.length, 'at least 4 queues').to.be.at.least(4)
-    expect(body.queues, 'includes weather-ingestion').to.include('weather-ingestion')
-    expect(body.queues, 'includes alert-fanout').to.include('alert-fanout')
+    expect(body?.status, 'status is ok').to.equal('ok')
+    expect(body?.queues.length, 'at least 4 queues').to.be.at.least(4)
+    expect(body?.queues, 'includes weather-ingestion').to.include('weather-ingestion')
+    expect(body?.queues, 'includes alert-fanout').to.include('alert-fanout')
   })
 
   sleep(0.2)
@@ -141,9 +141,10 @@ export function testGuardianWritePath() {
   const { status: teenStatus, body: teen } = signUp(uniqueEmail('teen'), '2012-05-18')
   describe('POST /api/v1/auth/signup (teen)', () => {
     expect(teenStatus, 'status is 201').to.equal(201)
-    expect(teen.guardianConsentRequired, 'requires guardian consent').to.equal(true)
+    expect(teen?.guardianConsentRequired, 'requires guardian consent').to.equal(true)
   })
   if (teenStatus !== 201) fail(`teen signup failed: ${teenStatus}`)
+  if (!teen) fail('signup returned empty body')
 
   const { status: inviteStatus, body: invitation } = postJson<GuardianInvitationResponse>(
     apiUrl('/api/v1/guardian/invitations'),
@@ -156,9 +157,11 @@ export function testGuardianWritePath() {
   )
   describe('POST /api/v1/guardian/invitations', () => {
     expect(inviteStatus, 'status is 201').to.equal(201)
-    expect(invitation.teenId, 'targets teen').to.equal(teen.userId)
-    expect(invitation.deliveryQueued, 'queues delivery').to.equal(true)
+    expect(invitation?.teenId, 'targets teen').to.equal(teen.userId)
+    expect(invitation?.deliveryQueued, 'queues delivery').to.equal(true)
   })
+  if (inviteStatus !== 201) fail(`guardian invitation failed: ${inviteStatus}`)
+  if (!invitation) fail('invitation returned empty body')
 
   const token = extractInvitationToken(invitation.invitationLink)
   const { status: acceptStatus, body: accepted } =
@@ -169,9 +172,11 @@ export function testGuardianWritePath() {
     )
   describe('POST /api/v1/guardian/accept', () => {
     expect(acceptStatus, 'status is 200').to.equal(200)
-    expect(accepted.teenId, 'links teen').to.equal(teen.userId)
-    expect(accepted.guardianId.length, 'creates guardian').to.be.at.least(1)
+    expect(accepted?.teenId, 'links teen').to.equal(teen.userId)
+    expect(accepted?.guardianId.length, 'creates guardian').to.be.at.least(1)
   })
+  if (acceptStatus !== 200) fail(`guardian accept failed: ${acceptStatus}`)
+  if (!accepted) fail('accept returned empty body')
 
   const { status: revokeStatus, body: revoked } = postJson<{
     teenId: string
@@ -186,8 +191,8 @@ export function testGuardianWritePath() {
   )
   describe('POST /api/v1/guardian/revoke', () => {
     expect(revokeStatus, 'status is 200').to.equal(200)
-    expect(revoked.teenId, 'targets teen').to.equal(teen.userId)
-    expect(revoked.guardianId, 'targets guardian').to.equal(accepted.guardianId)
+    expect(revoked?.teenId, 'targets teen').to.equal(teen.userId)
+    expect(revoked?.guardianId, 'targets guardian').to.equal(accepted.guardianId)
   })
 
   sleep(0.2)
@@ -202,6 +207,7 @@ export function testProfileAndModeration() {
     expect(signupStatus, 'status is 201').to.equal(201)
   })
   if (signupStatus !== 201) fail(`adult signup failed: ${signupStatus}`)
+  if (!adult) fail('signup returned empty body')
 
   describe('GET /api/v1/user/profile', () => {
     const { status, body } = getJson<{ user: { id: string; role: string } }>(
@@ -209,8 +215,8 @@ export function testProfileAndModeration() {
       { headers: authHeaders(adult.userId, 'admin'), tags: { name: 'user/profile' } }
     )
     expect(status, 'status is 200').to.equal(200)
-    expect(body.user.id, 'returns authenticated user').to.equal(adult.userId)
-    expect(body.user.role, 'returns requested role').to.equal('admin')
+    expect(body?.user.id, 'returns authenticated user').to.equal(adult.userId)
+    expect(body?.user.role, 'returns requested role').to.equal('admin')
   })
 
   describe('POST /api/v1/moderation/actions', () => {
@@ -230,7 +236,7 @@ export function testProfileAndModeration() {
       }
     )
     expect(status, 'status is 200').to.equal(200)
-    expect(body.tracked, 'action is tracked').to.equal(true)
+    expect(body?.tracked, 'action is tracked').to.equal(true)
   })
 
   sleep(0.2)

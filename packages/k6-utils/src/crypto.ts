@@ -20,11 +20,17 @@ export async function aesEncrypt(
 ): Promise<{ ciphertext: string; iv: string }> {
   // Convert hex-encoded key to raw bytes for WebCrypto
   const keyBytes = hexToBytes(keyHex)
+  if (keyBytes.length !== 16 && keyBytes.length !== 24 && keyBytes.length !== 32)
+    throw new Error(
+      `AES key must be 16, 24, or 32 bytes (128, 192, or 256-bit); got ${keyBytes.length}`
+    )
 
   // If caller provides an IV, use it. Otherwise generate a random 16-byte IV.
   // Random IV is preferred — reusing IVs with AES-CBC leaks information about the plaintext.
   // crypto.getRandomValues is a global in k6 v1.0+ (same as browser Web Crypto API).
   const ivBytes = ivHex ? hexToBytes(ivHex) : crypto.getRandomValues(new Uint8Array(16))
+  if (ivHex && ivBytes.length !== 16)
+    throw new Error(`AES-CBC IV must be exactly 16 bytes; got ${ivBytes.length}`)
 
   // Import the raw key bytes into a CryptoKey object that WebCrypto can use.
   // 'raw' = key is raw bytes (not JWK or PKCS8).

@@ -25,7 +25,15 @@ export function randomEmail(prefix = 'k6user', domain = 'test.k6.io'): string {
  * @param fakerEmail - An email from faker.person.email() (e.g. 'john.doe@gmail.com')
  */
 export function realisticEmail(fakerEmail: string): string {
-  const [local, domain] = fakerEmail.split('@')
+  const atIdx = fakerEmail.indexOf('@')
+  if (
+    atIdx < 1 ||
+    atIdx === fakerEmail.length - 1 ||
+    fakerEmail.lastIndexOf('@') !== atIdx
+  )
+    throw new Error(`realisticEmail: invalid email format: "${fakerEmail}"`)
+  const local = fakerEmail.slice(0, atIdx)
+  const domain = fakerEmail.slice(atIdx + 1)
   const ts = Date.now()
   const rand = Math.random().toString(36).substring(2, 8)
   return `${local}+${ts}-${rand}@${domain}`

@@ -24,5 +24,8 @@ export function measureInfraDelay(healthUrl: string, samples = 5): number {
     return -1
   }
   durations.sort((a, b) => a - b)
-  return durations[Math.floor(durations.length / 2)]!
+  const mid = Math.floor(durations.length / 2)
+  return durations.length % 2 === 1
+    ? durations[mid]!
+    : (durations[mid - 1]! + durations[mid]!) / 2
 }

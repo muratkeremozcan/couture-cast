@@ -1,5 +1,5 @@
-// Barrel export for k6-toolkit.
-// Consumers can import from the root or from subpaths (e.g. 'k6-toolkit/jwt').
+// Barrel export for @couture/k6-utils.
+// Consumers can import from the root or from subpaths (e.g. '@couture/k6-utils/jwt').
 
 export type { ApiRequestParams, ApiResponse, HttpMethod } from './api-request.ts'
 export { apiRequest } from './api-request.ts'

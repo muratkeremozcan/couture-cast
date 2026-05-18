@@ -53,7 +53,7 @@ jobs:
           GIT_SHA: ${{ github.sha }}
           K6_RUN_MODE: smoke
           SUMMARY_OUTPUT: k6/summary.json
-        run: npm run test:k6-local
+        run: npm run test:k6:local
 
       - name: Summarize k6 smoke
         if: always()

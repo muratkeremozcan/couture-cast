@@ -124,9 +124,11 @@ export async function encodeRS256(
  */
 export function decode(token: string): DecodedToken {
   const parts = token.split('.')
+  if (parts.length !== 3 || !parts[0] || !parts[1])
+    throw new Error('Invalid JWT: expected 3 non-empty segments')
   return {
-    header: JSON.parse(encoding.b64decode(parts[0]!, 'rawurl', 's')) as JwtHeader,
-    payload: JSON.parse(encoding.b64decode(parts[1]!, 'rawurl', 's')) as Record<
+    header: JSON.parse(encoding.b64decode(parts[0], 'rawurl', 's')) as JwtHeader,
+    payload: JSON.parse(encoding.b64decode(parts[1], 'rawurl', 's')) as Record<
       string,
       unknown
     >,
@@ -146,6 +148,13 @@ export function verify(
   const parts = token.split('.')
   if (parts.length !== 3) throw new Error('JWT must have 3 segments')
 
+  // Decode header early so we can verify the declared algorithm matches the caller's expectation
+  const header = JSON.parse(encoding.b64decode(parts[0]!, 'rawurl', 's')) as JwtHeader
+  if (header.alg !== algorithm)
+    throw new Error(
+      `JWT algorithm mismatch: token declares ${header.alg} but expected ${algorithm}`
+    )
+
   // Recompute the signature from header.payload using the same secret
   const sigInput = `${parts[0]}.${parts[1]}`
   const hmacAlg = algorithm.replace('HS', 'sha') as Algorithm
@@ -159,7 +168,7 @@ export function verify(
   }
 
   return {
-    header: JSON.parse(encoding.b64decode(parts[0]!, 'rawurl', 's')) as JwtHeader,
+    header,
     payload: JSON.parse(encoding.b64decode(parts[1]!, 'rawurl', 's')) as Record<
       string,
       unknown
@@ -180,6 +189,13 @@ export async function verifyRS256(
 ): Promise<DecodedToken> {
   const parts = token.split('.')
   if (parts.length !== 3) throw new Error('JWT must have 3 segments')
+
+  // Decode header early so we can verify the declared algorithm matches RS256
+  const header = JSON.parse(encoding.b64decode(parts[0]!, 'rawurl', 's')) as JwtHeader
+  if (header.alg !== 'RS256')
+    throw new Error(
+      `JWT algorithm mismatch: token declares ${header.alg} but expected RS256`
+    )
 
   const sigInput = `${parts[0]}.${parts[1]}`
 
@@ -215,7 +231,7 @@ export async function verifyRS256(
   }
 
   return {
-    header: JSON.parse(encoding.b64decode(parts[0]!, 'rawurl', 's')) as JwtHeader,
+    header,
     payload: JSON.parse(encoding.b64decode(parts[1]!, 'rawurl', 's')) as Record<
       string,
       unknown

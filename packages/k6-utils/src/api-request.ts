@@ -35,8 +35,8 @@ export type ApiRequestParams = {
 export type ApiResponse<T> = {
   /** HTTP status code */
   status: number
-  /** Parsed JSON response body */
-  body: T
+  /** Parsed JSON response body, or null for empty responses (HEAD, 204, or missing body) */
+  body: T | null
   /** Full k6 response for advanced use (timings, cookies, etc.) */
   rawResponse: Response
 }

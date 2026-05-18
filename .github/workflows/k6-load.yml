@@ -62,12 +62,17 @@ jobs:
           API_PRODUCTION_BASE_URL: ${{ secrets.API_PRODUCTION_BASE_URL }}
         run: |
           if [ -n "$INPUT_BASE_URL" ]; then
-            echo "base_url=$INPUT_BASE_URL" >> "$GITHUB_OUTPUT"
+            BASE_URL_RESOLVED="$INPUT_BASE_URL"
           elif [ "$ENVIRONMENT" = "production" ]; then
-            echo "base_url=$API_PRODUCTION_BASE_URL" >> "$GITHUB_OUTPUT"
+            BASE_URL_RESOLVED="$API_PRODUCTION_BASE_URL"
           else
-            echo "base_url=$API_PREVIEW_BASE_URL" >> "$GITHUB_OUTPUT"
+            BASE_URL_RESOLVED="$API_PREVIEW_BASE_URL"
           fi
+          if [ -z "$BASE_URL_RESOLVED" ]; then
+            echo "::error::base_url resolved to empty — ensure API_PREVIEW_BASE_URL or API_PRODUCTION_BASE_URL is set in repository secrets" >&2
+            exit 1
+          fi
+          echo "base_url=$BASE_URL_RESOLVED" >> "$GITHUB_OUTPUT"
 
       - name: Run k6 load test
         env:
