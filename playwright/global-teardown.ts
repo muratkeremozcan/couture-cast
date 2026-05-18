@@ -4,7 +4,15 @@ import path from 'node:path'
 function isLocalDatabaseUrl(value: string): boolean {
   try {
     const url = new URL(value)
-    return ['127.0.0.1', 'localhost', '0.0.0.0'].includes(url.hostname)
+    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '')
+    return [
+      '127.0.0.1',
+      'localhost',
+      '0.0.0.0',
+      '::1',
+      '::ffff:127.0.0.1',
+      '::ffff:7f00:1',
+    ].includes(hostname)
   } catch {
     return false
   }

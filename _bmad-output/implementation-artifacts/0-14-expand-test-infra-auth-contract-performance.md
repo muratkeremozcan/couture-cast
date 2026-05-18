@@ -256,12 +256,15 @@ without blocking current feature delivery.
   the Vercel API project build command runs `prisma migrate deploy`, and the missing Preview runtime
   env vars were added to `couture-cast-api` on 2026-05-18:
   `GUARDIAN_INVITE_JWT_SECRET` (`sensitive`) and `GUARDIAN_INVITE_WEB_BASE_URL` (`plain`).
-  After redeploy, a targeted Preview probe against
+  After redeploy of Vercel deployment `dpl_HtVxq1pjsvjKUQnCk8ba7RqTajew`
+  ([dashboard](https://vercel.com/muratkeremozcans-projects/couture-cast-api/HtVxq1pjsvjKUQnCk8ba7RqTajew),
+  created `2026-05-18T15:45:50.082Z`), a targeted Preview probe against
   `https://couture-cast-api-git-main-muratkeremozcans-projects.vercel.app` returned:
   health `200` for SHA `6bf10a0832b9623ab7ba11636da23022bf7bfe12`, teen signup `201`,
   guardian invitation `201`, and invitation accept `200`.
   `playwright/tests/api/guardian-consent-lifecycle.spec.ts` now runs in Local and Preview while
-  continuing to skip Production write paths. `playwright/global-teardown.ts` now refuses to run
+  cleaning its guardian lifecycle records and continuing to skip Production write paths.
+  `playwright/global-teardown.ts` now refuses to run
   `db:reset` unless `TEST_ENV=local` and `DATABASE_URL` points at localhost, preventing remote
   Preview/Production database resets during local verification.
 - Maestro analytics Task 3 gate posture:

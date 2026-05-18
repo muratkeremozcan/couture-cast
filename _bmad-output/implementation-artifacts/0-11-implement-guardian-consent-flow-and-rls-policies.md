@@ -106,7 +106,7 @@ CoutureCast satisfies COPPA requirements and age-gating obligations.
     - Send confirmation email to teen and guardian
   - [x] Add invitation UI in mobile and web apps
 
-- [ ] Task 3.5: Propagate guardian invitation env vars to hosted runtimes
+- [x] Task 3.5: Propagate guardian invitation env vars to hosted runtimes
   - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.preview`
         into Vercel project `couture-cast-api` Preview environment variables
   - [x] Copy the variable `GUARDIAN_INVITE_JWT_SECRET` from local `.env.prod`
