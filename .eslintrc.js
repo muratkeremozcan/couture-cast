@@ -77,5 +77,23 @@ module.exports = {
         tsconfigRootDir: __dirname,
       },
     },
+    {
+      files: ['k6/**/*.ts', 'packages/k6-utils/src/**/*.ts'],
+      parserOptions: {
+        project: ['./k6/tsconfig.json', './packages/k6-utils/tsconfig.json'],
+        tsconfigRootDir: __dirname,
+      },
+      rules: {
+        // k6 jslib CDN imports (https://jslib.k6.io/...) are fetched at runtime by k6
+        'import/no-unresolved': ['error', { ignore: ['^https://jslib\\.k6\\.io/'] }],
+        // k6 native modules (k6/http, k6/crypto, k6/encoding) use default imports by convention
+        'import/no-named-as-default-member': 'off',
+        // k6 utility functions legitimately exceed the complexity ceiling
+        complexity: 'off',
+        // noUncheckedIndexedAccess causes false positives for ! on array/record accesses;
+        // tsc is the authoritative type-safety guard for k6 files
+        '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      },
+    },
   ],
 }

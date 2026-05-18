@@ -1,0 +1,129 @@
+name: k6 load
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Load profile
+        type: choice
+        options:
+          - smoke
+          - constant-rate
+          - ramp-up
+          - soak
+          - spike
+        default: constant-rate
+      environment:
+        description: Target environment
+        type: choice
+        options:
+          - preview
+          - production
+        default: preview
+      base_url:
+        description: Optional API base URL override
+        type: string
+      qps:
+        description: Optional QPS override
+        type: string
+      duration:
+        description: Optional duration override, for example 5m or 30m
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.environment }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  k6-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      TEST_ID: couture-cast-${{ inputs.profile }}-${{ github.run_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Resolve base URL
+        id: env
+        env:
+          INPUT_BASE_URL: ${{ inputs.base_url }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          API_PREVIEW_BASE_URL: ${{ secrets.API_PREVIEW_BASE_URL }}
+          API_PRODUCTION_BASE_URL: ${{ secrets.API_PRODUCTION_BASE_URL }}
+        run: |
+          if [ -n "$INPUT_BASE_URL" ]; then
+            BASE_URL_RESOLVED="$INPUT_BASE_URL"
+          elif [ "$ENVIRONMENT" = "production" ]; then
+            BASE_URL_RESOLVED="$API_PRODUCTION_BASE_URL"
+          else
+            BASE_URL_RESOLVED="$API_PREVIEW_BASE_URL"
+          fi
+          if [ -z "$BASE_URL_RESOLVED" ]; then
+            echo "::error::base_url resolved to empty — ensure API_PREVIEW_BASE_URL or API_PRODUCTION_BASE_URL is set in repository secrets" >&2
+            exit 1
+          fi
+          echo "base_url=$BASE_URL_RESOLVED" >> "$GITHUB_OUTPUT"
+
+      - name: Run k6 load test
+        env:
+          CI: 'true'
+          ENVIRONMENT: ${{ inputs.environment }}
+          TEST_ENV: ${{ inputs.environment }}
+          GIT_SHA: ${{ github.sha }}
+          TEST_CONFIG: ../packages/k6-utils/templates/load-profiles/${{ inputs.profile }}.json
+          SUMMARY_OUTPUT: k6/summary.json
+          BASE_URL: ${{ steps.env.outputs.base_url }}
+          QPS: ${{ inputs.qps }}
+          DURATION: ${{ inputs.duration }}
+          TEST_ID: ${{ env.TEST_ID }}
+        run: npm run test:k6-${{ inputs.environment }}
+
+      - name: Summarize k6 load
+        if: always()
+        run: |
+          echo "## k6 load - ${{ inputs.profile }} @ ${{ inputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Test ID: \`${TEST_ID}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          for summary_file in k6/summary-*.json; do
+            [ -f "$summary_file" ] || continue
+            test_name=$(basename "$summary_file" .json | sed 's/summary-//')
+            pass=$(jq -r '.pass' "$summary_file")
+            if [ "$pass" = "true" ]; then
+              status="PASS"
+            elif [ "$pass" = "false" ]; then
+              status="FAIL"
+            else
+              status="UNKNOWN"
+            fi
+            echo "### ${test_name}: ${status}" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          # head -1: safe while exactly one .k6test.ts file exists; update to iterate all files if a second test is added
+          summary_file=$(ls k6/summary-*.json 2>/dev/null | head -1 || true)
+          if [ -n "$summary_file" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Metric | p95 | p99 | avg | max |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| --- | --- | --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.metrics | to_entries[] | "| \(.key) | \(.value.p95 // "-")ms | \(.value.p99 // "-")ms | \(.value.avg // "-")ms | \(.value.max // "-")ms |"' "$summary_file" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload k6 load artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-summaries-${{ inputs.profile }}-${{ inputs.environment }}
+          path: k6/summary-*.json
+          if-no-files-found: ignore
+          retention-days: 30

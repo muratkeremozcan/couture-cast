@@ -1,0 +1,16 @@
+{
+  "scenarios": {
+    "default": {
+      "executor": "constant-arrival-rate",
+      "rate": 10,
+      "timeUnit": "1s",
+      "duration": "5m",
+      "preAllocatedVUs": 10,
+      "maxVUs": 50
+    }
+  },
+  "thresholds": {
+    "http_req_duration": ["p(95)<500", "p(99)<1000"],
+    "http_req_failed": ["rate<0.01"]
+  }
+}

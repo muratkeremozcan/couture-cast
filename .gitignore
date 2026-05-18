@@ -35,6 +35,7 @@ blob-report/
 downloads/
 pacts/
 pact/artifacts/
+k6/summary-*.json
 
 # Logs
 *.log
@@ -44,3 +45,4 @@ maestro/artifacts
 *.tsbuildinfo
 .agents
 _bmad
+perf-test-plan.md
