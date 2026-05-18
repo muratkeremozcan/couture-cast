@@ -29,6 +29,7 @@ Thin Turborepo for Couture Cast apps and smoke tests. Keep it lean: shared lint 
 | `apps/mobile`            | Expo Router SDK 54 project (tabs template, React Native 0.81).                                             |
 | `apps/api`               | NestJS 11 monolith wired to Vitest 4.                                                                      |
 | `maestro/`               | Maestro smoke and analytics advisory flows for mobile sanity checks.                                       |
+| `k6/`                    | Performance baseline scenarios and load profiles (driven by `@couture/k6-utils`).                          |
 | `playwright/`            | Root-level Playwright smoke suite (fixtures + README) shared by web + API teams.                           |
 | `playwright/scripts`     | Utility scripts for Playwright (burn-in variants).                                                         |
 | `packages/eslint-config` | Shared ESLint config consumed across workspaces.                                                           |
@@ -88,6 +89,10 @@ npm run typecheck:clear-cache
 | `npm run test:pw:burn-in`                 | Burn-in all specs locally (`PW_BURN_IN=true`, repeat-each=3, retries=0).                                                                        |
 | `npm run test:pw:burn-in-changed-classic` | Playwright built-in `--only-changed` burn-in vs main (3x, retries=0) — can overrun.                                                             |
 | `npm run test:pw:burn-in-changed`         | Smart burn-in via `@seontechnologies/playwright-utils` (config-driven, respects skip/percentage).                                               |
+| `npm run test:k6`                         | Alias for `npm run test:k6:local`.                                                                                                              |
+| `npm run test:k6:local`                   | Runs k6 smoke tests against local API (using `start-server-and-test`).                                                                          |
+| `npm run test:k6:preview`                 | Runs k6 smoke tests against Vercel Preview URL.                                                                                                 |
+| `npm run test:k6:prod`                    | Runs k6 smoke tests against Production URL.                                                                                                     |
 | `npm run maestro:install`                 | Installs the Maestro CLI (brew/curl on macOS; npx fallback on CI).                                                                              |
 | `npm run test:mobile:e2e:android`         | Boots/uses the Android emulator, starts Expo, and runs Maestro sanity + analytics flows.                                                        |
 | `npm run test:mobile:e2e:ios`             | Boots/uses the iOS simulator, starts Expo, and runs Maestro sanity + analytics flows.                                                           |

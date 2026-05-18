@@ -1,0 +1,82 @@
+name: k6 smoke
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'apps/api/**'
+      - 'k6/**'
+      - 'packages/k6-utils/**'
+      - 'packages/api-client/src/contracts/http/**'
+      - 'packages/db/prisma/**'
+      - 'package*.json'
+      - '.github/workflows/k6-smoke-prs.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  k6-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      TEST_ENV: local
+      ALLOW_DEV_GUARDIAN_SECRET: 'true'
+      GUARDIAN_INVITE_WEB_BASE_URL: http://127.0.0.1:3005
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Start local Supabase services
+        uses: ./.github/actions/start-local-supabase
+
+      - name: Reset local database
+        run: npm run db:reset
+
+      - name: Run k6 PR smoke
+        env:
+          CI: 'true'
+          GIT_SHA: ${{ github.sha }}
+          K6_RUN_MODE: smoke
+          SUMMARY_OUTPUT: k6/summary.json
+        run: npm run test:k6-local
+
+      - name: Summarize k6 smoke
+        if: always()
+        run: |
+          echo "## k6 smoke" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # head -1: safe while exactly one .k6test.ts file exists; update to iterate all files if a second test is added
+          summary_file=$(ls k6/summary-*.json 2>/dev/null | head -1 || true)
+          if [ -z "$summary_file" ]; then
+            echo "No k6 summary files were produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "| Metric | p95 | p99 | avg | max |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- | --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.metrics | to_entries[] | "| \(.key) | \(.value.p95 // "-")ms | \(.value.p99 // "-")ms | \(.value.avg // "-")ms | \(.value.max // "-")ms |"' "$summary_file" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload k6 smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-smoke-${{ github.event.pull_request.number || github.sha }}
+          path: k6/summary-*.json
+          if-no-files-found: ignore
+          retention-days: 14

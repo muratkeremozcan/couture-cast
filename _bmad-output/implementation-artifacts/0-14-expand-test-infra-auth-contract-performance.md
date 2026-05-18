@@ -135,11 +135,21 @@ without blocking current feature delivery.
         provide local/CI parity
         without Pact Broker dependency.
 
-- [ ] Task 5: Performance baseline harness (AC: #4)
-  - [ ] Add baseline k6 scenarios for critical API endpoints and queue load.
-  - [ ] Define thresholds and output reports for latency/error budgets.
-  - [ ] Add workflow trigger (nightly/manual) and artifact retention.
-  - [ ] Document promotion criteria from non-blocking to gate.
+- [x] Task 5: Performance baseline harness (AC: #4)
+  - [x] Add baseline k6 scenarios for critical API endpoints and queue load.
+  - [x] Define thresholds and output reports for latency/error budgets.
+  - [x] Add workflow trigger (nightly/manual) and artifact retention.
+  - [x] Document promotion criteria from non-blocking to gate.
+  - Note: smoke profile runs 1 VU / 1 iteration **per scenario** (5 scenarios = 5 named-export
+    executor slots). Total VUs across the run = 5, each executing exactly one function once.
+  - Required GitHub Secrets for `.github/workflows/k6-load.yml` (must be provisioned before
+    load workflow can run against remote environments):
+    - `API_PREVIEW_BASE_URL` — base URL for the preview API deployment
+    - `API_PRODUCTION_BASE_URL` — base URL for the production API deployment
+  - Write-path note: `testGuardianWritePath` and `testProfileAndModeration` create user
+    accounts and moderation records that are not deleted after the test. Acceptable for
+    1-iteration smoke in CI. For load profiles against preview, schedule periodic
+    `db:reset` or scope the write-path scenarios to local only (gate on `TEST_ENV=local`).
 
 - [x] Task 5.5: Resolve write-path preview E2E promotion debt
   - [x] Resolve preview deploy-path parity for write-path API E2E before promoting
@@ -293,6 +303,61 @@ without blocking current feature delivery.
   Keep the rotation scope focused on the first group unless an upstream provider forces a coupled
   replacement of the second group.
 
+## Dev Agent Record
+
+### Debug Log
+
+- 2026-05-18: Built `@couture/k6-utils`, typechecked the package and `k6/`, and bundled
+  `k6/tests/couture-api-baseline.k6test.ts` with esbuild.
+- 2026-05-18: Ran root `npm run typecheck` successfully after adding the k6 typecheck path.
+- 2026-05-18: Validated shell syntax for the k6 runner scripts and Prettier formatting for the
+  changed k6/package/workflow files.
+- 2026-05-18: Local k6 execution was not run because the `k6` CLI is not installed on this
+  workstation; GitHub workflows install it with `grafana/setup-k6-action@v1`.
+
+### Completion Notes
+
+- Added a workspace-local k6 utility package with config/profile loading, summary output,
+  request helpers, data helpers, and the shared TypeScript k6 runner.
+- Added Couture Cast k6 baseline coverage for API health, realtime polling, queue health,
+  guardian write path, profile read, and moderation action flows.
+- Added PR smoke coverage using the smoke profile and manual load execution with profile,
+  environment, QPS, duration, summary, and artifact support.
+
+### File List
+
+- `.github/workflows/k6-load.yml`
+- `.github/workflows/k6-smoke-prs.yml`
+- `k6/helpers/config.ts`
+- `k6/helpers/http.ts`
+- `k6/scripts/run-k6-env.sh`
+- `k6/scripts/run-k6-tests.sh`
+- `k6/tests/couture-api-baseline.k6test.ts`
+- `k6/tsconfig.json`
+- `k6/types.d.ts`
+- `package-lock.json`
+- `package.json`
+- `packages/k6-utils/package.json`
+- `packages/k6-utils/scripts/run-k6-tests.sh`
+- `packages/k6-utils/src/api-request.ts`
+- `packages/k6-utils/src/config.ts`
+- `packages/k6-utils/src/crypto.ts`
+- `packages/k6-utils/src/distributions.ts`
+- `packages/k6-utils/src/handle-summary.ts`
+- `packages/k6-utils/src/index.ts`
+- `packages/k6-utils/src/infra-delay.ts`
+- `packages/k6-utils/src/jwt.ts`
+- `packages/k6-utils/src/random-data.ts`
+- `packages/k6-utils/src/time.ts`
+- `packages/k6-utils/src/types.d.ts`
+- `packages/k6-utils/templates/load-profiles/constant-rate.json`
+- `packages/k6-utils/templates/load-profiles/ramp-up.json`
+- `packages/k6-utils/templates/load-profiles/smoke.json`
+- `packages/k6-utils/templates/load-profiles/soak.json`
+- `packages/k6-utils/templates/load-profiles/spike.json`
+- `packages/k6-utils/tsconfig.build.json`
+- `packages/k6-utils/tsconfig.json`
+
 ## Change Log
 
 | Date       | Author                       | Change                                                                                                                                                                                                                                                                                            |
@@ -309,3 +374,4 @@ without blocking current feature delivery.
 | 2026-05-05 | Codex (Murat/TEA)            | Completed Task 3: added diagnostics-mode Maestro analytics flow, local/manual scripts, CI artifact capture, and promotion criteria while keeping mobile analytics gating advisory-only.                                                                                                           |
 | 2026-05-05 | Codex (Murat/TEA)            | Verified and fixed Task 3 Maestro execution on Android emulator: analytics and sanity flows now pass locally with JUnit, command logs, and screenshots.                                                                                                                                           |
 | 2026-05-18 | Codex (Dev + Test Architect) | Completed Task 5.5: added missing API Preview guardian invitation env vars in Vercel, redeployed the API preview, verified signup/invite/accept write-path parity, promoted the lifecycle spec to Preview while keeping Production skipped, and blocked remote `db:reset` in Playwright teardown. |
+| 2026-05-18 | Codex                        | Completed Task 5: added k6 utility package, baseline API/queue scenarios, PR smoke workflow, manual load workflow, thresholds, summaries, and retained artifacts.                                                                                                                                 |

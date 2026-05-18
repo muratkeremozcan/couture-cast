@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "baseUrl": "..",
+    "paths": {
+      "@couture/k6-utils": ["packages/k6-utils/src/index.ts"],
+      "@couture/k6-utils/*": ["packages/k6-utils/src/*.ts"]
+    },
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "types": ["k6"]
+  },
+  "include": ["**/*.ts", "types.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,77 @@
+{
+  "name": "@couture/k6-utils",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Shared k6 utilities and load profiles for Couture Cast",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./api-request": {
+      "types": "./dist/api-request.d.ts",
+      "import": "./dist/api-request.js",
+      "default": "./dist/api-request.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js",
+      "default": "./dist/config.js"
+    },
+    "./crypto": {
+      "types": "./dist/crypto.d.ts",
+      "import": "./dist/crypto.js",
+      "default": "./dist/crypto.js"
+    },
+    "./distributions": {
+      "types": "./dist/distributions.d.ts",
+      "import": "./dist/distributions.js",
+      "default": "./dist/distributions.js"
+    },
+    "./handle-summary": {
+      "types": "./dist/handle-summary.d.ts",
+      "import": "./dist/handle-summary.js",
+      "default": "./dist/handle-summary.js"
+    },
+    "./infra-delay": {
+      "types": "./dist/infra-delay.d.ts",
+      "import": "./dist/infra-delay.js",
+      "default": "./dist/infra-delay.js"
+    },
+    "./jwt": {
+      "types": "./dist/jwt.d.ts",
+      "import": "./dist/jwt.js",
+      "default": "./dist/jwt.js"
+    },
+    "./random-data": {
+      "types": "./dist/random-data.d.ts",
+      "import": "./dist/random-data.js",
+      "default": "./dist/random-data.js"
+    },
+    "./time": {
+      "types": "./dist/time.d.ts",
+      "import": "./dist/time.js",
+      "default": "./dist/time.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
+    "lint": "npm run typecheck",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run typecheck"
+  },
+  "files": [
+    "dist",
+    "scripts",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=24.0.0",
+    "k6": ">=1.0.0"
+  }
+}
