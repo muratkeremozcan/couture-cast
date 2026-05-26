@@ -38,7 +38,7 @@ story_location: _bmad-output/implementation-artifacts
 development_status:
   # Epic 0: Platform Foundation & Infrastructure (Sprint 0)
   # All 14 stories must complete before Epic 1 begins
-  epic-0: in-progress
+  epic-0: done
   0-1-initialize-turborepo-monorepo: done
   0-13-scaffold-cross-surface-e2e-automation: done
   0-2-configure-prisma-schema-migrations-and-seed-data: done
@@ -52,7 +52,6 @@ development_status:
   0-10-implement-test-fixture-factories-and-seed-data: done
   0-11-implement-guardian-consent-flow-and-rls-policies: done
   0-12-provision-test-environments-and-harness-services: done
-  0-14-expand-test-infra-auth-contract-performance: in-progress
 
   # Epic 1: Weather Intelligence & Platform Foundation (Phase 1)
   epic-1: backlog
