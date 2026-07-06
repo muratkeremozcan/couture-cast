@@ -15,17 +15,25 @@ beforeAll(() => {
           ? input
           : input.url
 
+    let isForbidden = false
     try {
       const url = new URL(urlString)
-      if (url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
-        throw new Error(
-          `Forbidden outgoing network request to ${urlString} detected in test! All external network calls must be mocked.`
-        )
+      if (
+        url.hostname !== 'localhost' &&
+        url.hostname !== '127.0.0.1' &&
+        url.hostname !== '[::1]' &&
+        url.hostname !== '::1'
+      ) {
+        isForbidden = true
       }
-    } catch (err) {
-      if (err instanceof Error && err.message.startsWith('Forbidden')) {
-        throw err
-      }
+    } catch {
+      // Allow relative or invalid URLs to fall through to originalFetch naturally
+    }
+
+    if (isForbidden) {
+      throw new Error(
+        `Forbidden outgoing network request to ${urlString} detected in test! All external network calls must be mocked.`
+      )
     }
 
     return originalFetch(input, init)

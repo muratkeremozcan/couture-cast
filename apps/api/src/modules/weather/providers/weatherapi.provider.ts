@@ -214,6 +214,16 @@ export class WeatherApiProvider implements IWeatherProvider {
         }
       )
     }
+
+    if (uniqueHours[0] && uniqueHours[0].time_epoch !== currentHourEpoch) {
+      throw new WeatherProviderError(
+        'WeatherAPI hourly forecast start is shifted or delayed',
+        {
+          provider: PROVIDER,
+          kind: 'invalid_response',
+        }
+      )
+    }
     return uniqueHours
   }
 
