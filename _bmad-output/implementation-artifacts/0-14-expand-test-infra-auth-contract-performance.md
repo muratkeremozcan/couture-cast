@@ -1,8 +1,8 @@
 # Story 0.14: Expand test infrastructure for auth-session, burn-in, contracts, performance, and PR review automation
 
-Updated: 2026-04-22 — add incident-driven secret rotation and secret-classification follow-up after the Vercel April 2026 security bulletin
+Updated: 2026-07-06 — mark Story 0.14 complete after final verification
 
-Status: in progress
+Status: done
 
 ## Story
 
@@ -310,3 +310,4 @@ without blocking current feature delivery.
 | 2026-05-05 | Codex (Murat/TEA)            | Verified and fixed Task 3 Maestro execution on Android emulator: analytics and sanity flows now pass locally with JUnit, command logs, and screenshots.                                                                                                                                           |
 | 2026-05-18 | Codex (Dev + Test Architect) | Completed Task 5.5: added missing API Preview guardian invitation env vars in Vercel, redeployed the API preview, verified signup/invite/accept write-path parity, promoted the lifecycle spec to Preview while keeping Production skipped, and blocked remote `db:reset` in Playwright teardown. |
 | 2026-05-18 | Codex                        | Completed Task 5: added k6 utility package, baseline API/queue scenarios, PR smoke workflow, manual load workflow, thresholds, summaries, and retained artifacts.                                                                                                                                 |
+| 2026-07-06 | Murat                        | Confirmed Story 0.14 complete and synchronized its status with sprint tracking.                                                                                                                                                                                                                   |
