@@ -1617,3 +1617,90 @@ flowchart TD
   parity --> apps
   diff --> apps
 ```
+
+## Step 16 - Weather API ingestion service and provider integrations
+
+User/business impact:
+
+Ingesting real-time, accurate current and hourly weather conditions is the
+foundation of CoutureCast's outfit intelligence. Implementing a modular
+provider system with automated failover and secure credential handling
+guarantees high availability without compromising user data or incurring
+unexpected cloud API costs.
+
+Key takeaways:
+
+1. A single unified interface (`IWeatherProvider`) decouples the core worker
+   orchestrator from specific provider implementation quirks.
+2. Provider responses must be parsed and strictly validated with Zod before
+   normalization. Invalid payloads are rejected entirely to avoid partial
+   or corrupted state persistence.
+3. Coordinates must be rounded to a standard precision (e.g., 4 decimal
+   places) at the provider boundary to ensure consistent cache and lookups,
+   while raw coordinates and API keys must be scrubbed from errors and logs
+   to preserve user privacy.
+4. Setting a daily call cap (e.g., 1,000 requests) directly in vendor
+   dashboards ensures development and production run entirely within free
+   tiers.
+
+Story/Task mapping:
+
+- Story 1.1
+- Task 1 (Implement provider contracts, adapters, and configuration)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/1-1-weather-api-ingestion-service.md`
+
+Cross-links:
+
+- Step 3 frames weather snapshot and forecast segment database tables.
+- Step 4 documents environment configuration loading.
+- Step 5 details BullMQ worker concurrency and queuing defaults.
+
+Sequence to follow:
+
+1. Define clean interfaces and normalized data models in a provider-agnostic
+   way.
+2. Implement adapters for the primary (OpenWeather) and secondary (WeatherAPI)
+   providers.
+3. Handle vendor-specific unit normalization (e.g., wind speed in m/s) and
+   time epoch parsing.
+4. Author comprehensive test mock fixtures covering success, missing fields,
+   429 rate limit, 500 server error, and malformed responses.
+5. Verify behavior with robust unit tests that block live network access.
+
+Task owner map:
+
+- Story 1.1 Task 1 step 1 owner: define standard typescript interface
+  `IWeatherProvider` and target/normalization types in `weather.types.ts`
+- Step 16 step 2 owner: implement `OpenWeatherProvider` against One Call API
+  4.0/3.0 in `openweather.provider.ts`
+- Step 16 step 3 owner: implement `WeatherApiProvider` against the forecast
+  endpoint in `weatherapi.provider.ts`
+- Step 16 step 4 owner: define raw validation and normalized schemas in
+  `weather.schemas.ts`
+- Step 16 step 5 owner: configure provider fixtures for mock responses in
+  `fixtures/`
+- Step 16 step 6 owner: write unit tests in `openweather.provider.spec.ts` and
+  `weatherapi.provider.spec.ts`
+
+Current repo note:
+
+- We have completed the implementation and validation of the primary
+  (OpenWeather One Call 4.0/3.0) and secondary (WeatherAPI) provider adapters.
+  Both are fully integrated, support coordinate rounding, metric conversions,
+  and have 100% test coverage with robust error/limit mocking. Environment
+  configuration has been extended in `.env.example`.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Target["WeatherIngestionTarget"] --> Fetch["IWeatherProvider"]
+  Fetch --> OpenWeather["OpenWeatherProvider\n(One Call 4.0/3.0)"]
+  Fetch --> WeatherApi["WeatherApiProvider\n(Forecast API)"]
+  OpenWeather --> Zod["Zod Validation & Normalization"]
+  WeatherApi --> Zod
+  Zod --> Output["NormalizedWeatherForecast"]
+```

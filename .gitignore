@@ -44,5 +44,6 @@ maestro/artifacts
 
 *.tsbuildinfo
 .agents
+.agent
 _bmad
 perf-test-plan.md
