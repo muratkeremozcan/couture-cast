@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/murat/opensource/couture-cast/.bmad-loop/bmad_loop_hook.py SessionStart",
+            "timeout": 60000
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/murat/opensource/couture-cast/.bmad-loop/bmad_loop_hook.py Stop",
+            "timeout": 60000
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/murat/opensource/couture-cast/.bmad-loop/bmad_loop_hook.py SessionEnd",
+            "timeout": 60000
+          }
+        ]
+      }
+    ]
+  }
+}
