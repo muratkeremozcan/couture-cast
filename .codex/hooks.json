@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/murat/opensource/couture-cast/.bmad-loop/bmad_loop_hook.py SessionStart"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/murat/opensource/couture-cast/.bmad-loop/bmad_loop_hook.py Stop"
+          }
+        ]
+      }
+    ]
+  }
+}
