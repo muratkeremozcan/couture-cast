@@ -151,8 +151,6 @@ model ForecastSegment {
   created_at                DateTime               @default(now())
   outfits                   OutfitRecommendation[]
 
-  @@index([weather_snapshot_id])
-  @@index([weather_snapshot_id, forecast_at])
   @@index([forecast_at])
   @@unique([weather_snapshot_id, forecast_at])
 }

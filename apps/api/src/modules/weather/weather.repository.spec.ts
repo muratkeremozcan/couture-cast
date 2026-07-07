@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { Prisma } from '@prisma/client'
 
 import { WeatherRepository } from './weather.repository.js'
 import type { NormalizedWeatherForecast } from './providers/weather.types.js'
@@ -82,6 +83,9 @@ function createPrismaStub(existingSnapshot: unknown = null) {
   }
   const prisma = {
     $transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)),
+    weatherSnapshot: {
+      findUnique: vi.fn().mockResolvedValue(existingSnapshot),
+    },
   }
 
   return { prisma, tx, createdSnapshot }
@@ -89,7 +93,7 @@ function createPrismaStub(existingSnapshot: unknown = null) {
 
 describe('WeatherRepository', () => {
   it('persists a normalized forecast and 48 hourly segments in one transaction', async () => {
-    const forecast = buildForecast()
+    const forecast = { ...buildForecast(), locationKey: 'New-York-NY' }
     const { prisma, tx, createdSnapshot } = createPrismaStub()
     const repository = new WeatherRepository(prisma as never)
 
@@ -116,7 +120,7 @@ describe('WeatherRepository', () => {
     }
     expect(createArgs).toMatchObject({
       data: {
-        location: 'new-york-ny',
+        location: 'New-York-NY',
         location_key: 'new-york-ny',
         latitude: 40.7128,
         longitude: -74.006,
@@ -140,6 +144,35 @@ describe('WeatherRepository', () => {
       wind_speed: 4,
       wind_gust: 6,
       provider_weather_code: '500',
+    })
+  })
+
+  it('recovers from a concurrent unique constraint race by re-reading the snapshot', async () => {
+    const existingSnapshot = { id: 'weather-1', segments: [{ id: 'segment-1' }] }
+    const { tx, prisma } = createPrismaStub(existingSnapshot)
+    tx.weatherSnapshot.findUnique.mockResolvedValueOnce(null)
+    tx.weatherSnapshot.create.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'test',
+        meta: { target: ['location_key', 'provider', 'provider_updated_at'] },
+      })
+    )
+    const repository = new WeatherRepository(prisma as never)
+
+    await expect(repository.persistForecast(buildForecast())).resolves.toBe(
+      existingSnapshot
+    )
+
+    expect(prisma.weatherSnapshot.findUnique).toHaveBeenCalledWith({
+      where: {
+        location_key_provider_provider_updated_at: {
+          location_key: 'new-york-ny',
+          provider: 'openweather',
+          provider_updated_at: new Date('2026-07-06T13:00:00.000Z'),
+        },
+      },
+      include: { segments: true },
     })
   })
 

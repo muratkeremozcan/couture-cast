@@ -9,6 +9,10 @@ export type WeatherSnapshotWithSegments = Prisma.WeatherSnapshotGetPayload<{
 
 type PersistedWeatherSnapshot = WeatherSnapshotWithSegments
 
+function normalizeLocationKey(locationKey: string): string {
+  return locationKey.trim().toLowerCase()
+}
+
 @Injectable()
 export class WeatherRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -16,12 +20,13 @@ export class WeatherRepository {
   async persistForecast(
     forecast: NormalizedWeatherForecast
   ): Promise<PersistedWeatherSnapshot> {
+    const locationKey = normalizeLocationKey(forecast.locationKey)
     try {
       return await this.prisma.$transaction(async (transaction) => {
         const existing = await transaction.weatherSnapshot.findUnique({
           where: {
             location_key_provider_provider_updated_at: {
-              location_key: forecast.locationKey,
+              location_key: locationKey,
               provider: forecast.provider,
               provider_updated_at: forecast.providerUpdatedAt,
             },
@@ -46,7 +51,7 @@ export class WeatherRepository {
         const existing = await this.prisma.weatherSnapshot.findUnique({
           where: {
             location_key_provider_provider_updated_at: {
-              location_key: forecast.locationKey,
+              location_key: locationKey,
               provider: forecast.provider,
               provider_updated_at: forecast.providerUpdatedAt,
             },
@@ -64,7 +69,7 @@ export class WeatherRepository {
   async findLatestByLocationKey(
     locationKey: string
   ): Promise<WeatherSnapshotWithSegments | null> {
-    const normalizedKey = locationKey.trim().toLowerCase()
+    const normalizedKey = normalizeLocationKey(locationKey)
     return this.prisma.weatherSnapshot.findFirst({
       where: { location_key: normalizedKey },
       orderBy: [{ fetched_at: 'desc' }, { id: 'desc' }],
@@ -81,7 +86,7 @@ export class WeatherRepository {
   ): Prisma.WeatherSnapshotCreateInput {
     return {
       location: forecast.locationKey,
-      location_key: forecast.locationKey,
+      location_key: normalizeLocationKey(forecast.locationKey),
       latitude: forecast.latitude,
       longitude: forecast.longitude,
       timezone: forecast.timezone,

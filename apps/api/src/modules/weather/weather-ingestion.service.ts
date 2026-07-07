@@ -22,6 +22,7 @@ import {
 } from './weather.repository.js'
 
 const PRIMARY_RETRY_DELAYS_MS = [5000, 15000] as const
+const DEFAULT_INGESTION_TIMEOUT_MS = 30_000
 
 type WeatherLogger = {
   info(message: string, values?: Record<string, unknown>): void
@@ -162,7 +163,7 @@ export class WeatherIngestionService {
 
   async ingestTarget(
     target: WeatherIngestionTarget,
-    signal: AbortSignal = new AbortController().signal
+    signal: AbortSignal = AbortSignal.timeout(DEFAULT_INGESTION_TIMEOUT_MS)
   ): Promise<WeatherIngestionResult> {
     const forecast = await this.fetchWithFailover(target, signal)
 
@@ -282,7 +283,7 @@ export class WeatherIngestionService {
       )
       return forecast
     } catch (error) {
-      const providerError = toProviderError(provider, error)
+      const providerError = toProviderError(provider, error, signal)
       this.meter.recordProviderRequest?.(
         provider,
         providerError.kind,

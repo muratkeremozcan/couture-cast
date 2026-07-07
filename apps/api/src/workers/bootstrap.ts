@@ -10,7 +10,7 @@ import { WeatherRepository } from '../modules/weather/weather.repository'
 import { registerWeatherRefreshScheduler } from '../modules/weather/weather-scheduler'
 import { ConfiguredWeatherTargetSource } from '../modules/weather/weather-target-source'
 import { createWorker, defaultWorkerOptions } from './base.worker'
-import { getPrismaClient } from './prisma'
+import { disconnectPrismaClient, getPrismaClient } from './prisma'
 
 /** Story 0.4 owner file: worker process bootstrap and concurrency policy.
  * Dedicated worker process group:
@@ -59,6 +59,7 @@ async function startWorkers() {
       targetSource: new ConfiguredWeatherTargetSource(),
       ingestionService: weatherIngestionService,
       refreshMinutes: weatherConfig.refreshMinutes,
+      logger: console,
     })
 
     await registerWeatherRefreshScheduler(weatherQueue, weatherConfig)
@@ -109,6 +110,7 @@ async function shutdown() {
     await Promise.all([
       Promise.all(workers.map((w) => w.close())),
       Promise.all(queues.map((q) => q.close())),
+      disconnectPrismaClient(),
     ])
   } catch (err) {
     console.error('Error closing workers or queues', err)

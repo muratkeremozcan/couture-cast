@@ -72,6 +72,47 @@ describe('weather processor', () => {
       data: { type: 'location', target },
     } as never)
 
-    expect(ingestionService.ingestTarget).toHaveBeenCalledWith(target)
+    expect(ingestionService.ingestTarget).toHaveBeenCalledWith(
+      target,
+      expect.any(AbortSignal)
+    )
+  })
+
+  it('attempts every location enqueue before surfacing sweep failures', async () => {
+    const queue = {
+      add: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('redis unavailable'))
+        .mockResolvedValueOnce({ id: 'location-job' }),
+    }
+    const logger = {
+      warn: vi.fn(),
+    }
+    const processor = createWeatherJobProcessor({
+      queue: queue as never,
+      targetSource: {
+        getTargets: vi
+          .fn()
+          .mockResolvedValue([
+            target,
+            { locationKey: 'chicago-il', latitude: 41.8781, longitude: -87.6298 },
+          ]),
+      },
+      ingestionService: { ingestTarget: vi.fn() } as never,
+      refreshMinutes: 30,
+      logger,
+    })
+
+    await expect(
+      processor({ name: 'weather-refresh-sweep', data: { type: 'sweep' } } as never)
+    ).rejects.toThrow('Failed to enqueue weather location jobs: new-york-ny')
+
+    expect(queue.add).toHaveBeenCalledTimes(2)
+    expect(logger.warn).toHaveBeenCalledWith(
+      'weather sweep failed to enqueue location jobs',
+      {
+        failedTargets: [{ locationKey: 'new-york-ny', error: 'redis unavailable' }],
+      }
+    )
   })
 })

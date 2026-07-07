@@ -1691,21 +1691,38 @@ Sequence to follow:
 
 Task owner map:
 
-- Story 1.1 Task 1 step 1 owner: define `IWeatherProvider` and normalized weather target/forecast types in `apps/api/src/modules/weather/providers/weather-provider.interface.ts` and `apps/api/src/modules/weather/providers/weather.types.ts`
-- Story 1.1 Task 1 step 2 owner: implement the primary OpenWeather adapter in `apps/api/src/modules/weather/providers/openweather.provider.ts`
-- Story 1.1 Task 1 step 3 owner: implement the secondary WeatherAPI adapter in `apps/api/src/modules/weather/providers/weatherapi.provider.ts`
-- Story 1.1 Task 1 step 4 owner: validate provider payloads and normalized forecasts in `apps/api/src/modules/weather/providers/weather.schemas.ts`
-- Story 1.1 Task 2 step 1 owner: model normalized weather snapshots and forecast segments in `packages/db/prisma/schema.prisma`
-- Story 1.1 Task 2 step 2 owner: backfill and constrain normalized weather persistence in `packages/db/prisma/migrations/20260707104000_normalize_weather_persistence/migration.sql`
-- Story 1.1 Task 2 step 3 owner: keep shared weather factories aligned with the migrated persistence shape in `packages/testing/src/factories/weather.factory.ts`
-- Story 1.1 Task 2 step 4 owner: persist normalized snapshots and segments transactionally in `apps/api/src/modules/weather/weather.repository.ts`
-- Story 1.1 Task 3 step 1 owner: implement bounded provider retry and failover in `apps/api/src/modules/weather/weather-ingestion.service.ts`
-- Story 1.1 Task 3 step 2 owner: classify latest-weather freshness and fallback responses in `apps/api/src/modules/weather/weather-query.service.ts`
-- Story 1.1 Task 4 step 1 owner: load configured bootstrap ingestion targets in `apps/api/src/modules/weather/weather-target-source.ts`
-- Story 1.1 Task 4 step 2 owner: coalesce targets and enqueue interval-bucketed location jobs in `apps/api/src/modules/weather/weather-processor.ts`
-- Story 1.1 Task 4 step 3 owner: register the durable BullMQ weather sweep scheduler in `apps/api/src/modules/weather/weather-scheduler.ts`
-- Story 1.1 Task 4 step 4 owner: wire the real weather worker processor and scheduler startup in `apps/api/src/workers/bootstrap.ts`
-- Story 1.1 Task 4 step 5 owner: document the non-serverless weather worker runtime in `apps/api/README.md`
+- Story 1.1 Task 1 step 1 owner: define `IWeatherProvider` and normalized weather
+  target/forecast types in
+  `apps/api/src/modules/weather/providers/weather-provider.interface.ts` and
+  `apps/api/src/modules/weather/providers/weather.types.ts`
+- Story 1.1 Task 1 step 2 owner: implement the primary OpenWeather adapter in
+  `apps/api/src/modules/weather/providers/openweather.provider.ts`
+- Story 1.1 Task 1 step 3 owner: implement the secondary WeatherAPI adapter in
+  `apps/api/src/modules/weather/providers/weatherapi.provider.ts`
+- Story 1.1 Task 1 step 4 owner: validate provider payloads and normalized forecasts in
+  `apps/api/src/modules/weather/providers/weather.schemas.ts`
+- Story 1.1 Task 2 step 1 owner: model normalized weather snapshots and forecast segments
+  in `packages/db/prisma/schema.prisma`
+- Story 1.1 Task 2 step 2 owner: backfill and constrain normalized weather persistence in
+  `packages/db/prisma/migrations/20260707104000_normalize_weather_persistence/migration.sql`
+- Story 1.1 Task 2 step 3 owner: keep shared weather factories aligned with the migrated
+  persistence shape in `packages/testing/src/factories/weather.factory.ts`
+- Story 1.1 Task 2 step 4 owner: persist normalized snapshots and segments transactionally
+  in `apps/api/src/modules/weather/weather.repository.ts`
+- Story 1.1 Task 3 step 1 owner: implement bounded provider retry and failover in
+  `apps/api/src/modules/weather/weather-ingestion.service.ts`
+- Story 1.1 Task 3 step 2 owner: classify latest-weather freshness and fallback responses
+  in `apps/api/src/modules/weather/weather-query.service.ts`
+- Story 1.1 Task 4 step 1 owner: load configured bootstrap ingestion targets in
+  `apps/api/src/modules/weather/weather-target-source.ts`
+- Story 1.1 Task 4 step 2 owner: coalesce targets and enqueue interval-bucketed location
+  jobs in `apps/api/src/modules/weather/weather-processor.ts`
+- Story 1.1 Task 4 step 3 owner: register the durable BullMQ weather sweep scheduler in
+  `apps/api/src/modules/weather/weather-scheduler.ts`
+- Story 1.1 Task 4 step 4 owner: wire the real weather worker processor and scheduler
+  startup in `apps/api/src/workers/bootstrap.ts`
+- Story 1.1 Task 4 step 5 owner: document the non-serverless weather worker runtime in
+  `apps/api/README.md`
 
 Current repo note:
 

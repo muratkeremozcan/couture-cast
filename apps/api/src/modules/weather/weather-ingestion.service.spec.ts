@@ -206,4 +206,17 @@ describe('WeatherIngestionService', () => {
       liveProviderFailed: true,
     })
   })
+
+  it('rejects abort-only provider failures instead of falling back', async () => {
+    const { service, queryService, repository } = createService({
+      primaryResults: [providerError('openweather', 'invalid_target')],
+    })
+
+    await expect(service.ingestTarget(target)).rejects.toMatchObject({
+      kind: 'invalid_target',
+    })
+
+    expect(repository.persistForecast).not.toHaveBeenCalled()
+    expect(queryService.getLatestWeather).not.toHaveBeenCalled()
+  })
 })

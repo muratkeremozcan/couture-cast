@@ -7,6 +7,10 @@ import type { WeatherTargetSource } from './weather-target-source.js'
 
 type WeatherQueue = Pick<Queue, 'add'>
 
+type WeatherProcessorLogger = {
+  warn(message: string, values?: Record<string, unknown>): void
+}
+
 export type WeatherJobData =
   | { type: 'sweep' }
   | { type: 'location'; target: WeatherIngestionTarget }
@@ -21,6 +25,7 @@ export interface WeatherJobProcessorOptions {
   ingestionService: WeatherIngestionService
   refreshMinutes: number
   clock?: WeatherProcessorClock
+  logger?: WeatherProcessorLogger
 }
 
 const systemClock: WeatherProcessorClock = {
@@ -56,7 +61,10 @@ export function createWeatherJobProcessor(options: WeatherJobProcessorOptions) {
 
   return async (job: Job<WeatherJobData>): Promise<void> => {
     if (job.data.type === 'location') {
-      await options.ingestionService.ingestTarget(job.data.target)
+      await options.ingestionService.ingestTarget(
+        job.data.target,
+        AbortSignal.timeout(30_000)
+      )
       return
     }
 
@@ -70,7 +78,7 @@ export function createWeatherJobProcessor(options: WeatherJobProcessorOptions) {
     const bucketTime = clock.now()
     const targets = coalesceTargets(await options.targetSource.getTargets())
 
-    await Promise.all(
+    const results = await Promise.allSettled(
       targets.map((target) =>
         options.queue.add(
           WEATHER_LOCATION_JOB_NAME,
@@ -86,5 +94,36 @@ export function createWeatherJobProcessor(options: WeatherJobProcessorOptions) {
         )
       )
     )
+
+    const failures = results
+      .map((result, index) => ({ result, target: targets[index] }))
+      .filter(
+        (
+          entry
+        ): entry is {
+          result: PromiseRejectedResult
+          target: WeatherIngestionTarget
+        } => entry.result.status === 'rejected' && Boolean(entry.target)
+      )
+
+    if (failures.length > 0) {
+      const failedTargets = failures.map(({ result, target }) => {
+        const reason: unknown = result.reason
+        const error = reason instanceof Error ? reason.message : 'Unknown error'
+        return { locationKey: target.locationKey, error }
+      })
+      options.logger?.warn('weather sweep failed to enqueue location jobs', {
+        failedTargets,
+      })
+      throw new AggregateError(
+        failures.map(({ result }) => {
+          const reason: unknown = result.reason
+          return reason instanceof Error ? reason : new Error(String(reason))
+        }),
+        `Failed to enqueue weather location jobs: ${failedTargets
+          .map((failure) => failure.locationKey)
+          .join(', ')}`
+      )
+    }
   }
 }
