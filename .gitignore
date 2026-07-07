@@ -47,3 +47,5 @@ maestro/artifacts
 .agent
 _bmad
 perf-test-plan.md
+.bmad-loop/runs/
+.bmad-loop/cache/
