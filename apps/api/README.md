@@ -44,6 +44,20 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## Weather worker runtime
+
+Weather ingestion requires the standalone worker process; the Vercel HTTP deployment does not run
+the durable BullMQ scheduler. Deploy one non-serverless worker runtime with:
+
+```bash
+$ npm run start:workers:prod
+```
+
+On startup the worker upserts the `weather-refresh-sweep` scheduler, logs the configured queues, and
+processes `weather-ingestion` jobs with provider calls capped by the worker concurrency and limiter.
+Use worker logs plus the queue health endpoint to confirm the scheduler and processor are active
+after deploys.
+
 ## Run tests
 
 ```bash

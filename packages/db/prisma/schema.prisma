@@ -115,27 +115,46 @@ model GuardianInvitation {
 }
 
 model WeatherSnapshot {
-  id          String            @id @default(cuid())
-  location    String
-  temperature Float
-  condition   String
-  alerts      Json?
-  fetched_at  DateTime          @default(now())
-  created_at  DateTime          @default(now())
-  segments    ForecastSegment[]
+  id                  String            @id @default(cuid())
+  location            String
+  location_key        String
+  latitude            Float
+  longitude           Float
+  timezone            String
+  provider            String
+  provider_updated_at DateTime
+  temperature         Float
+  condition           String
+  alerts              Json?
+  fetched_at          DateTime          @default(now())
+  created_at          DateTime          @default(now())
+  segments            ForecastSegment[]
+
+  @@unique([location_key, provider, provider_updated_at])
+  @@index([location_key, fetched_at])
 }
 
 model ForecastSegment {
-  id                  String                 @id @default(cuid())
-  weather_snapshot    WeatherSnapshot        @relation(fields: [weather_snapshot_id], references: [id])
-  weather_snapshot_id String
-  hour_offset         Int
-  temperature         Float
-  condition           String
-  created_at          DateTime               @default(now())
-  outfits             OutfitRecommendation[]
+  id                        String                 @id @default(cuid())
+  weather_snapshot          WeatherSnapshot        @relation(fields: [weather_snapshot_id], references: [id])
+  weather_snapshot_id       String
+  forecast_at               DateTime
+  hour_offset               Int
+  temperature               Float
+  feels_like                Float
+  precipitation_probability Float
+  precipitation_amount      Float
+  wind_speed                Float
+  wind_gust                 Float?
+  condition                 String
+  provider_weather_code     String
+  created_at                DateTime               @default(now())
+  outfits                   OutfitRecommendation[]
 
   @@index([weather_snapshot_id])
+  @@index([weather_snapshot_id, forecast_at])
+  @@index([forecast_at])
+  @@unique([weather_snapshot_id, forecast_at])
 }
 
 /// RLS: user-scoped comfort settings enforced by user_id

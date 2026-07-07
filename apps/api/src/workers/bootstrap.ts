@@ -1,6 +1,16 @@
 import type { Queue, Worker } from 'bullmq'
 import { createQueues, queueConfigs } from '../config/queues'
+import { loadWeatherConfig } from '../modules/weather/providers/weather.config'
+import { OpenWeatherProvider } from '../modules/weather/providers/openweather.provider'
+import { WeatherApiProvider } from '../modules/weather/providers/weatherapi.provider'
+import { WeatherIngestionService } from '../modules/weather/weather-ingestion.service'
+import { createWeatherJobProcessor } from '../modules/weather/weather-processor'
+import { WeatherQueryService } from '../modules/weather/weather-query.service'
+import { WeatherRepository } from '../modules/weather/weather.repository'
+import { registerWeatherRefreshScheduler } from '../modules/weather/weather-scheduler'
+import { ConfiguredWeatherTargetSource } from '../modules/weather/weather-target-source'
 import { createWorker, defaultWorkerOptions } from './base.worker'
+import { getPrismaClient } from './prisma'
 
 /** Story 0.4 owner file: worker process bootstrap and concurrency policy.
  * Dedicated worker process group:
@@ -23,19 +33,42 @@ import { createWorker, defaultWorkerOptions } from './base.worker'
 const workers: Worker[] = []
 const queues: Queue[] = []
 
-function startWorkers() {
+async function startWorkers() {
   try {
     // Flow ref S0.4/T5: create queue clients for the known queues before any
     // workers start consuming jobs.
     const startedQueues = createQueues()
     queues.push(...startedQueues)
+    const weatherQueue = startedQueues.find((queue) => queue.name === 'weather-ingestion')
+
+    if (!weatherQueue) {
+      throw new Error('weather-ingestion queue was not created')
+    }
+
+    const weatherConfig = loadWeatherConfig()
+    const weatherRepository = new WeatherRepository(getPrismaClient())
+    const weatherQueryService = new WeatherQueryService(weatherRepository)
+    const weatherIngestionService = new WeatherIngestionService(
+      new OpenWeatherProvider(),
+      new WeatherApiProvider(),
+      weatherRepository,
+      weatherQueryService
+    )
+    const weatherProcessor = createWeatherJobProcessor({
+      queue: weatherQueue,
+      targetSource: new ConfiguredWeatherTargetSource(),
+      ingestionService: weatherIngestionService,
+      refreshMinutes: weatherConfig.refreshMinutes,
+    })
+
+    await registerWeatherRefreshScheduler(weatherQueue, weatherConfig)
 
     // Flow ref S0.4/T4: start one worker per queue with the queue-specific
     // concurrency and optional rate limiter policy.
     workers.push(
-      // Moderate parallelism with a minute-level limiter for ingest burst control.
-      createWorker('weather-ingestion', async () => Promise.resolve(), {
-        ...defaultWorkerOptions(10),
+      // Weather provider calls are bounded in-service; worker concurrency stays capped.
+      createWorker('weather-ingestion', weatherProcessor, {
+        ...defaultWorkerOptions(5),
         limiter: { max: 60, duration: 60_000 },
       })
     )
@@ -88,4 +121,4 @@ async function shutdown() {
 process.on('SIGTERM', () => void shutdown())
 process.on('SIGINT', () => void shutdown())
 
-startWorkers()
+void startWorkers()

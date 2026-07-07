@@ -1,8 +1,8 @@
 # bmad-loop orchestration policy. All keys optional; defaults shown.
 
 [gates]
-mode = "per-epic"            # none | per-epic | per-story-spec-approval
-retrospective = "notify"     # never | notify | auto (auto unsupported in v1)
+mode = "per-story-spec-approval"            # none | per-epic | per-story-spec-approval
+retrospective = "never"     # never | notify | auto (auto unsupported in v1)
 
 [limits]
 max_review_cycles = 3
@@ -35,7 +35,7 @@ enabled = true
 #                    and flags this when its changes warrant an independent pass).
 #   "always"      -> run the second-opinion review on every story.
 # The loop is bounded by limits.max_review_cycles either way.
-trigger = "recommended"
+trigger = "always"
 
 [adapter]
 name = "codex"               # claude | codex | gemini | <custom .bmad-loop/profiles/*.toml>
