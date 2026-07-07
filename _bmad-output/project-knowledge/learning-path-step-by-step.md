@@ -1,10 +1,8 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-04-22 - Step 4 and Step 14 reflect the completed guardian-aware
-RLS rollout, revoke-consent enforcement, the shared guardian contract surface,
-the DB-level policy coverage that now backs guardian consent, and Step 12 now
-captures when a local API integration test is a better fit than browser E2E
-for cron-driven policy transitions
+Updated: 2026-07-07 - Step 16 reflects the weather ingestion service through
+durable normalized persistence, provider failover, freshness fallback,
+BullMQ scheduler fan-out, and the standalone worker runtime.
 
 ## LLM collaborator prompt
 
@@ -1618,15 +1616,15 @@ flowchart TD
   diff --> apps
 ```
 
-## Step 16 - Weather API ingestion service and provider integrations
+## Step 16 - Weather API ingestion service and durable worker ingestion
 
 User/business impact:
 
 Ingesting real-time, accurate current and hourly weather conditions is the
 foundation of CoutureCast's outfit intelligence. Implementing a modular
-provider system with automated failover and secure credential handling
-guarantees high availability without compromising user data or incurring
-unexpected cloud API costs.
+provider system with transactional persistence, bounded failover, and durable
+worker scheduling keeps outfit guidance useful even when a weather provider is
+slow, rate-limited, or temporarily unavailable.
 
 Key takeaways:
 
@@ -1639,14 +1637,25 @@ Key takeaways:
    places) at the provider boundary to ensure consistent cache and lookups,
    while raw coordinates and API keys must be scrubbed from errors and logs
    to preserve user privacy.
-4. Setting a daily call cap (e.g., 1,000 requests) directly in vendor
-   dashboards ensures development and production run entirely within free
-   tiers.
+4. Normalized snapshots and exactly 48 hourly forecast segments are persisted
+   transactionally with a location/provider/provider-update uniqueness key so
+   repeated worker attempts are idempotent.
+5. Provider retries are bounded in the ingestion service, not multiplied by
+   BullMQ retries: three primary attempts for timeout/retryable HTTP failures,
+   immediate failover on `429`, and one secondary attempt before fallback.
+6. Latest-weather reads are a freshness union: `fresh`, `cached`, `stale`, or
+   `unavailable`, with the exact 60-minute boundary and user-safe fallback
+   messages.
+7. Durable scheduling belongs to BullMQ 5 Job Schedulers in the standalone
+   worker runtime; Vercel HTTP instances do not satisfy periodic ingestion.
 
 Story/Task mapping:
 
 - Story 1.1
-- Task 1 (Implement provider contracts, adapters, and configuration)
+- Task 1 (provider contracts, adapters, and configuration)
+- Task 2 (normalized persistence model and shared fixtures)
+- Task 3 (bounded provider orchestration and freshness fallback)
+- Task 4 (durable scheduling, target fan-out, and real worker processor)
 
 Story reference:
 
@@ -1657,6 +1666,8 @@ Cross-links:
 - Step 3 frames weather snapshot and forecast segment database tables.
 - Step 4 documents environment configuration loading.
 - Step 5 details BullMQ worker concurrency and queuing defaults.
+- Step 9 and Step 10 provide the OpenTelemetry/Grafana foundation that Task 6
+  will extend with weather-specific metrics and alerts.
 
 Sequence to follow:
 
@@ -1666,41 +1677,79 @@ Sequence to follow:
    providers.
 3. Handle vendor-specific unit normalization (e.g., wind speed in m/s) and
    time epoch parsing.
-4. Author comprehensive test mock fixtures covering success, missing fields,
+4. Persist validated normalized snapshots and all 48 hourly entries in one
+   Prisma transaction.
+5. Implement retry/failover and freshness fallback using injected providers,
+   repository, clock, sleeper, logger, and meter.
+6. Fan out canonical weather targets through BullMQ sweep and location jobs,
+   using stable interval-bucketed job IDs.
+7. Run the standalone worker runtime with `npm run start:workers:prod` in a
+   non-serverless process group.
+8. Author comprehensive test mock fixtures covering success, missing fields,
    429 rate limit, 500 server error, and malformed responses.
-5. Verify behavior with robust unit tests that block live network access.
+9. Verify behavior with robust unit tests that block live network access.
 
 Task owner map:
 
-- Story 1.1 Task 1 step 1 owner: define standard typescript interface
-  `IWeatherProvider` and target/normalization types in `weather.types.ts`
-- Step 16 step 2 owner: implement `OpenWeatherProvider` against One Call API
-  4.0/3.0 in `openweather.provider.ts`
-- Step 16 step 3 owner: implement `WeatherApiProvider` against the forecast
-  endpoint in `weatherapi.provider.ts`
-- Step 16 step 4 owner: define raw validation and normalized schemas in
-  `weather.schemas.ts`
-- Step 16 step 5 owner: configure provider fixtures for mock responses in
-  `fixtures/`
-- Step 16 step 6 owner: write unit tests in `openweather.provider.spec.ts` and
-  `weatherapi.provider.spec.ts`
+- Story 1.1 Task 1 step 1 owner: define `IWeatherProvider` and normalized weather
+  target/forecast types in
+  `apps/api/src/modules/weather/providers/weather-provider.interface.ts` and
+  `apps/api/src/modules/weather/providers/weather.types.ts`
+- Story 1.1 Task 1 step 2 owner: implement the primary OpenWeather adapter in
+  `apps/api/src/modules/weather/providers/openweather.provider.ts`
+- Story 1.1 Task 1 step 3 owner: implement the secondary WeatherAPI adapter in
+  `apps/api/src/modules/weather/providers/weatherapi.provider.ts`
+- Story 1.1 Task 1 step 4 owner: validate provider payloads and normalized forecasts in
+  `apps/api/src/modules/weather/providers/weather.schemas.ts`
+- Story 1.1 Task 2 step 1 owner: model normalized weather snapshots and forecast segments
+  in `packages/db/prisma/schema.prisma`
+- Story 1.1 Task 2 step 2 owner: backfill and constrain normalized weather persistence in
+  `packages/db/prisma/migrations/20260707104000_normalize_weather_persistence/migration.sql`
+- Story 1.1 Task 2 step 3 owner: keep shared weather factories aligned with the migrated
+  persistence shape in `packages/testing/src/factories/weather.factory.ts`
+- Story 1.1 Task 2 step 4 owner: persist normalized snapshots and segments transactionally
+  in `apps/api/src/modules/weather/weather.repository.ts`
+- Story 1.1 Task 3 step 1 owner: implement bounded provider retry and failover in
+  `apps/api/src/modules/weather/weather-ingestion.service.ts`
+- Story 1.1 Task 3 step 2 owner: classify latest-weather freshness and fallback responses
+  in `apps/api/src/modules/weather/weather-query.service.ts`
+- Story 1.1 Task 4 step 1 owner: load configured bootstrap ingestion targets in
+  `apps/api/src/modules/weather/weather-target-source.ts`
+- Story 1.1 Task 4 step 2 owner: coalesce targets and enqueue interval-bucketed location
+  jobs in `apps/api/src/modules/weather/weather-processor.ts`
+- Story 1.1 Task 4 step 3 owner: register the durable BullMQ weather sweep scheduler in
+  `apps/api/src/modules/weather/weather-scheduler.ts`
+- Story 1.1 Task 4 step 4 owner: wire the real weather worker processor and scheduler
+  startup in `apps/api/src/workers/bootstrap.ts`
+- Story 1.1 Task 4 step 5 owner: document the non-serverless weather worker runtime in
+  `apps/api/README.md`
 
 Current repo note:
 
-- We have completed the implementation and validation of the primary
-  (OpenWeather One Call 4.0/3.0) and secondary (WeatherAPI) provider adapters.
-  Both are fully integrated, support coordinate rounding, metric conversions,
-  and have 100% test coverage with robust error/limit mocking. Environment
-  configuration has been extended in `.env.example`.
+- Tasks 1 through 4 are implemented and validated. The provider adapters produce
+  one normalized forecast response, the Prisma model stores canonical snapshots
+  and hourly segments, the ingestion service owns provider retry/failover, and
+  the standalone worker owns durable scheduling and target fan-out.
+- The current stop point is intentional: Task 5 still needs the public
+  latest-weather API contract/controller work, Task 6 owns weather-specific
+  OpenTelemetry/Grafana assets, and Tasks 7-8 close out broader test and
+  documentation coverage.
 
 Architecture diagram:
 
 ```mermaid
 flowchart TD
-  Target["WeatherIngestionTarget"] --> Fetch["IWeatherProvider"]
-  Fetch --> OpenWeather["OpenWeatherProvider\n(One Call 4.0/3.0)"]
-  Fetch --> WeatherApi["WeatherApiProvider\n(Forecast API)"]
-  OpenWeather --> Zod["Zod Validation & Normalization"]
-  WeatherApi --> Zod
-  Zod --> Output["NormalizedWeatherForecast"]
+  Scheduler["BullMQ Job Scheduler\nweather-refresh-sweep"] --> Sweep["Sweep processor"]
+  Targets["ConfiguredWeatherTargetSource"] --> Sweep
+  Sweep --> LocationJobs["Interval-bucketed location jobs\nattempts: 1"]
+  LocationJobs --> Worker["Weather worker\nconcurrency <= 5"]
+
+  Worker --> Ingestion["WeatherIngestionService"]
+  Ingestion --> OpenWeather["OpenWeatherProvider\nprimary"]
+  Ingestion --> WeatherApi["WeatherApiProvider\nsecondary"]
+  OpenWeather --> Normalized["NormalizedWeatherForecast\n48 hourly entries"]
+  WeatherApi --> Normalized
+  Normalized --> Repository["WeatherRepository\ntransactional persistence"]
+  Repository --> DB["WeatherSnapshot + ForecastSegment"]
+  Repository --> Query["WeatherQueryService\nfresh/cached/stale/unavailable"]
 ```

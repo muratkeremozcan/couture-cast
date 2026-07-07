@@ -29,7 +29,7 @@
 # - SM typically drafts next story ONLY after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
-generated: 2026-07-06
+generated: 2026-07-07
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system

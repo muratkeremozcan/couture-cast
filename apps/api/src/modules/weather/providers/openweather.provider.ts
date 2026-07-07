@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common'
 import type { z } from 'zod'
 import { mapOpenWeatherCondition } from './weather-condition.mapper.js'
 import {
@@ -31,6 +32,7 @@ export interface OpenWeatherProviderOptions {
   env?: NodeJS.ProcessEnv
 }
 
+@Injectable()
 export class OpenWeatherProvider implements IWeatherProvider {
   private readonly apiKey: string
   private readonly baseUrl: string
