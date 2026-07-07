@@ -17,33 +17,12 @@ SET
 WHERE "location_key" IS NULL;
 
 ALTER TABLE "WeatherSnapshot"
-  ADD CONSTRAINT "WeatherSnapshot_location_key_not_null" CHECK ("location_key" IS NOT NULL) NOT VALID,
-  ADD CONSTRAINT "WeatherSnapshot_latitude_not_null" CHECK ("latitude" IS NOT NULL) NOT VALID,
-  ADD CONSTRAINT "WeatherSnapshot_longitude_not_null" CHECK ("longitude" IS NOT NULL) NOT VALID,
-  ADD CONSTRAINT "WeatherSnapshot_timezone_not_null" CHECK ("timezone" IS NOT NULL) NOT VALID,
-  ADD CONSTRAINT "WeatherSnapshot_provider_not_null" CHECK ("provider" IS NOT NULL) NOT VALID,
-  ADD CONSTRAINT "WeatherSnapshot_provider_updated_at_not_null" CHECK ("provider_updated_at" IS NOT NULL) NOT VALID;
-
-ALTER TABLE "WeatherSnapshot" VALIDATE CONSTRAINT "WeatherSnapshot_location_key_not_null";
-ALTER TABLE "WeatherSnapshot" VALIDATE CONSTRAINT "WeatherSnapshot_latitude_not_null";
-ALTER TABLE "WeatherSnapshot" VALIDATE CONSTRAINT "WeatherSnapshot_longitude_not_null";
-ALTER TABLE "WeatherSnapshot" VALIDATE CONSTRAINT "WeatherSnapshot_timezone_not_null";
-ALTER TABLE "WeatherSnapshot" VALIDATE CONSTRAINT "WeatherSnapshot_provider_not_null";
-ALTER TABLE "WeatherSnapshot" VALIDATE CONSTRAINT "WeatherSnapshot_provider_updated_at_not_null";
-
-ALTER TABLE "WeatherSnapshot"
   ALTER COLUMN "location_key" SET NOT NULL,
   ALTER COLUMN "latitude" SET NOT NULL,
   ALTER COLUMN "longitude" SET NOT NULL,
   ALTER COLUMN "timezone" SET NOT NULL,
   ALTER COLUMN "provider" SET NOT NULL,
-  ALTER COLUMN "provider_updated_at" SET NOT NULL,
-  DROP CONSTRAINT "WeatherSnapshot_location_key_not_null",
-  DROP CONSTRAINT "WeatherSnapshot_latitude_not_null",
-  DROP CONSTRAINT "WeatherSnapshot_longitude_not_null",
-  DROP CONSTRAINT "WeatherSnapshot_timezone_not_null",
-  DROP CONSTRAINT "WeatherSnapshot_provider_not_null",
-  DROP CONSTRAINT "WeatherSnapshot_provider_updated_at_not_null";
+  ALTER COLUMN "provider_updated_at" SET NOT NULL;
 
 ALTER TABLE "ForecastSegment"
   ADD COLUMN "forecast_at" TIMESTAMP(3),
@@ -75,16 +54,16 @@ ALTER TABLE "ForecastSegment"
   ALTER COLUMN "wind_speed" SET NOT NULL,
   ALTER COLUMN "provider_weather_code" SET NOT NULL;
 
-CREATE UNIQUE INDEX CONCURRENTLY "WeatherSnapshot_location_key_provider_provider_updated_at_key"
+CREATE UNIQUE INDEX "WeatherSnapshot_location_key_provider_provider_updated_at_key"
   ON "WeatherSnapshot"("location_key", "provider", "provider_updated_at");
 
-CREATE INDEX CONCURRENTLY "WeatherSnapshot_location_key_fetched_at_idx"
+CREATE INDEX "WeatherSnapshot_location_key_fetched_at_idx"
   ON "WeatherSnapshot"("location_key", "fetched_at");
 
 DROP INDEX IF EXISTS "ForecastSegment_weather_snapshot_id_idx";
 
-CREATE INDEX CONCURRENTLY "ForecastSegment_forecast_at_idx"
+CREATE INDEX "ForecastSegment_forecast_at_idx"
   ON "ForecastSegment"("forecast_at");
 
-CREATE UNIQUE INDEX CONCURRENTLY "ForecastSegment_weather_snapshot_id_forecast_at_key"
+CREATE UNIQUE INDEX "ForecastSegment_weather_snapshot_id_forecast_at_key"
   ON "ForecastSegment"("weather_snapshot_id", "forecast_at");
