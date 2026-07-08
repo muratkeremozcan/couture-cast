@@ -58,6 +58,31 @@ processes `weather-ingestion` jobs with provider calls capped by the worker conc
 Use worker logs plus the queue health endpoint to confirm the scheduler and processor are active
 after deploys.
 
+Required weather environment variables:
+
+- `OPENWEATHER_API_KEY`: primary OpenWeather One Call key.
+- `WEATHERAPI_API_KEY`: secondary WeatherAPI.com key.
+- `WEATHER_REFRESH_MINUTES`: cadence in minutes, capped at 30 by policy.
+- `WEATHER_PROVIDER_MODE`: provider compatibility mode.
+- `WEATHER_INGESTION_TARGETS_JSON`: non-personal bootstrap targets for Story 1.1.
+
+Provider-call budgeting:
+
+- At a 30-minute cadence, each canonical target consumes up to 48 primary forecast calls per day
+  before retry/failover.
+- Retryable primary failures can add two extra primary attempts for a single target interval.
+- A primary `429` switches directly to one secondary attempt.
+- Keep OpenWeather account daily-call caps at or below the approved free-tier budget unless product
+  explicitly approves more targets or a faster cadence.
+
+Operational checks:
+
+- Grafana dashboard: `infra/grafana/dashboards/couturecast-weather-ingestion.json`.
+- Alert: provider five-minute error rate above 2%.
+- Disable/rollback: remove or empty `WEATHER_INGESTION_TARGETS_JSON`, restart the worker, and verify
+  no new `weather-refresh-location` jobs are enqueued. Restore the previous deployment if provider
+  failures come from the worker build rather than provider availability.
+
 ## Run tests
 
 ```bash

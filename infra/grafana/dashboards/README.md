@@ -14,6 +14,7 @@ Expected files:
 - `couturecast-queue-cache-metrics.json`
 - `couturecast-realtime-connections.json`
 - `couturecast-database-performance.json`
+- `couturecast-weather-ingestion.json`
 
 Export workflow:
 

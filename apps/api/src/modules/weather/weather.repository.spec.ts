@@ -85,6 +85,11 @@ function createPrismaStub(existingSnapshot: unknown = null) {
     $transaction: vi.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)),
     weatherSnapshot: {
       findUnique: vi.fn().mockResolvedValue(existingSnapshot),
+      findFirst: vi.fn().mockResolvedValue(existingSnapshot),
+    },
+    weatherIngestionState: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      upsert: vi.fn().mockResolvedValue({ location_key: 'new-york-ny' }),
     },
   }
 
@@ -186,5 +191,78 @@ describe('WeatherRepository', () => {
     )
 
     expect(tx.weatherSnapshot.create).not.toHaveBeenCalled()
+  })
+
+  it('filters latest reads to public provider snapshots', async () => {
+    const { prisma } = createPrismaStub()
+    const repository = new WeatherRepository(prisma as never)
+
+    await repository.findLatestByLocationKey('New-York-NY')
+
+    expect(prisma.weatherSnapshot.findFirst).toHaveBeenCalledWith({
+      where: {
+        location_key: 'new-york-ny',
+        provider: { in: ['openweather', 'weatherapi'] },
+      },
+      orderBy: [{ fetched_at: 'desc' }, { id: 'desc' }],
+      include: {
+        segments: {
+          orderBy: { forecast_at: 'asc' },
+        },
+      },
+    })
+  })
+
+  it('records provider failure and success state by canonical location', async () => {
+    const { prisma } = createPrismaStub()
+    const repository = new WeatherRepository(prisma as never)
+    const failedAt = new Date('2026-07-06T13:45:00.000Z')
+    const succeededAt = new Date('2026-07-06T14:00:00.000Z')
+
+    await repository.recordProviderFailure('New-York-NY', failedAt)
+    await repository.recordProviderSuccess('New-York-NY', succeededAt)
+
+    expect(prisma.weatherIngestionState.upsert).toHaveBeenNthCalledWith(1, {
+      where: { location_key: 'new-york-ny' },
+      create: {
+        location_key: 'new-york-ny',
+        last_provider_failure_at: failedAt,
+      },
+      update: {
+        last_provider_failure_at: failedAt,
+      },
+    })
+    expect(prisma.weatherIngestionState.upsert).toHaveBeenNthCalledWith(2, {
+      where: { location_key: 'new-york-ny' },
+      create: {
+        location_key: 'new-york-ny',
+        last_provider_success_at: succeededAt,
+      },
+      update: {
+        last_provider_success_at: succeededAt,
+      },
+    })
+  })
+
+  it('finds ingestion state by canonical location with freshness fields only', async () => {
+    const ingestionState = {
+      last_provider_failure_at: new Date('2026-07-06T13:45:00.000Z'),
+      last_provider_success_at: new Date('2026-07-06T13:30:00.000Z'),
+    }
+    const { prisma } = createPrismaStub()
+    prisma.weatherIngestionState.findUnique.mockResolvedValueOnce(ingestionState)
+    const repository = new WeatherRepository(prisma as never)
+
+    await expect(repository.findIngestionState(' New-York-NY ')).resolves.toBe(
+      ingestionState
+    )
+
+    expect(prisma.weatherIngestionState.findUnique).toHaveBeenCalledWith({
+      where: { location_key: 'new-york-ny' },
+      select: {
+        last_provider_failure_at: true,
+        last_provider_success_at: true,
+      },
+    })
   })
 })

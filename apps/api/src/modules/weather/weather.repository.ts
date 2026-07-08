@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 
 import type { NormalizedWeatherForecast } from './providers/weather.types.js'
@@ -6,6 +6,11 @@ import type { NormalizedWeatherForecast } from './providers/weather.types.js'
 export type WeatherSnapshotWithSegments = Prisma.WeatherSnapshotGetPayload<{
   include: { segments: true }
 }>
+
+export interface WeatherIngestionStateSnapshot {
+  last_provider_failure_at: Date | null
+  last_provider_success_at: Date | null
+}
 
 type PersistedWeatherSnapshot = WeatherSnapshotWithSegments
 
@@ -15,7 +20,7 @@ function normalizeLocationKey(locationKey: string): string {
 
 @Injectable()
 export class WeatherRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
 
   async persistForecast(
     forecast: NormalizedWeatherForecast
@@ -71,12 +76,55 @@ export class WeatherRepository {
   ): Promise<WeatherSnapshotWithSegments | null> {
     const normalizedKey = normalizeLocationKey(locationKey)
     return this.prisma.weatherSnapshot.findFirst({
-      where: { location_key: normalizedKey },
+      where: {
+        location_key: normalizedKey,
+        provider: { in: ['openweather', 'weatherapi'] },
+      },
       orderBy: [{ fetched_at: 'desc' }, { id: 'desc' }],
       include: {
         segments: {
           orderBy: { forecast_at: 'asc' },
         },
+      },
+    })
+  }
+
+  async findIngestionState(
+    locationKey: string
+  ): Promise<WeatherIngestionStateSnapshot | null> {
+    return this.prisma.weatherIngestionState.findUnique({
+      where: { location_key: normalizeLocationKey(locationKey) },
+      select: {
+        last_provider_failure_at: true,
+        last_provider_success_at: true,
+      },
+    })
+  }
+
+  async recordProviderFailure(locationKey: string, failedAt: Date): Promise<void> {
+    const normalizedKey = normalizeLocationKey(locationKey)
+    await this.prisma.weatherIngestionState.upsert({
+      where: { location_key: normalizedKey },
+      create: {
+        location_key: normalizedKey,
+        last_provider_failure_at: failedAt,
+      },
+      update: {
+        last_provider_failure_at: failedAt,
+      },
+    })
+  }
+
+  async recordProviderSuccess(locationKey: string, succeededAt: Date): Promise<void> {
+    const normalizedKey = normalizeLocationKey(locationKey)
+    await this.prisma.weatherIngestionState.upsert({
+      where: { location_key: normalizedKey },
+      create: {
+        location_key: normalizedKey,
+        last_provider_success_at: succeededAt,
+      },
+      update: {
+        last_provider_success_at: succeededAt,
       },
     })
   }

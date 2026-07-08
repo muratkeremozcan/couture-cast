@@ -87,12 +87,20 @@ function createService(input: {
   }
 
   const repository = {
-    persistForecast: vi.fn().mockResolvedValue({ id: 'persisted-weather' }),
+    persistForecast: vi.fn().mockResolvedValue({
+      id: 'persisted-weather',
+      fetched_at: new Date('2026-07-06T13:30:00.000Z'),
+    }),
+    recordProviderFailure: vi.fn().mockResolvedValue(undefined),
+    recordProviderSuccess: vi.fn().mockResolvedValue(undefined),
   }
   const queryService = {
     getLatestWeather: vi.fn().mockResolvedValue({
       status: 'cached',
-      data: { id: 'cached-weather' },
+      data: {
+        id: 'cached-weather',
+        fetched_at: new Date('2026-07-06T13:20:00.000Z'),
+      },
       message: 'Using recently cached weather data.',
     }),
   }
@@ -106,6 +114,8 @@ function createService(input: {
     recordProviderRequest: vi.fn(),
     recordRateLimit: vi.fn(),
     recordIngestion: vi.fn(),
+    recordFallbackOutcome: vi.fn(),
+    recordSnapshotAge: vi.fn(),
   }
 
   const service = new WeatherIngestionService(
@@ -126,15 +136,18 @@ function createService(input: {
     repository,
     queryService,
     sleeper,
+    logger,
+    meter,
   }
 }
 
 describe('WeatherIngestionService', () => {
   it('persists a successful primary forecast without calling the secondary provider', async () => {
     const forecast = buildForecast('openweather')
-    const { service, primaryProvider, secondaryProvider, repository } = createService({
-      primaryResults: [forecast],
-    })
+    const { service, primaryProvider, secondaryProvider, repository, logger, meter } =
+      createService({
+        primaryResults: [forecast],
+      })
 
     await expect(service.ingestTarget(target)).resolves.toMatchObject({
       outcome: 'persisted',
@@ -144,6 +157,27 @@ describe('WeatherIngestionService', () => {
     expect(primaryProvider.fetchForecast).toHaveBeenCalledTimes(1)
     expect(secondaryProvider.fetchForecast).not.toHaveBeenCalled()
     expect(repository.persistForecast).toHaveBeenCalledWith(forecast)
+    expect(repository.recordProviderSuccess).toHaveBeenCalledWith(
+      'new-york-ny',
+      expect.any(Date)
+    )
+    expect(repository.recordProviderFailure).not.toHaveBeenCalled()
+    expect(logger.info).toHaveBeenCalledWith('weather_provider_attempt', {
+      provider: 'openweather',
+      attempt: 1,
+    })
+    expect(logger.info).toHaveBeenCalledWith('weather_ingestion_completed', {
+      provider: 'openweather',
+      outcome: 'persisted',
+    })
+    expect(meter.recordProviderRequest).toHaveBeenCalledWith(
+      'openweather',
+      'success',
+      expect.any(Number),
+      undefined
+    )
+    expect(meter.recordIngestion).toHaveBeenCalledWith('persisted')
+    expect(meter.recordSnapshotAge).toHaveBeenCalledWith('persisted', expect.any(Number))
   })
 
   it('uses exactly three primary attempts with 5s and 15s delays before failover', async () => {
@@ -188,7 +222,7 @@ describe('WeatherIngestionService', () => {
   })
 
   it('returns latest persisted weather when both providers fail', async () => {
-    const { service, queryService, repository } = createService({
+    const { service, queryService, repository, logger, meter } = createService({
       primaryResults: [providerError('openweather', 'invalid_response')],
       secondaryResults: [providerError('weatherapi', 'non_retryable_http', 400)],
     })
@@ -202,8 +236,51 @@ describe('WeatherIngestionService', () => {
     })
 
     expect(repository.persistForecast).not.toHaveBeenCalled()
+    expect(repository.recordProviderFailure).toHaveBeenCalledWith(
+      'new-york-ny',
+      expect.any(Date)
+    )
     expect(queryService.getLatestWeather).toHaveBeenCalledWith('new-york-ny', {
       liveProviderFailed: true,
+    })
+    expect(logger.warn).toHaveBeenCalledWith('weather_provider_failover', {
+      fromProvider: 'openweather',
+      toProvider: 'weatherapi',
+      reason: 'invalid_response',
+      statusClass: undefined,
+    })
+    expect(logger.warn).toHaveBeenCalledWith('weather_fallback_outcome', {
+      outcome: 'cached',
+    })
+    expect(meter.recordFallbackOutcome).toHaveBeenCalledWith('cached')
+    expect(meter.recordIngestion).toHaveBeenCalledWith('fallback')
+  })
+
+  it('counts secondary provider rate limits in rate-limit telemetry', async () => {
+    const { service, meter } = createService({
+      primaryResults: [providerError('openweather', 'invalid_response')],
+      secondaryResults: [providerError('weatherapi', 'rate_limit', 429)],
+    })
+
+    await expect(service.ingestTarget(target)).resolves.toMatchObject({
+      outcome: 'fallback',
+    })
+
+    expect(meter.recordRateLimit).toHaveBeenCalledWith('weatherapi')
+  })
+
+  it('does not fail ingestion when telemetry recording throws after persistence', async () => {
+    const forecast = buildForecast('openweather')
+    const { service, meter } = createService({
+      primaryResults: [forecast],
+    })
+    meter.recordIngestion.mockImplementationOnce(() => {
+      throw new Error('metrics backend unavailable')
+    })
+
+    await expect(service.ingestTarget(target)).resolves.toMatchObject({
+      outcome: 'persisted',
+      provider: 'openweather',
     })
   })
 
@@ -218,5 +295,84 @@ describe('WeatherIngestionService', () => {
 
     expect(repository.persistForecast).not.toHaveBeenCalled()
     expect(queryService.getLatestWeather).not.toHaveBeenCalled()
+  })
+
+  it('keeps weather logs and metrics free of coordinates, API keys, user ids, and raw payloads', async () => {
+    const primaryFailure = new WeatherProviderError('primary failed with secret', {
+      provider: 'openweather',
+      kind: 'retryable_http',
+      statusCode: 503,
+      cause: new Error('OPENWEATHER_API_KEY=secret 40.7128 -74.006 user-123 raw payload'),
+    })
+    const secondaryFailure = new WeatherProviderError('secondary failed with secret', {
+      provider: 'weatherapi',
+      kind: 'non_retryable_http',
+      statusCode: 400,
+      cause: new Error('WEATHERAPI_API_KEY=secret 40.7128 -74.006 user-123 raw payload'),
+    })
+    const { service, logger, meter } = createService({
+      primaryResults: [primaryFailure],
+      secondaryResults: [secondaryFailure],
+    })
+
+    await expect(service.ingestTarget(target)).resolves.toMatchObject({
+      outcome: 'fallback',
+    })
+
+    const telemetryPayload = JSON.stringify({
+      logs: [logger.info.mock.calls, logger.warn.mock.calls, logger.error.mock.calls],
+      metrics: [
+        meter.recordProviderRequest.mock.calls,
+        meter.recordRateLimit.mock.calls,
+        meter.recordIngestion.mock.calls,
+        meter.recordFallbackOutcome.mock.calls,
+        meter.recordSnapshotAge.mock.calls,
+      ],
+    })
+
+    expect(telemetryPayload).not.toContain('40.7128')
+    expect(telemetryPayload).not.toContain('-74.006')
+    expect(telemetryPayload).not.toContain('OPENWEATHER_API_KEY')
+    expect(telemetryPayload).not.toContain('WEATHERAPI_API_KEY')
+    expect(telemetryPayload).not.toContain('secret')
+    expect(telemetryPayload).not.toContain('user-123')
+    expect(telemetryPayload).not.toContain('raw payload')
+  })
+
+  it('keeps ingestion failure logs free of coordinates, API keys, user ids, and raw payloads', async () => {
+    const abortFailure = new WeatherProviderError('aborted with secret', {
+      provider: 'openweather',
+      kind: 'aborted',
+      cause: new Error('OPENWEATHER_API_KEY=secret 40.7128 -74.006 user-123 raw payload'),
+    })
+    const { service, logger, meter } = createService({
+      primaryResults: [abortFailure],
+    })
+
+    await expect(service.ingestTarget(target)).rejects.toMatchObject({
+      kind: 'aborted',
+    })
+
+    const telemetryPayload = JSON.stringify({
+      logs: [logger.info.mock.calls, logger.warn.mock.calls, logger.error.mock.calls],
+      metrics: [
+        meter.recordProviderRequest.mock.calls,
+        meter.recordRateLimit.mock.calls,
+        meter.recordIngestion.mock.calls,
+        meter.recordFallbackOutcome.mock.calls,
+        meter.recordSnapshotAge.mock.calls,
+      ],
+    })
+
+    expect(logger.error).toHaveBeenCalledWith('weather_ingestion_failed', {
+      outcome: 'failed',
+      errorKind: 'aborted',
+    })
+    expect(telemetryPayload).not.toContain('40.7128')
+    expect(telemetryPayload).not.toContain('-74.006')
+    expect(telemetryPayload).not.toContain('OPENWEATHER_API_KEY')
+    expect(telemetryPayload).not.toContain('secret')
+    expect(telemetryPayload).not.toContain('user-123')
+    expect(telemetryPayload).not.toContain('raw payload')
   })
 })

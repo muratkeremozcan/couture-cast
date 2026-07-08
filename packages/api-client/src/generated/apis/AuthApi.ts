@@ -12,10 +12,19 @@
  */
 
 import * as runtime from '../runtime'
-import type { GuardianConsentInput, TrackedResponse } from '../models/index'
+import type {
+  GuardianConsentInput,
+  SignupInput,
+  SignupResponse,
+  TrackedResponse,
+} from '../models/index'
 
 export interface ApiV1AuthGuardianConsentPostRequest {
   guardianConsentInput: GuardianConsentInput
+}
+
+export interface ApiV1AuthSignupPostRequest {
+  signupInput: SignupInput
 }
 
 /**
@@ -79,6 +88,62 @@ export class AuthApi extends runtime.BaseAPI {
       requestParameters,
       initOverrides
     )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1AuthSignupPost without sending the request
+   */
+  async apiV1AuthSignupPostRequestOpts(
+    requestParameters: ApiV1AuthSignupPostRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['signupInput'] == null) {
+      throw new runtime.RequiredError(
+        'signupInput',
+        'Required parameter "signupInput" was null or undefined when calling apiV1AuthSignupPost().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    let urlPath = `/api/v1/auth/signup`
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['signupInput'],
+    }
+  }
+
+  /**
+   * Evaluates the submitted birthdate, blocks signups for children under 13, and flags 13-15 year olds for guardian consent.
+   * Create an account with age verification
+   */
+  async apiV1AuthSignupPostRaw(
+    requestParameters: ApiV1AuthSignupPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<SignupResponse>> {
+    const requestOptions = await this.apiV1AuthSignupPostRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Evaluates the submitted birthdate, blocks signups for children under 13, and flags 13-15 year olds for guardian consent.
+   * Create an account with age verification
+   */
+  async apiV1AuthSignupPost(
+    requestParameters: ApiV1AuthSignupPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<SignupResponse> {
+    const response = await this.apiV1AuthSignupPostRaw(requestParameters, initOverrides)
     return await response.value()
   }
 }

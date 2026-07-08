@@ -6,7 +6,7 @@ baseline_commit: e183add80c96d9f486786132f06006361f9c89ee
 
 Updated: 2026-07-07 — completed tasks and resolved code review findings
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -92,7 +92,7 @@ using an injected clock in tests.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement provider contracts, adapters, and configuration (AC: #1, #2)
+- [x] Task 1: Implement provider contracts, adapters, and configuration (AC: #1, #2)
   - [x] Add `weather-provider.interface.ts`, `weather.types.ts`, and `weather.schemas.ts` under
         `apps/api/src/modules/weather/providers/` with the single-call normalized contract.
   - [x] Implement `OpenWeatherProvider` against One Call API 4.0 (or 3.0 backward compatibility mode) using one request with
@@ -114,44 +114,44 @@ using an injected clock in tests.
 
 ### Review Findings — Task 1 checkpoint
 
-- [x] [Review][Patch] Define a canonical condition enum while preserving raw provider condition
+- [x] [Review] Patch Define a canonical condition enum while preserving raw provider condition
       text and code [apps/api/src/modules/weather/providers/weather.types.ts:7]
-- [x] [Review][Patch] Prevent provider errors from exposing API keys or coordinates
+- [x] [Review] Patch Prevent provider errors from exposing API keys or coordinates
       [apps/api/src/modules/weather/providers/openweather.provider.ts:33]
-- [x] [Review][Patch] Preserve typed rate-limit, HTTP, timeout, cancellation, and validation failure
+- [x] [Review] Patch Preserve typed rate-limit, HTTP, timeout, cancellation, and validation failure
       semantics for the Task 3 orchestrator
       [apps/api/src/modules/weather/providers/weather-provider.interface.ts:3]
-- [x] [Review][Patch] Validate targets and construct encoded provider URLs safely
+- [x] [Review] Patch Validate targets and construct encoded provider URLs safely
       [apps/api/src/modules/weather/providers/openweather.provider.ts:27]
-- [x] [Review][Patch] Reject stale, duplicate, non-contiguous, or incomplete 48-hour forecast
+- [x] [Review] Patch Reject stale, duplicate, non-contiguous, or incomplete 48-hour forecast
       horizons instead of backfilling historical hours
       [apps/api/src/modules/weather/providers/weatherapi.provider.ts:67]
-- [x] [Review][Patch] Tighten raw and normalized schemas for bounded measurements, timestamps,
+- [x] [Review] Patch Tighten raw and normalized schemas for bounded measurements, timestamps,
       non-empty identifiers, alert intervals, and response-location consistency
       [apps/api/src/modules/weather/providers/weather.schemas.ts:6]
-- [x] [Review][Patch] Parse and validate all Task 1 weather environment settings through a typed
+- [x] [Review] Patch Parse and validate all Task 1 weather environment settings through a typed
       configuration boundary [apps/api/src/modules/weather/providers/openweather.provider.ts:14]
-- [x] [Review][Patch] Complete the required success/missing/429/5xx/timeout/malformed fixture and
+- [x] [Review] Patch Complete the required success/missing/429/5xx/timeout/malformed fixture and
       test matrix, and clear the scoped provider lint failures
       [apps/api/src/modules/weather/providers/openweather.provider.spec.ts:3]
-- [x] [Review][Patch] Reject delayed forecast horizons and duplicate provider hours rather than
+- [x] [Review] Patch Reject delayed forecast horizons and duplicate provider hours rather than
       silently repairing them [apps/api/src/modules/weather/providers/openweather.provider.ts:107]
-- [x] [Review][Patch] Preserve timeout and cancellation semantics while consuming response bodies,
+- [x] [Review] Patch Preserve timeout and cancellation semantics while consuming response bodies,
       including custom abort reasons [apps/api/src/modules/weather/providers/openweather.provider.ts:76]
-- [x] [Review][Patch] Treat HTTP 408 as retryable and distinguish invalid deployment configuration
+- [x] [Review] Patch Treat HTTP 408 as retryable and distinguish invalid deployment configuration
       from invalid ingestion targets [apps/api/src/modules/weather/providers/weather-provider.error.ts:63]
-- [x] [Review][Patch] Bound stale/future provider update timestamps while allowing ordinary clock
+- [x] [Review] Patch Bound stale/future provider update timestamps while allowing ordinary clock
       skew [apps/api/src/modules/weather/providers/weather.schemas.ts:175]
-- [x] [Review][Patch] Validate IANA timezones and compare response locations correctly across the
+- [x] [Review] Patch Validate IANA timezones and compare response locations correctly across the
       antimeridian with a tighter tolerance
       [apps/api/src/modules/weather/providers/openweather.provider.ts:94]
-- [x] [Review][Patch] Complete freezing-rain, ice-pellet, and alert-severity normalization
+- [x] [Review] Patch Complete freezing-rain, ice-pellet, and alert-severity normalization
       [apps/api/src/modules/weather/providers/weather-condition.mapper.ts:6]
-- [x] [Review][Patch] Make time-sensitive provider fixtures deterministic across hour boundaries
+- [x] [Review] Patch Make time-sensitive provider fixtures deterministic across hour boundaries
       [apps/api/src/modules/weather/providers/openweather.provider.spec.ts:27]
-- [x] [Review][Patch] Classify missing provider credentials as invalid configuration rather than an
+- [x] [Review] Patch Classify missing provider credentials as invalid configuration rather than an
       HTTP failure [apps/api/src/modules/weather/providers/openweather.provider.ts:47]
-- [x] [Review][Patch] Anchor fetch time when the response arrives so JSON parsing across an hour
+- [x] [Review] Patch Anchor fetch time when the response arrives so JSON parsing across an hour
       boundary cannot discard a valid forecast hour
       [apps/api/src/modules/weather/providers/openweather.provider.ts:93]
 
@@ -164,34 +164,34 @@ using an injected clock in tests.
       from being persisted in the database (causing an unavailable state instead of stale).
       Options: [1] Remove the staleness check from the Zod validation schema (recommended), [2] Keep
       it and handle stale responses differently.
-- [x] [Review][Patch] Alert validation triggers complete ingestion failure
+- [x] [Review] Patch Alert validation triggers complete ingestion failure
       [apps/api/src/modules/weather/providers/weather.schemas.ts:161]
-- [x] [Review][Patch] Swallowing of Zod validation error details
+- [x] [Review] Patch Swallowing of Zod validation error details
       [apps/api/src/modules/weather/providers/openweather.provider.ts:180]
-- [x] [Review][Patch] Tight coupling of configuration loading in provider constructors
+- [x] [Review] Patch Tight coupling of configuration loading in provider constructors
       [apps/api/src/modules/weather/providers/openweather.provider.ts:37]
-- [x] [Review][Patch] Loss of original error stack trace in classifyFetchFailure
+- [x] [Review] Patch Loss of original error stack trace in classifyFetchFailure
       [apps/api/src/modules/weather/providers/weather-provider.error.ts:34]
-- [x] [Review][Patch] Timeout classification is fragile when AbortSignal reason is a string
+- [x] [Review] Patch Timeout classification is fragile when AbortSignal reason is a string
       [apps/api/src/modules/weather/providers/weather-provider.error.ts:40]
-- [x] [Review][Patch] WEATHER_INGESTION_TARGETS_JSON parses crashes on empty string
+- [x] [Review] Patch WEATHER_INGESTION_TARGETS_JSON parses crashes on empty string
       [apps/api/src/modules/weather/providers/weather.config.ts:29]
-- [x] [Review][Patch] Ambiguous single quotes surrounding target JSON in .env.example
+- [x] [Review] Patch Ambiguous single quotes surrounding target JSON in .env.example
       [.env.example:66]
 - [x] [Review][Defer] Absence of global network request blocking or interceptors in tests — deferred,
       pre-existing
 
 ### Review Findings — Round 3 (2026-07-07)
 
-- [x] [Review][Patch] NestJS Dependency Injection Compatibility Risk in `WeatherIngestionService` [apps/api/src/modules/weather/weather-ingestion.service.ts:123]
-- [x] [Review][Patch] Abort/Cancellation Handling during Provider Fetch/Sleep [apps/api/src/modules/weather/weather-ingestion.service.ts:90-103]
-- [x] [Review][Patch] Memory Leak in defaultSleeper Listener Cleanup [apps/api/src/modules/weather/weather-ingestion.service.ts:59-76]
-- [x] [Review][Patch] Concurrent persistForecast Unique Constraint Crash [apps/api/src/modules/weather/weather.repository.ts:19-40]
-- [x] [Review][Patch] Sequential Awaits in Sweeper Loop [apps/api/src/modules/weather/weather-processor.ts:72-85]
-- [x] [Review][Patch] Seed Snapshot Dates Hardcoded in the Past [packages/db/prisma/seeds/weather.ts]
-- [x] [Review][Patch] Non-deterministic Latest Snapshot Order [apps/api/src/modules/weather/weather.repository.ts:45-54]
-- [x] [Review][Patch] Unnormalized Location Key Query [apps/api/src/modules/weather/weather.repository.ts:42-54]
-- [x] [Review][Patch] Missing `clock` Injection in `WeatherIngestionService` [apps/api/src/modules/weather/weather-ingestion.service.ts]
+- [x] [Review] Patch NestJS Dependency Injection Compatibility Risk in `WeatherIngestionService` [apps/api/src/modules/weather/weather-ingestion.service.ts:123]
+- [x] [Review] Patch Abort/Cancellation Handling during Provider Fetch/Sleep [apps/api/src/modules/weather/weather-ingestion.service.ts:90-103]
+- [x] [Review] Patch Memory Leak in defaultSleeper Listener Cleanup [apps/api/src/modules/weather/weather-ingestion.service.ts:59-76]
+- [x] [Review] Patch Concurrent persistForecast Unique Constraint Crash [apps/api/src/modules/weather/weather.repository.ts:19-40]
+- [x] [Review] Patch Sequential Awaits in Sweeper Loop [apps/api/src/modules/weather/weather-processor.ts:72-85]
+- [x] [Review] Patch Seed Snapshot Dates Hardcoded in the Past [packages/db/prisma/seeds/weather.ts]
+- [x] [Review] Patch Non-deterministic Latest Snapshot Order [apps/api/src/modules/weather/weather.repository.ts:45-54]
+- [x] [Review] Patch Unnormalized Location Key Query [apps/api/src/modules/weather/weather.repository.ts:42-54]
+- [x] [Review] Patch Missing `clock` Injection in `WeatherIngestionService` [apps/api/src/modules/weather/weather-ingestion.service.ts]
 - [x] [Review][Defer] Inconsistent Database `location` Field Populated with `location_key` [apps/api/src/modules/weather/weather.repository.ts:60] — deferred, pre-existing
 
 - [x] Task 2: Migrate the persistence model and shared fixtures (AC: #1, #2)
@@ -236,54 +236,67 @@ using an injected clock in tests.
   - [x] Document and configure the non-serverless worker runtime that runs
         `npm run start:workers:prod`; include a startup health/observability check.
 
-- [ ] Task 5: Expose the canonical latest-weather read contract (AC: #2)
-  - [ ] Add `packages/api-client/src/contracts/http/weather.ts` with canonical Zod schemas for the
+- [x] Task 5: Expose the canonical latest-weather read contract (AC: #2)
+  - [x] Add `packages/api-client/src/contracts/http/weather.ts` with canonical Zod schemas for the
         normalized current/hourly data and freshness discriminated union.
-  - [ ] Register the authenticated `/api/v1/weather/:locationKey` GET operation in the canonical
+  - [x] Register the authenticated `/api/v1/weather/:locationKey` GET operation in the canonical
         OpenAPI registry before implementing controller code; regenerate checked-in OpenAPI and SDK
         artifacts.
-  - [ ] Add `WeatherController` as a thin authenticated adapter over `WeatherQueryService`; follow
+  - [x] Add `WeatherController` as a thin authenticated adapter over `WeatherQueryService`; follow
         existing `{ data }` success-envelope and API error conventions.
-  - [ ] Register `WeatherModule` in `AppModule`; import existing `PrismaModule`, auth guard support,
+  - [x] Register `WeatherModule` in `AppModule`; import existing `PrismaModule`, auth guard support,
         and observability dependencies instead of constructing duplicate global clients.
 
-- [ ] Task 6: Add privacy-safe operational telemetry (AC: #3)
-  - [ ] Use `createBaseLogger().child({ feature: 'weather' })` and stable event names for provider
+- [x] Task 6: Add privacy-safe operational telemetry (AC: #3)
+  - [x] Use `createBaseLogger().child({ feature: 'weather' })` and stable event names for provider
         attempts, failover, ingestion completion/failure, and fallback outcomes.
-  - [ ] Add OpenTelemetry counters/histograms for provider request duration, requests by outcome,
+  - [x] Add OpenTelemetry counters/histograms for provider request duration, requests by outcome,
         rate limits, ingestion jobs by outcome, and snapshot age. Metric attributes are limited to
         bounded values such as provider, outcome, and HTTP status class.
-  - [ ] Add/update the Grafana weather-ingestion dashboard and an alert derived from provider
+  - [x] Add/update the Grafana weather-ingestion dashboard and an alert derived from provider
         request counters when the five-minute error rate exceeds 2%.
-  - [ ] Do not send operational ingestion events to PostHog. Story 1.4 owns product analytics;
+  - [x] Do not send operational ingestion events to PostHog. Story 1.4 owns product analytics;
         weather provider telemetry belongs in OpenTelemetry/Grafana.
 
-- [ ] Task 7: Prove provider, persistence, scheduling, fallback, and telemetry behavior (AC: #1-#3)
-  - [ ] Add provider contract tests for both official fixture shapes, unit normalization, metric
+- [x] Task 7: Prove provider, persistence, scheduling, fallback, and telemetry behavior (AC: #1-#3)
+  - [x] Add provider contract tests for both official fixture shapes, unit normalization, metric
         units, UTC timestamps, exactly 48 hourly entries, and malformed-response rejection.
-  - [ ] Add orchestration tests for success, three-attempt primary failover, immediate `429`
+  - [x] Add orchestration tests for success, three-attempt primary failover, immediate `429`
         failover, secondary failure, timeout, and no multiplied queue retries.
-  - [ ] Add freshness tests for 59:59, exactly 60:00, greater than 60:00, cached fallback, and no
+  - [x] Add freshness tests for 59:59, exactly 60:00, greater than 60:00, cached fallback, and no
         snapshot; assert the exact user-safe messages.
-  - [ ] Add scheduler tests proving `upsertJobScheduler` and interval-bucketed job IDs remain
+  - [x] Add scheduler tests proving `upsertJobScheduler` and interval-bucketed job IDs remain
         idempotent across repeated starts and duplicate targets.
-  - [ ] Add API integration tests under `apps/api/integration/` for transactional persistence,
+  - [x] Add API integration tests under `apps/api/integration/` for transactional persistence,
         duplicate provider updates, latest-location reads, auth, and canonical response validation.
-  - [ ] Add telemetry tests that assert bounded attributes and confirm that coordinates, user IDs,
+  - [x] Add telemetry tests that assert bounded attributes and confirm that coordinates, user IDs,
         provider keys, and raw payloads are absent.
-  - [ ] Block live network access in unit/integration tests. Real-provider smoke is opt-in,
+  - [x] Block live network access in unit/integration tests. Real-provider smoke is opt-in,
         non-blocking, and restricted to approved non-production credentials.
-  - [ ] Run targeted API/database tests plus repository `typecheck`, `lint`, OpenAPI generation/diff,
+  - [x] Run targeted API/database tests plus repository `typecheck`, `lint`, OpenAPI generation/diff,
         and build gates; record commands and results in the Dev Agent Record.
 
-- [ ] Task 8: Align architecture and operational documentation (AC: #1-#3)
-  - [ ] Update ADR-012 to the implemented three-attempt failover, BullMQ 5 Job Scheduler, canonical
+- [x] Task 8: Align architecture and operational documentation (AC: #1-#3)
+  - [x] Update ADR-012 to the implemented three-attempt failover, BullMQ 5 Job Scheduler, canonical
         location, normalized data, and privacy-safe telemetry decisions.
-  - [ ] Update environment and deployment runbooks with provider credentials, worker runtime,
+  - [x] Update environment and deployment runbooks with provider credentials, worker runtime,
         scheduler ownership, quota monitoring, and rollback/disable procedures.
-  - [ ] Document provider-call budgeting. At a 30-minute cadence, each canonical target consumes up
+  - [x] Document provider-call budgeting. At a 30-minute cadence, each canonical target consumes up
         to 48 primary forecast calls per day before retries; alert before the configured account
         quota is approached.
+  - [x] Update `_bmad-output/project-knowledge/learning-path-step-by-step.md`
+  - [x] Using the Bmad test architect agent, evaluate if we have to add e2e, contract or perforance tests.
+
+### Review Findings - Code Review (2026-07-08)
+
+- [x] [Review] Patch Public latest-weather endpoint cannot surface cached fallback outcome [apps/api/src/modules/weather/weather.controller.ts:132]
+- [x] [Review] Patch Generated weather client and OpenAPI contract do not declare authentication [packages/api-client/src/contracts/http/weather.ts:136]
+- [x] [Review] Patch Backfilled `provider = seed` weather rows can make the latest-weather response fail schema validation [apps/api/src/modules/weather/weather.controller.ts:54]
+- [x] [Review] Patch Secondary provider rate limits are not counted in weather rate-limit telemetry [apps/api/src/modules/weather/weather-ingestion.service.ts:273]
+- [x] [Review] Patch OpenAPI and generated SDK drop the exact 48-hourly-entry invariant [packages/api-client/src/contracts/http/weather.ts:68]
+- [x] [Review] Patch Telemetry exceptions can fail ingestion after persistence or fallback work succeeds [apps/api/src/modules/weather/weather-ingestion.service.ts:168]
+- [x] [Review] Patch Weather API integration persistence coverage uses a Prisma stub instead of proving real transactions and indexes [apps/api/integration/weather.integration.spec.ts:111]
+- [x] [Review] Patch Empty generated weather location-key requests can route to 404 instead of the documented 400 validation error [packages/api-client/src/generated/apis/WeatherApi.ts:31]
 
 ## Dev Notes
 
@@ -344,8 +357,102 @@ planning architecture are historical context, not implementation pins.
 
 Gemini 3.5 Flash (High)
 
+### Implementation Plan
+
+- Task 5: Add failing contract/controller tests first for the latest-weather freshness union,
+  authenticated route registration, controller response mapping, and invalid location-key handling.
+- Implement the shared Zod/OpenAPI contract in `packages/api-client`, then expose the Nest
+  controller/module as a thin adapter over `WeatherQueryService`.
+- Regenerate the checked-in OpenAPI document and generated SDK artifacts from the canonical registry.
+- Validate with targeted contract/controller tests, API-client and API typecheck/lint, the full API
+  test suite, and the API build.
+- Task 8: Reconcile planning docs and runbooks with the actual worker, failover, telemetry, quota,
+  and rollback behavior; use the BMad test architect lens to decide whether E2E, Pact, or k6
+  coverage belongs in this story or a later consumer/performance story.
+
 ### Debug Log References
 
+- Command `npm run test --workspace @couture/api-client -- --run testing/weather-contract.spec.ts`
+  failed in the red phase before implementation because the weather contract exports and OpenAPI
+  route did not exist.
+- Command `npm run test --workspace api -- --run src/modules/weather/weather.controller.spec.ts`
+  failed in the red phase before implementation because `WeatherController` did not exist.
+- Command `npm run generate:api-client` completed successfully after registering the weather
+  contract, updating `packages/api-client/docs/http.openapi.json` and generated SDK artifacts.
+- Command
+  `npm run test --workspace @couture/api-client -- --run testing/weather-contract.spec.ts testing/http-openapi.spec.ts testing/generated-client.spec.ts`
+  completed successfully, 6/6 tests passing.
+- Command
+  `npm run test --workspace api -- --run src/modules/weather/weather.controller.spec.ts src/openapi.spec.ts`
+  completed successfully, 7/7 tests passing.
+- Command `npm run typecheck --workspace @couture/api-client` completed successfully.
+- Command `npm run typecheck --workspace api` completed successfully.
+- Command `npm run lint --workspace @couture/api-client` completed successfully.
+- Command `npm run lint --workspace api` completed successfully.
+- Command `npm run test --workspace api -- --run src/modules/weather` completed successfully,
+  92/92 tests passing.
+- Command `npm run test --workspace api` completed successfully, 234/234 tests passing.
+- Command `npm run build --workspace api` completed successfully.
+- Command
+  `npm run test --workspace api -- --run src/modules/weather/weather-ingestion.service.spec.ts src/modules/weather/weather-telemetry.spec.ts`
+  failed in the red phase before Task 6 implementation because stable weather log events and the
+  OpenTelemetry weather meter adapter did not exist.
+- Command
+  `npm run test --workspace api -- --run src/modules/weather/weather-ingestion.service.spec.ts src/modules/weather/weather-telemetry.spec.ts`
+  completed successfully after Task 6 telemetry implementation, 6/6 tests passing.
+- Command
+  `node -e "JSON.parse(require('fs').readFileSync('infra/grafana/dashboards/couturecast-weather-ingestion.json','utf8')); console.log('weather dashboard json valid')"`
+  completed successfully.
+- Command `npm run test --workspace api -- --run src/modules/weather` completed successfully,
+  93/93 tests passing after Task 6 telemetry additions.
+- Command `npm run typecheck --workspace api` completed successfully after Task 6 telemetry
+  additions.
+- Command `npm run lint --workspace api` completed successfully after Task 6 telemetry additions.
+- Command
+  `npx prettier --check infra/grafana/dashboards/couturecast-weather-ingestion.json infra/grafana/dashboards/README.md`
+  completed successfully.
+- Command `npm run test --workspace api` completed successfully, 235/235 tests passing after Task 6
+  telemetry additions.
+- Command `npm run build --workspace api` completed successfully after Task 6 telemetry additions.
+- Command
+  `npm run test --workspace api -- --run integration/weather.integration.spec.ts src/modules/weather/weather-ingestion.service.spec.ts`
+  failed in the red phase while adding Task 7 integration coverage, first exposing missing focused
+  Nest guard wiring and then an implicit `WeatherRepository` Prisma injection risk.
+- Command
+  `npm run test --workspace api -- --run integration/weather.integration.spec.ts src/modules/weather/weather-ingestion.service.spec.ts src/modules/weather/weather.repository.spec.ts`
+  completed successfully after explicit `WeatherRepository` Prisma injection, 12/12 tests passing.
+- Command `npm run generate:api-client` completed successfully during Task 7 validation.
+- Command `npm run optic:lint` completed successfully.
+- Command `npm run optic:diff` completed successfully and reported one added operation,
+  `GET /api/v1/weather/{locationKey}`.
+- Command
+  `npm run test --workspace api -- --run src/modules/weather integration/weather.integration.spec.ts`
+  completed successfully, 97/97 tests passing.
+- Command `npm run test --workspace @couture/api-client` completed successfully, 6/6 tests passing.
+- Command `npm run typecheck --workspace @couture/api-client` completed successfully.
+- Command `npm run lint --workspace @couture/api-client` completed successfully.
+- Command `npm run typecheck --workspace api` completed successfully after Task 7 integration
+  additions.
+- Command `npm run lint --workspace api` completed successfully after Task 7 integration additions.
+- Command `npm run test --workspace api` completed successfully, 239/239 tests passing after Task 7
+  integration additions.
+- Command `npm run build --workspace api` completed successfully after Task 7 integration additions.
+- Command
+  `npx prettier --write _bmad-output/planning-artifacts/architecture.md apps/api/README.md _bmad-output/project-knowledge/secrets-management.md _bmad-output/project-knowledge/learning-path-step-by-step.md _bmad-output/test-artifacts/test-reviews/weather-ingestion-test-architect-evaluation-2026-07-08.md`
+  completed successfully after Task 8 documentation updates.
+- Command
+  `npx markdownlint-cli2 _bmad-output/test-artifacts/test-reviews/weather-ingestion-test-architect-evaluation-2026-07-08.md`
+  completed successfully for the new Task 8 test architect evaluation artifact.
+- Command
+  `npx markdownlint-cli2 _bmad-output/planning-artifacts/architecture.md apps/api/README.md _bmad-output/project-knowledge/secrets-management.md _bmad-output/project-knowledge/learning-path-step-by-step.md _bmad-output/test-artifacts/test-reviews/weather-ingestion-test-architect-evaluation-2026-07-08.md`
+  was attempted after Task 8 documentation updates but failed on existing baseline markdownlint
+  violations across the larger docs and stock API README.
+- Command
+  `npm run test --workspace api -- --run src/modules/weather integration/weather.integration.spec.ts`
+  completed successfully after Task 8 documentation updates, 97/97 tests passing.
+- Command `npm run typecheck --workspace api` completed successfully after Task 8 documentation
+  updates.
+- Command `npm run lint --workspace api` completed successfully after Task 8 documentation updates.
 - Command `npm run test` completed successfully, 155/155 tests passing.
 - Command `npm run db:generate` completed successfully after the normalized weather Prisma schema
   update.
@@ -375,6 +482,33 @@ Gemini 3.5 Flash (High)
 - Command `npm run typecheck --workspace api` completed successfully after Task 4 additions.
 - Command `npm run lint --workspace api` completed successfully after Task 4 additions.
 - Command `npm run test --workspace api` completed successfully, 227/227 tests passing.
+- Command `npm run test` was attempted for final regression. API, mobile, web, api-client, config,
+  testing, utils, and k6 utility checks passed, but `@couture/db` failed because the local
+  Postgres/Supabase target at `127.0.0.1:54322` was unavailable.
+- Command `npm run supabase:start` was attempted to unblock the DB suites, but Docker Desktop was
+  not running, so the local Supabase stack could not be started from this session.
+- Command `npm run generate:api-client` initially exposed that generated SDK files were not
+  reproducibly formatted by the postprocess step. After updating
+  `packages/api-client/scripts/postprocess-generated-sdk.ts`, the command completed successfully.
+- Command `npm run lint` initially failed in the root Prettier check because local `.agent` and
+  `.bmad-loop` runtime folders were not ignored and regenerated SDK files needed pipeline-owned
+  formatting. After updating `.prettierignore` and the SDK postprocess step, the command completed
+  successfully.
+- Command `npm run typecheck` completed successfully after the generator postprocess update.
+- Command `npm run test --workspace @couture/api-client` completed successfully after the generator
+  postprocess update, 6/6 tests passing.
+- Command `npm run build` completed successfully after the generator postprocess update.
+- Command `npm run optic:lint` completed successfully after final SDK regeneration.
+- Command `npm run optic:diff` completed successfully after final SDK regeneration and reported one
+  added operation, `GET /api/v1/weather/{locationKey}`.
+- Command `npm run supabase:start` was retried after Docker Desktop started and confirmed the local
+  Supabase database was available at `127.0.0.1:54322`.
+- Command `node scripts/prisma-migrate-deploy.mjs` completed successfully and applied
+  `20260707104000_normalize_weather_persistence` to the local Supabase database.
+- Command `npm run test --workspace @couture/db` completed successfully, 16/16 tests passing.
+- Command `npm run test` completed successfully after the local database became available: API
+  239/239, mobile 26/26, web 24/24, api-client 6/6, config 7/7, db 16/16, testing 7/7, utils 8/8,
+  and k6 utility typecheck all passed.
 
 ### Completion Notes List
 
@@ -416,9 +550,74 @@ Gemini 3.5 Flash (High)
   of five.
 - Documented the required non-serverless worker runtime using `npm run start:workers:prod` and the
   startup observability checks in the API README.
+- Added the shared latest-weather HTTP contract with canonical normalized weather snapshot schemas,
+  exact `fresh`/`cached`/`stale`/`unavailable` response shapes, and the `{ data }` response envelope.
+- Registered authenticated `GET /api/v1/weather/{locationKey}` in the canonical OpenAPI registry and
+  regenerated the checked-in OpenAPI document plus generated SDK, including `WeatherApi`.
+- Added `WeatherController` as a thin authenticated adapter over `WeatherQueryService`, mapping
+  persisted weather snapshots into the canonical API response without exposing database field names.
+- Added `WeatherModule` and registered it in `AppModule` using the existing `PrismaModule` and auth
+  guard support.
+- Added privacy-safe weather telemetry with stable log event names under
+  `createBaseLogger().child({ feature: 'weather' })`, OpenTelemetry counters/histograms for provider
+  requests, rate limits, ingestion outcomes, fallback outcomes, and snapshot age.
+- Updated weather ingestion logging and metric calls to use bounded provider/outcome/status-class
+  attributes only, with no PostHog ingestion events.
+- Added the Grafana weather ingestion dashboard with provider latency, rate limits, ingestion
+  outcomes, fallback outcomes, snapshot age, and a five-minute provider error-rate alert above 2%.
+- Added weather API integration coverage for transactional persistence, duplicate provider update
+  idempotency and unique-constraint races, latest-location reads, auth enforcement, and canonical
+  latest-weather response validation.
+- Strengthened weather telemetry tests to prove bounded metric/log attributes do not include
+  coordinates, provider keys, user identifiers, or raw payload details.
+- Made `WeatherRepository` explicitly inject `PrismaClient`, matching the focused Nest integration
+  coverage and avoiding implicit DI metadata fragility.
+- Updated architecture ADR-012 and platform notes to match the implemented OpenWeather/WeatherAPI
+  retry/failover sequence, BullMQ 5 Job Scheduler ownership, freshness union, privacy-safe telemetry,
+  and Grafana alerting.
+- Updated worker runbook and secrets guidance with weather provider credentials, 30-minute cadence
+  provider-call budgeting, quota monitoring, worker runtime ownership, and disable/rollback steps.
+- Updated the step-by-step learning path to reflect completed Task 5 through Task 8 weather API,
+  SDK, telemetry, validation, and documentation coverage.
+- Added the BMad test architect evaluation for E2E, contract, and performance coverage. The
+  recommendation is PASS for Story 1.1 scope, with Playwright UI E2E, Pact, and k6 deferred to the
+  relevant consumer, independent-release, or performance-hardening stories.
+- Hardened the API-client SDK postprocess step so generated TypeScript is formatted as part of the
+  canonical generation pipeline, and ignored local agent runtime folders in repository Prettier
+  checks.
 
 ### File List
 
+- `_bmad-output/implementation-artifacts/1-1-weather-api-ingestion-service.md`
+- `apps/api/src/app.module.ts`
+- `apps/api/src/contracts/http.ts`
+- `apps/api/integration/weather.integration.spec.ts`
+- `apps/api/src/modules/weather/weather.controller.spec.ts`
+- `apps/api/src/modules/weather/weather.controller.ts`
+- `apps/api/src/modules/weather/weather-ingestion.service.spec.ts`
+- `apps/api/src/modules/weather/weather-ingestion.service.ts`
+- `apps/api/src/modules/weather/weather.module.ts`
+- `apps/api/src/modules/weather/weather-telemetry.spec.ts`
+- `apps/api/src/modules/weather/weather-telemetry.ts`
+- `infra/grafana/dashboards/README.md`
+- `infra/grafana/dashboards/couturecast-weather-ingestion.json`
+- `packages/api-client/docs/http.openapi.json`
+- `packages/api-client/src/contracts/http/index.ts`
+- `packages/api-client/src/contracts/http/openapi.ts`
+- `packages/api-client/src/contracts/http/weather.ts`
+- `packages/api-client/src/generated/apis/AuthApi.ts`
+- `packages/api-client/src/generated/apis/EventsApi.ts`
+- `packages/api-client/src/generated/apis/GuardianApi.ts`
+- `packages/api-client/src/generated/apis/HealthApi.ts`
+- `packages/api-client/src/generated/apis/ModerationApi.ts`
+- `packages/api-client/src/generated/apis/UserApi.ts`
+- `packages/api-client/src/generated/apis/WeatherApi.ts`
+- `packages/api-client/src/generated/apis/index.ts`
+- `packages/api-client/src/generated/default-api.ts`
+- `packages/api-client/src/generated/index.ts`
+- `packages/api-client/src/generated/models/index.ts`
+- `packages/api-client/src/generated/runtime.ts`
+- `packages/api-client/testing/weather-contract.spec.ts`
 - `apps/api/src/modules/weather/providers/weather.types.ts`
 - `apps/api/src/modules/weather/providers/weather.schemas.ts`
 - `apps/api/src/modules/weather/providers/weather-provider.interface.ts`
@@ -443,6 +642,12 @@ Gemini 3.5 Flash (High)
 - `apps/api/src/modules/weather/weather-target-source.spec.ts`
 - `apps/api/src/workers/bootstrap.ts`
 - `apps/api/README.md`
+- `_bmad-output/planning-artifacts/architecture.md`
+- `_bmad-output/project-knowledge/secrets-management.md`
+- `_bmad-output/project-knowledge/learning-path-step-by-step.md`
+- `_bmad-output/test-artifacts/test-reviews/weather-ingestion-test-architect-evaluation-2026-07-08.md`
+- `.prettierignore`
+- `packages/api-client/scripts/postprocess-generated-sdk.ts`
 - `packages/db/prisma/schema.prisma`
 - `packages/db/prisma/migrations/20260707104000_normalize_weather_persistence/migration.sql`
 - `packages/db/prisma/seeds/weather.ts`
@@ -457,3 +662,16 @@ Gemini 3.5 Flash (High)
   services.
 - 2026-07-07: Completed Task 4 durable BullMQ weather scheduling, target fan-out, real worker
   processing, and worker runtime documentation.
+- 2026-07-08: Completed Task 5 canonical latest-weather read contract, authenticated controller,
+  WeatherModule registration, OpenAPI document update, and generated SDK refresh.
+- 2026-07-08: Completed Task 6 privacy-safe weather telemetry, OpenTelemetry weather meter adapter,
+  stable weather log event names, and Grafana weather-ingestion dashboard with 2% error-rate alert.
+- 2026-07-08: Completed Task 7 weather provider, orchestration, freshness, scheduler, API
+  integration, telemetry privacy, network-blocking, OpenAPI, lint, typecheck, test, and build
+  validation.
+- 2026-07-08: Completed Task 8 architecture, runbook, provider-call budgeting, learning-path, and
+  BMad test architect documentation updates.
+- 2026-07-08: Completed final story validation, hardened generated SDK formatting, and moved Story
+  1.1 to review.
+- 2026-07-08: Re-ran the final repository test suite after local Supabase startup and migration;
+  all workspace tests passed.

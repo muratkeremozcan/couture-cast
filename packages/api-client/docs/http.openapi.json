@@ -12,6 +12,13 @@
     }
   ],
   "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
     "schemas": {
       "ApiError": {
         "type": "object",
@@ -818,6 +825,1015 @@
           "linkedGuardians",
           "linkedTeens"
         ]
+      },
+      "LatestWeatherPathParams": {
+        "type": "object",
+        "properties": {
+          "locationKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Canonical weather location key."
+          }
+        },
+        "required": [
+          "locationKey"
+        ]
+      },
+      "WeatherCondition": {
+        "type": "string",
+        "enum": [
+          "clear",
+          "partly_cloudy",
+          "cloudy",
+          "fog",
+          "drizzle",
+          "rain",
+          "sleet",
+          "snow",
+          "thunderstorm",
+          "wind",
+          "unknown"
+        ]
+      },
+      "WeatherProvider": {
+        "type": "string",
+        "enum": [
+          "openweather",
+          "weatherapi"
+        ]
+      },
+      "WeatherCurrent": {
+        "type": "object",
+        "properties": {
+          "temperature": {
+            "type": "number"
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "clear",
+              "partly_cloudy",
+              "cloudy",
+              "fog",
+              "drizzle",
+              "rain",
+              "sleet",
+              "snow",
+              "thunderstorm",
+              "wind",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "temperature",
+          "condition"
+        ]
+      },
+      "WeatherHourlyEntry": {
+        "type": "object",
+        "properties": {
+          "forecastAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "temperature": {
+            "type": "number"
+          },
+          "feelsLike": {
+            "type": "number"
+          },
+          "precipitationProbability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "precipitationAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "windSpeed": {
+            "type": "number",
+            "minimum": 0
+          },
+          "windGust": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "clear",
+              "partly_cloudy",
+              "cloudy",
+              "fog",
+              "drizzle",
+              "rain",
+              "sleet",
+              "snow",
+              "thunderstorm",
+              "wind",
+              "unknown"
+            ]
+          },
+          "providerWeatherCode": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "forecastAt",
+          "temperature",
+          "feelsLike",
+          "precipitationProbability",
+          "precipitationAmount",
+          "windSpeed",
+          "windGust",
+          "condition",
+          "providerWeatherCode"
+        ]
+      },
+      "WeatherAlert": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        },
+        "required": [
+          "event",
+          "description",
+          "start",
+          "end"
+        ]
+      },
+      "WeatherSnapshot": {
+        "type": "object",
+        "properties": {
+          "locationKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "openweather",
+              "weatherapi"
+            ]
+          },
+          "providerUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current": {
+            "type": "object",
+            "properties": {
+              "temperature": {
+                "type": "number"
+              },
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "clear",
+                  "partly_cloudy",
+                  "cloudy",
+                  "fog",
+                  "drizzle",
+                  "rain",
+                  "sleet",
+                  "snow",
+                  "thunderstorm",
+                  "wind",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "temperature",
+              "condition"
+            ]
+          },
+          "hourly": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "forecastAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "temperature": {
+                  "type": "number"
+                },
+                "feelsLike": {
+                  "type": "number"
+                },
+                "precipitationProbability": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "precipitationAmount": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "windSpeed": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "windGust": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "condition": {
+                  "type": "string",
+                  "enum": [
+                    "clear",
+                    "partly_cloudy",
+                    "cloudy",
+                    "fog",
+                    "drizzle",
+                    "rain",
+                    "sleet",
+                    "snow",
+                    "thunderstorm",
+                    "wind",
+                    "unknown"
+                  ]
+                },
+                "providerWeatherCode": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "forecastAt",
+                "temperature",
+                "feelsLike",
+                "precipitationProbability",
+                "precipitationAmount",
+                "windSpeed",
+                "windGust",
+                "condition",
+                "providerWeatherCode"
+              ]
+            },
+            "minItems": 48,
+            "maxItems": 48
+          },
+          "alerts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "start": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high"
+                  ]
+                }
+              },
+              "required": [
+                "event",
+                "description",
+                "start",
+                "end"
+              ]
+            }
+          }
+        },
+        "required": [
+          "locationKey",
+          "latitude",
+          "longitude",
+          "timezone",
+          "provider",
+          "providerUpdatedAt",
+          "fetchedAt",
+          "current",
+          "hourly",
+          "alerts"
+        ]
+      },
+      "LatestWeatherResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "fresh"
+                    ]
+                  },
+                  "weather": {
+                    "type": "object",
+                    "properties": {
+                      "locationKey": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "latitude": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90
+                      },
+                      "longitude": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180
+                      },
+                      "timezone": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "openweather",
+                          "weatherapi"
+                        ]
+                      },
+                      "providerUpdatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "fetchedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "current": {
+                        "type": "object",
+                        "properties": {
+                          "temperature": {
+                            "type": "number"
+                          },
+                          "condition": {
+                            "type": "string",
+                            "enum": [
+                              "clear",
+                              "partly_cloudy",
+                              "cloudy",
+                              "fog",
+                              "drizzle",
+                              "rain",
+                              "sleet",
+                              "snow",
+                              "thunderstorm",
+                              "wind",
+                              "unknown"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "temperature",
+                          "condition"
+                        ]
+                      },
+                      "hourly": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "forecastAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "temperature": {
+                              "type": "number"
+                            },
+                            "feelsLike": {
+                              "type": "number"
+                            },
+                            "precipitationProbability": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "precipitationAmount": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "windSpeed": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "windGust": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "minimum": 0
+                            },
+                            "condition": {
+                              "type": "string",
+                              "enum": [
+                                "clear",
+                                "partly_cloudy",
+                                "cloudy",
+                                "fog",
+                                "drizzle",
+                                "rain",
+                                "sleet",
+                                "snow",
+                                "thunderstorm",
+                                "wind",
+                                "unknown"
+                              ]
+                            },
+                            "providerWeatherCode": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "forecastAt",
+                            "temperature",
+                            "feelsLike",
+                            "precipitationProbability",
+                            "precipitationAmount",
+                            "windSpeed",
+                            "windGust",
+                            "condition",
+                            "providerWeatherCode"
+                          ]
+                        },
+                        "minItems": 48,
+                        "maxItems": 48
+                      },
+                      "alerts": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "event": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "start": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "end": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "severity": {
+                              "type": "string",
+                              "enum": [
+                                "low",
+                                "medium",
+                                "high"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "event",
+                            "description",
+                            "start",
+                            "end"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "locationKey",
+                      "latitude",
+                      "longitude",
+                      "timezone",
+                      "provider",
+                      "providerUpdatedAt",
+                      "fetchedAt",
+                      "current",
+                      "hourly",
+                      "alerts"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "weather"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "cached"
+                    ]
+                  },
+                  "weather": {
+                    "type": "object",
+                    "properties": {
+                      "locationKey": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "latitude": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90
+                      },
+                      "longitude": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180
+                      },
+                      "timezone": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "openweather",
+                          "weatherapi"
+                        ]
+                      },
+                      "providerUpdatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "fetchedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "current": {
+                        "type": "object",
+                        "properties": {
+                          "temperature": {
+                            "type": "number"
+                          },
+                          "condition": {
+                            "type": "string",
+                            "enum": [
+                              "clear",
+                              "partly_cloudy",
+                              "cloudy",
+                              "fog",
+                              "drizzle",
+                              "rain",
+                              "sleet",
+                              "snow",
+                              "thunderstorm",
+                              "wind",
+                              "unknown"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "temperature",
+                          "condition"
+                        ]
+                      },
+                      "hourly": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "forecastAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "temperature": {
+                              "type": "number"
+                            },
+                            "feelsLike": {
+                              "type": "number"
+                            },
+                            "precipitationProbability": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "precipitationAmount": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "windSpeed": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "windGust": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "minimum": 0
+                            },
+                            "condition": {
+                              "type": "string",
+                              "enum": [
+                                "clear",
+                                "partly_cloudy",
+                                "cloudy",
+                                "fog",
+                                "drizzle",
+                                "rain",
+                                "sleet",
+                                "snow",
+                                "thunderstorm",
+                                "wind",
+                                "unknown"
+                              ]
+                            },
+                            "providerWeatherCode": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "forecastAt",
+                            "temperature",
+                            "feelsLike",
+                            "precipitationProbability",
+                            "precipitationAmount",
+                            "windSpeed",
+                            "windGust",
+                            "condition",
+                            "providerWeatherCode"
+                          ]
+                        },
+                        "minItems": 48,
+                        "maxItems": 48
+                      },
+                      "alerts": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "event": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "start": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "end": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "severity": {
+                              "type": "string",
+                              "enum": [
+                                "low",
+                                "medium",
+                                "high"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "event",
+                            "description",
+                            "start",
+                            "end"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "locationKey",
+                      "latitude",
+                      "longitude",
+                      "timezone",
+                      "provider",
+                      "providerUpdatedAt",
+                      "fetchedAt",
+                      "current",
+                      "hourly",
+                      "alerts"
+                    ]
+                  },
+                  "message": {
+                    "type": "string",
+                    "enum": [
+                      "Using recently cached weather data."
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "weather",
+                  "message"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "stale"
+                    ]
+                  },
+                  "weather": {
+                    "type": "object",
+                    "properties": {
+                      "locationKey": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "latitude": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90
+                      },
+                      "longitude": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180
+                      },
+                      "timezone": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "openweather",
+                          "weatherapi"
+                        ]
+                      },
+                      "providerUpdatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "fetchedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "current": {
+                        "type": "object",
+                        "properties": {
+                          "temperature": {
+                            "type": "number"
+                          },
+                          "condition": {
+                            "type": "string",
+                            "enum": [
+                              "clear",
+                              "partly_cloudy",
+                              "cloudy",
+                              "fog",
+                              "drizzle",
+                              "rain",
+                              "sleet",
+                              "snow",
+                              "thunderstorm",
+                              "wind",
+                              "unknown"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "temperature",
+                          "condition"
+                        ]
+                      },
+                      "hourly": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "forecastAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "temperature": {
+                              "type": "number"
+                            },
+                            "feelsLike": {
+                              "type": "number"
+                            },
+                            "precipitationProbability": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "precipitationAmount": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "windSpeed": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "windGust": {
+                              "type": [
+                                "number",
+                                "null"
+                              ],
+                              "minimum": 0
+                            },
+                            "condition": {
+                              "type": "string",
+                              "enum": [
+                                "clear",
+                                "partly_cloudy",
+                                "cloudy",
+                                "fog",
+                                "drizzle",
+                                "rain",
+                                "sleet",
+                                "snow",
+                                "thunderstorm",
+                                "wind",
+                                "unknown"
+                              ]
+                            },
+                            "providerWeatherCode": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "forecastAt",
+                            "temperature",
+                            "feelsLike",
+                            "precipitationProbability",
+                            "precipitationAmount",
+                            "windSpeed",
+                            "windGust",
+                            "condition",
+                            "providerWeatherCode"
+                          ]
+                        },
+                        "minItems": 48,
+                        "maxItems": 48
+                      },
+                      "alerts": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "event": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "start": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "end": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "severity": {
+                              "type": "string",
+                              "enum": [
+                                "low",
+                                "medium",
+                                "high"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "event",
+                            "description",
+                            "start",
+                            "end"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "locationKey",
+                      "latitude",
+                      "longitude",
+                      "timezone",
+                      "provider",
+                      "providerUpdatedAt",
+                      "fetchedAt",
+                      "current",
+                      "hourly",
+                      "alerts"
+                    ]
+                  },
+                  "message": {
+                    "type": "string",
+                    "enum": [
+                      "Weather data is delayed. Check again shortly."
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "weather",
+                  "message"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "unavailable"
+                    ]
+                  },
+                  "weather": {
+                    "type": "null"
+                  },
+                  "message": {
+                    "type": "string",
+                    "enum": [
+                      "Weather data is temporarily unavailable."
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "weather",
+                  "message"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
       }
     },
     "parameters": {}
@@ -1368,6 +2384,75 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/weather/{locationKey}": {
+      "get": {
+        "tags": [
+          "weather"
+        ],
+        "summary": "Get latest weather for a canonical location",
+        "description": "Returns the latest normalized weather snapshot and freshness outcome for an authenticated request.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Canonical weather location key."
+            },
+            "required": true,
+            "description": "Canonical weather location key.",
+            "name": "locationKey",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest weather freshness result returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestWeatherResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Weather location key failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent is required for teen access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
                 }
               }
             }

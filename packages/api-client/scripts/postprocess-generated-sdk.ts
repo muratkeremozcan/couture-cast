@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { format, resolveConfig } from 'prettier'
 
 // Story 0.9 Task 3 step 3 owner:
 // this file exists because the generator gets us close, but not all the way to the package shape
@@ -86,6 +87,31 @@ function normalizeGeneratedModelsIndex() {
   writeFileSync(generatedModelsIndexPath, normalizedSource)
 }
 
+function strengthenWeatherHourlyArrayTypes() {
+  const source = readFileSync(generatedModelsIndexPath, 'utf8')
+  const helper = [
+    'export type FixedLengthArray<T, L extends number, Acc extends T[] = []> =',
+    `  Acc[${JSON.stringify('length')}] extends L ? Acc : FixedLengthArray<T, L, [...Acc, T]>;`,
+    '',
+    '',
+  ].join('\n')
+  const helperAlreadyExists = source.includes('export type FixedLengthArray')
+  const withHelper = helperAlreadyExists
+    ? source
+    : source.replace(/(\/\* eslint-disable \*\/\n)/u, `$1${helper}`)
+  if (!helperAlreadyExists && withHelper === source) {
+    throw new Error(
+      `Unable to insert FixedLengthArray helper into ${generatedModelsIndexPath}`
+    )
+  }
+  const normalizedSource = withHelper.replace(
+    /hourly: Array<WeatherSnapshotHourlyInner>/gu,
+    'hourly: FixedLengthArray<WeatherSnapshotHourlyInner, 48>'
+  )
+
+  writeFileSync(generatedModelsIndexPath, normalizedSource)
+}
+
 function walkGeneratedTypeScriptFiles(currentDir: string): string[] {
   return readdirSync(currentDir, { withFileTypes: true }).flatMap((entry) => {
     const entryPath = resolve(currentDir, entry.name)
@@ -161,17 +187,40 @@ function removeGeneratorNoise() {
   rmSync(resolve(generatedRoot, '.openapi-generator-ignore'), { force: true })
 }
 
-const apiClassNames = readGeneratedApiClassNames()
+async function formatGeneratedTypeScript() {
+  const prettierOptions = await resolveConfig(packageRoot)
 
-if (apiClassNames.length === 0) {
-  throw new Error(`No generated API classes found in ${apisRoot}`)
+  for (const filePath of walkGeneratedTypeScriptFiles(generatedRoot)) {
+    const source = readFileSync(filePath, 'utf8')
+    const formattedSource = await format(source, {
+      ...prettierOptions,
+      filepath: filePath,
+    })
+
+    writeFileSync(filePath, formattedSource)
+  }
 }
 
-writeFileSync(generatedIndexPath, createGeneratedIndexSource())
-writeFileSync(defaultApiPath, createDefaultApiSource(apiClassNames))
-normalizeGeneratedModelsIndex()
-stripGeneratedTslintComments()
-removeUnusedModelTypeImportsFromGeneratedApis()
-removeGeneratorNoise()
+async function main() {
+  const apiClassNames = readGeneratedApiClassNames()
 
-console.log(`✅ Added DefaultApi compatibility wrapper for ${apiClassNames.join(', ')}`)
+  if (apiClassNames.length === 0) {
+    throw new Error(`No generated API classes found in ${apisRoot}`)
+  }
+
+  writeFileSync(generatedIndexPath, createGeneratedIndexSource())
+  writeFileSync(defaultApiPath, createDefaultApiSource(apiClassNames))
+  normalizeGeneratedModelsIndex()
+  strengthenWeatherHourlyArrayTypes()
+  stripGeneratedTslintComments()
+  removeUnusedModelTypeImportsFromGeneratedApis()
+  removeGeneratorNoise()
+  await formatGeneratedTypeScript()
+
+  console.log(`✅ Added DefaultApi compatibility wrapper for ${apiClassNames.join(', ')}`)
+}
+
+main().catch((error: unknown) => {
+  console.error(error)
+  process.exitCode = 1
+})

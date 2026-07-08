@@ -30,6 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
+last_updated: 2026-07-08
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -56,7 +57,7 @@ development_status:
 
   # Epic 1: Weather Intelligence & Platform Foundation (Phase 1)
   epic-1: in-progress
-  1-1-weather-api-ingestion-service: in-progress
+  1-1-weather-api-ingestion-service: done
   1-2-multi-location-preferences: backlog
   1-3-alert-rules-notification-pipeline: backlog
   1-4-telemetry-audit-baseline: backlog

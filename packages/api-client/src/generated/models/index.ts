@@ -1,4 +1,10 @@
 /* eslint-disable */
+export type FixedLengthArray<
+  T,
+  L extends number,
+  Acc extends T[] = [],
+> = Acc['length'] extends L ? Acc : FixedLengthArray<T, L, [...Acc, T]>
+
 /**
  *
  * @export
@@ -430,6 +436,507 @@ export interface GuardianConsentInput {
 /**
  *
  * @export
+ * @interface GuardianConsentRevokeInput
+ */
+export interface GuardianConsentRevokeInput {
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianConsentRevokeInput
+   */
+  guardianId: string
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianConsentRevokeInput
+   */
+  teenId: string
+}
+/**
+ *
+ * @export
+ * @interface GuardianConsentRevokeResponse
+ */
+export interface GuardianConsentRevokeResponse {
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianConsentRevokeResponse
+   */
+  guardianId: string
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianConsentRevokeResponse
+   */
+  teenId: string
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianConsentRevokeResponse
+   */
+  revokedAt: string
+  /**
+   *
+   * @type {number}
+   * @memberof GuardianConsentRevokeResponse
+   */
+  remainingActiveGuardians: number
+  /**
+   *
+   * @type {boolean}
+   * @memberof GuardianConsentRevokeResponse
+   */
+  sessionInvalidated: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof GuardianConsentRevokeResponse
+   */
+  notificationQueued: boolean
+}
+/**
+ *
+ * @export
+ * @interface GuardianInvitationAcceptInput
+ */
+export interface GuardianInvitationAcceptInput {
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationAcceptInput
+   */
+  token: string
+}
+/**
+ *
+ * @export
+ * @interface GuardianInvitationAcceptResponse
+ */
+export interface GuardianInvitationAcceptResponse {
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationAcceptResponse
+   */
+  teenId: string
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationAcceptResponse
+   */
+  teenEmail: string
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationAcceptResponse
+   */
+  guardianId: string
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationAcceptResponse
+   */
+  guardianEmail: string
+  /**
+   *
+   * @type {GuardianInvitationAcceptResponseConsentLevelEnum}
+   * @memberof GuardianInvitationAcceptResponse
+   */
+  consentLevel: GuardianInvitationAcceptResponseConsentLevelEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationAcceptResponse
+   */
+  grantedAt: string
+}
+
+/**
+ * @export
+ */
+export const GuardianInvitationAcceptResponseConsentLevelEnum = {
+  read_only: 'read_only',
+  full_access: 'full_access',
+} as const
+export type GuardianInvitationAcceptResponseConsentLevelEnum =
+  (typeof GuardianInvitationAcceptResponseConsentLevelEnum)[keyof typeof GuardianInvitationAcceptResponseConsentLevelEnum]
+
+/**
+ *
+ * @export
+ * @interface GuardianInvitationInput
+ */
+export interface GuardianInvitationInput {
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationInput
+   */
+  teenId: string
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationInput
+   */
+  guardianEmail: string
+  /**
+   *
+   * @type {GuardianInvitationInputConsentLevelEnum}
+   * @memberof GuardianInvitationInput
+   */
+  consentLevel?: GuardianInvitationInputConsentLevelEnum
+}
+
+/**
+ * @export
+ */
+export const GuardianInvitationInputConsentLevelEnum = {
+  read_only: 'read_only',
+  full_access: 'full_access',
+} as const
+export type GuardianInvitationInputConsentLevelEnum =
+  (typeof GuardianInvitationInputConsentLevelEnum)[keyof typeof GuardianInvitationInputConsentLevelEnum]
+
+/**
+ *
+ * @export
+ * @interface GuardianInvitationResponse
+ */
+export interface GuardianInvitationResponse {
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationResponse
+   */
+  invitationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationResponse
+   */
+  teenId: string
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationResponse
+   */
+  guardianEmail: string
+  /**
+   *
+   * @type {GuardianInvitationResponseConsentLevelEnum}
+   * @memberof GuardianInvitationResponse
+   */
+  consentLevel: GuardianInvitationResponseConsentLevelEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationResponse
+   */
+  expiresAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof GuardianInvitationResponse
+   */
+  invitationLink: string
+  /**
+   *
+   * @type {boolean}
+   * @memberof GuardianInvitationResponse
+   */
+  deliveryQueued: boolean
+}
+
+/**
+ * @export
+ */
+export const GuardianInvitationResponseConsentLevelEnum = {
+  read_only: 'read_only',
+  full_access: 'full_access',
+} as const
+export type GuardianInvitationResponseConsentLevelEnum =
+  (typeof GuardianInvitationResponseConsentLevelEnum)[keyof typeof GuardianInvitationResponseConsentLevelEnum]
+
+/**
+ *
+ * @export
+ * @interface LatestWeatherPathParams
+ */
+export interface LatestWeatherPathParams {
+  /**
+   * Canonical weather location key.
+   * @type {string}
+   * @memberof LatestWeatherPathParams
+   */
+  locationKey: string
+}
+/**
+ *
+ * @export
+ * @interface LatestWeatherResponse
+ */
+export interface LatestWeatherResponse {
+  /**
+   *
+   * @type {LatestWeatherResponseData}
+   * @memberof LatestWeatherResponse
+   */
+  data: LatestWeatherResponseData
+}
+/**
+ * @type LatestWeatherResponseData
+ *
+ * @export
+ */
+export type LatestWeatherResponseData =
+  | LatestWeatherResponseDataOneOf
+  | LatestWeatherResponseDataOneOf1
+  | LatestWeatherResponseDataOneOf2
+  | LatestWeatherResponseDataOneOf3
+/**
+ *
+ * @export
+ * @interface LatestWeatherResponseDataOneOf
+ */
+export interface LatestWeatherResponseDataOneOf {
+  /**
+   *
+   * @type {LatestWeatherResponseDataOneOfStatusEnum}
+   * @memberof LatestWeatherResponseDataOneOf
+   */
+  status: LatestWeatherResponseDataOneOfStatusEnum
+  /**
+   *
+   * @type {LatestWeatherResponseDataOneOfWeather}
+   * @memberof LatestWeatherResponseDataOneOf
+   */
+  weather: LatestWeatherResponseDataOneOfWeather
+}
+
+/**
+ * @export
+ */
+export const LatestWeatherResponseDataOneOfStatusEnum = {
+  fresh: 'fresh',
+} as const
+export type LatestWeatherResponseDataOneOfStatusEnum =
+  (typeof LatestWeatherResponseDataOneOfStatusEnum)[keyof typeof LatestWeatherResponseDataOneOfStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface LatestWeatherResponseDataOneOf1
+ */
+export interface LatestWeatherResponseDataOneOf1 {
+  /**
+   *
+   * @type {LatestWeatherResponseDataOneOf1StatusEnum}
+   * @memberof LatestWeatherResponseDataOneOf1
+   */
+  status: LatestWeatherResponseDataOneOf1StatusEnum
+  /**
+   *
+   * @type {LatestWeatherResponseDataOneOfWeather}
+   * @memberof LatestWeatherResponseDataOneOf1
+   */
+  weather: LatestWeatherResponseDataOneOfWeather
+  /**
+   *
+   * @type {LatestWeatherResponseDataOneOf1MessageEnum}
+   * @memberof LatestWeatherResponseDataOneOf1
+   */
+  message: LatestWeatherResponseDataOneOf1MessageEnum
+}
+
+/**
+ * @export
+ */
+export const LatestWeatherResponseDataOneOf1StatusEnum = {
+  cached: 'cached',
+} as const
+export type LatestWeatherResponseDataOneOf1StatusEnum =
+  (typeof LatestWeatherResponseDataOneOf1StatusEnum)[keyof typeof LatestWeatherResponseDataOneOf1StatusEnum]
+
+/**
+ * @export
+ */
+export const LatestWeatherResponseDataOneOf1MessageEnum = {
+  Using_recently_cached_weather_data: 'Using recently cached weather data.',
+} as const
+export type LatestWeatherResponseDataOneOf1MessageEnum =
+  (typeof LatestWeatherResponseDataOneOf1MessageEnum)[keyof typeof LatestWeatherResponseDataOneOf1MessageEnum]
+
+/**
+ *
+ * @export
+ * @interface LatestWeatherResponseDataOneOf2
+ */
+export interface LatestWeatherResponseDataOneOf2 {
+  /**
+   *
+   * @type {LatestWeatherResponseDataOneOf2StatusEnum}
+   * @memberof LatestWeatherResponseDataOneOf2
+   */
+  status: LatestWeatherResponseDataOneOf2StatusEnum
+  /**
+   *
+   * @type {LatestWeatherResponseDataOneOfWeather}
+   * @memberof LatestWeatherResponseDataOneOf2
+   */
+  weather: LatestWeatherResponseDataOneOfWeather
+  /**
+   *
+   * @type {LatestWeatherResponseDataOneOf2MessageEnum}
+   * @memberof LatestWeatherResponseDataOneOf2
+   */
+  message: LatestWeatherResponseDataOneOf2MessageEnum
+}
+
+/**
+ * @export
+ */
+export const LatestWeatherResponseDataOneOf2StatusEnum = {
+  stale: 'stale',
+} as const
+export type LatestWeatherResponseDataOneOf2StatusEnum =
+  (typeof LatestWeatherResponseDataOneOf2StatusEnum)[keyof typeof LatestWeatherResponseDataOneOf2StatusEnum]
+
+/**
+ * @export
+ */
+export const LatestWeatherResponseDataOneOf2MessageEnum = {
+  Weather_data_is_delayed__Check_again_shortly:
+    'Weather data is delayed. Check again shortly.',
+} as const
+export type LatestWeatherResponseDataOneOf2MessageEnum =
+  (typeof LatestWeatherResponseDataOneOf2MessageEnum)[keyof typeof LatestWeatherResponseDataOneOf2MessageEnum]
+
+/**
+ *
+ * @export
+ * @interface LatestWeatherResponseDataOneOf3
+ */
+export interface LatestWeatherResponseDataOneOf3 {
+  /**
+   *
+   * @type {LatestWeatherResponseDataOneOf3StatusEnum}
+   * @memberof LatestWeatherResponseDataOneOf3
+   */
+  status: LatestWeatherResponseDataOneOf3StatusEnum
+  /**
+   *
+   * @type {null}
+   * @memberof LatestWeatherResponseDataOneOf3
+   */
+  weather: null
+  /**
+   *
+   * @type {LatestWeatherResponseDataOneOf3MessageEnum}
+   * @memberof LatestWeatherResponseDataOneOf3
+   */
+  message: LatestWeatherResponseDataOneOf3MessageEnum
+}
+
+/**
+ * @export
+ */
+export const LatestWeatherResponseDataOneOf3StatusEnum = {
+  unavailable: 'unavailable',
+} as const
+export type LatestWeatherResponseDataOneOf3StatusEnum =
+  (typeof LatestWeatherResponseDataOneOf3StatusEnum)[keyof typeof LatestWeatherResponseDataOneOf3StatusEnum]
+
+/**
+ * @export
+ */
+export const LatestWeatherResponseDataOneOf3MessageEnum = {
+  Weather_data_is_temporarily_unavailable: 'Weather data is temporarily unavailable.',
+} as const
+export type LatestWeatherResponseDataOneOf3MessageEnum =
+  (typeof LatestWeatherResponseDataOneOf3MessageEnum)[keyof typeof LatestWeatherResponseDataOneOf3MessageEnum]
+
+/**
+ *
+ * @export
+ * @interface LatestWeatherResponseDataOneOfWeather
+ */
+export interface LatestWeatherResponseDataOneOfWeather {
+  /**
+   *
+   * @type {string}
+   * @memberof LatestWeatherResponseDataOneOfWeather
+   */
+  locationKey: string
+  /**
+   *
+   * @type {number}
+   * @memberof LatestWeatherResponseDataOneOfWeather
+   */
+  latitude: number
+  /**
+   *
+   * @type {number}
+   * @memberof LatestWeatherResponseDataOneOfWeather
+   */
+  longitude: number
+  /**
+   *
+   * @type {string}
+   * @memberof LatestWeatherResponseDataOneOfWeather
+   */
+  timezone: string
+  /**
+   *
+   * @type {LatestWeatherResponseDataOneOfWeatherProviderEnum}
+   * @memberof LatestWeatherResponseDataOneOfWeather
+   */
+  provider: LatestWeatherResponseDataOneOfWeatherProviderEnum
+  /**
+   *
+   * @type {string}
+   * @memberof LatestWeatherResponseDataOneOfWeather
+   */
+  providerUpdatedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof LatestWeatherResponseDataOneOfWeather
+   */
+  fetchedAt: string
+  /**
+   *
+   * @type {WeatherSnapshotCurrent}
+   * @memberof LatestWeatherResponseDataOneOfWeather
+   */
+  current: WeatherSnapshotCurrent
+  /**
+   *
+   * @type {Array<WeatherSnapshotHourlyInner>}
+   * @memberof LatestWeatherResponseDataOneOfWeather
+   */
+  hourly: FixedLengthArray<WeatherSnapshotHourlyInner, 48>
+  /**
+   *
+   * @type {Array<WeatherSnapshotAlertsInner>}
+   * @memberof LatestWeatherResponseDataOneOfWeather
+   */
+  alerts: Array<WeatherSnapshotAlertsInner>
+}
+
+/**
+ * @export
+ */
+export const LatestWeatherResponseDataOneOfWeatherProviderEnum = {
+  openweather: 'openweather',
+  weatherapi: 'weatherapi',
+} as const
+export type LatestWeatherResponseDataOneOfWeatherProviderEnum =
+  (typeof LatestWeatherResponseDataOneOfWeatherProviderEnum)[keyof typeof LatestWeatherResponseDataOneOfWeatherProviderEnum]
+
+/**
+ *
+ * @export
  * @interface LinkedGuardian
  */
 export interface LinkedGuardian {
@@ -706,6 +1213,67 @@ export interface QueueMetrics {
 /**
  *
  * @export
+ * @interface SignupInput
+ */
+export interface SignupInput {
+  /**
+   *
+   * @type {string}
+   * @memberof SignupInput
+   */
+  email: string
+  /**
+   *
+   * @type {string}
+   * @memberof SignupInput
+   */
+  birthdate: string
+}
+/**
+ *
+ * @export
+ * @interface SignupResponse
+ */
+export interface SignupResponse {
+  /**
+   *
+   * @type {string}
+   * @memberof SignupResponse
+   */
+  userId: string
+  /**
+   *
+   * @type {number}
+   * @memberof SignupResponse
+   */
+  age: number
+  /**
+   *
+   * @type {SignupResponseAccountStatusEnum}
+   * @memberof SignupResponse
+   */
+  accountStatus: SignupResponseAccountStatusEnum
+  /**
+   *
+   * @type {boolean}
+   * @memberof SignupResponse
+   */
+  guardianConsentRequired: boolean
+}
+
+/**
+ * @export
+ */
+export const SignupResponseAccountStatusEnum = {
+  active: 'active',
+  pending_guardian_consent: 'pending_guardian_consent',
+} as const
+export type SignupResponseAccountStatusEnum =
+  (typeof SignupResponseAccountStatusEnum)[keyof typeof SignupResponseAccountStatusEnum]
+
+/**
+ *
+ * @export
  * @interface TrackedResponse
  */
 export interface TrackedResponse {
@@ -918,3 +1486,448 @@ export const UserProfileResponseUserRoleEnum = {
 } as const
 export type UserProfileResponseUserRoleEnum =
   (typeof UserProfileResponseUserRoleEnum)[keyof typeof UserProfileResponseUserRoleEnum]
+
+/**
+ *
+ * @export
+ * @interface WeatherAlert
+ */
+export interface WeatherAlert {
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherAlert
+   */
+  event: string
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherAlert
+   */
+  description: string
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherAlert
+   */
+  start: string
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherAlert
+   */
+  end: string
+  /**
+   *
+   * @type {WeatherAlertSeverityEnum}
+   * @memberof WeatherAlert
+   */
+  severity?: WeatherAlertSeverityEnum
+}
+
+/**
+ * @export
+ */
+export const WeatherAlertSeverityEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type WeatherAlertSeverityEnum =
+  (typeof WeatherAlertSeverityEnum)[keyof typeof WeatherAlertSeverityEnum]
+
+/**
+ *
+ * @export
+ */
+export const WeatherCondition = {
+  clear: 'clear',
+  partly_cloudy: 'partly_cloudy',
+  cloudy: 'cloudy',
+  fog: 'fog',
+  drizzle: 'drizzle',
+  rain: 'rain',
+  sleet: 'sleet',
+  snow: 'snow',
+  thunderstorm: 'thunderstorm',
+  wind: 'wind',
+  unknown: 'unknown',
+} as const
+export type WeatherCondition = (typeof WeatherCondition)[keyof typeof WeatherCondition]
+
+/**
+ *
+ * @export
+ * @interface WeatherCurrent
+ */
+export interface WeatherCurrent {
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherCurrent
+   */
+  temperature: number
+  /**
+   *
+   * @type {WeatherCurrentConditionEnum}
+   * @memberof WeatherCurrent
+   */
+  condition: WeatherCurrentConditionEnum
+}
+
+/**
+ * @export
+ */
+export const WeatherCurrentConditionEnum = {
+  clear: 'clear',
+  partly_cloudy: 'partly_cloudy',
+  cloudy: 'cloudy',
+  fog: 'fog',
+  drizzle: 'drizzle',
+  rain: 'rain',
+  sleet: 'sleet',
+  snow: 'snow',
+  thunderstorm: 'thunderstorm',
+  wind: 'wind',
+  unknown: 'unknown',
+} as const
+export type WeatherCurrentConditionEnum =
+  (typeof WeatherCurrentConditionEnum)[keyof typeof WeatherCurrentConditionEnum]
+
+/**
+ *
+ * @export
+ * @interface WeatherHourlyEntry
+ */
+export interface WeatherHourlyEntry {
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherHourlyEntry
+   */
+  forecastAt: string
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherHourlyEntry
+   */
+  temperature: number
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherHourlyEntry
+   */
+  feelsLike: number
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherHourlyEntry
+   */
+  precipitationProbability: number
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherHourlyEntry
+   */
+  precipitationAmount: number
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherHourlyEntry
+   */
+  windSpeed: number
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherHourlyEntry
+   */
+  windGust: number | null
+  /**
+   *
+   * @type {WeatherHourlyEntryConditionEnum}
+   * @memberof WeatherHourlyEntry
+   */
+  condition: WeatherHourlyEntryConditionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherHourlyEntry
+   */
+  providerWeatherCode: string
+}
+
+/**
+ * @export
+ */
+export const WeatherHourlyEntryConditionEnum = {
+  clear: 'clear',
+  partly_cloudy: 'partly_cloudy',
+  cloudy: 'cloudy',
+  fog: 'fog',
+  drizzle: 'drizzle',
+  rain: 'rain',
+  sleet: 'sleet',
+  snow: 'snow',
+  thunderstorm: 'thunderstorm',
+  wind: 'wind',
+  unknown: 'unknown',
+} as const
+export type WeatherHourlyEntryConditionEnum =
+  (typeof WeatherHourlyEntryConditionEnum)[keyof typeof WeatherHourlyEntryConditionEnum]
+
+/**
+ *
+ * @export
+ */
+export const WeatherProvider = {
+  openweather: 'openweather',
+  weatherapi: 'weatherapi',
+} as const
+export type WeatherProvider = (typeof WeatherProvider)[keyof typeof WeatherProvider]
+
+/**
+ *
+ * @export
+ * @interface WeatherSnapshot
+ */
+export interface WeatherSnapshot {
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherSnapshot
+   */
+  locationKey: string
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherSnapshot
+   */
+  latitude: number
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherSnapshot
+   */
+  longitude: number
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherSnapshot
+   */
+  timezone: string
+  /**
+   *
+   * @type {WeatherSnapshotProviderEnum}
+   * @memberof WeatherSnapshot
+   */
+  provider: WeatherSnapshotProviderEnum
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherSnapshot
+   */
+  providerUpdatedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherSnapshot
+   */
+  fetchedAt: string
+  /**
+   *
+   * @type {WeatherSnapshotCurrent}
+   * @memberof WeatherSnapshot
+   */
+  current: WeatherSnapshotCurrent
+  /**
+   *
+   * @type {Array<WeatherSnapshotHourlyInner>}
+   * @memberof WeatherSnapshot
+   */
+  hourly: FixedLengthArray<WeatherSnapshotHourlyInner, 48>
+  /**
+   *
+   * @type {Array<WeatherSnapshotAlertsInner>}
+   * @memberof WeatherSnapshot
+   */
+  alerts: Array<WeatherSnapshotAlertsInner>
+}
+
+/**
+ * @export
+ */
+export const WeatherSnapshotProviderEnum = {
+  openweather: 'openweather',
+  weatherapi: 'weatherapi',
+} as const
+export type WeatherSnapshotProviderEnum =
+  (typeof WeatherSnapshotProviderEnum)[keyof typeof WeatherSnapshotProviderEnum]
+
+/**
+ *
+ * @export
+ * @interface WeatherSnapshotAlertsInner
+ */
+export interface WeatherSnapshotAlertsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherSnapshotAlertsInner
+   */
+  event: string
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherSnapshotAlertsInner
+   */
+  description: string
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherSnapshotAlertsInner
+   */
+  start: string
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherSnapshotAlertsInner
+   */
+  end: string
+  /**
+   *
+   * @type {WeatherSnapshotAlertsInnerSeverityEnum}
+   * @memberof WeatherSnapshotAlertsInner
+   */
+  severity?: WeatherSnapshotAlertsInnerSeverityEnum
+}
+
+/**
+ * @export
+ */
+export const WeatherSnapshotAlertsInnerSeverityEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type WeatherSnapshotAlertsInnerSeverityEnum =
+  (typeof WeatherSnapshotAlertsInnerSeverityEnum)[keyof typeof WeatherSnapshotAlertsInnerSeverityEnum]
+
+/**
+ *
+ * @export
+ * @interface WeatherSnapshotCurrent
+ */
+export interface WeatherSnapshotCurrent {
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherSnapshotCurrent
+   */
+  temperature: number
+  /**
+   *
+   * @type {WeatherSnapshotCurrentConditionEnum}
+   * @memberof WeatherSnapshotCurrent
+   */
+  condition: WeatherSnapshotCurrentConditionEnum
+}
+
+/**
+ * @export
+ */
+export const WeatherSnapshotCurrentConditionEnum = {
+  clear: 'clear',
+  partly_cloudy: 'partly_cloudy',
+  cloudy: 'cloudy',
+  fog: 'fog',
+  drizzle: 'drizzle',
+  rain: 'rain',
+  sleet: 'sleet',
+  snow: 'snow',
+  thunderstorm: 'thunderstorm',
+  wind: 'wind',
+  unknown: 'unknown',
+} as const
+export type WeatherSnapshotCurrentConditionEnum =
+  (typeof WeatherSnapshotCurrentConditionEnum)[keyof typeof WeatherSnapshotCurrentConditionEnum]
+
+/**
+ *
+ * @export
+ * @interface WeatherSnapshotHourlyInner
+ */
+export interface WeatherSnapshotHourlyInner {
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherSnapshotHourlyInner
+   */
+  forecastAt: string
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherSnapshotHourlyInner
+   */
+  temperature: number
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherSnapshotHourlyInner
+   */
+  feelsLike: number
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherSnapshotHourlyInner
+   */
+  precipitationProbability: number
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherSnapshotHourlyInner
+   */
+  precipitationAmount: number
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherSnapshotHourlyInner
+   */
+  windSpeed: number
+  /**
+   *
+   * @type {number}
+   * @memberof WeatherSnapshotHourlyInner
+   */
+  windGust: number | null
+  /**
+   *
+   * @type {WeatherSnapshotHourlyInnerConditionEnum}
+   * @memberof WeatherSnapshotHourlyInner
+   */
+  condition: WeatherSnapshotHourlyInnerConditionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof WeatherSnapshotHourlyInner
+   */
+  providerWeatherCode: string
+}
+
+/**
+ * @export
+ */
+export const WeatherSnapshotHourlyInnerConditionEnum = {
+  clear: 'clear',
+  partly_cloudy: 'partly_cloudy',
+  cloudy: 'cloudy',
+  fog: 'fog',
+  drizzle: 'drizzle',
+  rain: 'rain',
+  sleet: 'sleet',
+  snow: 'snow',
+  thunderstorm: 'thunderstorm',
+  wind: 'wind',
+  unknown: 'unknown',
+} as const
+export type WeatherSnapshotHourlyInnerConditionEnum =
+  (typeof WeatherSnapshotHourlyInnerConditionEnum)[keyof typeof WeatherSnapshotHourlyInnerConditionEnum]

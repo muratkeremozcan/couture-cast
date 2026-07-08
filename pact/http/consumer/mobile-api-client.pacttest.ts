@@ -1,7 +1,7 @@
 import type { V3MockServer } from '@pact-foundation/pact'
 import { PactV4 } from '@pact-foundation/pact'
 import path from 'node:path'
-import { afterEach, describe, it } from 'vitest'
+import { describe, it } from 'vitest'
 import { createMobileApiClient } from '../../../apps/mobile/src/lib/api-client'
 import {
   verifyApiHealthInteraction,
@@ -16,31 +16,11 @@ const pact = new PactV4({
   logLevel: 'warn',
 })
 
-const originalExpoBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
-const originalApiBaseUrl = process.env.API_BASE_URL
-
-function restoreEnvironmentVariable(name: string, value: string | undefined) {
-  if (value === undefined) {
-    delete process.env[name]
-    return
-  }
-
-  process.env[name] = value
-}
-
 function createMobileClientForMockServer(mockServer: V3MockServer) {
-  process.env.EXPO_PUBLIC_API_BASE_URL = mockServer.url
-  delete process.env.API_BASE_URL
-
-  return createMobileApiClient()
+  return createMobileApiClient({ baseUrl: mockServer.url })
 }
 
 describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
-  afterEach(() => {
-    restoreEnvironmentVariable('EXPO_PUBLIC_API_BASE_URL', originalExpoBaseUrl)
-    restoreEnvironmentVariable('API_BASE_URL', originalApiBaseUrl)
-  })
-
   it('reads API health metadata', async () => {
     await verifyApiHealthInteraction(pact, createMobileClientForMockServer)
   })

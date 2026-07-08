@@ -58,3 +58,12 @@ Updated: 2026-03-27 - replaced third-party secret-manager plan with the existing
 - Use read-only keys where a client or read path does not need write access.
 - Keep server-side elevated keys scoped to the narrowest runtime that needs them.
 - Separate local, non-production, and production credentials.
+- Weather provider credentials (`OPENWEATHER_API_KEY`, `WEATHERAPI_API_KEY`) are server-side worker
+  secrets only. Store them in local gitignored `.env*` files, GitHub environment secrets for CI, and
+  the non-serverless worker platform secret store for deployed runtimes.
+- Keep OpenWeather daily-call caps aligned to the approved target count and cadence. For Story 1.1,
+  budget 48 primary forecast calls per canonical target per day at a 30-minute cadence before
+  retries.
+- Rotate weather provider keys immediately if logs, tickets, screenshots, or test artifacts expose a
+  provider key. Validate rotation by running the worker startup health check and observing provider
+  request metrics in Grafana.

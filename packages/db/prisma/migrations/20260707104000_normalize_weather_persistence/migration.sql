@@ -12,7 +12,7 @@ SET
   "latitude" = 0,
   "longitude" = 0,
   "timezone" = 'UTC',
-  "provider" = 'seed',
+  "provider" = 'openweather',
   "provider_updated_at" = "fetched_at"
 WHERE "location_key" IS NULL;
 
