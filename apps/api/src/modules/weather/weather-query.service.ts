@@ -45,6 +45,21 @@ export interface LatestWeatherOptions {
   liveProviderFailed?: boolean
 }
 
+function hasUnrecoveredProviderFailure(input: {
+  failureAt: Date | null | undefined
+  successAt: Date | null | undefined
+  snapshotFetchedAt: Date
+}): boolean {
+  if (!input.failureAt) {
+    return false
+  }
+
+  const failureTime = input.failureAt.getTime()
+  const successTime = input.successAt?.getTime() ?? Number.NEGATIVE_INFINITY
+
+  return failureTime > successTime && failureTime >= input.snapshotFetchedAt.getTime()
+}
+
 @Injectable()
 export class WeatherQueryService {
   constructor(
@@ -76,7 +91,16 @@ export class WeatherQueryService {
       }
     }
 
-    if (options.liveProviderFailed) {
+    const ingestionState = await this.repository.findIngestionState(locationKey)
+    const liveProviderFailed =
+      options.liveProviderFailed ||
+      hasUnrecoveredProviderFailure({
+        failureAt: ingestionState?.last_provider_failure_at,
+        successAt: ingestionState?.last_provider_success_at,
+        snapshotFetchedAt: snapshot.fetched_at,
+      })
+
+    if (liveProviderFailed) {
       return {
         status: 'cached',
         data: snapshot,

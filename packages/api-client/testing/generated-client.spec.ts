@@ -33,3 +33,15 @@ test('accepts configuration overrides through the stable wrapper surface', async
   })
   expect(await configuration.accessToken?.()).toBe('token-456')
 })
+
+test('applies accessToken to authenticated generated weather requests', async () => {
+  const client = createApiClient('https://api.couturecast.test', 'token-789')
+
+  const requestOptions = await client.apiV1WeatherLocationKeyGetRequestOpts({
+    locationKey: 'new-york-ny',
+  })
+
+  expect(requestOptions.headers).toMatchObject({
+    Authorization: 'Bearer token-789',
+  })
+})

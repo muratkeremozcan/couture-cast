@@ -35,4 +35,9 @@ export {
   moderationActionResponseSchema,
   queueHealthResponseSchema,
   userProfileResponseSchema,
+  latestWeatherResponseSchema,
+  type LatestWeatherResponse,
+  type WeatherAlert,
+  type WeatherCondition,
+  type WeatherProvider,
 } from '@couture/api-client/contracts/http'

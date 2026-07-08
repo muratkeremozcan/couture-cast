@@ -9,6 +9,7 @@ const clock = {
 function createRepository(snapshot: unknown) {
   return {
     findLatestByLocationKey: vi.fn().mockResolvedValue(snapshot),
+    findIngestionState: vi.fn().mockResolvedValue(null),
   }
 }
 
@@ -47,6 +48,33 @@ describe('WeatherQueryService', () => {
     ).resolves.toMatchObject({
       status: 'cached',
       message: 'Using recently cached weather data.',
+    })
+  })
+
+  it('returns cached for public reads when a persisted provider failure is newer than the last success', async () => {
+    const repository = createRepository(snapshotAt('2026-07-06T13:30:00.000Z'))
+    repository.findIngestionState.mockResolvedValue({
+      last_provider_failure_at: new Date('2026-07-06T13:45:00.000Z'),
+      last_provider_success_at: new Date('2026-07-06T13:30:00.000Z'),
+    })
+    const service = new WeatherQueryService(repository as never, clock)
+
+    await expect(service.getLatestWeather('new-york-ny')).resolves.toMatchObject({
+      status: 'cached',
+      message: 'Using recently cached weather data.',
+    })
+  })
+
+  it('returns fresh when a provider success recovered after the latest failure', async () => {
+    const repository = createRepository(snapshotAt('2026-07-06T13:45:00.000Z'))
+    repository.findIngestionState.mockResolvedValue({
+      last_provider_failure_at: new Date('2026-07-06T13:30:00.000Z'),
+      last_provider_success_at: new Date('2026-07-06T13:45:00.000Z'),
+    })
+    const service = new WeatherQueryService(repository as never, clock)
+
+    await expect(service.getLatestWeather('new-york-ny')).resolves.toMatchObject({
+      status: 'fresh',
     })
   })
 

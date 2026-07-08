@@ -1,8 +1,8 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-07-07 - Step 16 reflects the weather ingestion service through
-durable normalized persistence, provider failover, freshness fallback,
-BullMQ scheduler fan-out, and the standalone worker runtime.
+Updated: 2026-07-08 - Step 16 reflects the complete Story 1.1 weather ingestion service through
+durable normalized persistence, provider failover, freshness fallback, canonical latest-weather API,
+privacy-safe telemetry, validation coverage, and operational documentation.
 
 ## LLM collaborator prompt
 
@@ -1648,6 +1648,15 @@ Key takeaways:
    messages.
 7. Durable scheduling belongs to BullMQ 5 Job Schedulers in the standalone
    worker runtime; Vercel HTTP instances do not satisfy periodic ingestion.
+8. The public read surface is contract-first: `GET /api/v1/weather/{locationKey}`
+   returns the shared `{ data }` latest-weather union and the generated SDK exposes
+   `WeatherApi`.
+9. Operational weather telemetry belongs in OpenTelemetry/Grafana, not PostHog,
+   and uses bounded provider/outcome/status attributes with no coordinates, raw
+   payloads, provider keys, or user identifiers.
+10. Provider-call budgeting is part of the operational design: at a 30-minute
+    cadence each canonical target consumes up to 48 primary forecast calls per day
+    before retry/failover.
 
 Story/Task mapping:
 
@@ -1656,6 +1665,10 @@ Story/Task mapping:
 - Task 2 (normalized persistence model and shared fixtures)
 - Task 3 (bounded provider orchestration and freshness fallback)
 - Task 4 (durable scheduling, target fan-out, and real worker processor)
+- Task 5 (canonical latest-weather read contract)
+- Task 6 (privacy-safe operational telemetry)
+- Task 7 (provider, persistence, scheduling, fallback, and telemetry proof)
+- Task 8 (architecture and operational documentation)
 
 Story reference:
 
@@ -1667,7 +1680,8 @@ Cross-links:
 - Step 4 documents environment configuration loading.
 - Step 5 details BullMQ worker concurrency and queuing defaults.
 - Step 9 and Step 10 provide the OpenTelemetry/Grafana foundation that Task 6
-  will extend with weather-specific metrics and alerts.
+  extends with weather-specific metrics and alerts.
+- Step 15 explains the OpenAPI and generated SDK flow used by Task 5.
 
 Sequence to follow:
 
@@ -1688,6 +1702,11 @@ Sequence to follow:
 8. Author comprehensive test mock fixtures covering success, missing fields,
    429 rate limit, 500 server error, and malformed responses.
 9. Verify behavior with robust unit tests that block live network access.
+10. Publish the latest-weather read contract through the canonical OpenAPI
+    registry before controller code, then regenerate checked-in SDK artifacts.
+11. Wire weather telemetry through stable log event names and OpenTelemetry
+    counters/histograms, then back it with Grafana panels and alerting.
+12. Keep provider-call budgets and rollback procedures in the worker runbook.
 
 Task owner map:
 
@@ -1723,17 +1742,30 @@ Task owner map:
   startup in `apps/api/src/workers/bootstrap.ts`
 - Story 1.1 Task 4 step 5 owner: document the non-serverless weather worker runtime in
   `apps/api/README.md`
+- Story 1.1 Task 5 step 1 owner: define the shared latest-weather HTTP contract in
+  `packages/api-client/src/contracts/http/weather.ts`
+- Story 1.1 Task 5 step 2 owner: register `GET /api/v1/weather/{locationKey}` in
+  `packages/api-client/src/contracts/http/openapi.ts`
+- Story 1.1 Task 5 step 3 owner: expose the authenticated weather read adapter in
+  `apps/api/src/modules/weather/weather.controller.ts` and `weather.module.ts`
+- Story 1.1 Task 6 step 1 owner: define privacy-safe weather metrics and log events in
+  `apps/api/src/modules/weather/weather-telemetry.ts`
+- Story 1.1 Task 6 step 2 owner: dashboard and alert evidence lives in
+  `infra/grafana/dashboards/couturecast-weather-ingestion.json`
+- Story 1.1 Task 7 step 1 owner: weather API integration proof lives in
+  `apps/api/integration/weather.integration.spec.ts`
 
 Current repo note:
 
-- Tasks 1 through 4 are implemented and validated. The provider adapters produce
-  one normalized forecast response, the Prisma model stores canonical snapshots
-  and hourly segments, the ingestion service owns provider retry/failover, and
-  the standalone worker owns durable scheduling and target fan-out.
-- The current stop point is intentional: Task 5 still needs the public
-  latest-weather API contract/controller work, Task 6 owns weather-specific
-  OpenTelemetry/Grafana assets, and Tasks 7-8 close out broader test and
-  documentation coverage.
+- Story 1.1 is implemented through Task 8. The provider adapters produce one
+  normalized forecast response, the Prisma model stores canonical snapshots and
+  hourly segments, the ingestion service owns provider retry/failover, the
+  standalone worker owns durable scheduling and target fan-out, and the public
+  latest-weather read contract is available through the canonical OpenAPI/SDK
+  pipeline.
+- Weather-specific telemetry now flows through stable Pino event names and
+  OpenTelemetry metrics, with a Grafana weather-ingestion dashboard and a
+  five-minute provider error-rate alert above 2%.
 
 Architecture diagram:
 

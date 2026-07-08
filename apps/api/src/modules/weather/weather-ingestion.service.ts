@@ -20,6 +20,12 @@ import {
   WeatherRepository,
   type WeatherSnapshotWithSegments,
 } from './weather.repository.js'
+import {
+  createOpenTelemetryWeatherMeter,
+  WEATHER_LOG_EVENTS,
+  WEATHER_LOG_FEATURE,
+  type WeatherMeter,
+} from './weather-telemetry.js'
 
 const PRIMARY_RETRY_DELAYS_MS = [5000, 15000] as const
 const DEFAULT_INGESTION_TIMEOUT_MS = 30_000
@@ -28,17 +34,6 @@ type WeatherLogger = {
   info(message: string, values?: Record<string, unknown>): void
   warn(message: string, values?: Record<string, unknown>): void
   error(message: string, values?: Record<string, unknown>): void
-}
-
-type WeatherMeter = {
-  recordProviderRequest?(
-    provider: WeatherProviderName,
-    outcome: string,
-    durationMs: number,
-    statusClass?: string
-  ): void
-  recordRateLimit?(provider: WeatherProviderName): void
-  recordIngestion?(outcome: string): void
 }
 
 export type WeatherSleeper = (ms: number, signal: AbortSignal) => Promise<void>
@@ -62,6 +57,46 @@ export interface WeatherIngestionServiceOptions {
   sleeper?: WeatherSleeper
   logger?: WeatherLogger
   meter?: WeatherMeter
+}
+
+function createSafeWeatherMeter(meter: WeatherMeter): WeatherMeter {
+  return {
+    recordProviderRequest(provider, outcome, durationMs, statusClass) {
+      try {
+        meter.recordProviderRequest(provider, outcome, durationMs, statusClass)
+      } catch {
+        // Metrics must not change ingestion behavior.
+      }
+    },
+    recordRateLimit(provider) {
+      try {
+        meter.recordRateLimit(provider)
+      } catch {
+        // Metrics must not change ingestion behavior.
+      }
+    },
+    recordIngestion(outcome) {
+      try {
+        meter.recordIngestion(outcome)
+      } catch {
+        // Metrics must not change ingestion behavior.
+      }
+    },
+    recordFallbackOutcome(outcome) {
+      try {
+        meter.recordFallbackOutcome(outcome)
+      } catch {
+        // Metrics must not change ingestion behavior.
+      }
+    },
+    recordSnapshotAge(outcome, ageMs) {
+      try {
+        meter.recordSnapshotAge(outcome, ageMs)
+      } catch {
+        // Metrics must not change ingestion behavior.
+      }
+    },
+  }
 }
 
 function defaultSleeper(ms: number, signal: AbortSignal): Promise<void> {
@@ -157,40 +192,58 @@ export class WeatherIngestionService {
     this.queryService = queryService
     this.clock = clock ?? systemWeatherClock
     this.sleeper = sleeper ?? defaultSleeper
-    this.logger = logger ?? createBaseLogger().child({ feature: 'weather-ingestion' })
-    this.meter = meter ?? {}
+    this.logger = logger ?? createBaseLogger().child({ feature: WEATHER_LOG_FEATURE })
+    this.meter = createSafeWeatherMeter(meter ?? createOpenTelemetryWeatherMeter())
   }
 
   async ingestTarget(
     target: WeatherIngestionTarget,
     signal: AbortSignal = AbortSignal.timeout(DEFAULT_INGESTION_TIMEOUT_MS)
   ): Promise<WeatherIngestionResult> {
-    const forecast = await this.fetchWithFailover(target, signal)
+    try {
+      const forecast = await this.fetchWithFailover(target, signal)
 
-    if (forecast) {
-      const snapshot = await this.repository.persistForecast(forecast)
-      this.meter.recordIngestion?.('persisted')
-      this.logger.info('weather ingestion persisted', {
-        provider: forecast.provider,
-        outcome: 'persisted',
+      if (forecast) {
+        const snapshot = await this.repository.persistForecast(forecast)
+        await this.repository.recordProviderSuccess(
+          forecast.locationKey,
+          this.clock.now()
+        )
+        this.meter.recordIngestion('persisted')
+        this.recordSnapshotAge('persisted', snapshot)
+        this.logger.info(WEATHER_LOG_EVENTS.ingestionCompleted, {
+          provider: forecast.provider,
+          outcome: 'persisted',
+        })
+        return {
+          outcome: 'persisted',
+          provider: forecast.provider,
+          snapshot,
+        }
+      }
+
+      await this.repository.recordProviderFailure(target.locationKey, this.clock.now())
+      const fallback = await this.queryService.getLatestWeather(target.locationKey, {
+        liveProviderFailed: true,
+      })
+      this.meter.recordIngestion('fallback')
+      this.meter.recordFallbackOutcome(fallback.status)
+      this.recordFallbackSnapshotAge(fallback)
+      this.logger.warn(WEATHER_LOG_EVENTS.fallbackOutcome, {
+        outcome: fallback.status,
       })
       return {
-        outcome: 'persisted',
-        provider: forecast.provider,
-        snapshot,
+        outcome: 'fallback',
+        fallback,
       }
-    }
-
-    const fallback = await this.queryService.getLatestWeather(target.locationKey, {
-      liveProviderFailed: true,
-    })
-    this.meter.recordIngestion?.('fallback')
-    this.logger.warn('weather ingestion using fallback', {
-      outcome: fallback.status,
-    })
-    return {
-      outcome: 'fallback',
-      fallback,
+    } catch (error) {
+      this.meter.recordIngestion('failed')
+      this.logger.error(WEATHER_LOG_EVENTS.ingestionFailed, {
+        outcome: 'failed',
+        errorKind:
+          error instanceof WeatherProviderError ? error.kind : 'unexpected_error',
+      })
+      throw error
     }
   }
 
@@ -206,6 +259,10 @@ export class WeatherIngestionService {
       }
 
       try {
+        this.logger.info(WEATHER_LOG_EVENTS.providerAttempt, {
+          provider: 'openweather',
+          attempt: attempt + 1,
+        })
         return await this.fetchProvider(
           'openweather',
           this.primaryProvider,
@@ -222,7 +279,7 @@ export class WeatherIngestionService {
         }
 
         if (providerError.kind === 'rate_limit') {
-          this.meter.recordRateLimit?.('openweather')
+          this.meter.recordRateLimit('openweather')
           break
         }
 
@@ -240,7 +297,7 @@ export class WeatherIngestionService {
     signal: AbortSignal,
     lastPrimaryError: WeatherProviderError | null
   ): Promise<NormalizedWeatherForecast | null> {
-    this.logger.warn('weather provider failover', {
+    this.logger.warn(WEATHER_LOG_EVENTS.providerFailover, {
       fromProvider: 'openweather',
       toProvider: 'weatherapi',
       reason: lastPrimaryError?.kind,
@@ -248,6 +305,10 @@ export class WeatherIngestionService {
     })
 
     try {
+      this.logger.info(WEATHER_LOG_EVENTS.providerAttempt, {
+        provider: 'weatherapi',
+        attempt: 1,
+      })
       return await this.fetchProvider(
         'weatherapi',
         this.secondaryProvider,
@@ -257,6 +318,9 @@ export class WeatherIngestionService {
     } catch (error) {
       const providerError = toProviderError('weatherapi', error, signal)
       this.recordProviderFailure(providerError, 1)
+      if (providerError.kind === 'rate_limit') {
+        this.meter.recordRateLimit('weatherapi')
+      }
 
       if (shouldAbortIngestion(providerError)) {
         throw providerError
@@ -276,15 +340,16 @@ export class WeatherIngestionService {
 
     try {
       const forecast = await weatherProvider.fetchForecast(target, signal)
-      this.meter.recordProviderRequest?.(
+      this.meter.recordProviderRequest(
         provider,
         'success',
-        performance.now() - startedAt
+        performance.now() - startedAt,
+        undefined
       )
       return forecast
     } catch (error) {
       const providerError = toProviderError(provider, error, signal)
-      this.meter.recordProviderRequest?.(
+      this.meter.recordProviderRequest(
         provider,
         providerError.kind,
         performance.now() - startedAt,
@@ -295,11 +360,30 @@ export class WeatherIngestionService {
   }
 
   private recordProviderFailure(error: WeatherProviderError, attempt: number): void {
-    this.logger.warn('weather provider request failed', {
+    this.logger.warn(WEATHER_LOG_EVENTS.providerRequestFailed, {
       provider: error.provider,
       outcome: error.kind,
       statusClass: statusClassFor(error),
       attempt,
     })
+  }
+
+  private recordSnapshotAge(
+    outcome: 'persisted',
+    snapshot: Pick<WeatherSnapshotWithSegments, 'fetched_at'>
+  ): void {
+    this.meter.recordSnapshotAge(
+      outcome,
+      this.clock.now().getTime() - snapshot.fetched_at.getTime()
+    )
+  }
+
+  private recordFallbackSnapshotAge(result: LatestWeatherResult): void {
+    if (result.data?.fetched_at instanceof Date) {
+      this.meter.recordSnapshotAge(
+        result.status,
+        this.clock.now().getTime() - result.data.fetched_at.getTime()
+      )
+    }
   }
 }

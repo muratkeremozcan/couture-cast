@@ -5,7 +5,9 @@ node_modules
 _bmad
 .windsurf
 .claude
+.agent
 .agents
+.bmad-loop
 .cursor
 .github/chatmodes
 .github/workflows
