@@ -95,9 +95,15 @@ function strengthenWeatherHourlyArrayTypes() {
     '',
     '',
   ].join('\n')
-  const withHelper = source.includes('export type FixedLengthArray')
+  const helperAlreadyExists = source.includes('export type FixedLengthArray')
+  const withHelper = helperAlreadyExists
     ? source
     : source.replace(/(\/\* eslint-disable \*\/\n)/u, `$1${helper}`)
+  if (!helperAlreadyExists && withHelper === source) {
+    throw new Error(
+      `Unable to insert FixedLengthArray helper into ${generatedModelsIndexPath}`
+    )
+  }
   const normalizedSource = withHelper.replace(
     /hourly: Array<WeatherSnapshotHourlyInner>/gu,
     'hourly: FixedLengthArray<WeatherSnapshotHourlyInner, 48>'

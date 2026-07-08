@@ -61,4 +61,60 @@ describe('weather telemetry', () => {
       outcome: 'stale',
     })
   })
+
+  it('drops invalid status classes and clamps negative snapshot ages', () => {
+    const providerRequestCounter = { add: vi.fn() }
+    const providerDurationHistogram = { record: vi.fn() }
+    const rateLimitCounter = { add: vi.fn() }
+    const ingestionCounter = { add: vi.fn() }
+    const fallbackCounter = { add: vi.fn() }
+    const snapshotAgeHistogram = { record: vi.fn() }
+    const meter = {
+      createCounter: vi
+        .fn()
+        .mockReturnValueOnce(providerRequestCounter)
+        .mockReturnValueOnce(rateLimitCounter)
+        .mockReturnValueOnce(ingestionCounter)
+        .mockReturnValueOnce(fallbackCounter),
+      createHistogram: vi
+        .fn()
+        .mockReturnValueOnce(providerDurationHistogram)
+        .mockReturnValueOnce(snapshotAgeHistogram),
+    }
+
+    const weatherMeter = createOpenTelemetryWeatherMeter(meter as never)
+
+    weatherMeter.recordProviderRequest('openweather', 'retryable_http', 10, '6xx')
+    weatherMeter.recordProviderRequest('openweather', 'retryable_http', 11, 'abc')
+    weatherMeter.recordProviderRequest('openweather', 'retryable_http', 12, '200')
+    weatherMeter.recordSnapshotAge('cached', -25)
+
+    expect(providerRequestCounter.add).toHaveBeenNthCalledWith(1, 1, {
+      provider: 'openweather',
+      outcome: 'retryable_http',
+    })
+    expect(providerRequestCounter.add).toHaveBeenNthCalledWith(2, 1, {
+      provider: 'openweather',
+      outcome: 'retryable_http',
+    })
+    expect(providerRequestCounter.add).toHaveBeenNthCalledWith(3, 1, {
+      provider: 'openweather',
+      outcome: 'retryable_http',
+    })
+    expect(providerDurationHistogram.record).toHaveBeenNthCalledWith(1, 10, {
+      provider: 'openweather',
+      outcome: 'retryable_http',
+    })
+    expect(providerDurationHistogram.record).toHaveBeenNthCalledWith(2, 11, {
+      provider: 'openweather',
+      outcome: 'retryable_http',
+    })
+    expect(providerDurationHistogram.record).toHaveBeenNthCalledWith(3, 12, {
+      provider: 'openweather',
+      outcome: 'retryable_http',
+    })
+    expect(snapshotAgeHistogram.record).toHaveBeenCalledWith(0, {
+      outcome: 'cached',
+    })
+  })
 })

@@ -5,6 +5,7 @@ import { latestWeatherResponseSchema } from '../../contracts/http'
 import { RequestAuthGuard } from '../auth/security.guards'
 import { WeatherController } from './weather.controller'
 import type { WeatherQueryService } from './weather-query.service'
+import { WEATHER_STALE_MESSAGE } from './weather-query.service'
 
 const createSnapshot = () => ({
   id: 'weather-1',
@@ -130,6 +131,24 @@ describe('WeatherController', () => {
       throw new Error('Expected cached weather')
     }
     expect(response.data.message).toBe('Using recently cached weather data.')
+    expect(response.data.weather?.locationKey).toBe('new-york-ny')
+  })
+
+  it('returns the exact stale fallback contract', async () => {
+    const snapshot = createSnapshot()
+    const { controller } = createController({
+      status: 'stale',
+      data: snapshot,
+      message: WEATHER_STALE_MESSAGE,
+    })
+
+    const response = await controller.getLatestWeather('new-york-ny')
+
+    expect(response.data.status).toBe('stale')
+    if (response.data.status !== 'stale') {
+      throw new Error('Expected stale weather')
+    }
+    expect(response.data.message).toBe(WEATHER_STALE_MESSAGE)
     expect(response.data.weather?.locationKey).toBe('new-york-ny')
   })
 

@@ -114,44 +114,44 @@ using an injected clock in tests.
 
 ### Review Findings — Task 1 checkpoint
 
-- [x] [Review][Patch] Define a canonical condition enum while preserving raw provider condition
+- [x] [Review] Patch Define a canonical condition enum while preserving raw provider condition
       text and code [apps/api/src/modules/weather/providers/weather.types.ts:7]
-- [x] [Review][Patch] Prevent provider errors from exposing API keys or coordinates
+- [x] [Review] Patch Prevent provider errors from exposing API keys or coordinates
       [apps/api/src/modules/weather/providers/openweather.provider.ts:33]
-- [x] [Review][Patch] Preserve typed rate-limit, HTTP, timeout, cancellation, and validation failure
+- [x] [Review] Patch Preserve typed rate-limit, HTTP, timeout, cancellation, and validation failure
       semantics for the Task 3 orchestrator
       [apps/api/src/modules/weather/providers/weather-provider.interface.ts:3]
-- [x] [Review][Patch] Validate targets and construct encoded provider URLs safely
+- [x] [Review] Patch Validate targets and construct encoded provider URLs safely
       [apps/api/src/modules/weather/providers/openweather.provider.ts:27]
-- [x] [Review][Patch] Reject stale, duplicate, non-contiguous, or incomplete 48-hour forecast
+- [x] [Review] Patch Reject stale, duplicate, non-contiguous, or incomplete 48-hour forecast
       horizons instead of backfilling historical hours
       [apps/api/src/modules/weather/providers/weatherapi.provider.ts:67]
-- [x] [Review][Patch] Tighten raw and normalized schemas for bounded measurements, timestamps,
+- [x] [Review] Patch Tighten raw and normalized schemas for bounded measurements, timestamps,
       non-empty identifiers, alert intervals, and response-location consistency
       [apps/api/src/modules/weather/providers/weather.schemas.ts:6]
-- [x] [Review][Patch] Parse and validate all Task 1 weather environment settings through a typed
+- [x] [Review] Patch Parse and validate all Task 1 weather environment settings through a typed
       configuration boundary [apps/api/src/modules/weather/providers/openweather.provider.ts:14]
-- [x] [Review][Patch] Complete the required success/missing/429/5xx/timeout/malformed fixture and
+- [x] [Review] Patch Complete the required success/missing/429/5xx/timeout/malformed fixture and
       test matrix, and clear the scoped provider lint failures
       [apps/api/src/modules/weather/providers/openweather.provider.spec.ts:3]
-- [x] [Review][Patch] Reject delayed forecast horizons and duplicate provider hours rather than
+- [x] [Review] Patch Reject delayed forecast horizons and duplicate provider hours rather than
       silently repairing them [apps/api/src/modules/weather/providers/openweather.provider.ts:107]
-- [x] [Review][Patch] Preserve timeout and cancellation semantics while consuming response bodies,
+- [x] [Review] Patch Preserve timeout and cancellation semantics while consuming response bodies,
       including custom abort reasons [apps/api/src/modules/weather/providers/openweather.provider.ts:76]
-- [x] [Review][Patch] Treat HTTP 408 as retryable and distinguish invalid deployment configuration
+- [x] [Review] Patch Treat HTTP 408 as retryable and distinguish invalid deployment configuration
       from invalid ingestion targets [apps/api/src/modules/weather/providers/weather-provider.error.ts:63]
-- [x] [Review][Patch] Bound stale/future provider update timestamps while allowing ordinary clock
+- [x] [Review] Patch Bound stale/future provider update timestamps while allowing ordinary clock
       skew [apps/api/src/modules/weather/providers/weather.schemas.ts:175]
-- [x] [Review][Patch] Validate IANA timezones and compare response locations correctly across the
+- [x] [Review] Patch Validate IANA timezones and compare response locations correctly across the
       antimeridian with a tighter tolerance
       [apps/api/src/modules/weather/providers/openweather.provider.ts:94]
-- [x] [Review][Patch] Complete freezing-rain, ice-pellet, and alert-severity normalization
+- [x] [Review] Patch Complete freezing-rain, ice-pellet, and alert-severity normalization
       [apps/api/src/modules/weather/providers/weather-condition.mapper.ts:6]
-- [x] [Review][Patch] Make time-sensitive provider fixtures deterministic across hour boundaries
+- [x] [Review] Patch Make time-sensitive provider fixtures deterministic across hour boundaries
       [apps/api/src/modules/weather/providers/openweather.provider.spec.ts:27]
-- [x] [Review][Patch] Classify missing provider credentials as invalid configuration rather than an
+- [x] [Review] Patch Classify missing provider credentials as invalid configuration rather than an
       HTTP failure [apps/api/src/modules/weather/providers/openweather.provider.ts:47]
-- [x] [Review][Patch] Anchor fetch time when the response arrives so JSON parsing across an hour
+- [x] [Review] Patch Anchor fetch time when the response arrives so JSON parsing across an hour
       boundary cannot discard a valid forecast hour
       [apps/api/src/modules/weather/providers/openweather.provider.ts:93]
 
@@ -164,34 +164,34 @@ using an injected clock in tests.
       from being persisted in the database (causing an unavailable state instead of stale).
       Options: [1] Remove the staleness check from the Zod validation schema (recommended), [2] Keep
       it and handle stale responses differently.
-- [x] [Review][Patch] Alert validation triggers complete ingestion failure
+- [x] [Review] Patch Alert validation triggers complete ingestion failure
       [apps/api/src/modules/weather/providers/weather.schemas.ts:161]
-- [x] [Review][Patch] Swallowing of Zod validation error details
+- [x] [Review] Patch Swallowing of Zod validation error details
       [apps/api/src/modules/weather/providers/openweather.provider.ts:180]
-- [x] [Review][Patch] Tight coupling of configuration loading in provider constructors
+- [x] [Review] Patch Tight coupling of configuration loading in provider constructors
       [apps/api/src/modules/weather/providers/openweather.provider.ts:37]
-- [x] [Review][Patch] Loss of original error stack trace in classifyFetchFailure
+- [x] [Review] Patch Loss of original error stack trace in classifyFetchFailure
       [apps/api/src/modules/weather/providers/weather-provider.error.ts:34]
-- [x] [Review][Patch] Timeout classification is fragile when AbortSignal reason is a string
+- [x] [Review] Patch Timeout classification is fragile when AbortSignal reason is a string
       [apps/api/src/modules/weather/providers/weather-provider.error.ts:40]
-- [x] [Review][Patch] WEATHER_INGESTION_TARGETS_JSON parses crashes on empty string
+- [x] [Review] Patch WEATHER_INGESTION_TARGETS_JSON parses crashes on empty string
       [apps/api/src/modules/weather/providers/weather.config.ts:29]
-- [x] [Review][Patch] Ambiguous single quotes surrounding target JSON in .env.example
+- [x] [Review] Patch Ambiguous single quotes surrounding target JSON in .env.example
       [.env.example:66]
 - [x] [Review][Defer] Absence of global network request blocking or interceptors in tests — deferred,
       pre-existing
 
 ### Review Findings — Round 3 (2026-07-07)
 
-- [x] [Review][Patch] NestJS Dependency Injection Compatibility Risk in `WeatherIngestionService` [apps/api/src/modules/weather/weather-ingestion.service.ts:123]
-- [x] [Review][Patch] Abort/Cancellation Handling during Provider Fetch/Sleep [apps/api/src/modules/weather/weather-ingestion.service.ts:90-103]
-- [x] [Review][Patch] Memory Leak in defaultSleeper Listener Cleanup [apps/api/src/modules/weather/weather-ingestion.service.ts:59-76]
-- [x] [Review][Patch] Concurrent persistForecast Unique Constraint Crash [apps/api/src/modules/weather/weather.repository.ts:19-40]
-- [x] [Review][Patch] Sequential Awaits in Sweeper Loop [apps/api/src/modules/weather/weather-processor.ts:72-85]
-- [x] [Review][Patch] Seed Snapshot Dates Hardcoded in the Past [packages/db/prisma/seeds/weather.ts]
-- [x] [Review][Patch] Non-deterministic Latest Snapshot Order [apps/api/src/modules/weather/weather.repository.ts:45-54]
-- [x] [Review][Patch] Unnormalized Location Key Query [apps/api/src/modules/weather/weather.repository.ts:42-54]
-- [x] [Review][Patch] Missing `clock` Injection in `WeatherIngestionService` [apps/api/src/modules/weather/weather-ingestion.service.ts]
+- [x] [Review] Patch NestJS Dependency Injection Compatibility Risk in `WeatherIngestionService` [apps/api/src/modules/weather/weather-ingestion.service.ts:123]
+- [x] [Review] Patch Abort/Cancellation Handling during Provider Fetch/Sleep [apps/api/src/modules/weather/weather-ingestion.service.ts:90-103]
+- [x] [Review] Patch Memory Leak in defaultSleeper Listener Cleanup [apps/api/src/modules/weather/weather-ingestion.service.ts:59-76]
+- [x] [Review] Patch Concurrent persistForecast Unique Constraint Crash [apps/api/src/modules/weather/weather.repository.ts:19-40]
+- [x] [Review] Patch Sequential Awaits in Sweeper Loop [apps/api/src/modules/weather/weather-processor.ts:72-85]
+- [x] [Review] Patch Seed Snapshot Dates Hardcoded in the Past [packages/db/prisma/seeds/weather.ts]
+- [x] [Review] Patch Non-deterministic Latest Snapshot Order [apps/api/src/modules/weather/weather.repository.ts:45-54]
+- [x] [Review] Patch Unnormalized Location Key Query [apps/api/src/modules/weather/weather.repository.ts:42-54]
+- [x] [Review] Patch Missing `clock` Injection in `WeatherIngestionService` [apps/api/src/modules/weather/weather-ingestion.service.ts]
 - [x] [Review][Defer] Inconsistent Database `location` Field Populated with `location_key` [apps/api/src/modules/weather/weather.repository.ts:60] — deferred, pre-existing
 
 - [x] Task 2: Migrate the persistence model and shared fixtures (AC: #1, #2)
@@ -284,19 +284,19 @@ using an injected clock in tests.
   - [x] Document provider-call budgeting. At a 30-minute cadence, each canonical target consumes up
         to 48 primary forecast calls per day before retries; alert before the configured account
         quota is approached.
-  - [x] Update the @/Users/murat/opensource/couture-cast/\_bmad-output/project-knowledge/learning-path-step-by-step.md
+  - [x] Update `_bmad-output/project-knowledge/learning-path-step-by-step.md`
   - [x] Using the Bmad test architect agent, evaluate if we have to add e2e, contract or perforance tests.
 
 ### Review Findings - Code Review (2026-07-08)
 
-- [x] [Review][Patch] Public latest-weather endpoint cannot surface cached fallback outcome [apps/api/src/modules/weather/weather.controller.ts:132]
-- [x] [Review][Patch] Generated weather client and OpenAPI contract do not declare authentication [packages/api-client/src/contracts/http/weather.ts:136]
-- [x] [Review][Patch] Backfilled `provider = seed` weather rows can make the latest-weather response fail schema validation [apps/api/src/modules/weather/weather.controller.ts:54]
-- [x] [Review][Patch] Secondary provider rate limits are not counted in weather rate-limit telemetry [apps/api/src/modules/weather/weather-ingestion.service.ts:273]
-- [x] [Review][Patch] OpenAPI and generated SDK drop the exact 48-hourly-entry invariant [packages/api-client/src/contracts/http/weather.ts:68]
-- [x] [Review][Patch] Telemetry exceptions can fail ingestion after persistence or fallback work succeeds [apps/api/src/modules/weather/weather-ingestion.service.ts:168]
-- [x] [Review][Patch] Weather API integration persistence coverage uses a Prisma stub instead of proving real transactions and indexes [apps/api/integration/weather.integration.spec.ts:111]
-- [x] [Review][Patch] Empty generated weather location-key requests can route to 404 instead of the documented 400 validation error [packages/api-client/src/generated/apis/WeatherApi.ts:31]
+- [x] [Review] Patch Public latest-weather endpoint cannot surface cached fallback outcome [apps/api/src/modules/weather/weather.controller.ts:132]
+- [x] [Review] Patch Generated weather client and OpenAPI contract do not declare authentication [packages/api-client/src/contracts/http/weather.ts:136]
+- [x] [Review] Patch Backfilled `provider = seed` weather rows can make the latest-weather response fail schema validation [apps/api/src/modules/weather/weather.controller.ts:54]
+- [x] [Review] Patch Secondary provider rate limits are not counted in weather rate-limit telemetry [apps/api/src/modules/weather/weather-ingestion.service.ts:273]
+- [x] [Review] Patch OpenAPI and generated SDK drop the exact 48-hourly-entry invariant [packages/api-client/src/contracts/http/weather.ts:68]
+- [x] [Review] Patch Telemetry exceptions can fail ingestion after persistence or fallback work succeeds [apps/api/src/modules/weather/weather-ingestion.service.ts:168]
+- [x] [Review] Patch Weather API integration persistence coverage uses a Prisma stub instead of proving real transactions and indexes [apps/api/integration/weather.integration.spec.ts:111]
+- [x] [Review] Patch Empty generated weather location-key requests can route to 404 instead of the documented 400 validation error [packages/api-client/src/generated/apis/WeatherApi.ts:31]
 
 ## Dev Notes
 

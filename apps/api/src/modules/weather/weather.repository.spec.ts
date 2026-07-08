@@ -243,4 +243,26 @@ describe('WeatherRepository', () => {
       },
     })
   })
+
+  it('finds ingestion state by canonical location with freshness fields only', async () => {
+    const ingestionState = {
+      last_provider_failure_at: new Date('2026-07-06T13:45:00.000Z'),
+      last_provider_success_at: new Date('2026-07-06T13:30:00.000Z'),
+    }
+    const { prisma } = createPrismaStub()
+    prisma.weatherIngestionState.findUnique.mockResolvedValueOnce(ingestionState)
+    const repository = new WeatherRepository(prisma as never)
+
+    await expect(repository.findIngestionState(' New-York-NY ')).resolves.toBe(
+      ingestionState
+    )
+
+    expect(prisma.weatherIngestionState.findUnique).toHaveBeenCalledWith({
+      where: { location_key: 'new-york-ny' },
+      select: {
+        last_provider_failure_at: true,
+        last_provider_success_at: true,
+      },
+    })
+  })
 })

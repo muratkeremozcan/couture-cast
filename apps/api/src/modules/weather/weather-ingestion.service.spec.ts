@@ -97,7 +97,10 @@ function createService(input: {
   const queryService = {
     getLatestWeather: vi.fn().mockResolvedValue({
       status: 'cached',
-      data: { id: 'cached-weather' },
+      data: {
+        id: 'cached-weather',
+        fetched_at: new Date('2026-07-06T13:20:00.000Z'),
+      },
       message: 'Using recently cached weather data.',
     }),
   }
@@ -331,6 +334,43 @@ describe('WeatherIngestionService', () => {
     expect(telemetryPayload).not.toContain('-74.006')
     expect(telemetryPayload).not.toContain('OPENWEATHER_API_KEY')
     expect(telemetryPayload).not.toContain('WEATHERAPI_API_KEY')
+    expect(telemetryPayload).not.toContain('secret')
+    expect(telemetryPayload).not.toContain('user-123')
+    expect(telemetryPayload).not.toContain('raw payload')
+  })
+
+  it('keeps ingestion failure logs free of coordinates, API keys, user ids, and raw payloads', async () => {
+    const abortFailure = new WeatherProviderError('aborted with secret', {
+      provider: 'openweather',
+      kind: 'aborted',
+      cause: new Error('OPENWEATHER_API_KEY=secret 40.7128 -74.006 user-123 raw payload'),
+    })
+    const { service, logger, meter } = createService({
+      primaryResults: [abortFailure],
+    })
+
+    await expect(service.ingestTarget(target)).rejects.toMatchObject({
+      kind: 'aborted',
+    })
+
+    const telemetryPayload = JSON.stringify({
+      logs: [logger.info.mock.calls, logger.warn.mock.calls, logger.error.mock.calls],
+      metrics: [
+        meter.recordProviderRequest.mock.calls,
+        meter.recordRateLimit.mock.calls,
+        meter.recordIngestion.mock.calls,
+        meter.recordFallbackOutcome.mock.calls,
+        meter.recordSnapshotAge.mock.calls,
+      ],
+    })
+
+    expect(logger.error).toHaveBeenCalledWith('weather_ingestion_failed', {
+      outcome: 'failed',
+      errorKind: 'aborted',
+    })
+    expect(telemetryPayload).not.toContain('40.7128')
+    expect(telemetryPayload).not.toContain('-74.006')
+    expect(telemetryPayload).not.toContain('OPENWEATHER_API_KEY')
     expect(telemetryPayload).not.toContain('secret')
     expect(telemetryPayload).not.toContain('user-123')
     expect(telemetryPayload).not.toContain('raw payload')
