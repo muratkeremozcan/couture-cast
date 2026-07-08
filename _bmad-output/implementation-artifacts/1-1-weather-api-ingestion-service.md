@@ -284,6 +284,8 @@ using an injected clock in tests.
   - [ ] Document provider-call budgeting. At a 30-minute cadence, each canonical target consumes up
         to 48 primary forecast calls per day before retries; alert before the configured account
         quota is approached.
+  - [ ] Update the @/Users/murat/opensource/couture-cast/\_bmad-output/project-knowledge/learning-path-step-by-step.md
+  - [ ] Using the Bmad test architect agent, evaluate if we have to add e2e, contract or perforance tests.
 
 ## Dev Notes
 
