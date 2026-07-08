@@ -25,6 +25,20 @@ describe('createMobileApiClient', () => {
     expect(await configuration.accessToken?.()).toBe('mobile-token')
   })
 
+  it('uses an explicit base URL override for tests and embedded clients', async () => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = 'https://mobile-api.couturecast.test/'
+
+    const client = createMobileApiClient({
+      baseUrl: 'https://mock-api.couturecast.test/',
+      accessToken: () => 'mobile-token',
+    })
+    const configuration = (client as unknown as { configuration: Configuration })
+      .configuration
+
+    expect(configuration.basePath).toBe('https://mock-api.couturecast.test')
+    expect(await configuration.accessToken?.()).toBe('mobile-token')
+  })
+
   it('falls back to API_BASE_URL when the Expo public base URL is unset', async () => {
     delete process.env.EXPO_PUBLIC_API_BASE_URL
     process.env.API_BASE_URL = 'https://fallback-api.couturecast.test/'

@@ -4,6 +4,10 @@ import {
   type DefaultApi,
 } from '@couture/api-client'
 
+export interface MobileApiClientOptions extends ApiClientOptions {
+  baseUrl?: string
+}
+
 // Story 0.9 Task 7 step 2 owner:
 // keep mobile base URL and auth resolution local to the Expo surface before calling the shared SDK.
 function normalizeBaseUrl(baseUrl: string) {
@@ -22,6 +26,9 @@ export function resolveMobileApiBaseUrl() {
   return normalizeBaseUrl(baseUrl)
 }
 
-export function createMobileApiClient(options: ApiClientOptions = {}): DefaultApi {
-  return createApiClient(resolveMobileApiBaseUrl(), options)
+export function createMobileApiClient(options: MobileApiClientOptions = {}): DefaultApi {
+  return createApiClient(
+    normalizeBaseUrl(options.baseUrl ?? resolveMobileApiBaseUrl()),
+    options
+  )
 }
