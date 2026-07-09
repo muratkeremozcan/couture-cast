@@ -10,6 +10,7 @@ import { registerCommonHttpSchemas } from './common'
 import { registerEventsContracts } from './events'
 import { registerGuardianContracts } from './guardian'
 import { registerHealthContracts } from './health'
+import { registerLocationsContracts } from './locations'
 import { registerModerationContracts } from './moderation'
 import { registerUserContracts } from './user'
 import { registerWeatherContracts } from './weather'
@@ -32,6 +33,7 @@ export function createHttpOpenApiRegistry() {
   registerHealthContracts(registry)
   registerEventsContracts(registry)
   registerGuardianContracts(registry, commonSchemas)
+  registerLocationsContracts(registry, commonSchemas)
   registerModerationContracts(registry, commonSchemas)
   registerUserContracts(registry, commonSchemas)
   registerWeatherContracts(registry, commonSchemas)

@@ -14,6 +14,11 @@ export {
   RITUAL_SCENARIOS,
 } from './ritual.factory.js'
 export {
+  buildSavedLocationCreateInput,
+  createSavedLocation,
+  persistSavedLocation,
+} from './saved-location.factory.js'
+export {
   buildWardrobeItemCreateInput,
   createWardrobeItem,
   persistWardrobeItem,
@@ -54,6 +59,12 @@ export type {
   RitualReasoningBadge,
   RitualScenario,
 } from './ritual.factory.js'
+export type {
+  CreatePersistedSavedLocationOptions,
+  PersistedSavedLocationFixture,
+  SavedLocationFactoryOverrides,
+  SavedLocationFixture,
+} from './saved-location.factory.js'
 export type {
   CreatePersistedWardrobeItemOptions,
   PersistedWardrobeItemFixture,

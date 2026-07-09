@@ -15,7 +15,7 @@ const guardianSharedTables = [
   'OutfitRecommendation',
 ] as const
 
-const selfOnlyTables = ['LookbookPost', 'EngagementEvent'] as const
+const selfOnlyTables = ['LookbookPost', 'EngagementEvent', 'SavedLocation'] as const
 
 const adminPool = new Pool({
   connectionString: databaseUrl,
@@ -38,9 +38,11 @@ type SeededScenario = {
   outfitId: string
   postId: string
   eventId: string
+  savedLocationId: string
   otherTeenId: string
   otherTeenEmail: string
   otherGarmentId: string
+  otherSavedLocationId: string
   consentReadOnlyId: string
   consentFullId: string
 }
@@ -112,9 +114,11 @@ const seedScenario = async (): Promise<SeededScenario> => {
     outfitId: `outfit-${suffix}`,
     postId: `post-${suffix}`,
     eventId: `event-${suffix}`,
+    savedLocationId: `saved-location-${suffix}`,
     otherTeenId: `other-teen-${suffix}`,
     otherTeenEmail: `other-teen-${suffix}@example.com`,
     otherGarmentId: `other-garment-${suffix}`,
+    otherSavedLocationId: `other-saved-location-${suffix}`,
     consentReadOnlyId: `consent-read-${suffix}`,
     consentFullId: `consent-full-${suffix}`,
   }
@@ -196,6 +200,70 @@ const seedScenario = async (): Promise<SeededScenario> => {
     )
 
     await client.query(
+      `INSERT INTO public."SavedLocation"
+        (
+          "id",
+          "user_id",
+          "label",
+          "location_key",
+          "latitude",
+          "longitude",
+          "timezone",
+          "city",
+          "region",
+          "country",
+          "is_primary",
+          "sort_order",
+          "updated_at"
+        )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, 0, NOW())`,
+      [
+        seeded.savedLocationId,
+        seeded.teenId,
+        'Home',
+        `home-${suffix}`,
+        41.878,
+        -87.63,
+        'America/Chicago',
+        'Chicago',
+        'IL',
+        'US',
+      ]
+    )
+
+    await client.query(
+      `INSERT INTO public."SavedLocation"
+        (
+          "id",
+          "user_id",
+          "label",
+          "location_key",
+          "latitude",
+          "longitude",
+          "timezone",
+          "city",
+          "region",
+          "country",
+          "is_primary",
+          "sort_order",
+          "updated_at"
+        )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, 0, NOW())`,
+      [
+        seeded.otherSavedLocationId,
+        seeded.otherTeenId,
+        'Other Home',
+        `other-home-${suffix}`,
+        40.713,
+        -74.006,
+        'America/New_York',
+        'New York',
+        'NY',
+        'US',
+      ]
+    )
+
+    await client.query(
       `INSERT INTO public."GuardianConsent"
         ("id", "guardian_id", "teen_id", "consent_level", "status", "ip_address")
        VALUES ($1, $2, $3, 'read_only', 'granted', '127.0.0.1')`,
@@ -230,6 +298,10 @@ const cleanupScenario = async (seeded: SeededScenario | undefined) => {
     await client.query('BEGIN')
     await client.query('DELETE FROM public."EngagementEvent" WHERE "id" = $1', [
       seeded.eventId,
+    ])
+    await client.query('DELETE FROM public."SavedLocation" WHERE "id" IN ($1, $2)', [
+      seeded.savedLocationId,
+      seeded.otherSavedLocationId,
     ])
     await client.query('DELETE FROM public."LookbookPost" WHERE "id" = $1', [
       seeded.postId,
@@ -403,6 +475,30 @@ describe.sequential('guardian-aware RLS policies', () => {
         ])
 
         expect(updatedProfile.rows[0]?.display_name).toBe('Teen Wardrobe Owner')
+
+        const savedLocationRows = await client.query<{
+          id: string
+          label: string
+        }>('SELECT "id", "label" FROM public."SavedLocation" WHERE "user_id" = $1', [
+          seeded.teenId,
+        ])
+
+        expect(savedLocationRows.rows).toEqual([
+          {
+            id: seeded.savedLocationId,
+            label: 'Home',
+          },
+        ])
+
+        const updateLocationResult = await client.query(
+          `UPDATE public."SavedLocation"
+           SET "label" = $1, "updated_at" = NOW()
+           WHERE "id" = $2
+           RETURNING "label"`,
+          ['Office', seeded.savedLocationId]
+        )
+
+        expect(updateLocationResult.rows).toEqual([{ label: 'Office' }])
       }
     )
   })
@@ -598,6 +694,36 @@ describe.sequential('guardian-aware RLS policies', () => {
     )
   })
 
+  it('keeps saved locations self-scoped for guardians while allowing admin access', async () => {
+    const seeded = (scenario = await seedScenario())
+
+    await withRole(
+      'authenticated',
+      buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
+      async (client) => {
+        const teenLocations = await client.query(
+          'SELECT "id" FROM public."SavedLocation" WHERE "user_id" = $1',
+          [seeded.teenId]
+        )
+
+        expect(teenLocations.rows).toHaveLength(0)
+      }
+    )
+
+    await withRole(
+      'authenticated',
+      buildClaims(`admin-${randomUUID()}@example.com`, 'admin'),
+      async (client) => {
+        const teenLocations = await client.query(
+          'SELECT "id" FROM public."SavedLocation" WHERE "user_id" = $1',
+          [seeded.teenId]
+        )
+
+        expect(teenLocations.rows).toEqual([{ id: seeded.savedLocationId }])
+      }
+    )
+  })
+
   it('denies teens from reading another teen wardrobe', async () => {
     const seeded = (scenario = await seedScenario())
 
@@ -611,6 +737,30 @@ describe.sequential('guardian-aware RLS policies', () => {
         )
 
         expect(otherTeenRows.rows).toHaveLength(0)
+
+        const otherSavedLocationRows = await guardedClient.query(
+          'SELECT "id" FROM public."SavedLocation" WHERE "user_id" = $1',
+          [seeded.otherTeenId]
+        )
+
+        expect(otherSavedLocationRows.rows).toHaveLength(0)
+
+        const otherSavedLocationUpdate = await guardedClient.query(
+          `UPDATE public."SavedLocation"
+           SET "label" = $1, "updated_at" = NOW()
+           WHERE "id" = $2
+           RETURNING "id"`,
+          ['Blocked update', seeded.otherSavedLocationId]
+        )
+
+        expect(otherSavedLocationUpdate.rows).toHaveLength(0)
+
+        const otherSavedLocationDelete = await guardedClient.query(
+          'DELETE FROM public."SavedLocation" WHERE "id" = $1 RETURNING "id"',
+          [seeded.otherSavedLocationId]
+        )
+
+        expect(otherSavedLocationDelete.rows).toHaveLength(0)
       }
     )
   })

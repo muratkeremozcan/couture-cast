@@ -19,6 +19,7 @@ const prisma = {
   outfitRecommendation: { deleteMany: () => Promise.resolve({ count: 0 }) },
   paletteInsights: { deleteMany: () => Promise.resolve({ count: 0 }) },
   pushToken: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  savedLocation: { deleteMany: () => Promise.resolve({ count: 0 }) },
   user: { deleteMany: () => Promise.resolve({ count: 0 }) },
   userProfile: { deleteMany: () => Promise.resolve({ count: 0 }) },
   weatherSnapshot: { deleteMany: () => Promise.resolve({ count: 0 }) },

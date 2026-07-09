@@ -17,6 +17,7 @@ import { GuardianModule } from './modules/guardian/guardian.module'
 import { ModerationModule } from './modules/moderation/moderation.module'
 import { UserModule } from './modules/user/user.module'
 import { WeatherModule } from './modules/weather/weather.module'
+import { LocationPreferencesModule } from './modules/location-preferences/location-preferences.module'
 
 // Disable websockets by setting DISABLE_WEBSOCKETS=true (e.g., in specific tests)
 const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [GatewayModule]
@@ -33,6 +34,7 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     FeatureFlagsModule,
     ModerationModule,
     UserModule,
+    LocationPreferencesModule,
     WeatherModule,
   ],
   controllers: [AppController, ApiHealthController, HealthController, AdminController],

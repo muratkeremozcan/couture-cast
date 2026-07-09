@@ -51,6 +51,9 @@ test('writes a valid HTTP OpenAPI document for the initial contract slice', asyn
     expect(paths['/api/v1/events/poll']).toBeDefined()
     expect(paths['/api/v1/moderation/actions']).toBeDefined()
     expect(paths['/api/v1/user/profile']).toBeDefined()
+    expect(paths['/api/v1/locations']).toBeDefined()
+    expect(paths['/api/v1/locations/{locationId}']).toBeDefined()
+    expect(paths['/api/v1/locations/{locationId}/primary']).toBeDefined()
   } finally {
     rmSync(outputDir, { recursive: true, force: true })
   }

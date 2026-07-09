@@ -5,6 +5,7 @@ import {
   EventsApi,
   GuardianApi,
   HealthApi,
+  LocationsApi,
   ModerationApi,
   UserApi,
   WeatherApi,
@@ -35,6 +36,7 @@ export interface DefaultApi
     PublicApi<EventsApi>,
     PublicApi<GuardianApi>,
     PublicApi<HealthApi>,
+    PublicApi<LocationsApi>,
     PublicApi<ModerationApi>,
     PublicApi<UserApi>,
     PublicApi<WeatherApi> {}
@@ -50,6 +52,7 @@ applyApiMixins(DefaultApi, [
   EventsApi,
   GuardianApi,
   HealthApi,
+  LocationsApi,
   ModerationApi,
   UserApi,
   WeatherApi,

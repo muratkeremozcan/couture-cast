@@ -23,6 +23,7 @@ export interface CleanupPrismaClient {
   outfitRecommendation: CleanupDelegate
   paletteInsights: CleanupDelegate
   pushToken: CleanupDelegate
+  savedLocation: CleanupDelegate
   user: CleanupDelegate
   userProfile: CleanupDelegate
   weatherSnapshot: CleanupDelegate
@@ -170,6 +171,7 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const userIds = uniqueValues(tracked.users)
   const wardrobeItemIds = uniqueValues(tracked.wardrobeItems)
   const ritualIds = uniqueValues(tracked.rituals)
+  const savedLocationIds = uniqueValues(tracked.savedLocations)
   const weatherSnapshotIds = uniqueValues(tracked.weatherSnapshots)
 
   const outfitRecommendationWhere = buildDeleteWhere(ritualIds, userIds)
@@ -194,7 +196,22 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
         prisma.pushToken.deleteMany({
           where: buildUserFilter(userIds),
         }),
+      () =>
+        prisma.savedLocation.deleteMany({
+          where:
+            savedLocationIds.length > 0
+              ? {
+                  OR: [buildIdFilter(savedLocationIds), buildUserFilter(userIds)],
+                }
+              : buildUserFilter(userIds),
+        }),
     ])
+
+    if (savedLocationIds.length > 0 && userIds.length === 0) {
+      await prisma.savedLocation.deleteMany({
+        where: buildIdFilter(savedLocationIds),
+      })
+    }
 
     if (outfitRecommendationWhere) {
       await prisma.outfitRecommendation.deleteMany({

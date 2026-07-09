@@ -279,6 +279,110 @@ export type BadRequestHttpErrorErrorEnum =
 /**
  *
  * @export
+ * @interface CreateSavedLocationInput
+ */
+export interface CreateSavedLocationInput {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLocationInput
+   */
+  label: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLocationInput
+   */
+  locationKey: string
+  /**
+   *
+   * @type {number}
+   * @memberof CreateSavedLocationInput
+   */
+  latitude: number
+  /**
+   *
+   * @type {number}
+   * @memberof CreateSavedLocationInput
+   */
+  longitude: number
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLocationInput
+   */
+  timezone: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLocationInput
+   */
+  city?: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLocationInput
+   */
+  region?: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLocationInput
+   */
+  country?: string
+}
+/**
+ *
+ * @export
+ * @interface CreateSavedLocationResponse
+ */
+export interface CreateSavedLocationResponse {
+  /**
+   *
+   * @type {ListSavedLocationsResponseDataInner}
+   * @memberof CreateSavedLocationResponse
+   */
+  data: ListSavedLocationsResponseDataInner
+}
+/**
+ *
+ * @export
+ * @interface DeleteSavedLocationResponse
+ */
+export interface DeleteSavedLocationResponse {
+  /**
+   *
+   * @type {DeleteSavedLocationResponseData}
+   * @memberof DeleteSavedLocationResponse
+   */
+  data: DeleteSavedLocationResponseData
+}
+/**
+ *
+ * @export
+ * @interface DeleteSavedLocationResponseData
+ */
+export interface DeleteSavedLocationResponseData {
+  /**
+   *
+   * @type {DeleteSavedLocationResponseDataDeletedEnum}
+   * @memberof DeleteSavedLocationResponseData
+   */
+  deleted: DeleteSavedLocationResponseDataDeletedEnum
+}
+
+/**
+ * @export
+ */
+export const DeleteSavedLocationResponseDataDeletedEnum = {
+  true: true,
+} as const
+export type DeleteSavedLocationResponseDataDeletedEnum =
+  (typeof DeleteSavedLocationResponseDataDeletedEnum)[keyof typeof DeleteSavedLocationResponseDataDeletedEnum]
+
+/**
+ *
+ * @export
  * @interface EventsPollInvalidSinceResponse
  */
 export interface EventsPollInvalidSinceResponse {
@@ -1011,6 +1115,104 @@ export type LinkedTeenStatusEnum =
 /**
  *
  * @export
+ * @interface ListSavedLocationsResponse
+ */
+export interface ListSavedLocationsResponse {
+  /**
+   *
+   * @type {Array<ListSavedLocationsResponseDataInner>}
+   * @memberof ListSavedLocationsResponse
+   */
+  data: Array<ListSavedLocationsResponseDataInner>
+}
+/**
+ *
+ * @export
+ * @interface ListSavedLocationsResponseDataInner
+ */
+export interface ListSavedLocationsResponseDataInner {
+  /**
+   *
+   * @type {string}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  label: string
+  /**
+   *
+   * @type {string}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  locationKey: string
+  /**
+   *
+   * @type {number}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  latitude: number
+  /**
+   *
+   * @type {number}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  longitude: number
+  /**
+   *
+   * @type {string}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  timezone: string
+  /**
+   *
+   * @type {string}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  city: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  region: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  country: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  isPrimary: boolean
+  /**
+   *
+   * @type {number}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  sortOrder: number
+  /**
+   *
+   * @type {string}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  createdAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ListSavedLocationsResponseDataInner
+   */
+  updatedAt: string
+}
+/**
+ *
+ * @export
  * @interface ModerationActionInput
  */
 export interface ModerationActionInput {
@@ -1213,6 +1415,117 @@ export interface QueueMetrics {
 /**
  *
  * @export
+ * @interface SavedLocation
+ */
+export interface SavedLocation {
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLocation
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLocation
+   */
+  label: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLocation
+   */
+  locationKey: string
+  /**
+   *
+   * @type {number}
+   * @memberof SavedLocation
+   */
+  latitude: number
+  /**
+   *
+   * @type {number}
+   * @memberof SavedLocation
+   */
+  longitude: number
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLocation
+   */
+  timezone: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLocation
+   */
+  city: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLocation
+   */
+  region: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLocation
+   */
+  country: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof SavedLocation
+   */
+  isPrimary: boolean
+  /**
+   *
+   * @type {number}
+   * @memberof SavedLocation
+   */
+  sortOrder: number
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLocation
+   */
+  createdAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLocation
+   */
+  updatedAt: string
+}
+/**
+ *
+ * @export
+ * @interface SavedLocationIdPathParams
+ */
+export interface SavedLocationIdPathParams {
+  /**
+   * Saved location ID.
+   * @type {string}
+   * @memberof SavedLocationIdPathParams
+   */
+  locationId: string
+}
+/**
+ *
+ * @export
+ * @interface SetPrimarySavedLocationResponse
+ */
+export interface SetPrimarySavedLocationResponse {
+  /**
+   *
+   * @type {ListSavedLocationsResponseDataInner}
+   * @memberof SetPrimarySavedLocationResponse
+   */
+  data: ListSavedLocationsResponseDataInner
+}
+/**
+ *
+ * @export
  * @interface SignupInput
  */
 export interface SignupInput {
@@ -1338,6 +1651,80 @@ export const UnauthorizedHttpErrorErrorEnum = {
 export type UnauthorizedHttpErrorErrorEnum =
   (typeof UnauthorizedHttpErrorErrorEnum)[keyof typeof UnauthorizedHttpErrorErrorEnum]
 
+/**
+ *
+ * @export
+ * @interface UpdateSavedLocationInput
+ */
+export interface UpdateSavedLocationInput {
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateSavedLocationInput
+   */
+  label?: string
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateSavedLocationInput
+   */
+  locationKey?: string
+  /**
+   *
+   * @type {number}
+   * @memberof UpdateSavedLocationInput
+   */
+  latitude?: number
+  /**
+   *
+   * @type {number}
+   * @memberof UpdateSavedLocationInput
+   */
+  longitude?: number
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateSavedLocationInput
+   */
+  timezone?: string
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateSavedLocationInput
+   */
+  city?: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateSavedLocationInput
+   */
+  region?: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateSavedLocationInput
+   */
+  country?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof UpdateSavedLocationInput
+   */
+  sortOrder?: number
+}
+/**
+ *
+ * @export
+ * @interface UpdateSavedLocationResponse
+ */
+export interface UpdateSavedLocationResponse {
+  /**
+   *
+   * @type {ListSavedLocationsResponseDataInner}
+   * @memberof UpdateSavedLocationResponse
+   */
+  data: ListSavedLocationsResponseDataInner
+}
 /**
  *
  * @export

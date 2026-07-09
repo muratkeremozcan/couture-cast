@@ -61,6 +61,7 @@ model User {
   moderation_flags   ModerationEvent[]      @relation("FlaggedByRelation")
   moderation_reviews ModerationEvent[]      @relation("ReviewedByRelation")
   push_tokens        PushToken[]
+  saved_locations    SavedLocation[]
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -160,6 +161,29 @@ model WeatherIngestionState {
   last_provider_failure_at DateTime?
   last_provider_success_at DateTime?
   updated_at               DateTime  @updatedAt
+}
+
+/// RLS: saved weather location preferences are scoped to the owning user_id
+model SavedLocation {
+  id           String   @id @default(cuid())
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id      String
+  label        String
+  location_key String
+  latitude     Float
+  longitude    Float
+  timezone     String
+  city         String?
+  region       String?
+  country      String?
+  is_primary   Boolean  @default(false)
+  sort_order   Int      @default(0)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@unique([user_id, location_key])
+  @@index([user_id, sort_order, created_at, id])
+  @@index([location_key])
 }
 
 /// RLS: user-scoped comfort settings enforced by user_id

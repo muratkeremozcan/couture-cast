@@ -8,7 +8,11 @@ import { createWeatherJobProcessor } from '../modules/weather/weather-processor'
 import { WeatherQueryService } from '../modules/weather/weather-query.service'
 import { WeatherRepository } from '../modules/weather/weather.repository'
 import { registerWeatherRefreshScheduler } from '../modules/weather/weather-scheduler'
-import { ConfiguredWeatherTargetSource } from '../modules/weather/weather-target-source'
+import {
+  CombinedWeatherTargetSource,
+  ConfiguredWeatherTargetSource,
+  SavedLocationWeatherTargetSource,
+} from '../modules/weather/weather-target-source'
 import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 
@@ -56,7 +60,10 @@ async function startWorkers() {
     )
     const weatherProcessor = createWeatherJobProcessor({
       queue: weatherQueue,
-      targetSource: new ConfiguredWeatherTargetSource(),
+      targetSource: new CombinedWeatherTargetSource([
+        new SavedLocationWeatherTargetSource(getPrismaClient()),
+        new ConfiguredWeatherTargetSource(),
+      ]),
       ingestionService: weatherIngestionService,
       refreshMinutes: weatherConfig.refreshMinutes,
       logger: console,
