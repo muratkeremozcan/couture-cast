@@ -164,7 +164,7 @@ describe('LocationPreferencesService', () => {
     const result = await service.listLocations(userId)
     expect(repository.findManyByUserId).toHaveBeenCalledWith(userId)
     expect(result).toHaveLength(2)
-    expect(result[0].id).toBe('location-1')
+    expect(result[0]?.id).toBe('location-1')
   })
 
   it('updates a saved location successfully', async () => {
