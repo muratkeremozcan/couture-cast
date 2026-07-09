@@ -6,7 +6,7 @@ const WeatherProviderModeSchema = z.enum(['openweather', 'weatherapi'])
 const WeatherEnvironmentSchema = z.object({
   OPENWEATHER_API_KEY: z.string().trim().min(1).optional(),
   WEATHERAPI_API_KEY: z.string().trim().min(1).optional(),
-  WEATHER_REFRESH_MINUTES: z.coerce.number().int().min(1).max(30).default(30),
+  WEATHER_REFRESH_MINUTES: z.coerce.number().int().min(1).max(5).default(5),
   WEATHER_PROVIDER_MODE: WeatherProviderModeSchema.default('openweather'),
   WEATHER_INGESTION_TARGETS_JSON: z.string().default('[]'),
 })

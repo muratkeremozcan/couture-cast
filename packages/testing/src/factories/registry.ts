@@ -2,6 +2,7 @@ export const DEFAULT_FACTORY_REGISTRY_KEYS = [
   'users',
   'wardrobeItems',
   'rituals',
+  'savedLocations',
   'weatherSnapshots',
 ] as const
 

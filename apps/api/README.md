@@ -62,13 +62,13 @@ Required weather environment variables:
 
 - `OPENWEATHER_API_KEY`: primary OpenWeather One Call key.
 - `WEATHERAPI_API_KEY`: secondary WeatherAPI.com key.
-- `WEATHER_REFRESH_MINUTES`: cadence in minutes, capped at 30 by policy.
+- `WEATHER_REFRESH_MINUTES`: cadence in minutes, capped at 5 by policy.
 - `WEATHER_PROVIDER_MODE`: provider compatibility mode.
 - `WEATHER_INGESTION_TARGETS_JSON`: non-personal bootstrap targets for Story 1.1.
 
 Provider-call budgeting:
 
-- At a 30-minute cadence, each canonical target consumes up to 48 primary forecast calls per day
+- At a 5-minute cadence, each canonical target consumes up to 288 primary forecast calls per day
   before retry/failover.
 - Retryable primary failures can add two extra primary attempts for a single target interval.
 - A primary `429` switches directly to one secondary attempt.

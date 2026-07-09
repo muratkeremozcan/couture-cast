@@ -15,7 +15,9 @@
   "scripts": {
     "preinstall": "node scripts/check-node-version.mjs",
     "dev": "turbo run dev --parallel",
-    "build": "npm run --workspaces --if-present build",
+    "build": "npm-run-all2 --sequential build:packages build:apps",
+    "build:apps": "npm run build --workspace api && npm run build --workspace web",
+    "build:packages": "npm run build --workspace @couture/config && npm run build --workspace @couture/utils && npm run build --workspace @couture/api-client && npm run build --workspace @couture/testing && npm run build --workspace @couture/k6-utils",
     "generate:http-openapi": "tsx packages/api-client/scripts/generate-http-openapi.ts",
     "generate:api-client": "npm run generate:http-openapi && openapi-generator-cli generate --generator-key api-client && tsx packages/api-client/scripts/postprocess-generated-sdk.ts",
     "optic:lint": "optic lint packages/api-client/docs/http.openapi.json",

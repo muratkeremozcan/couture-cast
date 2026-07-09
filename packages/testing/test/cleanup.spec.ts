@@ -32,6 +32,7 @@ function createCleanupPrismaStub(calls: CleanupCall[]): CleanupPrismaClient {
     outfitRecommendation: createDelegate('outfitRecommendation'),
     paletteInsights: createDelegate('paletteInsights'),
     pushToken: createDelegate('pushToken'),
+    savedLocation: createDelegate('savedLocation'),
     user: createDelegate('user'),
     userProfile: createDelegate('userProfile'),
     weatherSnapshot: createDelegate('weatherSnapshot'),
@@ -47,6 +48,7 @@ describe('cleanup', () => {
     registry.track('users', 'user-1')
     registry.track('wardrobeItems', 'garment-1')
     registry.track('rituals', 'ritual-1')
+    registry.track('savedLocations', 'location-1')
     registry.track('weatherSnapshots', 'weather-1')
 
     await cleanup({ prisma, registry })
@@ -56,6 +58,7 @@ describe('cleanup', () => {
       'lookbookPost',
       'auditLog',
       'pushToken',
+      'savedLocation',
       'outfitRecommendation',
       'paletteInsights',
       'garmentItem',
@@ -70,6 +73,9 @@ describe('cleanup', () => {
     expect(calls.find((call) => call.delegate === 'garmentItem')?.where).toMatchObject({
       OR: [{ id: { in: ['garment-1'] } }, { user_id: { in: ['user-1'] } }],
     })
+    expect(calls.find((call) => call.delegate === 'savedLocation')?.where).toMatchObject({
+      OR: [{ id: { in: ['location-1'] } }, { user_id: { in: ['user-1'] } }],
+    })
     expect(
       calls.find((call) => call.delegate === 'weatherSnapshot')?.where
     ).toMatchObject({
@@ -82,6 +88,7 @@ describe('cleanup', () => {
       users: [],
       wardrobeItems: [],
       rituals: [],
+      savedLocations: [],
       weatherSnapshots: [],
     })
   })
