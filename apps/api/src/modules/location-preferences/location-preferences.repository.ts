@@ -140,6 +140,8 @@ export class PrismaLocationPreferencesRepository
 
   async delete(userId: string, locationId: string): Promise<SavedLocationRecord | null> {
     return this.prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`
+
       const existing = await transaction.savedLocation.findFirst({
         where: { id: locationId, user_id: userId },
       })
@@ -227,13 +229,13 @@ export class PrismaLocationPreferencesRepository
     locationId: string,
     command: UpdateSavedLocationCommand
   ): Promise<SavedLocationRecord | null> {
-    const existing = await this.findByIdForUser(userId, locationId)
-
-    if (!existing) {
-      return null
-    }
-
     try {
+      const existing = await this.findByIdForUser(userId, locationId)
+
+      if (!existing) {
+        return null
+      }
+
       return await this.prisma.savedLocation.update({
         where: { id: existing.id },
         data: {
@@ -249,6 +251,13 @@ export class PrismaLocationPreferencesRepository
         },
       })
     } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        return null
+      }
+
       if (isUniqueConstraintError(error)) {
         throw new SavedLocationDuplicateError()
       }

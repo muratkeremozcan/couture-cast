@@ -90,27 +90,27 @@ so that I can plan home and office outfits easily.
 
 ### Review Findings
 
-- [x] [Review][Patch] Primary-location refresh does not meet the 5-minute
+- [x] \[Review\]\[Patch\] Primary-location refresh does not meet the 5-minute
       widget/watch requirement [apps/api/src/modules/weather/providers/weather.config.ts:9]
-- [x] [Review][Patch] Max-three saved-location limit is vulnerable to
+- [x] \[Review\]\[Patch\] Max-three saved-location limit is vulnerable to
       concurrent creates [apps/api/src/modules/location-preferences/location-preferences.service.ts:76]
-- [x] [Review][Patch] Duplicate saved-location races can surface as raw Prisma
+- [x] \[Review\]\[Patch\] Duplicate saved-location races can surface as raw Prisma
       conflicts instead of 400 responses [apps/api/src/modules/location-preferences/location-preferences.repository.ts:76]
-- [x] [Review][Patch] Whitespace-only timezone can be persisted before response
+- [x] \[Review\]\[Patch\] Whitespace-only timezone can be persisted before response
       validation fails [packages/api-client/src/contracts/http/locations.ts:38]
-- [x] [Review][Patch] Partial `locationKey` updates can leave coordinates and
+- [x] \[Review\]\[Patch\] Partial `locationKey` updates can leave coordinates and
       timezone for the old place [apps/api/src/modules/location-preferences/location-preferences.service.ts:118]
-- [x] [Review][Patch] `PATCH isPrimary` is not atomic with other update fields
+- [x] \[Review\]\[Patch\] `PATCH isPrimary` is not atomic with other update fields
       [apps/api/src/modules/location-preferences/location-preferences.service.ts:151]
-- [x] [Review][Patch] Database only enforces lowercase `location_key`, not
+- [x] \[Review\]\[Patch\] Database only enforces lowercase `location_key`, not
       provider-safe canonical keys [packages/db/prisma/migrations/20260709120000_add_saved_locations/migration.sql:23]
-- [x] [Review][Patch] Configured weather bootstrap targets are no longer wired
+- [x] \[Review\]\[Patch\] Configured weather bootstrap targets are no longer wired
       into worker startup [apps/api/src/workers/bootstrap.ts:57]
-- [x] [Review][Patch] API integration coverage uses an in-memory repository
+- [x] \[Review\]\[Patch\] API integration coverage uses an in-memory repository
       instead of the live Prisma path [apps/api/integration/location-preferences.integration.spec.ts:35]
-- [x] [Review][Patch] RLS coverage does not prove foreign saved-location
+- [x] \[Review\]\[Patch\] RLS coverage does not prove foreign saved-location
       updates or deletes are denied [packages/db/test/rls-policies.spec.ts:741]
-- [x] [Review][Patch] `sortOrder` accepts values outside the PostgreSQL integer
+- [x] \[Review\]\[Patch\] `sortOrder` accepts values outside the PostgreSQL integer
       range [packages/api-client/src/contracts/http/locations.ts:56]
 
 ## Dev Notes

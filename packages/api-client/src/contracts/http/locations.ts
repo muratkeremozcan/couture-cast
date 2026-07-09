@@ -11,6 +11,15 @@ const optionalDisplayFieldSchema = z.string().trim().min(1).max(120).nullable()
 const timezoneInputSchema = z.string().trim().min(1).max(120)
 const postgresIntegerMax = 2_147_483_647
 const sortOrderSchema = z.number().int().nonnegative().max(postgresIntegerMax)
+const locationKeySchema = z
+  .string()
+  .min(1)
+  .max(120)
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, {
+    message:
+      'locationKey must be a lowercase slug containing only alphanumeric characters and hyphens.',
+  })
+
 const locationIdentityFields = [
   'locationKey',
   'latitude',
@@ -25,7 +34,7 @@ export const savedLocationIdPathParamsSchema = z.object({
 export const savedLocationSchema = z.object({
   id: nonEmptyStringSchema,
   label: nonEmptyStringSchema,
-  locationKey: nonEmptyStringSchema,
+  locationKey: locationKeySchema,
   latitude: z.number().finite().min(-90).max(90),
   longitude: z.number().finite().min(-180).max(180),
   timezone: nonEmptyStringSchema,
@@ -41,7 +50,7 @@ export const savedLocationSchema = z.object({
 export const createSavedLocationInputSchema = z
   .object({
     label: locationLabelSchema,
-    locationKey: nonEmptyStringSchema,
+    locationKey: locationKeySchema,
     latitude: z.number().finite().min(-90).max(90),
     longitude: z.number().finite().min(-180).max(180),
     timezone: timezoneInputSchema,
@@ -54,7 +63,7 @@ export const createSavedLocationInputSchema = z
 export const updateSavedLocationInputSchema = z
   .object({
     label: locationLabelSchema.optional(),
-    locationKey: nonEmptyStringSchema.optional(),
+    locationKey: locationKeySchema.optional(),
     latitude: z.number().finite().min(-90).max(90).optional(),
     longitude: z.number().finite().min(-180).max(180).optional(),
     timezone: timezoneInputSchema.optional(),
@@ -202,6 +211,7 @@ export function registerLocationsContracts(
     security: [{ bearerAuth: [] }],
     request: {
       body: {
+        required: true,
         content: {
           'application/json': {
             schema: registeredCreateSavedLocationInputSchema,
@@ -254,6 +264,7 @@ export function registerLocationsContracts(
     request: {
       params: registeredSavedLocationIdPathParamsSchema,
       body: {
+        required: true,
         content: {
           'application/json': {
             schema: registeredUpdateSavedLocationInputSchema,

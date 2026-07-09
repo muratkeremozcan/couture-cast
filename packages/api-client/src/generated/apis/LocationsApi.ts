@@ -28,7 +28,7 @@ export interface ApiV1LocationsLocationIdDeleteRequest {
 
 export interface ApiV1LocationsLocationIdPatchRequest {
   locationId: string
-  updateSavedLocationInput?: UpdateSavedLocationInput
+  updateSavedLocationInput: UpdateSavedLocationInput
 }
 
 export interface ApiV1LocationsLocationIdPrimaryPostRequest {
@@ -36,7 +36,7 @@ export interface ApiV1LocationsLocationIdPrimaryPostRequest {
 }
 
 export interface ApiV1LocationsPostRequest {
-  createSavedLocationInput?: CreateSavedLocationInput
+  createSavedLocationInput: CreateSavedLocationInput
 }
 
 /**
@@ -173,6 +173,13 @@ export class LocationsApi extends runtime.BaseAPI {
       )
     }
 
+    if (requestParameters['updateSavedLocationInput'] == null) {
+      throw new runtime.RequiredError(
+        'updateSavedLocationInput',
+        'Required parameter "updateSavedLocationInput" was null or undefined when calling apiV1LocationsLocationIdPatch().'
+      )
+    }
+
     const queryParameters: any = {}
 
     const headerParameters: runtime.HTTPHeaders = {}
@@ -305,6 +312,13 @@ export class LocationsApi extends runtime.BaseAPI {
   async apiV1LocationsPostRequestOpts(
     requestParameters: ApiV1LocationsPostRequest
   ): Promise<runtime.RequestOpts> {
+    if (requestParameters['createSavedLocationInput'] == null) {
+      throw new runtime.RequiredError(
+        'createSavedLocationInput',
+        'Required parameter "createSavedLocationInput" was null or undefined when calling apiV1LocationsPost().'
+      )
+    }
+
     const queryParameters: any = {}
 
     const headerParameters: runtime.HTTPHeaders = {}
@@ -348,7 +362,7 @@ export class LocationsApi extends runtime.BaseAPI {
    * Create a saved location
    */
   async apiV1LocationsPost(
-    requestParameters: ApiV1LocationsPostRequest = {},
+    requestParameters: ApiV1LocationsPostRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<CreateSavedLocationResponse> {
     const response = await this.apiV1LocationsPostRaw(requestParameters, initOverrides)

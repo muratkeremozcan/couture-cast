@@ -7,6 +7,7 @@ import {
   createSavedLocationResponseSchema,
   listSavedLocationsResponseSchema,
   setPrimarySavedLocationResponseSchema,
+  updateSavedLocationResponseSchema,
 } from '@couture/api-client/contracts/http'
 
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service'
@@ -175,6 +176,23 @@ describe('LocationPreferencesController', () => {
     expect(service.createLocation).toHaveBeenCalledWith(
       'user-1',
       expect.objectContaining({ locationKey: 'chicago-il' })
+    )
+
+    const patchResponse = await request(getHttpServer())
+      .patch('/api/v1/locations/location-1')
+      .set(authHeaders)
+      .send({
+        label: 'Office',
+      })
+
+    expect(patchResponse.status).toBe(200)
+    expect(updateSavedLocationResponseSchema.parse(patchResponse.body)).toEqual({
+      data: { ...savedLocation, label: 'Office' },
+    })
+    expect(service.updateLocation).toHaveBeenCalledWith(
+      'user-1',
+      'location-1',
+      expect.objectContaining({ label: 'Office' })
     )
 
     const primaryResponse = await request(getHttpServer())

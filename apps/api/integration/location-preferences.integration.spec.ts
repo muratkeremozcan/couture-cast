@@ -298,7 +298,7 @@ describe('Location preferences API integration', () => {
     const firstResponse = await request(getHttpServer())
       .post('/api/v1/locations')
       .set(primaryUserHeaders)
-      .send(createLocationInput('Home', 'Chicago IL'))
+      .send(createLocationInput('Home', 'chicago-il'))
 
     expect(firstResponse.status).toBe(201)
     const firstLocation = createSavedLocationResponseSchema.parse(firstResponse.body).data
@@ -462,7 +462,7 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
     const firstResponse = await request(getHttpServer())
       .post('/api/v1/locations')
       .set(primaryHeaders)
-      .send(createLocationInput('Home', 'Chicago IL'))
+      .send(createLocationInput('Home', 'chicago-il'))
 
     expect(firstResponse.status).toBe(201)
     const firstLocation = createSavedLocationResponseSchema.parse(firstResponse.body).data

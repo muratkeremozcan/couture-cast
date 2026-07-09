@@ -31,7 +31,7 @@ test('validates saved-location request and response envelopes', () => {
   expect(
     createSavedLocationInputSchema.parse({
       label: 'Office',
-      locationKey: ' CHICAGO IL ',
+      locationKey: 'chicago-il',
       latitude: 41.8781,
       longitude: -87.6298,
       timezone: ' America/Chicago ',
@@ -41,7 +41,7 @@ test('validates saved-location request and response envelopes', () => {
     })
   ).toMatchObject({
     label: 'Office',
-    locationKey: ' CHICAGO IL ',
+    locationKey: 'chicago-il',
     timezone: 'America/Chicago',
   })
   expect(
@@ -75,6 +75,16 @@ test('rejects user-owned and invalid saved-location input fields', () => {
       userId: 'client-supplied-user',
       label: 'Office',
       locationKey: 'chicago-il',
+      latitude: 41.8781,
+      longitude: -87.6298,
+      timezone: 'America/Chicago',
+    })
+  ).toThrow()
+
+  expect(() =>
+    createSavedLocationInputSchema.parse({
+      label: 'Office',
+      locationKey: ' CHICAGO IL ',
       latitude: 41.8781,
       longitude: -87.6298,
       timezone: 'America/Chicago',

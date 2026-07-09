@@ -21,12 +21,19 @@ export class CombinedWeatherTargetSource implements WeatherTargetSource {
     const targetsByLocationKey = new Map<string, WeatherIngestionTarget>()
 
     for (const source of this.sources) {
-      const targets = await source.getTargets()
+      try {
+        const targets = await source.getTargets()
 
-      for (const target of targets) {
-        if (!targetsByLocationKey.has(target.locationKey)) {
-          targetsByLocationKey.set(target.locationKey, target)
+        for (const target of targets) {
+          if (!targetsByLocationKey.has(target.locationKey)) {
+            targetsByLocationKey.set(target.locationKey, target)
+          }
         }
+      } catch (error) {
+        console.error(
+          `Failed to get weather targets from source ${source.constructor.name}:`,
+          error
+        )
       }
     }
 
@@ -41,6 +48,7 @@ export class SavedLocationWeatherTargetSource implements WeatherTargetSource {
     const primaryLocations = await this.prisma.savedLocation.findMany({
       where: { is_primary: true },
       orderBy: [{ location_key: 'asc' }, { created_at: 'asc' }, { id: 'asc' }],
+      take: 5000,
       select: {
         location_key: true,
         latitude: true,
