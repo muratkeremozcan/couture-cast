@@ -280,7 +280,16 @@ As a user, I want to understand why an outfit is suggested so that I trust the r
 
 ## Epic 3 — Cross-Surface Experience & Localization (Phase 1)
 
+_Updated: 2026-07-09 — added contract testing requirements for locations and_
+_weather APIs_
+
 Present CoutureCast recommendations consistently across mobile, web widget, watch, and supported languages.
+
+> [!NOTE]
+> **Testing Gate**: Once the consumer UI surfaces (mobile hero, web widgets,
+> watch glance) start consuming the location preferences and weather APIs,
+> consumer-driven contract tests (Pact) must be implemented to establish API
+> contracts and prevent client-server drift.
 
 **Stories**
 
