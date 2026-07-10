@@ -1,0 +1,202 @@
+name: Pact report and comment
+
+# IMPORTANT: Run the Pact contract test step(s) before using this action
+description: 'Upload Pact contract artifacts, generate a step summary, and optionally comment on PR'
+
+inputs:
+  artifacts-path:
+    description: 'Newline-separated paths to upload as the contract diagnostics artifact'
+    required: false
+    default: |
+      packages/api-client/docs/http.openapi.json
+      pacts/
+      pact/artifacts/
+  report-name:
+    description: 'Name for the uploaded artifact'
+    required: false
+    default: 'pact-report'
+  retention-days:
+    description: 'Artifact retention days'
+    required: false
+    default: '14'
+  test-outcome:
+    description: 'Outcome of the contract test step (success/failure)'
+    required: true
+  check-label:
+    description: 'Label describing the check(s) that ran'
+    required: false
+    default: 'Local schema, consumer, and provider contracts'
+  broker-url:
+    description: 'Optional Pact Broker deep-link to include in the summary/comment'
+    required: false
+    default: ''
+  comment-on-pr:
+    description: 'Whether to post a PR comment'
+    required: false
+    default: 'true'
+  github-token:
+    description: 'Token to use for GitHub API (pass GITHUB_TOKEN)'
+    required: false
+    default: ''
+
+outputs:
+  report-url:
+    description: 'Download URL for the contract diagnostics artifact'
+    value: ${{ steps.resolve-url.outputs.report_url }}
+  report-artifact-url:
+    description: 'Direct artifact URL for the contract diagnostics artifact'
+    value: ${{ steps.upload-report.outputs.artifact-url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Upload contract diagnostics artifact
+      id: upload-report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.report-name }}
+        path: ${{ inputs.artifacts-path }}
+        if-no-files-found: ignore
+        retention-days: ${{ inputs.retention-days }}
+
+    - name: Resolve report download URL
+      id: resolve-url
+      if: ${{ always() }}
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token || github.token }}
+        script: |
+          const artifactName = '${{ inputs.report-name }}';
+          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          const uploadedArtifactUrl = '${{ steps.upload-report.outputs.artifact-url }}';
+          let reportUrl = uploadedArtifactUrl || runUrl;
+          let hasReport = false;
+          if (uploadedArtifactUrl) {
+            hasReport = true;
+          } else {
+            try {
+              const { data } = await github.rest.actions.listWorkflowRunArtifacts({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: context.runId,
+              });
+              const artifact = data.artifacts.find((a) => a.name === artifactName);
+              if (artifact?.id) {
+                hasReport = true;
+                reportUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts/${artifact.id}`;
+              }
+            } catch (e) {
+              core.warning(`Could not resolve report URL: ${e.message}`);
+            }
+          }
+          core.setOutput('report_url', reportUrl);
+          core.setOutput('run_url', runUrl);
+          core.setOutput('has_report', String(hasReport));
+
+    - name: Generate summary
+      if: always()
+      shell: bash
+      env:
+        CHECK_LABEL: ${{ inputs.check-label }}
+        TEST_OUTCOME: ${{ inputs.test-outcome }}
+        HAS_REPORT: ${{ steps.resolve-url.outputs.has_report }}
+        REPORT_URL: ${{ steps.resolve-url.outputs.report_url }}
+        RUN_URL: ${{ steps.resolve-url.outputs.run_url }}
+        BROKER_URL: ${{ inputs.broker-url }}
+      run: |
+        OUTCOME_NORM="$(echo "${TEST_OUTCOME}" | tr '[:upper:]' '[:lower:]')"
+        if [ "${OUTCOME_NORM}" = "success" ]; then
+          STATUS="SUCCESS"
+        else
+          STATUS="FAILURE"
+        fi
+
+        echo "## Contract testing (${STATUS})" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "| Check | Outcome |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| ${CHECK_LABEL} | ${TEST_OUTCOME} |" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+
+        if [ "${HAS_REPORT}" = "true" ]; then
+          echo "- Diagnostics: [${{ inputs.report-name }}](${REPORT_URL})" >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "- Diagnostics: no contract artifacts found in this run" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Run: ${RUN_URL}" >> "$GITHUB_STEP_SUMMARY"
+        fi
+        if [ -n "${BROKER_URL}" ]; then
+          echo "- Pact Broker: ${BROKER_URL}" >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - name: Comment Pact result on PR
+      if: ${{ always() && github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
+      uses: actions/github-script@v7
+      env:
+        INPUT_CHECK_LABEL: ${{ inputs.check-label }}
+        INPUT_TEST_OUTCOME: ${{ inputs.test-outcome }}
+        INPUT_REPORT_URL: ${{ steps.resolve-url.outputs.report_url }}
+        INPUT_RUN_URL: ${{ steps.resolve-url.outputs.run_url }}
+        INPUT_HAS_REPORT: ${{ steps.resolve-url.outputs.has_report }}
+        INPUT_BROKER_URL: ${{ inputs.broker-url }}
+      with:
+        github-token: ${{ inputs.github-token || github.token }}
+        script: |
+          const testOutcome = process.env.INPUT_TEST_OUTCOME.toLowerCase();
+          const checkLabel = process.env.INPUT_CHECK_LABEL;
+          const hasReport = process.env.INPUT_HAS_REPORT === 'true';
+          const reportUrl = process.env.INPUT_REPORT_URL;
+          const runUrl = process.env.INPUT_RUN_URL;
+          const brokerUrl = process.env.INPUT_BROKER_URL;
+
+          const isSuccess = testOutcome === 'success';
+          const statusEmoji = isSuccess ? '✅' : '❌';
+          const statusText = isSuccess ? 'SUCCESS' : 'FAILURE';
+
+          const reportLink = hasReport ? reportUrl : runUrl;
+          const marker = '<!-- pact-report -->';
+
+          const lines = [
+            marker,
+            `## 🤝 Contract Testing: ${statusEmoji} **${statusText}**`,
+            '',
+            `| Check | Outcome |`,
+            `|-------|---------|`,
+            `| ${checkLabel} | ${testOutcome} |`,
+            '',
+            `📦 **[Download Diagnostics](${reportLink})**`,
+          ];
+          if (brokerUrl) {
+            lines.push(`🔗 **[View in Pact Broker](${brokerUrl})**`);
+          }
+          const body = lines.join('\n');
+
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            per_page: 100,
+          });
+
+          const existing = comments.find((c) =>
+            c.user?.login === 'github-actions[bot]' &&
+            c.body?.includes(marker)
+          );
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+            core.info(`Updated existing Pact comment (id: ${existing.id})`);
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+            core.info('Created new Pact comment');
+          }

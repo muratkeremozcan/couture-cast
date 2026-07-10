@@ -23,6 +23,16 @@ runs:
         base_delay='${{ inputs.base-delay-seconds }}'
         attempt=1
 
+        diagnose_db_port() {
+          echo "::group::Supabase database port diagnostics"
+          echo "Containers publishing port 54322:"
+          docker ps --all --filter publish=54322 \
+            --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}' || true
+          echo "Host listeners on port 54322:"
+          ss -ltnp '( sport = :54322 )' || true
+          echo "::endgroup::"
+        }
+
         while [ "$attempt" -le "$max_attempts" ]; do
           echo "::group::Start local Supabase (attempt ${attempt}/${max_attempts})"
 
@@ -31,12 +41,14 @@ runs:
             npx supabase status || true
             echo "::endgroup::"
             exit 0
+          else
+            exit_code=$?
           fi
 
-          exit_code=$?
           echo "Supabase startup failed with exit code ${exit_code}."
           npx supabase status || true
           echo "::endgroup::"
+          diagnose_db_port
 
           if [ "$attempt" -eq "$max_attempts" ]; then
             echo "::error::Failed to start local Supabase after ${max_attempts} attempts."

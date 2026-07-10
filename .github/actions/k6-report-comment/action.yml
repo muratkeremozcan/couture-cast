@@ -1,0 +1,214 @@
+name: k6 report and comment
+
+# IMPORTANT: Run the k6 test step before using this action - it reads the summary json(s) produced by handleSummary()
+description: 'Upload k6 summary artifacts, generate a step summary, and optionally comment on PR'
+
+inputs:
+  summary-glob:
+    description: 'Glob pattern for k6 summary json files'
+    required: false
+    default: 'k6/summary-*.json'
+  report-name:
+    description: 'Name for the uploaded summary artifact'
+    required: false
+    default: 'k6-report'
+  retention-days:
+    description: 'Artifact retention days'
+    required: false
+    default: '14'
+  test-outcome:
+    description: 'Outcome of the k6 test step (success/failure)'
+    required: true
+  run-mode:
+    description: 'Label describing the k6 run (e.g. smoke, load)'
+    required: false
+    default: 'smoke'
+  comment-on-pr:
+    description: 'Whether to post a PR comment'
+    required: false
+    default: 'true'
+  github-token:
+    description: 'Token to use for GitHub API (pass GITHUB_TOKEN)'
+    required: false
+    default: ''
+
+outputs:
+  report-url:
+    description: 'Download URL for the summary artifact'
+    value: ${{ steps.resolve-url.outputs.report_url }}
+  report-artifact-url:
+    description: 'Direct artifact URL for the summary artifact'
+    value: ${{ steps.upload-report.outputs.artifact-url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect k6 summary files
+      id: detect-summary
+      shell: bash
+      env:
+        SUMMARY_GLOB: ${{ inputs.summary-glob }}
+      run: |
+        files=$(ls ${SUMMARY_GLOB} 2>/dev/null || true)
+        if [ -n "$files" ]; then
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "Found k6 summary file(s):"
+          echo "$files"
+        else
+          echo "found=false" >> "$GITHUB_OUTPUT"
+          echo "No k6 summary files found matching ${SUMMARY_GLOB}"
+        fi
+
+    - name: Upload k6 summary artifact
+      id: upload-report
+      if: ${{ steps.detect-summary.outputs.found == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.report-name }}
+        path: ${{ inputs.summary-glob }}
+        retention-days: ${{ inputs.retention-days }}
+        if-no-files-found: ignore
+
+    - name: Resolve report download URL
+      id: resolve-url
+      if: ${{ always() }}
+      uses: actions/github-script@v7
+      env:
+        ARTIFACT_NAME: ${{ inputs.report-name }}
+      with:
+        github-token: ${{ inputs.github-token || github.token }}
+        script: |
+          const artifactName = process.env.ARTIFACT_NAME;
+          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          const uploadedArtifactUrl = '${{ steps.upload-report.outputs.artifact-url }}';
+          let reportUrl = uploadedArtifactUrl || runUrl;
+          let hasReport = false;
+          if (uploadedArtifactUrl) {
+            hasReport = true;
+          } else {
+            try {
+              const { data } = await github.rest.actions.listWorkflowRunArtifacts({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: context.runId,
+              });
+              const artifact = data.artifacts.find((a) => a.name === artifactName);
+              if (artifact?.id) {
+                hasReport = true;
+                reportUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts/${artifact.id}`;
+              }
+            } catch (e) {
+              core.warning(`Could not resolve report URL: ${e.message}`);
+            }
+          }
+          core.setOutput('report_url', reportUrl);
+          core.setOutput('run_url', runUrl);
+          core.setOutput('has_report', String(hasReport));
+
+    - name: Generate summary
+      if: always()
+      shell: bash
+      env:
+        RUN_MODE: ${{ inputs.run-mode }}
+        TEST_OUTCOME: ${{ inputs.test-outcome }}
+        HAS_REPORT: ${{ steps.resolve-url.outputs.has_report }}
+        REPORT_URL: ${{ steps.resolve-url.outputs.report_url }}
+        RUN_URL: ${{ steps.resolve-url.outputs.run_url }}
+        SUMMARY_GLOB: ${{ inputs.summary-glob }}
+        REPORT_NAME: ${{ inputs.report-name }}
+      run: |
+        OUTCOME_NORM="$(echo "${TEST_OUTCOME}" | tr '[:upper:]' '[:lower:]')"
+        if [ "${OUTCOME_NORM}" = "success" ]; then
+          STATUS="SUCCESS"
+        else
+          STATUS="FAILURE"
+        fi
+
+        echo "## k6 ${RUN_MODE} (${STATUS})" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+
+        shopt -s nullglob
+        files=(${SUMMARY_GLOB})
+        if [ ${#files[@]} -eq 0 ]; then
+          echo "No k6 summary files were produced." >> "$GITHUB_STEP_SUMMARY"
+        else
+          for f in "${files[@]}"; do
+            if [ ${#files[@]} -gt 1 ]; then
+              echo "### $(basename "$f")" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo "| Metric | p95 | p99 | avg | max |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| --- | --- | --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.metrics | to_entries[] | "| \(.key) | \(.value.p95 // "-")ms | \(.value.p99 // "-")ms | \(.value.avg // "-")ms | \(.value.max // "-")ms |"' "$f" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          done
+        fi
+
+        if [ "${HAS_REPORT}" = "true" ]; then
+          echo "- Report: [${REPORT_NAME}](${REPORT_URL})" >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "- Report: no k6 summary artifacts found in this run" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Run: ${RUN_URL}" >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - name: Comment k6 result on PR
+      if: ${{ always() && github.event_name == 'pull_request' && inputs.comment-on-pr == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
+      uses: actions/github-script@v7
+      env:
+        INPUT_RUN_MODE: ${{ inputs.run-mode }}
+        INPUT_TEST_OUTCOME: ${{ inputs.test-outcome }}
+        INPUT_REPORT_URL: ${{ steps.resolve-url.outputs.report_url }}
+        INPUT_RUN_URL: ${{ steps.resolve-url.outputs.run_url }}
+        INPUT_HAS_REPORT: ${{ steps.resolve-url.outputs.has_report }}
+      with:
+        github-token: ${{ inputs.github-token || github.token }}
+        script: |
+          const fs = require('fs');
+          const testOutcome = process.env.INPUT_TEST_OUTCOME.toLowerCase();
+          const runMode = process.env.INPUT_RUN_MODE;
+          const hasReport = process.env.INPUT_HAS_REPORT === 'true';
+          const reportUrl = process.env.INPUT_REPORT_URL;
+          const runUrl = process.env.INPUT_RUN_URL;
+
+          const isSuccess = testOutcome === 'success';
+          const statusEmoji = isSuccess ? '✅' : '❌';
+          const statusText = isSuccess ? 'SUCCESS' : 'FAILURE';
+
+          const reportLink = hasReport ? reportUrl : runUrl;
+          const marker = '<!-- k6-report -->';
+
+          const body = [
+            marker,
+            `## ⚡ k6 ${runMode}: ${statusEmoji} **${statusText}**`,
+            '',
+            `📦 **[Download Summary](${reportLink})**`,
+          ].join('\n');
+
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            per_page: 100,
+          });
+
+          const existing = comments.find((c) =>
+            c.user?.login === 'github-actions[bot]' &&
+            c.body?.includes(marker)
+          );
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+            core.info(`Updated existing k6 comment (id: ${existing.id})`);
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+            core.info('Created new k6 comment');
+          }

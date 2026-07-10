@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   local-contracts:
@@ -30,27 +31,17 @@ jobs:
 
       - name: Run blocking Pact workflow
         id: pact
+        continue-on-error: true
         run: npm run test:pact
 
-      - name: Upload contract diagnostics
+      - name: Pact report and comment
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/pact-report-comment
         with:
-          name: contract-testing-diagnostics-${{ github.event.pull_request.number || github.sha }}
-          path: |
-            packages/api-client/docs/http.openapi.json
-            pacts/
-            pact/artifacts/
-          if-no-files-found: ignore
-          retention-days: 14
+          report-name: contract-testing-diagnostics-${{ github.event.pull_request.number || github.sha }}
+          test-outcome: ${{ steps.pact.outcome }}
+          check-label: 'Local schema, consumer, and provider contracts'
 
-      - name: Summarize contract status
-        if: always()
-        run: |
-          {
-            echo "## Contract testing"
-            echo ""
-            echo "| Check | Outcome |"
-            echo "| --- | --- |"
-            echo "| Local schema, consumer, and provider contracts | ${{ steps.pact.outcome }} |"
-          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Fail if Pact workflow failed
+        if: steps.pact.outcome == 'failure'
+        run: exit 1
