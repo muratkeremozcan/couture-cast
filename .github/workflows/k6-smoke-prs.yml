@@ -60,6 +60,7 @@ jobs:
 
       - name: k6 report and comment
         if: always()
+        continue-on-error: true
         uses: ./.github/actions/k6-report-comment
         with:
           summary-glob: k6/summary-*.json

@@ -64,12 +64,15 @@ runs:
       id: resolve-url
       if: ${{ always() }}
       uses: actions/github-script@v7
+      env:
+        ARTIFACT_NAME: ${{ inputs.report-name }}
+        UPLOADED_ARTIFACT_URL: ${{ steps.upload-report.outputs.artifact-url }}
       with:
         github-token: ${{ inputs.github-token || github.token }}
         script: |
-          const artifactName = '${{ inputs.report-name }}';
+          const artifactName = process.env.ARTIFACT_NAME;
           const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-          const uploadedArtifactUrl = '${{ steps.upload-report.outputs.artifact-url }}';
+          const uploadedArtifactUrl = process.env.UPLOADED_ARTIFACT_URL;
           let reportUrl = uploadedArtifactUrl || runUrl;
           let hasReport = false;
           if (uploadedArtifactUrl) {
@@ -104,6 +107,7 @@ runs:
         REPORT_URL: ${{ steps.resolve-url.outputs.report_url }}
         RUN_URL: ${{ steps.resolve-url.outputs.run_url }}
         BROKER_URL: ${{ inputs.broker-url }}
+        REPORT_NAME: ${{ inputs.report-name }}
       run: |
         OUTCOME_NORM="$(echo "${TEST_OUTCOME}" | tr '[:upper:]' '[:lower:]')"
         if [ "${OUTCOME_NORM}" = "success" ]; then
@@ -120,7 +124,7 @@ runs:
         echo "" >> "$GITHUB_STEP_SUMMARY"
 
         if [ "${HAS_REPORT}" = "true" ]; then
-          echo "- Diagnostics: [${{ inputs.report-name }}](${REPORT_URL})" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Diagnostics: [${REPORT_NAME}](${REPORT_URL})" >> "$GITHUB_STEP_SUMMARY"
         else
           echo "- Diagnostics: no contract artifacts found in this run" >> "$GITHUB_STEP_SUMMARY"
           echo "- Run: ${RUN_URL}" >> "$GITHUB_STEP_SUMMARY"
@@ -178,10 +182,7 @@ runs:
             per_page: 100,
           });
 
-          const existing = comments.find((c) =>
-            c.user?.login === 'github-actions[bot]' &&
-            c.body?.includes(marker)
-          );
+          const existing = comments.find((c) => c.body?.includes(marker));
 
           if (existing) {
             await github.rest.issues.updateComment({
