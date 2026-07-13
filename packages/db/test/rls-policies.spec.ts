@@ -15,7 +15,16 @@ const guardianSharedTables = [
   'OutfitRecommendation',
 ] as const
 
-const selfOnlyTables = ['LookbookPost', 'EngagementEvent', 'SavedLocation'] as const
+const selfOnlyTables = [
+  'LookbookPost',
+  'EngagementEvent',
+  'SavedLocation',
+  'AlertRule',
+  'NotificationPreference',
+  'PushToken',
+] as const
+
+const ownerOrGlobalReadTables = ['EventEnvelope'] as const
 
 const adminPool = new Pool({
   connectionString: databaseUrl,
@@ -39,10 +48,21 @@ type SeededScenario = {
   postId: string
   eventId: string
   savedLocationId: string
+  alertRuleId: string
+  notificationPreferenceId: string
+  pushTokenId: string
+  pushToken: string
+  eventEnvelopeId: string
   otherTeenId: string
   otherTeenEmail: string
   otherGarmentId: string
   otherSavedLocationId: string
+  otherAlertRuleId: string
+  otherNotificationPreferenceId: string
+  otherPushTokenId: string
+  otherPushToken: string
+  otherEventEnvelopeId: string
+  globalEventEnvelopeId: string
   consentReadOnlyId: string
   consentFullId: string
 }
@@ -115,10 +135,21 @@ const seedScenario = async (): Promise<SeededScenario> => {
     postId: `post-${suffix}`,
     eventId: `event-${suffix}`,
     savedLocationId: `saved-location-${suffix}`,
+    alertRuleId: `alert-rule-${suffix}`,
+    notificationPreferenceId: `notification-preference-${suffix}`,
+    pushTokenId: `push-token-${suffix}`,
+    pushToken: `ExponentPushToken[owner-${suffix}]`,
+    eventEnvelopeId: `event-envelope-${suffix}`,
     otherTeenId: `other-teen-${suffix}`,
     otherTeenEmail: `other-teen-${suffix}@example.com`,
     otherGarmentId: `other-garment-${suffix}`,
     otherSavedLocationId: `other-saved-location-${suffix}`,
+    otherAlertRuleId: `other-alert-rule-${suffix}`,
+    otherNotificationPreferenceId: `other-notification-preference-${suffix}`,
+    otherPushTokenId: `other-push-token-${suffix}`,
+    otherPushToken: `ExponentPushToken[other-${suffix}]`,
+    otherEventEnvelopeId: `other-event-envelope-${suffix}`,
+    globalEventEnvelopeId: `global-event-envelope-${suffix}`,
     consentReadOnlyId: `consent-read-${suffix}`,
     consentFullId: `consent-full-${suffix}`,
   }
@@ -264,6 +295,73 @@ const seedScenario = async (): Promise<SeededScenario> => {
     )
 
     await client.query(
+      `INSERT INTO public."AlertRule"
+        ("id", "user_id", "rule_type", "threshold", "updated_at")
+       VALUES
+        ($1, $2, 'temperature', 8, NOW()),
+        ($3, $4, 'temperature', 12, NOW())`,
+      [seeded.alertRuleId, seeded.teenId, seeded.otherAlertRuleId, seeded.otherTeenId]
+    )
+
+    await client.query(
+      `INSERT INTO public."NotificationPreference"
+        (
+          "id",
+          "user_id",
+          "quiet_hours_enabled",
+          "push_enabled",
+          "quiet_hours_start",
+          "quiet_hours_end",
+          "timezone",
+          "updated_at"
+        )
+       VALUES
+        ($1, $2, TRUE, TRUE, '22:00', '07:00', 'America/Chicago', NOW()),
+        ($3, $4, FALSE, TRUE, '23:00', '06:00', 'America/New_York', NOW())`,
+      [
+        seeded.notificationPreferenceId,
+        seeded.teenId,
+        seeded.otherNotificationPreferenceId,
+        seeded.otherTeenId,
+      ]
+    )
+
+    await client.query(
+      `INSERT INTO public."PushToken"
+        ("id", "user_id", "token", "platform", "updated_at")
+       VALUES
+        ($1, $2, $3, 'ios', NOW()),
+        ($4, $5, $6, 'android', NOW())`,
+      [
+        seeded.pushTokenId,
+        seeded.teenId,
+        seeded.pushToken,
+        seeded.otherPushTokenId,
+        seeded.otherTeenId,
+        seeded.otherPushToken,
+      ]
+    )
+
+    await client.query(
+      `INSERT INTO public."EventEnvelope"
+        ("id", "channel", "payload", "user_id", "updated_at")
+       VALUES
+        ($1, 'alert:weather', $2::jsonb, $3, NOW()),
+        ($4, 'alert:weather', $5::jsonb, $6, NOW()),
+        ($7, 'alert:weather', $8::jsonb, NULL, NOW())`,
+      [
+        seeded.eventEnvelopeId,
+        JSON.stringify({ audience: 'owner' }),
+        seeded.teenId,
+        seeded.otherEventEnvelopeId,
+        JSON.stringify({ audience: 'other-owner' }),
+        seeded.otherTeenId,
+        seeded.globalEventEnvelopeId,
+        JSON.stringify({ audience: 'global' }),
+      ]
+    )
+
+    await client.query(
       `INSERT INTO public."GuardianConsent"
         ("id", "guardian_id", "teen_id", "consent_level", "status", "ip_address")
        VALUES ($1, $2, $3, 'read_only', 'granted', '127.0.0.1')`,
@@ -296,6 +394,23 @@ const cleanupScenario = async (seeded: SeededScenario | undefined) => {
 
   try {
     await client.query('BEGIN')
+    await client.query('DELETE FROM public."EventEnvelope" WHERE "id" IN ($1, $2, $3)', [
+      seeded.eventEnvelopeId,
+      seeded.otherEventEnvelopeId,
+      seeded.globalEventEnvelopeId,
+    ])
+    await client.query('DELETE FROM public."PushToken" WHERE "id" IN ($1, $2)', [
+      seeded.pushTokenId,
+      seeded.otherPushTokenId,
+    ])
+    await client.query(
+      'DELETE FROM public."NotificationPreference" WHERE "id" IN ($1, $2)',
+      [seeded.notificationPreferenceId, seeded.otherNotificationPreferenceId]
+    )
+    await client.query('DELETE FROM public."AlertRule" WHERE "id" IN ($1, $2)', [
+      seeded.alertRuleId,
+      seeded.otherAlertRuleId,
+    ])
     await client.query('DELETE FROM public."EngagementEvent" WHERE "id" = $1', [
       seeded.eventId,
     ])
@@ -374,7 +489,12 @@ describe.sequential('guardian-aware RLS policies', () => {
   })
 
   it('enables RLS and installs the expected policy sets', async () => {
-    const targetTables = [...guardianSharedTables, ...selfOnlyTables, 'GuardianConsent']
+    const targetTables = [
+      ...guardianSharedTables,
+      ...selfOnlyTables,
+      ...ownerOrGlobalReadTables,
+      'GuardianConsent',
+    ]
     const client = await adminPool.connect()
 
     try {
@@ -434,9 +554,56 @@ describe.sequential('guardian-aware RLS policies', () => {
         )
       }
 
+      expect(policyMap.get('EventEnvelope')).toEqual(
+        new Set(['authenticated_read_own_or_global_events'])
+      )
+
       expect(policyMap.get('GuardianConsent')).toEqual(
         new Set(['authenticated_read_guardian_consent'])
       )
+    } finally {
+      client.release()
+    }
+  })
+
+  it('keeps alert delivery coordination tables worker-only', async () => {
+    const privateTables = ['AlertDeliveryOutbox', 'AlertCooldownReservation'] as const
+    const client = await adminPool.connect()
+
+    try {
+      const rlsState = await client.query<{
+        table_name: string
+        rls_enabled: boolean
+      }>(
+        `SELECT c.relname AS table_name, c.relrowsecurity AS rls_enabled
+         FROM pg_class AS c
+         INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'public'
+           AND c.relname = ANY($1::text[])`,
+        [privateTables]
+      )
+
+      expect(rlsState.rows).toHaveLength(privateTables.length)
+      expect(rlsState.rows.every((row) => row.rls_enabled)).toBe(true)
+
+      const policies = await client.query(
+        `SELECT policyname
+         FROM pg_policies
+         WHERE schemaname = 'public'
+           AND tablename = ANY($1::text[])`,
+        [privateTables]
+      )
+      expect(policies.rows).toEqual([])
+
+      const clientGrants = await client.query(
+        `SELECT grantee, table_name, privilege_type
+         FROM information_schema.role_table_grants
+         WHERE table_schema = 'public'
+           AND table_name = ANY($1::text[])
+           AND grantee = ANY($2::text[])`,
+        [privateTables, ['anon', 'authenticated']]
+      )
+      expect(clientGrants.rows).toEqual([])
     } finally {
       client.release()
     }
@@ -720,6 +887,336 @@ describe.sequential('guardian-aware RLS policies', () => {
         )
 
         expect(teenLocations.rows).toEqual([{ id: seeded.savedLocationId }])
+      }
+    )
+  })
+
+  it('allows owners to perform CRUD on alert settings and push tokens', async () => {
+    const seeded = (scenario = await seedScenario())
+
+    await withRole(
+      'authenticated',
+      buildClaims(seeded.teenEmail, 'teen'),
+      async (client) => {
+        const alertRules = await client.query<{
+          id: string
+          threshold: number
+        }>(
+          `SELECT "id", "threshold"
+           FROM public."AlertRule"
+           WHERE "id" = ANY($1::text[])`,
+          [[seeded.alertRuleId, seeded.otherAlertRuleId]]
+        )
+
+        expect(alertRules.rows).toEqual([{ id: seeded.alertRuleId, threshold: 8 }])
+
+        const notificationPreferences = await client.query<{
+          id: string
+          push_enabled: boolean
+        }>(
+          `SELECT "id", "push_enabled"
+           FROM public."NotificationPreference"
+           WHERE "id" = ANY($1::text[])`,
+          [[seeded.notificationPreferenceId, seeded.otherNotificationPreferenceId]]
+        )
+
+        expect(notificationPreferences.rows).toEqual([
+          { id: seeded.notificationPreferenceId, push_enabled: true },
+        ])
+
+        const pushTokens = await client.query<{
+          id: string
+          platform: string
+        }>(
+          `SELECT "id", "platform"
+           FROM public."PushToken"
+           WHERE "id" = ANY($1::text[])`,
+          [[seeded.pushTokenId, seeded.otherPushTokenId]]
+        )
+
+        expect(pushTokens.rows).toEqual([{ id: seeded.pushTokenId, platform: 'ios' }])
+
+        const updatedRule = await client.query(
+          `UPDATE public."AlertRule"
+           SET "threshold" = 10, "updated_at" = NOW()
+           WHERE "id" = $1
+           RETURNING "threshold"`,
+          [seeded.alertRuleId]
+        )
+        expect(updatedRule.rows).toEqual([{ threshold: 10 }])
+
+        const updatedPreference = await client.query(
+          `UPDATE public."NotificationPreference"
+           SET "push_enabled" = FALSE, "updated_at" = NOW()
+           WHERE "id" = $1
+           RETURNING "push_enabled"`,
+          [seeded.notificationPreferenceId]
+        )
+        expect(updatedPreference.rows).toEqual([{ push_enabled: false }])
+
+        const updatedToken = await client.query(
+          `UPDATE public."PushToken"
+           SET "platform" = 'android', "updated_at" = NOW()
+           WHERE "id" = $1
+           RETURNING "platform"`,
+          [seeded.pushTokenId]
+        )
+        expect(updatedToken.rows).toEqual([{ platform: 'android' }])
+
+        for (const [tableName, id] of [
+          ['AlertRule', seeded.alertRuleId],
+          ['NotificationPreference', seeded.notificationPreferenceId],
+          ['PushToken', seeded.pushTokenId],
+        ] as const) {
+          const deleted = await client.query(
+            `DELETE FROM public."${tableName}" WHERE "id" = $1 RETURNING "id"`,
+            [id]
+          )
+          expect(deleted.rows).toEqual([{ id }])
+        }
+
+        const insertedRule = await client.query(
+          `INSERT INTO public."AlertRule"
+            ("id", "user_id", "rule_type", "threshold", "updated_at")
+           VALUES ($1, $2, 'precipitation', 0.5, NOW())
+           RETURNING "id"`,
+          [seeded.alertRuleId, seeded.teenId]
+        )
+        expect(insertedRule.rows).toEqual([{ id: seeded.alertRuleId }])
+
+        const insertedPreference = await client.query(
+          `INSERT INTO public."NotificationPreference"
+            ("id", "user_id", "push_enabled", "updated_at")
+           VALUES ($1, $2, TRUE, NOW())
+           RETURNING "id"`,
+          [seeded.notificationPreferenceId, seeded.teenId]
+        )
+        expect(insertedPreference.rows).toEqual([{ id: seeded.notificationPreferenceId }])
+
+        const insertedToken = await client.query(
+          `INSERT INTO public."PushToken"
+            ("id", "user_id", "token", "platform", "updated_at")
+           VALUES ($1, $2, $3, 'ios', NOW())
+           RETURNING "id"`,
+          [seeded.pushTokenId, seeded.teenId, seeded.pushToken]
+        )
+        expect(insertedToken.rows).toEqual([{ id: seeded.pushTokenId }])
+      }
+    )
+  })
+
+  it('exposes only owned and global event envelopes to authenticated users', async () => {
+    const seeded = (scenario = await seedScenario())
+
+    await withRole(
+      'authenticated',
+      buildClaims(seeded.teenEmail, 'teen'),
+      async (client) => {
+        const events = await client.query<{ id: string }>(
+          `SELECT "id"
+           FROM public."EventEnvelope"
+           WHERE "id" = ANY($1::text[])`,
+          [
+            [
+              seeded.eventEnvelopeId,
+              seeded.otherEventEnvelopeId,
+              seeded.globalEventEnvelopeId,
+            ],
+          ]
+        )
+
+        expect(new Set(events.rows.map((row) => row.id))).toEqual(
+          new Set([seeded.eventEnvelopeId, seeded.globalEventEnvelopeId])
+        )
+      }
+    )
+  })
+
+  it('keeps alert settings, push tokens, and user events hidden from other users', async () => {
+    const seeded = (scenario = await seedScenario())
+
+    await withRole(
+      'authenticated',
+      buildClaims(seeded.teenEmail, 'teen'),
+      async (client) => {
+        const otherRules = await client.query(
+          'SELECT "id" FROM public."AlertRule" WHERE "user_id" = $1',
+          [seeded.otherTeenId]
+        )
+        expect(otherRules.rows).toHaveLength(0)
+
+        const otherPreferences = await client.query(
+          'SELECT "id" FROM public."NotificationPreference" WHERE "user_id" = $1',
+          [seeded.otherTeenId]
+        )
+        expect(otherPreferences.rows).toHaveLength(0)
+
+        const otherTokens = await client.query(
+          'SELECT "id" FROM public."PushToken" WHERE "user_id" = $1',
+          [seeded.otherTeenId]
+        )
+        expect(otherTokens.rows).toHaveLength(0)
+
+        const otherEvents = await client.query(
+          'SELECT "id" FROM public."EventEnvelope" WHERE "user_id" = $1',
+          [seeded.otherTeenId]
+        )
+        expect(otherEvents.rows).toHaveLength(0)
+
+        const updatedRule = await client.query(
+          `UPDATE public."AlertRule"
+           SET "threshold" = 99, "updated_at" = NOW()
+           WHERE "id" = $1
+           RETURNING "id"`,
+          [seeded.otherAlertRuleId]
+        )
+        expect(updatedRule.rows).toHaveLength(0)
+
+        const deletedToken = await client.query(
+          'DELETE FROM public."PushToken" WHERE "id" = $1 RETURNING "id"',
+          [seeded.otherPushTokenId]
+        )
+        expect(deletedToken.rows).toHaveLength(0)
+      }
+    )
+  })
+
+  it('rejects cross-account alert rule inserts', async () => {
+    const seeded = (scenario = await seedScenario())
+
+    await withRole(
+      'authenticated',
+      buildClaims(seeded.teenEmail, 'teen'),
+      async (client) => {
+        await expect(
+          client.query(
+            `INSERT INTO public."AlertRule"
+              ("id", "user_id", "rule_type", "threshold", "updated_at")
+             VALUES ($1, $2, 'precipitation', 0.5, NOW())`,
+            [`cross-alert-rule-${randomUUID()}`, seeded.otherTeenId]
+          )
+        ).rejects.toMatchObject({ code: '42501' })
+      }
+    )
+  })
+
+  it('rejects cross-account notification preference inserts', async () => {
+    const seeded = (scenario = await seedScenario())
+
+    await withRole(
+      'authenticated',
+      buildClaims(seeded.teenEmail, 'teen'),
+      async (client) => {
+        await expect(
+          client.query(
+            `INSERT INTO public."NotificationPreference"
+              ("id", "user_id", "push_enabled", "updated_at")
+             VALUES ($1, $2, TRUE, NOW())`,
+            [`cross-notification-preference-${randomUUID()}`, seeded.guardianReadOnlyId]
+          )
+        ).rejects.toMatchObject({ code: '42501' })
+      }
+    )
+  })
+
+  it('rejects cross-account push token inserts', async () => {
+    const seeded = (scenario = await seedScenario())
+
+    await withRole(
+      'authenticated',
+      buildClaims(seeded.teenEmail, 'teen'),
+      async (client) => {
+        await expect(
+          client.query(
+            `INSERT INTO public."PushToken"
+              ("id", "user_id", "token", "platform", "updated_at")
+             VALUES ($1, $2, $3, 'ios', NOW())`,
+            [
+              `cross-push-token-${randomUUID()}`,
+              seeded.otherTeenId,
+              `ExponentPushToken[cross-${randomUUID()}]`,
+            ]
+          )
+        ).rejects.toMatchObject({ code: '42501' })
+      }
+    )
+  })
+
+  it('does not extend full guardian access to private alert delivery records', async () => {
+    const seeded = (scenario = await seedScenario())
+
+    await withRole(
+      'authenticated',
+      buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
+      async (client) => {
+        for (const tableName of [
+          'AlertRule',
+          'NotificationPreference',
+          'PushToken',
+        ] as const) {
+          const rows = await client.query(
+            `SELECT "id" FROM public."${tableName}" WHERE "user_id" = $1`,
+            [seeded.teenId]
+          )
+          expect(rows.rows).toHaveLength(0)
+        }
+
+        const privateEvents = await client.query(
+          'SELECT "id" FROM public."EventEnvelope" WHERE "user_id" = $1',
+          [seeded.teenId]
+        )
+        expect(privateEvents.rows).toHaveLength(0)
+
+        const globalEvents = await client.query(
+          'SELECT "id" FROM public."EventEnvelope" WHERE "id" = $1',
+          [seeded.globalEventEnvelopeId]
+        )
+        expect(globalEvents.rows).toEqual([{ id: seeded.globalEventEnvelopeId }])
+      }
+    )
+  })
+
+  it('allows administrators to inspect alert settings and delivery records', async () => {
+    const seeded = (scenario = await seedScenario())
+
+    await withRole(
+      'authenticated',
+      buildClaims(`admin-${randomUUID()}@example.com`, 'admin'),
+      async (client) => {
+        for (const tableName of [
+          'AlertRule',
+          'NotificationPreference',
+          'PushToken',
+        ] as const) {
+          const rows = await client.query(
+            `SELECT "id" FROM public."${tableName}"
+             WHERE "user_id" = ANY($1::text[])`,
+            [[seeded.teenId, seeded.otherTeenId]]
+          )
+          expect(rows.rows).toHaveLength(2)
+        }
+
+        const events = await client.query(
+          `SELECT "id" FROM public."EventEnvelope"
+           WHERE "id" = ANY($1::text[])`,
+          [
+            [
+              seeded.eventEnvelopeId,
+              seeded.otherEventEnvelopeId,
+              seeded.globalEventEnvelopeId,
+            ],
+          ]
+        )
+        expect(events.rows).toHaveLength(3)
+
+        const updatedRule = await client.query(
+          `UPDATE public."AlertRule"
+           SET "enabled" = FALSE, "updated_at" = NOW()
+           WHERE "id" = $1
+           RETURNING "enabled"`,
+          [seeded.otherAlertRuleId]
+        )
+        expect(updatedRule.rows).toEqual([{ enabled: false }])
       }
     )
   })

@@ -117,6 +117,9 @@ function createService(input: {
     recordFallbackOutcome: vi.fn(),
     recordSnapshotAge: vi.fn(),
   }
+  const alertProcessor = {
+    process: vi.fn().mockResolvedValue([]),
+  }
 
   const service = new WeatherIngestionService(
     primaryProvider,
@@ -126,7 +129,8 @@ function createService(input: {
     undefined,
     sleeper,
     logger as never,
-    meter
+    meter,
+    alertProcessor as never
   )
 
   return {
@@ -138,16 +142,24 @@ function createService(input: {
     sleeper,
     logger,
     meter,
+    alertProcessor,
   }
 }
 
 describe('WeatherIngestionService', () => {
   it('persists a successful primary forecast without calling the secondary provider', async () => {
     const forecast = buildForecast('openweather')
-    const { service, primaryProvider, secondaryProvider, repository, logger, meter } =
-      createService({
-        primaryResults: [forecast],
-      })
+    const {
+      service,
+      primaryProvider,
+      secondaryProvider,
+      repository,
+      logger,
+      meter,
+      alertProcessor,
+    } = createService({
+      primaryResults: [forecast],
+    })
 
     await expect(service.ingestTarget(target)).resolves.toMatchObject({
       outcome: 'persisted',
@@ -157,9 +169,19 @@ describe('WeatherIngestionService', () => {
     expect(primaryProvider.fetchForecast).toHaveBeenCalledTimes(1)
     expect(secondaryProvider.fetchForecast).not.toHaveBeenCalled()
     expect(repository.persistForecast).toHaveBeenCalledWith(forecast)
+    expect(alertProcessor.process).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'persisted-weather' }),
+      forecast
+    )
     expect(repository.recordProviderSuccess).toHaveBeenCalledWith(
       'new-york-ny',
       expect.any(Date)
+    )
+    expect(repository.persistForecast.mock.invocationCallOrder[0]).toBeLessThan(
+      alertProcessor.process.mock.invocationCallOrder[0]!
+    )
+    expect(alertProcessor.process.mock.invocationCallOrder[0]).toBeLessThan(
+      repository.recordProviderSuccess.mock.invocationCallOrder[0]!
     )
     expect(repository.recordProviderFailure).not.toHaveBeenCalled()
     expect(logger.info).toHaveBeenCalledWith('weather_provider_attempt', {
@@ -178,6 +200,20 @@ describe('WeatherIngestionService', () => {
     )
     expect(meter.recordIngestion).toHaveBeenCalledWith('persisted')
     expect(meter.recordSnapshotAge).toHaveBeenCalledWith('persisted', expect.any(Number))
+  })
+
+  it('does not fail the ingestion attempt when alert processing fails', async () => {
+    const forecast = buildForecast('openweather')
+    const { service, alertProcessor, repository, meter } = createService({
+      primaryResults: [forecast],
+    })
+    alertProcessor.process.mockRejectedValueOnce(new Error('event store unavailable'))
+
+    await expect(service.ingestTarget(target)).resolves.not.toThrow()
+
+    expect(repository.persistForecast).toHaveBeenCalledWith(forecast)
+    expect(repository.recordProviderSuccess).toHaveBeenCalled()
+    expect(meter.recordIngestion).toHaveBeenCalledWith('persisted')
   })
 
   it('uses exactly three primary attempts with 5s and 15s delays before failover', async () => {
@@ -222,10 +258,11 @@ describe('WeatherIngestionService', () => {
   })
 
   it('returns latest persisted weather when both providers fail', async () => {
-    const { service, queryService, repository, logger, meter } = createService({
-      primaryResults: [providerError('openweather', 'invalid_response')],
-      secondaryResults: [providerError('weatherapi', 'non_retryable_http', 400)],
-    })
+    const { service, queryService, repository, logger, meter, alertProcessor } =
+      createService({
+        primaryResults: [providerError('openweather', 'invalid_response')],
+        secondaryResults: [providerError('weatherapi', 'non_retryable_http', 400)],
+      })
 
     await expect(service.ingestTarget(target)).resolves.toMatchObject({
       outcome: 'fallback',
@@ -236,6 +273,7 @@ describe('WeatherIngestionService', () => {
     })
 
     expect(repository.persistForecast).not.toHaveBeenCalled()
+    expect(alertProcessor.process).not.toHaveBeenCalled()
     expect(repository.recordProviderFailure).toHaveBeenCalledWith(
       'new-york-ny',
       expect.any(Date)

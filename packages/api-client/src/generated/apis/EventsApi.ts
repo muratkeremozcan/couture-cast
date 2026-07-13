@@ -36,6 +36,15 @@ export class EventsApi extends runtime.BaseAPI {
 
     const headerParameters: runtime.HTTPHeaders = {}
 
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
     let urlPath = `/api/v1/events/poll`
 
     return {
@@ -47,7 +56,7 @@ export class EventsApi extends runtime.BaseAPI {
   }
 
   /**
-   * Returns unseen events plus the next cursor for polling fallback clients.
+   * Returns unseen events owned by the authenticated user, plus global events and the next cursor for polling fallback clients.
    * Poll incremental realtime fallback events
    */
   async apiV1EventsPollGetRaw(
@@ -61,7 +70,7 @@ export class EventsApi extends runtime.BaseAPI {
   }
 
   /**
-   * Returns unseen events plus the next cursor for polling fallback clients.
+   * Returns unseen events owned by the authenticated user, plus global events and the next cursor for polling fallback clients.
    * Poll incremental realtime fallback events
    */
   async apiV1EventsPollGet(

@@ -133,7 +133,7 @@ export class WeatherRepository {
     forecast: NormalizedWeatherForecast
   ): Prisma.WeatherSnapshotCreateInput {
     return {
-      location: forecast.locationKey,
+      location: forecast.locationName ?? forecast.locationKey,
       location_key: normalizeLocationKey(forecast.locationKey),
       latitude: forecast.latitude,
       longitude: forecast.longitude,

@@ -12,6 +12,7 @@ type CleanupDelegate = {
 }
 
 export interface CleanupPrismaClient {
+  alertRule: CleanupDelegate
   auditLog: CleanupDelegate
   comfortPreferences: CleanupDelegate
   engagementEvent: CleanupDelegate
@@ -20,6 +21,7 @@ export interface CleanupPrismaClient {
   guardianConsent: CleanupDelegate
   guardianInvitation: CleanupDelegate
   lookbookPost: CleanupDelegate
+  notificationPreference: CleanupDelegate
   outfitRecommendation: CleanupDelegate
   paletteInsights: CleanupDelegate
   pushToken: CleanupDelegate
@@ -27,6 +29,9 @@ export interface CleanupPrismaClient {
   user: CleanupDelegate
   userProfile: CleanupDelegate
   weatherSnapshot: CleanupDelegate
+  eventEnvelope: CleanupDelegate
+  alertDeliveryOutbox: CleanupDelegate
+  alertCooldownReservation: CleanupDelegate
 }
 
 export interface CleanupConfiguration {
@@ -173,6 +178,8 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const ritualIds = uniqueValues(tracked.rituals)
   const savedLocationIds = uniqueValues(tracked.savedLocations)
   const weatherSnapshotIds = uniqueValues(tracked.weatherSnapshots)
+  const alertRuleIds = uniqueValues(tracked.alertRules)
+  const notificationPreferenceIds = uniqueValues(tracked.notificationPreferences)
 
   const outfitRecommendationWhere = buildDeleteWhere(ritualIds, userIds)
   const garmentItemWhere = buildDeleteWhere(wardrobeItemIds, userIds)
@@ -180,6 +187,11 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
 
   try {
     await deleteByUserIds(userIds, [
+      () =>
+        prisma.eventEnvelope.deleteMany({
+          where: buildUserFilter(userIds),
+        }),
+      () => prisma.alertCooldownReservation.deleteMany({}),
       () =>
         prisma.engagementEvent.deleteMany({
           where: buildUserFilter(userIds),
@@ -197,6 +209,27 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
           where: buildUserFilter(userIds),
         }),
       () =>
+        prisma.alertRule.deleteMany({
+          where:
+            alertRuleIds.length > 0
+              ? {
+                  OR: [buildIdFilter(alertRuleIds), buildUserFilter(userIds)],
+                }
+              : buildUserFilter(userIds),
+        }),
+      () =>
+        prisma.notificationPreference.deleteMany({
+          where:
+            notificationPreferenceIds.length > 0
+              ? {
+                  OR: [
+                    buildIdFilter(notificationPreferenceIds),
+                    buildUserFilter(userIds),
+                  ],
+                }
+              : buildUserFilter(userIds),
+        }),
+      () =>
         prisma.savedLocation.deleteMany({
           where:
             savedLocationIds.length > 0
@@ -210,6 +243,18 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
     if (savedLocationIds.length > 0 && userIds.length === 0) {
       await prisma.savedLocation.deleteMany({
         where: buildIdFilter(savedLocationIds),
+      })
+    }
+
+    if (alertRuleIds.length > 0 && userIds.length === 0) {
+      await prisma.alertRule.deleteMany({
+        where: buildIdFilter(alertRuleIds),
+      })
+    }
+
+    if (notificationPreferenceIds.length > 0 && userIds.length === 0) {
+      await prisma.notificationPreference.deleteMany({
+        where: buildIdFilter(notificationPreferenceIds),
       })
     }
 

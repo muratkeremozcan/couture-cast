@@ -55,6 +55,18 @@ export class PushTokenRepository {
     return records
   }
 
+  async deleteTokens(tokens: string[]): Promise<number> {
+    const normalizedTokens = [
+      ...new Set(tokens.map((token) => token.trim()).filter(Boolean)),
+    ]
+    if (normalizedTokens.length === 0) return 0
+
+    const result = await this.prisma.pushToken.deleteMany({
+      where: { token: { in: normalizedTokens } },
+    })
+    return result.count
+  }
+
   private normalizePlatform(platform?: string): string | null {
     const value = platform?.trim()
     return value && value.length > 0 ? value : null

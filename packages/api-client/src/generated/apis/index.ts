@@ -1,4 +1,5 @@
 /* eslint-disable */
+export * from './AlertsApi'
 export * from './AuthApi'
 export * from './EventsApi'
 export * from './GuardianApi'

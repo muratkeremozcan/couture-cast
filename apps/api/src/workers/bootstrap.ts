@@ -1,5 +1,23 @@
+import '../load-env'
 import type { Queue, Worker } from 'bullmq'
+import { Expo } from 'expo-server-sdk'
+import Redis from 'ioredis'
 import { createQueues, queueConfigs } from '../config/queues'
+import { getRedisConfig, redisOptionsFromConfig } from '../config/redis'
+import { AlertFanoutProcessor } from '../modules/alerts/alert-fanout.processor'
+import { PrismaAlertFanoutRepository } from '../modules/alerts/alert-fanout.repository'
+import {
+  ALERT_REALTIME_PUBLISH_TIMEOUT_MS,
+  RedisAlertRealtimePublisher,
+} from '../modules/alerts/redis-alert-realtime.publisher'
+import { PrismaWeatherAlertProcessingRepository } from '../modules/alerts/weather-alert-processing.repository'
+import { WeatherAlertProcessingService } from '../modules/alerts/weather-alert-processing.service'
+import {
+  WeatherAlertFanoutQueue,
+  type AlertFanoutJobData,
+} from '../modules/alerts/weather-alert-fanout.queue'
+import { PushNotificationService } from '../modules/notifications/push-notification.service'
+import { PushTokenRepository } from '../modules/notifications/push-token.repository'
 import { loadWeatherConfig } from '../modules/weather/providers/weather.config'
 import { OpenWeatherProvider } from '../modules/weather/providers/openweather.provider'
 import { WeatherApiProvider } from '../modules/weather/providers/weatherapi.provider'
@@ -13,8 +31,10 @@ import {
   ConfiguredWeatherTargetSource,
   SavedLocationWeatherTargetSource,
 } from '../modules/weather/weather-target-source'
+import { createBaseLogger } from '../logger/pino.config.js'
 import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
+import { shutdownWorkerResources } from './shutdown-resources'
 
 /** Story 0.4 owner file: worker process bootstrap and concurrency policy.
  * Dedicated worker process group:
@@ -34,8 +54,10 @@ import { disconnectPrismaClient, getPrismaClient } from './prisma'
  * - S0.4/T3: failed jobs emitted by these workers are persisted as DLQ records by the worker base layer.
  */
 // Flow ref S0.4/T5: track worker/queue instances for coordinated shutdown.
+const logger = createBaseLogger('workers')
 const workers: Worker[] = []
 const queues: Queue[] = []
+const redisClients: Redis[] = []
 
 async function startWorkers() {
   try {
@@ -44,29 +66,62 @@ async function startWorkers() {
     const startedQueues = createQueues()
     queues.push(...startedQueues)
     const weatherQueue = startedQueues.find((queue) => queue.name === 'weather-ingestion')
+    const alertFanoutQueue = startedQueues.find((queue) => queue.name === 'alert-fanout')
 
-    if (!weatherQueue) {
-      throw new Error('weather-ingestion queue was not created')
+    if (!weatherQueue || !alertFanoutQueue) {
+      throw new Error(
+        'Required weather-ingestion and alert-fanout queues were not created'
+      )
     }
 
     const weatherConfig = loadWeatherConfig()
-    const weatherRepository = new WeatherRepository(getPrismaClient())
+    const prisma = getPrismaClient()
+    const redisConfig = getRedisConfig()
+    const alertRelayRedis = new Redis(redisConfig.url, {
+      ...redisOptionsFromConfig(redisConfig),
+      commandTimeout: ALERT_REALTIME_PUBLISH_TIMEOUT_MS,
+      connectTimeout: ALERT_REALTIME_PUBLISH_TIMEOUT_MS,
+      enableOfflineQueue: false,
+      maxRetriesPerRequest: 1,
+    })
+    redisClients.push(alertRelayRedis)
+    const alertFanoutProcessor = new AlertFanoutProcessor(
+      new PrismaAlertFanoutRepository(prisma),
+      new RedisAlertRealtimePublisher(alertRelayRedis),
+      new PushNotificationService(
+        new PushTokenRepository(prisma),
+        new Expo({ accessToken: process.env.EXPO_TOKEN })
+      )
+    )
+    const weatherRepository = new WeatherRepository(prisma)
     const weatherQueryService = new WeatherQueryService(weatherRepository)
+    const weatherAlertProcessor = new WeatherAlertProcessingService(
+      new PrismaWeatherAlertProcessingRepository(prisma),
+      undefined,
+      new WeatherAlertFanoutQueue(alertFanoutQueue)
+    )
     const weatherIngestionService = new WeatherIngestionService(
       new OpenWeatherProvider(),
       new WeatherApiProvider(),
       weatherRepository,
-      weatherQueryService
+      weatherQueryService,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      weatherAlertProcessor
     )
+    const baseLogger = logger
     const weatherProcessor = createWeatherJobProcessor({
       queue: weatherQueue,
       targetSource: new CombinedWeatherTargetSource([
-        new SavedLocationWeatherTargetSource(getPrismaClient()),
+        new SavedLocationWeatherTargetSource(prisma),
         new ConfiguredWeatherTargetSource(),
       ]),
       ingestionService: weatherIngestionService,
+      alertDispatcher: weatherAlertProcessor,
       refreshMinutes: weatherConfig.refreshMinutes,
-      logger: console,
+      logger: baseLogger,
     })
 
     await registerWeatherRefreshScheduler(weatherQueue, weatherConfig)
@@ -83,9 +138,15 @@ async function startWorkers() {
 
     workers.push(
       // Fanout is lightweight enough for higher parallelism and no extra rate limiter.
-      createWorker('alert-fanout', async () => Promise.resolve(), {
-        ...defaultWorkerOptions(20),
-      })
+      createWorker(
+        'alert-fanout',
+        async (job) => {
+          await alertFanoutProcessor.process(job.data as AlertFanoutJobData)
+        },
+        {
+          ...defaultWorkerOptions(20),
+        }
+      )
     )
 
     workers.push(
@@ -104,26 +165,36 @@ async function startWorkers() {
       })
     )
 
-    console.log('Workers started for queues:', queueConfigs.map((q) => q.name).join(', '))
+    logger.info({ queues: queueConfigs.map((q) => q.name) }, 'Workers started for queues')
   } catch (err) {
-    console.error('Failed to start workers:', err)
+    logger.error(err, 'Failed to start workers')
     process.exit(1)
   }
 }
 
-async function shutdown() {
-  console.log('Shutting down workers and queues...')
+async function performShutdown() {
+  logger.info('Shutting down workers and queues...')
+  let exitCode = 0
   try {
-    await Promise.all([
-      Promise.all(workers.map((w) => w.close())),
-      Promise.all(queues.map((q) => q.close())),
-      disconnectPrismaClient(),
-    ])
+    await shutdownWorkerResources({
+      workers,
+      queues,
+      redisClients,
+      disconnectPrisma: disconnectPrismaClient,
+    })
   } catch (err) {
-    console.error('Error closing workers or queues', err)
+    logger.error(err, 'Error closing workers or queues')
+    exitCode = 1
   } finally {
-    process.exit(0)
+    process.exit(exitCode)
   }
+}
+
+let shutdownPromise: Promise<void> | undefined
+
+function shutdown(): Promise<void> {
+  shutdownPromise ??= performShutdown()
+  return shutdownPromise
 }
 
 // Flow ref S0.4/T5: handle SIGTERM/SIGINT and close resources cleanly.

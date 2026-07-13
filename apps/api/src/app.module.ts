@@ -8,6 +8,7 @@ import { HealthController } from './controllers/health.controller'
 import { AdminController } from './admin/admin.controller'
 import { AdminService } from './admin/admin.service'
 import { AdminCron } from './admin/admin.cron'
+import { AlertsModule } from './modules/alerts/alerts.module'
 import { GatewayModule } from './modules/gateway/gateway.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { EventsModule } from './modules/events/events.module'
@@ -26,6 +27,7 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
   imports: [
     ScheduleModule.forRoot(),
     AnalyticsModule,
+    AlertsModule,
     ...websocketModules,
     NotificationsModule,
     EventsModule,

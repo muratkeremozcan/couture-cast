@@ -8,8 +8,11 @@ type MockExpo = {
   sendPushNotificationsAsync: ReturnType<typeof vi.fn>
 }
 
-class InMemoryPushTokenRepository implements Pick<PushTokenRepository, 'saveToken'> {
+class InMemoryPushTokenRepository
+  implements Pick<PushTokenRepository, 'saveToken' | 'deleteTokens'>
+{
   tokens = new Map<string, { userId: string; platform?: string }>()
+  deletedTokens: string[] = []
 
   saveToken(userId: string, token: string, platform?: string) {
     this.tokens.set(token, { userId, platform })
@@ -23,6 +26,15 @@ class InMemoryPushTokenRepository implements Pick<PushTokenRepository, 'saveToke
       created_at: now,
       updated_at: now,
     })
+  }
+
+  deleteTokens(tokens: string[]) {
+    this.deletedTokens.push(...tokens)
+    let count = 0
+    tokens.forEach((token) => {
+      if (this.tokens.delete(token)) count += 1
+    })
+    return Promise.resolve(count)
   }
 }
 
@@ -116,8 +128,8 @@ describe('PushNotificationService', () => {
     const sendPushNotificationsAsync = vi.fn().mockImplementation(
       (batch: ExpoPushMessage[]): Promise<ExpoPushTicket[]> =>
         Promise.resolve(
-          batch.map((message, index) =>
-            index === 0
+          batch.map((message) =>
+            message.to === 'ExponentPushToken[invalid]'
               ? {
                   status: 'error',
                   message: 'Device not registered',
@@ -133,7 +145,7 @@ describe('PushNotificationService', () => {
           )
         )
     )
-    const { service } = createService({ expo: { sendPushNotificationsAsync } })
+    const { repo, service } = createService({ expo: { sendPushNotificationsAsync } })
 
     const result = await service.sendBatchNotifications([
       { to: 'ExponentPushToken[invalid]', body: 'Hello', sound: 'default' },
@@ -142,6 +154,96 @@ describe('PushNotificationService', () => {
 
     expect(result.invalidTokens).toContain('ExponentPushToken[invalid]')
     expect(result.rateLimitedTokens).toContain('ExponentPushToken[rate]')
+    expect(repo.deletedTokens).toEqual(['ExponentPushToken[invalid]'])
+  })
+
+  it('retries only rate-limited messages from the current batch', async () => {
+    const sendPushNotificationsAsync = vi
+      .fn()
+      .mockResolvedValueOnce([
+        { status: 'ok', id: 'ticket-ok' },
+        {
+          status: 'error',
+          message: 'Rate limited',
+          details: { error: 'MessageRateExceeded' },
+        },
+      ] satisfies ExpoPushTicket[])
+      .mockResolvedValueOnce([{ status: 'ok', id: 'ticket-retried' }])
+    const { service } = createService({ expo: { sendPushNotificationsAsync } })
+    const messages: ExpoPushMessage[] = [
+      { to: 'ExponentPushToken[ok]', body: 'Hello' },
+      { to: 'ExponentPushToken[rate]', body: 'Hello' },
+    ]
+
+    const result = await service.sendBatchNotifications(messages)
+
+    expect(sendPushNotificationsAsync).toHaveBeenCalledTimes(2)
+    expect(sendPushNotificationsAsync.mock.calls[0]?.[0]).toEqual(messages)
+    expect(sendPushNotificationsAsync.mock.calls[1]?.[0]).toEqual([messages[1]])
+    expect(result.tickets).toEqual([
+      { status: 'ok', id: 'ticket-ok' },
+      { status: 'ok', id: 'ticket-retried' },
+    ])
+    expect(result.rateLimitedTokens).toEqual([])
+  })
+
+  it('retries a network-failed later batch without resending an earlier batch', async () => {
+    const sendPushNotificationsAsync = vi
+      .fn()
+      .mockImplementationOnce((batch: ExpoPushMessage[]) =>
+        Promise.resolve(
+          batch.map((_, index) => ({
+            status: 'ok',
+            id: `first-${index}`,
+          })) as ExpoPushTicket[]
+        )
+      )
+      .mockRejectedValueOnce(new Error('network reset'))
+      .mockImplementationOnce((batch: ExpoPushMessage[]) =>
+        Promise.resolve(
+          batch.map((_, index) => ({
+            status: 'ok',
+            id: `second-${index}`,
+          })) as ExpoPushTicket[]
+        )
+      )
+    const { service } = createService({ expo: { sendPushNotificationsAsync } })
+    const messages: ExpoPushMessage[] = Array.from({ length: 120 }, (_, index) => ({
+      to: `ExponentPushToken[token-${index}]`,
+      body: 'Hello',
+    }))
+
+    const result = await service.sendBatchNotifications(messages)
+
+    expect(sendPushNotificationsAsync).toHaveBeenCalledTimes(3)
+    const calls = sendPushNotificationsAsync.mock.calls as [ExpoPushMessage[]][]
+    expect(calls.map(([batch]) => batch.length)).toEqual([100, 20, 20])
+    expect(result.tickets).toHaveLength(120)
+    expect(result.networkFailedTokens).toEqual([])
+  })
+
+  it('bounds a never-resolving Expo attempt and exhausts only its current batch', async () => {
+    const sendPushNotificationsAsync = vi.fn(
+      () => new Promise<ExpoPushTicket[]>(() => undefined)
+    )
+    const service = new PushNotificationService(
+      new InMemoryPushTokenRepository() as never,
+      { sendPushNotificationsAsync },
+      5
+    )
+    const dispatch = service.sendBatchNotifications([
+      { to: 'ExponentPushToken[stalled]', body: 'Hello' },
+    ])
+
+    const result = await Promise.race([
+      dispatch,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 500)),
+    ])
+
+    expect(result).not.toBeNull()
+    expect(result?.tickets).toEqual([])
+    expect(result?.networkFailedTokens).toEqual(['ExponentPushToken[stalled]'])
+    expect(sendPushNotificationsAsync).toHaveBeenCalledTimes(3)
   })
 
   it('handles mixed ok and error tickets with receipts', async () => {

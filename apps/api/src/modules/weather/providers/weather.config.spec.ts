@@ -9,7 +9,12 @@ describe('loadWeatherConfig', () => {
       WEATHER_REFRESH_MINUTES: '5',
       WEATHER_PROVIDER_MODE: 'weatherapi',
       WEATHER_INGESTION_TARGETS_JSON: JSON.stringify([
-        { locationKey: 'chi', latitude: 41.8781, longitude: -87.6298 },
+        {
+          locationKey: 'chi',
+          locationName: 'Chicago, IL',
+          latitude: 41.8781,
+          longitude: -87.6298,
+        },
       ]),
     })
 
@@ -18,7 +23,14 @@ describe('loadWeatherConfig', () => {
       weatherApiKey: 'secondary-key',
       refreshMinutes: 5,
       providerMode: 'weatherapi',
-      ingestionTargets: [{ locationKey: 'chi', latitude: 41.8781, longitude: -87.6298 }],
+      ingestionTargets: [
+        {
+          locationKey: 'chi',
+          locationName: 'Chicago, IL',
+          latitude: 41.8781,
+          longitude: -87.6298,
+        },
+      ],
     })
   })
 
@@ -45,7 +57,12 @@ describe('loadWeatherConfig', () => {
       'target coordinates',
       {
         WEATHER_INGESTION_TARGETS_JSON: JSON.stringify([
-          { locationKey: 'invalid', latitude: 91, longitude: 0 },
+          {
+            locationKey: 'invalid',
+            locationName: 'Invalid place',
+            latitude: 91,
+            longitude: 0,
+          },
         ]),
       },
     ],
@@ -53,8 +70,39 @@ describe('loadWeatherConfig', () => {
       'duplicate target keys',
       {
         WEATHER_INGESTION_TARGETS_JSON: JSON.stringify([
+          {
+            locationKey: 'chi',
+            locationName: 'Chicago, IL',
+            latitude: 41.8781,
+            longitude: -87.6298,
+          },
+          {
+            locationKey: 'chi',
+            locationName: 'Chicago duplicate',
+            latitude: 40,
+            longitude: -80,
+          },
+        ]),
+      },
+    ],
+    [
+      'target without a descriptive location name',
+      {
+        WEATHER_INGESTION_TARGETS_JSON: JSON.stringify([
           { locationKey: 'chi', latitude: 41.8781, longitude: -87.6298 },
-          { locationKey: 'chi', latitude: 40, longitude: -80 },
+        ]),
+      },
+    ],
+    [
+      'target with a blank descriptive location name',
+      {
+        WEATHER_INGESTION_TARGETS_JSON: JSON.stringify([
+          {
+            locationKey: 'chi',
+            locationName: '   ',
+            latitude: 41.8781,
+            longitude: -87.6298,
+          },
         ]),
       },
     ],

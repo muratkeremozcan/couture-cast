@@ -19,6 +19,7 @@ import {
   createTeenProfileFixture,
   resetCleanupRegistry,
 } from '../test/factories.js'
+import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { AuthModule } from '../src/modules/auth/auth.module'
 import { ModerationModule } from '../src/modules/moderation/moderation.module'
 
@@ -86,11 +87,21 @@ describe('Analytics tracking endpoints (integration)', () => {
   })
   const originalEnv = { ...process.env }
   const eventExpectations = createAnalyticsEventExpectations(trackedEvents, expect)
-  const createHeaders = (userId: string, role: 'guardian' | 'moderator' | 'admin') => ({
-    authorization: 'Bearer test-token',
-    'x-user-id': userId,
-    'x-user-role': role,
+  const identities = new Map<
+    string,
+    { userId: string; role: 'guardian' | 'moderator' | 'admin' }
+  >()
+  const resolveIdentity = vi.fn((token: string) => {
+    const identity = identities.get(token)
+    return identity
+      ? Promise.resolve(identity)
+      : Promise.reject(new Error('Unknown test access token'))
   })
+  const createHeaders = (userId: string, role: 'guardian' | 'moderator' | 'admin') => {
+    const token = `analytics-${role}-${userId}`
+    identities.set(token, { userId, role })
+    return { authorization: `Bearer ${token}` }
+  }
   const getHttpServer = (): Parameters<typeof request>[0] => {
     if (!app) {
       throw new Error('App is not initialized')
@@ -102,6 +113,8 @@ describe('Analytics tracking endpoints (integration)', () => {
   // exercised without a real PostHog dependency.
   beforeEach(async () => {
     trackedEvents.splice(0, trackedEvents.length)
+    identities.clear()
+    resolveIdentity.mockClear()
     posthogCaptureMock.mockClear()
     posthogShutdownMock.mockClear()
     process.env.POSTHOG_API_KEY = 'phc_test'
@@ -109,7 +122,10 @@ describe('Analytics tracking endpoints (integration)', () => {
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AuthModule, ModerationModule],
-    }).compile()
+    })
+      .overrideProvider(AccessTokenIdentityService)
+      .useValue({ resolveIdentity })
+      .compile()
 
     app = moduleFixture.createNestApplication()
     await app.init()

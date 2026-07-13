@@ -70,7 +70,7 @@
     "test:cov": "npm run test:coverage --silent",
     "test:coverage": "cross-env NODE_OPTIONS=--conditions=development vitest run --coverage",
     "pretest:integration": "npm run prepare:shared-deps",
-    "test:integration": "cross-env NODE_OPTIONS=--conditions=development vitest run integration/**/*.spec.ts",
+    "test:integration": "cross-env NODE_OPTIONS=--conditions=development vitest run integration",
     "prestart:workers": "npm run prepare:shared-deps",
     "start:workers": "tsx src/workers/bootstrap.ts",
     "prestart:workers:prod": "npm run prepare:shared-deps",

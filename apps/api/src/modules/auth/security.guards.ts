@@ -2,17 +2,16 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import { updateRequestContext } from '../../logger/request-context'
+import { AccessTokenIdentityService } from './access-token-identity.service.js'
 import { GuardianConsentStateService } from './guardian-consent-state.service'
 import { API_ROLES_KEY } from './security.decorators'
-import { API_ROLES, type ApiRole, type AuthenticatedRequest } from './security.types'
-
-const USER_ID_HEADER = 'x-user-id'
-const USER_ROLE_HEADER = 'x-user-role'
+import { type ApiRole, type AuthenticatedRequest } from './security.types'
 
 const normalizeHeaderValue = (
   value: string | string[] | undefined
@@ -33,39 +32,40 @@ const parseBearerToken = (
   authorizationHeader: string | string[] | undefined
 ): string | undefined => {
   const headerValue = normalizeHeaderValue(authorizationHeader)
-  if (!headerValue || !headerValue.startsWith('Bearer ')) {
+  const match = headerValue ? /^Bearer\s+(.+)$/i.exec(headerValue) : null
+  const token = match?.[1]?.trim()
+  if (!token) {
     return undefined
   }
 
-  const token = headerValue.slice('Bearer '.length).trim()
-  return token.length > 0 ? token : undefined
-}
-
-const parseRole = (headerValue: string | string[] | undefined): ApiRole | undefined => {
-  const value = normalizeHeaderValue(headerValue)?.toLowerCase()
-  if (!value) {
-    return undefined
-  }
-
-  return API_ROLES.find((role) => role === value)
+  return token
 }
 
 @Injectable()
 export class RequestAuthGuard implements CanActivate {
   constructor(
-    private readonly guardianConsentStateService: GuardianConsentStateService
+    @Inject(GuardianConsentStateService)
+    private readonly guardianConsentStateService: GuardianConsentStateService,
+    @Inject(AccessTokenIdentityService)
+    private readonly accessTokenIdentityService: AccessTokenIdentityService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>()
     const token = parseBearerToken(request.headers.authorization)
-    const userId = normalizeHeaderValue(request.headers[USER_ID_HEADER])
-    const role = parseRole(request.headers[USER_ROLE_HEADER])
 
-    if (!token || !userId || !role) {
-      throw new UnauthorizedException('Missing or invalid authentication headers')
+    if (!token) {
+      throw new UnauthorizedException('Missing or invalid bearer token')
     }
 
+    let identity: { userId: string; role: ApiRole }
+    try {
+      identity = await this.accessTokenIdentityService.resolveIdentity(token)
+    } catch {
+      throw new UnauthorizedException('Invalid access token')
+    }
+
+    const { userId, role } = identity
     request.auth = { token, userId, role }
     updateRequestContext({ userId })
 

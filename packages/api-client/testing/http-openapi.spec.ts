@@ -49,11 +49,16 @@ test('writes a valid HTTP OpenAPI document for the initial contract slice', asyn
     expect(paths['/api/v1/guardian/accept']).toBeDefined()
     expect(paths['/api/v1/health/queues']).toBeDefined()
     expect(paths['/api/v1/events/poll']).toBeDefined()
+    expect(paths['/api/v1/events/poll']?.get?.security).toEqual([{ bearerAuth: [] }])
+    expect(paths['/api/v1/events/poll']?.get?.responses?.['401']).toBeDefined()
+    expect(paths['/api/v1/events/poll']?.get?.responses?.['403']).toBeDefined()
     expect(paths['/api/v1/moderation/actions']).toBeDefined()
     expect(paths['/api/v1/user/profile']).toBeDefined()
     expect(paths['/api/v1/locations']).toBeDefined()
     expect(paths['/api/v1/locations/{locationId}']).toBeDefined()
     expect(paths['/api/v1/locations/{locationId}/primary']).toBeDefined()
+    expect(paths['/api/v1/alerts/preferences']).toBeDefined()
+    expect(paths['/api/v1/alerts/rules']).toBeDefined()
   } finally {
     rmSync(outputDir, { recursive: true, force: true })
   }

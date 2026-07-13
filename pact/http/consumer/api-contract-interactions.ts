@@ -10,6 +10,16 @@ import { expect } from 'vitest'
 
 const { eachLike, like, nullValue, regex, string } = MatchersV3
 
+export const pactEventAuth = {
+  accessToken: 'pact-event-token',
+  userId: 'guardian-1',
+  role: 'guardian',
+} as const
+
+const pactEventHeaders = {
+  Authorization: `Bearer ${pactEventAuth.accessToken}`,
+}
+
 type ContractApiClient = Pick<DefaultApi, 'apiHealthGet' | 'apiV1EventsPollGet'>
 type CreateClient = (mockServer: V3MockServer) => ContractApiClient
 
@@ -69,7 +79,11 @@ export async function verifyEventsPollInteraction(
       })
     )
     .uponReceiving('a request to poll realtime fallback events')
-    .withRequest('GET', '/api/v1/events/poll', setJsonContent({ query: { since } }))
+    .withRequest(
+      'GET',
+      '/api/v1/events/poll',
+      setJsonContent({ headers: pactEventHeaders, query: { since } })
+    )
     .willRespondWith(
       200,
       setJsonContent({
@@ -105,7 +119,10 @@ export async function verifyInvalidCursorInteraction(
     .withRequest(
       'GET',
       '/api/v1/events/poll',
-      setJsonContent({ query: { since: 'not-a-date' } })
+      setJsonContent({
+        headers: pactEventHeaders,
+        query: { since: 'not-a-date' },
+      })
     )
     .willRespondWith(
       200,

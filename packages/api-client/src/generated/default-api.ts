@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { BaseAPI, type Configuration } from './runtime'
 import {
+  AlertsApi,
   AuthApi,
   EventsApi,
   GuardianApi,
@@ -32,7 +33,8 @@ function applyApiMixins(
 }
 
 export interface DefaultApi
-  extends PublicApi<AuthApi>,
+  extends PublicApi<AlertsApi>,
+    PublicApi<AuthApi>,
     PublicApi<EventsApi>,
     PublicApi<GuardianApi>,
     PublicApi<HealthApi>,
@@ -48,6 +50,7 @@ export class DefaultApi extends BaseAPI {
 }
 
 applyApiMixins(DefaultApi, [
+  AlertsApi,
   AuthApi,
   EventsApi,
   GuardianApi,

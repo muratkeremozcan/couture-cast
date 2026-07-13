@@ -23,15 +23,17 @@ export class EventsService {
 
   constructor(@Inject(EventsRepository) private readonly repo: EventsRepository) {}
 
-  async poll(since?: Date) {
+  async poll(userId: string, since?: Date) {
     // Flow ref S0.5/T5: polling stays available even when websocket or push paths are degraded.
     try {
-      const events = await this.repo.findSince(since)
-      const nextSince = events.length
-        ? events[events.length - 1]?.created_at.toISOString()
+      const ownedEvents = (await this.repo.findSince(userId, since)).filter(
+        (event) => event.user_id === userId || event.user_id === null
+      )
+      const nextSince = ownedEvents.length
+        ? ownedEvents[ownedEvents.length - 1]?.created_at.toISOString()
         : null
       return eventsPollResponseSchema.parse({
-        events: events.map((event) => ({
+        events: ownedEvents.map((event) => ({
           id: event.id,
           channel: event.channel,
           payload: event.payload,

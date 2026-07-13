@@ -12,6 +12,7 @@ type MockSocket = Pick<Socket, 'id' | 'emit' | 'handshake' | 'nsp'> & {
 const baseSocket = (): MockSocket => ({
   id: 'socket-1',
   emit: vi.fn(),
+  data: { userId: 'verified-user-42' },
   nsp: { name: '/lookbook' } as unknown as Socket['nsp'],
   handshake: {
     auth: { token: 'token-123', userId: 'user-42' },
@@ -65,7 +66,7 @@ describe('ConnectionManager', () => {
     expect(infoSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         requestId: 'req-abc',
-        userId: 'user-42',
+        userId: 'verified-user-42',
         namespace: '/lookbook',
       }),
       'socket_connected'
@@ -78,7 +79,8 @@ describe('EventsGateway lifecycle', () => {
     const logger = pino({ level: 'silent' })
     const warnSpy = vi.spyOn(logger, 'warn')
     const manager = new ConnectionManager(logger)
-    const gateway = new EventsGateway(manager, logger)
+    const identity = { resolveUserId: vi.fn() }
+    const gateway = new EventsGateway(manager, logger, identity as never)
     const socket = baseSocket()
 
     const server = { use: vi.fn() } satisfies Pick<Server, 'use'>

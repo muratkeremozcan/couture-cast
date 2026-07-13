@@ -1,6 +1,16 @@
 export { createFactory, faker } from './factory.js'
 export type { Factory, FactoryDefaults, FactoryOverrides } from './factory.js'
 export {
+  buildAlertRuleCreateInput,
+  createAlertRule,
+  persistAlertRule,
+} from './alert-rule.factory.js'
+export {
+  buildNotificationPreferenceCreateInput,
+  createNotificationPreference,
+  persistNotificationPreference,
+} from './notification-preference.factory.js'
+export {
   buildUserCreateInput,
   createGuardianUser,
   createTeenUser,
@@ -42,6 +52,19 @@ export {
   snapshotTrackedEntities,
 } from './registry.js'
 export type { FactoryRegistry, FactoryRegistryKey } from './registry.js'
+export type {
+  AlertRuleFactoryOverrides,
+  AlertRuleFixture,
+  AlertRuleType,
+  CreatePersistedAlertRuleOptions,
+  PersistedAlertRuleFixture,
+} from './alert-rule.factory.js'
+export type {
+  CreatePersistedNotificationPreferenceOptions,
+  NotificationPreferenceFactoryOverrides,
+  NotificationPreferenceFixture,
+  PersistedNotificationPreferenceFixture,
+} from './notification-preference.factory.js'
 export type {
   CreatePersistedUserOptions,
   PersistedUserFixture,

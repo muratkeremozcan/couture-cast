@@ -5,6 +5,7 @@ import {
   extendZodWithOpenApi,
 } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
+import { registerAlertsContracts } from './alerts'
 import { registerAuthContracts } from './auth'
 import { registerCommonHttpSchemas } from './common'
 import { registerEventsContracts } from './events'
@@ -29,9 +30,10 @@ export function createHttpOpenApiRegistry() {
   const registry = new OpenAPIRegistry()
 
   const commonSchemas = registerCommonHttpSchemas(registry)
+  registerAlertsContracts(registry, commonSchemas)
   registerAuthContracts(registry, commonSchemas)
   registerHealthContracts(registry)
-  registerEventsContracts(registry)
+  registerEventsContracts(registry, commonSchemas)
   registerGuardianContracts(registry, commonSchemas)
   registerLocationsContracts(registry, commonSchemas)
   registerModerationContracts(registry, commonSchemas)

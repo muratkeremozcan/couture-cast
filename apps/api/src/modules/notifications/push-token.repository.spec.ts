@@ -27,8 +27,11 @@ const mockPushTokens: PushToken[] = [
 const createRepository = () => {
   const findMany = vi.fn().mockResolvedValue(mockPushTokens)
   const upsert = vi.fn().mockResolvedValue(mockPushTokens[0])
-  const prisma = { pushToken: { findMany, upsert } } as unknown as PrismaClient
-  return { repo: new PushTokenRepository(prisma), findMany, upsert }
+  const deleteMany = vi.fn().mockResolvedValue({ count: 2 })
+  const prisma = {
+    pushToken: { findMany, upsert, deleteMany },
+  } as unknown as PrismaClient
+  return { repo: new PushTokenRepository(prisma), findMany, upsert, deleteMany }
 }
 
 describe('PushTokenRepository', () => {
@@ -81,5 +84,31 @@ describe('PushTokenRepository', () => {
       where: { user_id: { in: ['user-a', 'user-b'] } },
     })
     expect(result).toEqual(mockPushTokens)
+  })
+
+  it('deduplicates and deletes provider-invalid tokens', async () => {
+    const { repo, deleteMany } = createRepository()
+
+    await expect(
+      repo.deleteTokens([
+        ' ExponentPushToken[token-1] ',
+        'ExponentPushToken[token-1]',
+        'ExponentPushToken[token-2]',
+      ])
+    ).resolves.toBe(2)
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: {
+        token: {
+          in: ['ExponentPushToken[token-1]', 'ExponentPushToken[token-2]'],
+        },
+      },
+    })
+  })
+
+  it('does not issue a delete for an empty token set', async () => {
+    const { repo, deleteMany } = createRepository()
+
+    await expect(repo.deleteTokens([' ', ''])).resolves.toBe(0)
+    expect(deleteMany).not.toHaveBeenCalled()
   })
 })

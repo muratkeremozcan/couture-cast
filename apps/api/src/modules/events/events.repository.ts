@@ -23,9 +23,12 @@ export class EventsRepository {
     })
   }
 
-  async findSince(since?: Date) {
+  async findSince(userId: string, since?: Date) {
     return this.prisma.eventEnvelope.findMany({
-      where: since ? { created_at: { gt: since } } : undefined,
+      where: {
+        ...(since ? { created_at: { gt: since } } : {}),
+        OR: [{ user_id: userId }, { user_id: null }],
+      },
       orderBy: { created_at: 'asc' },
     })
   }

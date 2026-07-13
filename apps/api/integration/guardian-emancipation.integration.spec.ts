@@ -2,11 +2,7 @@ import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import {
-  ForbiddenException,
-  type INestApplication,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { type INestApplication } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 import request from 'supertest'
 import {
@@ -18,6 +14,7 @@ import {
   createTeenProfileFixture,
   resetCleanupRegistry,
 } from '../test/factories.js'
+import type { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards'
 import { UserController } from '../src/modules/user/user.controller'
@@ -244,9 +241,7 @@ describe('Guardian emancipation sweep (integration)', () => {
   let guardianConsentStateService: GuardianConsentStateService
 
   const createHeaders = (userId: string, role: RequestRole) => ({
-    authorization: 'Bearer test-token',
-    'x-user-id': userId,
-    'x-user-role': role,
+    authorization: `Bearer test-token:${role}:${userId}`,
   })
 
   const getHttpServer = (): Parameters<typeof request>[0] => {
@@ -259,66 +254,42 @@ describe('Guardian emancipation sweep (integration)', () => {
 
   beforeEach(async () => {
     prisma = new InMemoryGuardianIntegrationPrisma()
+    guardianConsentStateService = new GuardianConsentStateService(
+      prisma as unknown as PrismaClient
+    )
+    const accessTokenIdentityService = {
+      resolveIdentity: vi.fn((token: string) => {
+        const match = /^test-token:(guardian|teen|moderator|admin):(.+)$/.exec(token)
+        const role = match?.[1] as RequestRole | undefined
+        const userId = match?.[2]
+        return role && userId
+          ? Promise.resolve({ role, userId })
+          : Promise.reject(new Error('Unknown test access token'))
+      }),
+    } as unknown as AccessTokenIdentityService
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [UserController],
       providers: [
         UserService,
-        GuardianConsentStateService,
+        {
+          provide: GuardianConsentStateService,
+          useValue: guardianConsentStateService,
+        },
         {
           provide: PrismaClient,
           useValue: prisma,
         },
-        {
-          provide: RequestAuthGuard,
-          useFactory: (guardianConsentStateService: GuardianConsentStateService) =>
-            new RequestAuthGuard(guardianConsentStateService),
-          inject: [GuardianConsentStateService],
-        },
       ],
-    }).compile()
+    })
+      .overrideGuard(RequestAuthGuard)
+      .useValue(
+        new RequestAuthGuard(guardianConsentStateService, accessTokenIdentityService)
+      )
+      .compile()
 
     app = moduleFixture.createNestApplication()
     await app.init()
-
-    guardianConsentStateService = moduleFixture.get(GuardianConsentStateService)
-    vi.spyOn(RequestAuthGuard.prototype, 'canActivate').mockImplementation(
-      async (context) => {
-        const request = context.switchToHttp().getRequest<{
-          auth?: { token: string; userId: string; role: RequestRole }
-          headers: Record<string, string | string[] | undefined>
-        }>()
-        const authorization = request.headers.authorization
-        const userId = request.headers['x-user-id']
-        const role = request.headers['x-user-role']
-
-        if (
-          typeof authorization !== 'string' ||
-          !authorization.startsWith('Bearer ') ||
-          typeof userId !== 'string' ||
-          userId.trim().length === 0 ||
-          typeof role !== 'string' ||
-          !['guardian', 'teen', 'moderator', 'admin'].includes(role)
-        ) {
-          throw new UnauthorizedException('Missing or invalid authentication headers')
-        }
-
-        request.auth = {
-          token: authorization.slice('Bearer '.length).trim(),
-          userId,
-          role: role as RequestRole,
-        }
-
-        if (
-          role === 'teen' &&
-          !(await guardianConsentStateService.canTeenAccess(userId))
-        ) {
-          throw new ForbiddenException('Guardian consent required before continuing')
-        }
-
-        return true
-      }
-    )
 
     guardianService = new GuardianService(
       { capture: vi.fn() } as never,

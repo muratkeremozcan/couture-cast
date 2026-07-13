@@ -22,9 +22,16 @@ const IanaTimeZoneSchema = NonEmptyStringSchema.refine(
 
 export const WeatherIngestionTargetSchema = z.object({
   locationKey: NonEmptyStringSchema,
+  locationName: NonEmptyStringSchema.optional(),
   latitude: LatitudeSchema,
   longitude: LongitudeSchema,
 })
+
+export const ConfiguredWeatherIngestionTargetSchema = WeatherIngestionTargetSchema.extend(
+  {
+    locationName: NonEmptyStringSchema,
+  }
+)
 
 const OpenWeatherConditionSchema = z.object({
   description: NonEmptyStringSchema,
@@ -175,6 +182,7 @@ export const NormalizedWeatherForecastSchema = z
   .object({
     provider: z.enum(['openweather', 'weatherapi']),
     locationKey: NonEmptyStringSchema,
+    locationName: NonEmptyStringSchema.optional(),
     latitude: LatitudeSchema,
     longitude: LongitudeSchema,
     timezone: IanaTimeZoneSchema,

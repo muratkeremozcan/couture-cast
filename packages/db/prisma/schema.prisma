@@ -42,26 +42,29 @@ enum PrecipPreparedness {
 }
 
 model User {
-  id                 String                 @id @default(cuid())
-  email              String                 @unique
-  created_at         DateTime               @default(now())
-  updated_at         DateTime               @updatedAt
-  profile            UserProfile?
-  comfort_profile    ComfortPreferences?
-  garments           GarmentItem[]
-  palette_insights   PaletteInsights[]
-  outfits            OutfitRecommendation[]
-  lookbook_posts     LookbookPost[]
-  engagement         EngagementEvent[]
-  audit_logs         AuditLog[]
-  guardian_roles     GuardianConsent[]      @relation("GuardianRole")
-  teen_roles         GuardianConsent[]      @relation("TeenRole")
-  sent_guardian_invitations GuardianInvitation[] @relation("TeenGuardianInvitations")
-  accepted_guardian_invitations GuardianInvitation[] @relation("AcceptedGuardianInvitations")
-  moderation_flags   ModerationEvent[]      @relation("FlaggedByRelation")
-  moderation_reviews ModerationEvent[]      @relation("ReviewedByRelation")
-  push_tokens        PushToken[]
-  saved_locations    SavedLocation[]
+  id                            String                  @id @default(cuid())
+  email                         String                  @unique
+  created_at                    DateTime                @default(now())
+  updated_at                    DateTime                @updatedAt
+  profile                       UserProfile?
+  comfort_profile               ComfortPreferences?
+  garments                      GarmentItem[]
+  palette_insights              PaletteInsights[]
+  outfits                       OutfitRecommendation[]
+  lookbook_posts                LookbookPost[]
+  engagement                    EngagementEvent[]
+  audit_logs                    AuditLog[]
+  guardian_roles                GuardianConsent[]       @relation("GuardianRole")
+  teen_roles                    GuardianConsent[]       @relation("TeenRole")
+  sent_guardian_invitations     GuardianInvitation[]    @relation("TeenGuardianInvitations")
+  accepted_guardian_invitations GuardianInvitation[]    @relation("AcceptedGuardianInvitations")
+  moderation_flags              ModerationEvent[]       @relation("FlaggedByRelation")
+  moderation_reviews            ModerationEvent[]       @relation("ReviewedByRelation")
+  push_tokens                   PushToken[]
+  saved_locations               SavedLocation[]
+  alert_rules                   AlertRule[]
+  notification_preference       NotificationPreference?
+  event_envelopes               EventEnvelope[]
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -96,17 +99,17 @@ model GuardianConsent {
 }
 
 model GuardianInvitation {
-  id                  String        @id @default(cuid())
-  teen                User          @relation("TeenGuardianInvitations", fields: [teen_id], references: [id])
-  teen_id             String
-  guardian_email      String
-  consent_level       ConsentLevel  @default(read_only)
-  expires_at          DateTime
-  accepted_at         DateTime?
-  accepted_guardian   User?         @relation("AcceptedGuardianInvitations", fields: [accepted_guardian_id], references: [id])
+  id                   String       @id @default(cuid())
+  teen                 User         @relation("TeenGuardianInvitations", fields: [teen_id], references: [id])
+  teen_id              String
+  guardian_email       String
+  consent_level        ConsentLevel @default(read_only)
+  expires_at           DateTime
+  accepted_at          DateTime?
+  accepted_guardian    User?        @relation("AcceptedGuardianInvitations", fields: [accepted_guardian_id], references: [id])
   accepted_guardian_id String?
-  created_at          DateTime      @default(now())
-  updated_at          DateTime      @updatedAt
+  created_at           DateTime     @default(now())
+  updated_at           DateTime     @updatedAt
 
   // Prisma cannot express the filtered unique index for open invitations; the raw SQL
   // migration enforces one outstanding invite per teen/email while still allowing history.
@@ -152,8 +155,8 @@ model ForecastSegment {
   created_at                DateTime               @default(now())
   outfits                   OutfitRecommendation[]
 
-  @@index([forecast_at])
   @@unique([weather_snapshot_id, forecast_at])
+  @@index([forecast_at])
 }
 
 model WeatherIngestionState {
@@ -184,6 +187,35 @@ model SavedLocation {
   @@unique([user_id, location_key])
   @@index([user_id, sort_order, created_at, id])
   @@index([location_key])
+}
+
+/// RLS: configurable weather alert rules are scoped to the owning user_id
+model AlertRule {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id    String
+  rule_type  String
+  threshold  Float
+  enabled    Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([user_id, rule_type])
+  @@index([user_id])
+}
+
+/// RLS: notification delivery preferences are scoped to the owning user_id
+model NotificationPreference {
+  id                  String   @id @default(cuid())
+  user                User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id             String   @unique
+  quiet_hours_enabled Boolean  @default(false)
+  push_enabled        Boolean  @default(true)
+  quiet_hours_start   String   @default("22:00")
+  quiet_hours_end     String   @default("07:00")
+  timezone            String   @default("UTC")
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
 }
 
 /// RLS: user-scoped comfort settings enforced by user_id
@@ -295,16 +327,43 @@ model PushToken {
 }
 
 model EventEnvelope {
-  id         String   @id @default(cuid())
-  channel    String
-  payload    Json
-  user_id    String?
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id                    String                @id @default(cuid())
+  channel               String
+  payload               Json
+  user                  User?                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id               String?
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  alert_delivery_outbox AlertDeliveryOutbox?
 
   @@index([channel])
   @@index([created_at])
   @@index([user_id])
+}
+
+/// Worker-owned transactional handoff from alert persistence to BullMQ fanout
+model AlertDeliveryOutbox {
+  id                     String        @id @default(cuid())
+  event                  EventEnvelope @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  event_id               String        @unique
+  deduplication_key      String
+  reservation_started_at DateTime
+  attempts               Int           @default(0)
+  last_error             String?
+  dispatched_at          DateTime?
+  created_at             DateTime      @default(now())
+  updated_at             DateTime      @updatedAt
+
+  @@index([deduplication_key, reservation_started_at])
+  @@index([dispatched_at, created_at])
+}
+
+/// Worker-owned rolling cooldown state. No authenticated client policies are granted.
+model AlertCooldownReservation {
+  deduplication_key String   @id
+  next_eligible_at  DateTime
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
 }
 
 model JobFailure {

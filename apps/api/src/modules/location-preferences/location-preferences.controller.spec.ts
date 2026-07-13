@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { UnauthorizedException, type INestApplication } from '@nestjs/common'
+import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +10,7 @@ import {
   updateSavedLocationResponseSchema,
 } from '@couture/api-client/contracts/http'
 
+import type { AccessTokenIdentityService } from '../auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service'
 import { RequestAuthGuard } from '../auth/security.guards'
 import { LocationPreferencesController } from './location-preferences.controller'
@@ -17,8 +18,6 @@ import { LocationPreferencesService } from './location-preferences.service'
 
 const authHeaders = {
   authorization: 'Bearer location-token',
-  'x-user-id': 'user-1',
-  'x-user-role': 'user',
 }
 
 const savedLocation = {
@@ -56,33 +55,16 @@ describe('LocationPreferencesController', () => {
   }
 
   beforeEach(async () => {
-    vi.spyOn(RequestAuthGuard.prototype, 'canActivate').mockImplementation((context) => {
-      const requestContext = context.switchToHttp().getRequest<{
-        auth?: { token: string; userId: string; role: 'user' }
-        headers: Record<string, string | string[] | undefined>
-      }>()
-      const authorization = requestContext.headers.authorization
-      const userId = requestContext.headers['x-user-id']
-      const role = requestContext.headers['x-user-role']
-
-      if (
-        typeof authorization !== 'string' ||
-        !authorization.startsWith('Bearer ') ||
-        typeof userId !== 'string' ||
-        userId.trim().length === 0 ||
-        role !== 'user'
-      ) {
-        throw new UnauthorizedException('Missing or invalid authentication headers')
-      }
-
-      requestContext.auth = {
-        token: authorization.slice('Bearer '.length).trim(),
-        userId,
-        role,
-      }
-
-      return Promise.resolve(true)
-    })
+    const guardianConsentStateService = {
+      canTeenAccess: vi.fn().mockResolvedValue(true),
+    } as unknown as GuardianConsentStateService
+    const accessTokenIdentityService = {
+      resolveIdentity: vi.fn((token: string) =>
+        token === 'location-token'
+          ? Promise.resolve({ userId: 'user-1', role: 'guardian' as const })
+          : Promise.reject(new Error('Unknown test access token'))
+      ),
+    } as unknown as AccessTokenIdentityService
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [LocationPreferencesController],
@@ -93,18 +75,15 @@ describe('LocationPreferencesController', () => {
         },
         {
           provide: GuardianConsentStateService,
-          useValue: {
-            canTeenAccess: vi.fn().mockResolvedValue(true),
-          },
-        },
-        {
-          provide: RequestAuthGuard,
-          useFactory: (guardianConsentStateService: GuardianConsentStateService) =>
-            new RequestAuthGuard(guardianConsentStateService),
-          inject: [GuardianConsentStateService],
+          useValue: guardianConsentStateService,
         },
       ],
-    }).compile()
+    })
+      .overrideGuard(RequestAuthGuard)
+      .useValue(
+        new RequestAuthGuard(guardianConsentStateService, accessTokenIdentityService)
+      )
+      .compile()
 
     app = moduleFixture.createNestApplication()
     await app.init()

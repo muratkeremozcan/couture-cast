@@ -18,7 +18,7 @@ describe('weather processor', () => {
     ).toBe('weather-refresh-location:new-york-ny:2026-07-06T13:30:00.000Z')
   })
 
-  it('coalesces duplicate targets and enqueues one attempts-1 location job per key', async () => {
+  it('coalesces duplicate targets and enqueues retryable location jobs per key', async () => {
     const queue = {
       add: vi.fn().mockResolvedValue({ id: 'location-job' }),
     }
@@ -49,7 +49,8 @@ describe('weather processor', () => {
       'weather-refresh-location',
       { type: 'location', target },
       expect.objectContaining({
-        attempts: 1,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
         jobId: 'weather-refresh-location:new-york-ny:2026-07-06T13:30:00.000Z',
       })
     )
@@ -76,6 +77,52 @@ describe('weather processor', () => {
       target,
       expect.any(AbortSignal)
     )
+  })
+
+  it('surfaces an alert dispatch failure so BullMQ can retry and recover', async () => {
+    const ingestionService = {
+      ingestTarget: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('alert queue unavailable'))
+        .mockResolvedValueOnce({ outcome: 'persisted' }),
+    }
+    const processor = createWeatherJobProcessor({
+      queue: { add: vi.fn() } as never,
+      targetSource: { getTargets: vi.fn() },
+      ingestionService: ingestionService as never,
+      refreshMinutes: 30,
+    })
+    const locationJob = {
+      name: 'weather-refresh-location',
+      data: { type: 'location', target },
+    } as never
+
+    await expect(processor(locationJob)).rejects.toThrow('alert queue unavailable')
+    await expect(processor(locationJob)).resolves.toBeUndefined()
+
+    expect(ingestionService.ingestTarget).toHaveBeenCalledTimes(2)
+  })
+
+  it('dispatches durable alert outbox jobs without starting weather ingestion', async () => {
+    const alertDispatcher = {
+      dispatchPending: vi.fn().mockResolvedValue(2),
+    }
+    const ingestionService = { ingestTarget: vi.fn() }
+    const processor = createWeatherJobProcessor({
+      queue: { add: vi.fn() } as never,
+      targetSource: { getTargets: vi.fn() },
+      ingestionService: ingestionService as never,
+      alertDispatcher,
+      refreshMinutes: 30,
+    })
+
+    await processor({
+      name: 'weather-alert-outbox-dispatch',
+      data: { type: 'alert-outbox' },
+    } as never)
+
+    expect(alertDispatcher.dispatchPending).toHaveBeenCalledTimes(1)
+    expect(ingestionService.ingestTarget).not.toHaveBeenCalled()
   })
 
   it('attempts every location enqueue before surfacing sweep failures', async () => {

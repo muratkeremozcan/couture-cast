@@ -4,6 +4,8 @@ export const DEFAULT_FACTORY_REGISTRY_KEYS = [
   'rituals',
   'savedLocations',
   'weatherSnapshots',
+  'alertRules',
+  'notificationPreferences',
 ] as const
 
 export type FactoryRegistryKey = (typeof DEFAULT_FACTORY_REGISTRY_KEYS)[number]
