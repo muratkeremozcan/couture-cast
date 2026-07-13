@@ -31,7 +31,7 @@ export class CombinedWeatherTargetSource implements WeatherTargetSource {
           }
         }
       } catch (error) {
-        const logger = createBaseLogger('weather-target-source')
+        const logger = createBaseLogger().child({ feature: 'weather-target-source' })
         logger.error(
           error,
           `Failed to get weather targets from source ${source.constructor.name}`

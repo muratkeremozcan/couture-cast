@@ -54,7 +54,7 @@ import { shutdownWorkerResources } from './shutdown-resources'
  * - S0.4/T3: failed jobs emitted by these workers are persisted as DLQ records by the worker base layer.
  */
 // Flow ref S0.4/T5: track worker/queue instances for coordinated shutdown.
-const logger = createBaseLogger('workers')
+const logger = createBaseLogger().child({ feature: 'workers' })
 const workers: Worker[] = []
 const queues: Queue[] = []
 const redisClients: Redis[] = []

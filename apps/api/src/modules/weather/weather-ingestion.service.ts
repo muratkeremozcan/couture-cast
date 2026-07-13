@@ -214,10 +214,10 @@ export class WeatherIngestionService {
         try {
           await this.alertProcessor?.process(snapshot, forecast)
         } catch (alertError) {
-          this.logger.error(
-            { error: alertError, locationKey: forecast.locationKey },
-            'Alert processing failed during weather ingestion'
-          )
+          this.logger.error('Alert processing failed during weather ingestion', {
+            error: alertError instanceof Error ? alertError.message : String(alertError),
+            locationKey: forecast.locationKey,
+          })
         }
         await this.repository.recordProviderSuccess(
           forecast.locationKey,
