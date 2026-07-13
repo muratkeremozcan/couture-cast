@@ -1,5 +1,5 @@
 // Step 10 step 4 owner: searchable owner anchor
-import { Inject } from '@nestjs/common'
+import { Inject, Injectable, Optional } from '@nestjs/common'
 import type { Logger } from 'pino'
 import type { Socket } from 'socket.io'
 
@@ -49,6 +49,7 @@ export type GatewayContext = {
 const defaultBackoff = [1000, 3000, 9000]
 const defaultMaxRetries = 5
 
+@Injectable()
 export class ConnectionManager {
   private readonly backoffDelays: number[]
   private readonly maxRetries: number
@@ -57,7 +58,7 @@ export class ConnectionManager {
 
   constructor(
     @Inject(GATEWAY_LOGGER) private readonly logger: Logger,
-    opts?: { backoff?: number[]; maxRetries?: number }
+    @Optional() opts?: { backoff?: number[]; maxRetries?: number }
   ) {
     this.backoffDelays = opts?.backoff ?? defaultBackoff
     this.maxRetries = opts?.maxRetries ?? defaultMaxRetries
