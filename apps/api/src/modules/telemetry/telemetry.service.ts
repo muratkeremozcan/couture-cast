@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { ANALYTICS_CLIENT, type AnalyticsClient } from '../../analytics/analytics.service'
 import {
@@ -175,7 +175,7 @@ export class TelemetryService {
         data: {
           user_id: userId,
           event_type: eventType,
-          properties: properties,
+          properties: properties as Prisma.InputJsonValue,
         },
       })
     } catch (dbError: unknown) {

@@ -7,6 +7,11 @@ import { WeatherController } from './weather.controller'
 import type { WeatherQueryService } from './weather-query.service'
 import { WEATHER_STALE_MESSAGE } from './weather-query.service'
 import type { TelemetryService } from '../telemetry/telemetry.service'
+import type { Request } from 'express'
+
+/** Minimal authenticated request shape used in unit tests. */
+type TestAuthRequest = Pick<Request, never> & { auth: { userId: string } }
+const fakeReq = (userId: string): TestAuthRequest => ({ auth: { userId } })
 
 const createSnapshot = () => ({
   id: 'weather-1',
@@ -88,9 +93,10 @@ describe('WeatherController', () => {
       data: snapshot,
     })
 
-    const response = await controller.getLatestWeather('new-york-ny', {
-      auth: { userId: 'user-1' },
-    })
+    const response = await controller.getLatestWeather(
+      'new-york-ny',
+      fakeReq('user-1') as unknown as Parameters<typeof controller.getLatestWeather>[1]
+    )
 
     expect(captureEvent).toHaveBeenCalledWith('user-1', 'forecast_viewed', {
       userId: 'user-1',
@@ -124,7 +130,10 @@ describe('WeatherController', () => {
     })
 
     await expect(
-      controller.getLatestWeather('new-york-ny', { auth: { userId: 'user-1' } })
+      controller.getLatestWeather(
+        'new-york-ny',
+        fakeReq('user-1') as unknown as Parameters<typeof controller.getLatestWeather>[1]
+      )
     ).resolves.toEqual({
       data: {
         status: 'unavailable',
@@ -142,9 +151,10 @@ describe('WeatherController', () => {
       message: 'Using recently cached weather data.',
     })
 
-    const response = await controller.getLatestWeather('new-york-ny', {
-      auth: { userId: 'user-1' },
-    })
+    const response = await controller.getLatestWeather(
+      'new-york-ny',
+      fakeReq('user-1') as unknown as Parameters<typeof controller.getLatestWeather>[1]
+    )
 
     expect(response.data.status).toBe('cached')
     if (response.data.status !== 'cached') {
@@ -162,9 +172,10 @@ describe('WeatherController', () => {
       message: WEATHER_STALE_MESSAGE,
     })
 
-    const response = await controller.getLatestWeather('new-york-ny', {
-      auth: { userId: 'user-1' },
-    })
+    const response = await controller.getLatestWeather(
+      'new-york-ny',
+      fakeReq('user-1') as unknown as Parameters<typeof controller.getLatestWeather>[1]
+    )
 
     expect(response.data.status).toBe('stale')
     if (response.data.status !== 'stale') {
@@ -194,7 +205,10 @@ describe('WeatherController', () => {
     })
 
     await expect(
-      controller.getLatestWeather('   ', { auth: { userId: 'user-1' } })
+      controller.getLatestWeather(
+        '   ',
+        fakeReq('user-1') as unknown as Parameters<typeof controller.getLatestWeather>[1]
+      )
     ).rejects.toBeInstanceOf(BadRequestException)
     expect(getLatestWeather).not.toHaveBeenCalled()
   })

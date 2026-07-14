@@ -4,7 +4,7 @@ baseline_commit: c0ca9002d2e30d8131b8dea1154bf19fde7ec1bf
 
 # Story 1.4: Telemetry & audit baseline
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -120,15 +120,15 @@ so that we can track success criteria and maintain an audit log.
   - [x] Register `ApiExceptionFilter` globally in `apps/api/src/main.ts` via
         `app.useGlobalFilters(new ApiExceptionFilter(app.get(TelemetryService)))`.
 
-- [ ] **Task 6: Test Suite Verification & Validation (AC: #1-#4)**
-  - [ ] Add unit tests for `TelemetryService` covering database capture, PostHog
+- [x] **Task 6: Test Suite Verification & Validation (AC: #1-#4)**
+  - [x] Add unit tests for `TelemetryService` covering database capture, PostHog
         forwarding, and scheduler pruner.
-  - [ ] Add unit tests for `ApiExceptionFilter` ensuring telemetry is sent and
+  - [x] Add unit tests for `ApiExceptionFilter` ensuring telemetry is sent and
         error response formatting is preserved.
-  - [ ] Add integration/E2E tests verifying that signup, weather requests,
+  - [x] Add integration/E2E tests verifying that signup, weather requests,
         location updates, and forced errors generate correct telemetry rows and
         PostHog calls.
-  - [ ] Run typecheck and lint checking to ensure project cleanliness.
+  - [x] Run typecheck and lint checking to ensure project cleanliness.
 
 ## Dev Notes
 
