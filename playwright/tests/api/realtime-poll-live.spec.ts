@@ -1,5 +1,5 @@
 import { test, expect } from '../../support/fixtures/merged-fixtures'
-import { resolveApiBaseUrl } from '../../support/helpers/api-test'
+import { resolveApiBaseUrl, authHeaders } from '../../support/helpers/api-test'
 import {
   eventsPollInvalidSinceResponseSchema,
   eventsPollResponseSchema,
@@ -28,6 +28,7 @@ test.describe('Realtime poll API', () => {
       method: 'GET',
       path: POLL_PATH,
       baseUrl,
+      headers: authHeaders('poll-test-user', 'admin'),
     })) as TypedResponse
     expect(status).toBe(200)
 
@@ -51,6 +52,7 @@ test.describe('Realtime poll API', () => {
       method: 'GET',
       path: pollUrl,
       baseUrl,
+      headers: authHeaders('poll-test-user', 'admin'),
     })) as TypedResponse
     expect(status).toBe(200)
 

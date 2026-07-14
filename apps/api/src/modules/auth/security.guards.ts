@@ -60,7 +60,7 @@ export class RequestAuthGuard implements CanActivate {
 
     let identity: { userId: string; role: ApiRole }
     try {
-      identity = await this.accessTokenIdentityService.resolveIdentity(token)
+      identity = await this.accessTokenIdentityService.resolveIdentity(token, request)
     } catch {
       throw new UnauthorizedException('Invalid access token')
     }

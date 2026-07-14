@@ -54,7 +54,7 @@ describe('RequestAuthGuard', () => {
     })
 
     await expect(guard.canActivate(context)).resolves.toBe(true)
-    expect(resolveIdentity).toHaveBeenCalledWith('guardian-token')
+    expect(resolveIdentity).toHaveBeenCalledWith('guardian-token', expect.anything())
     expect(request.auth).toEqual({
       token: 'guardian-token',
       userId: 'guardian-1',

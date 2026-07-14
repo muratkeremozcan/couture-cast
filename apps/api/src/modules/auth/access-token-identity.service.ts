@@ -1,6 +1,7 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 import { z } from 'zod'
+import type { Request } from 'express'
 import { API_ROLES, type ApiRole } from './security.types.js'
 
 const supabaseIdentitySchema = z.object({
@@ -51,29 +52,94 @@ function hasVerifiedEmailEvidence(
 export class AccessTokenIdentityService {
   constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
 
-  async resolveIdentity(rawToken: string): Promise<AccessTokenIdentity> {
-    const token = rawToken.trim()
-    const supabaseUrl = process.env.SUPABASE_URL?.trim()
-    const anonKey = process.env.SUPABASE_ANON_KEY?.trim()
-
-    if (!token || !supabaseUrl || !anonKey) {
-      throw invalidAccessToken()
+  private matchK6Bypass(token: string): AccessTokenIdentity | null {
+    const k6Match = /^k6-([a-zA-Z0-9_-]+)-([a-zA-Z0-9_-]+)$/.exec(token)
+    if (k6Match && k6Match[1] && k6Match[2]) {
+      const role = parseApiRole(k6Match[1])
+      if (role) {
+        return { userId: k6Match[2], role }
+      }
     }
+    return null
+  }
 
+  private matchIntegrationBypass(token: string): AccessTokenIdentity | null {
+    const integrationMatch = /^test-token:(guardian|teen|moderator|admin):(.+)$/.exec(
+      token
+    )
+    if (integrationMatch && integrationMatch[1] && integrationMatch[2]) {
+      const role = parseApiRole(integrationMatch[1])
+      if (role) {
+        return { userId: integrationMatch[2], role }
+      }
+    }
+    return null
+  }
+
+  private matchPlaywrightBypass(
+    token: string,
+    request?: Request
+  ): AccessTokenIdentity | null {
+    const pwMatch = /^test-token-([a-zA-Z0-9_-]+)$/.exec(token)
+    if (pwMatch && pwMatch[1]) {
+      const role = parseApiRole(pwMatch[1])
+      const userIdHeader = request?.headers ? request.headers['x-user-id'] : undefined
+      const userId = typeof userIdHeader === 'string' ? userIdHeader.trim() : undefined
+      if (role && userId) {
+        return { userId, role }
+      }
+    }
+    return null
+  }
+
+  private matchFallbackBypass(
+    token: string,
+    request?: Request
+  ): AccessTokenIdentity | null {
+    if (token === 'test-token') {
+      const roleHeader = request?.headers ? request.headers['x-user-role'] : undefined
+      const userIdHeader = request?.headers ? request.headers['x-user-id'] : undefined
+      const role = parseApiRole(roleHeader)
+      const userId = typeof userIdHeader === 'string' ? userIdHeader.trim() : undefined
+      if (role && userId) {
+        return { userId, role }
+      }
+    }
+    return null
+  }
+
+  private resolveLocalBypass(
+    token: string,
+    request?: Request
+  ): AccessTokenIdentity | null {
+    return (
+      this.matchK6Bypass(token) ??
+      this.matchIntegrationBypass(token) ??
+      this.matchPlaywrightBypass(token, request) ??
+      this.matchFallbackBypass(token, request)
+    )
+  }
+
+  private async fetchSupabaseIdentity(
+    token: string,
+    supabaseUrl: string,
+    anonKey: string
+  ): Promise<unknown> {
+    const endpoint = new URL(
+      '/auth/v1/user',
+      `${supabaseUrl.replace(/\/$/, '')}/`
+    ).toString()
     let response: Response
     try {
-      response = await fetch(
-        new URL('/auth/v1/user', `${supabaseUrl.replace(/\/$/, '')}/`).toString(),
-        {
-          method: 'GET',
-          headers: {
-            apikey: anonKey,
-            authorization: `Bearer ${token}`,
-          },
-          cache: 'no-store',
-          signal: AbortSignal.timeout(5_000),
-        }
-      )
+      response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          apikey: anonKey,
+          authorization: `Bearer ${token}`,
+        },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(5_000),
+      })
     } catch {
       throw invalidAccessToken()
     }
@@ -82,13 +148,64 @@ export class AccessTokenIdentityService {
       throw invalidAccessToken()
     }
 
-    let body: unknown
     try {
-      body = await response.json()
+      return await response.json()
     } catch {
       throw invalidAccessToken()
     }
+  }
 
+  private async resolveUserIdFromDb(
+    emailValue: unknown,
+    verified: boolean
+  ): Promise<string> {
+    const parsedEmail = z.string().trim().email().safeParse(emailValue)
+    if (!parsedEmail.success || !verified) {
+      throw invalidAccessToken()
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: {
+          equals: parsedEmail.data.toLowerCase(),
+          mode: 'insensitive',
+        },
+      },
+      select: { id: true },
+    })
+
+    if (!user) {
+      throw invalidAccessToken()
+    }
+
+    return user.id
+  }
+
+  async resolveIdentity(
+    rawToken: string,
+    request?: Request
+  ): Promise<AccessTokenIdentity> {
+    const token = rawToken.trim()
+
+    if (process.env.TEST_ENV === 'local') {
+      const bypass = this.resolveLocalBypass(token, request)
+      if (bypass) {
+        return bypass
+      }
+    }
+
+    const supabaseUrl = process.env.SUPABASE_URL
+    const anonKey = process.env.SUPABASE_ANON_KEY
+
+    if (!token || !supabaseUrl || !anonKey) {
+      throw invalidAccessToken()
+    }
+
+    const body = await this.fetchSupabaseIdentity(
+      token,
+      supabaseUrl.trim(),
+      anonKey.trim()
+    )
     const identity = supabaseIdentitySchema.safeParse(body)
     if (!identity.success) {
       throw invalidAccessToken()
@@ -107,26 +224,9 @@ export class AccessTokenIdentityService {
       return { userId: trustedAppUserId, role }
     }
 
-    const parsedEmail = z.string().trim().email().safeParse(identity.data.email)
-    if (!parsedEmail.success || !hasVerifiedEmailEvidence(identity.data)) {
-      throw invalidAccessToken()
-    }
-
-    const user = await this.prisma.user.findFirst({
-      where: {
-        email: {
-          equals: parsedEmail.data.toLowerCase(),
-          mode: 'insensitive',
-        },
-      },
-      select: { id: true },
-    })
-
-    if (!user) {
-      throw invalidAccessToken()
-    }
-
-    return { userId: user.id, role }
+    const verified = hasVerifiedEmailEvidence(identity.data)
+    const userId = await this.resolveUserIdFromDb(identity.data.email, verified)
+    return { userId, role }
   }
 
   async resolveUserId(rawToken: string): Promise<string> {

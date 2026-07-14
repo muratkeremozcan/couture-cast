@@ -293,7 +293,10 @@ describe('Alerts API integration', () => {
       .set(primaryUserHeaders)
       .send({ rules: allRules })
 
-    expect(resolveAlertIdentity).toHaveBeenCalledWith('primary-alert-token')
+    expect(resolveAlertIdentity).toHaveBeenCalledWith(
+      'primary-alert-token',
+      expect.anything()
+    )
     expect(rulesResponse.status).toBe(200)
     expect(updateAlertRulesResponseSchema.parse(rulesResponse.body)).toEqual({
       data: { rules: allRules },

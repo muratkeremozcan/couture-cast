@@ -309,7 +309,7 @@ describe('observability integration', () => {
       })
 
     expect(response.status).toBe(200)
-    expect(resolveIdentity).toHaveBeenCalledWith('test-token')
+    expect(resolveIdentity).toHaveBeenCalledWith('test-token', expect.anything())
     expect(response.headers['x-request-id']).toBe(requestId)
 
     logExpectations.expectLogEntry(

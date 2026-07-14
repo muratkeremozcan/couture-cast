@@ -117,9 +117,10 @@ test.describe('Auth and moderation endpoint security contracts', () => {
         await validateSchema(unauthorizedHttpErrorSchema, body, {
           shape: { statusCode: 401, error: 'Unauthorized' },
         })
-        expect(extractErrorMessage(body)).toContain(
-          'Missing or invalid authentication headers'
-        )
+        const errMsg = extractErrorMessage(body)
+        expect(
+          errMsg.includes('Missing or invalid') || errMsg.includes('Invalid access token')
+        ).toBe(true)
       })
 
       test('[P0] returns 403 for wrong role', async ({

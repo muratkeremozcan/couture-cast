@@ -47,9 +47,6 @@ export default defineConfig(
     },
     webServer: [
       {
-        // Use the compiled API runtime for Playwright. `tsx` startup is fine for
-        // interactive local development, but the CI/local smoke path needs a
-        // deterministic server process that actually reaches `app.listen()`.
         command: 'npm run start:api:e2e',
         url: environment.apiBaseUrl,
         reuseExistingServer: !process.env.CI,
@@ -57,6 +54,10 @@ export default defineConfig(
         stdout: 'pipe',
         stderr: 'pipe',
         cwd: repoRoot,
+        env: {
+          ...process.env,
+          TEST_ENV: 'local',
+        },
       },
       {
         command: 'npm run start:web',
@@ -69,6 +70,7 @@ export default defineConfig(
         env: {
           ...process.env,
           API_BASE_URL: environment.apiBaseUrl,
+          POSTHOG_API_KEY: '',
         },
       },
     ],
