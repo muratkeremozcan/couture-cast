@@ -11,6 +11,7 @@ import {
   type SavedLocationRecord,
   type UpdateSavedLocationCommand,
 } from './location-preferences.repository'
+import type { TelemetryService } from '../telemetry/telemetry.service'
 
 const userId = 'user-1'
 
@@ -94,10 +95,13 @@ function createRepositoryStub() {
 describe('LocationPreferencesService', () => {
   let repository: ReturnType<typeof createRepositoryStub>
   let service: LocationPreferencesService
+  let captureEvent: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     repository = createRepositoryStub()
-    service = new LocationPreferencesService(repository)
+    captureEvent = vi.fn()
+    const telemetryService = { captureEvent } as unknown as TelemetryService
+    service = new LocationPreferencesService(repository, telemetryService)
   })
 
   it('creates the first saved location as primary with canonical key and rounded coordinates', async () => {
@@ -316,6 +320,11 @@ describe('LocationPreferencesService', () => {
     await service.setPrimary(userId, 'location-2')
 
     expect(repository.setPrimary).toHaveBeenCalledWith(userId, 'location-2')
+    expect(captureEvent).toHaveBeenCalledWith(userId, 'location_switched', {
+      userId,
+      fromLocation: 'home',
+      toLocation: 'chicago-il',
+    })
   })
 
   it('promotes the lowest remaining sort order when deleting the primary location', async () => {

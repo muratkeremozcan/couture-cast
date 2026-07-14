@@ -18,6 +18,7 @@ import type {
 import { WeatherController } from '../src/modules/weather/weather.controller'
 import { WeatherQueryService } from '../src/modules/weather/weather-query.service'
 import { WeatherRepository } from '../src/modules/weather/weather.repository'
+import { TelemetryService } from '../src/modules/telemetry/telemetry.service'
 import { SavedLocationWeatherTargetSource } from '../src/modules/weather/weather-target-source'
 
 const locationKey = 'new-york-ny'
@@ -181,6 +182,12 @@ describe('Weather API integration', () => {
         {
           provide: GuardianConsentStateService,
           useValue: guardianConsentStateService,
+        },
+        {
+          provide: TelemetryService,
+          useValue: {
+            captureEvent: vi.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     })

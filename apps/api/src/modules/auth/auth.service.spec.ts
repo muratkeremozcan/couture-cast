@@ -8,6 +8,7 @@ import {
 } from '../../../test/factories.js'
 import type { AnalyticsClient } from '../../analytics/analytics.service'
 import { AuthService } from './auth.service'
+import type { TelemetryService } from '../telemetry/telemetry.service'
 
 const FIXED_TODAY = new Date('2026-04-16T12:00:00.000Z')
 
@@ -24,11 +25,15 @@ const createService = (findUnique = vi.fn(), create = vi.fn()) => {
     },
   } as unknown as PrismaClient
 
+  const captureEvent = vi.fn()
+  const telemetryService = { captureEvent } as unknown as TelemetryService
+
   return {
-    service: new AuthService(analyticsClient, prisma),
+    service: new AuthService(analyticsClient, prisma, telemetryService),
     capture,
     findUnique,
     create,
+    captureEvent,
   }
 }
 
@@ -55,7 +60,7 @@ describe('AuthService', () => {
   })
 
   it('creates active accounts for users aged sixteen and older', async () => {
-    const { service, findUnique, create } = createService(
+    const { service, findUnique, create, captureEvent } = createService(
       vi.fn().mockResolvedValue(null),
       vi.fn().mockResolvedValue({ id: 'user-16' })
     )
@@ -99,10 +104,16 @@ describe('AuthService', () => {
       },
       select: { id: true },
     })
+
+    expect(captureEvent).toHaveBeenCalledWith('user-16', 'profile_completed', {
+      userId: 'user-16',
+      age: 16,
+      guardianConsentRequired: false,
+    })
   })
 
   it('creates pending consent accounts for users aged thirteen through fifteen', async () => {
-    const { service, create } = createService(
+    const { service, create, captureEvent } = createService(
       vi.fn().mockResolvedValue(null),
       vi.fn().mockResolvedValue({ id: 'user-guardian' })
     )
@@ -141,6 +152,12 @@ describe('AuthService', () => {
         },
       },
       select: { id: true },
+    })
+
+    expect(captureEvent).toHaveBeenCalledWith('user-guardian', 'profile_completed', {
+      userId: 'user-guardian',
+      age: 15,
+      guardianConsentRequired: true,
     })
   })
 

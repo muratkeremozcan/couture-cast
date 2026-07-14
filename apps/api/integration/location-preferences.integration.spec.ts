@@ -24,6 +24,7 @@ import {
   type UpdateSavedLocationCommand,
 } from '../src/modules/location-preferences/location-preferences.repository'
 import { LocationPreferencesService } from '../src/modules/location-preferences/location-preferences.service'
+import { TelemetryService } from '../src/modules/telemetry/telemetry.service'
 
 const primaryUserHeaders = {
   authorization: 'Bearer location-token',
@@ -259,6 +260,12 @@ describe('Location preferences API integration', () => {
           provide: GuardianConsentStateService,
           useValue: auth.guardianConsentStateService,
         },
+        {
+          provide: TelemetryService,
+          useValue: {
+            captureEvent: vi.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     })
       .overrideGuard(RequestAuthGuard)
@@ -398,6 +405,12 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
         {
           provide: GuardianConsentStateService,
           useValue: auth.guardianConsentStateService,
+        },
+        {
+          provide: TelemetryService,
+          useValue: {
+            captureEvent: vi.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     })

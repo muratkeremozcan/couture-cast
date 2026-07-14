@@ -16,6 +16,7 @@ import type {
 } from '../src/modules/alerts/weather-alert-processing.repository'
 import { WeatherAlertProcessingService } from '../src/modules/alerts/weather-alert-processing.service'
 import { PushNotificationService } from '../src/modules/notifications/push-notification.service'
+import type { TelemetryService } from '../src/modules/telemetry/telemetry.service'
 import type {
   NormalizedWeatherForecast,
   WeatherIngestionTarget,
@@ -213,6 +214,7 @@ describe('weather alert delivery latency integration', () => {
       fanoutRepository,
       realtimePublisher,
       pushService,
+      { captureEvent: () => Promise.resolve() } as unknown as TelemetryService,
       pino({ level: 'silent' })
     )
 

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { PushNotificationService } from '../notifications/push-notification.service.js'
 import { AlertFanoutProcessor } from './alert-fanout.processor.js'
+import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import type {
   AlertFanoutAuditInput,
   AlertFanoutRepository,
@@ -82,10 +83,13 @@ function createHarness(options?: {
     { sendPushNotificationsAsync } as never
   )
   const logger = { error: vi.fn(), info: vi.fn() }
+  const captureEvent = vi.fn()
+  const telemetryService = { captureEvent } as unknown as TelemetryService
   const processor = new AlertFanoutProcessor(
     repository as unknown as AlertFanoutRepository,
     realtimePublisher,
     pushService,
+    telemetryService,
     logger as never
   )
 
@@ -96,6 +100,7 @@ function createHarness(options?: {
     sendPushNotificationsAsync,
     deleteTokens,
     logger,
+    captureEvent,
   }
 }
 
@@ -513,5 +518,11 @@ describe('AlertFanoutProcessor', () => {
       push: { outcome: 'suppressed', reason: 'realtime_active' },
     })
     expect(harness.sendPushNotificationsAsync).not.toHaveBeenCalled()
+    expect(harness.captureEvent).toHaveBeenCalledWith('user-1', 'alert_sent', {
+      userId: 'user-1',
+      alertType: 'severe',
+      severity: 'critical',
+      channel: 'realtime',
+    })
   })
 })

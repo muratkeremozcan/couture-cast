@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { evaluateAgeGate, parseBirthdateInput } from '@couture/utils'
+import { TelemetryService } from '../telemetry/telemetry.service'
 import {
   InjectAnalyticsClient,
   type AnalyticsClient,
@@ -42,7 +43,8 @@ function isUniqueConstraintError(
 export class AuthService {
   constructor(
     @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient,
-    @Inject(PrismaClient) private readonly prisma: PrismaClient
+    @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    private readonly telemetryService: TelemetryService
   ) {}
 
   async signUp(input: SignupInput, options: SignUpOptions = {}) {
@@ -106,6 +108,12 @@ export class AuthService {
 
       throw error
     }
+
+    await this.telemetryService.captureEvent(user.id, 'profile_completed', {
+      userId: user.id,
+      age: gate.age,
+      guardianConsentRequired: gate.requiresGuardian,
+    })
 
     return signupResponseSchema.parse({
       userId: user.id,

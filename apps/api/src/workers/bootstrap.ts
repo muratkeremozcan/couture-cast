@@ -5,6 +5,8 @@ import Redis from 'ioredis'
 import { createQueues, queueConfigs } from '../config/queues'
 import { getRedisConfig, redisOptionsFromConfig } from '../config/redis'
 import { AlertFanoutProcessor } from '../modules/alerts/alert-fanout.processor'
+import { TelemetryService } from '../modules/telemetry/telemetry.service.js'
+import { PostHogService } from '../posthog/posthog.service.js'
 import { PrismaAlertFanoutRepository } from '../modules/alerts/alert-fanout.repository'
 import {
   ALERT_REALTIME_PUBLISH_TIMEOUT_MS,
@@ -85,13 +87,16 @@ async function startWorkers() {
       maxRetriesPerRequest: 1,
     })
     redisClients.push(alertRelayRedis)
+    const posthogService = new PostHogService()
+    const telemetryService = new TelemetryService(prisma, posthogService)
     const alertFanoutProcessor = new AlertFanoutProcessor(
       new PrismaAlertFanoutRepository(prisma),
       new RedisAlertRealtimePublisher(alertRelayRedis),
       new PushNotificationService(
         new PushTokenRepository(prisma),
         new Expo({ accessToken: process.env.EXPO_TOKEN })
-      )
+      ),
+      telemetryService
     )
     const weatherRepository = new WeatherRepository(prisma)
     const weatherQueryService = new WeatherQueryService(weatherRepository)

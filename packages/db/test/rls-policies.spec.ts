@@ -494,6 +494,7 @@ describe.sequential('guardian-aware RLS policies', () => {
       ...selfOnlyTables,
       ...ownerOrGlobalReadTables,
       'GuardianConsent',
+      'telemetry_events',
     ]
     const client = await adminPool.connect()
 
@@ -560,6 +561,10 @@ describe.sequential('guardian-aware RLS policies', () => {
 
       expect(policyMap.get('GuardianConsent')).toEqual(
         new Set(['authenticated_read_guardian_consent'])
+      )
+
+      expect(policyMap.get('telemetry_events')).toEqual(
+        new Set(['authenticated_read_own_telemetry', 'authenticated_insert_telemetry'])
       )
     } finally {
       client.release()

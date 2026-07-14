@@ -24,6 +24,12 @@ export const analyticsEventNameSchema = z.enum([
   'alert_received',
   'moderation_action',
   'guardian_consent_granted',
+  'profile_completed',
+  'first_outfit_generated',
+  'forecast_viewed',
+  'alert_sent',
+  'location_switched',
+  'api_error_occurred',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -90,12 +96,75 @@ export type GuardianConsentGrantedEvent = z.infer<
   typeof guardianConsentGrantedEventSchema
 >
 
+export const profileCompletedEventSchema = z.object({
+  userId: nonEmptyString,
+  age: z.number().int().positive(),
+  guardianConsentRequired: z.boolean(),
+  timestamp: isoTimestamp,
+})
+
+export type ProfileCompletedEvent = z.infer<typeof profileCompletedEventSchema>
+
+export const firstOutfitGeneratedEventSchema = z.object({
+  userId: nonEmptyString,
+  locationId: nonEmptyString,
+  timestamp: isoTimestamp,
+  isFirstOutfit: z.boolean(),
+})
+
+export type FirstOutfitGeneratedEvent = z.infer<typeof firstOutfitGeneratedEventSchema>
+
+export const forecastViewedEventSchema = z.object({
+  userId: nonEmptyString,
+  locationKey: nonEmptyString,
+  status: nonEmptyString,
+  timestamp: isoTimestamp,
+})
+
+export type ForecastViewedEvent = z.infer<typeof forecastViewedEventSchema>
+
+export const alertSentEventSchema = z.object({
+  userId: nonEmptyString,
+  alertType: nonEmptyString,
+  severity: z.enum(['info', 'warning', 'critical']),
+  channel: z.enum(['realtime', 'push']),
+  timestamp: isoTimestamp,
+})
+
+export type AlertSentEvent = z.infer<typeof alertSentEventSchema>
+
+export const locationSwitchedEventSchema = z.object({
+  userId: nonEmptyString,
+  fromLocation: z.string().nullable(),
+  toLocation: nonEmptyString,
+  timestamp: isoTimestamp,
+})
+
+export type LocationSwitchedEvent = z.infer<typeof locationSwitchedEventSchema>
+
+export const apiErrorOccurredEventSchema = z.object({
+  userId: z.string().nullable(),
+  endpoint: nonEmptyString,
+  method: nonEmptyString,
+  statusCode: z.number().int().positive(),
+  errorMessage: nonEmptyString,
+  timestamp: isoTimestamp,
+})
+
+export type ApiErrorOccurredEvent = z.infer<typeof apiErrorOccurredEventSchema>
+
 export const analyticsEventSchemas = {
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
   alert_received: alertReceivedEventSchema,
   moderation_action: moderationActionEventSchema,
   guardian_consent_granted: guardianConsentGrantedEventSchema,
+  profile_completed: profileCompletedEventSchema,
+  first_outfit_generated: firstOutfitGeneratedEventSchema,
+  forecast_viewed: forecastViewedEventSchema,
+  alert_sent: alertSentEventSchema,
+  location_switched: locationSwitchedEventSchema,
+  api_error_occurred: apiErrorOccurredEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -153,6 +222,65 @@ export const guardianConsentGrantedPropertiesSchema = z.object({
 export type GuardianConsentGrantedProperties = z.infer<
   typeof guardianConsentGrantedPropertiesSchema
 >
+
+export const profileCompletedPropertiesSchema = z.object({
+  user_id: nonEmptyString,
+  age: z.number().int().positive(),
+  guardian_consent_required: z.boolean(),
+  timestamp: isoTimestamp,
+})
+
+export type ProfileCompletedProperties = z.infer<typeof profileCompletedPropertiesSchema>
+
+export const firstOutfitGeneratedPropertiesSchema = z.object({
+  user_id: nonEmptyString,
+  location_id: nonEmptyString,
+  timestamp: isoTimestamp,
+  is_first_outfit: z.boolean(),
+})
+
+export type FirstOutfitGeneratedProperties = z.infer<
+  typeof firstOutfitGeneratedPropertiesSchema
+>
+
+export const forecastViewedPropertiesSchema = z.object({
+  user_id: nonEmptyString,
+  location_key: nonEmptyString,
+  status: nonEmptyString,
+  timestamp: isoTimestamp,
+})
+
+export type ForecastViewedProperties = z.infer<typeof forecastViewedPropertiesSchema>
+
+export const alertSentPropertiesSchema = z.object({
+  user_id: nonEmptyString,
+  alert_type: nonEmptyString,
+  severity: z.enum(['info', 'warning', 'critical']),
+  channel: z.enum(['realtime', 'push']),
+  timestamp: isoTimestamp,
+})
+
+export type AlertSentProperties = z.infer<typeof alertSentPropertiesSchema>
+
+export const locationSwitchedPropertiesSchema = z.object({
+  user_id: nonEmptyString,
+  from_location: z.string().nullable(),
+  to_location: nonEmptyString,
+  timestamp: isoTimestamp,
+})
+
+export type LocationSwitchedProperties = z.infer<typeof locationSwitchedPropertiesSchema>
+
+export const apiErrorOccurredPropertiesSchema = z.object({
+  user_id: z.string().nullable(),
+  endpoint: nonEmptyString,
+  method: nonEmptyString,
+  status_code: z.number().int().positive(),
+  error_message: nonEmptyString,
+  timestamp: isoTimestamp,
+})
+
+export type ApiErrorOccurredProperties = z.infer<typeof apiErrorOccurredPropertiesSchema>
 
 // Flow ref S0.7/T2/2: normalize domain inputs to snake_case analytics
 // properties in the shared wrappers below.
@@ -246,6 +374,111 @@ export function trackGuardianConsentGranted(
       consent_level: parsed.consentLevel,
       timestamp: parsed.timestamp,
       consent_timestamp: parsed.timestamp,
+    }),
+  }
+}
+
+export function trackProfileCompleted(
+  event: ProfileCompletedEvent
+): AnalyticsCapturePayload<'profile_completed', ProfileCompletedProperties> {
+  const parsed = profileCompletedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.userId,
+    event: 'profile_completed',
+    properties: profileCompletedPropertiesSchema.parse({
+      user_id: parsed.userId,
+      age: parsed.age,
+      guardian_consent_required: parsed.guardianConsentRequired,
+      timestamp: parsed.timestamp,
+    }),
+  }
+}
+
+export function trackFirstOutfitGenerated(
+  event: FirstOutfitGeneratedEvent
+): AnalyticsCapturePayload<'first_outfit_generated', FirstOutfitGeneratedProperties> {
+  const parsed = firstOutfitGeneratedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.userId,
+    event: 'first_outfit_generated',
+    properties: firstOutfitGeneratedPropertiesSchema.parse({
+      user_id: parsed.userId,
+      location_id: parsed.locationId,
+      timestamp: parsed.timestamp,
+      is_first_outfit: parsed.isFirstOutfit,
+    }),
+  }
+}
+
+export function trackForecastViewed(
+  event: ForecastViewedEvent
+): AnalyticsCapturePayload<'forecast_viewed', ForecastViewedProperties> {
+  const parsed = forecastViewedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.userId,
+    event: 'forecast_viewed',
+    properties: forecastViewedPropertiesSchema.parse({
+      user_id: parsed.userId,
+      location_key: parsed.locationKey,
+      status: parsed.status,
+      timestamp: parsed.timestamp,
+    }),
+  }
+}
+
+export function trackAlertSent(
+  event: AlertSentEvent
+): AnalyticsCapturePayload<'alert_sent', AlertSentProperties> {
+  const parsed = alertSentEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.userId,
+    event: 'alert_sent',
+    properties: alertSentPropertiesSchema.parse({
+      user_id: parsed.userId,
+      alert_type: parsed.alertType,
+      severity: parsed.severity,
+      channel: parsed.channel,
+      timestamp: parsed.timestamp,
+    }),
+  }
+}
+
+export function trackLocationSwitched(
+  event: LocationSwitchedEvent
+): AnalyticsCapturePayload<'location_switched', LocationSwitchedProperties> {
+  const parsed = locationSwitchedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.userId,
+    event: 'location_switched',
+    properties: locationSwitchedPropertiesSchema.parse({
+      user_id: parsed.userId,
+      from_location: parsed.fromLocation,
+      to_location: parsed.toLocation,
+      timestamp: parsed.timestamp,
+    }),
+  }
+}
+
+export function trackApiErrorOccurred(
+  event: ApiErrorOccurredEvent
+): AnalyticsCapturePayload<'api_error_occurred', ApiErrorOccurredProperties> {
+  const parsed = apiErrorOccurredEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.userId ?? 'anonymous',
+    event: 'api_error_occurred',
+    properties: apiErrorOccurredPropertiesSchema.parse({
+      user_id: parsed.userId,
+      endpoint: parsed.endpoint,
+      method: parsed.method,
+      status_code: parsed.statusCode,
+      error_message: parsed.errorMessage,
+      timestamp: parsed.timestamp,
     }),
   }
 }

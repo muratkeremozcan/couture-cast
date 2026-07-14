@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-07-13
+last_updated: 2026-07-14
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -59,8 +59,8 @@ development_status:
   epic-1: in-progress
   1-1-weather-api-ingestion-service: done
   1-2-multi-location-preferences: done
-  1-3-alert-rules-notification-pipeline: review
-  1-4-telemetry-audit-baseline: backlog
+  1-3-alert-rules-notification-pipeline: done
+  1-4-telemetry-audit-baseline: in-progress
 
   # Epic 2: Outfit Personalization Core (Phase 1)
   epic-2: backlog

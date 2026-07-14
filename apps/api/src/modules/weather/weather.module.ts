@@ -5,9 +5,10 @@ import { RequestAuthGuard } from '../auth/security.guards'
 import { systemWeatherClock, WeatherQueryService } from './weather-query.service'
 import { WeatherRepository } from './weather.repository'
 import { WeatherController } from './weather.controller'
+import { TelemetryModule } from '../telemetry/telemetry.module'
 
 @Module({
-  imports: [PrismaModule, AuthStateModule],
+  imports: [PrismaModule, AuthStateModule, TelemetryModule],
   controllers: [WeatherController],
   providers: [
     WeatherRepository,

@@ -65,6 +65,7 @@ model User {
   alert_rules                   AlertRule[]
   notification_preference       NotificationPreference?
   event_envelopes               EventEnvelope[]
+  telemetry_events              TelemetryEvent[]
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -418,4 +419,19 @@ model FeatureFlag {
   updated_at DateTime @updatedAt
 
   @@map("feature_flags")
+}
+
+/// RLS: telemetry events filter by user_id for row-level policies
+model TelemetryEvent {
+  id         String   @id @default(cuid())
+  user       User?    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id    String?
+  event_type String
+  properties Json
+  created_at DateTime @default(now())
+
+  @@index([event_type])
+  @@index([created_at])
+  @@index([user_id])
+  @@map("telemetry_events")
 }
