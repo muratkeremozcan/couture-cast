@@ -188,7 +188,9 @@ export class AccessTokenIdentityService {
     const token = rawToken.trim()
 
     const isTestEnv =
-      process.env.TEST_ENV === 'local' || process.env.TEST_ENV === 'preview'
+      process.env.TEST_ENV === 'local' ||
+      process.env.TEST_ENV === 'preview' ||
+      process.env.VERCEL_ENV === 'preview'
     if (isTestEnv) {
       const bypass = this.resolveLocalBypass(token, request)
       if (bypass) {
