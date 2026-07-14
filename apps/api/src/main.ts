@@ -32,12 +32,14 @@ async function bootstrap() {
   // Delay Nest/app imports until after OTEL starts so HTTP/framework modules are patched before
   // they load; otherwise incoming request instrumentation can be missed.
   const [
-    { NestFactory },
+    { NestFactory, HttpAdapterHost },
     { AppModule },
     { ANALYTICS_CLIENT },
     { bindRequestContext },
     { createRequestLoggerMiddleware },
     { configureOpenApi, isOpenApiEnabled },
+    { TelemetryService },
+    { ApiExceptionFilter },
   ] = await Promise.all([
     import('@nestjs/core'),
     import('#app.module'),
@@ -45,12 +47,18 @@ async function bootstrap() {
     import('#logger/request-context'),
     import('#logger/request-logger.middleware'),
     import('#openapi'),
+    import('./modules/telemetry/telemetry.service.js'),
+    import('./filters/api-exception.filter.js'),
   ])
 
   // 2) NestFactory.create(AppModule) builds the route graph from that metadata.
   const app = await NestFactory.create(AppModule)
   app.use(bindRequestContext)
   app.use(createRequestLoggerMiddleware())
+
+  const adapterHost = app.get(HttpAdapterHost)
+  const telemetryService = app.get(TelemetryService)
+  app.useGlobalFilters(new ApiExceptionFilter(adapterHost, telemetryService))
   const openApiEnabled = isOpenApiEnabled(process.env)
   // Step 13 evidence:
   // this is the API-boundary hook where the OpenAPI surface is attached during bootstrap.

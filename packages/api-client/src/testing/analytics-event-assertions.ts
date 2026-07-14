@@ -5,6 +5,12 @@ import {
   moderationActionPropertiesSchema,
   ritualCreatedPropertiesSchema,
   wardrobeUploadStartedPropertiesSchema,
+  profileCompletedPropertiesSchema,
+  firstOutfitGeneratedPropertiesSchema,
+  forecastViewedPropertiesSchema,
+  alertSentPropertiesSchema,
+  locationSwitchedPropertiesSchema,
+  apiErrorOccurredPropertiesSchema,
   type AnalyticsEventName,
 } from '../types/analytics-events'
 import type { ExpectLike } from './expect-like'
@@ -26,6 +32,12 @@ const analyticsPropertySchemas = {
   alert_received: alertReceivedPropertiesSchema,
   moderation_action: moderationActionPropertiesSchema,
   guardian_consent_granted: guardianConsentGrantedPropertiesSchema,
+  profile_completed: profileCompletedPropertiesSchema,
+  first_outfit_generated: firstOutfitGeneratedPropertiesSchema,
+  forecast_viewed: forecastViewedPropertiesSchema,
+  alert_sent: alertSentPropertiesSchema,
+  location_switched: locationSwitchedPropertiesSchema,
+  api_error_occurred: apiErrorOccurredPropertiesSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

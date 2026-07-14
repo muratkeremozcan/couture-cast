@@ -80,7 +80,7 @@ const buildClaims = (email: string, role: string) => ({
 })
 
 const withRole = async <T>(
-  role: 'authenticated' | 'anon',
+  role: 'authenticated' | 'anon' | 'service_role',
   claims: Record<string, unknown> | null,
   run: (client: PoolClient) => Promise<T>
 ) => {
@@ -494,6 +494,7 @@ describe.sequential('guardian-aware RLS policies', () => {
       ...selfOnlyTables,
       ...ownerOrGlobalReadTables,
       'GuardianConsent',
+      'telemetry_events',
     ]
     const client = await adminPool.connect()
 
@@ -560,6 +561,14 @@ describe.sequential('guardian-aware RLS policies', () => {
 
       expect(policyMap.get('GuardianConsent')).toEqual(
         new Set(['authenticated_read_guardian_consent'])
+      )
+
+      expect(policyMap.get('telemetry_events')).toEqual(
+        new Set([
+          'authenticated_read_own_telemetry',
+          'authenticated_insert_telemetry',
+          'service_role_insert_telemetry',
+        ])
       )
     } finally {
       client.release()
@@ -1446,5 +1455,53 @@ describe.sequential('guardian-aware RLS policies', () => {
         expect(updateResult.rows).toEqual([{ category: 'admin-reviewed' }])
       }
     )
+  })
+
+  it('enforces telemetry RLS policies for authenticated users and the service role', async () => {
+    const seeded = (scenario = await seedScenario())
+
+    // 1. Authenticated user CAN insert their own telemetry
+    await withRole(
+      'authenticated',
+      buildClaims(seeded.teenEmail, 'teen'),
+      async (client) => {
+        const id = randomUUID()
+        const result = await client.query(
+          `INSERT INTO public."telemetry_events" ("id", "user_id", "event_type", "properties")
+           VALUES ($1, $2, 'profile_completed', '{"age": 16}'::jsonb)
+           RETURNING "id"`,
+          [id, seeded.teenId]
+        )
+        expect(result.rowCount).toBe(1)
+      }
+    )
+
+    // 2. Authenticated user CANNOT insert telemetry with null user_id (anonymous/system record)
+    await withRole(
+      'authenticated',
+      buildClaims(seeded.teenEmail, 'teen'),
+      async (client) => {
+        const id = randomUUID()
+        await expect(
+          client.query(
+            `INSERT INTO public."telemetry_events" ("id", "user_id", "event_type", "properties")
+             VALUES ($1, NULL, 'forecast_viewed', '{"status": "success"}'::jsonb)`,
+            [id]
+          )
+        ).rejects.toThrow()
+      }
+    )
+
+    // 3. Service role CAN insert anonymous telemetry (null user_id)
+    await withRole('service_role', {}, async (client) => {
+      const id = randomUUID()
+      const result = await client.query(
+        `INSERT INTO public."telemetry_events" ("id", "user_id", "event_type", "properties")
+           VALUES ($1, NULL, 'forecast_viewed', '{"status": "success"}'::jsonb)
+           RETURNING "id"`,
+        [id]
+      )
+      expect(result.rowCount).toBe(1)
+    })
   })
 })

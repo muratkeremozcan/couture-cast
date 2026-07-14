@@ -8,6 +8,7 @@ import type { Logger } from 'pino'
 
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { PushNotificationService } from '../notifications/push-notification.service.js'
+import { TelemetryService } from '../telemetry/telemetry.service.js'
 import {
   DEFAULT_NOTIFICATION_PREFERENCE,
   evaluatePushSuppression,
@@ -123,6 +124,7 @@ export class AlertFanoutProcessor {
     @Inject(AlertRealtimePublisher)
     private readonly realtimePublisher: AlertRealtimePublisher,
     private readonly pushNotificationService: PushNotificationService,
+    private readonly telemetryService: TelemetryService,
     @Inject(ALERT_FANOUT_LOGGER)
     @Optional()
     logger?: Pick<Logger, 'error' | 'info'>
@@ -155,58 +157,26 @@ export class AlertFanoutProcessor {
 
     const { userId, payload } = validated
     const alreadyPublished = await this.repository.hasRealtimeBeenPublished(eventId)
-    const realtime = alreadyPublished
-      ? { published: true }
-      : await this.publishRealtime(eventId, userId, payload)
-    let failureStage: AlertFanoutFailureStage = 'preferences'
-    let tokenCount = 0
-    let push: AlertFanoutPushResult
-
-    try {
-      const preference =
-        (await this.repository.findPreferenceByUserId(userId)) ??
-        DEFAULT_NOTIFICATION_PREFERENCE
-      const suppression = evaluatePushSuppression(preference, instant)
-      if (suppression.suppressed) {
-        push = emptyPushResult('suppressed', suppression.reason)
-      } else if (realtime.published) {
-        push = emptyPushResult('suppressed', 'realtime_active')
-      } else {
-        failureStage = 'tokens'
-        const tokens = await this.repository.findPushTokensByUserId(userId)
-        tokenCount = tokens.length
-        if (tokenCount === 0) {
-          push = emptyPushResult('suppressed', 'no_push_tokens')
-        } else {
-          failureStage = 'push_provider'
-          const dispatch = await this.pushNotificationService.sendBatchNotifications(
-            buildPushMessages(eventId, payload, tokens)
-          )
-          const successfulTicketCount = dispatch.tickets.filter(
-            (ticket) => ticket.status === 'ok'
-          ).length
-          push = {
-            outcome: successfulTicketCount > 0 ? 'sent' : 'failed',
-            ...(successfulTicketCount === 0
-              ? { reason: 'provider_rejected' as const }
-              : {}),
-            tokenCount,
-            successfulTicketCount,
-            failedTicketCount: tokenCount - successfulTicketCount,
-            invalidTokenCount: dispatch.invalidTokens.length,
-            rateLimitedTokenCount: dispatch.rateLimitedTokens.length,
-            networkFailedTokenCount: dispatch.networkFailedTokens.length,
-            prunedInvalidTokenCount: dispatch.prunedInvalidTokenCount,
-            invalidTokenPruneFailed: dispatch.invalidTokenPruneFailed,
-          }
-        }
-      }
-    } catch (error) {
-      await this.recordFailure(eventId, userId, failureStage, error, realtime, tokenCount)
-      throw error
+    let publishedNow = false
+    let realtime: RealtimeDeliveryResult
+    if (alreadyPublished) {
+      realtime = { published: true }
+    } else {
+      realtime = await this.publishRealtime(eventId, userId, payload)
+      publishedNow = realtime.published
     }
 
+    const push = await this.handlePushDelivery(
+      eventId,
+      userId,
+      payload,
+      realtime,
+      instant
+    )
+
     await this.persistOutcome(eventId, userId, realtime, push)
+    await this.dispatchAlertTelemetry(userId, payload, realtime, push, publishedNow)
+
     if (push.outcome === 'failed') {
       const error = new AlertPushDeliveryRejectedError(eventId)
       this.logger.error(
@@ -230,6 +200,82 @@ export class AlertFanoutProcessor {
       realtimePublished: realtime.published,
       ...(realtime.errorCode ? { realtimeErrorCode: realtime.errorCode } : {}),
       push,
+    }
+  }
+
+  private async handlePushDelivery(
+    eventId: string,
+    userId: string,
+    payload: AlertWeatherEvent,
+    realtime: RealtimeDeliveryResult,
+    instant: Date
+  ): Promise<AlertFanoutPushResult> {
+    let failureStage: AlertFanoutFailureStage = 'preferences'
+    let tokenCount = 0
+    try {
+      if (realtime.published) {
+        return emptyPushResult('suppressed', 'realtime_active')
+      }
+      const preference =
+        (await this.repository.findPreferenceByUserId(userId)) ??
+        DEFAULT_NOTIFICATION_PREFERENCE
+      const suppression = evaluatePushSuppression(preference, instant)
+      if (suppression.suppressed) {
+        return emptyPushResult('suppressed', suppression.reason)
+      }
+      failureStage = 'tokens'
+      const tokens = await this.repository.findPushTokensByUserId(userId)
+      tokenCount = tokens.length
+      if (tokenCount === 0) {
+        return emptyPushResult('suppressed', 'no_push_tokens')
+      }
+      failureStage = 'push_provider'
+      const dispatch = await this.pushNotificationService.sendBatchNotifications(
+        buildPushMessages(eventId, payload, tokens)
+      )
+      const successfulTicketCount = dispatch.tickets.filter(
+        (ticket) => ticket.status === 'ok'
+      ).length
+      return {
+        outcome: successfulTicketCount > 0 ? 'sent' : 'failed',
+        ...(successfulTicketCount === 0 ? { reason: 'provider_rejected' as const } : {}),
+        tokenCount,
+        successfulTicketCount,
+        failedTicketCount: tokenCount - successfulTicketCount,
+        invalidTokenCount: dispatch.invalidTokens.length,
+        rateLimitedTokenCount: dispatch.rateLimitedTokens.length,
+        networkFailedTokenCount: dispatch.networkFailedTokens.length,
+        prunedInvalidTokenCount: dispatch.prunedInvalidTokenCount,
+        invalidTokenPruneFailed: dispatch.invalidTokenPruneFailed,
+      }
+    } catch (error) {
+      await this.recordFailure(eventId, userId, failureStage, error, realtime, tokenCount)
+      throw error
+    }
+  }
+
+  private async dispatchAlertTelemetry(
+    userId: string,
+    payload: AlertWeatherEvent,
+    realtime: RealtimeDeliveryResult,
+    push: AlertFanoutPushResult,
+    publishedNow: boolean
+  ): Promise<void> {
+    if (publishedNow) {
+      await this.telemetryService.captureEvent(userId, 'alert_sent', {
+        userId,
+        alertType: payload.data.alertType,
+        severity: payload.data.severity,
+        channel: 'realtime',
+      })
+    }
+    if (push.outcome === 'sent') {
+      await this.telemetryService.captureEvent(userId, 'alert_sent', {
+        userId,
+        alertType: payload.data.alertType,
+        severity: payload.data.severity,
+        channel: 'push',
+      })
     }
   }
 

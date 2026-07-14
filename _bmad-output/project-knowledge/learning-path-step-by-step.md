@@ -1870,6 +1870,77 @@ flowchart TD
   QuietHours -->|no| Expo["PushNotificationService\nExpo Push SDK"]
 ````
 
-```
+## Step 18 - Telemetry and audit baseline
 
+User/business impact:
+
+Type-safe telemetry tracking enables the product and business teams to evaluate user activation funnels (such as signup completion and outfit recommendation engagement) and operational reliability. Concurrently, a local Postgres telemetry table acts as a reliable audit log for key events with a scheduled 24-hour retention pruner to prevent database bloat, while Postgres Row-Level Security (RLS) restricts access so authenticated users can only view their own events and system-level processes can safely persist anonymous records.
+
+Key takeaways:
+
+1. Telemetry events (e.g. `profile_completed`, `first_outfit_generated`, `forecast_viewed`, `alert_sent`, `location_switched`, `api_error_occurred`) are defined in type-safe contracts inside `@couture/api-client`.
+2. `TelemetryService` orchestrates dual-destination delivery: writing to the local Postgres `telemetry_events` table and forwarding events to PostHog via `AnalyticsClient`.
+3. To prevent service blocking, database persistence and PostHog capture execute concurrently. If the database or PostHog fails, the errors are caught, logged, and isolated to prevent user request disruption.
+4. Duplicate event tracking for first-outfit generation is prevented using an advisory-lock transaction (`pg_advisory_xact_lock` hash derived from `userId`) to coordinate concurrent recommendation triggers.
+5. Ingestion of telemetry event inserts is secured by split RLS policies: authenticated users can insert only their own rows (matching their `user_id`), while a dedicated policy grants `service_role` insertion capabilities for anonymous/system telemetry (where `user_id` is null).
+6. Local database events are automatically pruned by a Cron scheduler task running hourly to delete records older than 24 hours.
+
+Story/Task mapping:
+
+- Story 1.4
+- Task 1 (Prisma schema, migrations, RLS, and service_role telemetry policies)
+- Task 2 (Type-safe analytics event contracts and track wrappers)
+- Task 3 (NestJS Telemetry service, retention scheduler, and error isolation)
+- Task 4 (Feature module instrumentation: auth signup, weather views, alert dispatches, location switches)
+- Task 5 (Global API exception filter route sanitization and error code mapping)
+- Task 6 (Test suite coverage, mock protection, and RLS integration verification)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/1-4-telemetry-audit-baseline.md`
+
+Cross-links:
+
+- Step 3 defines the database schema and RLS baseline that this model extends.
+- Step 7 covers the CI/CD and test validation pipeline that tests this module.
+- Step 8 establishes the shared analytics contracts that this telemetry service implements.
+- Step 11 outlines the NestJS global filters and structured logging.
+
+Sequence to follow:
+
+1. Create the `TelemetryEvent` model in Prisma, run migrations, and define RLS policies (including `service_role` insert grants).
+2. Register the Zod schemas and track wrappers in `packages/api-client` to guarantee type-safety.
+3. Build the NestJS `TelemetryModule` and `TelemetryService` with concurrent database/PostHog execution.
+4. Implement the cron pruner method to delete events older than 24 hours.
+5. Instrument existing modules (auth, weather, location, alerts) and configure the global exception filter.
+6. Verify RLS behavior and telemetry persistence using integration tests.
+
+Task owner map:
+
+- Story 1.4 Task 1 step 1 owner: define Prisma model for telemetry events in `packages/db/prisma/schema.prisma`
+- Story 1.4 Task 1 step 2 owner: write manual migration for RLS policies and service role grants in `packages/db/prisma/migrations/20260714100000_add_telemetry_event/migration.sql`
+- Story 1.4 Task 2 step 1 owner: declare telemetry event schemas and trackers in `packages/api-client/src/types/analytics-events.ts`
+- Story 1.4 Task 3 step 1 owner: implement telemetry service database and PostHog concurrent delivery in `apps/api/src/modules/telemetry/telemetry.service.ts`
+- Story 1.4 Task 3 step 2 owner: coordinate posthogService cleanup in worker shutdown routine in `apps/api/src/workers/bootstrap.ts`
+- Story 1.4 Task 4 step 1 owner: integrate signup telemetry in `apps/api/src/modules/auth/auth.service.ts`
+- Story 1.4 Task 5 step 1 owner: implement global api exception filter in `apps/api/src/filters/api-exception.filter.ts`
+- Story 1.4 Task 6 step 1 owner: verify telemetry RLS policies for authenticated users and the service role in `packages/db/test/rls-policies.spec.ts`
+
+Current repo note:
+
+- Telemetry calls run fire-and-forget in the main application flow, and are defensively wrapped to check if `telemetryPromise !== undefined` to prevent crash triggers in tests that use unmocked or stubbed service definitions.
+- RLS policy checks explicitly verify that standard users cannot insert telemetry events under another user's ID or with a null user ID, while the backend `service_role` retains permissions to insert anonymous metrics.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Trigger["Feature Trigger\nsignup, weather, alert, exception"] --> Service["TelemetryService"]
+  Service -->|concurrent| DB["Postgres DB\ntelemetry_events table"]
+  Service -->|concurrent| PH["PostHog Service\nanalyticsClient.capture"]
+
+  DB -->|hourly prune| Pruner["Prune Scheduler\ndelete older than 24h"]
+
+  RLS{"Row Level Security"} -->|authenticated| UserOnly["Insert allowed only if user_id = auth.uid()"]
+  RLS -->|service_role| AnonAllowed["Insert allowed with NULL user_id"]
 ```

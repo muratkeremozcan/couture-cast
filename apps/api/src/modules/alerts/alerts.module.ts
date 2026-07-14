@@ -7,9 +7,10 @@ import { PrismaAlertsRepository } from './alerts.repository'
 import { AlertsService } from './alerts.service'
 import { PrismaWeatherAlertProcessingRepository } from './weather-alert-processing.repository'
 import { WeatherAlertProcessingService } from './weather-alert-processing.service'
+import { TelemetryModule } from '../telemetry/telemetry.module'
 
 @Module({
-  imports: [PrismaModule, AuthStateModule],
+  imports: [PrismaModule, AuthStateModule, TelemetryModule],
   controllers: [AlertsController],
   providers: [
     PrismaAlertsRepository,

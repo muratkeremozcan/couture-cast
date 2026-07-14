@@ -4,8 +4,16 @@ import {
   Get,
   Inject,
   Param,
+  Req,
   UseGuards,
 } from '@nestjs/common'
+import type { Request } from 'express'
+
+interface AuthenticatedRequest extends Request {
+  auth?: {
+    userId?: string
+  }
+}
 import {
   latestWeatherResponseSchema,
   type LatestWeatherResponse,
@@ -14,6 +22,7 @@ import {
   type WeatherProvider,
 } from '../../contracts/http'
 import { RequestAuthGuard } from '../auth/security.guards'
+import { TelemetryService } from '../telemetry/telemetry.service'
 import { WeatherQueryService, type LatestWeatherResult } from './weather-query.service'
 import type { WeatherSnapshotWithSegments } from './weather.repository'
 
@@ -116,7 +125,9 @@ function toResponse(result: LatestWeatherResult): LatestWeatherResponse {
 export class WeatherController {
   constructor(
     @Inject(WeatherQueryService)
-    private readonly weatherQueryService: WeatherQueryService
+    private readonly weatherQueryService: WeatherQueryService,
+    @Inject(TelemetryService)
+    private readonly telemetryService: TelemetryService
   ) {}
 
   @Get()
@@ -128,7 +139,8 @@ export class WeatherController {
   @Get(':locationKey')
   @UseGuards(RequestAuthGuard)
   async getLatestWeather(
-    @Param('locationKey') locationKey: string
+    @Param('locationKey') locationKey: string,
+    @Req() req: AuthenticatedRequest
   ): Promise<LatestWeatherResponse> {
     const normalizedLocationKey = locationKey.trim()
     if (!normalizedLocationKey) {
@@ -136,6 +148,17 @@ export class WeatherController {
     }
 
     const result = await this.weatherQueryService.getLatestWeather(normalizedLocationKey)
-    return latestWeatherResponseSchema.parse(toResponse(result))
+    const response = latestWeatherResponseSchema.parse(toResponse(result))
+
+    const userId: string | null = req.auth?.userId ?? null
+    if (userId) {
+      await this.telemetryService.captureEvent(userId, 'forecast_viewed', {
+        userId,
+        locationKey: normalizedLocationKey,
+        status: 'success',
+      })
+    }
+
+    return response
   }
 }

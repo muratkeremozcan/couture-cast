@@ -5,6 +5,8 @@ import Redis from 'ioredis'
 import { createQueues, queueConfigs } from '../config/queues'
 import { getRedisConfig, redisOptionsFromConfig } from '../config/redis'
 import { AlertFanoutProcessor } from '../modules/alerts/alert-fanout.processor'
+import { TelemetryService } from '../modules/telemetry/telemetry.service.js'
+import { PostHogService } from '../posthog/posthog.service.js'
 import { PrismaAlertFanoutRepository } from '../modules/alerts/alert-fanout.repository'
 import {
   ALERT_REALTIME_PUBLISH_TIMEOUT_MS,
@@ -36,28 +38,12 @@ import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 import { shutdownWorkerResources } from './shutdown-resources'
 
-/** Story 0.4 owner file: worker process bootstrap and concurrency policy.
- * Dedicated worker process group:
- * - Why this process group exists: separate background throughput from API request handling.
- * - Problems it solves: protects API latency, supports independent scaling/restarts, and keeps
- *   graceful shutdown for workers explicit.
- * - Why concurrency controls exist: each queue has different workload cost and external dependency
- *   constraints, so we tune per queue instead of one global value.
- * - Alternatives: run workers inside the API process, split one process per queue, or use
- *   serverless/event-driven consumers.
- * Ownership anchors:
- * - Story 0.4 Task 4 owner: apply per-queue concurrency and rate-limit policy during worker startup.
- * - Story 0.4 Task 5 owner: bootstrap and shut down the dedicated worker process group cleanly.
- *
- * Flow refs:
- * - S0.4/T2: queue definitions come from the shared BullMQ config module.
- * - S0.4/T3: failed jobs emitted by these workers are persisted as DLQ records by the worker base layer.
- */
 // Flow ref S0.4/T5: track worker/queue instances for coordinated shutdown.
 const logger = createBaseLogger().child({ feature: 'workers' })
 const workers: Worker[] = []
 const queues: Queue[] = []
 const redisClients: Redis[] = []
+let posthogService: PostHogService | undefined
 
 async function startWorkers() {
   try {
@@ -85,13 +71,16 @@ async function startWorkers() {
       maxRetriesPerRequest: 1,
     })
     redisClients.push(alertRelayRedis)
+    posthogService = new PostHogService()
+    const telemetryService = new TelemetryService(prisma, posthogService)
     const alertFanoutProcessor = new AlertFanoutProcessor(
       new PrismaAlertFanoutRepository(prisma),
       new RedisAlertRealtimePublisher(alertRelayRedis),
       new PushNotificationService(
         new PushTokenRepository(prisma),
         new Expo({ accessToken: process.env.EXPO_TOKEN })
-      )
+      ),
+      telemetryService
     )
     const weatherRepository = new WeatherRepository(prisma)
     const weatherQueryService = new WeatherQueryService(weatherRepository)
@@ -176,6 +165,13 @@ async function performShutdown() {
   logger.info('Shutting down workers and queues...')
   let exitCode = 0
   try {
+    if (posthogService) {
+      try {
+        posthogService.onApplicationShutdown()
+      } catch (err) {
+        logger.error(err, 'Error shutting down PostHogService')
+      }
+    }
     await shutdownWorkerResources({
       workers,
       queues,

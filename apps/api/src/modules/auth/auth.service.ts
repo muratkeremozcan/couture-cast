@@ -7,10 +7,12 @@ import {
 } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { evaluateAgeGate, parseBirthdateInput } from '@couture/utils'
+import { TelemetryService } from '../telemetry/telemetry.service'
 import {
   InjectAnalyticsClient,
   type AnalyticsClient,
 } from '../../analytics/analytics.service'
+import { createBaseLogger } from '../../logger/pino.config'
 import {
   guardianConsentInputSchema,
   guardianConsentResponseSchema,
@@ -40,9 +42,12 @@ function isUniqueConstraintError(
 
 @Injectable()
 export class AuthService {
+  private readonly logger = createBaseLogger().child({ feature: 'auth' })
+
   constructor(
     @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient,
-    @Inject(PrismaClient) private readonly prisma: PrismaClient
+    @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    private readonly telemetryService: TelemetryService
   ) {}
 
   async signUp(input: SignupInput, options: SignUpOptions = {}) {
@@ -105,6 +110,24 @@ export class AuthService {
       }
 
       throw error
+    }
+
+    const telemetryPromise = this.telemetryService.captureEvent(
+      user.id,
+      'profile_completed',
+      {
+        userId: user.id,
+        age: gate.age,
+        guardianConsentRequired: gate.requiresGuardian,
+      }
+    )
+    if (
+      telemetryPromise !== undefined &&
+      typeof (telemetryPromise as unknown as { catch: unknown }).catch === 'function'
+    ) {
+      telemetryPromise.catch((err: unknown) => {
+        this.logger.error({ err, userId: user.id }, 'signUp_telemetry_failed')
+      })
     }
 
     return signupResponseSchema.parse({

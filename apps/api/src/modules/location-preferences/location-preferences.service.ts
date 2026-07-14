@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
+import { TelemetryService } from '../telemetry/telemetry.service'
 import type {
   CreateSavedLocationInput,
   SavedLocation,
@@ -134,7 +135,9 @@ function buildUpdateCommand(input: UpdateSavedLocationInput): UpdateSavedLocatio
 export class LocationPreferencesService {
   constructor(
     @Inject(PrismaLocationPreferencesRepository)
-    private readonly repository: LocationPreferencesRepository
+    private readonly repository: LocationPreferencesRepository,
+    @Inject(TelemetryService)
+    private readonly telemetryService: TelemetryService
   ) {}
 
   async listLocations(userId: string): Promise<SavedLocation[]> {
@@ -209,12 +212,26 @@ export class LocationPreferencesService {
   }
 
   async setPrimary(userId: string, locationId: string): Promise<SavedLocation> {
+    const existing = await this.repository.findManyByUserId(userId)
+    const currentPrimary = existing.find((loc) => loc.is_primary)
+    const fromLocation = currentPrimary ? currentPrimary.location_key : null
+
     const updated = await this.repository.setPrimary(userId, locationId)
     if (!updated) {
       throw new NotFoundException('Saved location not found')
     }
 
-    return toSavedLocation(updated)
+    const savedLocation = toSavedLocation(updated)
+
+    if (fromLocation !== savedLocation.locationKey) {
+      await this.telemetryService.captureEvent(userId, 'location_switched', {
+        userId,
+        fromLocation,
+        toLocation: savedLocation.locationKey,
+      })
+    }
+
+    return savedLocation
   }
 
   async deleteLocation(userId: string, locationId: string): Promise<{ deleted: true }> {
