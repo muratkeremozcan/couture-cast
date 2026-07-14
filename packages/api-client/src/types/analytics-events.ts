@@ -144,10 +144,10 @@ export type LocationSwitchedEvent = z.infer<typeof locationSwitchedEventSchema>
 
 export const apiErrorOccurredEventSchema = z.object({
   userId: z.string().nullable(),
-  endpoint: nonEmptyString,
+  route: nonEmptyString,
   method: nonEmptyString,
   statusCode: z.number().int().positive(),
-  errorMessage: nonEmptyString,
+  errorCode: nonEmptyString,
   timestamp: isoTimestamp,
 })
 
@@ -273,10 +273,10 @@ export type LocationSwitchedProperties = z.infer<typeof locationSwitchedProperti
 
 export const apiErrorOccurredPropertiesSchema = z.object({
   user_id: z.string().nullable(),
-  endpoint: nonEmptyString,
+  route: nonEmptyString,
   method: nonEmptyString,
   status_code: z.number().int().positive(),
-  error_message: nonEmptyString,
+  error_code: nonEmptyString,
   timestamp: isoTimestamp,
 })
 
@@ -474,10 +474,10 @@ export function trackApiErrorOccurred(
     event: 'api_error_occurred',
     properties: apiErrorOccurredPropertiesSchema.parse({
       user_id: parsed.userId,
-      endpoint: parsed.endpoint,
+      route: parsed.route,
       method: parsed.method,
       status_code: parsed.statusCode,
-      error_message: parsed.errorMessage,
+      error_code: parsed.errorCode,
       timestamp: parsed.timestamp,
     }),
   }

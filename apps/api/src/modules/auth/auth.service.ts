@@ -12,6 +12,7 @@ import {
   InjectAnalyticsClient,
   type AnalyticsClient,
 } from '../../analytics/analytics.service'
+import { createBaseLogger } from '../../logger/pino.config'
 import {
   guardianConsentInputSchema,
   guardianConsentResponseSchema,
@@ -41,6 +42,8 @@ function isUniqueConstraintError(
 
 @Injectable()
 export class AuthService {
+  private readonly logger = createBaseLogger().child({ feature: 'auth' })
+
   constructor(
     @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient,
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
@@ -109,11 +112,23 @@ export class AuthService {
       throw error
     }
 
-    await this.telemetryService.captureEvent(user.id, 'profile_completed', {
-      userId: user.id,
-      age: gate.age,
-      guardianConsentRequired: gate.requiresGuardian,
-    })
+    const telemetryPromise = this.telemetryService.captureEvent(
+      user.id,
+      'profile_completed',
+      {
+        userId: user.id,
+        age: gate.age,
+        guardianConsentRequired: gate.requiresGuardian,
+      }
+    )
+    if (
+      telemetryPromise !== undefined &&
+      typeof (telemetryPromise as unknown as { catch: unknown }).catch === 'function'
+    ) {
+      telemetryPromise.catch((err: unknown) => {
+        this.logger.error({ err, userId: user.id }, 'signUp_telemetry_failed')
+      })
+    }
 
     return signupResponseSchema.parse({
       userId: user.id,

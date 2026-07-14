@@ -57,10 +57,10 @@ describe('ApiExceptionFilter', () => {
       'api_error_occurred',
       expect.objectContaining({
         userId: 'user-1',
-        endpoint: '/api/v1/weather/chicago-il',
+        route: '/api/v1/weather/chicago-il',
         method: 'GET',
         statusCode: 400,
-        errorMessage: 'Invalid payload',
+        errorCode: 'BAD_REQUEST',
       })
     )
   })
@@ -94,10 +94,10 @@ describe('ApiExceptionFilter', () => {
       'api_error_occurred',
       expect.objectContaining({
         userId: 'user-2',
-        endpoint: '/api/v1/outfits',
+        route: '/api/v1/outfits',
         method: 'POST',
         statusCode: 500,
-        errorMessage: 'Unexpected database failure',
+        errorCode: 'INTERNAL_ERROR',
       })
     )
   })

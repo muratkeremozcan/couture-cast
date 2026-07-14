@@ -39,4 +39,13 @@ CREATE POLICY authenticated_insert_telemetry
   ON public."telemetry_events"
   FOR INSERT
   TO authenticated
-  WITH CHECK (user_id IS NULL OR private.can_manage_self_row(user_id));
+  WITH CHECK (user_id IS NOT NULL AND private.can_manage_self_row(user_id));
+
+GRANT USAGE ON SCHEMA public TO service_role;
+GRANT SELECT, INSERT ON TABLE public."telemetry_events" TO service_role;
+DROP POLICY IF EXISTS service_role_insert_telemetry ON public."telemetry_events";
+CREATE POLICY service_role_insert_telemetry
+  ON public."telemetry_events"
+  FOR INSERT
+  TO service_role
+  WITH CHECK (TRUE);

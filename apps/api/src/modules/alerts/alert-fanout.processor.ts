@@ -157,9 +157,14 @@ export class AlertFanoutProcessor {
 
     const { userId, payload } = validated
     const alreadyPublished = await this.repository.hasRealtimeBeenPublished(eventId)
-    const realtime = alreadyPublished
-      ? { published: true }
-      : await this.publishRealtime(eventId, userId, payload)
+    let publishedNow = false
+    let realtime: RealtimeDeliveryResult
+    if (alreadyPublished) {
+      realtime = { published: true }
+    } else {
+      realtime = await this.publishRealtime(eventId, userId, payload)
+      publishedNow = realtime.published
+    }
 
     const push = await this.handlePushDelivery(
       eventId,
@@ -170,7 +175,7 @@ export class AlertFanoutProcessor {
     )
 
     await this.persistOutcome(eventId, userId, realtime, push)
-    await this.dispatchAlertTelemetry(userId, payload, realtime, push)
+    await this.dispatchAlertTelemetry(userId, payload, realtime, push, publishedNow)
 
     if (push.outcome === 'failed') {
       const error = new AlertPushDeliveryRejectedError(eventId)
@@ -208,15 +213,15 @@ export class AlertFanoutProcessor {
     let failureStage: AlertFanoutFailureStage = 'preferences'
     let tokenCount = 0
     try {
+      if (realtime.published) {
+        return emptyPushResult('suppressed', 'realtime_active')
+      }
       const preference =
         (await this.repository.findPreferenceByUserId(userId)) ??
         DEFAULT_NOTIFICATION_PREFERENCE
       const suppression = evaluatePushSuppression(preference, instant)
       if (suppression.suppressed) {
         return emptyPushResult('suppressed', suppression.reason)
-      }
-      if (realtime.published) {
-        return emptyPushResult('suppressed', 'realtime_active')
       }
       failureStage = 'tokens'
       const tokens = await this.repository.findPushTokensByUserId(userId)
@@ -253,9 +258,10 @@ export class AlertFanoutProcessor {
     userId: string,
     payload: AlertWeatherEvent,
     realtime: RealtimeDeliveryResult,
-    push: AlertFanoutPushResult
+    push: AlertFanoutPushResult,
+    publishedNow: boolean
   ): Promise<void> {
-    if (realtime.published) {
+    if (publishedNow) {
       await this.telemetryService.captureEvent(userId, 'alert_sent', {
         userId,
         alertType: payload.data.alertType,

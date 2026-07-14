@@ -12,9 +12,19 @@ interface AuthenticatedRequest {
   }
 }
 
-interface HttpExceptionResponse {
-  message?: string | string[]
-  error?: string
+function getErrorCodeForStatus(statusCode: HttpStatus): string {
+  if (statusCode === HttpStatus.BAD_REQUEST) return 'BAD_REQUEST'
+  if (statusCode === HttpStatus.UNAUTHORIZED) return 'UNAUTHORIZED'
+  if (statusCode === HttpStatus.FORBIDDEN) return 'FORBIDDEN'
+  if (statusCode === HttpStatus.NOT_FOUND) return 'NOT_FOUND'
+  if (statusCode === HttpStatus.TOO_MANY_REQUESTS) return 'RATE_LIMIT'
+  if (
+    statusCode >= HttpStatus.BAD_REQUEST &&
+    statusCode < HttpStatus.INTERNAL_SERVER_ERROR
+  ) {
+    return 'CLIENT_ERROR'
+  }
+  return 'INTERNAL_ERROR'
 }
 
 @Catch()
@@ -39,40 +49,40 @@ export class ApiExceptionFilter extends BaseExceptionFilter {
         return
       }
 
-      const endpoint = request.url || request.path || 'unknown'
+      const route = request.path || request.url?.split('?')[0] || 'unknown'
       const method = request.method || 'unknown'
       const userId = request.auth?.userId || null
 
       let statusCode = HttpStatus.INTERNAL_SERVER_ERROR
-      let errorMessage = 'Internal Server Error'
-
       if (exception instanceof HttpException) {
-        statusCode = exception.getStatus()
-        const resBody = exception.getResponse() as string | HttpExceptionResponse
-        errorMessage =
-          typeof resBody === 'string'
-            ? resBody
-            : Array.isArray(resBody.message)
-              ? resBody.message.join(', ')
-              : resBody.message || resBody.error || exception.message
-      } else if (exception instanceof Error) {
-        errorMessage = exception.message
+        statusCode = exception.getStatus() as HttpStatus
       }
 
-      this.telemetryService
-        .captureEvent(userId, 'api_error_occurred', {
+      const errorCode = getErrorCodeForStatus(statusCode)
+
+      const telemetryPromise = this.telemetryService.captureEvent(
+        userId,
+        'api_error_occurred',
+        {
           userId,
-          endpoint,
+          route,
           method,
           statusCode,
-          errorMessage,
-        })
-        .catch((err: unknown) => {
+          errorCode,
+        }
+      )
+
+      if (
+        telemetryPromise !== undefined &&
+        typeof (telemetryPromise as unknown as { catch: unknown }).catch === 'function'
+      ) {
+        telemetryPromise.catch((err: unknown) => {
           this.logger.error(
             { err },
             'Failed to dispatch api_error_occurred telemetry event'
           )
         })
+      }
     } catch (err: unknown) {
       this.logger.error(
         { err },

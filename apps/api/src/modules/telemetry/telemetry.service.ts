@@ -1,6 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common'
 import { PrismaClient, Prisma } from '@prisma/client'
 import { Cron, CronExpression } from '@nestjs/schedule'
+import { z } from 'zod'
 import { ANALYTICS_CLIENT, type AnalyticsClient } from '../../analytics/analytics.service'
 import {
   trackProfileCompleted,
@@ -10,24 +11,68 @@ import {
   trackLocationSwitched,
   trackApiErrorOccurred,
   type AnalyticsEventName,
-  type ProfileCompletedEvent,
-  type FirstOutfitGeneratedEvent,
-  type ForecastViewedEvent,
-  type AlertSentEvent,
-  type LocationSwitchedEvent,
-  type ApiErrorOccurredEvent,
 } from '@couture/api-client'
 import { createBaseLogger } from '../../logger/pino.config'
 
-/** Typed properties union covering all telemetry events this service handles. */
-export type TelemetryEventProperties =
-  | (Omit<ProfileCompletedEvent, 'timestamp'> & Record<string, unknown>)
-  | (Omit<FirstOutfitGeneratedEvent, 'timestamp'> & Record<string, unknown>)
-  | (Omit<ForecastViewedEvent, 'timestamp'> & Record<string, unknown>)
-  | (Omit<AlertSentEvent, 'timestamp'> & Record<string, unknown>)
-  | (Omit<LocationSwitchedEvent, 'timestamp'> & Record<string, unknown>)
-  | (Omit<ApiErrorOccurredEvent, 'timestamp'> & Record<string, unknown>)
-  | Record<string, unknown>
+export interface TelemetryPropertiesMap {
+  profile_completed: {
+    age: number
+    guardianConsentRequired?: boolean
+    guardian_consent_required?: boolean
+  } & Record<string, unknown>
+  first_outfit_generated: {
+    locationId?: string
+    location_id?: string
+    isFirstOutfit?: boolean
+    is_first_outfit?: boolean
+  } & Record<string, unknown>
+  forecast_viewed: {
+    locationKey?: string
+    location_key?: string
+    status: string
+  } & Record<string, unknown>
+  alert_sent: {
+    alertType?: string
+    alert_type?: string
+    severity: 'info' | 'warning' | 'critical'
+    channel: 'realtime' | 'push'
+  } & Record<string, unknown>
+  location_switched: {
+    fromLocation: string | null
+    from_location?: string | null
+    toLocation: string
+    to_location?: string
+  } & Record<string, unknown>
+  api_error_occurred: {
+    route?: string
+    endpoint?: string
+    method: string
+    statusCode?: number
+    status_code?: number
+    errorCode?: string
+    error_code?: string
+    errorMessage?: string
+    error_message?: string
+  } & Record<string, unknown>
+}
+
+const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
+  profile_completed: z.object({
+    age: z.number().int().positive(),
+  }),
+  first_outfit_generated: z.object({}),
+  forecast_viewed: z.object({
+    status: z.string(),
+  }),
+  alert_sent: z.object({
+    severity: z.enum(['info', 'warning', 'critical']),
+    channel: z.enum(['realtime', 'push']),
+  }),
+  location_switched: z.object({}),
+  api_error_occurred: z.object({
+    method: z.string(),
+  }),
+}
 
 type PostHogPayload = {
   distinctId: string
@@ -54,8 +99,17 @@ function getBool(v: unknown, fallback = false): boolean {
   return typeof v === 'boolean' ? v : fallback
 }
 
+function hashStringToInteger(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash)
+}
+
 // ---------------------------------------------------------------------------
-// Per-event payload builders (one function per event = lower per-function complexity)
+// Per-event payload builders
 // ---------------------------------------------------------------------------
 function buildProfileCompleted(
   userId: string,
@@ -85,6 +139,7 @@ function buildFirstOutfitGenerated(
   })
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildForecastViewed(
   userId: string,
   props: Record<string, unknown>,
@@ -130,12 +185,19 @@ function buildApiErrorOccurred(
   props: Record<string, unknown>,
   timestamp: string
 ): PostHogPayload {
+  const route = getString(props['route'] ?? props['endpoint'])
+  const errorCodeVal = getString(
+    props['errorCode'] ??
+      props['error_code'] ??
+      props['errorMessage'] ??
+      props['error_message']
+  )
   return trackApiErrorOccurred({
     userId: getStringOrNull(userId ?? props['userId'] ?? props['user_id']),
-    endpoint: getString(props['endpoint']),
-    method: getString(props['method']),
+    route: route !== '' ? route : 'unknown',
+    method: getString(props['method']) !== '' ? getString(props['method']) : 'unknown',
     statusCode: getNumber(props['statusCode'] ?? props['status_code']),
-    errorMessage: getString(props['errorMessage'] ?? props['error_message']),
+    errorCode: errorCodeVal !== '' ? errorCodeVal : 'INTERNAL_ERROR',
     timestamp,
   })
 }
@@ -164,33 +226,41 @@ export class TelemetryService {
     @Inject(ANALYTICS_CLIENT) private readonly analyticsClient: AnalyticsClient
   ) {}
 
-  async captureEvent(
+  async captureEvent<T extends keyof TelemetryPropertiesMap>(
     userId: string | null,
-    eventType: AnalyticsEventName,
-    properties: Record<string, unknown>
+    eventType: T,
+    properties: TelemetryPropertiesMap[T]
   ): Promise<void> {
-    try {
-      // 1. Persist to Postgres database
-      await this.prisma.telemetryEvent.create({
+    // Runtime validation before any execution
+    const validator = telemetryValidators[eventType]
+    if (validator) {
+      validator.parse(properties)
+    }
+
+    // 1. Start database persistence asynchronously (without awaiting)
+    const dbPromise = this.prisma.telemetryEvent
+      .create({
         data: {
           user_id: userId,
           event_type: eventType,
           properties: properties as Prisma.InputJsonValue,
         },
       })
-    } catch (dbError: unknown) {
-      // Robustness: Database failures MUST NOT crash the application or prevent PostHog delivery.
-      this.logger.error(
-        { dbError, eventType, userId },
-        'Failed to persist telemetry event to database'
-      )
-    }
+      .catch((dbError: unknown) => {
+        // Robustness: Database failures MUST NOT crash the application or prevent PostHog delivery.
+        this.logger.error(
+          { dbError, eventType, userId },
+          'Failed to persist telemetry event to database'
+        )
+      })
 
+    // 2. Format payload via packages/api-client wrappers and call analyticsClient.capture(...)
     try {
-      // 2. Format payload via packages/api-client wrappers and call analyticsClient.capture(...)
       const timestamp = new Date().toISOString()
       const resolvedUserId =
-        userId ?? getString(properties['userId']) ?? getString(properties['user_id'])
+        userId ??
+        getStringOrNull(properties['userId']) ??
+        getStringOrNull(properties['user_id'])
       const builder = eventBuilders[eventType]
       const payload = builder ? builder(resolvedUserId, properties, timestamp) : null
 
@@ -208,21 +278,59 @@ export class TelemetryService {
         'Failed to dispatch telemetry event to PostHog'
       )
     }
+
+    // Await dbPromise to ensure database writes are settled before the captureEvent promise resolves.
+    await dbPromise
   }
 
   async trackOutfitGenerated(userId: string, locationId: string): Promise<void> {
     try {
-      const count = await this.prisma.outfitRecommendation.count({
-        where: { user_id: userId },
-      })
-
-      if (count === 1) {
-        await this.captureEvent(userId, 'first_outfit_generated', {
-          userId,
-          locationId,
-          isFirstOutfit: true,
+      const lockId = hashStringToInteger(`first_outfit_${userId}`)
+      // Fallback safely to non-transactional check if $transaction is not mocked or available
+      if (typeof this.prisma.$transaction !== 'function') {
+        const count = await this.prisma.outfitRecommendation.count({
+          where: { user_id: userId },
         })
+        if (count === 1) {
+          await this.captureEvent(userId, 'first_outfit_generated', {
+            userId,
+            locationId,
+            isFirstOutfit: true,
+          })
+        }
+        return
       }
+
+      await this.prisma.$transaction(async (tx) => {
+        // Acquire an advisory lock for this user's first outfit check (Postgres only)
+        try {
+          await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${lockId})`)
+        } catch {
+          // Ignore locks if database does not support them (e.g. during test setup or SQLite)
+        }
+
+        const count = await tx.outfitRecommendation.count({
+          where: { user_id: userId },
+        })
+
+        if (count === 1) {
+          // Double-check lock: check if first_outfit_generated was already captured
+          const alreadyCaptured = await tx.telemetryEvent.findFirst({
+            where: {
+              user_id: userId,
+              event_type: 'first_outfit_generated',
+            },
+          })
+
+          if (!alreadyCaptured) {
+            await this.captureEvent(userId, 'first_outfit_generated', {
+              userId,
+              locationId,
+              isFirstOutfit: true,
+            })
+          }
+        }
+      })
     } catch (error: unknown) {
       this.logger.error(
         { error, userId, locationId },

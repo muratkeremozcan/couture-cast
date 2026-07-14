@@ -223,11 +223,13 @@ export class LocationPreferencesService {
 
     const savedLocation = toSavedLocation(updated)
 
-    await this.telemetryService.captureEvent(userId, 'location_switched', {
-      userId,
-      fromLocation,
-      toLocation: savedLocation.locationKey,
-    })
+    if (fromLocation !== savedLocation.locationKey) {
+      await this.telemetryService.captureEvent(userId, 'location_switched', {
+        userId,
+        fromLocation,
+        toLocation: savedLocation.locationKey,
+      })
+    }
 
     return savedLocation
   }

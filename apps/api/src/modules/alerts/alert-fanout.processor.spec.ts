@@ -236,9 +236,9 @@ describe('AlertFanoutProcessor', () => {
     expect(JSON.stringify(audit)).not.toContain('ExponentPushToken')
   })
 
-  it('publishes realtime while suppressing an opted-out push', async () => {
+  it('suppresses an opted-out push when realtime is not published', async () => {
     const harness = createHarness({
-      realtimeResult: true,
+      realtimeResult: false,
       preference: {
         pushEnabled: false,
         quietHoursEnabled: false,
@@ -252,7 +252,7 @@ describe('AlertFanoutProcessor', () => {
     await expect(
       harness.processor.process({ eventId: 'event-1' }, now)
     ).resolves.toMatchObject({
-      realtimePublished: true,
+      realtimePublished: false,
       push: { outcome: 'suppressed', reason: 'push_disabled' },
     })
     expect(harness.realtimePublisher.publish).toHaveBeenCalledTimes(1)
@@ -260,9 +260,9 @@ describe('AlertFanoutProcessor', () => {
     expect(harness.sendPushNotificationsAsync).not.toHaveBeenCalled()
   })
 
-  it('publishes realtime while suppressing push at the quiet-hours start boundary', async () => {
+  it('suppresses push at the quiet-hours start boundary when realtime is not published', async () => {
     const harness = createHarness({
-      realtimeResult: true,
+      realtimeResult: false,
       preference: {
         pushEnabled: true,
         quietHoursEnabled: true,
@@ -276,16 +276,16 @@ describe('AlertFanoutProcessor', () => {
     await expect(
       harness.processor.process({ eventId: 'event-1' }, now)
     ).resolves.toMatchObject({
-      realtimePublished: true,
+      realtimePublished: false,
       push: { outcome: 'suppressed', reason: 'quiet_hours' },
     })
     expect(harness.realtimePublisher.publish).toHaveBeenCalledTimes(1)
     expect(harness.repository.findPushTokensByUserId).not.toHaveBeenCalled()
   })
 
-  it('fails safe on an invalid persisted timezone after publishing realtime', async () => {
+  it('fails safe on an invalid persisted timezone when realtime is not published', async () => {
     const harness = createHarness({
-      realtimeResult: true,
+      realtimeResult: false,
       preference: {
         pushEnabled: true,
         quietHoursEnabled: true,
@@ -299,7 +299,7 @@ describe('AlertFanoutProcessor', () => {
     await expect(
       harness.processor.process({ eventId: 'event-1' }, now)
     ).resolves.toMatchObject({
-      realtimePublished: true,
+      realtimePublished: false,
       push: { outcome: 'suppressed', reason: 'invalid_timezone' },
     })
     expect(harness.realtimePublisher.publish).toHaveBeenCalledTimes(1)

@@ -7,12 +7,14 @@ describe('TelemetryService', () => {
   let service: TelemetryService
   let telemetryCreate: ReturnType<typeof vi.fn>
   let telemetryDeleteMany: ReturnType<typeof vi.fn>
+  let telemetryFindFirst: ReturnType<typeof vi.fn>
   let outfitCount: ReturnType<typeof vi.fn>
   let analyticsCapture: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     telemetryCreate = vi.fn()
     telemetryDeleteMany = vi.fn()
+    telemetryFindFirst = vi.fn().mockResolvedValue(null)
     outfitCount = vi.fn()
     analyticsCapture = vi.fn()
 
@@ -20,10 +22,13 @@ describe('TelemetryService', () => {
       telemetryEvent: {
         create: telemetryCreate,
         deleteMany: telemetryDeleteMany,
+        findFirst: telemetryFindFirst,
       },
       outfitRecommendation: {
         count: outfitCount,
       },
+      $transaction: vi.fn((cb: (tx: unknown) => unknown) => cb(mockPrisma)),
+      $executeRawUnsafe: vi.fn().mockResolvedValue(1),
     }
 
     const mockAnalyticsClient: AnalyticsClient = {
@@ -129,6 +134,11 @@ describe('TelemetryService', () => {
         data: expect.objectContaining({
           user_id: 'user-1',
           event_type: 'first_outfit_generated',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          properties: expect.objectContaining({
+            locationId: 'loc-1',
+            isFirstOutfit: true,
+          }),
         }),
       })
     )
