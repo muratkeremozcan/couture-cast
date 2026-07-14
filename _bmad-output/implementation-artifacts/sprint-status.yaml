@@ -56,11 +56,11 @@ development_status:
   0-14-expand-test-infra-auth-contract-performance: done
 
   # Epic 1: Weather Intelligence & Platform Foundation (Phase 1)
-  epic-1: in-progress
+  epic-1: done
   1-1-weather-api-ingestion-service: done
   1-2-multi-location-preferences: done
   1-3-alert-rules-notification-pipeline: done
-  1-4-telemetry-audit-baseline: in-progress
+  1-4-telemetry-audit-baseline: done
 
   # Epic 2: Outfit Personalization Core (Phase 1)
   epic-2: backlog
