@@ -5,6 +5,9 @@ import { existsSync, mkdirSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { ApiHealthController } from '../../../apps/api/src/controllers/api-health.controller'
 import { HealthController } from '../../../apps/api/src/controllers/health.controller'
+import { AccessTokenIdentityService } from '../../../apps/api/src/modules/auth/access-token-identity.service'
+import { GuardianConsentStateService } from '../../../apps/api/src/modules/auth/guardian-consent-state.service'
+import { RequestAuthGuard } from '../../../apps/api/src/modules/auth/security.guards'
 import { EventsController } from '../../../apps/api/src/modules/events/events.controller'
 import { EventsRepository } from '../../../apps/api/src/modules/events/events.repository'
 import { EventsService } from '../../../apps/api/src/modules/events/events.service'
@@ -59,12 +62,14 @@ export function configureProviderEvent(event: PactEvent) {
 }
 
 const eventsRepository = {
-  findSince(since?: Date) {
-    if (!since) {
-      return Promise.resolve(providerEvents)
-    }
-
-    return Promise.resolve(providerEvents.filter((event) => event.created_at > since))
+  findSince(userId: string, since?: Date) {
+    return Promise.resolve(
+      providerEvents.filter(
+        (event) =>
+          (event.user_id === userId || event.user_id === null) &&
+          (!since || event.created_at > since)
+      )
+    )
   },
   create() {
     return Promise.reject(
@@ -103,6 +108,16 @@ export async function startLocalPactProvider({
   assertPactFilesExist(pactFiles)
   mkdirSync(artifactsDir, { recursive: true })
   resetProviderState()
+  const guardianConsentStateService = {
+    canTeenAccess: () => Promise.resolve(true),
+  } as unknown as GuardianConsentStateService
+  const accessTokenIdentityService = {
+    resolveIdentity(token: string) {
+      return token === 'pact-event-token'
+        ? Promise.resolve({ userId: 'guardian-1', role: 'guardian' as const })
+        : Promise.reject(new Error('Unknown Pact access token'))
+    },
+  } as unknown as AccessTokenIdentityService
 
   const moduleFixture = await Test.createTestingModule({
     controllers: [ApiHealthController, HealthController, EventsController],
@@ -112,8 +127,21 @@ export async function startLocalPactProvider({
         provide: EventsRepository,
         useValue: eventsRepository,
       },
+      {
+        provide: GuardianConsentStateService,
+        useValue: guardianConsentStateService,
+      },
+      {
+        provide: AccessTokenIdentityService,
+        useValue: accessTokenIdentityService,
+      },
     ],
-  }).compile()
+  })
+    .overrideGuard(RequestAuthGuard)
+    .useValue(
+      new RequestAuthGuard(guardianConsentStateService, accessTokenIdentityService)
+    )
+    .compile()
 
   const localApp = moduleFixture.createNestApplication()
   await localApp.init()

@@ -9,6 +9,7 @@ import { WeatherApiProvider } from './weatherapi.provider.js'
 
 const target = {
   locationKey: 'nyc',
+  locationName: 'New York',
   latitude: 40.71281,
   longitude: -74.00599,
 }
@@ -62,6 +63,7 @@ describe('WeatherApiProvider', () => {
     expect(result).toMatchObject({
       provider: 'weatherapi',
       locationKey: 'nyc',
+      locationName: 'New York',
       latitude: 40.7128,
       longitude: -74.006,
       timezone: 'America/New_York',

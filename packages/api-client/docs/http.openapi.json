@@ -150,6 +150,529 @@
           "error"
         ]
       },
+      "AlertRuleType": {
+        "type": "string",
+        "enum": [
+          "temperature",
+          "precipitation",
+          "severe"
+        ]
+      },
+      "AlertRule": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "ruleType": {
+                "type": "string",
+                "enum": [
+                  "temperature"
+                ]
+              },
+              "threshold": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 100
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ruleType",
+              "threshold",
+              "enabled"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ruleType": {
+                "type": "string",
+                "enum": [
+                  "precipitation"
+                ]
+              },
+              "threshold": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ruleType",
+              "threshold",
+              "enabled"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ruleType": {
+                "type": "string",
+                "enum": [
+                  "severe"
+                ]
+              },
+              "threshold": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ruleType",
+              "threshold",
+              "enabled"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "AlertPreferences": {
+        "type": "object",
+        "properties": {
+          "quietHoursEnabled": {
+            "type": "boolean"
+          },
+          "pushEnabled": {
+            "type": "boolean"
+          },
+          "quietHoursStart": {
+            "type": "string",
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "quietHoursEnd": {
+            "type": "string",
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "quietHoursEnabled",
+          "pushEnabled",
+          "quietHoursStart",
+          "quietHoursEnd",
+          "timezone"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateAlertRulesInput": {
+        "type": "object",
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "ruleType": {
+                      "type": "string",
+                      "enum": [
+                        "temperature"
+                      ]
+                    },
+                    "threshold": {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "maximum": 100
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ruleType",
+                    "threshold",
+                    "enabled"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "ruleType": {
+                      "type": "string",
+                      "enum": [
+                        "precipitation"
+                      ]
+                    },
+                    "threshold": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ruleType",
+                    "threshold",
+                    "enabled"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "ruleType": {
+                      "type": "string",
+                      "enum": [
+                        "severe"
+                      ]
+                    },
+                    "threshold": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 3
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ruleType",
+                    "threshold",
+                    "enabled"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
+          }
+        },
+        "required": [
+          "rules"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateNotificationPreferencesInput": {
+        "type": "object",
+        "properties": {
+          "quietHoursEnabled": {
+            "type": "boolean"
+          },
+          "pushEnabled": {
+            "type": "boolean"
+          },
+          "quietHoursStart": {
+            "type": "string",
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "quietHoursEnd": {
+            "type": "string",
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "quietHoursEnabled",
+          "pushEnabled",
+          "quietHoursStart",
+          "quietHoursEnd",
+          "timezone"
+        ],
+        "additionalProperties": false
+      },
+      "GetAlertPreferencesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "preferences": {
+                "type": "object",
+                "properties": {
+                  "quietHoursEnabled": {
+                    "type": "boolean"
+                  },
+                  "pushEnabled": {
+                    "type": "boolean"
+                  },
+                  "quietHoursStart": {
+                    "type": "string",
+                    "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "quietHoursEnd": {
+                    "type": "string",
+                    "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                },
+                "required": [
+                  "quietHoursEnabled",
+                  "pushEnabled",
+                  "quietHoursStart",
+                  "quietHoursEnd",
+                  "timezone"
+                ],
+                "additionalProperties": false
+              },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ruleType": {
+                          "type": "string",
+                          "enum": [
+                            "temperature"
+                          ]
+                        },
+                        "threshold": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 100
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ruleType",
+                        "threshold",
+                        "enabled"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ruleType": {
+                          "type": "string",
+                          "enum": [
+                            "precipitation"
+                          ]
+                        },
+                        "threshold": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ruleType",
+                        "threshold",
+                        "enabled"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ruleType": {
+                          "type": "string",
+                          "enum": [
+                            "severe"
+                          ]
+                        },
+                        "threshold": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ruleType",
+                        "threshold",
+                        "enabled"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "maxItems": 3
+              }
+            },
+            "required": [
+              "preferences",
+              "rules"
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdateAlertRulesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "rules": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ruleType": {
+                          "type": "string",
+                          "enum": [
+                            "temperature"
+                          ]
+                        },
+                        "threshold": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "maximum": 100
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ruleType",
+                        "threshold",
+                        "enabled"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ruleType": {
+                          "type": "string",
+                          "enum": [
+                            "precipitation"
+                          ]
+                        },
+                        "threshold": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ruleType",
+                        "threshold",
+                        "enabled"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ruleType": {
+                          "type": "string",
+                          "enum": [
+                            "severe"
+                          ]
+                        },
+                        "threshold": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ruleType",
+                        "threshold",
+                        "enabled"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "maxItems": 3
+              }
+            },
+            "required": [
+              "rules"
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdateNotificationPreferencesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "preferences": {
+                "type": "object",
+                "properties": {
+                  "quietHoursEnabled": {
+                    "type": "boolean"
+                  },
+                  "pushEnabled": {
+                    "type": "boolean"
+                  },
+                  "quietHoursStart": {
+                    "type": "string",
+                    "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "quietHoursEnd": {
+                    "type": "string",
+                    "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                },
+                "required": [
+                  "quietHoursEnabled",
+                  "pushEnabled",
+                  "quietHoursStart",
+                  "quietHoursEnd",
+                  "timezone"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "preferences"
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "SignupInput": {
         "type": "object",
         "properties": {
@@ -2464,6 +2987,179 @@
     "parameters": {}
   },
   "paths": {
+    "/api/v1/alerts/preferences": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Get alert rules and notification preferences",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alert settings returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetAlertPreferencesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent is required for teen access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Update notification preferences",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationPreferencesInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notification preferences updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateNotificationPreferencesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Notification preferences failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent is required for teen access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/rules": {
+      "put": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Upsert alert rules",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAlertRulesInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Alert rules updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateAlertRulesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Alert rules failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent is required for teen access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/signup": {
       "post": {
         "tags": [
@@ -2713,7 +3409,12 @@
           "events"
         ],
         "summary": "Poll incremental realtime fallback events",
-        "description": "Returns unseen events plus the next cursor for polling fallback clients.",
+        "description": "Returns unseen events owned by the authenticated user, plus global events and the next cursor for polling fallback clients.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "schema": {
@@ -2734,6 +3435,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventsPollResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent is required for teen access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
                 }
               }
             }

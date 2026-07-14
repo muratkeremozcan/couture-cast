@@ -1,6 +1,6 @@
 import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { UnauthorizedException, type INestApplication } from '@nestjs/common'
+import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { Prisma, PrismaClient } from '@prisma/client'
 import request from 'supertest'
@@ -8,25 +8,29 @@ import {
   latestWeatherResponseSchema,
   unauthorizedHttpErrorSchema,
 } from '@couture/api-client/contracts/http'
+import type { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards'
-import type { NormalizedWeatherForecast } from '../src/modules/weather/providers/weather.types'
+import type {
+  NormalizedWeatherForecast,
+  WeatherIngestionTarget,
+} from '../src/modules/weather/providers/weather.types'
 import { WeatherController } from '../src/modules/weather/weather.controller'
 import { WeatherQueryService } from '../src/modules/weather/weather-query.service'
 import { WeatherRepository } from '../src/modules/weather/weather.repository'
+import { SavedLocationWeatherTargetSource } from '../src/modules/weather/weather-target-source'
 
 const locationKey = 'new-york-ny'
 
 const authHeaders = {
   authorization: 'Bearer weather-token',
-  'x-user-id': 'teen-weather',
-  'x-user-role': 'teen',
 }
 
 const realDatabaseIt = process.env.WEATHER_REAL_DB_INTEGRATION === 'true' ? it : it.skip
 
 type CreateWeatherSnapshotArgs = {
   data: {
+    location: string
     location_key: string
     provider: string
     provider_updated_at: Date
@@ -147,33 +151,16 @@ describe('Weather API integration', () => {
 
   beforeEach(async () => {
     ;({ prisma } = createPrismaStub())
-    vi.spyOn(RequestAuthGuard.prototype, 'canActivate').mockImplementation((context) => {
-      const request = context.switchToHttp().getRequest<{
-        auth?: { token: string; userId: string; role: 'teen' }
-        headers: Record<string, string | string[] | undefined>
-      }>()
-      const authorization = request.headers.authorization
-      const userId = request.headers['x-user-id']
-      const role = request.headers['x-user-role']
-
-      if (
-        typeof authorization !== 'string' ||
-        !authorization.startsWith('Bearer ') ||
-        typeof userId !== 'string' ||
-        userId.trim().length === 0 ||
-        role !== 'teen'
-      ) {
-        throw new UnauthorizedException('Missing or invalid authentication headers')
-      }
-
-      request.auth = {
-        token: authorization.slice('Bearer '.length).trim(),
-        userId,
-        role,
-      }
-
-      return Promise.resolve(true)
-    })
+    const guardianConsentStateService = {
+      canTeenAccess: vi.fn().mockResolvedValue(true),
+    } as unknown as GuardianConsentStateService
+    const accessTokenIdentityService = {
+      resolveIdentity: vi.fn((token: string) =>
+        token === 'weather-token'
+          ? Promise.resolve({ userId: 'teen-weather', role: 'teen' as const })
+          : Promise.reject(new Error('Unknown test access token'))
+      ),
+    } as unknown as AccessTokenIdentityService
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [WeatherController],
@@ -193,18 +180,15 @@ describe('Weather API integration', () => {
         },
         {
           provide: GuardianConsentStateService,
-          useValue: {
-            canTeenAccess: vi.fn().mockResolvedValue(true),
-          },
-        },
-        {
-          provide: RequestAuthGuard,
-          useFactory: (guardianConsentStateService: GuardianConsentStateService) =>
-            new RequestAuthGuard(guardianConsentStateService),
-          inject: [GuardianConsentStateService],
+          useValue: guardianConsentStateService,
         },
       ],
-    }).compile()
+    })
+      .overrideGuard(RequestAuthGuard)
+      .useValue(
+        new RequestAuthGuard(guardianConsentStateService, accessTokenIdentityService)
+      )
+      .compile()
 
     app = moduleFixture.createNestApplication()
     await app.init()
@@ -250,6 +234,49 @@ describe('Weather API integration', () => {
       createdSnapshot
     )
     expect(duplicate.tx.weatherSnapshot.create).not.toHaveBeenCalled()
+  })
+
+  it('carries a saved location display name into the persisted weather snapshot', async () => {
+    const targetSource = new SavedLocationWeatherTargetSource({
+      savedLocation: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            location_key: locationKey,
+            latitude: 40.713,
+            longitude: -74.006,
+            city: 'New York',
+            label: 'Home',
+          },
+        ]),
+      },
+    } as never)
+    const [target] = await targetSource.getTargets()
+
+    expect(target).toBeDefined()
+    if (!target) {
+      throw new Error('Expected a saved-location weather target')
+    }
+
+    const targetWithLocationName = target as WeatherIngestionTarget & {
+      locationName?: string
+    }
+    const forecast = {
+      ...buildForecast(),
+      locationKey: target.locationKey,
+      latitude: target.latitude,
+      longitude: target.longitude,
+      locationName: targetWithLocationName.locationName,
+    }
+    const { prisma: prismaStub, tx } = createPrismaStub()
+    const repository = new WeatherRepository(prismaStub as never)
+
+    await repository.persistForecast(forecast)
+
+    const createArgs = tx.weatherSnapshot.create.mock.calls[0]?.[0] as
+      | CreateWeatherSnapshotArgs
+      | undefined
+    expect(createArgs?.data.location).toBe('New York')
+    expect(createArgs?.data.location_key).toBe(locationKey)
   })
 
   it('recovers duplicate provider update races by reading the committed snapshot', async () => {

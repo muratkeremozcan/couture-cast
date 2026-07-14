@@ -2,11 +2,7 @@ import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
-import {
-  ForbiddenException,
-  type INestApplication,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { type INestApplication } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 import request from 'supertest'
 import {
@@ -30,6 +26,7 @@ import {
 import { queueConfigs } from '../src/config/queues'
 import { ApiHealthController } from '../src/controllers/api-health.controller'
 import { HealthController } from '../src/controllers/health.controller'
+import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards'
 import { EventsController } from '../src/modules/events/events.controller'
@@ -38,12 +35,17 @@ import { EventsService } from '../src/modules/events/events.service'
 import { UserController } from '../src/modules/user/user.controller'
 import { UserService } from '../src/modules/user/user.service'
 
-const { guardianCanTeenAccessMock, prismaEventFindManyMock, prismaUserFindUniqueMock } =
-  vi.hoisted(() => ({
-    guardianCanTeenAccessMock: vi.fn(),
-    prismaEventFindManyMock: vi.fn(),
-    prismaUserFindUniqueMock: vi.fn(),
-  }))
+const {
+  guardianCanTeenAccessMock,
+  identityResolveMock,
+  prismaEventFindManyMock,
+  prismaUserFindUniqueMock,
+} = vi.hoisted(() => ({
+  guardianCanTeenAccessMock: vi.fn(),
+  identityResolveMock: vi.fn(),
+  prismaEventFindManyMock: vi.fn(),
+  prismaUserFindUniqueMock: vi.fn(),
+}))
 
 type RequestRole = 'guardian' | 'teen' | 'moderator' | 'admin'
 
@@ -51,9 +53,7 @@ describe('HTTP contract parity (integration)', () => {
   let app: INestApplication | undefined
 
   const createHeaders = (userId: string, role: RequestRole) => ({
-    authorization: 'Bearer test-token',
-    'x-user-id': userId,
-    'x-user-role': role,
+    authorization: `Bearer test-token:${role}:${userId}`,
   })
 
   const getHttpServer = (): Parameters<typeof request>[0] => {
@@ -65,42 +65,20 @@ describe('HTTP contract parity (integration)', () => {
   }
 
   beforeEach(async () => {
-    vi.spyOn(RequestAuthGuard.prototype, 'canActivate').mockImplementation(
-      async (context) => {
-        const request = context.switchToHttp().getRequest<{
-          auth?: { token: string; userId: string; role: RequestRole }
-          headers: Record<string, string | string[] | undefined>
-        }>()
-        const authorization = request.headers.authorization
-        const userId = request.headers['x-user-id']
-        const role = request.headers['x-user-role']
-
-        if (
-          typeof authorization !== 'string' ||
-          !authorization.startsWith('Bearer ') ||
-          typeof userId !== 'string' ||
-          userId.trim().length === 0 ||
-          typeof role !== 'string' ||
-          !['guardian', 'teen', 'moderator', 'admin'].includes(role)
-        ) {
-          throw new UnauthorizedException('Missing or invalid authentication headers')
-        }
-
-        request.auth = {
-          token: authorization.slice('Bearer '.length).trim(),
-          userId,
-          role: role as RequestRole,
-        }
-
-        if (role === 'teen' && !(await guardianCanTeenAccessMock(userId))) {
-          throw new ForbiddenException('Guardian consent required before continuing')
-        }
-
-        return true
-      }
-    )
     guardianCanTeenAccessMock.mockReset()
     guardianCanTeenAccessMock.mockResolvedValue(true)
+    identityResolveMock.mockReset()
+    identityResolveMock.mockImplementation((token: string) => {
+      const match = /^test-token:(guardian|teen|moderator|admin):(.+)$/.exec(token)
+      if (!match) {
+        return Promise.reject(new Error('Unknown test access token'))
+      }
+
+      return Promise.resolve({
+        role: match[1] as RequestRole,
+        userId: match[2],
+      })
+    })
     prismaEventFindManyMock.mockReset()
     prismaUserFindUniqueMock.mockReset()
     const prisma = {
@@ -112,6 +90,12 @@ describe('HTTP contract parity (integration)', () => {
         findUnique: prismaUserFindUniqueMock,
       },
     } as unknown as PrismaClient
+    const guardianConsentStateService = {
+      canTeenAccess: guardianCanTeenAccessMock,
+    } as unknown as GuardianConsentStateService
+    const accessTokenIdentityService = {
+      resolveIdentity: identityResolveMock,
+    } as unknown as AccessTokenIdentityService
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [
@@ -130,18 +114,19 @@ describe('HTTP contract parity (integration)', () => {
         },
         {
           provide: GuardianConsentStateService,
-          useValue: {
-            canTeenAccess: guardianCanTeenAccessMock,
-          },
+          useValue: guardianConsentStateService,
         },
         {
-          provide: RequestAuthGuard,
-          useFactory: (guardianConsentStateService: GuardianConsentStateService) =>
-            new RequestAuthGuard(guardianConsentStateService),
-          inject: [GuardianConsentStateService],
+          provide: AccessTokenIdentityService,
+          useValue: accessTokenIdentityService,
         },
       ],
-    }).compile()
+    })
+      .overrideGuard(RequestAuthGuard)
+      .useValue(
+        new RequestAuthGuard(guardianConsentStateService, accessTokenIdentityService)
+      )
+      .compile()
 
     app = moduleFixture.createNestApplication()
     await app.init()
@@ -187,18 +172,34 @@ describe('HTTP contract parity (integration)', () => {
       },
     ])
 
-    const response = await request(getHttpServer()).get('/api/v1/events/poll')
+    const unauthorizedResponse = await request(getHttpServer()).get('/api/v1/events/poll')
+    expect(unauthorizedResponse.status).toBe(401)
+    unauthorizedHttpErrorSchema.parse(unauthorizedResponse.body)
+
+    const response = await request(getHttpServer())
+      .get('/api/v1/events/poll')
+      .set({
+        ...createHeaders('guardian-1', 'guardian'),
+        'x-user-id': 'spoofed-user',
+        'x-user-role': 'admin',
+      })
 
     expect(response.status).toBe(200)
     const body = eventsPollResponseSchema.parse(response.body)
     expect(body.events).toHaveLength(1)
     expect(body.nextSince).toBe('2026-03-04T10:00:00.000Z')
+    expect(prismaEventFindManyMock).toHaveBeenCalledWith({
+      where: {
+        OR: [{ user_id: 'guardian-1' }, { user_id: null }],
+      },
+      orderBy: { created_at: 'asc' },
+    })
   })
 
   it('validates invalid poll cursors against the shared graceful-error schema', async () => {
-    const response = await request(getHttpServer()).get(
-      '/api/v1/events/poll?since=not-a-date'
-    )
+    const response = await request(getHttpServer())
+      .get('/api/v1/events/poll?since=not-a-date')
+      .set(createHeaders('guardian-1', 'guardian'))
 
     expect(response.status).toBe(200)
     const body = eventsPollInvalidSinceResponseSchema.parse(response.body)

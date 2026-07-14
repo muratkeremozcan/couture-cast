@@ -1,6 +1,9 @@
 // Step 10 step 4 owner: searchable owner anchor
-import type { Socket } from 'socket.io'
+import { Inject, Injectable, Optional } from '@nestjs/common'
 import type { Logger } from 'pino'
+import type { Socket } from 'socket.io'
+
+import { GATEWAY_LOGGER, readVerifiedSocketUserId } from './gateway.constants.js'
 
 /**
  * Story 0.5 owner file: connection lifecycle tracking.
@@ -46,6 +49,7 @@ export type GatewayContext = {
 const defaultBackoff = [1000, 3000, 9000]
 const defaultMaxRetries = 5
 
+@Injectable()
 export class ConnectionManager {
   private readonly backoffDelays: number[]
   private readonly maxRetries: number
@@ -53,8 +57,8 @@ export class ConnectionManager {
   private readonly retryCounts = new Map<string, number>()
 
   constructor(
-    private readonly logger: Logger,
-    opts?: { backoff?: number[]; maxRetries?: number }
+    @Inject(GATEWAY_LOGGER) private readonly logger: Logger,
+    @Optional() opts?: { backoff?: number[]; maxRetries?: number }
   ) {
     this.backoffDelays = opts?.backoff ?? defaultBackoff
     this.maxRetries = opts?.maxRetries ?? defaultMaxRetries
@@ -96,7 +100,6 @@ export class ConnectionManager {
   }
 
   private extractContext(socket: Socket): GatewayContext {
-    const auth = socket.handshake.auth as Record<string, unknown> | undefined
     const requestIdHeader = socket.handshake.headers?.['x-request-id']
     const requestIdQuery = socket.handshake.query?.requestId
     const requestId =
@@ -106,7 +109,7 @@ export class ConnectionManager {
           ? requestIdQuery
           : undefined
 
-    const userId = typeof auth?.userId === 'string' ? auth.userId : undefined
+    const userId = readVerifiedSocketUserId(socket.data as unknown)
 
     return {
       requestId,

@@ -98,7 +98,11 @@ function createPrismaStub(existingSnapshot: unknown = null) {
 
 describe('WeatherRepository', () => {
   it('persists a normalized forecast and 48 hourly segments in one transaction', async () => {
-    const forecast = { ...buildForecast(), locationKey: 'New-York-NY' }
+    const forecast = {
+      ...buildForecast(),
+      locationKey: 'New-York-NY',
+      locationName: 'New York',
+    }
     const { prisma, tx, createdSnapshot } = createPrismaStub()
     const repository = new WeatherRepository(prisma as never)
 
@@ -125,7 +129,7 @@ describe('WeatherRepository', () => {
     }
     expect(createArgs).toMatchObject({
       data: {
-        location: 'New-York-NY',
+        location: 'New York',
         location_key: 'new-york-ny',
         latitude: 40.7128,
         longitude: -74.006,
@@ -179,6 +183,19 @@ describe('WeatherRepository', () => {
       },
       include: { segments: true },
     })
+  })
+
+  it('falls back to the canonical location key when no display name is available', async () => {
+    const forecast = buildForecast()
+    const { prisma, tx } = createPrismaStub()
+    const repository = new WeatherRepository(prisma as never)
+
+    await repository.persistForecast(forecast)
+
+    const createArgs = tx.weatherSnapshot.create.mock.calls[0]?.[0] as
+      | CreateWeatherSnapshotArgs
+      | undefined
+    expect(createArgs?.data.location).toBe('new-york-ny')
   })
 
   it('returns an already committed provider update without duplicating segments', async () => {

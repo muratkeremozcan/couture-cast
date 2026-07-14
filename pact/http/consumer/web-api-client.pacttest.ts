@@ -3,6 +3,7 @@ import { createApiClient } from '@couture/api-client'
 import path from 'node:path'
 import { describe, it } from 'vitest'
 import {
+  pactEventAuth,
   verifyApiHealthInteraction,
   verifyEventsPollInteraction,
   verifyInvalidCursorInteraction,
@@ -15,22 +16,21 @@ const pact = new PactV4({
   logLevel: 'warn',
 })
 
+const createWebClientForMockServer = (mockServer: { url: string }) =>
+  createApiClient(mockServer.url, {
+    accessToken: pactEventAuth.accessToken,
+  })
+
 describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
   it('reads API health metadata', async () => {
-    await verifyApiHealthInteraction(pact, (mockServer) =>
-      createApiClient(mockServer.url)
-    )
+    await verifyApiHealthInteraction(pact, createWebClientForMockServer)
   })
 
   it('polls realtime fallback events', async () => {
-    await verifyEventsPollInteraction(pact, (mockServer) =>
-      createApiClient(mockServer.url)
-    )
+    await verifyEventsPollInteraction(pact, createWebClientForMockServer)
   })
 
   it('returns the graceful invalid cursor payload used by fallback clients', async () => {
-    await verifyInvalidCursorInteraction(pact, (mockServer) =>
-      createApiClient(mockServer.url)
-    )
+    await verifyInvalidCursorInteraction(pact, createWebClientForMockServer)
   })
 })

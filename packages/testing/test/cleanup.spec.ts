@@ -22,6 +22,7 @@ function createCleanupPrismaStub(calls: CleanupCall[]): CleanupPrismaClient {
 
   return {
     auditLog: createDelegate('auditLog'),
+    alertRule: createDelegate('alertRule'),
     comfortPreferences: createDelegate('comfortPreferences'),
     engagementEvent: createDelegate('engagementEvent'),
     forecastSegment: createDelegate('forecastSegment'),
@@ -29,6 +30,7 @@ function createCleanupPrismaStub(calls: CleanupCall[]): CleanupPrismaClient {
     guardianConsent: createDelegate('guardianConsent'),
     guardianInvitation: createDelegate('guardianInvitation'),
     lookbookPost: createDelegate('lookbookPost'),
+    notificationPreference: createDelegate('notificationPreference'),
     outfitRecommendation: createDelegate('outfitRecommendation'),
     paletteInsights: createDelegate('paletteInsights'),
     pushToken: createDelegate('pushToken'),
@@ -36,6 +38,9 @@ function createCleanupPrismaStub(calls: CleanupCall[]): CleanupPrismaClient {
     user: createDelegate('user'),
     userProfile: createDelegate('userProfile'),
     weatherSnapshot: createDelegate('weatherSnapshot'),
+    eventEnvelope: createDelegate('eventEnvelope'),
+    alertDeliveryOutbox: createDelegate('alertDeliveryOutbox'),
+    alertCooldownReservation: createDelegate('alertCooldownReservation'),
   }
 }
 
@@ -50,14 +55,20 @@ describe('cleanup', () => {
     registry.track('rituals', 'ritual-1')
     registry.track('savedLocations', 'location-1')
     registry.track('weatherSnapshots', 'weather-1')
+    registry.track('alertRules', 'rule-1')
+    registry.track('notificationPreferences', 'preference-1')
 
     await cleanup({ prisma, registry })
 
     expect(calls.map((call) => call.delegate)).toEqual([
+      'eventEnvelope',
+      'alertCooldownReservation',
       'engagementEvent',
       'lookbookPost',
       'auditLog',
       'pushToken',
+      'alertRule',
+      'notificationPreference',
       'savedLocation',
       'outfitRecommendation',
       'paletteInsights',
@@ -90,6 +101,8 @@ describe('cleanup', () => {
       rituals: [],
       savedLocations: [],
       weatherSnapshots: [],
+      alertRules: [],
+      notificationPreferences: [],
     })
   })
 })

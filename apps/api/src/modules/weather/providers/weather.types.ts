@@ -1,5 +1,6 @@
 export interface WeatherIngestionTarget {
   locationKey: string
+  locationName?: string
   latitude: number
   longitude: number
 }
@@ -56,6 +57,7 @@ export interface NormalizedWeatherAlert {
 export interface NormalizedWeatherForecast {
   provider: WeatherProviderName
   locationKey: string
+  locationName?: string
   latitude: number
   longitude: number
   timezone: string

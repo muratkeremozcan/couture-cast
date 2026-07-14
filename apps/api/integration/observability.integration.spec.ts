@@ -22,6 +22,7 @@ import {
 import { createBaseLogger } from '../src/logger/pino.config'
 import { bindRequestContext } from '../src/logger/request-context'
 import { createRequestLoggerMiddleware } from '../src/logger/request-logger.middleware'
+import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { AuthModule } from '../src/modules/auth/auth.module'
 
 vi.mock('posthog-node', () => ({
@@ -196,6 +197,8 @@ describe('observability integration', () => {
   beforeEach(async () => {
     await shutdownOpenTelemetry()
     resetOpenTelemetryForTests()
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
   })
 
   afterEach(async () => {
@@ -206,6 +209,8 @@ describe('observability integration', () => {
 
     await shutdownOpenTelemetry()
     resetOpenTelemetryForTests()
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
   })
 
   it('exports OTLP traces to the configured Grafana endpoint', async () => {
@@ -272,10 +277,17 @@ describe('observability integration', () => {
     const logger = createBaseLogger({ destination: stream, env })
     const logExpectations = createLogExpectations(stream.entries, expect)
     const requestId = 'req-observe-123'
+    const resolveIdentity = vi.fn().mockResolvedValue({
+      userId: 'guardian-123',
+      role: 'guardian',
+    })
 
     const moduleFixture = await Test.createTestingModule({
       imports: [AuthModule],
-    }).compile()
+    })
+      .overrideProvider(AccessTokenIdentityService)
+      .useValue({ resolveIdentity })
+      .compile()
 
     app = moduleFixture.createNestApplication()
     app.use(bindRequestContext)
@@ -287,8 +299,8 @@ describe('observability integration', () => {
       .post('/api/v1/auth/guardian-consent')
       .set('authorization', 'Bearer test-token')
       .set('x-request-id', requestId)
-      .set('x-user-id', 'guardian-123')
-      .set('x-user-role', 'guardian')
+      .set('x-user-id', 'spoofed-user')
+      .set('x-user-role', 'admin')
       .send({
         guardianId: 'guardian-123',
         teenId: 'teen-123',
@@ -297,6 +309,7 @@ describe('observability integration', () => {
       })
 
     expect(response.status).toBe(200)
+    expect(resolveIdentity).toHaveBeenCalledWith('test-token', expect.anything())
     expect(response.headers['x-request-id']).toBe(requestId)
 
     logExpectations.expectLogEntry(

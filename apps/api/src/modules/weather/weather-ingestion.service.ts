@@ -1,6 +1,7 @@
 import { Injectable, Inject, Optional } from '@nestjs/common'
 
 import { createBaseLogger } from '../../logger/pino.config.js'
+import { WeatherAlertProcessingService } from '../alerts/weather-alert-processing.service.js'
 import { OpenWeatherProvider } from './providers/openweather.provider.js'
 import { WeatherApiProvider } from './providers/weatherapi.provider.js'
 import { WeatherProviderError } from './providers/weather-provider.error.js'
@@ -175,6 +176,7 @@ export class WeatherIngestionService {
   private readonly sleeper: WeatherSleeper
   private readonly logger: WeatherLogger
   private readonly meter: WeatherMeter
+  private readonly alertProcessor?: Pick<WeatherAlertProcessingService, 'process'>
 
   constructor(
     @Inject(OpenWeatherProvider) primaryProvider: IWeatherProvider,
@@ -184,7 +186,10 @@ export class WeatherIngestionService {
     @Inject('WeatherClock') @Optional() clock?: WeatherClock,
     @Inject('WeatherSleeper') @Optional() sleeper?: WeatherSleeper,
     @Inject('WeatherLogger') @Optional() logger?: WeatherLogger,
-    @Inject('WeatherMeter') @Optional() meter?: WeatherMeter
+    @Inject('WeatherMeter') @Optional() meter?: WeatherMeter,
+    @Inject(WeatherAlertProcessingService)
+    @Optional()
+    alertProcessor?: Pick<WeatherAlertProcessingService, 'process'>
   ) {
     this.primaryProvider = primaryProvider
     this.secondaryProvider = secondaryProvider
@@ -194,6 +199,7 @@ export class WeatherIngestionService {
     this.sleeper = sleeper ?? defaultSleeper
     this.logger = logger ?? createBaseLogger().child({ feature: WEATHER_LOG_FEATURE })
     this.meter = createSafeWeatherMeter(meter ?? createOpenTelemetryWeatherMeter())
+    this.alertProcessor = alertProcessor
   }
 
   async ingestTarget(
@@ -205,6 +211,14 @@ export class WeatherIngestionService {
 
       if (forecast) {
         const snapshot = await this.repository.persistForecast(forecast)
+        try {
+          await this.alertProcessor?.process(snapshot, forecast)
+        } catch (alertError) {
+          this.logger.error('Alert processing failed during weather ingestion', {
+            error: alertError instanceof Error ? alertError.message : String(alertError),
+            locationKey: forecast.locationKey,
+          })
+        }
         await this.repository.recordProviderSuccess(
           forecast.locationKey,
           this.clock.now()

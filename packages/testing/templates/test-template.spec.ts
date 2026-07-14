@@ -8,6 +8,7 @@ type DeleteManyRecorder = {
 }
 
 const prisma = {
+  alertRule: { deleteMany: () => Promise.resolve({ count: 0 }) },
   auditLog: { deleteMany: () => Promise.resolve({ count: 0 }) },
   comfortPreferences: { deleteMany: () => Promise.resolve({ count: 0 }) },
   engagementEvent: { deleteMany: () => Promise.resolve({ count: 0 }) },
@@ -16,6 +17,7 @@ const prisma = {
   guardianConsent: { deleteMany: () => Promise.resolve({ count: 0 }) },
   guardianInvitation: { deleteMany: () => Promise.resolve({ count: 0 }) },
   lookbookPost: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  notificationPreference: { deleteMany: () => Promise.resolve({ count: 0 }) },
   outfitRecommendation: { deleteMany: () => Promise.resolve({ count: 0 }) },
   paletteInsights: { deleteMany: () => Promise.resolve({ count: 0 }) },
   pushToken: { deleteMany: () => Promise.resolve({ count: 0 }) },
@@ -23,6 +25,9 @@ const prisma = {
   user: { deleteMany: () => Promise.resolve({ count: 0 }) },
   userProfile: { deleteMany: () => Promise.resolve({ count: 0 }) },
   weatherSnapshot: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  eventEnvelope: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  alertDeliveryOutbox: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  alertCooldownReservation: { deleteMany: () => Promise.resolve({ count: 0 }) },
 } satisfies Record<string, DeleteManyRecorder>
 
 describe('example factory suite', () => {

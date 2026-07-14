@@ -62,7 +62,7 @@ export class OpenWeatherProvider implements IWeatherProvider {
       })
     }
 
-    const { latitude, longitude, locationKey } = targetResult.data
+    const { latitude, longitude, locationKey, locationName } = targetResult.data
     const roundedLat = Math.round(latitude * 10000) / 10000
     const roundedLon = Math.round(longitude * 10000) / 10000
     const url = this.buildUrl(roundedLat, roundedLon)
@@ -130,6 +130,7 @@ export class OpenWeatherProvider implements IWeatherProvider {
     const normalizedForecast: NormalizedWeatherForecast = {
       provider: PROVIDER,
       locationKey,
+      locationName,
       latitude: roundedLat,
       longitude: roundedLon,
       timezone: data.timezone,
@@ -202,9 +203,9 @@ export class OpenWeatherProvider implements IWeatherProvider {
     }
     const uniqueHours = futureHours.sort((left, right) => left.dt - right.dt).slice(0, 48)
 
-    if (uniqueHours.length !== 48) {
+    if (uniqueHours.length < 24) {
       throw new WeatherProviderError(
-        'OpenWeather returned an incomplete hourly forecast',
+        'OpenWeather returned an incomplete hourly forecast (less than 24 hours)',
         {
           provider: PROVIDER,
           kind: 'invalid_response',

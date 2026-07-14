@@ -5,6 +5,20 @@
 // the contract source of truth lives in @couture/api-client. This bridge lets the API use that
 // package surface directly instead of redefining request/response shapes inside controller code.
 export {
+  alertPreferencesSchema,
+  alertRuleSchema,
+  getAlertPreferencesResponseSchema,
+  updateAlertRulesInputSchema,
+  updateAlertRulesResponseSchema,
+  updateNotificationPreferencesInputSchema,
+  updateNotificationPreferencesResponseSchema,
+  type AlertPreferences,
+  type AlertRule,
+  type GetAlertPreferencesResponse,
+  type UpdateAlertRulesInput,
+  type UpdateAlertRulesResponse,
+  type UpdateNotificationPreferencesInput,
+  type UpdateNotificationPreferencesResponse,
   type ConsentLevel,
   type GuardianConsentInput,
   type GuardianConsentRevokeInput,

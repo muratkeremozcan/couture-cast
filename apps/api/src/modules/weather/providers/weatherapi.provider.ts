@@ -66,7 +66,7 @@ export class WeatherApiProvider implements IWeatherProvider {
       })
     }
 
-    const { latitude, longitude, locationKey } = targetResult.data
+    const { latitude, longitude, locationKey, locationName } = targetResult.data
     const roundedLat = Math.round(latitude * 10000) / 10000
     const roundedLon = Math.round(longitude * 10000) / 10000
     const url = this.buildUrl(roundedLat, roundedLon)
@@ -130,6 +130,7 @@ export class WeatherApiProvider implements IWeatherProvider {
     const normalizedForecast: NormalizedWeatherForecast = {
       provider: PROVIDER,
       locationKey,
+      locationName,
       latitude: roundedLat,
       longitude: roundedLon,
       timezone: data.location.tz_id,
@@ -207,9 +208,9 @@ export class WeatherApiProvider implements IWeatherProvider {
       .sort((left, right) => left.time_epoch - right.time_epoch)
       .slice(0, 48)
 
-    if (uniqueHours.length !== 48) {
+    if (uniqueHours.length < 24) {
       throw new WeatherProviderError(
-        'WeatherAPI returned an incomplete hourly forecast',
+        'WeatherAPI returned an incomplete hourly forecast (less than 24 hours)',
         {
           provider: PROVIDER,
           kind: 'invalid_response',
@@ -217,15 +218,6 @@ export class WeatherApiProvider implements IWeatherProvider {
       )
     }
 
-    if (uniqueHours[0] && uniqueHours[0].time_epoch !== currentHourEpoch) {
-      throw new WeatherProviderError(
-        'WeatherAPI hourly forecast start is shifted or delayed',
-        {
-          provider: PROVIDER,
-          kind: 'invalid_response',
-        }
-      )
-    }
     return uniqueHours
   }
 

@@ -8,6 +8,165 @@ export type FixedLengthArray<
 /**
  *
  * @export
+ * @interface AlertPreferences
+ */
+export interface AlertPreferences {
+  /**
+   *
+   * @type {boolean}
+   * @memberof AlertPreferences
+   */
+  quietHoursEnabled: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof AlertPreferences
+   */
+  pushEnabled: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof AlertPreferences
+   */
+  quietHoursStart: string
+  /**
+   *
+   * @type {string}
+   * @memberof AlertPreferences
+   */
+  quietHoursEnd: string
+  /**
+   *
+   * @type {string}
+   * @memberof AlertPreferences
+   */
+  timezone: string
+}
+/**
+ * @type AlertRule
+ *
+ * @export
+ */
+export type AlertRule = AlertRuleOneOf | AlertRuleOneOf1 | AlertRuleOneOf2
+/**
+ *
+ * @export
+ * @interface AlertRuleOneOf
+ */
+export interface AlertRuleOneOf {
+  /**
+   *
+   * @type {AlertRuleOneOfRuleTypeEnum}
+   * @memberof AlertRuleOneOf
+   */
+  ruleType: AlertRuleOneOfRuleTypeEnum
+  /**
+   *
+   * @type {number}
+   * @memberof AlertRuleOneOf
+   */
+  threshold: number
+  /**
+   *
+   * @type {boolean}
+   * @memberof AlertRuleOneOf
+   */
+  enabled: boolean
+}
+
+/**
+ * @export
+ */
+export const AlertRuleOneOfRuleTypeEnum = {
+  temperature: 'temperature',
+} as const
+export type AlertRuleOneOfRuleTypeEnum =
+  (typeof AlertRuleOneOfRuleTypeEnum)[keyof typeof AlertRuleOneOfRuleTypeEnum]
+
+/**
+ *
+ * @export
+ * @interface AlertRuleOneOf1
+ */
+export interface AlertRuleOneOf1 {
+  /**
+   *
+   * @type {AlertRuleOneOf1RuleTypeEnum}
+   * @memberof AlertRuleOneOf1
+   */
+  ruleType: AlertRuleOneOf1RuleTypeEnum
+  /**
+   *
+   * @type {number}
+   * @memberof AlertRuleOneOf1
+   */
+  threshold: number
+  /**
+   *
+   * @type {boolean}
+   * @memberof AlertRuleOneOf1
+   */
+  enabled: boolean
+}
+
+/**
+ * @export
+ */
+export const AlertRuleOneOf1RuleTypeEnum = {
+  precipitation: 'precipitation',
+} as const
+export type AlertRuleOneOf1RuleTypeEnum =
+  (typeof AlertRuleOneOf1RuleTypeEnum)[keyof typeof AlertRuleOneOf1RuleTypeEnum]
+
+/**
+ *
+ * @export
+ * @interface AlertRuleOneOf2
+ */
+export interface AlertRuleOneOf2 {
+  /**
+   *
+   * @type {AlertRuleOneOf2RuleTypeEnum}
+   * @memberof AlertRuleOneOf2
+   */
+  ruleType: AlertRuleOneOf2RuleTypeEnum
+  /**
+   *
+   * @type {number}
+   * @memberof AlertRuleOneOf2
+   */
+  threshold: number
+  /**
+   *
+   * @type {boolean}
+   * @memberof AlertRuleOneOf2
+   */
+  enabled: boolean
+}
+
+/**
+ * @export
+ */
+export const AlertRuleOneOf2RuleTypeEnum = {
+  severe: 'severe',
+} as const
+export type AlertRuleOneOf2RuleTypeEnum =
+  (typeof AlertRuleOneOf2RuleTypeEnum)[keyof typeof AlertRuleOneOf2RuleTypeEnum]
+
+/**
+ *
+ * @export
+ */
+export const AlertRuleType = {
+  temperature: 'temperature',
+  precipitation: 'precipitation',
+  severe: 'severe',
+} as const
+export type AlertRuleType = (typeof AlertRuleType)[keyof typeof AlertRuleType]
+
+/**
+ *
+ * @export
  * @interface ApiError
  */
 export interface ApiError {
@@ -506,6 +665,75 @@ export const ForbiddenHttpErrorErrorEnum = {
 export type ForbiddenHttpErrorErrorEnum =
   (typeof ForbiddenHttpErrorErrorEnum)[keyof typeof ForbiddenHttpErrorErrorEnum]
 
+/**
+ *
+ * @export
+ * @interface GetAlertPreferencesResponse
+ */
+export interface GetAlertPreferencesResponse {
+  /**
+   *
+   * @type {GetAlertPreferencesResponseData}
+   * @memberof GetAlertPreferencesResponse
+   */
+  data: GetAlertPreferencesResponseData
+}
+/**
+ *
+ * @export
+ * @interface GetAlertPreferencesResponseData
+ */
+export interface GetAlertPreferencesResponseData {
+  /**
+   *
+   * @type {GetAlertPreferencesResponseDataPreferences}
+   * @memberof GetAlertPreferencesResponseData
+   */
+  preferences: GetAlertPreferencesResponseDataPreferences
+  /**
+   *
+   * @type {Array<UpdateAlertRulesInputRulesInner>}
+   * @memberof GetAlertPreferencesResponseData
+   */
+  rules: Array<UpdateAlertRulesInputRulesInner>
+}
+/**
+ *
+ * @export
+ * @interface GetAlertPreferencesResponseDataPreferences
+ */
+export interface GetAlertPreferencesResponseDataPreferences {
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetAlertPreferencesResponseDataPreferences
+   */
+  quietHoursEnabled: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetAlertPreferencesResponseDataPreferences
+   */
+  pushEnabled: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof GetAlertPreferencesResponseDataPreferences
+   */
+  quietHoursStart: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetAlertPreferencesResponseDataPreferences
+   */
+  quietHoursEnd: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetAlertPreferencesResponseDataPreferences
+   */
+  timezone: string
+}
 /**
  *
  * @export
@@ -1651,6 +1879,152 @@ export const UnauthorizedHttpErrorErrorEnum = {
 export type UnauthorizedHttpErrorErrorEnum =
   (typeof UnauthorizedHttpErrorErrorEnum)[keyof typeof UnauthorizedHttpErrorErrorEnum]
 
+/**
+ *
+ * @export
+ * @interface UpdateAlertRulesInput
+ */
+export interface UpdateAlertRulesInput {
+  /**
+   *
+   * @type {Array<UpdateAlertRulesInputRulesInner>}
+   * @memberof UpdateAlertRulesInput
+   */
+  rules: Array<UpdateAlertRulesInputRulesInner>
+}
+/**
+ * @type UpdateAlertRulesInputRulesInner
+ *
+ * @export
+ */
+export type UpdateAlertRulesInputRulesInner =
+  | AlertRuleOneOf1
+  | AlertRuleOneOf2
+  | UpdateAlertRulesInputRulesInnerOneOf
+/**
+ *
+ * @export
+ * @interface UpdateAlertRulesInputRulesInnerOneOf
+ */
+export interface UpdateAlertRulesInputRulesInnerOneOf {
+  /**
+   *
+   * @type {UpdateAlertRulesInputRulesInnerOneOfRuleTypeEnum}
+   * @memberof UpdateAlertRulesInputRulesInnerOneOf
+   */
+  ruleType: UpdateAlertRulesInputRulesInnerOneOfRuleTypeEnum
+  /**
+   *
+   * @type {number}
+   * @memberof UpdateAlertRulesInputRulesInnerOneOf
+   */
+  threshold: number
+  /**
+   *
+   * @type {boolean}
+   * @memberof UpdateAlertRulesInputRulesInnerOneOf
+   */
+  enabled: boolean
+}
+
+/**
+ * @export
+ */
+export const UpdateAlertRulesInputRulesInnerOneOfRuleTypeEnum = {
+  temperature: 'temperature',
+} as const
+export type UpdateAlertRulesInputRulesInnerOneOfRuleTypeEnum =
+  (typeof UpdateAlertRulesInputRulesInnerOneOfRuleTypeEnum)[keyof typeof UpdateAlertRulesInputRulesInnerOneOfRuleTypeEnum]
+
+/**
+ *
+ * @export
+ * @interface UpdateAlertRulesResponse
+ */
+export interface UpdateAlertRulesResponse {
+  /**
+   *
+   * @type {UpdateAlertRulesResponseData}
+   * @memberof UpdateAlertRulesResponse
+   */
+  data: UpdateAlertRulesResponseData
+}
+/**
+ *
+ * @export
+ * @interface UpdateAlertRulesResponseData
+ */
+export interface UpdateAlertRulesResponseData {
+  /**
+   *
+   * @type {Array<UpdateAlertRulesInputRulesInner>}
+   * @memberof UpdateAlertRulesResponseData
+   */
+  rules: Array<UpdateAlertRulesInputRulesInner>
+}
+/**
+ *
+ * @export
+ * @interface UpdateNotificationPreferencesInput
+ */
+export interface UpdateNotificationPreferencesInput {
+  /**
+   *
+   * @type {boolean}
+   * @memberof UpdateNotificationPreferencesInput
+   */
+  quietHoursEnabled: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof UpdateNotificationPreferencesInput
+   */
+  pushEnabled: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateNotificationPreferencesInput
+   */
+  quietHoursStart: string
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateNotificationPreferencesInput
+   */
+  quietHoursEnd: string
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateNotificationPreferencesInput
+   */
+  timezone: string
+}
+/**
+ *
+ * @export
+ * @interface UpdateNotificationPreferencesResponse
+ */
+export interface UpdateNotificationPreferencesResponse {
+  /**
+   *
+   * @type {UpdateNotificationPreferencesResponseData}
+   * @memberof UpdateNotificationPreferencesResponse
+   */
+  data: UpdateNotificationPreferencesResponseData
+}
+/**
+ *
+ * @export
+ * @interface UpdateNotificationPreferencesResponseData
+ */
+export interface UpdateNotificationPreferencesResponseData {
+  /**
+   *
+   * @type {GetAlertPreferencesResponseDataPreferences}
+   * @memberof UpdateNotificationPreferencesResponseData
+   */
+  preferences: GetAlertPreferencesResponseDataPreferences
+}
 /**
  *
  * @export

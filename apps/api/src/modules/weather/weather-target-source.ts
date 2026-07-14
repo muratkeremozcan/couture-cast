@@ -1,3 +1,4 @@
+import { createBaseLogger } from '../../logger/pino.config.js'
 import type { PrismaClient } from '@prisma/client'
 import type { WeatherIngestionTarget } from './providers/weather.types.js'
 import { loadWeatherConfig } from './providers/weather.config.js'
@@ -30,9 +31,10 @@ export class CombinedWeatherTargetSource implements WeatherTargetSource {
           }
         }
       } catch (error) {
-        console.error(
-          `Failed to get weather targets from source ${source.constructor.name}:`,
-          error
+        const logger = createBaseLogger().child({ feature: 'weather-target-source' })
+        logger.error(
+          error,
+          `Failed to get weather targets from source ${source.constructor.name}`
         )
       }
     }
@@ -51,16 +53,28 @@ export class SavedLocationWeatherTargetSource implements WeatherTargetSource {
       take: 5000,
       select: {
         location_key: true,
+        city: true,
+        label: true,
         latitude: true,
         longitude: true,
       },
     })
     const targetsByLocationKey = new Map<string, WeatherIngestionTarget>()
+    const cityByLocationKey = new Map<string, string>()
+
+    for (const location of primaryLocations) {
+      const city = location.city?.trim()
+      if (city && !cityByLocationKey.has(location.location_key)) {
+        cityByLocationKey.set(location.location_key, city)
+      }
+    }
 
     for (const location of primaryLocations) {
       if (!targetsByLocationKey.has(location.location_key)) {
         targetsByLocationKey.set(location.location_key, {
           locationKey: location.location_key,
+          locationName:
+            cityByLocationKey.get(location.location_key) ?? location.label.trim(),
           latitude: location.latitude,
           longitude: location.longitude,
         })

@@ -45,3 +45,54 @@ test('applies accessToken to authenticated generated weather requests', async ()
     Authorization: 'Bearer token-789',
   })
 })
+
+test('applies accessToken to authenticated event polling requests', async () => {
+  const client = createApiClient('https://api.couturecast.test', 'token-events')
+
+  const requestOptions = await client.apiV1EventsPollGetRequestOpts({})
+
+  expect(requestOptions.headers).toMatchObject({
+    Authorization: 'Bearer token-events',
+  })
+})
+
+test('generates authenticated alert preference and rule requests', async () => {
+  const client = createApiClient('https://api.couturecast.test', 'token-alerts')
+
+  const getOptions = await client.apiV1AlertsPreferencesGetRequestOpts()
+  const preferencesOptions = await client.apiV1AlertsPreferencesPutRequestOpts({
+    updateNotificationPreferencesInput: {
+      quietHoursEnabled: true,
+      pushEnabled: true,
+      quietHoursStart: '22:00',
+      quietHoursEnd: '07:00',
+      timezone: 'America/Chicago',
+    },
+  })
+  const rulesOptions = await client.apiV1AlertsRulesPutRequestOpts({
+    updateAlertRulesInput: {
+      rules: [
+        {
+          ruleType: 'temperature',
+          threshold: 5,
+          enabled: true,
+        },
+      ],
+    },
+  })
+
+  for (const requestOptions of [getOptions, preferencesOptions, rulesOptions]) {
+    expect(requestOptions.headers).toMatchObject({
+      Authorization: 'Bearer token-alerts',
+    })
+  }
+
+  expect(preferencesOptions).toMatchObject({
+    method: 'PUT',
+    path: '/api/v1/alerts/preferences',
+  })
+  expect(rulesOptions).toMatchObject({
+    method: 'PUT',
+    path: '/api/v1/alerts/rules',
+  })
+})

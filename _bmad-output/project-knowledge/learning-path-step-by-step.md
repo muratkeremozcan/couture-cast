@@ -1,8 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-07-08 - Step 16 reflects the complete Story 1.1 weather ingestion service through
-durable normalized persistence, provider failover, freshness fallback, canonical latest-weather API,
-privacy-safe telemetry, validation coverage, and operational documentation.
+Updated: 2026-07-13 - Step 17 reflects the complete Story 1.3 weather alert rules, timezone-aware quiet hours, real-time push suppression, and the transactional handoff delivery pipeline.
 
 ## LLM collaborator prompt
 
@@ -1769,7 +1767,7 @@ Current repo note:
 
 Architecture diagram:
 
-```mermaid
+````mermaid
 flowchart TD
   Scheduler["BullMQ Job Scheduler\nweather-refresh-sweep"] --> Sweep["Sweep processor"]
   Targets["ConfiguredWeatherTargetSource"] --> Sweep
@@ -1784,4 +1782,93 @@ flowchart TD
   Normalized --> Repository["WeatherRepository\ntransactional persistence"]
   Repository --> DB["WeatherSnapshot + ForecastSegment"]
   Repository --> Query["WeatherQueryService\nfresh/cached/stale/unavailable"]
+
+## Step 17 - Weather alert rules and notification pipeline
+
+User/business impact:
+
+Realtime and push weather alerts notify users immediately of severe weather or precipitation transitions so they can protect themselves and adjust their wardrobe choices. Quiet hours support preserves user trust and prevents alert fatigue, while duplicate suppression and transactional handoffs ensure reliable, spam-free notification delivery.
+
+Key takeaways:
+
+1. Alert rules (e.g. temperature delta, precipitation start, severe conditions) are stored in the database per-user and evaluated hourly after weather ingestion.
+2. Ingestion-triggered alerts are written to a transactional outbox (`AlertDeliveryOutbox`) linked to `EventEnvelope` with channel `alert:weather`, ensuring atomicity before BullMQ fanout.
+3. BullMQ `alert-fanout` workers process the delivery: checking user notification preferences and active realtime Socket.io sessions.
+4. Active Socket.io realtime clients successfully receiving the alert (`realtime.published` is `true` via Redis relay channel `ALERT_WEATHER_RELAY_CHANNEL`) suppress subsequent push notifications to avoid double alerting.
+5. Inactive or offline clients fall back to push notification delivery via Expo Push API (batched, retried, and pruned for invalid tokens), unless suppressed by user-configured local quiet hours or duplicate checks.
+6. The entire alert rule, preference management, and event delivery pipeline is backed by a manual DB-level cascade delete constraint on user deletion, preventing silent database leaks.
+
+Story/Task mapping:
+
+- Story 1.3
+- Task 1 (Prisma schema, migrations, and user preferences)
+- Task 2 (Alerts API contracts and OpenAPI schemas)
+- Task 3 (NestJS Alerts module API and RLS validation)
+- Task 4 (Inconsistent database location field alignment)
+- Task 5 (Weather alert processing and rule trigger engine)
+- Task 6 (Quiet hours and push notification dispatch pipeline)
+- Task 7 (Test coverage, worker integration, and validation)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/1-3-alert-rules-notification-pipeline.md`
+
+Cross-links:
+
+- Step 3 frames the database schemas that alert rules and preferences extend.
+- Step 5 defines BullMQ concurrency policies that the fanout queue uses.
+- Step 6 details the Socket.io and Expo Push infrastructure that this pipeline orchestrates.
+- Step 15 explains the OpenAPI generated SDK client flow.
+
+Sequence to follow:
+
+1. Add database models (`AlertRule`, `NotificationPreference`, `EventEnvelope`, `AlertDeliveryOutbox`, `AlertCooldownReservation`) with Cascade constraints and migrations.
+2. Define Zod HTTP read/write contracts for alert rules and preferences, and generate the SDK.
+3. Build the NestJS alerts API module, enforcing RLS queries filtered by authenticated `userId`.
+4. Trigger rules evaluation engine (`WeatherAlertProcessingService`) concurrently inside transactions, reserving rolling 1-hour cooldowns.
+5. Implement the BullMQ `alert-fanout` worker to process events: checking timezone-aware quiet hours start/end boundaries via cached DateTimeFormatters.
+6. Relay real-time socket events over namespace `/alert:weather` using Redis Pub/Sub, and suppress push notifications when realtime is successfully published.
+7. Implement automated cleanup for test databases in the testing packages, ensuring all temporary outbox and reservation tables are purged.
+
+Task owner map:
+
+- Story 1.3 Task 1 step 1 owner: define Prisma models for alert rules and preferences in `packages/db/prisma/schema.prisma`
+- Story 1.3 Task 1 step 2 owner: write manual migration for cascade deletion on user delete in `packages/db/prisma/migrations/20260713180000_cascade_delete_user_event_envelopes/migration.sql`
+- Story 1.3 Task 2 step 1 owner: declare alerts HTTP schemas and routes in `packages/api-client/src/contracts/http/alerts.ts`
+- Story 1.3 Task 3 step 1 owner: implement user alerts controllers and RLS repository queries in `apps/api/src/modules/alerts/alerts.controller.ts` and `apps/api/src/modules/alerts/alerts.repository.ts`
+- Story 1.3 Task 5 step 1 owner: evaluate temperature, precipitation, and severe alert rules in `apps/api/src/modules/alerts/weather-alert-evaluator.ts`
+- Story 1.3 Task 5 step 2 owner: orchestrate weather alert processing and BullMQ dispatch in `apps/api/src/modules/alerts/weather-alert-processing.service.ts`
+- Story 1.3 Task 6 step 1 owner: implement quiet-hours checks using cached formatters in `apps/api/src/modules/alerts/quiet-hours.ts`
+- Story 1.3 Task 6 step 2 owner: execute realtime relay, push suppression, and Expo dispatch in `apps/api/src/modules/alerts/alert-fanout.processor.ts`
+- Story 1.3 Task 6 step 3 owner: broadcast realtime updates over `/alert:weather` in `apps/api/src/modules/gateway/gateway.gateway.ts`
+- Story 1.3 Task 7 step 1 owner: clean up event envelopes and alert tables on teardown in `packages/testing/src/cleanup.ts`
+- Story 1.3 Task 7 step 2 owner: verify realtime push suppression and quiet hours boundaries in `apps/api/src/modules/alerts/alert-fanout.processor.spec.ts`
+
+Current repo note:
+
+- Realtime Socket.io connections are namespace-scoped to `/alert:weather`. Push notifications are suppressed with reason `realtime_active` if realtime publish resolves successfully.
+- Database cleanups during tests explicitly purge `EventEnvelope`, `AlertDeliveryOutbox`, and `AlertCooldownReservation` to ensure no database state pollution between test runs.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Ingest["Weather Ingestion"] --> Process["WeatherAlertProcessingService"]
+  Process --> Evaluate["WeatherAlertEvaluator\ndelta-temp, precip, severe"]
+  Evaluate --> Outbox["Prisma Transaction\nEventEnvelope + AlertDeliveryOutbox"]
+  Outbox --> Queue["BullMQ alert-fanout queue"]
+
+  Queue --> Worker["AlertFanoutProcessor"]
+  Worker --> Realtime["Socket Gateway\n/alert:weather namespace"]
+  Realtime -->|success| Active["Realtime Published\nrealtimePublished: true"]
+  Active -->|suppresses push| PushSuppressed["Push Delivery Suppressed\nreason: realtime_active"]
+
+  Realtime -->|fail/inactive| Offline["Realtime Inactive\nrealtimePublished: false"]
+  Offline --> QuietHours{"Within user quiet hours?\nminuteOfDayAt (cached)"}
+  QuietHours -->|yes| PushQuiet["Push Delivery Suppressed\nreason: quiet_hours"]
+  QuietHours -->|no| Expo["PushNotificationService\nExpo Push SDK"]
+````
+
+```
+
 ```

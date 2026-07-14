@@ -97,11 +97,22 @@ export function testApiHealth() {
 // ── Scenario: Realtime poll ──────────────────────────────────────────────────
 
 export function testRealtimePoll() {
+  const { status: signupStatus, body: user } = signUp(
+    uniqueEmail('poll-user'),
+    '1990-05-18'
+  )
+  if (signupStatus !== 201 || !user) {
+    fail(`poll-user signup failed: ${signupStatus}`)
+  }
+
   describe('GET /api/v1/events/poll', () => {
     const since = encodeURIComponent(new Date(Date.now() - 60_000).toISOString())
     const { status, body } = getJson<{ events: unknown[]; nextSince: string | null }>(
       apiUrl(`/api/v1/events/poll?since=${since}`),
-      { tags: { name: 'api/events-poll' } }
+      {
+        headers: authHeaders(user.userId, 'admin'),
+        tags: { name: 'api/events-poll' },
+      }
     )
     expect(status, 'status is 200').to.equal(200)
     expect(body?.events, 'events is array').to.be.an('array')

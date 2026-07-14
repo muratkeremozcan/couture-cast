@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { UnauthorizedException, type INestApplication } from '@nestjs/common'
+import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { PrismaClient } from '@prisma/client'
 import { randomUUID } from 'node:crypto'
@@ -10,6 +10,7 @@ import {
   listSavedLocationsResponseSchema,
 } from '@couture/api-client/contracts/http'
 
+import type { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards'
 import { LocationPreferencesController } from '../src/modules/location-preferences/location-preferences.controller'
@@ -26,44 +27,29 @@ import { LocationPreferencesService } from '../src/modules/location-preferences/
 
 const primaryUserHeaders = {
   authorization: 'Bearer location-token',
-  'x-user-id': 'user-1',
-  'x-user-role': 'user',
 }
 
 const foreignUserHeaders = {
   authorization: 'Bearer foreign-location-token',
-  'x-user-id': 'user-2',
-  'x-user-role': 'user',
 }
 
-function mockRequestAuthGuard() {
-  vi.spyOn(RequestAuthGuard.prototype, 'canActivate').mockImplementation((context) => {
-    const requestContext = context.switchToHttp().getRequest<{
-      auth?: { token: string; userId: string; role: 'user' }
-      headers: Record<string, string | string[] | undefined>
-    }>()
-    const authorization = requestContext.headers.authorization
-    const userId = requestContext.headers['x-user-id']
-    const role = requestContext.headers['x-user-role']
+function createLocationRequestAuthGuard(identities: Record<string, string>) {
+  const guardianConsentStateService = {
+    canTeenAccess: vi.fn().mockResolvedValue(true),
+  } as unknown as GuardianConsentStateService
+  const accessTokenIdentityService = {
+    resolveIdentity: vi.fn((token: string) => {
+      const userId = identities[token]
+      return userId
+        ? Promise.resolve({ userId, role: 'guardian' as const })
+        : Promise.reject(new Error('Unknown test access token'))
+    }),
+  } as unknown as AccessTokenIdentityService
 
-    if (
-      typeof authorization !== 'string' ||
-      !authorization.startsWith('Bearer ') ||
-      typeof userId !== 'string' ||
-      userId.trim().length === 0 ||
-      role !== 'user'
-    ) {
-      throw new UnauthorizedException('Missing or invalid authentication headers')
-    }
-
-    requestContext.auth = {
-      token: authorization.slice('Bearer '.length).trim(),
-      userId,
-      role,
-    }
-
-    return Promise.resolve(true)
-  })
+  return {
+    guardianConsentStateService,
+    guard: new RequestAuthGuard(guardianConsentStateService, accessTokenIdentityService),
+  }
 }
 
 class InMemoryLocationPreferencesRepository implements LocationPreferencesRepository {
@@ -256,7 +242,10 @@ describe('Location preferences API integration', () => {
   }
 
   beforeEach(async () => {
-    mockRequestAuthGuard()
+    const auth = createLocationRequestAuthGuard({
+      'foreign-location-token': 'user-2',
+      'location-token': 'user-1',
+    })
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [LocationPreferencesController],
@@ -268,18 +257,13 @@ describe('Location preferences API integration', () => {
         LocationPreferencesService,
         {
           provide: GuardianConsentStateService,
-          useValue: {
-            canTeenAccess: vi.fn().mockResolvedValue(true),
-          },
-        },
-        {
-          provide: RequestAuthGuard,
-          useFactory: (guardianConsentStateService: GuardianConsentStateService) =>
-            new RequestAuthGuard(guardianConsentStateService),
-          inject: [GuardianConsentStateService],
+          useValue: auth.guardianConsentStateService,
         },
       ],
-    }).compile()
+    })
+      .overrideGuard(RequestAuthGuard)
+      .useValue(auth.guard)
+      .compile()
 
     app = moduleFixture.createNestApplication()
     await app.init()
@@ -381,10 +365,13 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
   }
 
   beforeEach(async () => {
-    mockRequestAuthGuard()
     prisma = new PrismaClient()
     primaryUserId = `real-location-user-${randomUUID()}`
     foreignUserId = `real-location-foreign-${randomUUID()}`
+    const auth = createLocationRequestAuthGuard({
+      'real-location-foreign-token': foreignUserId,
+      'real-location-token': primaryUserId,
+    })
 
     await prisma.user.createMany({
       data: [
@@ -410,18 +397,13 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
         LocationPreferencesService,
         {
           provide: GuardianConsentStateService,
-          useValue: {
-            canTeenAccess: vi.fn().mockResolvedValue(true),
-          },
-        },
-        {
-          provide: RequestAuthGuard,
-          useFactory: (guardianConsentStateService: GuardianConsentStateService) =>
-            new RequestAuthGuard(guardianConsentStateService),
-          inject: [GuardianConsentStateService],
+          useValue: auth.guardianConsentStateService,
         },
       ],
-    }).compile()
+    })
+      .overrideGuard(RequestAuthGuard)
+      .useValue(auth.guard)
+      .compile()
 
     app = moduleFixture.createNestApplication()
     await app.init()
@@ -450,13 +432,9 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
   it('enforces real database limits, uniqueness, ownership, and primary promotion over HTTP', async () => {
     const primaryHeaders = {
       authorization: 'Bearer real-location-token',
-      'x-user-id': primaryUserId,
-      'x-user-role': 'user',
     }
     const foreignHeaders = {
       authorization: 'Bearer real-location-foreign-token',
-      'x-user-id': foreignUserId,
-      'x-user-role': 'user',
     }
 
     const firstResponse = await request(getHttpServer())

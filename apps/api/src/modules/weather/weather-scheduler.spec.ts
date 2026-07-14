@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { registerWeatherRefreshScheduler } from './weather-scheduler.js'
 
 describe('registerWeatherRefreshScheduler', () => {
-  it('upserts the stable BullMQ scheduler with the configured interval', async () => {
+  it('upserts weather refresh and durable alert outbox schedulers', async () => {
     const queue = {
       upsertJobScheduler: vi.fn().mockResolvedValue({ id: 'scheduled-job' }),
     }
@@ -17,7 +17,20 @@ describe('registerWeatherRefreshScheduler', () => {
         name: 'weather-refresh-sweep',
         data: { type: 'sweep' },
         opts: {
-          attempts: 1,
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 1000 },
+        },
+      }
+    )
+    expect(queue.upsertJobScheduler).toHaveBeenCalledWith(
+      'weather-alert-outbox-dispatch',
+      { every: 30_000 },
+      {
+        name: 'weather-alert-outbox-dispatch',
+        data: { type: 'alert-outbox' },
+        opts: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 1000 },
         },
       }
     )

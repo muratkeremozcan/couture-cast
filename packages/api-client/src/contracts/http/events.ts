@@ -1,6 +1,7 @@
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { apiErrorSchema, isoTimestampSchema, nonEmptyStringSchema } from './common'
+import type { RegisteredCommonHttpSchemas } from './common'
 
 // Story 0.9 Task 2 step 3 owner:
 // model the first non-trivial feature contract here, not just a health-check shape.
@@ -61,7 +62,10 @@ export const eventsPollResultSchema = z.union([
   eventsPollInvalidSinceResponseSchema,
 ])
 
-export function registerEventsContracts(registry: OpenAPIRegistry) {
+export function registerEventsContracts(
+  registry: OpenAPIRegistry,
+  commonSchemas: RegisteredCommonHttpSchemas
+) {
   const registeredPolledEventSchema = registry.register('PolledEvent', polledEventSchema)
   const registeredEventsPollQuerySchema = registry.register(
     'EventsPollQuery',
@@ -89,7 +93,8 @@ export function registerEventsContracts(registry: OpenAPIRegistry) {
     tags: ['events'],
     summary: 'Poll incremental realtime fallback events',
     description:
-      'Returns unseen events plus the next cursor for polling fallback clients.',
+      'Returns unseen events owned by the authenticated user, plus global events and the next cursor for polling fallback clients.',
+    security: [{ bearerAuth: [] }],
     request: {
       query: registeredEventsPollQuerySchema,
     },
@@ -100,6 +105,22 @@ export function registerEventsContracts(registry: OpenAPIRegistry) {
         content: {
           'application/json': {
             schema: registeredEventsPollResultSchema,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian consent is required for teen access',
+        content: {
+          'application/json': {
+            schema: commonSchemas.forbiddenHttpErrorSchema,
           },
         },
       },

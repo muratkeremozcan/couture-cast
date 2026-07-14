@@ -64,7 +64,8 @@ Required weather environment variables:
 - `WEATHERAPI_API_KEY`: secondary WeatherAPI.com key.
 - `WEATHER_REFRESH_MINUTES`: cadence in minutes, capped at 5 by policy.
 - `WEATHER_PROVIDER_MODE`: provider compatibility mode.
-- `WEATHER_INGESTION_TARGETS_JSON`: non-personal bootstrap targets for Story 1.1.
+- `WEATHER_INGESTION_TARGETS_JSON`: non-personal bootstrap targets for Story 1.1. Every target must
+  include a non-blank descriptive `locationName` for user-facing forecasts and alerts.
 
 Provider-call budgeting:
 

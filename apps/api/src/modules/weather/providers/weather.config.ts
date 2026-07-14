@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { WeatherIngestionTargetSchema } from './weather.schemas.js'
+import { ConfiguredWeatherIngestionTargetSchema } from './weather.schemas.js'
 
 const WeatherProviderModeSchema = z.enum(['openweather', 'weatherapi'])
 
@@ -16,7 +16,7 @@ export interface WeatherConfig {
   weatherApiKey?: string
   refreshMinutes: number
   providerMode: z.infer<typeof WeatherProviderModeSchema>
-  ingestionTargets: z.infer<typeof WeatherIngestionTargetSchema>[]
+  ingestionTargets: z.infer<typeof ConfiguredWeatherIngestionTargetSchema>[]
 }
 
 export class WeatherConfigError extends Error {
@@ -47,7 +47,7 @@ export function loadWeatherConfig(env: NodeJS.ProcessEnv = process.env): Weather
   }
 
   const targetResult = z
-    .array(WeatherIngestionTargetSchema)
+    .array(ConfiguredWeatherIngestionTargetSchema)
     .superRefine((targets, context) => {
       const locationKeys = new Set<string>()
       targets.forEach((target, index) => {

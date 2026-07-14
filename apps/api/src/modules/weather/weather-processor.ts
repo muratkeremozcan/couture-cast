@@ -14,6 +14,11 @@ type WeatherProcessorLogger = {
 export type WeatherJobData =
   | { type: 'sweep' }
   | { type: 'location'; target: WeatherIngestionTarget }
+  | { type: 'alert-outbox' }
+
+export interface WeatherAlertDispatcher {
+  dispatchPending(): Promise<number>
+}
 
 export interface WeatherProcessorClock {
   now(): Date
@@ -23,6 +28,7 @@ export interface WeatherJobProcessorOptions {
   queue: WeatherQueue
   targetSource: WeatherTargetSource
   ingestionService: WeatherIngestionService
+  alertDispatcher?: WeatherAlertDispatcher
   refreshMinutes: number
   clock?: WeatherProcessorClock
   logger?: WeatherProcessorLogger
@@ -30,6 +36,11 @@ export interface WeatherJobProcessorOptions {
 
 const systemClock: WeatherProcessorClock = {
   now: () => new Date(),
+}
+
+const weatherLocationRetryOptions: JobsOptions = {
+  attempts: 3,
+  backoff: { type: 'exponential', delay: 1000 },
 }
 
 export function createWeatherLocationJobId(
@@ -68,13 +79,18 @@ export function createWeatherJobProcessor(options: WeatherJobProcessorOptions) {
       return
     }
 
+    if (job.data.type === 'alert-outbox') {
+      if (!options.alertDispatcher) {
+        throw new Error('Weather alert outbox dispatcher is not configured')
+      }
+      await options.alertDispatcher.dispatchPending()
+      return
+    }
+
     if (job.name !== WEATHER_SWEEP_JOB_NAME) {
       return
     }
 
-    const jobOptions: JobsOptions = {
-      attempts: 1,
-    }
     const bucketTime = clock.now()
     const targets = coalesceTargets(await options.targetSource.getTargets())
 
@@ -84,7 +100,7 @@ export function createWeatherJobProcessor(options: WeatherJobProcessorOptions) {
           WEATHER_LOCATION_JOB_NAME,
           { type: 'location', target },
           {
-            ...jobOptions,
+            ...weatherLocationRetryOptions,
             jobId: createWeatherLocationJobId(
               target.locationKey,
               bucketTime,

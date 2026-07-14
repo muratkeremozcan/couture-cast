@@ -1,43 +1,26 @@
+import { alertWeatherEventSchema, type AlertWeatherEvent } from '@couture/api-client'
 import { Inject } from '@nestjs/common'
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets'
 import type { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets'
 import type { Logger } from 'pino'
-import type { Server, Socket, ExtendedError } from 'socket.io'
+import type { ExtendedError, Namespace, Server, Socket } from 'socket.io'
+
 import { createBaseLogger } from '../../logger/pino.config'
-// Value import required so Nest can reflect the provider token
+import { AccessTokenIdentityService } from '../auth/access-token-identity.service.js'
 import { ConnectionManager, type DisconnectResult } from './connection-manager.service'
+import {
+  GATEWAY_LOGGER,
+  readVerifiedSocketUserId,
+  writeVerifiedSocketUserId,
+} from './gateway.constants.js'
 
 /**
- * Story 0.5 owner file: realtime + push integration overview.
- *
- * Realtime gateway handles low-latency delivery for active sessions, while push notifications
- * cover background/offline delivery. If realtime remains unstable, clients fall back to polling.
- *
- * Problems solved:
- * - Latency: socket channels deliver updates faster than request/response polling.
- * - Reliability: retry + backoff absorbs temporary network drops.
- * - Offline fallback: explicit polling activation keeps event delivery available.
- *
- * Ownership anchor:
- * - Story 0.5 Task 1 owner: expose the Socket.io gateway surface and attach the core auth +
- *   connection orchestration.
- *
- * Flow refs:
- * - S0.5/T2: connection lifecycle state and retry math live in ConnectionManager.
- * - S0.5/T3: push delivery covers users who are no longer actively connected.
- * - S0.5/T5: polling remains the final fallback when realtime continuity is unavailable.
- *
- * Alternatives:
- * - SSE for one-way server updates with lower protocol complexity.
- * - Polling-only architecture with simpler ops but higher latency/load.
- * - Message brokers (for example NATS/Kafka) for larger fan-out and stronger guarantees.
- *
- * Namespaces map to ADR-007 surface areas:
- * - lookbook -> new posts
- * - ritual -> ritual updates
- * - alert -> weather alerts
+ * The alert namespace is static so Socket.IO can expose a dedicated, authenticated
+ * delivery boundary. Generic realtime surfaces remain on their own namespaces.
  */
-export const namespacePattern = /^\/(lookbook|ritual|alert)$/
+export const namespacePattern = /^\/(lookbook|ritual)$/
+export const ALERT_NAMESPACE = '/alert:weather'
+export const ALERT_WEATHER_EVENT = 'alert:weather'
 
 type BuildGatewayOptionsArgs = {
   corsOrigin?: string | string[]
@@ -45,9 +28,10 @@ type BuildGatewayOptionsArgs = {
 
 type MiddlewareFn = Parameters<Server['use']>[0]
 type ServerLike = { use: (fn: MiddlewareFn) => void }
-type TokenSocket = Omit<Socket, 'data'> & { data: Record<string, unknown> }
-
-export const GATEWAY_LOGGER = Symbol('GATEWAY_LOGGER')
+export type AccessTokenIdentityResolver = Pick<
+  AccessTokenIdentityService,
+  'resolveUserId'
+>
 
 function parseCorsOrigin(origin?: string | string[]) {
   if (!origin) return true
@@ -61,97 +45,163 @@ function parseCorsOrigin(origin?: string | string[]) {
   return entries.length ? entries : true
 }
 
+function buildCorsOptions(config: BuildGatewayOptionsArgs) {
+  return {
+    origin: parseCorsOrigin(config.corsOrigin ?? process.env.SOCKET_IO_CORS_ORIGIN),
+    credentials: true,
+  }
+}
+
 export function buildGatewayOptions(config: BuildGatewayOptionsArgs = {}) {
   return {
     namespace: namespacePattern,
-    cors: {
-      origin: parseCorsOrigin(config.corsOrigin ?? process.env.SOCKET_IO_CORS_ORIGIN),
-      credentials: true,
-    },
+    cors: buildCorsOptions(config),
+    serveClient: false,
+  }
+}
+
+export function buildAlertGatewayOptions(config: BuildGatewayOptionsArgs = {}) {
+  return {
+    namespace: ALERT_NAMESPACE,
+    cors: buildCorsOptions(config),
     serveClient: false,
   }
 }
 
 function extractAuthToken(socket: Socket) {
   const auth = socket.handshake.auth as Record<string, unknown> | undefined
-  const authToken = typeof auth?.token === 'string' ? auth.token : undefined
-  const bearer = socket.handshake.headers?.authorization
-  const query = socket.handshake.query
-  const queryToken =
-    typeof query?.token === 'string'
-      ? query.token
-      : Array.isArray(query?.token)
-        ? query.token[0]
-        : undefined
+  const authToken = typeof auth?.token === 'string' ? auth.token.trim() : ''
+  if (authToken) {
+    return authToken
+  }
 
-  if (typeof authToken === 'string' && authToken.trim()) return authToken
-  if (typeof bearer === 'string' && bearer.startsWith('Bearer '))
-    return bearer.slice('Bearer '.length)
-  if (typeof queryToken === 'string' && queryToken.trim()) return queryToken
-
-  return undefined
+  const authorization: unknown = (
+    socket.handshake.headers as Record<string, unknown> | undefined
+  )?.authorization
+  const header: unknown = Array.isArray(authorization)
+    ? (authorization as unknown[])[0]
+    : authorization
+  const match = typeof header === 'string' ? /^Bearer\s+(.+)$/i.exec(header.trim()) : null
+  const bearerToken = match?.[1]?.trim()
+  return bearerToken || undefined
 }
 
-export function createAuthMiddleware() {
+export function createAuthMiddleware(identityResolver: AccessTokenIdentityResolver) {
   return (socket: Socket, next: (err?: ExtendedError) => void) => {
     const token = extractAuthToken(socket)
-
     if (!token) {
-      return next(new Error('Missing Socket.io auth token'))
+      next(new Error('Missing Socket.io auth token'))
+      return
     }
 
-    const tokenSocket = socket as TokenSocket
-    const existingData: Record<string, unknown> = tokenSocket.data ?? {}
-    tokenSocket.data = { ...existingData, token }
-    return next()
+    void identityResolver
+      .resolveUserId(token)
+      .then((userId) => {
+        socket.data = writeVerifiedSocketUserId(socket.data as unknown, userId)
+        next()
+      })
+      .catch(() => {
+        next(new Error('Invalid Socket.io auth token'))
+      })
   }
 }
 
 function emitDisconnectResult(socket: Socket, result: DisconnectResult) {
-  // Server-side guidance for client recovery path: retry first, then polling fallback.
   if (result.shouldRetry) {
     const payload = { delayMs: result.delayMs, attempt: result.attempt }
     socket.emit('connection:retry', payload)
     return { event: 'connection:retry', payload }
   }
 
-  // Flow ref S0.5/T3: push delivery covers users who are no longer actively connected.
-  // Flow ref S0.5/T5: polling remains the final delivery safety net.
   const payload = { activatePolling: result.activatePolling, attempt: result.attempt }
   socket.emit('connection:fallback', payload)
   return { event: 'connection:fallback', payload }
+}
+
+function handleDisconnect(
+  socket: Socket,
+  connectionManager: ConnectionManager,
+  logger: Logger
+) {
+  const result = connectionManager.handleDisconnect(socket)
+  logger.warn(
+    { attempt: result.attempt, namespace: socket.nsp?.name },
+    'socket_disconnected'
+  )
+  return emitDisconnectResult(socket, result)
+}
+
+export function alertUserRoom(userId: string) {
+  return `alert:user:${userId}`
 }
 
 @WebSocketGateway(buildGatewayOptions())
 export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     @Inject(ConnectionManager) private readonly connectionManager: ConnectionManager,
-    @Inject(GATEWAY_LOGGER) private readonly logger: Logger
+    @Inject(GATEWAY_LOGGER) private readonly logger: Logger,
+    @Inject(AccessTokenIdentityService)
+    private readonly identityResolver: AccessTokenIdentityService
   ) {}
 
   @WebSocketServer()
   server!: Server
 
   afterInit(server: ServerLike) {
-    // Flow ref S0.5/T1: apply gateway auth middleware before any socket joins.
-    server.use(createAuthMiddleware())
+    server.use(createAuthMiddleware(this.identityResolver))
   }
 
   handleConnection(socket: Socket) {
-    // Flow ref S0.5/T2: delegate lifecycle state to ConnectionManager.
     this.connectionManager.handleConnect(socket)
   }
 
   handleDisconnect(socket: Socket) {
-    // Flow ref S0.5/T2: emit retry/fallback hints so the client recovery path is explicit.
-    const result = this.connectionManager.handleDisconnect(socket)
-    this.logger.warn(
-      { attempt: result.attempt, namespace: socket.nsp?.name },
-      'socket_disconnected'
-    )
-    return emitDisconnectResult(socket, result)
+    return handleDisconnect(socket, this.connectionManager, this.logger)
   }
 }
+
+@WebSocketGateway(buildAlertGatewayOptions())
+export class AlertWeatherGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  constructor(
+    @Inject(ConnectionManager) private readonly connectionManager: ConnectionManager,
+    @Inject(GATEWAY_LOGGER) private readonly logger: Logger,
+    @Inject(AccessTokenIdentityService)
+    private readonly identityResolver: AccessTokenIdentityService
+  ) {}
+
+  @WebSocketServer()
+  server!: Namespace
+
+  afterInit(server: ServerLike) {
+    server.use(createAuthMiddleware(this.identityResolver))
+  }
+
+  async handleConnection(socket: Socket) {
+    const userId = readVerifiedSocketUserId(socket.data as unknown)
+    if (!userId) {
+      socket.disconnect(true)
+      return
+    }
+
+    await socket.join(alertUserRoom(userId))
+    this.connectionManager.handleConnect(socket)
+  }
+
+  handleDisconnect(socket: Socket) {
+    return handleDisconnect(socket, this.connectionManager, this.logger)
+  }
+
+  emitWeatherAlert(userId: string, event: AlertWeatherEvent) {
+    const parsedEvent = alertWeatherEventSchema.parse(event)
+    if (parsedEvent.userId !== userId) {
+      throw new Error('Alert target user does not match event user')
+    }
+
+    this.server.to(alertUserRoom(userId)).emit(ALERT_WEATHER_EVENT, parsedEvent)
+  }
+}
+
+export { GATEWAY_LOGGER } from './gateway.constants.js'
 
 export const gatewayLoggerProvider = {
   provide: GATEWAY_LOGGER,

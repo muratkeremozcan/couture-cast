@@ -48,40 +48,28 @@ export const queueConfigs: QueueConfig[] = [
     name: 'weather-ingestion',
     options: {
       connection,
-      defaultJobOptions: {
-        ...defaultJobOptions,
-        timeout: 30_000,
-      } as JobsOptions,
+      defaultJobOptions,
     },
   },
   {
     name: 'alert-fanout',
     options: {
       connection,
-      defaultJobOptions: {
-        ...defaultJobOptions,
-        timeout: 10_000,
-      } as JobsOptions,
+      defaultJobOptions,
     },
   },
   {
     name: 'color-extraction',
     options: {
       connection,
-      defaultJobOptions: {
-        ...defaultJobOptions,
-        timeout: 60_000,
-      } as JobsOptions,
+      defaultJobOptions,
     },
   },
   {
     name: 'moderation-review',
     options: {
       connection,
-      defaultJobOptions: {
-        ...defaultJobOptions,
-        timeout: 120_000,
-      } as JobsOptions,
+      defaultJobOptions,
     },
   },
 ]

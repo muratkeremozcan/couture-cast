@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, it } from 'vitest'
 import { createMobileApiClient } from '../../../apps/mobile/src/lib/api-client'
 import {
+  pactEventAuth,
   verifyApiHealthInteraction,
   verifyEventsPollInteraction,
   verifyInvalidCursorInteraction,
@@ -17,7 +18,10 @@ const pact = new PactV4({
 })
 
 function createMobileClientForMockServer(mockServer: V3MockServer) {
-  return createMobileApiClient({ baseUrl: mockServer.url })
+  return createMobileApiClient({
+    baseUrl: mockServer.url,
+    accessToken: pactEventAuth.accessToken,
+  })
 }
 
 describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {

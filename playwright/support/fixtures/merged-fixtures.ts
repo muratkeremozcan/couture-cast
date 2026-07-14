@@ -43,11 +43,6 @@ const authSession = base.extend<AuthFixtures>({
   page: authFixtures.page,
 })
 
-// Capture Playwright test context for playwright-utils logging before every test.
-base.beforeEach(({}, testInfo) => {
-  captureTestContext(testInfo)
-})
-
 // Compose base Playwright test with playwright-utils fixtures and local fixtures.
 export const test = mergeTests(
   base,
@@ -61,5 +56,36 @@ export const test = mergeTests(
   networkErrorMonitor,
   recurse
 )
+
+// Capture Playwright test context and mock PostHog ingest endpoints before every test.
+test.beforeEach(async ({ page }, testInfo) => {
+  captureTestContext(testInfo)
+
+  // Mock PostHog ingest endpoints to return 200 OK
+  await page.route('**/ingest/static/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/javascript',
+      body: '/* mocked posthog asset */',
+    })
+  })
+
+  await page.route('**/ingest/**', async (route) => {
+    const request = route.request()
+    if (request.method() === 'POST') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok' }),
+      })
+    } else {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/plain',
+        body: 'mocked',
+      })
+    }
+  })
+})
 
 export { expect }
