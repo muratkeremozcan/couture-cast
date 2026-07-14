@@ -187,7 +187,9 @@ export class AccessTokenIdentityService {
   ): Promise<AccessTokenIdentity> {
     const token = rawToken.trim()
 
-    if (process.env.TEST_ENV === 'local') {
+    const isTestEnv =
+      process.env.TEST_ENV === 'local' || process.env.TEST_ENV === 'preview'
+    if (isTestEnv) {
       const bypass = this.resolveLocalBypass(token, request)
       if (bypass) {
         return bypass
