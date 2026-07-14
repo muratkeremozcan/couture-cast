@@ -1848,6 +1848,7 @@ Current repo note:
 
 - Realtime Socket.io connections are namespace-scoped to `/alert:weather`. Push notifications are suppressed with reason `realtime_active` if realtime publish resolves successfully.
 - Database cleanups during tests explicitly purge `EventEnvelope`, `AlertDeliveryOutbox`, and `AlertCooldownReservation` to ensure no database state pollution between test runs.
+- Mock token bypasses (like `test-token-` and `k6-`) are enabled only in local and Vercel Preview environments (`TEST_ENV=local` or `VERCEL_ENV=preview`). They are strictly disabled in production to prevent security vulnerabilities. Testing in production requires authenticating real registered user accounts against the live Supabase instance to retrieve valid JWT access tokens.
 
 Architecture diagram:
 

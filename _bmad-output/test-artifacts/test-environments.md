@@ -72,6 +72,7 @@ Rules:
 - Production credentials are available only to Production runtime and production-safe smoke paths.
 - `VERCEL_AUTOMATION_BYPASS_SECRET` is a deployment access-control secret, not an app runtime
   credential.
+- Mock token bypasses (e.g. `test-token-`, `k6-`) are enabled only in Local (`TEST_ENV=local`) and Vercel Preview (`VERCEL_ENV=preview`) environments. They are strictly disabled in production (`TEST_ENV=prod`) to prevent unauthorized access. E2E and load tests running against Production must use real user credentials to generate valid JWTs.
 - No doc, screenshot, test artifact, or PR comment should include raw secret values.
 
 Manual verification still required:
