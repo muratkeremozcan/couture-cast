@@ -8,6 +8,7 @@ import {
   HealthApi,
   LocationsApi,
   ModerationApi,
+  RitualApi,
   UserApi,
   WeatherApi,
 } from './apis'
@@ -40,6 +41,7 @@ export interface DefaultApi
     PublicApi<HealthApi>,
     PublicApi<LocationsApi>,
     PublicApi<ModerationApi>,
+    PublicApi<RitualApi>,
     PublicApi<UserApi>,
     PublicApi<WeatherApi> {}
 
@@ -57,6 +59,7 @@ applyApiMixins(DefaultApi, [
   HealthApi,
   LocationsApi,
   ModerationApi,
+  RitualApi,
   UserApi,
   WeatherApi,
 ])

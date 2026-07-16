@@ -70,4 +70,12 @@ export {
   type SetPrimarySavedLocationResponse,
   type UpdateSavedLocationInput,
   type UpdateSavedLocationResponse,
+  ritualQueryParamsSchema,
+  ritualResponseSchema,
+  type RitualResponse,
+  type RitualQueryParams,
+  type ScenarioOutfit,
+  type ScenarioName,
+  scenarioOutfitSchema,
+  scenarioNameSchema,
 } from '@couture/api-client/contracts/http'

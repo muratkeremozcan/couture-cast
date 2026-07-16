@@ -7,6 +7,7 @@ import {
   verifyApiHealthInteraction,
   verifyEventsPollInteraction,
   verifyInvalidCursorInteraction,
+  verifyRitualInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -32,5 +33,9 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   it('returns the graceful invalid cursor payload used by fallback clients', async () => {
     await verifyInvalidCursorInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('gets daily scenario outfit recommendations', async () => {
+    await verifyRitualInteraction(pact, createWebClientForMockServer)
   })
 })

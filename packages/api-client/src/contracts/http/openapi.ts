@@ -15,6 +15,7 @@ import { registerLocationsContracts } from './locations'
 import { registerModerationContracts } from './moderation'
 import { registerUserContracts } from './user'
 import { registerWeatherContracts } from './weather'
+import { registerRitualContracts } from './ritual'
 
 export const HTTP_OPENAPI_OUTPUT_FILENAME = 'http.openapi.json'
 
@@ -39,6 +40,7 @@ export function createHttpOpenApiRegistry() {
   registerModerationContracts(registry, commonSchemas)
   registerUserContracts(registry, commonSchemas)
   registerWeatherContracts(registry, commonSchemas)
+  registerRitualContracts(registry, commonSchemas)
 
   return registry
 }

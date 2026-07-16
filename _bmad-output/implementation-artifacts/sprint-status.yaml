@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-07-14
+last_updated: 2026-07-16
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -63,8 +63,8 @@ development_status:
   1-4-telemetry-audit-baseline: done
 
   # Epic 2: Outfit Personalization Core (Phase 1)
-  epic-2: backlog
-  2-1-scenario-outfit-generator: backlog
+  epic-2: in-progress
+  2-1-scenario-outfit-generator: done
   2-2-comfort-calibration-settings: backlog
   2-3-reasoning-badges-explanations: backlog
 

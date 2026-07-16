@@ -1643,6 +1643,106 @@ export interface QueueMetrics {
 /**
  *
  * @export
+ * @interface RitualQueryParams
+ */
+export interface RitualQueryParams {
+  /**
+   * Optional ID of a saved user location key or preferences reference.
+   * @type {string}
+   * @memberof RitualQueryParams
+   */
+  locationId?: string
+}
+/**
+ *
+ * @export
+ * @interface RitualResponse
+ */
+export interface RitualResponse {
+  /**
+   *
+   * @type {RitualResponseData}
+   * @memberof RitualResponse
+   */
+  data: RitualResponseData
+}
+/**
+ *
+ * @export
+ * @interface RitualResponseData
+ */
+export interface RitualResponseData {
+  /**
+   *
+   * @type {LatestWeatherResponseDataOneOfWeather}
+   * @memberof RitualResponseData
+   */
+  weather: LatestWeatherResponseDataOneOfWeather
+  /**
+   *
+   * @type {Array<RitualResponseDataOutfitsInner>}
+   * @memberof RitualResponseData
+   */
+  outfits: Array<RitualResponseDataOutfitsInner>
+  /**
+   *
+   * @type {Array<string>}
+   * @memberof RitualResponseData
+   */
+  badges: Array<string>
+}
+/**
+ *
+ * @export
+ * @interface RitualResponseDataOutfitsInner
+ */
+export interface RitualResponseDataOutfitsInner {
+  /**
+   * Unique identifier for the recommendation card.
+   * @type {string}
+   * @memberof RitualResponseDataOutfitsInner
+   */
+  id: string
+  /**
+   * The daily scenario: morning, midday, or evening.
+   * @type {RitualResponseDataOutfitsInnerScenarioEnum}
+   * @memberof RitualResponseDataOutfitsInner
+   */
+  scenario: RitualResponseDataOutfitsInnerScenarioEnum
+  /**
+   * The custom or fallback garment identifiers suggested.
+   * @type {Array<string>}
+   * @memberof RitualResponseDataOutfitsInner
+   */
+  garmentIds: Array<string>
+  /**
+   * Reasoning badges justifying the garments chosen.
+   * @type {Array<ScenarioOutfitReasoningBadgesInner>}
+   * @memberof RitualResponseDataOutfitsInner
+   */
+  reasoningBadges: Array<ScenarioOutfitReasoningBadgesInner>
+  /**
+   * Explanation string based on weather and comfort thresholds.
+   * @type {string}
+   * @memberof RitualResponseDataOutfitsInner
+   */
+  comfortNotes: string
+}
+
+/**
+ * @export
+ */
+export const RitualResponseDataOutfitsInnerScenarioEnum = {
+  morning: 'morning',
+  midday: 'midday',
+  evening: 'evening',
+} as const
+export type RitualResponseDataOutfitsInnerScenarioEnum =
+  (typeof RitualResponseDataOutfitsInnerScenarioEnum)[keyof typeof RitualResponseDataOutfitsInnerScenarioEnum]
+
+/**
+ *
+ * @export
  * @interface SavedLocation
  */
 export interface SavedLocation {
@@ -1737,6 +1837,80 @@ export interface SavedLocationIdPathParams {
    * @memberof SavedLocationIdPathParams
    */
   locationId: string
+}
+
+/**
+ *
+ * @export
+ */
+export const ScenarioName = {
+  morning: 'morning',
+  midday: 'midday',
+  evening: 'evening',
+} as const
+export type ScenarioName = (typeof ScenarioName)[keyof typeof ScenarioName]
+
+/**
+ *
+ * @export
+ * @interface ScenarioOutfit
+ */
+export interface ScenarioOutfit {
+  /**
+   * Unique identifier for the recommendation card.
+   * @type {string}
+   * @memberof ScenarioOutfit
+   */
+  id: string
+  /**
+   * The daily scenario: morning, midday, or evening.
+   * @type {ScenarioOutfitScenarioEnum}
+   * @memberof ScenarioOutfit
+   */
+  scenario: ScenarioOutfitScenarioEnum
+  /**
+   * The custom or fallback garment identifiers suggested.
+   * @type {Array<string>}
+   * @memberof ScenarioOutfit
+   */
+  garmentIds: Array<string>
+  /**
+   * Reasoning badges justifying the garments chosen.
+   * @type {Array<ScenarioOutfitReasoningBadgesInner>}
+   * @memberof ScenarioOutfit
+   */
+  reasoningBadges: Array<ScenarioOutfitReasoningBadgesInner>
+  /**
+   * Explanation string based on weather and comfort thresholds.
+   * @type {string}
+   * @memberof ScenarioOutfit
+   */
+  comfortNotes: string
+}
+
+/**
+ * @export
+ */
+export const ScenarioOutfitScenarioEnum = {
+  morning: 'morning',
+  midday: 'midday',
+  evening: 'evening',
+} as const
+export type ScenarioOutfitScenarioEnum =
+  (typeof ScenarioOutfitScenarioEnum)[keyof typeof ScenarioOutfitScenarioEnum]
+
+/**
+ *
+ * @export
+ * @interface ScenarioOutfitReasoningBadgesInner
+ */
+export interface ScenarioOutfitReasoningBadgesInner {
+  /**
+   *
+   * @type {string}
+   * @memberof ScenarioOutfitReasoningBadgesInner
+   */
+  label: string
 }
 /**
  *

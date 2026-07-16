@@ -279,6 +279,7 @@ model OutfitRecommendation {
   created_at          DateTime         @default(now())
   updated_at          DateTime         @updatedAt
 
+  @@unique([user_id, forecast_segment_id, scenario])
   @@index([user_id])
 }
 

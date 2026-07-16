@@ -20,7 +20,10 @@ const pactEventHeaders = {
   Authorization: `Bearer ${pactEventAuth.accessToken}`,
 }
 
-type ContractApiClient = Pick<DefaultApi, 'apiHealthGet' | 'apiV1EventsPollGet'>
+type ContractApiClient = Pick<
+  DefaultApi,
+  'apiHealthGet' | 'apiV1EventsPollGet' | 'apiV1RitualGet'
+>
 type CreateClient = (mockServer: V3MockServer) => ContractApiClient
 
 const isoTimestamp = (value: string) =>
@@ -144,5 +147,112 @@ export async function verifyInvalidCursorInteraction(
         nextSince: null,
         error: 'Invalid since timestamp',
       })
+    })
+}
+
+export async function verifyRitualInteraction(pact: PactV4, createClient: CreateClient) {
+  const weatherSnapshot = {
+    locationKey: 'chicago-il',
+    latitude: 41.878,
+    longitude: -87.63,
+    timezone: 'America/Chicago',
+    provider: 'weatherapi',
+    providerUpdatedAt: '2026-07-16T12:00:00.000Z',
+    fetchedAt: '2026-07-16T12:00:00.000Z',
+    current: {
+      temperature: 16,
+      condition: 'clear',
+    },
+    hourly: Array.from({ length: 48 }, (_, i) => ({
+      forecastAt: new Date(
+        new Date('2026-07-16T12:00:00.000Z').getTime() + i * 3600 * 1000
+      ).toISOString(),
+      temperature: 16,
+      feelsLike: 15,
+      precipitationProbability: 0.1,
+      precipitationAmount: 0.0,
+      windSpeed: 5.0,
+      windGust: null,
+      condition: 'clear',
+      providerWeatherCode: '1000',
+    })),
+    alerts: [],
+  }
+
+  const outfitMorning = {
+    id: 'rec-morning-1',
+    scenario: 'morning',
+    garmentIds: ['g-1'],
+    reasoningBadges: [{ label: 'Wind layer' }],
+    comfortNotes: 'Chilly morning',
+  }
+  const outfitMidday = {
+    id: 'rec-midday-1',
+    scenario: 'midday',
+    garmentIds: ['g-2'],
+    reasoningBadges: [{ label: 'Mild' }],
+    comfortNotes: 'Pleasant midday',
+  }
+  const outfitEvening = {
+    id: 'rec-evening-1',
+    scenario: 'evening',
+    garmentIds: ['g-3'],
+    reasoningBadges: [{ label: 'Evening' }],
+    comfortNotes: 'Cool evening',
+  }
+
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Daily scenario outfit recommendations exist for user',
+        params: { userId: 'guardian-1', locationId: 'loc-1' },
+      })
+    )
+    .uponReceiving('a request to get daily scenario outfit recommendations')
+    .withRequest(
+      'GET',
+      '/api/v1/ritual',
+      setJsonContent({
+        headers: pactEventHeaders,
+        query: { locationId: 'loc-1' },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: {
+            weather: {
+              locationKey: string(weatherSnapshot.locationKey),
+              latitude: like(weatherSnapshot.latitude),
+              longitude: like(weatherSnapshot.longitude),
+              timezone: string(weatherSnapshot.timezone),
+              provider: string(weatherSnapshot.provider),
+              providerUpdatedAt: isoTimestamp(weatherSnapshot.providerUpdatedAt),
+              fetchedAt: isoTimestamp(weatherSnapshot.fetchedAt),
+              current: like(weatherSnapshot.current),
+              hourly: like(weatherSnapshot.hourly),
+              alerts: like([]),
+            },
+            outfits: [like(outfitMorning), like(outfitMidday), like(outfitEvening)],
+            badges: eachLike('Wind layer'),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1RitualGet({
+        locationId: 'loc-1',
+      })
+
+      expect(response.data).toBeDefined()
+      expect(response.data.weather.locationKey).toBe('chicago-il')
+      expect(response.data.outfits).toHaveLength(3)
+      const firstOutfit = response.data.outfits[0]!
+      expect(firstOutfit.scenario).toBe('morning')
+      expect(firstOutfit.garmentIds).toEqual(['g-1'])
+      expect(firstOutfit.reasoningBadges).toEqual([{ label: 'Wind layer' }])
+      expect(firstOutfit.comfortNotes).toBe('Chilly morning')
     })
 }
