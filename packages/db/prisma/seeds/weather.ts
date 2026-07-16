@@ -122,7 +122,7 @@ const weatherSeeds = [
 ] as const
 
 export async function seedWeather(prisma: PrismaClient): Promise<SeededWeather> {
-  const segmentOffsets = [0, 6]
+  const segmentOffsets = Array.from({ length: 48 }, (_, i) => i)
 
   const results = await Promise.all(
     weatherSeeds.map(async (seed, seedIndex) => {
@@ -141,8 +141,22 @@ export async function seedWeather(prisma: PrismaClient): Promise<SeededWeather> 
         temperature: seed.baseTemp,
         feelsLike: seed.baseTemp,
         conditions: seed.condition,
-        alerts: seed.alert ? [{ type: seed.alert }] : null,
+        alerts: seed.alert
+          ? [
+              {
+                event: seed.alert,
+                description: `${seed.alert} warning for local area`,
+                start: now,
+                end: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+                severity: 'medium',
+              },
+            ]
+          : null,
       })
+
+      if (seed.id === 'wx-4') {
+        console.log('Chicago fixture alerts:', JSON.stringify(fixture.alerts, null, 2))
+      }
 
       const snapshot = await prisma.weatherSnapshot.upsert({
         where: { id: fixture.id },

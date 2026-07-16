@@ -267,6 +267,25 @@ export function testRitualOutfits() {
     fail(`ritual-user signup failed: ${signupStatus}`)
   }
 
+  // Create location preference Chicago (chicago-il) for the user
+  const locationRes = postJson<{ data: { id: string } }>(
+    apiUrl('/api/v1/locations'),
+    {
+      label: 'Home',
+      locationKey: 'chicago-il',
+      latitude: 41.8781,
+      longitude: -87.6298,
+      timezone: 'America/Chicago',
+    },
+    {
+      headers: authHeaders(user.userId, 'admin'),
+      tags: { name: 'api/locations' },
+    }
+  )
+  if (locationRes.status !== 201) {
+    fail(`failed to create location preference: ${locationRes.status}`)
+  }
+
   describe('GET /api/v1/ritual', () => {
     const { status, body } = getJson<{
       data: { outfits: unknown[]; weather: unknown; badges: string[] }
