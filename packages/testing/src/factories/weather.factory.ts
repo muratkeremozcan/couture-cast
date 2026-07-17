@@ -23,7 +23,10 @@ export type WeatherCondition = (typeof WEATHER_CONDITIONS)[number]
 export type WeatherProvider = (typeof WEATHER_PROVIDERS)[number]
 
 export interface WeatherAlert {
-  type: string
+  event: string
+  description: string
+  start: Date | string
+  end: Date | string
   severity?: 'low' | 'medium' | 'high'
 }
 

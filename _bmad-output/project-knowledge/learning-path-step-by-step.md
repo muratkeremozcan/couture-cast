@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-07-13 - Step 17 reflects the complete Story 1.3 weather alert rules, timezone-aware quiet hours, real-time push suppression, and the transactional handoff delivery pipeline.
+Updated: 2026-07-16 - Step 19 reflects the complete Story 2.1 scenario outfit generator: Zod HTTP contract, personalization module, Redis caching layer, and type-safe test suite.
 
 ## LLM collaborator prompt
 
@@ -1938,9 +1938,124 @@ flowchart TD
   Trigger["Feature Trigger\nsignup, weather, alert, exception"] --> Service["TelemetryService"]
   Service -->|concurrent| DB["Postgres DB\ntelemetry_events table"]
   Service -->|concurrent| PH["PostHog Service\nanalyticsClient.capture"]
-
   DB -->|hourly prune| Pruner["Prune Scheduler\ndelete older than 24h"]
-
   RLS{"Row Level Security"} -->|authenticated| UserOnly["Insert allowed only if user_id = auth.uid()"]
   RLS -->|service_role| AnonAllowed["Insert allowed with NULL user_id"]
+```
+
+## Step 19 - Scenario outfit generator
+
+User/business impact:
+
+The ritual endpoint delivers three personalized outfit cards (morning, midday, evening) per requested
+day, each matched to forecast segment conditions, comfort preferences, and the user's real wardrobe.
+For users this means actionable, context-aware outfit suggestions at every part of their day without
+manual browsing. For the business it activates the core personalization loop that drives daily
+engagement and differentiates Couture Cast from generic weather apps.
+
+Key takeaways:
+
+1. Shared Zod contract first: the `ritualResponseSchema` and `ritualQueryParamsSchema` are defined
+   in `@couture/api-client` so web, mobile, and API all share the same validated shape; the SDK and
+   OpenAPI spec are regenerated from those schemas.
+2. Timezone-aware segment lookup: forecast hours are resolved in the location's IANA timezone
+   (8 AM, 1 PM, 7 PM local) against the active weather snapshot, not UTC wall-clock time.
+3. Layered garment matching: effective feels-like temperature is adjusted ±3°C for cold/warm runners
+   before category rules (Outerwear / Top+Bottom+Shoes / Dress+Shoes) select from real garments, with
+   type-safe fallback placeholders when the closet is empty.
+4. Cache-before-generate: Redis is checked for `ritual:{userId}:{locationKey}` before any DB or
+   algorithm work; a cache hit short-circuits everything and returns in sub-millisecond time.
+5. Idempotent DB writes: `OutfitRecommendation` rows are looked up by `(user_id, forecast_segment_id,
+scenario)` before creation; duplicate generation is prevented without a unique constraint.
+6. Explicit type annotation over implicit inference: TypeScript's control-flow narrowing fails when a
+   variable is reassigned inside a conditional block; declaring the outer variable as
+   `OutfitRecommendation | null` and using a post-creation non-null assertion resolves the compiler
+   confusion cleanly.
+7. Strict ESLint in tests: `@typescript-eslint/no-unsafe-*` rules require mock objects to be cast
+   through explicit intermediate types instead of `as any`; unbound-method warnings are suppressed by
+   asserting the mock variable directly rather than accessing a property of a mocked service.
+
+Story/Task mapping:
+
+- Story 2.1
+- Task 1 (Zod HTTP contract + SDK regeneration)
+- Task 2 (RitualController + module scaffold)
+- Task 3 (RitualService algorithm + DB persistence)
+- Task 4 (Redis caching layer)
+- Task 5 (unit + integration test suite)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/2-1-scenario-outfit-generator.md`
+
+Cross-links:
+
+- Step 3 defines the `OutfitRecommendation` and `ForecastSegment` Prisma models consumed here.
+- Step 4 explains the Supabase environment used by the Prisma client in this service.
+- Step 5 explains the Redis/BullMQ infrastructure that backs the caching layer.
+- Step 8 provides the api-client contract conventions this step follows.
+- Step 17 shows how the `WeatherQueryService` and timezone lookups introduced there are reused here.
+- Step 18 shows how the `TelemetryService` can be wired into the ritual response path in future stories.
+
+Sequence to follow:
+
+1. Read `packages/api-client/src/contracts/http/ritual.ts` for the shared Zod schemas and run
+   `npm run generate:api-client` to see how the SDK is regenerated.
+2. Open `apps/api/src/modules/personalization/ritual.controller.ts` to see how query params are
+   parsed, Zod errors are mapped to `BadRequestException`, and the response is validated before
+   returning.
+3. Read `apps/api/src/modules/personalization/ritual.service.ts` method `getOrCreateRitual`:
+   - cache check → weather snapshot → segment lookup → comfort prefs → garment fetch → algorithm →
+     DB upsert → cache write.
+4. Trace the garment-matching block to understand the category composition rules and the fallback
+   placeholder path when the closet is empty.
+5. Read `apps/api/src/modules/personalization/ritual.service.spec.ts` for unit coverage of the
+   algorithm (cold/warm offsets, fallback, badge mapping, segment finder).
+6. Read `apps/api/src/modules/personalization/ritual.controller.spec.ts` for integration coverage
+   of auth guards, Redis cache lifecycle, and DB persistence.
+
+Task owner map:
+
+- Story 2.1 Task 1 step 1 owner: define Zod request/response schemas for the ritual endpoint in `packages/api-client/src/contracts/http/ritual.ts`
+- Story 2.1 Task 1 step 2 owner: register the ritual contract in the api-client barrel in `packages/api-client/src/contracts/http/index.ts`
+- Story 2.1 Task 1 step 3 owner: re-export ritual contracts into the API workspace in `apps/api/src/contracts/http.ts`
+- Story 2.1 Task 2 step 1 owner: scaffold the NestJS personalization module in `apps/api/src/modules/personalization/personalization.module.ts`
+- Story 2.1 Task 2 step 2 owner: implement the ritual GET route with Zod-validated query and response in `apps/api/src/modules/personalization/ritual.controller.ts`
+- Story 2.1 Task 3 step 1 owner: implement the full recommendation algorithm with DB persistence in `apps/api/src/modules/personalization/ritual.service.ts`
+- Story 2.1 Task 4 step 1 owner: add Redis cache check and write with 15-minute TTL to RitualService in `apps/api/src/modules/personalization/ritual.service.ts`
+- Story 2.1 Task 5 step 1 owner: unit-test the algorithm, fallbacks, badges, and segment resolution in `apps/api/src/modules/personalization/ritual.service.spec.ts`
+- Story 2.1 Task 5 step 2 owner: integration-test the controller, Redis lifecycle, and DB persistence in `apps/api/src/modules/personalization/ritual.controller.spec.ts`
+
+Current repo note:
+
+- The `ritual.controller.ts` uses `RitualQueryParams` (imported from the shared Zod contract) as the
+  explicit type for `parsedQuery` instead of `any`, satisfying `@typescript-eslint/no-unsafe-*` rules
+  while still allowing `ritualQueryParamsSchema.parse(query)` to infer the shape at runtime.
+- `GarmentItem` is imported from `@prisma/client` and used as `GarmentItem | null` for `latestGarment`
+  in the cache-freshness check, removing the last `any` in the service.
+- The `outfitRecommendationCreateMock` in the controller spec uses an explicit intermediate type cast
+  (not `as any`) to access `.user.connect?.id` and `.forecast_segment?.connect?.id`, keeping the mock
+  both type-safe and lint-clean.
+- `npm run build` must be run at least once per session before `npm run lint` so that `eslint-plugin-import`
+  can resolve the generated declaration files (e.g. `socket-events.d.ts`) in `packages/api-client/dist`.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Client["GET /api/v1/ritual?locationId=..."] --> Controller["RitualController\n@UseGuards RequestAuthGuard"]
+  Controller --> Service["RitualService\ngetOrCreateRitual(userId, locationId?)"]
+
+  Service --> Redis{{"Redis\nritual:{userId}:{locationKey}"}}
+  Redis -->|hit| Response["Cached RitualResponse"]
+  Redis -->|miss| WeatherQ["WeatherQueryService\ngetLatestWeather(locationKey)"]
+
+  WeatherQ --> Segments["Timezone-aware segment lookup\n8AM / 1PM / 7PM local"]
+  Segments --> Comfort["ComfortPreferences\nruns_cold_warm ±3°C"]
+  Comfort --> Garments["GarmentItem fetch\n(real closet or fallback placeholders)"]
+  Garments --> Algo["Category matching\nOuterwear / Top+Bottom+Shoes / Dress+Shoes"]
+  Algo --> Badges["Reasoning badges\n+ comfort notes"]
+  Badges --> DB[("OutfitRecommendation\nDB upsert per segment+scenario")]
+  DB --> Cache["Redis write\nTTL 900s"]
+  Cache --> Response
 ```

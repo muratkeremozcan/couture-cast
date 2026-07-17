@@ -28,6 +28,7 @@ const scenarioNames = [
   'testQueueHealth',
   'testGuardianWritePath',
   'testProfileAndModeration',
+  'testRitualOutfits',
 ]
 
 export const options = {
@@ -53,6 +54,7 @@ export const options = {
     'http_req_duration{name:moderation/actions}': [
       `p(95)<${SLO.moderationAction + infraDelay}`,
     ],
+    'http_req_duration{name:api/ritual}': [`p(95)<${SLO.eventsPoll + infraDelay}`],
   },
 }
 
@@ -65,6 +67,7 @@ export default function () {
   testQueueHealth()
   testGuardianWritePath()
   testProfileAndModeration()
+  testRitualOutfits()
 }
 
 export function setup() {
@@ -248,6 +251,62 @@ export function testProfileAndModeration() {
     )
     expect(status, 'status is 200').to.equal(200)
     expect(body?.tracked, 'action is tracked').to.equal(true)
+  })
+
+  sleep(0.2)
+}
+
+// ── Scenario: Ritual outfit recommendations ──────────────────────────────────
+
+export function testRitualOutfits() {
+  const { status: signupStatus, body: user } = signUp(
+    uniqueEmail('ritual-user'),
+    '1990-05-18'
+  )
+  if (signupStatus !== 201 || !user) {
+    fail(`ritual-user signup failed: ${signupStatus}`)
+  }
+
+  // Create location preference Chicago (chicago-il) for the user
+  const locationRes = postJson<{ data: { id: string } }>(
+    apiUrl('/api/v1/locations'),
+    {
+      label: 'Home',
+      locationKey: 'chicago-il',
+      latitude: 41.8781,
+      longitude: -87.6298,
+      timezone: 'America/Chicago',
+    },
+    {
+      headers: authHeaders(user.userId, 'admin'),
+      tags: { name: 'api/locations' },
+    }
+  )
+  if (locationRes.status !== 201) {
+    fail(`failed to create location preference: ${locationRes.status}`)
+  }
+
+  describe('GET /api/v1/ritual', () => {
+    const { status, body } = getJson<{
+      data: { outfits: unknown[]; weather: unknown; badges: string[] }
+    }>(apiUrl('/api/v1/ritual'), {
+      headers: authHeaders(user.userId, 'admin'),
+      tags: { name: 'api/ritual' },
+    })
+    expect(status, 'status is 200').to.equal(200)
+    expect(body?.data?.outfits, 'outfits is array').to.be.an('array')
+    expect(body?.data?.outfits?.length, '3 scenario outfits').to.equal(3)
+    expect(body?.data?.weather, 'weather snapshot present').to.be.an('object')
+    expect(body?.data?.badges, 'badges is array').to.be.an('array')
+  })
+
+  // Second request should hit the Redis cache — verify it still returns 200
+  describe('GET /api/v1/ritual (cached)', () => {
+    const { status } = getJson<unknown>(apiUrl('/api/v1/ritual'), {
+      headers: authHeaders(user.userId, 'admin'),
+      tags: { name: 'api/ritual' },
+    })
+    expect(status, 'cached status is 200').to.equal(200)
   })
 
   sleep(0.2)

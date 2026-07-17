@@ -16,4 +16,7 @@ export const stateHandlers: StateHandlers = {
     configureProviderEvent(parsedEvent)
     return Promise.resolve({ description: `Configured event ${parsedEvent.id}` })
   },
+  'Daily scenario outfit recommendations exist for user': () => {
+    return Promise.resolve({ description: 'Configured mock outfit recommendations' })
+  },
 }

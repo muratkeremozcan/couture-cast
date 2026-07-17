@@ -49,6 +49,12 @@ export const notFoundHttpErrorSchema = z.object({
   error: z.literal('Not Found'),
 })
 
+export const internalServerErrorHttpErrorSchema = z.object({
+  statusCode: z.literal(500),
+  message: nonEmptyStringSchema,
+  error: z.literal('Internal Server Error'),
+})
+
 export type RegisteredCommonHttpSchemas = {
   apiErrorSchema: typeof apiErrorSchema
   trackedResponseSchema: typeof trackedResponseSchema
@@ -56,6 +62,7 @@ export type RegisteredCommonHttpSchemas = {
   unauthorizedHttpErrorSchema: typeof unauthorizedHttpErrorSchema
   forbiddenHttpErrorSchema: typeof forbiddenHttpErrorSchema
   notFoundHttpErrorSchema: typeof notFoundHttpErrorSchema
+  internalServerErrorHttpErrorSchema: typeof internalServerErrorHttpErrorSchema
 }
 
 export function registerCommonHttpSchemas(registry: OpenAPIRegistry) {
@@ -77,6 +84,10 @@ export function registerCommonHttpSchemas(registry: OpenAPIRegistry) {
     notFoundHttpErrorSchema: registry.register(
       'NotFoundHttpError',
       notFoundHttpErrorSchema
+    ),
+    internalServerErrorHttpErrorSchema: registry.register(
+      'InternalServerErrorHttpError',
+      internalServerErrorHttpErrorSchema
     ),
   } satisfies RegisteredCommonHttpSchemas
 }

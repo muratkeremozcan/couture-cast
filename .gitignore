@@ -45,6 +45,9 @@ maestro/artifacts
 *.tsbuildinfo
 .agents
 .agent
-_bmad
+_bmad/*
+!_bmad/custom/
+_bmad/custom/*
+!_bmad/custom/config.toml
 perf-test-plan.md
 .bmad-loop/

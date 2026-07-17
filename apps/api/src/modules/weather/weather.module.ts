@@ -20,5 +20,6 @@ import { TelemetryModule } from '../telemetry/telemetry.module'
       inject: [WeatherRepository],
     },
   ],
+  exports: [WeatherQueryService],
 })
 export class WeatherModule {}

@@ -11,6 +11,8 @@ import { RequestAuthGuard } from '../../../apps/api/src/modules/auth/security.gu
 import { EventsController } from '../../../apps/api/src/modules/events/events.controller'
 import { EventsRepository } from '../../../apps/api/src/modules/events/events.repository'
 import { EventsService } from '../../../apps/api/src/modules/events/events.service'
+import { RitualController } from '../../../apps/api/src/modules/personalization/ritual.controller'
+import { RitualService } from '../../../apps/api/src/modules/personalization/ritual.service'
 
 export type PactEvent = {
   id: string
@@ -119,8 +121,71 @@ export async function startLocalPactProvider({
     },
   } as unknown as AccessTokenIdentityService
 
+  const mockRitualService = {
+    getOrCreateRitual: (_userId: string, _locationId?: string) => {
+      return Promise.resolve({
+        weather: {
+          locationKey: 'chicago-il',
+          latitude: 41.878,
+          longitude: -87.63,
+          timezone: 'America/Chicago',
+          provider: 'weatherapi',
+          providerUpdatedAt: '2026-07-16T12:00:00.000Z',
+          fetchedAt: '2026-07-16T12:00:00.000Z',
+          current: {
+            temperature: 16,
+            condition: 'clear',
+          },
+          hourly: Array.from({ length: 48 }, (_, i) => ({
+            forecastAt: new Date(
+              new Date('2026-07-16T12:00:00.000Z').getTime() + i * 3600 * 1000
+            ).toISOString(),
+            temperature: 16,
+            feelsLike: 15,
+            precipitationProbability: 0.1,
+            precipitationAmount: 0.0,
+            windSpeed: 5.0,
+            windGust: null,
+            condition: 'clear',
+            providerWeatherCode: '1000',
+          })),
+          alerts: [],
+        },
+        outfits: [
+          {
+            id: 'rec-morning-1',
+            scenario: 'morning',
+            garmentIds: ['g-1'],
+            reasoningBadges: [{ label: 'Wind layer' }],
+            comfortNotes: 'Chilly morning',
+          },
+          {
+            id: 'rec-midday-1',
+            scenario: 'midday',
+            garmentIds: ['g-2'],
+            reasoningBadges: [{ label: 'Mild' }],
+            comfortNotes: 'Pleasant midday',
+          },
+          {
+            id: 'rec-evening-1',
+            scenario: 'evening',
+            garmentIds: ['g-3'],
+            reasoningBadges: [{ label: 'Evening' }],
+            comfortNotes: 'Cool evening',
+          },
+        ],
+        badges: ['Wind layer', 'Mild', 'Evening'],
+      })
+    },
+  } as unknown as RitualService
+
   const moduleFixture = await Test.createTestingModule({
-    controllers: [ApiHealthController, HealthController, EventsController],
+    controllers: [
+      ApiHealthController,
+      HealthController,
+      EventsController,
+      RitualController,
+    ],
     providers: [
       EventsService,
       {
@@ -134,6 +199,10 @@ export async function startLocalPactProvider({
       {
         provide: AccessTokenIdentityService,
         useValue: accessTokenIdentityService,
+      },
+      {
+        provide: RitualService,
+        useValue: mockRitualService,
       },
     ],
   })
