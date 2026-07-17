@@ -48,9 +48,10 @@ Playwright environment selection uses `TEST_ENV`:
   `PR Gate`; CodeRabbit is not part of that required status policy.
 - Automatic review behavior is configured in `.coderabbit.yaml`; this repository does not rely on
   a separate GitHub Actions workflow to summon CodeRabbit on draft transitions.
-- Initial review guidance is concentrated on higher-risk paths:
-  `.github/workflows/**`, `playwright/**`, `apps/api/**`, and
-  `_bmad-output/test-artifacts/**`.
+- Review guidance covers application, CI, database, Playwright, Pact, k6, Maestro, infrastructure,
+  and API-contract paths. Incremental review runs after each push.
+- Generated outputs, binary artifacts, lockfiles, and `_bmad-output/**` are excluded so review
+  attention stays on executable code, contracts, tests, and operational documentation.
 - Manual commands remain available in any PR comment:
   `@coderabbitai review`, `@coderabbitai full review`, `@coderabbitai pause`,
   `@coderabbitai resume`.
