@@ -1,0 +1,199 @@
+{
+  "repository_type": "monorepo",
+  "parts": [
+    {
+      "id": "api",
+      "name": "Couture Cast API",
+      "project_type": "backend",
+      "root_path": "apps/api",
+      "stack_summary": "Node.js 24, TypeScript 5.9, NestJS 11, Prisma 6.19, BullMQ 5, Redis, Socket.io 4, Expo Server SDK, PostHog, and OpenTelemetry",
+      "architecture_document": "_bmad-output/project-knowledge/architecture-api.md",
+      "key_entry_points": [
+        "apps/api/src/main.ts",
+        "apps/api/api/index.ts",
+        "apps/api/src/app.module.ts",
+        "apps/api/src/workers/bootstrap.ts"
+      ]
+    },
+    {
+      "id": "web",
+      "name": "Couture Cast Web",
+      "project_type": "web",
+      "root_path": "apps/web",
+      "stack_summary": "Next.js 15 App Router, React 19, TypeScript 5.9, Tailwind CSS 3.4, shared Zod API contracts, and PostHog",
+      "architecture_document": "_bmad-output/project-knowledge/architecture-web.md",
+      "key_entry_points": [
+        "apps/web/src/app/layout.tsx",
+        "apps/web/src/app/page.tsx",
+        "apps/web/src/lib/api-client.ts",
+        "apps/web/instrumentation-client.ts",
+        "apps/web/next.config.ts"
+      ]
+    },
+    {
+      "id": "mobile",
+      "name": "Couture Cast Mobile",
+      "project_type": "mobile",
+      "root_path": "apps/mobile",
+      "stack_summary": "Expo 54, Expo Router 6, React Native 0.81, React 19, TypeScript 5.9, shared Zod API contracts, Expo Notifications, and PostHog",
+      "architecture_document": "_bmad-output/project-knowledge/architecture-mobile.md",
+      "key_entry_points": [
+        "apps/mobile/app/_layout.tsx",
+        "apps/mobile/app/(tabs)/index.tsx",
+        "apps/mobile/src/lib/api-client.ts",
+        "apps/mobile/src/analytics/mobile-analytics.tsx",
+        "apps/mobile/app.config.ts"
+      ]
+    },
+    {
+      "id": "database",
+      "name": "Couture Cast Database",
+      "project_type": "backend",
+      "root_path": "packages/db",
+      "stack_summary": "PostgreSQL on Supabase, Prisma 6.19 schema and client, ordered SQL migrations, row-level security, and deterministic TypeScript seeds",
+      "architecture_document": "_bmad-output/project-knowledge/architecture-database.md",
+      "key_entry_points": [
+        "packages/db/prisma/schema.prisma",
+        "packages/db/prisma/seeds/index.ts",
+        "packages/db/package.json",
+        "supabase/config.toml",
+        "scripts/prisma-migrate-deploy.mjs"
+      ]
+    },
+    {
+      "id": "shared",
+      "name": "Couture Cast Shared Packages",
+      "project_type": "library",
+      "root_path": "packages",
+      "stack_summary": "TypeScript npm workspaces for Zod and OpenAPI contracts, generated Fetch SDK, feature configuration, common utilities, test factories, k6 helpers, and ESLint policy",
+      "architecture_document": "_bmad-output/project-knowledge/architecture-shared.md",
+      "key_entry_points": [
+        "packages/api-client/src/index.ts",
+        "packages/api-client/src/client.ts",
+        "packages/api-client/src/contracts/http/openapi.ts",
+        "packages/config/src/index.ts",
+        "packages/utils/src/index.ts",
+        "packages/testing/src/index.ts",
+        "packages/k6-utils/src/index.ts",
+        "packages/eslint-config/index.js"
+      ]
+    }
+  ],
+  "integration_points": [
+    {
+      "id": "web-to-api-http",
+      "from": ["web"],
+      "to": ["api"],
+      "type": "http",
+      "protocol": "HTTPS JSON with cookies and intended Bearer authentication",
+      "summary": "The Next.js client calls public and protected API v1 routes directly or through same-origin rewrites.",
+      "key_paths": [
+        "apps/web/src/lib/api-client.ts",
+        "apps/web/next.config.ts",
+        "apps/api/src/app.module.ts"
+      ]
+    },
+    {
+      "id": "mobile-to-api-http",
+      "from": ["mobile"],
+      "to": ["api"],
+      "type": "http",
+      "protocol": "HTTPS JSON with intended Bearer authentication",
+      "summary": "The Expo client resolves a configured API origin and uses generated-client or direct-fetch adapters.",
+      "key_paths": ["apps/mobile/src/lib/api-client.ts", "apps/api/src/app.module.ts"]
+    },
+    {
+      "id": "api-to-database-prisma",
+      "from": ["api"],
+      "to": ["database"],
+      "type": "persistence",
+      "protocol": "Prisma Client over PostgreSQL",
+      "summary": "API repositories and workers use the generated Prisma client against the schema and committed SQL migrations.",
+      "key_paths": [
+        "apps/api/src/prisma/prisma.module.ts",
+        "packages/db/prisma/schema.prisma",
+        "packages/db/prisma/migrations"
+      ]
+    },
+    {
+      "id": "shared-contracts-to-apps",
+      "from": ["shared"],
+      "to": ["api", "web", "mobile"],
+      "type": "in-process-contracts",
+      "protocol": "npm workspaces, TypeScript, Zod, OpenAPI, and generated Fetch SDK",
+      "summary": "Canonical HTTP, realtime, polling, and analytics contracts are shared with the API and both client applications.",
+      "key_paths": [
+        "packages/api-client/src/index.ts",
+        "packages/api-client/src/contracts/http/openapi.ts",
+        "packages/api-client/src/types/socket-events.ts",
+        "packages/api-client/src/types/analytics-events.ts"
+      ]
+    },
+    {
+      "id": "api-worker-redis-bullmq",
+      "from": ["api"],
+      "to": ["api"],
+      "type": "asynchronous-jobs",
+      "protocol": "BullMQ queues, Redis cache, and Redis pub/sub",
+      "summary": "The standalone API worker schedules and consumes jobs while sharing Redis-backed queues, caches, and alert relay channels with the HTTP process.",
+      "key_paths": [
+        "apps/api/src/workers/bootstrap.ts",
+        "apps/api/src/config/queues.ts",
+        "apps/api/src/config/redis.ts"
+      ]
+    },
+    {
+      "id": "api-realtime-and-polling",
+      "from": ["api"],
+      "to": ["web", "mobile"],
+      "type": "realtime",
+      "protocol": "Socket.io private rooms with HTTPS event-polling fallback",
+      "summary": "The API can emit validated alert events over Socket.io, while persisted events support timestamp-cursor HTTP polling.",
+      "key_paths": [
+        "apps/api/src/modules/gateway/gateway.gateway.ts",
+        "apps/api/src/modules/gateway/alert-weather-relay.service.ts",
+        "apps/api/src/modules/events/events.controller.ts",
+        "packages/api-client/src/realtime/polling-service.ts"
+      ]
+    },
+    {
+      "id": "api-worker-to-expo-push",
+      "from": ["api"],
+      "to": ["mobile"],
+      "type": "push-notifications",
+      "protocol": "Expo Push Service HTTPS API",
+      "summary": "Worker-side alert fan-out can send Expo push batches when realtime delivery is unavailable.",
+      "key_paths": [
+        "apps/api/src/modules/notifications/push-notification.service.ts",
+        "apps/api/src/modules/notifications/push-token.repository.ts",
+        "apps/mobile/app/_layout.tsx"
+      ]
+    },
+    {
+      "id": "applications-to-posthog",
+      "from": ["api", "web", "mobile"],
+      "to": ["PostHog"],
+      "type": "analytics-and-feature-flags",
+      "protocol": "PostHog provider SDKs over HTTPS",
+      "summary": "API, web, and mobile send analytics through app-specific adapters, and the API also reads remote feature flags with database and code fallbacks.",
+      "key_paths": [
+        "apps/api/src/posthog/posthog.service.ts",
+        "apps/web/instrumentation-client.ts",
+        "apps/mobile/src/analytics/mobile-analytics.tsx",
+        "packages/api-client/src/types/analytics-events.ts"
+      ]
+    },
+    {
+      "id": "api-to-otlp-grafana",
+      "from": ["api"],
+      "to": ["Grafana"],
+      "type": "observability",
+      "protocol": "OpenTelemetry OTLP over HTTP",
+      "summary": "The long-running API exports traces and periodic metrics to configured Grafana or local LGTM OTLP endpoints.",
+      "key_paths": [
+        "apps/api/src/instrumentation.ts",
+        "infra/grafana/local/docker-compose.yml"
+      ]
+    }
+  ]
+}

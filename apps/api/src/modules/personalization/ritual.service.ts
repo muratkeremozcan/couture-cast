@@ -58,6 +58,24 @@ function getLocalDateString(date: Date, timezone: string): string {
   return formatter.format(date)
 }
 
+function buildMockForecastSegmentInputs(now: Date) {
+  return Array.from({ length: 48 }, (_, offset) => {
+    const forecastAt = new Date(now.getTime() + offset * 60 * 60 * 1000)
+    return {
+      forecast_at: forecastAt,
+      hour_offset: offset,
+      temperature: 68.0,
+      feels_like: 68.0,
+      precipitation_probability: 0.0,
+      precipitation_amount: 0.0,
+      wind_speed: 5.0,
+      wind_gust: null,
+      condition: 'clear',
+      provider_weather_code: 'clear',
+    }
+  })
+}
+
 function toIsoTimestamp(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString()
 }
@@ -152,6 +170,24 @@ export class RitualService implements OnModuleDestroy {
     private readonly redis: Redis
   ) {}
 
+  // Refreshes a snapshot's forecast segments to a contiguous 48h window anchored to `now`,
+  // guaranteeing a day with morning/midday/evening coverage even when existing data is stale.
+  private async upsertMockForecastSegments(snapshotId: string, now: Date): Promise<void> {
+    await Promise.all(
+      buildMockForecastSegmentInputs(now).map((segment, offset) =>
+        this.prisma.forecastSegment.upsert({
+          where: { id: `${snapshotId}-seg-${offset}` },
+          update: segment,
+          create: {
+            id: `${snapshotId}-seg-${offset}`,
+            weather_snapshot_id: snapshotId,
+            ...segment,
+          },
+        })
+      )
+    )
+  }
+
   // eslint-disable-next-line complexity
   async getOrCreateRitual(
     userId: string,
@@ -173,6 +209,11 @@ export class RitualService implements OnModuleDestroy {
       throw new BadRequestException('No location preferences found for user')
     }
 
+    const isTestEnv =
+      process.env.TEST_ENV === 'local' ||
+      process.env.TEST_ENV === 'preview' ||
+      process.env.VERCEL_ENV === 'preview'
+
     // 2. Load Comfort Preferences and Weather Snapshot
     const [comfortPrefs, weatherResult] = await Promise.all([
       this.prisma.comfortPreferences.findUnique({ where: { user_id: userId } }),
@@ -182,11 +223,6 @@ export class RitualService implements OnModuleDestroy {
     let weatherSnapshot = weatherResult.data
 
     if (weatherResult.status === 'unavailable' || !weatherResult.data) {
-      const isTestEnv =
-        process.env.TEST_ENV === 'local' ||
-        process.env.TEST_ENV === 'preview' ||
-        process.env.VERCEL_ENV === 'preview'
-
       if (isTestEnv) {
         const now = new Date()
         const providerUpdatedAt = new Date(now.getTime() - 30 * 60 * 1000)
@@ -213,22 +249,10 @@ export class RitualService implements OnModuleDestroy {
               condition: 'clear',
               fetched_at: now,
               segments: {
-                create: Array.from({ length: 48 }, (_, i) => {
-                  const forecastTime = new Date(now.getTime() + i * 60 * 60 * 1000)
-                  return {
-                    id: `${snapshotId}-seg-${i}`,
-                    forecast_at: forecastTime,
-                    hour_offset: i,
-                    temperature: 68.0,
-                    feels_like: 68.0,
-                    precipitation_probability: 0.0,
-                    precipitation_amount: 0.0,
-                    wind_speed: 5.0,
-                    wind_gust: null,
-                    condition: 'clear',
-                    provider_weather_code: 'clear',
-                  }
-                }),
+                create: buildMockForecastSegmentInputs(now).map((segment, offset) => ({
+                  id: `${snapshotId}-seg-${offset}`,
+                  ...segment,
+                })),
               },
             },
             include: { segments: true },
@@ -264,6 +288,7 @@ export class RitualService implements OnModuleDestroy {
       targetTime += 24 * 60 * 60 * 1000
     }
     let targetLocalDateStr = getLocalDateString(new Date(targetTime), timezone)
+    const originalTargetLocalDateStr = targetLocalDateStr
 
     // Get latest garment update timestamp for staleness check
     let latestGarment: GarmentItem | null = null
@@ -357,6 +382,34 @@ export class RitualService implements OnModuleDestroy {
           break
         }
       }
+    }
+
+    // Self-heal: existing segments have no date with full morning/midday/evening coverage
+    // (e.g. stale staging seed data). Refresh a contiguous 48h window anchored to now
+    // rather than surfacing a 500 for a condition the app can recover from.
+    if ((!morningSegment || !middaySegment || !eveningSegment) && isTestEnv) {
+      await this.upsertMockForecastSegments(weatherSnapshot.id, new Date())
+      const refreshedSnapshot = await this.prisma.weatherSnapshot.findUniqueOrThrow({
+        where: { id: weatherSnapshot.id },
+        include: { segments: true },
+      })
+      weatherSnapshot = refreshedSnapshot
+      targetLocalDateStr = originalTargetLocalDateStr
+      morningSegment = refreshedSnapshot.segments.find(
+        (s) =>
+          getLocalDateString(s.forecast_at, timezone) === targetLocalDateStr &&
+          getHourInTimezone(s.forecast_at, timezone) === 8
+      )
+      middaySegment = refreshedSnapshot.segments.find(
+        (s) =>
+          getLocalDateString(s.forecast_at, timezone) === targetLocalDateStr &&
+          getHourInTimezone(s.forecast_at, timezone) === 13
+      )
+      eveningSegment = refreshedSnapshot.segments.find(
+        (s) =>
+          getLocalDateString(s.forecast_at, timezone) === targetLocalDateStr &&
+          getHourInTimezone(s.forecast_at, timezone) === 19
+      )
     }
 
     if (!morningSegment || !middaySegment || !eveningSegment) {
