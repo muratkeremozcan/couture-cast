@@ -19,7 +19,13 @@ import { getRedisConfig, redisOptionsFromConfig } from '../../config/redis.js'
       provide: RITUAL_REDIS_CLIENT,
       useFactory: () => {
         const config = getRedisConfig()
-        return new Redis(config.url, redisOptionsFromConfig(config))
+        const baseOptions = redisOptionsFromConfig(config)
+        return new Redis(config.url, {
+          ...baseOptions,
+          maxRetriesPerRequest: 1,
+          enableOfflineQueue: false,
+          connectTimeout: 1000,
+        })
       },
     },
   ],
