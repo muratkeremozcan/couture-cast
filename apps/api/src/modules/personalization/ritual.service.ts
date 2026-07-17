@@ -193,13 +193,35 @@ export class RitualService implements OnModuleDestroy {
     const precipPreparedness = comfortPrefs?.precip_preparedness ?? 'medium'
     const comfortUpdatedAt = comfortPrefs?.updated_at ?? new Date(0)
 
-    // 3. Check Redis Cache
-    const cacheKey = `ritual:${userId}:${selectedLocation.locationKey}`
+    // Determine target date and hour
+    const now = new Date()
+    const currentLocalHour = getHourInTimezone(now, timezone)
+    let targetTime = now.getTime()
+    if (currentLocalHour >= 8) {
+      targetTime += 24 * 60 * 60 * 1000
+    }
+    const targetLocalDateStr = getLocalDateString(new Date(targetTime), timezone)
+
+    // Get latest garment update timestamp for staleness check
+    let latestGarment: GarmentItem | null = null
+    if (this.prisma.garmentItem.findFirst) {
+      latestGarment = await this.prisma.garmentItem.findFirst({
+        where: { user_id: userId },
+        orderBy: { updated_at: 'desc' },
+      })
+    }
+    const wardrobeUpdatedAt = latestGarment?.updated_at ?? new Date(0)
+    const stalenessThreshold = new Date(
+      Math.max(comfortUpdatedAt.getTime(), wardrobeUpdatedAt.getTime())
+    )
+
+    // 3. Check Redis Cache using target date in cache key
+    const cacheKey = `ritual:${userId}:${selectedLocation.locationKey}:${targetLocalDateStr}`
     let cachedString: string | null = null
     try {
       cachedString = await this.redis.get(cacheKey)
     } catch (err) {
-      console.warn(`Redis cache get failed for key "${cacheKey}":`, err)
+      console.warn('Redis cache get failed:', err instanceof Error ? err.message : err)
     }
 
     if (cachedString) {
@@ -214,22 +236,9 @@ export class RitualService implements OnModuleDestroy {
 
         if (
           cachedFetchedAt === weatherSnapshot.fetched_at.toISOString() &&
-          cachedGeneratedAt.getTime() >= comfortUpdatedAt.getTime()
+          cachedGeneratedAt.getTime() >= stalenessThreshold.getTime()
         ) {
-          // Also check if any user garment was updated after the cache was generated
-          let latestGarment: GarmentItem | null = null
-          if (this.prisma.garmentItem.findFirst) {
-            latestGarment = await this.prisma.garmentItem.findFirst({
-              where: { user_id: userId },
-              orderBy: { updated_at: 'desc' },
-            })
-          }
-          if (
-            !latestGarment ||
-            latestGarment.updated_at.getTime() <= cachedGeneratedAt.getTime()
-          ) {
-            return cachedPayload.data
-          }
+          return cachedPayload.data
         }
       } catch {
         // Fallback to recalculation on parse failure
@@ -237,16 +246,6 @@ export class RitualService implements OnModuleDestroy {
     }
 
     // 4. Find timezone-aligned forecast segments for a single target date
-    const now = new Date()
-    const currentLocalHour = getHourInTimezone(now, timezone)
-
-    // Shift the entire outfit coverage to tomorrow if current hour is 8:00 AM local time or later
-    let targetTime = now.getTime()
-    if (currentLocalHour >= 8) {
-      targetTime += 24 * 60 * 60 * 1000
-    }
-    const targetLocalDateStr = getLocalDateString(new Date(targetTime), timezone)
-
     const segments = weatherSnapshot.segments
     const morningSegment = segments.find(
       (s) =>
@@ -294,14 +293,11 @@ export class RitualService implements OnModuleDestroy {
           },
         })
 
-      if (
+      const isStale =
         recommendation &&
-        recommendation.created_at.getTime() < comfortUpdatedAt.getTime()
-      ) {
-        recommendation = null
-      }
+        recommendation.created_at.getTime() < stalenessThreshold.getTime()
 
-      if (!recommendation) {
+      if (!recommendation || isStale) {
         // Generate recommendation
         let adjustedFeelsLike = segment.feels_like
         if (runsColdWarm === 'cold') {
@@ -406,33 +402,51 @@ export class RitualService implements OnModuleDestroy {
         }
 
         // Write to database
-        try {
-          recommendation = await this.prisma.outfitRecommendation.create({
-            data: {
-              user_id: userId,
-              forecast_segment_id: segment.id,
-              scenario,
-              garment_ids: garmentIds,
-              reasoning_badges: badgesList,
-            },
-          })
-        } catch (error) {
-          if (
-            error instanceof Prisma.PrismaClientKnownRequestError &&
-            error.code === 'P2002'
-          ) {
-            recommendation = await this.prisma.outfitRecommendation.findFirst({
-              where: {
+        if (recommendation) {
+          try {
+            recommendation = await this.prisma.outfitRecommendation.update({
+              where: { id: recommendation.id },
+              data: {
+                garment_ids: garmentIds,
+                reasoning_badges: badgesList,
+              },
+            })
+          } catch (error) {
+            console.warn(
+              'Failed to update stale recommendation:',
+              error instanceof Error ? error.message : error
+            )
+            throw error
+          }
+        } else {
+          try {
+            recommendation = await this.prisma.outfitRecommendation.create({
+              data: {
                 user_id: userId,
                 forecast_segment_id: segment.id,
                 scenario,
+                garment_ids: garmentIds,
+                reasoning_badges: badgesList,
               },
             })
-            if (!recommendation) {
+          } catch (error) {
+            if (
+              error instanceof Prisma.PrismaClientKnownRequestError &&
+              error.code === 'P2002'
+            ) {
+              recommendation = await this.prisma.outfitRecommendation.findFirst({
+                where: {
+                  user_id: userId,
+                  forecast_segment_id: segment.id,
+                  scenario,
+                },
+              })
+              if (!recommendation) {
+                throw error
+              }
+            } else {
               throw error
             }
-          } else {
-            throw error
           }
         }
       }
@@ -513,7 +527,7 @@ export class RitualService implements OnModuleDestroy {
     try {
       await this.redis.set(cacheKey, JSON.stringify(cachePayload), 'EX', 900)
     } catch (err) {
-      console.warn(`Redis cache set failed for key "${cacheKey}":`, err)
+      console.warn('Redis cache set failed:', err instanceof Error ? err.message : err)
     }
 
     return responseData

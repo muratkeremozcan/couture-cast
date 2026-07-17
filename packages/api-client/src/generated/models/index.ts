@@ -993,6 +993,50 @@ export type GuardianInvitationResponseConsentLevelEnum =
 /**
  *
  * @export
+ * @interface InternalServerErrorHttpError
+ */
+export interface InternalServerErrorHttpError {
+  /**
+   *
+   * @type {InternalServerErrorHttpErrorStatusCodeEnum}
+   * @memberof InternalServerErrorHttpError
+   */
+  statusCode: InternalServerErrorHttpErrorStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof InternalServerErrorHttpError
+   */
+  message: string
+  /**
+   *
+   * @type {InternalServerErrorHttpErrorErrorEnum}
+   * @memberof InternalServerErrorHttpError
+   */
+  error: InternalServerErrorHttpErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const InternalServerErrorHttpErrorStatusCodeEnum = {
+  NUMBER_500: 500,
+} as const
+export type InternalServerErrorHttpErrorStatusCodeEnum =
+  (typeof InternalServerErrorHttpErrorStatusCodeEnum)[keyof typeof InternalServerErrorHttpErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const InternalServerErrorHttpErrorErrorEnum = {
+  Internal_Server_Error: 'Internal Server Error',
+} as const
+export type InternalServerErrorHttpErrorErrorEnum =
+  (typeof InternalServerErrorHttpErrorErrorEnum)[keyof typeof InternalServerErrorHttpErrorErrorEnum]
+
+/**
+ *
+ * @export
  * @interface LatestWeatherPathParams
  */
 export interface LatestWeatherPathParams {

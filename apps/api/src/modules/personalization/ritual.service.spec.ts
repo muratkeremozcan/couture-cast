@@ -27,8 +27,10 @@ vi.mock('ioredis', () => {
 describe('RitualService', () => {
   let comfortPreferencesFindUnique: ReturnType<typeof vi.fn>
   let garmentItemFindMany: ReturnType<typeof vi.fn>
+  let garmentItemFindFirst: ReturnType<typeof vi.fn>
   let outfitRecommendationFindFirst: ReturnType<typeof vi.fn>
   let outfitRecommendationCreate: ReturnType<typeof vi.fn>
+  let outfitRecommendationUpdate: ReturnType<typeof vi.fn>
   let getLatestWeatherMock: ReturnType<typeof vi.fn>
   let listLocationsMock: ReturnType<typeof vi.fn>
 
@@ -76,6 +78,42 @@ describe('RitualService', () => {
       condition: 'rain',
       provider_weather_code: '1063',
     },
+    {
+      id: 'seg-morning-tomorrow',
+      forecast_at: new Date('2026-07-17T13:00:00.000Z'), // 8:00 AM in America/Chicago (tomorrow)
+      temperature: 16,
+      feels_like: 15,
+      precipitation_probability: 0.1,
+      precipitation_amount: 0.0,
+      wind_speed: 2.0,
+      wind_gust: null,
+      condition: 'clear',
+      provider_weather_code: '1000',
+    },
+    {
+      id: 'seg-midday-tomorrow',
+      forecast_at: new Date('2026-07-17T18:00:00.000Z'), // 1:00 PM in America/Chicago (tomorrow)
+      temperature: 23,
+      feels_like: 22,
+      precipitation_probability: 0.2,
+      precipitation_amount: 0.0,
+      wind_speed: 4.0,
+      wind_gust: null,
+      condition: 'partly_cloudy',
+      provider_weather_code: '1003',
+    },
+    {
+      id: 'seg-evening-tomorrow',
+      forecast_at: new Date('2026-07-18T00:00:00.000Z'), // 7:00 PM in America/Chicago (tomorrow)
+      temperature: 19,
+      feels_like: 18,
+      precipitation_probability: 0.5,
+      precipitation_amount: 0.8,
+      wind_speed: 6.0,
+      wind_gust: null,
+      condition: 'rain',
+      provider_weather_code: '1063',
+    },
   ]
 
   const weatherSnapshot = {
@@ -114,6 +152,7 @@ describe('RitualService', () => {
 
     comfortPreferencesFindUnique = vi.fn().mockResolvedValue(null)
     garmentItemFindMany = vi.fn().mockResolvedValue([])
+    garmentItemFindFirst = vi.fn().mockResolvedValue(null)
     outfitRecommendationFindFirst = vi.fn().mockResolvedValue(null)
     outfitRecommendationCreate = vi
       .fn()
@@ -121,6 +160,19 @@ describe('RitualService', () => {
         ({ data }: { data: Prisma.OutfitRecommendationCreateInput }) => {
           const scenarioStr = typeof data.scenario === 'string' ? data.scenario : ''
           return Promise.resolve({ id: `rec-${scenarioStr}`, ...data })
+        }
+      )
+    outfitRecommendationUpdate = vi
+      .fn()
+      .mockImplementation(
+        ({
+          where,
+          data,
+        }: {
+          where: { id: string }
+          data: Prisma.OutfitRecommendationUpdateInput
+        }) => {
+          return Promise.resolve({ id: where.id, ...data })
         }
       )
 
@@ -132,10 +184,12 @@ describe('RitualService', () => {
       },
       garmentItem: {
         findMany: garmentItemFindMany,
+        findFirst: garmentItemFindFirst,
       },
       outfitRecommendation: {
         findFirst: outfitRecommendationFindFirst,
         create: outfitRecommendationCreate,
+        update: outfitRecommendationUpdate,
       },
     } as unknown as PrismaClient
 
@@ -256,5 +310,75 @@ describe('RitualService', () => {
     const result = await service.getOrCreateRitual('user-1')
     const eveningOutfit = result.outfits.find((o) => o.scenario === 'evening')
     expect(eveningOutfit?.reasoningBadges).toContainEqual({ label: 'Rain-ready' })
+  })
+
+  it('prevents cache reuse across the 8:00 AM cutoff boundary (07:59 vs 08:00)', async () => {
+    const redis = new Redis()
+    const getSpy = vi.spyOn(redis, 'get')
+    const setSpy = vi.spyOn(redis, 'set')
+
+    const customService = new RitualService(
+      prismaMock,
+      weatherQueryMock,
+      locationPreferencesMock,
+      redis as unknown as Redis
+    )
+
+    vi.setSystemTime(new Date('2026-07-16T12:59:00.000Z'))
+    await customService.getOrCreateRitual('user-1')
+
+    expect(getSpy).toHaveBeenLastCalledWith('ritual:user-1:chicago-il:07/16/2026')
+    expect(setSpy).toHaveBeenLastCalledWith(
+      'ritual:user-1:chicago-il:07/16/2026',
+      expect.any(String),
+      'EX',
+      900
+    )
+
+    vi.setSystemTime(new Date('2026-07-16T13:00:00.000Z'))
+    await customService.getOrCreateRitual('user-1')
+
+    expect(getSpy).toHaveBeenLastCalledWith('ritual:user-1:chicago-il:07/17/2026')
+    expect(setSpy).toHaveBeenLastCalledWith(
+      'ritual:user-1:chicago-il:07/17/2026',
+      expect.any(String),
+      'EX',
+      900
+    )
+  })
+
+  it('invalidates cache on preference changes or wardrobe updates, and updates database recommendation rather than creating new', async () => {
+    const redis = new Redis()
+    const customService = new RitualService(
+      prismaMock,
+      weatherQueryMock,
+      locationPreferencesMock,
+      redis as unknown as Redis
+    )
+
+    const initialRec = {
+      id: 'rec-1',
+      user_id: 'user-1',
+      forecast_segment_id: 'seg-morning',
+      scenario: 'morning',
+      garment_ids: ['default-top'],
+      reasoning_badges: [],
+      created_at: new Date('2026-07-16T04:00:00.000Z'),
+      updated_at: new Date('2026-07-16T04:00:00.000Z'),
+    }
+    outfitRecommendationFindFirst.mockResolvedValue(initialRec)
+
+    garmentItemFindFirst.mockResolvedValue({
+      id: 'garment-1',
+      user_id: 'user-1',
+      category: 'top',
+      comfort_range: 'mild',
+      updated_at: new Date('2026-07-16T05:00:00.000Z'),
+    })
+
+    await customService.getOrCreateRitual('user-1')
+
+    expect(outfitRecommendationUpdate).toHaveBeenCalled()
+    expect(outfitRecommendationCreate).not.toHaveBeenCalled()
   })
 })

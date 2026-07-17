@@ -1,12 +1,14 @@
 import { test, expect } from '../../support/fixtures/merged-fixtures'
-import { resolveApiBaseUrl, authHeaders } from '../../support/helpers/api-test'
+import {
+  resolveApiBaseUrl,
+  authHeaders,
+  createTeenSignupPayload,
+} from '../../support/helpers/api-test'
 import { log } from '@seontechnologies/playwright-utils/log'
 import {
   ritualResponseSchema,
   unauthorizedHttpErrorSchema,
 } from '@couture/api-client/contracts/http'
-
-process.env.API_E2E_UI_MODE = 'true'
 
 const RITUAL_PATH = '/api/v1/ritual'
 
@@ -24,6 +26,61 @@ type RitualResponsePayload = {
 }
 
 test.describe('Ritual API – daily scenario outfit recommendations', () => {
+  let oldUiMode: string | undefined
+  let testUserId = 'ritual-e2e-user'
+  let locationId = 'loc-e2e-test'
+
+  test.beforeAll(async ({ apiRequest }, testInfo) => {
+    oldUiMode = process.env.API_E2E_UI_MODE
+    process.env.API_E2E_UI_MODE = 'true'
+
+    const baseUrl = resolveApiBaseUrl(testInfo, {
+      overrideEnvVar: 'LIVE_RITUAL_BASE_URL',
+      fallback: 'http://localhost:4000',
+    })
+
+    // Sign up a user
+    const signupPayload = createTeenSignupPayload(testInfo, 'ritual-e2e-user')
+    const signupResponse = await apiRequest({
+      method: 'POST',
+      path: '/api/v1/auth/signup',
+      baseUrl,
+      body: signupPayload,
+    })
+
+    if (signupResponse.status === 201) {
+      testUserId = (signupResponse.body as { userId: string }).userId
+
+      // Create a location preference for this user
+      const locationResponse = await apiRequest({
+        method: 'POST',
+        path: '/api/v1/locations',
+        baseUrl,
+        headers: authHeaders(testUserId, 'admin'),
+        body: {
+          label: 'Chicago',
+          locationKey: 'chicago-il',
+          latitude: 41.878,
+          longitude: -87.63,
+          timezone: 'America/Chicago',
+        },
+      })
+
+      if (locationResponse.status === 201) {
+        const bodyData = locationResponse.body as { data: { id: string } }
+        locationId = bodyData.data.id
+      }
+    }
+  })
+
+  test.afterAll(() => {
+    if (oldUiMode === undefined) {
+      delete process.env.API_E2E_UI_MODE
+    } else {
+      process.env.API_E2E_UI_MODE = oldUiMode
+    }
+  })
+
   test('[P1] unauthenticated request returns 401', async ({
     apiRequest,
     validateSchema,
@@ -59,7 +116,7 @@ test.describe('Ritual API – daily scenario outfit recommendations', () => {
       method: 'GET',
       path: RITUAL_PATH,
       baseUrl,
-      headers: authHeaders('ritual-e2e-user', 'admin'),
+      headers: authHeaders(testUserId, 'admin'),
     })) as RitualResponsePayload
 
     await log.step('Assert: expect 200 and validate ritual response schema')
@@ -90,12 +147,12 @@ test.describe('Ritual API – daily scenario outfit recommendations', () => {
     await log.step('Act: send GET with optional locationId query param')
     const { status } = (await apiRequest({
       method: 'GET',
-      path: `${RITUAL_PATH}?locationId=loc-e2e-test`,
+      path: `${RITUAL_PATH}?locationId=${locationId}`,
       baseUrl,
-      headers: authHeaders('ritual-e2e-user', 'admin'),
+      headers: authHeaders(testUserId, 'admin'),
     })) as RitualResponsePayload
 
     await log.step('Assert: locationId does not cause a 400 validation error')
-    expect([200, 404]).toContain(status)
+    expect(status).toBe(200)
   })
 })

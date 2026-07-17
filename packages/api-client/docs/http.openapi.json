@@ -150,6 +150,32 @@
           "error"
         ]
       },
+      "InternalServerErrorHttpError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              500
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Internal Server Error"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ]
+      },
       "AlertRuleType": {
         "type": "string",
         "enum": [
@@ -3316,9 +3342,11 @@
         "properties": {
           "locationId": {
             "type": "string",
+            "minLength": 1,
             "description": "Optional ID of a saved user location key or preferences reference."
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -4489,6 +4517,7 @@
           {
             "schema": {
               "type": "string",
+              "minLength": 1,
               "description": "Optional ID of a saved user location key or preferences reference."
             },
             "required": false,
@@ -4534,6 +4563,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
                 }
               }
             }

@@ -28,17 +28,30 @@ export const scenarioOutfitSchema = z.object({
 export const ritualResponseSchema = z.object({
   data: z.object({
     weather: weatherSnapshotSchema,
-    outfits: z.array(scenarioOutfitSchema).length(3),
+    outfits: z
+      .array(scenarioOutfitSchema)
+      .length(3)
+      .refine(
+        (items) => {
+          const scenarios = items.map((item) => item.scenario)
+          return new Set(scenarios).size === 3
+        },
+        {
+          message:
+            'Outfits must cover three distinct scenarios (morning, midday, and evening).',
+        }
+      ),
     badges: z.array(z.string()),
   }),
 })
 
-export const ritualQueryParamsSchema = z.object({
-  locationId: z
-    .string()
-    .optional()
-    .describe('Optional ID of a saved user location key or preferences reference.'),
-})
+export const ritualQueryParamsSchema = z
+  .object({
+    locationId: nonEmptyStringSchema
+      .optional()
+      .describe('Optional ID of a saved user location key or preferences reference.'),
+  })
+  .strict()
 
 export type ScenarioName = z.infer<typeof scenarioNameSchema>
 export type ScenarioOutfit = z.infer<typeof scenarioOutfitSchema>
@@ -107,6 +120,14 @@ export function registerRitualContracts(
         content: {
           'application/json': {
             schema: commonSchemas.forbiddenHttpErrorSchema,
+          },
+        },
+      },
+      500: {
+        description: 'Internal server error occurred',
+        content: {
+          'application/json': {
+            schema: commonSchemas.internalServerErrorHttpErrorSchema,
           },
         },
       },

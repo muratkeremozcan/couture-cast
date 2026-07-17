@@ -6,6 +6,7 @@ import {
   Query,
   UseGuards,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common'
 import { ZodError } from 'zod'
 import {
@@ -32,6 +33,8 @@ function isZodError(error: unknown): error is ZodError {
 @Controller('/api/v1/ritual')
 @UseGuards(RequestAuthGuard)
 export class RitualController {
+  private readonly logger = new Logger(RitualController.name)
+
   constructor(
     @Inject(RitualService)
     private readonly ritualService: RitualService
@@ -62,9 +65,11 @@ export class RitualController {
     try {
       return ritualResponseSchema.parse({ data })
     } catch (error) {
-      throw new InternalServerErrorException(
-        error instanceof Error ? error.message : 'Response schema validation failed'
+      this.logger.error(
+        `Ritual response schema validation failed for user ${auth.userId}:`,
+        error instanceof Error ? error.stack : error
       )
+      throw new InternalServerErrorException('Response schema validation failed')
     }
   }
 }

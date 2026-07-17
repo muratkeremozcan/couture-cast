@@ -31,9 +31,14 @@ vi.mock('ioredis', () => {
         return Promise.resolve(item.val)
       }
       set(key: string, value: string, mode?: string, ttl?: number) {
+        if (mode !== 'EX' || typeof ttl !== 'number') {
+          return Promise.reject(
+            new Error('MockRedis.set: mode must be EX and TTL must be specified')
+          )
+        }
         redisStore[key] = {
           val: value,
-          ttl: ttl || 900,
+          ttl: ttl,
           setAt: Date.now(),
         }
         return Promise.resolve('OK')
@@ -104,6 +109,9 @@ describe('RitualController', () => {
   let persistedRecommendations: OutfitRecommendation[] = []
 
   beforeEach(async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-16T06:00:00.000Z'))
+
     persistedRecommendations = []
     for (const key of Object.keys(redisStore)) {
       delete redisStore[key]
@@ -245,6 +253,7 @@ describe('RitualController', () => {
   })
 
   afterEach(async () => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
     if (app) {
       await app.close()
@@ -277,7 +286,7 @@ describe('RitualController', () => {
     expect(persistedRecommendations).toHaveLength(3)
     expect(outfitRecommendationCreateMock).toHaveBeenCalledTimes(3)
 
-    const cacheKey = 'ritual:user-1:chicago-il'
+    const cacheKey = 'ritual:user-1:chicago-il:07/16/2026'
     expect(redisStore[cacheKey]).toBeDefined()
     expect(redisStore[cacheKey]?.ttl).toBe(900)
 
