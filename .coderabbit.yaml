@@ -90,6 +90,7 @@ reviews:
     - "!playwright/artifacts/**"
     - "!playwright/playwright-logs/**"
     - "!playwright/playwright-report/**"
+    - "!pact/artifacts/**"
     - "!maestro/artifacts/**"
     - "!blob-report/**"
     - "!playwright-logs/**"
