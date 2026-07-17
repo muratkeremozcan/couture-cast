@@ -7,17 +7,46 @@ enable_free_tier: true
 reviews:
   profile: chill
   high_level_summary: false
+  high_level_summary_in_walkthrough: false
   request_changes_workflow: false
   review_status: false
+  review_details: false
   commit_status: false
+  collapse_walkthrough: true
+  changed_files_summary: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  assess_linked_issues: false
+  related_issues: false
+  related_prs: false
   poem: false
   in_progress_fortune: false
   suggested_labels: false
   suggested_reviewers: false
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    autofix:
+      enabled: true
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    title:
+      mode: warning
+      requirements: >-
+        Use a conventional-commit prefix and name the user-visible feature,
+        defect, or engineering outcome. Do not use only an epic, story, or task
+        number.
+    description:
+      mode: warning
+    issue_assessment:
+      mode: "off"
   auto_review:
     enabled: true
     drafts: false
-    auto_incremental_review: false
+    auto_incremental_review: true
     base_branches:
       - main
   path_filters:
@@ -28,13 +57,14 @@ reviews:
     - "apps/**"
     - "packages/**"
     - "playwright/**"
+    - "pact/**"
+    - "k6/**"
     - "maestro/**"
     - "infra/**"
     - "scripts/**"
     - "supabase/**"
     - "docs/**"
     - "test-support/**"
-    - "_bmad-output/**"
     - "AGENTS.md"
     - "README.md"
     - "app.json"
@@ -63,10 +93,10 @@ reviews:
     - "!maestro/artifacts/**"
     - "!blob-report/**"
     - "!playwright-logs/**"
-    - "!_bmad-output/**/refs/**"
-    - "!_bmad-output/**/validation-report-*.md"
-    - "!_bmad-output/implementation-artifacts/stories/**/*.context.xml"
+    - "!_bmad-output/**"
+    - "!pacts/**"
     - "!package-lock.json"
+    - "!**/generated/**"
     - "!**/*.generated.*"
     - "!**/*.min.js"
     - "!**/*.woff"
@@ -105,6 +135,20 @@ reviews:
         environment portability across local, preview, and production runs.
         Flag implicit cross-test dependencies, non-deterministic data setup, and
         assertions that are too timing-sensitive for CI.
+    - path: "pact/**"
+      instructions: |
+        Pact contract-test change. Check consumer expectations against the
+        published OpenAPI contract and provider behavior, provider-state setup and
+        cleanup, matcher strictness, deterministic data, and isolation between
+        interactions. Flag tests that can pass while masking a breaking contract
+        change or that depend on generated pact files committed under `pacts/`.
+    - path: "k6/**"
+      instructions: |
+        k6 performance-test change. Check executor and scenario semantics,
+        thresholds, checks, environment safety, test-data isolation, request-rate
+        assumptions, and summary/report compatibility with CI. Flag Node-only APIs,
+        unbounded load, misleading success thresholds, and behavior that differs
+        silently across local, preview, and production profiles.
     - path: "maestro/**"
       instructions: |
         Maestro/mobile E2E change. Focus on emulator/device determinism, analytics
@@ -134,6 +178,19 @@ reviews:
         Shared package change. Check for downstream contract breakage across apps,
         type/schema compatibility, migration safety, feature-flag semantics, and
         whether shared helpers remain stable for both runtime code and tests.
+    - path: "packages/db/prisma/migrations/**"
+      instructions: |
+        Database migration change. Treat data preservation and rollout safety as
+        high risk. Check existing-row backfills, duplicate cleanup before unique
+        constraints, lock and downtime risk, reversibility, RLS policy boundaries,
+        deployment ordering, and compatibility with the current Prisma schema.
+    - path: "packages/api-client/src/contracts/**"
+      instructions: |
+        API contract change. Check runtime validation, OpenAPI generation,
+        backward compatibility, error responses, strictness, cardinality, and
+        parity with controllers, services, Pact interactions, and generated
+        clients. Flag contracts that accept invalid states or omit reachable
+        responses.
     - path: "infra/**"
       instructions: |
         Infrastructure or observability change. Review for environment parity,
@@ -145,12 +202,6 @@ reviews:
         Supabase/local platform config change. Check environment assumptions,
         migration compatibility, local bootstrap correctness, and whether the
         change can drift from Prisma, CI, or documented developer setup steps.
-    - path: "_bmad-output/**/*.md"
-      instructions: |
-        BMAD artifact change. Treat this as advisory documentation review, not
-        application logic review. Check that workflow names, commands, file paths,
-        environment variable names, acceptance criteria, and promotion criteria
-        still match the repository's actual implementation.
     - path: "docs/**"
       instructions: |
         Documentation change. Check internal consistency with the current repo,
