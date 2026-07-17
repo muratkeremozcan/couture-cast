@@ -200,7 +200,7 @@ export class RitualService implements OnModuleDestroy {
     if (currentLocalHour >= 8) {
       targetTime += 24 * 60 * 60 * 1000
     }
-    const targetLocalDateStr = getLocalDateString(new Date(targetTime), timezone)
+    let targetLocalDateStr = getLocalDateString(new Date(targetTime), timezone)
 
     // Get latest garment update timestamp for staleness check
     let latestGarment: GarmentItem | null = null
@@ -247,21 +247,54 @@ export class RitualService implements OnModuleDestroy {
 
     // 4. Find timezone-aligned forecast segments for a single target date
     const segments = weatherSnapshot.segments
-    const morningSegment = segments.find(
+    let morningSegment = segments.find(
       (s) =>
         getLocalDateString(s.forecast_at, timezone) === targetLocalDateStr &&
         getHourInTimezone(s.forecast_at, timezone) === 8
     )
-    const middaySegment = segments.find(
+    let middaySegment = segments.find(
       (s) =>
         getLocalDateString(s.forecast_at, timezone) === targetLocalDateStr &&
         getHourInTimezone(s.forecast_at, timezone) === 13
     )
-    const eveningSegment = segments.find(
+    let eveningSegment = segments.find(
       (s) =>
         getLocalDateString(s.forecast_at, timezone) === targetLocalDateStr &&
         getHourInTimezone(s.forecast_at, timezone) === 19
     )
+
+    // Fallback: If segments for targetLocalDateStr are not found (e.g. database seed/data is stale),
+    // fall back to using the latest date present in the segments array.
+    if ((!morningSegment || !middaySegment || !eveningSegment) && segments.length > 0) {
+      const segmentDates = segments.map((s) =>
+        getLocalDateString(s.forecast_at, timezone)
+      )
+      const uniqueDates = [...new Set(segmentDates)]
+      for (const fallbackDate of uniqueDates.reverse()) {
+        const fallbackMorning = segments.find(
+          (s) =>
+            getLocalDateString(s.forecast_at, timezone) === fallbackDate &&
+            getHourInTimezone(s.forecast_at, timezone) === 8
+        )
+        const fallbackMidday = segments.find(
+          (s) =>
+            getLocalDateString(s.forecast_at, timezone) === fallbackDate &&
+            getHourInTimezone(s.forecast_at, timezone) === 13
+        )
+        const fallbackEvening = segments.find(
+          (s) =>
+            getLocalDateString(s.forecast_at, timezone) === fallbackDate &&
+            getHourInTimezone(s.forecast_at, timezone) === 19
+        )
+        if (fallbackMorning && fallbackMidday && fallbackEvening) {
+          morningSegment = fallbackMorning
+          middaySegment = fallbackMidday
+          eveningSegment = fallbackEvening
+          targetLocalDateStr = fallbackDate
+          break
+        }
+      }
+    }
 
     if (!morningSegment || !middaySegment || !eveningSegment) {
       throw new InternalServerErrorException(
