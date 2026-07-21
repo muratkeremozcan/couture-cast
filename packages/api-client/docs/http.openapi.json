@@ -3347,6 +3347,182 @@
           }
         },
         "additionalProperties": false
+      },
+      "ComfortRun": {
+        "type": "string",
+        "enum": [
+          "cold",
+          "neutral",
+          "warm"
+        ]
+      },
+      "WindTolerance": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "PrecipPreparedness": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "ComfortPreferences": {
+        "type": "object",
+        "properties": {
+          "runsColdWarm": {
+            "type": "string",
+            "enum": [
+              "cold",
+              "neutral",
+              "warm"
+            ]
+          },
+          "windTolerance": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "precipPreparedness": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        },
+        "required": [
+          "runsColdWarm",
+          "windTolerance",
+          "precipPreparedness"
+        ]
+      },
+      "ComfortPreferencesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "runsColdWarm": {
+                "type": "string",
+                "enum": [
+                  "cold",
+                  "neutral",
+                  "warm"
+                ]
+              },
+              "windTolerance": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              },
+              "precipPreparedness": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              }
+            },
+            "required": [
+              "runsColdWarm",
+              "windTolerance",
+              "precipPreparedness"
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdateComfortPreferencesInput": {
+        "type": "object",
+        "properties": {
+          "runsColdWarm": {
+            "type": "string",
+            "enum": [
+              "cold",
+              "neutral",
+              "warm"
+            ]
+          },
+          "windTolerance": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "precipPreparedness": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        },
+        "required": [
+          "runsColdWarm",
+          "windTolerance",
+          "precipPreparedness"
+        ]
+      },
+      "UpdateComfortPreferencesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "runsColdWarm": {
+                "type": "string",
+                "enum": [
+                  "cold",
+                  "neutral",
+                  "warm"
+                ]
+              },
+              "windTolerance": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              },
+              "precipPreparedness": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              }
+            },
+            "required": [
+              "runsColdWarm",
+              "windTolerance",
+              "precipPreparedness"
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
       }
     },
     "parameters": {}
@@ -4563,6 +4739,115 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/personalization/comfort": {
+      "get": {
+        "tags": [
+          "comfort"
+        ],
+        "summary": "Get user comfort preferences",
+        "description": "Retrieves comfort settings for the authenticated user, returning defaults if not yet configured.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comfort preferences retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComfortPreferencesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "comfort"
+        ],
+        "summary": "Update user comfort preferences",
+        "description": "Updates comfort settings for the authenticated user and invalidates relevant outfit caches.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateComfortPreferencesInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comfort preferences updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateComfortPreferencesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
                 }
               }
             }

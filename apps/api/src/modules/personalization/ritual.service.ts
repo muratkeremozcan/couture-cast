@@ -1,6 +1,7 @@
 import {
   Inject,
   Injectable,
+  Logger,
   BadRequestException,
   InternalServerErrorException,
   type OnModuleDestroy,
@@ -159,6 +160,8 @@ function getRainAmountThreshold(precipPreparedness: string): number {
 
 @Injectable()
 export class RitualService implements OnModuleDestroy {
+  private readonly logger = new Logger(RitualService.name)
+
   constructor(
     @Inject(PrismaClient)
     private readonly prisma: PrismaClient,
@@ -680,6 +683,19 @@ export class RitualService implements OnModuleDestroy {
     }
 
     return responseData
+  }
+
+  async invalidateUserCache(userId: string): Promise<void> {
+    try {
+      const keys = await this.redis.keys(`ritual:${userId}:*`)
+      if (keys.length > 0) {
+        await this.redis.del(...keys)
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Redis cache invalidation failed: ${err instanceof Error ? err.message : String(err)}`
+      )
+    }
   }
 
   async onModuleDestroy() {

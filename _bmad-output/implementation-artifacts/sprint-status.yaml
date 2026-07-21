@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-07-16
+last_updated: 2026-07-21
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -65,7 +65,7 @@ development_status:
   # Epic 2: Outfit Personalization Core (Phase 1)
   epic-2: in-progress
   2-1-scenario-outfit-generator: done
-  2-2-comfort-calibration-settings: backlog
+  2-2-comfort-calibration-settings: review
   2-3-reasoning-badges-explanations: backlog
 
   # Epic 3: Cross-Surface Experience & Localization (Phase 1)

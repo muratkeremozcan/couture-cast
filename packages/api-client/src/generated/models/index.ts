@@ -438,6 +438,148 @@ export type BadRequestHttpErrorErrorEnum =
 /**
  *
  * @export
+ * @interface ComfortPreferences
+ */
+export interface ComfortPreferences {
+  /**
+   *
+   * @type {ComfortPreferencesRunsColdWarmEnum}
+   * @memberof ComfortPreferences
+   */
+  runsColdWarm: ComfortPreferencesRunsColdWarmEnum
+  /**
+   *
+   * @type {ComfortPreferencesWindToleranceEnum}
+   * @memberof ComfortPreferences
+   */
+  windTolerance: ComfortPreferencesWindToleranceEnum
+  /**
+   *
+   * @type {ComfortPreferencesPrecipPreparednessEnum}
+   * @memberof ComfortPreferences
+   */
+  precipPreparedness: ComfortPreferencesPrecipPreparednessEnum
+}
+
+/**
+ * @export
+ */
+export const ComfortPreferencesRunsColdWarmEnum = {
+  cold: 'cold',
+  neutral: 'neutral',
+  warm: 'warm',
+} as const
+export type ComfortPreferencesRunsColdWarmEnum =
+  (typeof ComfortPreferencesRunsColdWarmEnum)[keyof typeof ComfortPreferencesRunsColdWarmEnum]
+
+/**
+ * @export
+ */
+export const ComfortPreferencesWindToleranceEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type ComfortPreferencesWindToleranceEnum =
+  (typeof ComfortPreferencesWindToleranceEnum)[keyof typeof ComfortPreferencesWindToleranceEnum]
+
+/**
+ * @export
+ */
+export const ComfortPreferencesPrecipPreparednessEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type ComfortPreferencesPrecipPreparednessEnum =
+  (typeof ComfortPreferencesPrecipPreparednessEnum)[keyof typeof ComfortPreferencesPrecipPreparednessEnum]
+
+/**
+ *
+ * @export
+ * @interface ComfortPreferencesResponse
+ */
+export interface ComfortPreferencesResponse {
+  /**
+   *
+   * @type {ComfortPreferencesResponseData}
+   * @memberof ComfortPreferencesResponse
+   */
+  data: ComfortPreferencesResponseData
+}
+/**
+ *
+ * @export
+ * @interface ComfortPreferencesResponseData
+ */
+export interface ComfortPreferencesResponseData {
+  /**
+   *
+   * @type {ComfortPreferencesResponseDataRunsColdWarmEnum}
+   * @memberof ComfortPreferencesResponseData
+   */
+  runsColdWarm: ComfortPreferencesResponseDataRunsColdWarmEnum
+  /**
+   *
+   * @type {ComfortPreferencesResponseDataWindToleranceEnum}
+   * @memberof ComfortPreferencesResponseData
+   */
+  windTolerance: ComfortPreferencesResponseDataWindToleranceEnum
+  /**
+   *
+   * @type {ComfortPreferencesResponseDataPrecipPreparednessEnum}
+   * @memberof ComfortPreferencesResponseData
+   */
+  precipPreparedness: ComfortPreferencesResponseDataPrecipPreparednessEnum
+}
+
+/**
+ * @export
+ */
+export const ComfortPreferencesResponseDataRunsColdWarmEnum = {
+  cold: 'cold',
+  neutral: 'neutral',
+  warm: 'warm',
+} as const
+export type ComfortPreferencesResponseDataRunsColdWarmEnum =
+  (typeof ComfortPreferencesResponseDataRunsColdWarmEnum)[keyof typeof ComfortPreferencesResponseDataRunsColdWarmEnum]
+
+/**
+ * @export
+ */
+export const ComfortPreferencesResponseDataWindToleranceEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type ComfortPreferencesResponseDataWindToleranceEnum =
+  (typeof ComfortPreferencesResponseDataWindToleranceEnum)[keyof typeof ComfortPreferencesResponseDataWindToleranceEnum]
+
+/**
+ * @export
+ */
+export const ComfortPreferencesResponseDataPrecipPreparednessEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type ComfortPreferencesResponseDataPrecipPreparednessEnum =
+  (typeof ComfortPreferencesResponseDataPrecipPreparednessEnum)[keyof typeof ComfortPreferencesResponseDataPrecipPreparednessEnum]
+
+/**
+ *
+ * @export
+ */
+export const ComfortRun = {
+  cold: 'cold',
+  neutral: 'neutral',
+  warm: 'warm',
+} as const
+export type ComfortRun = (typeof ComfortRun)[keyof typeof ComfortRun]
+
+/**
+ *
+ * @export
  * @interface CreateSavedLocationInput
  */
 export interface CreateSavedLocationInput {
@@ -1606,6 +1748,19 @@ export interface PolledEvent {
    */
   createdAt: string
 }
+
+/**
+ *
+ * @export
+ */
+export const PrecipPreparedness = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type PrecipPreparedness =
+  (typeof PrecipPreparedness)[keyof typeof PrecipPreparedness]
+
 /**
  *
  * @export
@@ -2179,6 +2334,78 @@ export interface UpdateAlertRulesResponseData {
    * @memberof UpdateAlertRulesResponseData
    */
   rules: Array<UpdateAlertRulesInputRulesInner>
+}
+/**
+ *
+ * @export
+ * @interface UpdateComfortPreferencesInput
+ */
+export interface UpdateComfortPreferencesInput {
+  /**
+   *
+   * @type {UpdateComfortPreferencesInputRunsColdWarmEnum}
+   * @memberof UpdateComfortPreferencesInput
+   */
+  runsColdWarm: UpdateComfortPreferencesInputRunsColdWarmEnum
+  /**
+   *
+   * @type {UpdateComfortPreferencesInputWindToleranceEnum}
+   * @memberof UpdateComfortPreferencesInput
+   */
+  windTolerance: UpdateComfortPreferencesInputWindToleranceEnum
+  /**
+   *
+   * @type {UpdateComfortPreferencesInputPrecipPreparednessEnum}
+   * @memberof UpdateComfortPreferencesInput
+   */
+  precipPreparedness: UpdateComfortPreferencesInputPrecipPreparednessEnum
+}
+
+/**
+ * @export
+ */
+export const UpdateComfortPreferencesInputRunsColdWarmEnum = {
+  cold: 'cold',
+  neutral: 'neutral',
+  warm: 'warm',
+} as const
+export type UpdateComfortPreferencesInputRunsColdWarmEnum =
+  (typeof UpdateComfortPreferencesInputRunsColdWarmEnum)[keyof typeof UpdateComfortPreferencesInputRunsColdWarmEnum]
+
+/**
+ * @export
+ */
+export const UpdateComfortPreferencesInputWindToleranceEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type UpdateComfortPreferencesInputWindToleranceEnum =
+  (typeof UpdateComfortPreferencesInputWindToleranceEnum)[keyof typeof UpdateComfortPreferencesInputWindToleranceEnum]
+
+/**
+ * @export
+ */
+export const UpdateComfortPreferencesInputPrecipPreparednessEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type UpdateComfortPreferencesInputPrecipPreparednessEnum =
+  (typeof UpdateComfortPreferencesInputPrecipPreparednessEnum)[keyof typeof UpdateComfortPreferencesInputPrecipPreparednessEnum]
+
+/**
+ *
+ * @export
+ * @interface UpdateComfortPreferencesResponse
+ */
+export interface UpdateComfortPreferencesResponse {
+  /**
+   *
+   * @type {ComfortPreferencesResponseData}
+   * @memberof UpdateComfortPreferencesResponse
+   */
+  data: ComfortPreferencesResponseData
 }
 /**
  *
@@ -2910,3 +3137,14 @@ export const WeatherSnapshotHourlyInnerConditionEnum = {
 } as const
 export type WeatherSnapshotHourlyInnerConditionEnum =
   (typeof WeatherSnapshotHourlyInnerConditionEnum)[keyof typeof WeatherSnapshotHourlyInnerConditionEnum]
+
+/**
+ *
+ * @export
+ */
+export const WindTolerance = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type WindTolerance = (typeof WindTolerance)[keyof typeof WindTolerance]
