@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-07-16 - Step 19 reflects the complete Story 2.1 scenario outfit generator: Zod HTTP contract, personalization module, Redis caching layer, and type-safe test suite.
+Updated: 2026-07-21 - Step 19, Step 20, and Step 21 capture the complete Epic 2 personalization features: scenario outfit generator, comfort calibration settings, and reasoning badges/explanations.
 
 ## LLM collaborator prompt
 
@@ -32,6 +32,13 @@ Step template rules:
 - Do not add `Pattern summary:` sections.
 - Do not add one-off headings that duplicate the owner map.
 - If a section does not earn its keep, remove it instead of adding another section.
+
+Mermaid diagram rules:
+- Use exactly three backticks for every Mermaid fence: open with three backticks plus `mermaid`,
+  and close with three backticks alone.
+- Close each diagram before the next Markdown heading; never let a Mermaid block span across steps.
+- After editing diagrams, verify the number of Mermaid openings matches the number of closings and
+  render or parse every diagram before finishing.
 
 Task owner map rules:
 - Use the section heading `Task owner map:` in every step.
@@ -1767,7 +1774,7 @@ Current repo note:
 
 Architecture diagram:
 
-````mermaid
+```mermaid
 flowchart TD
   Scheduler["BullMQ Job Scheduler\nweather-refresh-sweep"] --> Sweep["Sweep processor"]
   Targets["ConfiguredWeatherTargetSource"] --> Sweep
@@ -1782,6 +1789,7 @@ flowchart TD
   Normalized --> Repository["WeatherRepository\ntransactional persistence"]
   Repository --> DB["WeatherSnapshot + ForecastSegment"]
   Repository --> Query["WeatherQueryService\nfresh/cached/stale/unavailable"]
+```
 
 ## Step 17 - Weather alert rules and notification pipeline
 
@@ -1868,7 +1876,7 @@ flowchart TD
   Offline --> QuietHours{"Within user quiet hours?\nminuteOfDayAt (cached)"}
   QuietHours -->|yes| PushQuiet["Push Delivery Suppressed\nreason: quiet_hours"]
   QuietHours -->|no| Expo["PushNotificationService\nExpo Push SDK"]
-````
+```
 
 ## Step 18 - Telemetry and audit baseline
 
@@ -2059,3 +2067,95 @@ flowchart TD
   DB --> Cache["Redis write\nTTL 900s"]
   Cache --> Response
 ```
+
+## Step 20 - Comfort calibration settings
+
+User/business impact:
+
+Allows users who "run cold or warm" to fine-tune their comfort preferences. For the business, this improves suggestion quality, increases customer satisfaction, and ensures the recommendation engine adapts dynamically to personalized user comfort parameters.
+
+Key takeaways:
+
+1. Shared Zod contract first: define all preferences enums (`runsColdWarm`, `windTolerance`, `precipPreparedness`) in `packages/api-client/src/contracts/http/comfort.ts` to ensure consistency.
+2. Chunk-based Redis invalidation: clear caches safely using scan cursor and chunk delete to prevent blocking Redis threads in multi-tenant environments.
+3. Comfort-aware staleness tracking: the recommendation engine tracks comfort preference update timestamps (`ComfortPreferences.updated_at`) to force database regeneration and override cached recommendations.
+
+Story/Task mapping:
+
+- Story 2.2
+- Task 1 (Shared Zod HTTP Contract for Comfort Preferences)
+- Task 2 (Comfort Preferences Controller and Service)
+- Task 3 (Unit and Integration Test Verification)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/2-2-comfort-calibration-settings.md`
+
+Cross-links:
+
+- Step 19 introduces the base daily outfit recommendation and caching mechanism.
+- Step 21 maps these comfort parameters to reasoning explanation triggers.
+
+Sequence to follow:
+
+1. Open `packages/api-client/src/contracts/http/comfort.ts` to inspect the preferences schema enums and route registrations.
+2. Read `apps/api/src/modules/personalization/comfort.service.ts` to see how settings are upserted or defaulted.
+3. Read the `invalidateUserCache` method in `apps/api/src/modules/personalization/ritual.service.ts` to trace the Redis SCAN iteration.
+4. Read `apps/api/src/modules/personalization/comfort.controller.ts` to see input validation and response parsing.
+5. Review tests in `apps/api/src/modules/personalization/comfort.service.spec.ts` and `comfort.controller.spec.ts`.
+
+Task owner map:
+
+- Story 2.2 Task 1 step 1 owner: define Zod schemas and request/response contracts for comfort preferences in `packages/api-client/src/contracts/http/comfort.ts`
+- Story 2.2 Task 2 step 1 owner: implement ComfortService persistence and cache invalidation in `apps/api/src/modules/personalization/comfort.service.ts`
+- Story 2.2 Task 2 step 2 owner: implement ComfortController route handlers in `apps/api/src/modules/personalization/comfort.controller.ts`
+- Story 2.2 Task 2 step 3 owner: implement chunk-based Redis key invalidation in `apps/api/src/modules/personalization/ritual.service.ts`
+- Story 2.2 Task 3 step 1 owner: unit-test default fallbacks, upserts, and cache invalidation in `apps/api/src/modules/personalization/comfort.service.spec.ts`
+- Story 2.2 Task 3 step 2 owner: integration-test controller endpoints and validation boundaries in `apps/api/src/modules/personalization/comfort.controller.spec.ts`
+
+## Step 21 - Reasoning badges & explanations
+
+User/business impact:
+
+Gives users a clear, localized explanation of why recommendations are suggested, building transparency and trust in the platform. The business drives ritual engagement and retention by showing user-centric justification for suggested outfits.
+
+Key takeaways:
+
+1. Dynamic bullet rationale: reasoning badges generate dynamic explanatory bullet points interpolating actual conditions against user settings thresholds.
+2. Type-safe mock factories and seeds: update testing factories and seed structures synchronously to prevent database validation failures.
+3. Pact consumer-provider alignment: verification of consumer contract expectations against provider mock states for complex array response contracts.
+
+Story/Task mapping:
+
+- Story 2.3
+- Task 1 (Shared Zod Http Contract Update)
+- Task 2 (API Personalization Module & Seed Updates)
+- Task 3 (Pact Consumer & Provider Interaction Verification)
+- Task 4 (Test Suite Validation & Verification)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/2-3-reasoning-badges-explanations.md`
+
+Cross-links:
+
+- Step 19 introduces the outfit generator service.
+- Step 20 sets up the user comfort calibration thresholds.
+
+Sequence to follow:
+
+1. Open `packages/api-client/src/contracts/http/ritual.ts` and view the updated `reasoningBadges` property schema.
+2. Read the badge evaluation rules in `apps/api/src/modules/personalization/ritual.service.ts` to see dynamic bullet string generation.
+3. Read the mock factory in `packages/testing/src/factories/ritual.factory.ts` and seed script in `packages/db/prisma/seeds/rituals.ts`.
+4. Inspect consumer/provider mock expectations in `pact/http/consumer/api-contract-interactions.ts` and `pact/http/provider/provider-helper.ts`.
+5. Trace unit assertions verifying bullet rationales in `apps/api/src/modules/personalization/ritual.service.spec.ts`.
+
+Task owner map:
+
+- Story 2.3 Task 1 step 1 owner: update reasoningBadges property in the HTTP contracts schema in `packages/api-client/src/contracts/http/ritual.ts`
+- Story 2.3 Task 2 step 1 owner: refactor dynamic badge generation and interpolation in `apps/api/src/modules/personalization/ritual.service.ts`
+- Story 2.3 Task 2 step 2 owner: update reasoning badges test factory schema in `packages/testing/src/factories/ritual.factory.ts`
+- Story 2.3 Task 2 step 3 owner: update database seeding structures in `packages/db/prisma/seeds/rituals.ts`
+- Story 2.3 Task 3 step 1 owner: update consumer contract pact expectations in `pact/http/consumer/api-contract-interactions.ts`
+- Story 2.3 Task 3 step 2 owner: update provider mock responses in `pact/http/provider/provider-helper.ts`
+- Story 2.3 Task 4 step 1 owner: test badge keys, labels, and bullet interpolation rules in `apps/api/src/modules/personalization/ritual.service.spec.ts`

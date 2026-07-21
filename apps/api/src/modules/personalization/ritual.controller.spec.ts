@@ -3,7 +3,7 @@ import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ritualResponseSchema } from '../../contracts/http.js'
+import { ritualResponseSchema, type RitualResponse } from '../../contracts/http.js'
 import type { AccessTokenIdentityService } from '../auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
@@ -280,8 +280,20 @@ describe('RitualController', () => {
 
     expect(response.status).toBe(200)
 
-    const parsed = ritualResponseSchema.parse(response.body)
+    const parsed: RitualResponse = ritualResponseSchema.parse(response.body)
     expect(parsed.data.outfits).toHaveLength(3)
+
+    // Explicitly assert on reasoningBadges structure
+    for (const outfit of parsed.data.outfits) {
+      for (const badge of outfit.reasoningBadges) {
+        expect(badge.key).toBeDefined()
+        expect(badge.label).toBeDefined()
+        expect(Array.isArray(badge.bullets)).toBe(true)
+        for (const bullet of badge.bullets) {
+          expect(typeof bullet).toBe('string')
+        }
+      }
+    }
 
     expect(persistedRecommendations).toHaveLength(3)
     expect(outfitRecommendationCreateMock).toHaveBeenCalledTimes(3)

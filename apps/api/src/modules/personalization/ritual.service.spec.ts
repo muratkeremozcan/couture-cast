@@ -313,7 +313,13 @@ describe('RitualService', () => {
 
     const result = await service.getOrCreateRitual('user-1')
     const eveningOutfit = result.outfits.find((o) => o.scenario === 'evening')
-    expect(eveningOutfit?.reasoningBadges).toContainEqual({ label: 'Wind layer' })
+    expect(eveningOutfit?.reasoningBadges).toContainEqual({
+      key: 'wind_layer',
+      label: 'Wind layer',
+      bullets: [
+        'Wind speed is 6 m/s, which exceeds your wind tolerance threshold of 3 m/s.',
+      ],
+    })
   })
 
   it('correctly maps precipitation alert badge based on user preparedness setting', async () => {
@@ -328,7 +334,14 @@ describe('RitualService', () => {
 
     const result = await service.getOrCreateRitual('user-1')
     const eveningOutfit = result.outfits.find((o) => o.scenario === 'evening')
-    expect(eveningOutfit?.reasoningBadges).toContainEqual({ label: 'Rain-ready' })
+    expect(eveningOutfit?.reasoningBadges).toContainEqual({
+      key: 'rain_ready',
+      label: 'Rain-ready',
+      bullets: [
+        'Precipitation probability is 50%, which exceeds your threshold of 20%.',
+        'Precipitation amount is 0.8 mm, which exceeds your threshold of 0.1 mm.',
+      ],
+    })
   })
 
   it('prevents cache reuse across the 8:00 AM cutoff boundary (07:59 vs 08:00)', async () => {
@@ -399,6 +412,164 @@ describe('RitualService', () => {
 
     expect(outfitRecommendationUpdate).toHaveBeenCalled()
     expect(outfitRecommendationCreate).not.toHaveBeenCalled()
+  })
+
+  // Story 2.3 Task 4 step 1 owner: test badge keys, labels, and bullet interpolation rules
+  it('correctly maps various badge types and interpolates correct bullet rationales', async () => {
+    comfortPreferencesFindUnique.mockResolvedValue({
+      id: 'comfort-1',
+      user_id: 'user-1',
+      runs_cold_warm: 'cold',
+      wind_tolerance: 'high',
+      precip_preparedness: 'low',
+      updated_at: new Date('2026-07-16T12:00:00.000Z'),
+    })
+
+    const result = await service.getOrCreateRitual('user-1')
+
+    const morningOutfit = result.outfits.find((o) => o.scenario === 'morning')
+    expect(morningOutfit?.reasoningBadges).toEqual([
+      {
+        key: 'commute_warmth',
+        label: 'Commute warmth',
+        bullets: [
+          'Morning feels-like temperature is 14°C (adjusted to 11°C), which is below the commute warmth threshold of 12°C.',
+        ],
+      },
+    ])
+
+    const middayOutfit = result.outfits.find((o) => o.scenario === 'midday')
+    expect(middayOutfit?.reasoningBadges).toEqual([
+      {
+        key: 'light_layers',
+        label: 'Light layers',
+        bullets: [
+          'Feels-like temperature is 21°C (adjusted to 18°C), which is between 15°C and 22°C.',
+        ],
+      },
+    ])
+
+    const eveningOutfit = result.outfits.find((o) => o.scenario === 'evening')
+    expect(eveningOutfit?.reasoningBadges).toEqual([
+      {
+        key: 'evening_chill',
+        label: 'Evening chill',
+        bullets: [
+          'Evening feels-like temperature is 17°C (adjusted to 14°C), which is below the evening chill threshold of 15°C.',
+        ],
+      },
+    ])
+  })
+
+  it('prevents rounding and floating-point exposure in wind and precipitation badges', async () => {
+    const unroundedSegments = segments.map((s) => ({
+      ...s,
+      wind_speed: 6.000000000000001,
+      precipitation_amount: 0.80000000000001,
+    }))
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const originalGetLatestWeather = weatherQueryMock.getLatestWeather
+    weatherQueryMock.getLatestWeather = vi.fn().mockResolvedValue({
+      status: 'fresh',
+      data: {
+        ...weatherSnapshot,
+        segments: unroundedSegments,
+      },
+    })
+
+    comfortPreferencesFindUnique.mockResolvedValue({
+      id: 'comfort-1',
+      user_id: 'user-1',
+      runs_cold_warm: 'neutral',
+      wind_tolerance: 'low',
+      precip_preparedness: 'high',
+      updated_at: new Date('2026-07-16T12:00:00.000Z'),
+    })
+
+    const result = await service.getOrCreateRitual('user-1')
+    const eveningOutfit = result.outfits.find((o) => o.scenario === 'evening')
+
+    expect(eveningOutfit?.reasoningBadges).toContainEqual({
+      key: 'wind_layer',
+      label: 'Wind layer',
+      bullets: [
+        'Wind speed is 6 m/s, which exceeds your wind tolerance threshold of 3 m/s.',
+      ],
+    })
+
+    expect(eveningOutfit?.reasoningBadges).toContainEqual({
+      key: 'rain_ready',
+      label: 'Rain-ready',
+      bullets: [
+        'Precipitation probability is 50%, which exceeds your threshold of 20%.',
+        'Precipitation amount is 0.8 mm, which exceeds your threshold of 0.1 mm.',
+      ],
+    })
+
+    weatherQueryMock.getLatestWeather = originalGetLatestWeather
+  })
+
+  describe('mapRawBadgeToCanonical mappings', () => {
+    it('correctly maps raw badges based on new exact key and fallback rules', async () => {
+      const redis = new Redis()
+      const customService = new RitualService(
+        prismaMock,
+        weatherQueryMock,
+        locationPreferencesMock,
+        redis as unknown as Redis
+      )
+
+      const recMock = {
+        id: 'rec-1',
+        user_id: 'user-1',
+        forecast_segment_id: 'seg-morning',
+        scenario: 'morning',
+        garment_ids: ['default-top'],
+        reasoning_badges: [
+          // 1. Exact-key lookup matches a canonical key
+          { key: 'wind_layer', label: 'Custom Wind Label', bullets: ['Bullet 1'] },
+          // 2. Key is present but custom/non-canonical; preserves provided label
+          {
+            key: 'my_custom_badge',
+            label: 'My Custom Badge Label',
+            bullets: ['Bullet 2'],
+          },
+          // 3. Key is absent, triggers keyword inference on label
+          { label: 'Commute warmth advice', bullets: ['Bullet 3'] },
+          // 4. Key is absent, label has no match; preserves provided label
+          { label: 'Completely unknown label', bullets: ['Bullet 4'] },
+        ],
+        created_at: new Date('2026-07-16T04:00:00.000Z'),
+        updated_at: new Date('2026-07-16T04:00:00.000Z'),
+      }
+      outfitRecommendationFindFirst.mockResolvedValue(recMock)
+
+      const result = await customService.getOrCreateRitual('user-1')
+      const morningOutfit = result.outfits.find((o) => o.scenario === 'morning')
+      expect(morningOutfit).toBeDefined()
+      expect(morningOutfit?.reasoningBadges).toEqual([
+        {
+          key: 'wind_layer',
+          label: 'Wind layer', // maps key exactly and uses canonical label
+          bullets: ['Bullet 1'],
+        },
+        {
+          key: 'my_custom_badge',
+          label: 'My Custom Badge Label', // preserves the custom label
+          bullets: ['Bullet 2'],
+        },
+        {
+          key: 'commute_warmth',
+          label: 'Commute warmth', // infers from label since key is absent
+          bullets: ['Bullet 3'],
+        },
+        {
+          key: 'daily_base',
+          label: 'Completely unknown label', // preserves the label since key is absent and no match found
+          bullets: ['Bullet 4'],
+        },
+      ])
+    })
   })
 
   describe('invalidateUserCache', () => {

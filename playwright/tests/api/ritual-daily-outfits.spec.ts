@@ -134,6 +134,32 @@ test.describe('Ritual API – daily scenario outfit recommendations', () => {
     expect(body.data!.weather).toBeDefined()
     expect(body.data!.badges).toBeDefined()
     expect(Array.isArray(body.data!.badges)).toBe(true)
+
+    const outfits = body.data!.outfits as unknown as {
+      scenario: string
+      garmentIds: string[]
+      reasoningBadges: { key: string; label: string; bullets: string[] }[]
+      comfortNotes: string
+    }[]
+
+    await log.step('Assert: outfits contain structured reasoningBadges')
+    for (const outfit of outfits) {
+      expect(outfit.reasoningBadges).toBeDefined()
+      expect(Array.isArray(outfit.reasoningBadges)).toBe(true)
+      expect(outfit.reasoningBadges.length).toBeGreaterThan(0)
+      for (const badge of outfit.reasoningBadges) {
+        expect(badge.key).toBeDefined()
+        expect(typeof badge.key).toBe('string')
+        expect(badge.label).toBeDefined()
+        expect(typeof badge.label).toBe('string')
+        expect(badge.bullets).toBeDefined()
+        expect(Array.isArray(badge.bullets)).toBe(true)
+        expect(badge.bullets.length).toBeGreaterThan(0)
+        for (const bullet of badge.bullets) {
+          expect(typeof bullet).toBe('string')
+        }
+      }
+    }
   })
 
   test('[P2] optional locationId query param is accepted', async ({

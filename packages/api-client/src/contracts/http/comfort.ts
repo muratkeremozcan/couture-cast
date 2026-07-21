@@ -1,3 +1,4 @@
+// Story 2.2 Task 1 step 1 owner: define Zod schemas for comfort preferences
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { type RegisteredCommonHttpSchemas } from './common'

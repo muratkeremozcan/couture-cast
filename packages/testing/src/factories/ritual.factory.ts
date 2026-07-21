@@ -8,7 +8,9 @@ export const RITUAL_SCENARIOS = ['morning', 'midday', 'evening'] as const
 export type RitualScenario = (typeof RITUAL_SCENARIOS)[number]
 
 export interface RitualReasoningBadge {
+  key: string
   label: string
+  bullets: string[]
 }
 
 export interface RitualFixture {
@@ -43,8 +45,20 @@ function buildDefaultGarmentIds(): string[] {
   return Array.from({ length: 3 }, () => faker.string.uuid())
 }
 
+// Story 2.3 Task 2 step 2 owner: update reasoning badges test factory schema
 function buildDefaultReasoningBadges(): RitualReasoningBadge[] {
-  return [{ label: 'weather-aware' }, { label: 'layered' }]
+  return [
+    {
+      key: 'daily_base',
+      label: 'Daily base',
+      bullets: ['Dynamic weather conditions detected.'],
+    },
+    {
+      key: 'light_layers',
+      label: 'Light layers',
+      bullets: ['Recommend layered dressing today.'],
+    },
+  ]
 }
 
 function buildDefaultRitualFixture(): RitualFixture {

@@ -300,6 +300,13 @@ export function testRitualOutfits() {
     expect(status, 'status is 200').to.equal(200)
     expect(body?.data?.outfits, 'outfits is array').to.be.an('array')
     expect(body?.data?.outfits?.length, '3 scenario outfits').to.equal(3)
+    const outfits = body?.data?.outfits as { reasoningBadges?: unknown[] }[]
+    const firstOutfit = outfits[0]
+    expect(firstOutfit?.reasoningBadges, 'reasoningBadges is array').to.be.an('array')
+    expect(
+      firstOutfit?.reasoningBadges?.length,
+      'at least 1 reasoning badge'
+    ).to.be.at.least(1)
     expect(body?.data?.weather, 'weather snapshot present').to.be.an('object')
     expect(body?.data?.badges, 'badges is array').to.be.an('array')
   })

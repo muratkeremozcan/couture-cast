@@ -63,10 +63,10 @@ development_status:
   1-4-telemetry-audit-baseline: done
 
   # Epic 2: Outfit Personalization Core (Phase 1)
-  epic-2: in-progress
+  epic-2: done
   2-1-scenario-outfit-generator: done
   2-2-comfort-calibration-settings: done
-  2-3-reasoning-badges-explanations: backlog
+  2-3-reasoning-badges-explanations: done
 
   # Epic 3: Cross-Surface Experience & Localization (Phase 1)
   epic-3: backlog

@@ -13,10 +13,16 @@ export const scenarioOutfitSchema = z.object({
   garmentIds: z
     .array(z.string())
     .describe('The custom or fallback garment identifiers suggested.'),
+  // Story 2.3 Task 1 step 1 owner: update reasoningBadges property in the HTTP contracts schema
   reasoningBadges: z
     .array(
       z.object({
-        label: nonEmptyStringSchema,
+        key: nonEmptyStringSchema.describe('Unique key for the badge.'),
+        label: nonEmptyStringSchema.describe('Localized default label for the badge.'),
+        bullets: z
+          .array(z.string())
+          .min(1)
+          .describe('Explanatory bullet points explaining why the badge triggered.'),
       })
     )
     .describe('Reasoning badges justifying the garments chosen.'),
