@@ -181,6 +181,41 @@ function getRainAmountThreshold(precipPreparedness: PrecipPreparedness): number 
   return PRECIP_AMOUNT_THRESHOLD_MM[precipPreparedness]
 }
 
+const BADGE_MAPPING = [
+  { keyword: 'wind', key: 'wind_layer', label: 'Wind layer' },
+  { keyword: 'rain', key: 'rain_ready', label: 'Rain-ready' },
+  { keyword: 'evening', key: 'evening_chill', label: 'Evening chill' },
+  { keyword: 'chill', key: 'evening_chill', label: 'Evening chill' },
+  { keyword: 'commute', key: 'commute_warmth', label: 'Commute warmth' },
+  { keyword: 'warmth', key: 'commute_warmth', label: 'Commute warmth' },
+  { keyword: 'sun', key: 'sun_protection', label: 'Sun protection' },
+  { keyword: 'protection', key: 'sun_protection', label: 'Sun protection' },
+  { keyword: 'light', key: 'light_layers', label: 'Light layers' },
+  { keyword: 'layer', key: 'light_layers', label: 'Light layers' },
+  { keyword: 'breathable', key: 'breathable_comfort', label: 'Breathable comfort' },
+  { keyword: 'comfort', key: 'breathable_comfort', label: 'Breathable comfort' },
+] as const
+
+function mapRawBadgeToCanonical(badge: {
+  key?: string
+  label?: string
+  bullets?: string[]
+}): { key: string; label: string; bullets: string[] } {
+  const inputLabel = badge.label || ''
+  const inputKey = badge.key || ''
+  const searchStr = (inputKey || inputLabel).toLowerCase().replace(/[\s-_]+/g, '')
+
+  const match = BADGE_MAPPING.find((item) => searchStr.includes(item.keyword))
+  const key = match ? match.key : 'daily_base'
+  const label = match ? match.label : 'Daily base'
+
+  const bullets = Array.isArray(badge.bullets)
+    ? badge.bullets.filter((b): b is string => typeof b === 'string')
+    : []
+
+  return { key, label, bullets }
+}
+
 @Injectable()
 export class RitualService implements OnModuleDestroy {
   private readonly logger = new Logger(RitualService.name)
@@ -537,42 +572,136 @@ export class RitualService implements OnModuleDestroy {
           return candidates[0]!.id
         })
 
+        // Rounded values for consistent trigger logic and display formatting
+        const roundedAdjustedFeelsLike = Math.round(adjustedFeelsLike)
+
+        const getFeelsLikeDesc = (raw: number, adjusted: number) => {
+          const roundedRaw = Math.round(raw)
+          const roundedAdj = Math.round(adjusted)
+          if (roundedRaw === roundedAdj) {
+            return `${roundedRaw}°C`
+          }
+          return `${roundedRaw}°C (adjusted to ${roundedAdj}°C)`
+        }
+
         // Reasoning badges
-        const badgesList: { label: string }[] = []
+        // Story 2.3 Task 2 step 1 owner: refactor dynamic badge generation and interpolation
+        const badgesList: { key: string; label: string; bullets: string[] }[] = []
 
         // Wind tolerance trigger
         const windThreshold = getWindThreshold(windTolerance)
         if (segment.wind_speed > windThreshold) {
-          badgesList.push({ label: 'Wind layer' })
+          const windSpeedFormatted = Math.round(segment.wind_speed * 10) / 10
+          badgesList.push({
+            key: 'wind_layer',
+            label: 'Wind layer',
+            bullets: [
+              `Wind speed is ${windSpeedFormatted} m/s, which exceeds your wind tolerance threshold of ${windThreshold} m/s.`,
+            ],
+          })
         }
 
         // Rain preparation trigger
         const rainProbThreshold = getRainProbThreshold(precipPreparedness)
         const rainAmountThreshold = getRainAmountThreshold(precipPreparedness)
+        const roundedProb = Math.round(segment.precipitation_probability * 100)
+        const roundedProbThreshold = Math.round(rainProbThreshold * 100)
+        const roundedAmount = Math.round(segment.precipitation_amount * 10) / 10
+        const roundedAmountThreshold = Math.round(rainAmountThreshold * 10) / 10
+
         if (
-          segment.precipitation_probability > rainProbThreshold ||
-          segment.precipitation_amount > rainAmountThreshold
+          roundedProb > roundedProbThreshold ||
+          roundedAmount > roundedAmountThreshold
         ) {
-          badgesList.push({ label: 'Rain-ready' })
+          const rainBullets: string[] = []
+          if (roundedProb > roundedProbThreshold) {
+            rainBullets.push(
+              `Precipitation probability is ${roundedProb}%, which exceeds your threshold of ${roundedProbThreshold}%.`
+            )
+          }
+          if (roundedAmount > roundedAmountThreshold) {
+            rainBullets.push(
+              `Precipitation amount is ${roundedAmount} mm, which exceeds your threshold of ${roundedAmountThreshold} mm.`
+            )
+          }
+          badgesList.push({
+            key: 'rain_ready',
+            label: 'Rain-ready',
+            bullets: rainBullets,
+          })
         }
 
         // Evening chill trigger
-        if (scenario === 'evening' && adjustedFeelsLike < 15) {
-          badgesList.push({ label: 'Evening chill' })
+        if (scenario === 'evening' && roundedAdjustedFeelsLike < 15) {
+          badgesList.push({
+            key: 'evening_chill',
+            label: 'Evening chill',
+            bullets: [
+              `Evening feels-like temperature is ${getFeelsLikeDesc(
+                segment.feels_like,
+                adjustedFeelsLike
+              )}, which is below the evening chill threshold of 15°C.`,
+            ],
+          })
         }
 
         // Default scenario / temperature badges
         if (badgesList.length === 0) {
-          if (scenario === 'morning' && adjustedFeelsLike < 12) {
-            badgesList.push({ label: 'Commute warmth' })
-          } else if (segment.condition === 'clear' && adjustedFeelsLike >= 22) {
-            badgesList.push({ label: 'Sun protection' })
-          } else if (adjustedFeelsLike >= 15 && adjustedFeelsLike < 22) {
-            badgesList.push({ label: 'Light layers' })
-          } else if (adjustedFeelsLike >= 25) {
-            badgesList.push({ label: 'Breathable comfort' })
+          if (scenario === 'morning' && roundedAdjustedFeelsLike < 12) {
+            badgesList.push({
+              key: 'commute_warmth',
+              label: 'Commute warmth',
+              bullets: [
+                `Morning feels-like temperature is ${getFeelsLikeDesc(
+                  segment.feels_like,
+                  adjustedFeelsLike
+                )}, which is below the commute warmth threshold of 12°C.`,
+              ],
+            })
+          } else if (segment.condition === 'clear' && roundedAdjustedFeelsLike >= 22) {
+            badgesList.push({
+              key: 'sun_protection',
+              label: 'Sun protection',
+              bullets: [
+                `Skies are clear and feels-like temperature is ${getFeelsLikeDesc(
+                  segment.feels_like,
+                  adjustedFeelsLike
+                )}, which is at or above 22°C.`,
+              ],
+            })
+          } else if (roundedAdjustedFeelsLike >= 15 && roundedAdjustedFeelsLike < 22) {
+            badgesList.push({
+              key: 'light_layers',
+              label: 'Light layers',
+              bullets: [
+                `Feels-like temperature is ${getFeelsLikeDesc(
+                  segment.feels_like,
+                  adjustedFeelsLike
+                )}, which is between 15°C and 22°C.`,
+              ],
+            })
+          } else if (roundedAdjustedFeelsLike >= 25) {
+            badgesList.push({
+              key: 'breathable_comfort',
+              label: 'Breathable comfort',
+              bullets: [
+                `Feels-like temperature is ${getFeelsLikeDesc(
+                  segment.feels_like,
+                  adjustedFeelsLike
+                )}, which is at or above 25°C.`,
+              ],
+            })
           } else {
-            badgesList.push({ label: 'Daily base' })
+            badgesList.push({
+              key: 'daily_base',
+              label: 'Daily base',
+              bullets: [
+                `Feels-like temperature is ${getFeelsLikeDesc(
+                  segment.feels_like,
+                  adjustedFeelsLike
+                )}.`,
+              ],
+            })
           }
         }
 
@@ -677,7 +806,20 @@ export class RitualService implements OnModuleDestroy {
         id: rec.id,
         scenario: rec.scenario as ScenarioName,
         garmentIds: (rec.garment_ids as string[]) || [],
-        reasoningBadges: (rec.reasoning_badges as { label: string }[]) || [],
+        reasoningBadges: (Array.isArray(rec.reasoning_badges)
+          ? (rec.reasoning_badges as unknown as {
+              key?: string
+              label?: string
+              bullets?: string[]
+            }[])
+          : []
+        )
+          .filter(
+            (badge): badge is { key?: string; label?: string; bullets?: string[] } => {
+              return badge !== null && typeof badge === 'object'
+            }
+          )
+          .map((badge) => mapRawBadgeToCanonical(badge)),
         comfortNotes: comfortNotes,
       })
     }
@@ -708,6 +850,7 @@ export class RitualService implements OnModuleDestroy {
     return responseData
   }
 
+  // Story 2.2 Task 2 step 3 owner: implement chunk-based Redis key invalidation
   async invalidateUserCache(userId: string): Promise<void> {
     try {
       const matchPattern = `ritual:${userId}:*`

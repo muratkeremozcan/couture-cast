@@ -3046,13 +3046,28 @@
             "items": {
               "type": "object",
               "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique key for the badge."
+                },
                 "label": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "Localized default label for the badge."
+                },
+                "bullets": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Explanatory bullet points explaining why the badge triggered."
                 }
               },
               "required": [
-                "label"
+                "key",
+                "label",
+                "bullets"
               ]
             },
             "description": "Reasoning badges justifying the garments chosen."
@@ -3294,13 +3309,28 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "key": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Unique key for the badge."
+                          },
                           "label": {
                             "type": "string",
-                            "minLength": 1
+                            "minLength": 1,
+                            "description": "Localized default label for the badge."
+                          },
+                          "bullets": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Explanatory bullet points explaining why the badge triggered."
                           }
                         },
                         "required": [
-                          "label"
+                          "key",
+                          "label",
+                          "bullets"
                         ]
                       },
                       "description": "Reasoning badges justifying the garments chosen."

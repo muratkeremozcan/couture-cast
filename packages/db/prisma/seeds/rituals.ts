@@ -30,7 +30,19 @@ export async function seedRituals(
       forecastSegmentId: segmentId ?? null,
       scenario: RITUAL_SCENARIOS[i % RITUAL_SCENARIOS.length] ?? 'morning',
       garmentIds,
-      reasoningBadges: [{ label: 'layered' }, { label: 'weather-aware' }],
+      // Story 2.3 Task 2 step 3 owner: update database seeding structures
+      reasoningBadges: [
+        {
+          key: 'light_layers',
+          label: 'Light layers',
+          bullets: ['Recommend layered dressing today.'],
+        },
+        {
+          key: 'daily_base',
+          label: 'Daily base',
+          bullets: ['Dynamic weather conditions detected.'],
+        },
+      ],
     })
 
     return prisma.outfitRecommendation.upsert({

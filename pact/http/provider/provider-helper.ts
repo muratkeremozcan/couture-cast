@@ -123,6 +123,7 @@ export async function startLocalPactProvider({
     },
   } as unknown as AccessTokenIdentityService
 
+  // Story 2.3 Task 3 step 2 owner: update provider mock responses
   const mockRitualService = {
     getOrCreateRitual: (_userId: string, _locationId?: string) => {
       return Promise.resolve({
@@ -158,21 +159,27 @@ export async function startLocalPactProvider({
             id: 'rec-morning-1',
             scenario: 'morning',
             garmentIds: ['g-1'],
-            reasoningBadges: [{ label: 'Wind layer' }],
+            reasoningBadges: [
+              { key: 'wind_layer', label: 'Wind layer', bullets: ['Wind is high'] },
+            ],
             comfortNotes: 'Chilly morning',
           },
           {
             id: 'rec-midday-1',
             scenario: 'midday',
             garmentIds: ['g-2'],
-            reasoningBadges: [{ label: 'Mild' }],
+            reasoningBadges: [
+              { key: 'light_layers', label: 'Light layers', bullets: ['Mild day'] },
+            ],
             comfortNotes: 'Pleasant midday',
           },
           {
             id: 'rec-evening-1',
             scenario: 'evening',
             garmentIds: ['g-3'],
-            reasoningBadges: [{ label: 'Evening' }],
+            reasoningBadges: [
+              { key: 'evening_chill', label: 'Evening chill', bullets: ['Cool evening'] },
+            ],
             comfortNotes: 'Cool evening',
           },
         ],

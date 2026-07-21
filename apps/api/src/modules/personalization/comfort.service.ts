@@ -1,3 +1,4 @@
+// Story 2.2 Task 2 step 1 owner: implement ComfortService persistence and cache invalidation
 import { Injectable, Inject } from '@nestjs/common'
 import {
   PrismaClient,

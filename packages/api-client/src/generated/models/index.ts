@@ -2105,11 +2105,23 @@ export type ScenarioOutfitScenarioEnum =
  */
 export interface ScenarioOutfitReasoningBadgesInner {
   /**
-   *
+   * Unique key for the badge.
+   * @type {string}
+   * @memberof ScenarioOutfitReasoningBadgesInner
+   */
+  key: string
+  /**
+   * Localized default label for the badge.
    * @type {string}
    * @memberof ScenarioOutfitReasoningBadgesInner
    */
   label: string
+  /**
+   * Explanatory bullet points explaining why the badge triggered.
+   * @type {Array<string>}
+   * @memberof ScenarioOutfitReasoningBadgesInner
+   */
+  bullets: Array<string>
 }
 /**
  *

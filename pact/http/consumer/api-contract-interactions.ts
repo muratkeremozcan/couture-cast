@@ -185,25 +185,32 @@ export async function verifyRitualInteraction(pact: PactV4, createClient: Create
     alerts: [],
   }
 
+  // Story 2.3 Task 3 step 1 owner: update consumer contract pact expectations
   const outfitMorning = {
     id: 'rec-morning-1',
     scenario: 'morning',
     garmentIds: ['g-1'],
-    reasoningBadges: [{ label: 'Wind layer' }],
+    reasoningBadges: [
+      { key: 'wind_layer', label: 'Wind layer', bullets: ['Wind is high'] },
+    ],
     comfortNotes: 'Chilly morning',
   }
   const outfitMidday = {
     id: 'rec-midday-1',
     scenario: 'midday',
     garmentIds: ['g-2'],
-    reasoningBadges: [{ label: 'Mild' }],
+    reasoningBadges: [
+      { key: 'light_layers', label: 'Light layers', bullets: ['Mild day'] },
+    ],
     comfortNotes: 'Pleasant midday',
   }
   const outfitEvening = {
     id: 'rec-evening-1',
     scenario: 'evening',
     garmentIds: ['g-3'],
-    reasoningBadges: [{ label: 'Evening' }],
+    reasoningBadges: [
+      { key: 'evening_chill', label: 'Evening chill', bullets: ['Cool evening'] },
+    ],
     comfortNotes: 'Cool evening',
   }
 
@@ -258,8 +265,26 @@ export async function verifyRitualInteraction(pact: PactV4, createClient: Create
       const firstOutfit = response.data.outfits[0]!
       expect(firstOutfit.scenario).toBe('morning')
       expect(firstOutfit.garmentIds).toEqual(['g-1'])
-      expect(firstOutfit.reasoningBadges).toEqual([{ label: 'Wind layer' }])
+      expect(firstOutfit.reasoningBadges).toEqual([
+        { key: 'wind_layer', label: 'Wind layer', bullets: ['Wind is high'] },
+      ])
       expect(firstOutfit.comfortNotes).toBe('Chilly morning')
+
+      const secondOutfit = response.data.outfits[1]!
+      expect(secondOutfit.scenario).toBe('midday')
+      expect(secondOutfit.garmentIds).toEqual(['g-2'])
+      expect(secondOutfit.reasoningBadges).toEqual([
+        { key: 'light_layers', label: 'Light layers', bullets: ['Mild day'] },
+      ])
+      expect(secondOutfit.comfortNotes).toBe('Pleasant midday')
+
+      const thirdOutfit = response.data.outfits[2]!
+      expect(thirdOutfit.scenario).toBe('evening')
+      expect(thirdOutfit.garmentIds).toEqual(['g-3'])
+      expect(thirdOutfit.reasoningBadges).toEqual([
+        { key: 'evening_chill', label: 'Evening chill', bullets: ['Cool evening'] },
+      ])
+      expect(thirdOutfit.comfortNotes).toBe('Cool evening')
     })
 }
 

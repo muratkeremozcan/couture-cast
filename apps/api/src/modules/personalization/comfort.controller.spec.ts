@@ -1,3 +1,4 @@
+// Story 2.2 Task 3 step 2 owner: integration-test controller endpoints and validation boundaries
 import 'reflect-metadata'
 import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
