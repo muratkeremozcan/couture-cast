@@ -3,6 +3,7 @@ import { BaseAPI, type Configuration } from './runtime'
 import {
   AlertsApi,
   AuthApi,
+  ComfortApi,
   EventsApi,
   GuardianApi,
   HealthApi,
@@ -36,6 +37,7 @@ function applyApiMixins(
 export interface DefaultApi
   extends PublicApi<AlertsApi>,
     PublicApi<AuthApi>,
+    PublicApi<ComfortApi>,
     PublicApi<EventsApi>,
     PublicApi<GuardianApi>,
     PublicApi<HealthApi>,
@@ -54,6 +56,7 @@ export class DefaultApi extends BaseAPI {
 applyApiMixins(DefaultApi, [
   AlertsApi,
   AuthApi,
+  ComfortApi,
   EventsApi,
   GuardianApi,
   HealthApi,

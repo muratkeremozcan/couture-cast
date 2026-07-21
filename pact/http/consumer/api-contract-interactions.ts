@@ -5,6 +5,8 @@ import {
   apiHealthResponseSchema,
   eventsPollInvalidSinceResponseSchema,
   eventsPollResponseSchema,
+  comfortPreferencesResponseSchema,
+  updateComfortPreferencesResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { expect } from 'vitest'
 
@@ -22,7 +24,11 @@ const pactEventHeaders = {
 
 type ContractApiClient = Pick<
   DefaultApi,
-  'apiHealthGet' | 'apiV1EventsPollGet' | 'apiV1RitualGet'
+  | 'apiHealthGet'
+  | 'apiV1EventsPollGet'
+  | 'apiV1RitualGet'
+  | 'apiV1PersonalizationComfortGet'
+  | 'apiV1PersonalizationComfortPut'
 >
 type CreateClient = (mockServer: V3MockServer) => ContractApiClient
 
@@ -254,5 +260,96 @@ export async function verifyRitualInteraction(pact: PactV4, createClient: Create
       expect(firstOutfit.garmentIds).toEqual(['g-1'])
       expect(firstOutfit.reasoningBadges).toEqual([{ label: 'Wind layer' }])
       expect(firstOutfit.comfortNotes).toBe('Chilly morning')
+    })
+}
+
+export async function verifyGetComfortPreferencesInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Comfort preferences exist for user',
+        params: { userId: 'guardian-1' },
+      })
+    )
+    .uponReceiving('a request to get comfort preferences')
+    .withRequest(
+      'GET',
+      '/api/v1/personalization/comfort',
+      setJsonContent({ headers: pactEventHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: {
+            runsColdWarm: string('neutral'),
+            windTolerance: string('medium'),
+            precipPreparedness: string('medium'),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1PersonalizationComfortGet()
+
+      expect(comfortPreferencesResponseSchema.parse(response)).toEqual({
+        data: {
+          runsColdWarm: 'neutral',
+          windTolerance: 'medium',
+          precipPreparedness: 'medium',
+        },
+      })
+    })
+}
+
+export async function verifyUpdateComfortPreferencesInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  const input = {
+    runsColdWarm: 'cold' as const,
+    windTolerance: 'low' as const,
+    precipPreparedness: 'high' as const,
+  }
+
+  await pact
+    .addInteraction()
+    .uponReceiving('a request to update comfort preferences')
+    .withRequest(
+      'PUT',
+      '/api/v1/personalization/comfort',
+      setJsonContent({
+        headers: pactEventHeaders,
+        body: input,
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: {
+            runsColdWarm: string('cold'),
+            windTolerance: string('low'),
+            precipPreparedness: string('high'),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1PersonalizationComfortPut({
+        updateComfortPreferencesInput: input,
+      })
+
+      expect(updateComfortPreferencesResponseSchema.parse(response)).toEqual({
+        data: {
+          runsColdWarm: 'cold',
+          windTolerance: 'low',
+          precipPreparedness: 'high',
+        },
+      })
     })
 }

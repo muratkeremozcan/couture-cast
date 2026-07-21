@@ -18,7 +18,7 @@ import {
   type QueueHealthResponse,
   signUp,
 } from '../helpers/api'
-import { getJson, postJson } from '../helpers/http'
+import { getJson, postJson, putJson } from '../helpers/http'
 
 export { handleSummary }
 
@@ -29,6 +29,7 @@ const scenarioNames = [
   'testGuardianWritePath',
   'testProfileAndModeration',
   'testRitualOutfits',
+  'testComfortPreferences',
 ]
 
 export const options = {
@@ -55,6 +56,8 @@ export const options = {
       `p(95)<${SLO.moderationAction + infraDelay}`,
     ],
     'http_req_duration{name:api/ritual}': [`p(95)<${SLO.eventsPoll + infraDelay}`],
+    'http_req_duration{name:api/comfort-get}': [`p(95)<${SLO.userProfile + infraDelay}`],
+    'http_req_duration{name:api/comfort-put}': [`p(95)<${SLO.userProfile + infraDelay}`],
   },
 }
 
@@ -68,6 +71,7 @@ export default function () {
   testGuardianWritePath()
   testProfileAndModeration()
   testRitualOutfits()
+  testComfortPreferences()
 }
 
 export function setup() {
@@ -307,6 +311,52 @@ export function testRitualOutfits() {
       tags: { name: 'api/ritual' },
     })
     expect(status, 'cached status is 200').to.equal(200)
+  })
+
+  sleep(0.2)
+}
+
+// ── Scenario: Comfort preferences ───────────────────────────────────────────
+
+export function testComfortPreferences() {
+  const { status: signupStatus, body: user } = signUp(
+    uniqueEmail('comfort-user'),
+    '1990-05-18'
+  )
+  if (signupStatus !== 201 || !user) {
+    fail(`comfort-user signup failed: ${signupStatus}`)
+  }
+
+  describe('GET /api/v1/personalization/comfort', () => {
+    const { status, body } = getJson<{
+      data: { runsColdWarm: string; windTolerance: string; precipPreparedness: string }
+    }>(apiUrl('/api/v1/personalization/comfort'), {
+      headers: authHeaders(user.userId, 'admin'),
+      tags: { name: 'api/comfort-get' },
+    })
+    expect(status, 'status is 200').to.equal(200)
+    expect(body?.data?.runsColdWarm, 'default runsColdWarm is neutral').to.equal(
+      'neutral'
+    )
+  })
+
+  describe('PUT /api/v1/personalization/comfort', () => {
+    const { status, body } = putJson<{
+      data: { runsColdWarm: string; windTolerance: string; precipPreparedness: string }
+    }>(
+      apiUrl('/api/v1/personalization/comfort'),
+      {
+        runsColdWarm: 'warm',
+        windTolerance: 'high',
+        precipPreparedness: 'low',
+      },
+      {
+        headers: authHeaders(user.userId, 'admin'),
+        tags: { name: 'api/comfort-put' },
+      }
+    )
+    expect(status, 'status is 200').to.equal(200)
+    expect(body?.data?.runsColdWarm, 'updated runsColdWarm is warm').to.equal('warm')
   })
 
   sleep(0.2)

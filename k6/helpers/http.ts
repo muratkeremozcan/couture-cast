@@ -40,6 +40,25 @@ export function postJson<T = JsonObject>(
   })
 }
 
+export function putJson<T = JsonObject>(
+  path: string,
+  body: unknown,
+  options: {
+    headers?: Record<string, string>
+    tags?: Record<string, string>
+    timeout?: string | number
+  } = {}
+): ApiResponse<T> {
+  return apiRequest<T>({
+    method: 'PUT',
+    url: path,
+    body,
+    headers: options.headers,
+    tags: options.tags,
+    timeout: options.timeout,
+  })
+}
+
 export function responseBody(response: RefinedResponse<ResponseType>) {
   return typeof response.body === 'string' ? response.body : ''
 }

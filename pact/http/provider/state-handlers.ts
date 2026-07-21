@@ -19,4 +19,7 @@ export const stateHandlers: StateHandlers = {
   'Daily scenario outfit recommendations exist for user': () => {
     return Promise.resolve({ description: 'Configured mock outfit recommendations' })
   },
+  'Comfort preferences exist for user': () => {
+    return Promise.resolve({ description: 'Configured mock comfort preferences' })
+  },
 }

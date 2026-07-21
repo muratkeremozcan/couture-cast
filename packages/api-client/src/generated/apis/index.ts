@@ -1,6 +1,7 @@
 /* eslint-disable */
 export * from './AlertsApi'
 export * from './AuthApi'
+export * from './ComfortApi'
 export * from './EventsApi'
 export * from './GuardianApi'
 export * from './HealthApi'
