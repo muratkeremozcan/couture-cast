@@ -65,7 +65,7 @@ development_status:
   # Epic 2: Outfit Personalization Core (Phase 1)
   epic-2: in-progress
   2-1-scenario-outfit-generator: done
-  2-2-comfort-calibration-settings: review
+  2-2-comfort-calibration-settings: done
   2-3-reasoning-badges-explanations: backlog
 
   # Epic 3: Cross-Surface Experience & Localization (Phase 1)

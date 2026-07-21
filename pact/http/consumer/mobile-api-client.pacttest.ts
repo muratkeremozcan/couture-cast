@@ -9,6 +9,8 @@ import {
   verifyEventsPollInteraction,
   verifyInvalidCursorInteraction,
   verifyRitualInteraction,
+  verifyGetComfortPreferencesInteraction,
+  verifyUpdateComfortPreferencesInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -40,5 +42,13 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
 
   it('gets daily scenario outfit recommendations', async () => {
     await verifyRitualInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('reads user comfort preferences', async () => {
+    await verifyGetComfortPreferencesInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('updates user comfort preferences', async () => {
+    await verifyUpdateComfortPreferencesInteraction(pact, createMobileClientForMockServer)
   })
 })

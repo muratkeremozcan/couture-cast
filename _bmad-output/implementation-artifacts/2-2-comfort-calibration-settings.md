@@ -4,7 +4,7 @@ baseline_commit: d85ef5faca1b59fd303720c80af706c2818a5305
 
 # Story 2.2: Comfort calibration settings
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -64,6 +64,13 @@ so that outfits feel accurate.
     - Verify auth guard returns 401 on unauthenticated calls.
     - Verify request payload validation returns 400 on malformed payloads.
   - [x] Run verification tests locally: `npm run verify:changed` or `npm run validate` to ensure full type-safety and check monorepo compile gates.
+
+### Review Findings
+
+- [x] [Review][Patch] Use Redis SCAN and chunk-del instead of blocking KEYS in invalidateUserCache [apps/api/src/modules/personalization/ritual.service.ts:688]
+- [x] [Review][Patch] Implement unit tests verifying Redis scan/del cache invalidation logic [apps/api/src/modules/personalization/ritual.service.spec.ts:384]
+- [x] [Review][Defer] Weak type safety in helper functions getWindThreshold, getRainProbThreshold, and getRainAmountThreshold [apps/api/src/modules/personalization/ritual.service.ts:149] — deferred, pre-existing
+- [x] [Review][Defer] Magic numbers used for thresholds without unit context [apps/api/src/modules/personalization/ritual.service.ts:149] — deferred, pre-existing
 
 ## Dev Notes
 

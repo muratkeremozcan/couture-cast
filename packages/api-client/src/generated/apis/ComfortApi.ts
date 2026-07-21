@@ -19,7 +19,7 @@ import type {
 } from '../models/index'
 
 export interface ApiV1PersonalizationComfortPutRequest {
-  updateComfortPreferencesInput?: UpdateComfortPreferencesInput
+  updateComfortPreferencesInput: UpdateComfortPreferencesInput
 }
 
 /**
@@ -83,6 +83,13 @@ export class ComfortApi extends runtime.BaseAPI {
   async apiV1PersonalizationComfortPutRequestOpts(
     requestParameters: ApiV1PersonalizationComfortPutRequest
   ): Promise<runtime.RequestOpts> {
+    if (requestParameters['updateComfortPreferencesInput'] == null) {
+      throw new runtime.RequiredError(
+        'updateComfortPreferencesInput',
+        'Required parameter "updateComfortPreferencesInput" was null or undefined when calling apiV1PersonalizationComfortPut().'
+      )
+    }
+
     const queryParameters: any = {}
 
     const headerParameters: runtime.HTTPHeaders = {}
@@ -129,7 +136,7 @@ export class ComfortApi extends runtime.BaseAPI {
    * Update user comfort preferences
    */
   async apiV1PersonalizationComfortPut(
-    requestParameters: ApiV1PersonalizationComfortPutRequest = {},
+    requestParameters: ApiV1PersonalizationComfortPutRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<UpdateComfortPreferencesResponse> {
     const response = await this.apiV1PersonalizationComfortPutRaw(

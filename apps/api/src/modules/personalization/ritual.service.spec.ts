@@ -9,13 +9,32 @@ import Redis from 'ioredis'
 vi.mock('ioredis', () => {
   return {
     default: class MockRedis {
-      private store: Record<string, string> = {}
+      public store: Record<string, string> = {}
       get(key: string) {
         return Promise.resolve(this.store[key] || null)
       }
       set(key: string, value: string) {
         this.store[key] = value
         return Promise.resolve('OK')
+      }
+      scan(cursor: string, ...args: string[]) {
+        const matchIdx = args.indexOf('MATCH')
+        const pattern = matchIdx !== -1 ? (args[matchIdx + 1] ?? '*') : '*'
+        const regexStr = '^' + pattern.replace(/\*/g, '.*') + '$'
+        const regex = new RegExp(regexStr)
+        const matchedKeys = Object.keys(this.store).filter((k) => regex.test(k))
+        return Promise.resolve(['0', matchedKeys])
+      }
+      del(keys: string | string[]) {
+        const keysArr = Array.isArray(keys) ? keys : [keys]
+        let deletedCount = 0
+        for (const k of keysArr) {
+          if (k in this.store) {
+            delete this.store[k]
+            deletedCount++
+          }
+        }
+        return Promise.resolve(deletedCount)
       }
       quit() {
         return Promise.resolve('OK')
@@ -380,5 +399,37 @@ describe('RitualService', () => {
 
     expect(outfitRecommendationUpdate).toHaveBeenCalled()
     expect(outfitRecommendationCreate).not.toHaveBeenCalled()
+  })
+
+  describe('invalidateUserCache', () => {
+    it('should scan and delete matching user cache keys', async () => {
+      const redis = new Redis()
+      const mockRedisInstance = redis as unknown as { store: Record<string, string> }
+      mockRedisInstance.store['ritual:user-1:chicago:07/16/2026'] = 'data1'
+      mockRedisInstance.store['ritual:user-1:ny:07/16/2026'] = 'data2'
+      mockRedisInstance.store['ritual:user-2:chicago:07/16/2026'] = 'data3'
+
+      const customService = new RitualService(
+        prismaMock,
+        weatherQueryMock,
+        locationPreferencesMock,
+        redis as unknown as Redis
+      )
+
+      const scanSpy = vi.spyOn(redis, 'scan')
+      const delSpy = vi.spyOn(redis, 'del')
+
+      await customService.invalidateUserCache('user-1')
+
+      expect(scanSpy).toHaveBeenCalledWith('0', 'MATCH', 'ritual:user-1:*', 'COUNT', 100)
+      expect(delSpy).toHaveBeenCalledWith([
+        'ritual:user-1:chicago:07/16/2026',
+        'ritual:user-1:ny:07/16/2026',
+      ])
+
+      expect(mockRedisInstance.store['ritual:user-1:chicago:07/16/2026']).toBeUndefined()
+      expect(mockRedisInstance.store['ritual:user-1:ny:07/16/2026']).toBeUndefined()
+      expect(mockRedisInstance.store['ritual:user-2:chicago:07/16/2026']).toBe('data3')
+    })
   })
 })

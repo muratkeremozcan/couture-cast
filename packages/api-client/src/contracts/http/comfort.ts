@@ -102,6 +102,7 @@ export function registerComfortContracts(
     security: [{ bearerAuth: [] }],
     request: {
       body: {
+        required: true,
         content: {
           'application/json': {
             schema: registeredUpdateComfortPreferencesInputSchema,

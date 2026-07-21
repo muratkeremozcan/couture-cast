@@ -13,6 +13,8 @@ import { EventsRepository } from '../../../apps/api/src/modules/events/events.re
 import { EventsService } from '../../../apps/api/src/modules/events/events.service'
 import { RitualController } from '../../../apps/api/src/modules/personalization/ritual.controller'
 import { RitualService } from '../../../apps/api/src/modules/personalization/ritual.service'
+import { ComfortController } from '../../../apps/api/src/modules/personalization/comfort.controller'
+import { ComfortService } from '../../../apps/api/src/modules/personalization/comfort.service'
 
 export type PactEvent = {
   id: string
@@ -179,12 +181,37 @@ export async function startLocalPactProvider({
     },
   } as unknown as RitualService
 
+  const mockComfortService = {
+    getComfortPreferences: (_userId: string) => {
+      return Promise.resolve({
+        runsColdWarm: 'neutral',
+        windTolerance: 'medium',
+        precipPreparedness: 'medium',
+      })
+    },
+    updateComfortPreferences: (
+      _userId: string,
+      input: {
+        runsColdWarm: 'cold' | 'neutral' | 'warm'
+        windTolerance: 'low' | 'medium' | 'high'
+        precipPreparedness: 'low' | 'medium' | 'high'
+      }
+    ) => {
+      return Promise.resolve({
+        runsColdWarm: input.runsColdWarm,
+        windTolerance: input.windTolerance,
+        precipPreparedness: input.precipPreparedness,
+      })
+    },
+  }
+
   const moduleFixture = await Test.createTestingModule({
     controllers: [
       ApiHealthController,
       HealthController,
       EventsController,
       RitualController,
+      ComfortController,
     ],
     providers: [
       EventsService,
@@ -203,6 +230,10 @@ export async function startLocalPactProvider({
       {
         provide: RitualService,
         useValue: mockRitualService,
+      },
+      {
+        provide: ComfortService,
+        useValue: mockComfortService,
       },
     ],
   })

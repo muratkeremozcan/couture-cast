@@ -26,6 +26,8 @@ import type {
   WeatherCondition,
   WeatherProvider,
   RitualResponse,
+  WindTolerance,
+  PrecipPreparedness,
 } from '../../contracts/http.js'
 
 const formattersMap = new Map<string, Intl.DateTimeFormat>()
@@ -146,16 +148,37 @@ function toWeatherSnapshot(snapshot: WeatherSnapshotWithSegments) {
   }
 }
 
-function getWindThreshold(windTolerance: string): number {
-  return windTolerance === 'low' ? 3 : windTolerance === 'medium' ? 5 : 8
+// Wind threshold limits in meters per second (m/s) based on wind tolerance setting
+const WIND_THRESHOLD_M_S: Record<WindTolerance, number> = {
+  low: 3, // Sensitive to wind; flag wind-blocking layer at lower speeds
+  medium: 5, // Moderate tolerance
+  high: 8, // High tolerance; flag only in high wind speeds
+} as const
+
+// Precipitation probability threshold (0.0 to 1.0) based on preparedness setting
+const PRECIP_PROB_THRESHOLD: Record<PrecipPreparedness, number> = {
+  high: 0.2, // Highly prepared/cautious; suggest outerwear/umbrella for low probability
+  medium: 0.4, // Moderate caution
+  low: 0.7, // Low caution; suggest only for high probability
+} as const
+
+// Precipitation amount threshold in millimeters (mm) based on preparedness setting
+const PRECIP_AMOUNT_THRESHOLD_MM: Record<PrecipPreparedness, number> = {
+  high: 0.1, // Cautious; suggest for very light rain
+  medium: 0.5, // Moderate
+  low: 2.0, // High threshold; suggest only for heavier rain
+} as const
+
+function getWindThreshold(windTolerance: WindTolerance): number {
+  return WIND_THRESHOLD_M_S[windTolerance]
 }
 
-function getRainProbThreshold(precipPreparedness: string): number {
-  return precipPreparedness === 'high' ? 0.2 : precipPreparedness === 'medium' ? 0.4 : 0.7
+function getRainProbThreshold(precipPreparedness: PrecipPreparedness): number {
+  return PRECIP_PROB_THRESHOLD[precipPreparedness]
 }
 
-function getRainAmountThreshold(precipPreparedness: string): number {
-  return precipPreparedness === 'high' ? 0.1 : precipPreparedness === 'medium' ? 0.5 : 2.0
+function getRainAmountThreshold(precipPreparedness: PrecipPreparedness): number {
+  return PRECIP_AMOUNT_THRESHOLD_MM[precipPreparedness]
 }
 
 @Injectable()
@@ -687,10 +710,21 @@ export class RitualService implements OnModuleDestroy {
 
   async invalidateUserCache(userId: string): Promise<void> {
     try {
-      const keys = await this.redis.keys(`ritual:${userId}:*`)
-      if (keys.length > 0) {
-        await this.redis.del(...keys)
-      }
+      const matchPattern = `ritual:${userId}:*`
+      let cursor = '0'
+      do {
+        const [nextCursor, keys] = await this.redis.scan(
+          cursor,
+          'MATCH',
+          matchPattern,
+          'COUNT',
+          100
+        )
+        cursor = nextCursor
+        if (keys.length > 0) {
+          await this.redis.del(keys)
+        }
+      } while (cursor !== '0')
     } catch (err) {
       this.logger.warn(
         `Redis cache invalidation failed: ${err instanceof Error ? err.message : String(err)}`
