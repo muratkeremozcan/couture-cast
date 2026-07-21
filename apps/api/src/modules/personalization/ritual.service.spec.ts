@@ -509,6 +509,69 @@ describe('RitualService', () => {
     weatherQueryMock.getLatestWeather = originalGetLatestWeather
   })
 
+  describe('mapRawBadgeToCanonical mappings', () => {
+    it('correctly maps raw badges based on new exact key and fallback rules', async () => {
+      const redis = new Redis()
+      const customService = new RitualService(
+        prismaMock,
+        weatherQueryMock,
+        locationPreferencesMock,
+        redis as unknown as Redis
+      )
+
+      const recMock = {
+        id: 'rec-1',
+        user_id: 'user-1',
+        forecast_segment_id: 'seg-morning',
+        scenario: 'morning',
+        garment_ids: ['default-top'],
+        reasoning_badges: [
+          // 1. Exact-key lookup matches a canonical key
+          { key: 'wind_layer', label: 'Custom Wind Label', bullets: ['Bullet 1'] },
+          // 2. Key is present but custom/non-canonical; preserves provided label
+          {
+            key: 'my_custom_badge',
+            label: 'My Custom Badge Label',
+            bullets: ['Bullet 2'],
+          },
+          // 3. Key is absent, triggers keyword inference on label
+          { label: 'Commute warmth advice', bullets: ['Bullet 3'] },
+          // 4. Key is absent, label has no match; preserves provided label
+          { label: 'Completely unknown label', bullets: ['Bullet 4'] },
+        ],
+        created_at: new Date('2026-07-16T04:00:00.000Z'),
+        updated_at: new Date('2026-07-16T04:00:00.000Z'),
+      }
+      outfitRecommendationFindFirst.mockResolvedValue(recMock)
+
+      const result = await customService.getOrCreateRitual('user-1')
+      const morningOutfit = result.outfits.find((o) => o.scenario === 'morning')
+      expect(morningOutfit).toBeDefined()
+      expect(morningOutfit?.reasoningBadges).toEqual([
+        {
+          key: 'wind_layer',
+          label: 'Wind layer', // maps key exactly and uses canonical label
+          bullets: ['Bullet 1'],
+        },
+        {
+          key: 'my_custom_badge',
+          label: 'My Custom Badge Label', // preserves the custom label
+          bullets: ['Bullet 2'],
+        },
+        {
+          key: 'commute_warmth',
+          label: 'Commute warmth', // infers from label since key is absent
+          bullets: ['Bullet 3'],
+        },
+        {
+          key: 'daily_base',
+          label: 'Completely unknown label', // preserves the label since key is absent and no match found
+          bullets: ['Bullet 4'],
+        },
+      ])
+    })
+  })
+
   describe('invalidateUserCache', () => {
     it('should scan and delete matching user cache keys', async () => {
       const redis = new Redis()

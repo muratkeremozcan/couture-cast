@@ -3061,6 +3061,7 @@
                   "items": {
                     "type": "string"
                   },
+                  "minItems": 1,
                   "description": "Explanatory bullet points explaining why the badge triggered."
                 }
               },
@@ -3324,6 +3325,7 @@
                             "items": {
                               "type": "string"
                             },
+                            "minItems": 1,
                             "description": "Explanatory bullet points explaining why the badge triggered."
                           }
                         },

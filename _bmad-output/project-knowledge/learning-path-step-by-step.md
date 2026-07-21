@@ -33,6 +33,13 @@ Step template rules:
 - Do not add one-off headings that duplicate the owner map.
 - If a section does not earn its keep, remove it instead of adding another section.
 
+Mermaid diagram rules:
+- Use exactly three backticks for every Mermaid fence: open with three backticks plus `mermaid`,
+  and close with three backticks alone.
+- Close each diagram before the next Markdown heading; never let a Mermaid block span across steps.
+- After editing diagrams, verify the number of Mermaid openings matches the number of closings and
+  render or parse every diagram before finishing.
+
 Task owner map rules:
 - Use the section heading `Task owner map:` in every step.
 - Treat the owner ID as the search key.
@@ -1767,7 +1774,7 @@ Current repo note:
 
 Architecture diagram:
 
-````mermaid
+```mermaid
 flowchart TD
   Scheduler["BullMQ Job Scheduler\nweather-refresh-sweep"] --> Sweep["Sweep processor"]
   Targets["ConfiguredWeatherTargetSource"] --> Sweep
@@ -1782,6 +1789,7 @@ flowchart TD
   Normalized --> Repository["WeatherRepository\ntransactional persistence"]
   Repository --> DB["WeatherSnapshot + ForecastSegment"]
   Repository --> Query["WeatherQueryService\nfresh/cached/stale/unavailable"]
+```
 
 ## Step 17 - Weather alert rules and notification pipeline
 
@@ -1868,7 +1876,7 @@ flowchart TD
   Offline --> QuietHours{"Within user quiet hours?\nminuteOfDayAt (cached)"}
   QuietHours -->|yes| PushQuiet["Push Delivery Suppressed\nreason: quiet_hours"]
   QuietHours -->|no| Expo["PushNotificationService\nExpo Push SDK"]
-````
+```
 
 ## Step 18 - Telemetry and audit baseline
 

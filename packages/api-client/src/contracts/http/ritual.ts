@@ -21,6 +21,7 @@ export const scenarioOutfitSchema = z.object({
         label: nonEmptyStringSchema.describe('Localized default label for the badge.'),
         bullets: z
           .array(z.string())
+          .min(1)
           .describe('Explanatory bullet points explaining why the badge triggered.'),
       })
     )

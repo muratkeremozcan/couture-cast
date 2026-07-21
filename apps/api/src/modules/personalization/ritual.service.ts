@@ -201,13 +201,44 @@ function mapRawBadgeToCanonical(badge: {
   label?: string
   bullets?: string[]
 }): { key: string; label: string; bullets: string[] } {
-  const inputLabel = badge.label || ''
-  const inputKey = badge.key || ''
-  const searchStr = (inputKey || inputLabel).toLowerCase().replace(/[\s-_]+/g, '')
+  const CANONICAL_BADGES: Record<string, string> = {
+    wind_layer: 'Wind layer',
+    rain_ready: 'Rain-ready',
+    evening_chill: 'Evening chill',
+    commute_warmth: 'Commute warmth',
+    sun_protection: 'Sun protection',
+    light_layers: 'Light layers',
+    breathable_comfort: 'Breathable comfort',
+    daily_base: 'Daily base',
+  }
 
-  const match = BADGE_MAPPING.find((item) => searchStr.includes(item.keyword))
-  const key = match ? match.key : 'daily_base'
-  const label = match ? match.label : 'Daily base'
+  let key = 'daily_base'
+  let label = 'Daily base'
+  let matched = false
+
+  if (badge.key) {
+    if (badge.key in CANONICAL_BADGES) {
+      key = badge.key
+      label = CANONICAL_BADGES[badge.key]!
+      matched = true
+    }
+  } else {
+    // Retain keyword inference only when badge.key is absent and legacy label-only data requires it
+    const inputLabel = badge.label || ''
+    const searchStr = inputLabel.toLowerCase().replace(/[\s-_]+/g, '')
+    const match = BADGE_MAPPING.find((item) => searchStr.includes(item.keyword))
+    if (match) {
+      key = match.key
+      label = match.label
+      matched = true
+    }
+  }
+
+  if (!matched) {
+    // When no canonical match exists, preserve the provided label instead of defaulting to "Daily base"
+    key = badge.key || 'daily_base'
+    label = badge.label || badge.key || 'Daily base'
+  }
 
   const bullets = Array.isArray(badge.bullets)
     ? badge.bullets.filter((b): b is string => typeof b === 'string')
