@@ -1,4 +1,5 @@
-import { renderHook } from '@testing-library/react'
+/* eslint-disable @typescript-eslint/await-thenable */
+import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -87,8 +88,8 @@ describe('mobile analytics facade', () => {
     expect(mobileAnalyticsClient.getDistinctId()).toBe('provider-user')
   })
 
-  it('provides the PostHog client through the repo-local provider wrapper', () => {
-    renderHook(() => null, {
+  it('provides the PostHog client through the repo-local provider wrapper', async () => {
+    await renderHook(() => null, {
       wrapper: ({ children }) => (
         <MobileAnalyticsProvider>{children}</MobileAnalyticsProvider>
       ),
@@ -106,8 +107,8 @@ describe('mobile analytics facade', () => {
     )
   })
 
-  it('adapts the vendor hook behind useMobileAnalytics', () => {
-    const { result } = renderHook(() => useMobileAnalytics())
+  it('adapts the vendor hook behind useMobileAnalytics', async () => {
+    const { result } = await renderHook(() => useMobileAnalytics())
 
     result.current.capture('modal_opened')
     void result.current.screen('modal')

@@ -1,4 +1,6 @@
-import { act, render, screen } from '@testing-library/react'
+/* eslint-disable @typescript-eslint/await-thenable */
+import { act, screen } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/edit-screen-info', () => ({
@@ -35,7 +37,7 @@ describe('TabTwoScreen', () => {
       status: 'ok',
     })
 
-    render(<TabTwoScreen />)
+    await render(<TabTwoScreen />)
 
     await screen.findByText('API health: ok')
   })
@@ -44,7 +46,7 @@ describe('TabTwoScreen', () => {
     vi.useFakeTimers()
     loadMobileApiHealthMock.mockImplementation(() => new Promise(() => undefined))
 
-    render(<TabTwoScreen />)
+    await render(<TabTwoScreen />)
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5_000)

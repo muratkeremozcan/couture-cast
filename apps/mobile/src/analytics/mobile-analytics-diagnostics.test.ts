@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  clearMobileAnalyticsRecordedEvents,
+  setMobileAnalyticsDiagnosticsEnabled,
+} from './mobile-analytics-diagnostics.js'
 import type { MobileAnalyticsRecordedEvent } from './mobile-analytics-diagnostics.js'
 
 const originalDiagnosticsEnv = process.env.MOBILE_ANALYTICS_DIAGNOSTICS
@@ -6,6 +10,8 @@ const originalExpoDiagnosticsEnv = process.env.EXPO_PUBLIC_MOBILE_ANALYTICS_DIAG
 
 afterEach(() => {
   vi.resetModules()
+  clearMobileAnalyticsRecordedEvents()
+  setMobileAnalyticsDiagnosticsEnabled(false)
   process.env.MOBILE_ANALYTICS_DIAGNOSTICS = originalDiagnosticsEnv
   process.env.EXPO_PUBLIC_MOBILE_ANALYTICS_DIAGNOSTICS = originalExpoDiagnosticsEnv
 })
@@ -13,6 +19,7 @@ afterEach(() => {
 describe('mobile analytics diagnostics recorder', () => {
   it('records and publishes events when diagnostics are enabled', async () => {
     process.env.MOBILE_ANALYTICS_DIAGNOSTICS = '1'
+    setMobileAnalyticsDiagnosticsEnabled(true)
     const diagnostics = await import('./mobile-analytics-diagnostics.js')
     const snapshots: MobileAnalyticsRecordedEvent[][] = []
     const consoleInfo = vi.spyOn(console, 'info').mockImplementation(() => undefined)
@@ -45,6 +52,7 @@ describe('mobile analytics diagnostics recorder', () => {
   it('does not record events when diagnostics are disabled', async () => {
     delete process.env.MOBILE_ANALYTICS_DIAGNOSTICS
     delete process.env.EXPO_PUBLIC_MOBILE_ANALYTICS_DIAGNOSTICS
+    setMobileAnalyticsDiagnosticsEnabled(false)
     const diagnostics = await import('./mobile-analytics-diagnostics.js')
 
     diagnostics.recordMobileAnalyticsEvent('alert_received')

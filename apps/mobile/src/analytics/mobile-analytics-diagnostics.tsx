@@ -11,9 +11,13 @@ type AnalyticsDiagnosticsSubscriber = (
   records: readonly MobileAnalyticsRecordedEvent[]
 ) => void
 
-export const isMobileAnalyticsDiagnosticsEnabled =
+export let isMobileAnalyticsDiagnosticsEnabled =
   process.env.MOBILE_ANALYTICS_DIAGNOSTICS === '1' ||
   process.env.EXPO_PUBLIC_MOBILE_ANALYTICS_DIAGNOSTICS === '1'
+
+export function setMobileAnalyticsDiagnosticsEnabled(enabled: boolean) {
+  isMobileAnalyticsDiagnosticsEnabled = enabled
+}
 
 const records: MobileAnalyticsRecordedEvent[] = []
 const subscribers = new Set<AnalyticsDiagnosticsSubscriber>()
@@ -50,6 +54,10 @@ export function recordMobileAnalyticsEvent(
 
 export function getMobileAnalyticsRecordedEvents() {
   return records.slice()
+}
+
+export function clearMobileAnalyticsRecordedEvents() {
+  records.length = 0
 }
 
 export function subscribeMobileAnalyticsEvents(

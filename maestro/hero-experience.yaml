@@ -1,0 +1,41 @@
+# Story 3.1: Mobile hero experience E2E verification flow
+appId: ${MAESTRO_APP_ID}
+name: 'Mobile hero experience ritual'
+tags:
+  - e2e
+  - hero
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: false
+    stopApp: false
+
+- openLink: ${APP_URL}
+
+# Dismiss Expo developer sheets/menus if they appear
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu if it appears'
+- tapOn:
+    point: '50%,92%'
+
+# Assert landing screen elements are visible
+- assertVisible: 'Morning commute'
+- assertVisible: 'Midday'
+- assertVisible: 'Evening plans'
+
+# Toggle Midday scenario
+- tapOn:
+    text: 'Midday'
+    retryTapIfNoChange: true
+- takeScreenshot:
+    path: maestro/artifacts/hero-midday-scenario
+
+# Toggle Evening plans scenario
+- tapOn:
+    text: 'Evening plans'
+    retryTapIfNoChange: true
+- takeScreenshot:
+    path: maestro/artifacts/hero-evening-scenario

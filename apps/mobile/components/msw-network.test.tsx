@@ -13,7 +13,8 @@ describe('mobile msw network mocking', () => {
   })
 
   it('uses the default handler response', async () => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = 'https://example.test'
+    process.env.EXPO_PUBLIC_API_BASE_URL =
+      typeof window !== 'undefined' ? window.location.origin : 'https://example.test'
 
     const body = await loadMobileApiHealth()
 
@@ -22,9 +23,10 @@ describe('mobile msw network mocking', () => {
   })
 
   it('allows per-test handler overrides', async () => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = 'https://example.test'
+    process.env.EXPO_PUBLIC_API_BASE_URL =
+      typeof window !== 'undefined' ? window.location.origin : 'https://example.test'
     server.use(
-      http.get('https://example.test/api/health', () =>
+      http.get('*/api/health', () =>
         HttpResponse.json(
           {
             status: 'ok',

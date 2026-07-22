@@ -40,6 +40,11 @@ module.exports = {
             allowForKnownSafeCalls: ['test', 'it', 'describe'],
           },
         ],
+        // Allow dynamic testing methods, mocks, and browser tests without strict type limits
+        'import/named': 'off',
+        '@typescript-eslint/no-unsafe-call': 'off',
+        '@typescript-eslint/no-unsafe-member-access': 'off',
+        '@typescript-eslint/no-unsafe-assignment': 'off',
       },
     },
     {

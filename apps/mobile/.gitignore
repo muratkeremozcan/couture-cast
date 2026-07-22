@@ -5,6 +5,9 @@ node_modules/
 
 # Expo
 .expo/
+
+# Vitest browser UI artifacts
+**/__screenshots__/
 dist/
 web-build/
 expo-env.d.ts

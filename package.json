@@ -98,6 +98,7 @@
     "@typescript-eslint/parser": "8.46.3",
     "@useoptic/optic": "1.0.9",
     "@vitest/coverage-v8": "4.0.9",
+    "@vitest/ui": "^4.0.9",
     "axe-core": "4.10.0",
     "cross-env": "10.1.0",
     "dotenv": "17.2.3",
