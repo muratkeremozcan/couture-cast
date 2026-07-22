@@ -1,5 +1,8 @@
 import { Platform } from 'react-native'
-import type { RitualResponse } from '@couture/api-client/contracts/http'
+import {
+  ritualResponseSchema,
+  type RitualResponse,
+} from '@couture/api-client/contracts/http'
 
 const cachePrefix = 'ritual'
 const latestLocationKey = 'latest-location'
@@ -40,7 +43,7 @@ async function readStoredValue(key: string): Promise<string | null> {
   }
 
   const fileSystem = (await import(
-    /* @vite-ignore */ legacyFileSystemPath
+    /* @vite-ignore */ /* @metro-ignore */ legacyFileSystemPath
   )) as unknown as FileSystemShim
   if (!fileSystem.documentDirectory) {
     return null
@@ -58,7 +61,7 @@ async function writeStoredValue(key: string, value: string) {
   }
 
   const fileSystem = (await import(
-    /* @vite-ignore */ legacyFileSystemPath
+    /* @vite-ignore */ /* @metro-ignore */ legacyFileSystemPath
   )) as unknown as FileSystemShim
   if (!fileSystem.documentDirectory) {
     return
@@ -76,12 +79,15 @@ function parseCacheEntry(value: string | null): RitualCacheEntry | null {
   }
 
   try {
-    const parsed = JSON.parse(value) as RitualCacheEntry
-    return typeof parsed.timestamp === 'number' &&
-      parsed.data !== undefined &&
-      parsed.data !== null
-      ? parsed
-      : null
+    const parsed = JSON.parse(value) as Partial<RitualCacheEntry>
+    if (typeof parsed.timestamp !== 'number') {
+      return null
+    }
+
+    return {
+      timestamp: parsed.timestamp,
+      data: ritualResponseSchema.parse(parsed.data),
+    }
   } catch {
     return null
   }

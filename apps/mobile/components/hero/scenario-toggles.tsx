@@ -26,6 +26,7 @@ export function ScenarioToggles({
     <View
       style={[styles.container, { borderBottomColor: palette.divider }]}
       testID="scenario-toggles"
+      accessibilityRole="tablist"
     >
       {scenarios.map((tab) => {
         const isActive = activeScenario === tab.key
@@ -35,6 +36,8 @@ export function ScenarioToggles({
             onPress={() => onScenarioChange(tab.key)}
             style={[styles.tabButton, isActive && styles.activeTabButton]}
             testID={`scenario-toggle-${tab.key}`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
           >
             <Text
               style={[

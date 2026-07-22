@@ -8,7 +8,7 @@ tags:
 ---
 - launchApp:
     appId: ${MAESTRO_APP_ID}
-    clearState: false
+    clearState: true
     stopApp: false
 
 - openLink: ${APP_URL}
@@ -19,7 +19,9 @@ tags:
     optional: true
     label: 'Dismiss Expo Go developer menu if it appears'
 - tapOn:
-    point: '50%,92%'
+    text: 'Open app'
+    optional: true
+    label: 'Dismiss Expo Go developer sheet if it appears'
 
 # Assert landing screen elements are visible
 - assertVisible: 'Morning commute'
@@ -30,6 +32,7 @@ tags:
 - tapOn:
     text: 'Midday'
     retryTapIfNoChange: true
+- assertVisible: 'Warm and sunny midday. Light tee is perfect.'
 - takeScreenshot:
     path: maestro/artifacts/hero-midday-scenario
 
@@ -37,5 +40,6 @@ tags:
 - tapOn:
     text: 'Evening plans'
     retryTapIfNoChange: true
+- assertVisible: 'Cool evening ahead. Sweater recommended.'
 - takeScreenshot:
     path: maestro/artifacts/hero-evening-scenario

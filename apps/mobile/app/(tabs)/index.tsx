@@ -29,7 +29,7 @@ import { useHeroPalette } from '@/components/hero/hero-theme'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
 
-export { clearRitualMemoryCache as clearMemoryCache } from '@/src/lib/ritual-cache'
+const ritualRequestTimeoutMs = 15_000
 
 const alternateGarments: Record<string, string[]> = {
   Outerwear: [
@@ -51,6 +51,7 @@ export default function TabOneScreen() {
   const analyticsUserId = analytics.getDistinctId() || 'mobile-anonymous-user'
   const palette = useHeroPalette()
   const latestLoadId = useRef(0)
+  const hasTrackedTabView = useRef(false)
 
   const [ritual, setRitual] = useState<RitualResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -66,9 +67,16 @@ export default function TabOneScreen() {
     const client = createMobileApiClient({
       accessToken: async () => (await resolveMobileAccessToken()) || '',
     })
-    // Omitting locationId deliberately selects the user's primary saved location.
-    const response = await client.apiV1RitualGet()
-    return ritualResponseSchema.parse(response)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), ritualRequestTimeoutMs)
+
+    try {
+      // Omitting locationId deliberately selects the user's primary saved location.
+      const response = await client.apiV1RitualGet({}, { signal: controller.signal })
+      return ritualResponseSchema.parse(response)
+    } finally {
+      clearTimeout(timeout)
+    }
   }
 
   const loadData = async (forceRefresh = false) => {
@@ -128,7 +136,10 @@ export default function TabOneScreen() {
 
   useEffect(() => {
     // Track when user views Tab One — top of the engagement funnel
-    analytics.capture('tab_one_viewed')
+    if (!hasTrackedTabView.current) {
+      hasTrackedTabView.current = true
+      analytics.capture('tab_one_viewed')
+    }
     void loadData()
   }, [analyticsUserId])
 
@@ -140,9 +151,10 @@ export default function TabOneScreen() {
     })
   }
 
-  const handleRibbonToggle = (_isExpanded: boolean) => {
+  const handleRibbonToggle = (isExpanded: boolean) => {
     analytics.capture('hero_interaction', {
       interactionType: 'ribbon_toggle',
+      isExpanded,
     })
   }
 
@@ -385,8 +397,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
     fontFamily: Platform.select({
-      ios: 'Playfair Display',
-      android: 'Playfair Display',
+      ios: 'Playfair Display Bold',
+      android: 'Playfair Display Bold',
       web: 'Playfair Display, serif',
     }),
   },

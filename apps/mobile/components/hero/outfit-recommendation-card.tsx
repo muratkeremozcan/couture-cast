@@ -73,6 +73,8 @@ export function OutfitRecommendationCard({
                     isSelected && styles.badgeSelected,
                   ]}
                   testID={`reasoning-badge-${badge.key}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
                 >
                   <Text
                     style={[

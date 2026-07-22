@@ -48,6 +48,8 @@ export function GarmentItemTile({ garmentId, onSwap }: GarmentItemTileProps) {
       ]}
       onPress={() => onSwap(garmentId)}
       testID={`garment-tile-${garmentId}`}
+      accessibilityRole="button"
+      accessibilityLabel={`Swap ${name}`}
     >
       <View style={styles.content}>
         <View style={styles.textColumn}>

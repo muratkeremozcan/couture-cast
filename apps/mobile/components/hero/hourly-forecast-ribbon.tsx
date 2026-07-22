@@ -4,25 +4,12 @@ import { Text, View } from '@/components/themed'
 import type { WeatherHourlyEntry } from '@couture/api-client/contracts/http'
 import { formatTemperature } from './weather-header'
 import { useHeroPalette } from './hero-theme'
+import { weatherConditionGlyphs } from './weather-glyphs'
 
 type HourlyForecastRibbonProps = {
   hourly?: WeatherHourlyEntry[]
   isLoading?: boolean
   onToggleExpand?: (isExpanded: boolean) => void
-}
-
-const conditionGlyphs: Record<string, string> = {
-  clear: '☀️',
-  partly_cloudy: '⛅',
-  cloudy: '☁️',
-  fog: '🌫️',
-  drizzle: '🌧️',
-  rain: '🌧️',
-  sleet: '🌨️',
-  snow: '❄️',
-  thunderstorm: '⛈️',
-  wind: '💨',
-  unknown: '❓',
 }
 
 function formatHour(isoString: string) {
@@ -97,7 +84,7 @@ export function HourlyForecastRibbon({
         contentContainerStyle={styles.scrollContent}
       >
         {visibleEntries.map((item, index) => {
-          const glyph = conditionGlyphs[item.condition] || '❓'
+          const glyph = weatherConditionGlyphs[item.condition] || '❓'
           const precipPercent = Math.round(item.precipitationProbability * 100)
 
           return (
@@ -194,8 +181,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#a3a3a3',
     fontFamily: Platform.select({
-      ios: 'Space Grotesk',
-      android: 'Space Grotesk',
+      ios: 'Space Grotesk Bold',
+      android: 'Space Grotesk Bold',
       web: 'Space Grotesk, "SF Mono", monospace',
       default: 'System',
     }),

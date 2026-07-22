@@ -5,9 +5,9 @@ import { render } from 'vitest-browser-react'
 import { describe, expect, it, beforeAll, beforeEach, afterEach, vi } from 'vitest'
 import { server } from '@/src/test-utils/msw/server'
 import { http, HttpResponse } from 'msw'
-import TabOneScreen, { clearMemoryCache } from '@/app/(tabs)/index'
+import TabOneScreen from '@/app/(tabs)/index'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
-import { saveRitualCache } from '@/src/lib/ritual-cache'
+import { clearRitualMemoryCache, saveRitualCache } from '@/src/lib/ritual-cache'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
 
 // Mock analytics hook
@@ -34,7 +34,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
-    clearMemoryCache()
+    clearRitualMemoryCache()
     localStorage.clear()
   })
 
@@ -119,6 +119,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     // Verify telemetry
     expect(mockCapture).toHaveBeenCalledWith('hero_interaction', {
       interactionType: 'ribbon_toggle',
+      isExpanded: true,
     })
 
     // Click collapse

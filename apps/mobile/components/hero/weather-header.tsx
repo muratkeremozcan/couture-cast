@@ -3,6 +3,7 @@ import { StyleSheet, Platform, NativeModules } from 'react-native'
 import { Text, View } from '@/components/themed'
 import type { WeatherCurrent } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from './hero-theme'
+import { weatherConditionGlyphs } from './weather-glyphs'
 
 type WeatherHeaderProps = {
   current?: WeatherCurrent
@@ -36,20 +37,6 @@ export function formatTemperature(celsius: number, forceFahrenheit?: boolean) {
   return `${Math.round(celsius)}°C`
 }
 
-const conditionGlyphs: Record<string, string> = {
-  clear: '☀️',
-  partly_cloudy: '⛅',
-  cloudy: '☁️',
-  fog: '🌫️',
-  drizzle: '🌧️',
-  rain: '🌧️',
-  sleet: '🌨️',
-  snow: '❄️',
-  thunderstorm: '⛈️',
-  wind: '💨',
-  unknown: '❓',
-}
-
 const conditionNames: Record<string, string> = {
   clear: 'Clear Sky',
   partly_cloudy: 'Partly Cloudy',
@@ -80,7 +67,7 @@ export function WeatherHeader({ current, isLoading }: WeatherHeaderProps) {
     return null
   }
 
-  const glyph = conditionGlyphs[current.condition] || '❓'
+  const glyph = weatherConditionGlyphs[current.condition] || '❓'
   const text = conditionNames[current.condition] || 'Unknown'
 
   return (
@@ -115,8 +102,8 @@ const styles = StyleSheet.create({
     fontSize: 48,
     fontWeight: '700',
     fontFamily: Platform.select({
-      ios: 'Space Grotesk',
-      android: 'Space Grotesk',
+      ios: 'Space Grotesk Bold',
+      android: 'Space Grotesk Bold',
       web: 'Space Grotesk, "SF Mono", monospace',
       default: 'System',
     }),

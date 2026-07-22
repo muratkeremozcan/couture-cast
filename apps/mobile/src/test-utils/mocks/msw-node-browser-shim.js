@@ -8,6 +8,7 @@ export function setupServer(...handlers) {
       // Start the Service Worker in the browser
       return worker.start({
         onUnhandledRequest: 'bypass',
+        ...options,
       })
     },
     resetHandlers(...handlers) {
