@@ -129,6 +129,9 @@ outputs:
   diff-lines-total:
     description: 'Total instrumentable lines in the diff'
     value: ${{ steps.diff-coverage.outputs.diff_lines_total }}
+  diff-detail-path:
+    description: 'Path to the per-file diff coverage detail JSON (internal; unique per run, under RUNNER_TEMP)'
+    value: ${{ steps.diff-coverage.outputs.detail_path }}
   diff-threshold-valid:
     description: 'Whether the diff-coverage-threshold input is a valid number'
     value: ${{ steps.diff-coverage.outputs.diff_threshold_valid }}
@@ -295,8 +298,11 @@ runs:
     #   3. Cross-reference: only count DA (Data Annotation) entries in lcov.
     #      Blank lines, comments, type-only declarations have no DA entry and are excluded.
     #      (Add coverage.include to vitest configs so all source files appear in lcov.)
-    #   4. If diff-coverage-threshold is valid and pct < threshold → fail after posting comment.
-    #   5. Fails closed (diff_threshold_failed=true) when git diff errors and a threshold is set.
+    #   4. Preserve up to 25 files and 30 uncovered ranges per file in a temporary sidecar,
+    #      so the PR comment can link reviewers directly to missed lines without affecting
+    #      aggregate coverage or the gate. Detail is capped at 55,000 bytes when rendered.
+    #   5. If diff-coverage-threshold is valid and pct < threshold → fail after posting comment.
+    #   6. Fails closed (diff_threshold_failed=true) when git diff errors and a threshold is set.
     - name: Compute diff coverage
       id: diff-coverage
       if: ${{ github.event_name == 'pull_request' }}
@@ -325,6 +331,17 @@ runs:
           fi
         fi
 
+        # Keep the per-file detail outside the uploaded coverage artifact and unique per run.
+        # It is presentation-only: inability to create it must never change coverage results
+        # or fail the threshold gate.
+        DETAIL_PATH=""
+        if DETAIL_PATH=$(mktemp "${RUNNER_TEMP:-/tmp}/diff-coverage-detail.XXXXXX"); then
+          echo "detail_path=$DETAIL_PATH" >> "$GITHUB_OUTPUT"
+        else
+          echo "::warning::Could not create temporary diff coverage detail file; omitting per-file detail"
+          echo "detail_path=" >> "$GITHUB_OUTPUT"
+        fi
+
         handle_base_resolution_failure() {
           local message="$1"
           echo "::notice::${message} — diff coverage skipped"
@@ -351,7 +368,7 @@ runs:
           BASE_REF="origin/$BASE_BR"
         fi
 
-        LCOV_FILE="$LCOV_FILE" BASE_REF="$BASE_REF" node -e "
+        LCOV_FILE="$LCOV_FILE" BASE_REF="$BASE_REF" DETAIL_PATH="$DETAIL_PATH" node -e "
         const fs = require('fs');
         const { spawnSync } = require('child_process');
 
@@ -390,13 +407,14 @@ runs:
 
         if (!fs.existsSync(lcovPath)) skip('lcov.info not found at ' + lcovPath);
 
-        // lcov SF: paths are already normalized to repo-relative by the merge step
-        const fileCov = {};
+        // lcov SF: paths are already normalized to repo-relative by the merge step.
+        // Use null-prototype maps because paths originate from PR-controlled files.
+        const fileCov = Object.create(null);
         let curFile = null;
         for (const line of fs.readFileSync(lcovPath, 'utf8').split('\n')) {
           if (line.startsWith('SF:')) {
             curFile = line.slice(3).trim();
-            fileCov[curFile] = {};
+            fileCov[curFile] = Object.create(null);
           } else if (line.startsWith('DA:') && curFile) {
             const comma = line.indexOf(',', 3);
             const ln = parseInt(line.slice(3, comma), 10);
@@ -413,7 +431,7 @@ runs:
         if (result.error || result.status !== 0) failClosed('git diff failed — failing closed: ' + (result.stderr || ''));
         const diffOut = result.stdout;
 
-        const changed = {};
+        const changed = Object.create(null);
         let diffFile = null;
         for (const line of diffOut.split('\n')) {
           if (line.startsWith('+++ b/')) {
@@ -429,12 +447,76 @@ runs:
           }
         }
 
+        function groupRanges(nums) {
+          const sorted = [...nums].sort((a, b) => a - b);
+          const ranges = [];
+          let start = null;
+          let previous = null;
+          for (const number of sorted) {
+            if (start === null) {
+              start = number;
+              previous = number;
+              continue;
+            }
+            if (number === previous + 1) {
+              previous = number;
+              continue;
+            }
+            ranges.push({ start, end: previous });
+            start = number;
+            previous = number;
+          }
+          if (start !== null) ranges.push({ start, end: previous });
+          return ranges;
+        }
+
+        const MAX_DETAIL_FILES = 25;
+        const MAX_RANGES_PER_FILE = 30;
         let total = 0, covered = 0;
+        const fileDetails = [];
         for (const [file, lines] of Object.entries(changed)) {
           const cov = fileCov[file];
           if (!cov) continue;
+          let fileTotal = 0;
+          let fileCovered = 0;
+          const missingLines = [];
           for (const ln of lines) {
-            if (ln in cov) { total++; if (cov[ln] > 0) covered++; }
+            if (ln in cov) {
+              total++;
+              fileTotal++;
+              if (cov[ln] > 0) {
+                covered++;
+                fileCovered++;
+              } else {
+                missingLines.push(ln);
+              }
+            }
+          }
+          if (fileTotal > 0) {
+            const allRanges = groupRanges(missingLines);
+            fileDetails.push({
+              path: file,
+              total: fileTotal,
+              covered: fileCovered,
+              missingRanges: allRanges.slice(0, MAX_RANGES_PER_FILE),
+              rangesTruncated: allRanges.length > MAX_RANGES_PER_FILE,
+              rangesOmitted: Math.max(0, allRanges.length - MAX_RANGES_PER_FILE),
+            });
+          }
+        }
+
+        // Show the worst files first. The sidecar remains best-effort and never participates in
+        // aggregate coverage or threshold evaluation.
+        fileDetails.sort((a, b) => (b.total - b.covered) - (a.total - a.covered) || a.path.localeCompare(b.path));
+        if (process.env.DETAIL_PATH) {
+          try {
+            fs.writeFileSync(process.env.DETAIL_PATH, JSON.stringify({
+              files: fileDetails.slice(0, MAX_DETAIL_FILES),
+              truncated: fileDetails.length > MAX_DETAIL_FILES,
+              totalFiles: fileDetails.length,
+            }));
+          } catch (error) {
+            console.log('::warning::Could not write diff coverage detail file: ' + error.message);
           }
         }
 
@@ -539,8 +621,11 @@ runs:
         INPUT_DIFF_THRESHOLD_FAILED: ${{ steps.diff-coverage.outputs.diff_threshold_failed }}
         INPUT_DIFF_THRESHOLD: ${{ inputs.diff-coverage-threshold }}
         INPUT_DIFF_THRESHOLD_VALID: ${{ steps.diff-coverage.outputs.diff_threshold_valid }}
+        INPUT_DIFF_DETAIL_PATH: ${{ steps.diff-coverage.outputs.detail_path }}
       with:
         script: |
+          const fs = require('fs');
+
           if (context.payload.pull_request && context.payload.pull_request.head.repo.full_name !== context.payload.pull_request.base.repo.full_name) {
             core.info('Skipping PR comment for forked repository');
             return;
@@ -611,6 +696,96 @@ runs:
             const threshPart = diffThresholdValid ? ` _(threshold: ${diffThreshold}%)_` : '';
             const prefix = icon ? `${icon} ` : '';
             bodyParts.push('', `📝 **New/changed code (this PR):** ${prefix}**${diffPct}%** line coverage · ${diffCovered}/${diffTotal} lines${threshPart}`);
+
+            // Per-file detail is best-effort. A missing, malformed, or unwritable sidecar must
+            // never affect the aggregate result, threshold gate, or sticky-comment update.
+            try {
+              const detailPath = process.env.INPUT_DIFF_DETAIL_PATH;
+              const detail = detailPath && fs.existsSync(detailPath)
+                ? JSON.parse(fs.readFileSync(detailPath, 'utf8'))
+                : null;
+              const files = Array.isArray(detail && detail.files) ? detail.files : [];
+              const hasGap = files.some((file) => (
+                file && Array.isArray(file.missingRanges) && file.missingRanges.length > 0
+              ));
+
+              // Preserve the existing aggregate-only comment when every instrumentable changed
+              // line is covered.
+              if (hasGap) {
+                const crypto = require('crypto');
+                const { owner, repo } = context.repo;
+                const prNumber = context.issue.number;
+                const serverUrl = process.env.GITHUB_SERVER_URL || 'https://github.com';
+                const escapeCell = (value) => String(value)
+                  .replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/\|/g, '&#124;')
+                  .replace(/\r?\n/g, ' ');
+                const maxDetailBytes = 55000;
+                // Reserve enough room for the closing tag and a truncation notice even when the
+                // table rows consume the available budget.
+                const detailFooterReserveBytes = 512;
+                const maxRowBytes = maxDetailBytes - detailFooterReserveBytes;
+                const header = [
+                  '',
+                  '<details><summary>Click to see where and how coverage changed</summary>',
+                  '',
+                  '| File | New lines covered | Missing lines |',
+                  '|------|--------------------|---------------|',
+                ];
+                let detailBytes = Buffer.byteLength(header.join('\n'));
+                const rows = [];
+                let filesShown = 0;
+                let stoppedOnBudget = false;
+
+                for (const file of files) {
+                  if (!file || typeof file.path !== 'string' || !Array.isArray(file.missingRanges)) continue;
+                  const fileTotal = Number.isFinite(file.total) ? file.total : 0;
+                  const fileCovered = Number.isFinite(file.covered) ? file.covered : 0;
+                  const anchor = crypto.createHash('sha256').update(file.path).digest('hex');
+                  const fileUrl = `${serverUrl}/${owner}/${repo}/pull/${prNumber}/files#diff-${anchor}`;
+                  const filePct = fileTotal > 0 ? Math.round((fileCovered / fileTotal) * 1000) / 10 : 100;
+                  const rangeLinks = file.missingRanges
+                    .filter((range) => (
+                      range && Number.isFinite(range.start) && Number.isFinite(range.end)
+                    ))
+                    .map((range) => {
+                      const rangeLabel = range.start === range.end
+                        ? String(range.start)
+                        : `${range.start}-${range.end}`;
+                      return `[${rangeLabel}](${fileUrl}R${range.start}-R${range.end})`;
+                    });
+                  if (file.rangesTruncated) {
+                    rangeLinks.push(`+${file.rangesOmitted || 0} more omitted`);
+                  }
+                  const row = `| <a href="${fileUrl}"><code>${escapeCell(file.path)}</code></a> | ${fileCovered}/${fileTotal} (${filePct}%) | ${escapeCell(rangeLinks.join(', '))} |`;
+                  const rowBytes = Buffer.byteLength(row) + 1;
+                  if (detailBytes + rowBytes > maxRowBytes) {
+                    stoppedOnBudget = true;
+                    break;
+                  }
+                  rows.push(row);
+                  detailBytes += rowBytes;
+                  filesShown++;
+                }
+
+                if (rows.length > 0) {
+                  const detailLines = [...header, ...rows];
+                  const totalFiles = Number.isFinite(detail.totalFiles) ? detail.totalFiles : files.length;
+                  if (stoppedOnBudget || detail.truncated) {
+                    const reason = stoppedOnBudget
+                      ? ' (stopped early to stay within the comment size limit)'
+                      : '';
+                    detailLines.push('', `_Showing ${filesShown} of ${totalFiles} changed files${reason}._`);
+                  }
+                  detailLines.push('', '</details>');
+                  bodyParts.push(...detailLines);
+                }
+              }
+            } catch (error) {
+              core.warning(`Skipping per-file coverage detail, non-fatal: ${error.message}`);
+            }
           }
           if (reportUrl) {
             bodyParts.push('', `📦 **[Download Full Report](${reportUrl})**`);
