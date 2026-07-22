@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -69,8 +69,8 @@ development_status:
   2-3-reasoning-badges-explanations: done
 
   # Epic 3: Cross-Surface Experience & Localization (Phase 1)
-  epic-3: backlog
-  3-1-mobile-hero-experience: backlog
+  epic-3: in-progress
+  3-1-mobile-hero-experience: in-progress
   3-2-localization-infrastructure: backlog
   3-3-home-lock-screen-widgets: backlog
   3-4-watchos-glance: backlog

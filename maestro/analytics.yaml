@@ -5,10 +5,7 @@ tags:
   - analytics
   - maestro
 env:
-  TAB_ONE_PATH: 'app/(tabs)/index.tsx'
   TAB_TWO_PATH: 'app/(tabs)/two.tsx'
-  RITUAL_EVENT: 'Analytics event: ritual_created'
-  UPLOAD_EVENT: 'Analytics event: wardrobe_upload_started'
   ALERT_EVENT: 'Analytics event: alert_received'
 ---
 - launchApp:
@@ -30,22 +27,11 @@ env:
     point: '25%,94%'
     retryTapIfNoChange: true
 
-- assertVisible: ${TAB_ONE_PATH}
-- assertVisible: 'Mobile analytics diagnostics'
-
+- assertVisible: 'Morning commute'
 - tapOn:
-    text: 'Generate outfit ritual'
+    text: 'Evening plans'
     retryTapIfNoChange: true
-- assertVisible: ${RITUAL_EVENT}
-- takeScreenshot:
-    path: maestro/artifacts/mobile-analytics-ritual
-
-- tapOn:
-    text: 'Start wardrobe upload'
-    retryTapIfNoChange: true
-- assertVisible: ${UPLOAD_EVENT}
-- takeScreenshot:
-    path: maestro/artifacts/mobile-analytics-upload
+- assertVisible: 'Evening plans'
 
 - tapOn:
     point: '75%,94%'

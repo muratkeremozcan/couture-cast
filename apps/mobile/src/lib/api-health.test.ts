@@ -10,7 +10,8 @@ describe('loadMobileApiHealth', () => {
   })
 
   it('loads health details through the generated mobile client', async () => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = 'https://example.test'
+    process.env.EXPO_PUBLIC_API_BASE_URL =
+      typeof window !== 'undefined' ? window.location.origin : 'https://example.test'
 
     const response = await loadMobileApiHealth()
 

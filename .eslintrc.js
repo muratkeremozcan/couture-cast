@@ -43,6 +43,16 @@ module.exports = {
       },
     },
     {
+      files: ['apps/mobile/**/*.{spec,test}.{ts,tsx}'],
+      rules: {
+        // Mobile browser component tests use dynamic renderer and mock APIs.
+        'import/named': 'off',
+        '@typescript-eslint/no-unsafe-call': 'off',
+        '@typescript-eslint/no-unsafe-member-access': 'off',
+        '@typescript-eslint/no-unsafe-assignment': 'off',
+      },
+    },
+    {
       files: ['apps/api/**/*.{ts,tsx}'],
       parserOptions: {
         project: ['./apps/api/tsconfig.eslint.json'],

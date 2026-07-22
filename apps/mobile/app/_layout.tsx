@@ -1,6 +1,14 @@
 // Step 2 step 3 owner: searchable owner anchor
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
+import {
+  PlayfairDisplay_400Regular,
+  PlayfairDisplay_700Bold,
+} from '@expo-google-fonts/playfair-display'
+import {
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_700Bold,
+} from '@expo-google-fonts/space-grotesk'
 import Constants, { AppOwnership } from 'expo-constants'
 import { useFonts } from 'expo-font'
 import type { Notification } from 'expo-notifications'
@@ -35,6 +43,10 @@ export default function RootLayout() {
   // Expo's types return an untyped tuple; narrow locally to satisfy type-aware linting.
   const fontLoadResult = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    'Playfair Display': PlayfairDisplay_400Regular,
+    'Playfair Display Bold': PlayfairDisplay_700Bold,
+    'Space Grotesk': SpaceGrotesk_400Regular,
+    'Space Grotesk Bold': SpaceGrotesk_700Bold,
     ...FontAwesome.font,
   }) as unknown as FontLoadTuple
   const [loaded, fontError]: FontLoadTuple = fontLoadResult

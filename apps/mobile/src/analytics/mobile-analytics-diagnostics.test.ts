@@ -14,6 +14,8 @@ describe('mobile analytics diagnostics recorder', () => {
   it('records and publishes events when diagnostics are enabled', async () => {
     process.env.MOBILE_ANALYTICS_DIAGNOSTICS = '1'
     const diagnostics = await import('./mobile-analytics-diagnostics.js')
+    diagnostics.clearMobileAnalyticsRecordedEvents()
+    diagnostics.setMobileAnalyticsDiagnosticsEnabled(true)
     const snapshots: MobileAnalyticsRecordedEvent[][] = []
     const consoleInfo = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
@@ -46,6 +48,8 @@ describe('mobile analytics diagnostics recorder', () => {
     delete process.env.MOBILE_ANALYTICS_DIAGNOSTICS
     delete process.env.EXPO_PUBLIC_MOBILE_ANALYTICS_DIAGNOSTICS
     const diagnostics = await import('./mobile-analytics-diagnostics.js')
+    diagnostics.clearMobileAnalyticsRecordedEvents()
+    diagnostics.setMobileAnalyticsDiagnosticsEnabled(false)
 
     diagnostics.recordMobileAnalyticsEvent('alert_received')
 
