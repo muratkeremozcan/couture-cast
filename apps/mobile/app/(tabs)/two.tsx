@@ -65,7 +65,10 @@ export default function TabTwoScreen() {
       if (settings.localeSyncPending && !localeChangeInFlight.current) {
         try {
           await updatePreferredLocaleFromMobile(settings.locale)
-          await saveSettings({ localeSyncPending: false })
+          const didPersistSync = await saveSettings({ localeSyncPending: false })
+          if (!didPersistSync) {
+            throw new Error('Unable to persist locale synchronization state')
+          }
         } catch {
           if (isActive) {
             setLocaleError(
@@ -107,7 +110,13 @@ export default function TabTwoScreen() {
 
     try {
       await i18n.changeLanguage(localeCode)
-      await saveSettings({ locale: localeCode, localeSyncPending: true })
+      const didPersistLocale = await saveSettings({
+        locale: localeCode,
+        localeSyncPending: true,
+      })
+      if (!didPersistLocale) {
+        throw new Error('Unable to persist locale settings')
+      }
       setCurrentLocale(localeCode)
 
       trackMobileLocaleSwitched(analytics, {
@@ -118,7 +127,10 @@ export default function TabTwoScreen() {
 
       try {
         await updatePreferredLocaleFromMobile(localeCode)
-        await saveSettings({ localeSyncPending: false })
+        const didPersistSync = await saveSettings({ localeSyncPending: false })
+        if (!didPersistSync) {
+          throw new Error('Unable to persist locale synchronization state')
+        }
       } catch {
         setLocaleError(
           t('settings.locale_sync_error', {
@@ -127,6 +139,13 @@ export default function TabTwoScreen() {
           })
         )
       }
+    } catch {
+      await i18n.changeLanguage(oldLocale).catch(() => undefined)
+      setLocaleError(
+        t('settings.locale_change_error', {
+          defaultValue: 'Unable to change language. Please try again.',
+        })
+      )
     } finally {
       localeChangeInFlight.current = false
       setIsChangingLocale(false)

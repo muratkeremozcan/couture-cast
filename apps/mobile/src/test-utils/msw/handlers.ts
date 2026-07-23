@@ -246,8 +246,7 @@ export const handlers = [
     })
   ),
   http.get('*/api/v1/ritual', ({ request }) => {
-    const acceptLanguage = request.headers.get('accept-language') || 'en-US'
-    const locale = acceptLanguage.split(',')[0]?.split(';')[0]?.trim() || 'en-US'
+    const locale = new URL(request.url).searchParams.get('locale') || 'en-US'
     const localizedList = localizedOutfits[locale] || mockRitualResponse.data.outfits
 
     return HttpResponse.json({

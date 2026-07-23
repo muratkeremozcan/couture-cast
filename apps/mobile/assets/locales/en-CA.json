@@ -31,7 +31,7 @@
     "alert_title": "Severe Weather Warning",
     "offline_toast": "Using recently cached weather data",
     "loading": "Loading recommendations...",
-    "garment_swap_title": "Choose alternate garment",
+    "garment_swap_title": "Choose alternate {{category}}",
     "feels_like": "Feels like",
     "precipitation": "Precipitation"
   },
@@ -39,6 +39,7 @@
     "title": "Settings",
     "language": "Language",
     "locale_sync_error": "Language changed on this device. Profile sync will retry later.",
+    "locale_change_error": "Unable to change language. Please try again.",
     "region_units": "Region & Units",
     "languages": {
       "en-US": "English (US)",

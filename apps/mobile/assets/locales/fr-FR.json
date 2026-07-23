@@ -31,7 +31,7 @@
     "alert_title": "Alerte Météo Violente",
     "offline_toast": "Utilisation des données météo récemment mises en cache",
     "loading": "Chargement des recommandations...",
-    "garment_swap_title": "Choisir un vêtement alternatif",
+    "garment_swap_title": "Choisir une alternative pour {{category}}",
     "feels_like": "Ressenti",
     "precipitation": "Précipitations"
   },
@@ -39,6 +39,7 @@
     "title": "Paramètres",
     "language": "Langue",
     "locale_sync_error": "La langue a changé sur cet appareil. La synchronisation du profil sera réessayée plus tard.",
+    "locale_change_error": "Impossible de changer la langue. Veuillez réessayer.",
     "region_units": "Région et Unités",
     "languages": {
       "en-US": "Anglais (É.-U.)",

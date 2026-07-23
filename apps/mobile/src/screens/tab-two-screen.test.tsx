@@ -103,6 +103,26 @@ describe('TabTwoScreen', () => {
     )
   })
 
+  it('surfaces persistence failures without syncing an unpersisted locale', async () => {
+    const setItemSpy = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementationOnce(() => {
+        throw new Error('storage unavailable')
+      })
+
+    try {
+      await render(<TabTwoScreen />)
+
+      fireEvent.click(screen.getByTestId('locale-btn-tr-TR'))
+
+      await screen.findByText('Unable to change language. Please try again.')
+      expect(updatePreferredLocaleMock).not.toHaveBeenCalled()
+      expect(i18n.resolvedLanguage).toBe('en-US')
+    } finally {
+      setItemSpy.mockRestore()
+    }
+  })
+
   it('does not cause layout overflow or text truncation in any locale', async () => {
     loadMobileApiHealthMock.mockResolvedValue({ status: 'ok' })
 
@@ -124,9 +144,9 @@ describe('TabTwoScreen', () => {
         await i18n.changeLanguage(locale)
       })
 
-      const { unmount } = await render(<TabTwoScreen />)
+      const { container, unmount } = await render(<TabTwoScreen />)
 
-      const allElements = document.querySelectorAll('*')
+      const allElements = container.querySelectorAll('*')
       allElements.forEach((el) => {
         if (el.children.length === 0 && el.textContent && el.textContent.trim()) {
           const scrollWidth = el.scrollWidth

@@ -31,7 +31,7 @@
     "alert_title": "Şiddetli Hava Uyarısı",
     "offline_toast": "Yakın zamanda önbelleğe alınmış hava durumu verileri kullanılıyor",
     "loading": "Öneriler yükleniyor...",
-    "garment_swap_title": "Alternatif giysi seçin",
+    "garment_swap_title": "{{category}} için alternatif seçin",
     "feels_like": "Hissedilen sıcaklık",
     "precipitation": "Yağış oranı"
   },
@@ -39,6 +39,7 @@
     "title": "Ayarlar",
     "language": "Dil",
     "locale_sync_error": "Dil bu cihazda değiştirildi. Profil eşitlemesi daha sonra yeniden denenecek.",
+    "locale_change_error": "Dil değiştirilemedi. Lütfen tekrar deneyin.",
     "region_units": "Bölge ve Birimler",
     "languages": {
       "en-US": "İngilizce (ABD)",

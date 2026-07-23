@@ -186,6 +186,29 @@ function getRainAmountThreshold(precipPreparedness: PrecipPreparedness): number 
   return PRECIP_AMOUNT_THRESHOLD_MM[precipPreparedness] ?? 0.1
 }
 
+function toLocalizedTemperature(
+  temperatureCelsius: number,
+  locale: SupportedLocale
+): string {
+  return Math.round(
+    locale === 'en-US' ? (temperatureCelsius * 9) / 5 + 32 : temperatureCelsius
+  ).toString()
+}
+
+function localizeTemperatureTokens(text: string, locale: SupportedLocale): string {
+  if (locale !== 'en-US') {
+    return text
+  }
+
+  return text.replace(/(-?\d+(?:\.\d+)?)°C/g, (_match, rawTemperature: string) => {
+    const localizedTemperature = toLocalizedTemperature(
+      Number.parseFloat(rawTemperature),
+      locale
+    )
+    return `${localizedTemperature}°F`
+  })
+}
+
 const BADGE_MAPPING = [
   { keyword: 'wind', key: 'wind_layer', label: 'Wind layer' },
   { keyword: 'rain', key: 'rain_ready', label: 'Rain-ready' },
@@ -738,12 +761,15 @@ function mapRawBadgeToCanonical(
 
   const localized = badgeTranslations[locale][key]
   const sourceBullets = validBadgeBullets(badge.bullets)
+  const localizedSourceBullets = sourceBullets.map((bullet) =>
+    localizeTemperatureTokens(bullet, locale)
+  )
   const shouldLocalizeBullets = locale !== 'en-US' && locale !== 'en-CA'
   const bullets =
     shouldLocalizeBullets && localized?.bullets.length
       ? localized.bullets
       : sourceBullets.length > 0
-        ? sourceBullets
+        ? localizedSourceBullets
         : (localized?.bullets ?? [])
 
   return {
@@ -1321,12 +1347,8 @@ export class RitualService implements OnModuleDestroy {
       const dict = comfortNotesTranslations[locale]
       const notes: string[] = []
 
-      const toLocalizedTemperature = (temperatureCelsius: number) =>
-        Math.round(
-          locale === 'en-US' ? (temperatureCelsius * 9) / 5 + 32 : temperatureCelsius
-        ).toString()
-      const feelsLikeStr = toLocalizedTemperature(segment.feels_like)
-      const adjustedFeelsLikeStr = toLocalizedTemperature(adjustedFeelsLike)
+      const feelsLikeStr = toLocalizedTemperature(segment.feels_like, locale)
+      const adjustedFeelsLikeStr = toLocalizedTemperature(adjustedFeelsLike, locale)
 
       if (runsColdWarm !== 'neutral') {
         notes.push(
@@ -1352,7 +1374,8 @@ export class RitualService implements OnModuleDestroy {
 
       const windLimit = getWindThreshold(windTolerance)
       if (segment.wind_speed > windLimit) {
-        notes.push(dict.windy.replace('{windSpeed}', segment.wind_speed.toString()))
+        const windSpeed = Math.round(segment.wind_speed * 10) / 10
+        notes.push(dict.windy.replace('{windSpeed}', windSpeed.toString()))
       }
 
       const rainProbLimit = getRainProbThreshold(precipPreparedness)

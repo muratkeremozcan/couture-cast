@@ -46,24 +46,29 @@ async function readStoredSettings(): Promise<string | null> {
   }
 }
 
-async function writeStoredSettings(value: string) {
+async function writeStoredSettings(value: string): Promise<boolean> {
   try {
     if (Platform.OS === 'web') {
-      globalThis.localStorage?.setItem(settingsFile, value)
-      return
+      const storage = globalThis.localStorage
+      if (!storage) {
+        return false
+      }
+      storage.setItem(settingsFile, value)
+      return true
     }
 
     const fileSystem = (await import(
       /* @vite-ignore */ /* @metro-ignore */ legacyFileSystemPath
     )) as unknown as FileSystemShim
     if (!fileSystem.documentDirectory) {
-      return
+      return false
     }
 
     const fileUri = `${fileSystem.documentDirectory}${settingsFile}`
     await fileSystem.writeAsStringAsync(fileUri, value)
+    return true
   } catch {
-    // ignore write errors
+    return false
   }
 }
 
@@ -87,8 +92,8 @@ export async function getSavedSettings(): Promise<SettingsData> {
   }
 }
 
-export async function saveSettings(settings: Partial<SettingsData>) {
+export async function saveSettings(settings: Partial<SettingsData>): Promise<boolean> {
   const current = await getSavedSettings()
   const updated = { ...current, ...settings }
-  await writeStoredSettings(JSON.stringify(updated))
+  return writeStoredSettings(JSON.stringify(updated))
 }

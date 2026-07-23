@@ -5,6 +5,7 @@ import {
   ritualQueryParamsSchema,
   supportedLocales,
   userPreferencesInputSchema,
+  userPreferencesResponseSchema,
 } from '../src/contracts/http/index.js'
 
 describe('localization HTTP contracts', () => {
@@ -34,5 +35,12 @@ describe('localization HTTP contracts', () => {
       locale: 'de-DE',
     })
     expect(() => ritualQueryParamsSchema.parse({ locale: 'ja-JP' })).toThrow()
+  })
+
+  it('only accepts true for a successful preference update response', () => {
+    expect(userPreferencesResponseSchema.parse({ success: true })).toEqual({
+      success: true,
+    })
+    expect(() => userPreferencesResponseSchema.parse({ success: false })).toThrow()
   })
 })

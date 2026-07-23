@@ -23,7 +23,7 @@ tags:
     label: 'Dismiss Expo Go developer sheet if it appears'
 
 - tapOn:
-    point: '75%,94%'
+    id: 'settings-tab'
     retryTapIfNoChange: true
     label: 'Open language settings'
 

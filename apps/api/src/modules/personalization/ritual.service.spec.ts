@@ -441,7 +441,7 @@ describe('RitualService', () => {
         key: 'commute_warmth',
         label: 'Commute warmth',
         bullets: [
-          'Morning feels-like temperature is 14°C (adjusted to 11°C), which is below the commute warmth threshold of 12°C.',
+          'Morning feels-like temperature is 57°F (adjusted to 52°F), which is below the commute warmth threshold of 54°F.',
         ],
       },
     ])
@@ -452,7 +452,7 @@ describe('RitualService', () => {
         key: 'light_layers',
         label: 'Light layers',
         bullets: [
-          'Feels-like temperature is 21°C (adjusted to 18°C), which is between 15°C and 22°C.',
+          'Feels-like temperature is 70°F (adjusted to 64°F), which is between 59°F and 72°F.',
         ],
       },
     ])
@@ -463,10 +463,18 @@ describe('RitualService', () => {
         key: 'evening_chill',
         label: 'Evening chill',
         bullets: [
-          'Evening feels-like temperature is 17°C (adjusted to 14°C), which is below the evening chill threshold of 15°C.',
+          'Evening feels-like temperature is 63°F (adjusted to 57°F), which is below the evening chill threshold of 59°F.',
         ],
       },
     ])
+
+    const createCalls = outfitRecommendationCreate.mock.calls as unknown as [
+      { data: { reasoning_badges: unknown } },
+    ][]
+    const persistedBadgeText = JSON.stringify(
+      createCalls.map(([input]) => input.data.reasoning_badges)
+    )
+    expect(persistedBadgeText).toContain('12°C')
   })
 
   it('prevents rounding and floating-point exposure in wind and precipitation badges', async () => {
@@ -513,6 +521,8 @@ describe('RitualService', () => {
         'Precipitation amount is 0.8 mm, which exceeds your threshold of 0.1 mm.',
       ],
     })
+    expect(eveningOutfit?.comfortNotes).toContain('Winds are high at 6 m/s')
+    expect(eveningOutfit?.comfortNotes).not.toContain('6.000000000000001')
 
     weatherQueryMock.getLatestWeather = originalGetLatestWeather
   })

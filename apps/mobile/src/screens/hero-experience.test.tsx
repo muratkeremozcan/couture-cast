@@ -147,6 +147,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
     // Verify modal is visible
     expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
+    expect(screen.getByText('Choose alternate Outerwear')).toBeTruthy()
 
     // Choose 'Leather Jacket'
     const leatherJacketOption = screen.getByTestId('swap-option-leather-jacket')
@@ -207,6 +208,29 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     expect(screen.getByText('Açık')).toBeTruthy()
     expect(screen.getByText('Saatlik tahmin')).toBeTruthy()
     expect(screen.getByText('Genişlet (48 sa)')).toBeTruthy()
+  })
+
+  it('renders localized API fixtures selected by the locale query parameter', async () => {
+    await i18n.changeLanguage('tr-TR')
+
+    await render(<TabOneScreen />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Hafif rüzgarlı serin sabah. Trençkot önerilir.')
+      ).toBeTruthy()
+    })
+    expect(screen.getByText('Rüzgarlık')).toBeTruthy()
+  })
+
+  it('uses the resolved supported locale for temperature formatting', async () => {
+    await i18n.changeLanguage('en')
+
+    await render(<TabOneScreen />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('current-temperature').textContent).toBe('70°F')
+    })
   })
 
   it('displays Merlot warning banner when weather alerts are active', async () => {

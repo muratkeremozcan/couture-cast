@@ -46,7 +46,7 @@ export const userPreferencesInputSchema = z.object({
 })
 
 export const userPreferencesResponseSchema = z.object({
-  success: z.boolean(),
+  success: z.literal(true),
 })
 
 export type ApiRole = z.infer<typeof apiRoleSchema>

@@ -301,7 +301,8 @@ export default function TabOneScreen() {
           <View style={styles.modalContent} testID="garment-swap-modal">
             <Text style={styles.modalTitle}>
               {t('hero.garment_swap_title', {
-                defaultValue: 'Choose alternate garment',
+                category: swapCategory,
+                defaultValue: `Choose alternate ${swapCategory}`,
               })}
             </Text>
             <ScrollView style={styles.modalScroll}>

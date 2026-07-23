@@ -28,7 +28,12 @@ describe('Localization Formatters', () => {
 
     it('should format CAD for en-CA', () => {
       const result = formatCurrency(100, 'en-CA')
-      expect(result).toContain('$100')
+      expect(result).toBe(
+        new Intl.NumberFormat('en-CA', {
+          style: 'currency',
+          currency: 'CAD',
+        }).format(100)
+      )
     })
 
     it('should format EUR for fr-FR', () => {
@@ -49,9 +54,12 @@ describe('Localization Formatters', () => {
 
     it('should format BRL for pt-BR', () => {
       const result = formatCurrency(100, 'pt-BR')
-      expect(
-        result.includes('R$') || result.includes('BRL') || result.includes('100')
-      ).toBe(true)
+      expect(result).toBe(
+        new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        }).format(100)
+      )
     })
 
     it('should format EUR for pt-PT', () => {
@@ -61,12 +69,12 @@ describe('Localization Formatters', () => {
 
     it('should format TRY for tr-TR', () => {
       const result = formatCurrency(100, 'tr-TR')
-      expect(
-        result.includes('₺') ||
-          result.includes('TL') ||
-          result.includes('TRY') ||
-          result.includes('100')
-      ).toBe(true)
+      expect(result).toBe(
+        new Intl.NumberFormat('tr-TR', {
+          style: 'currency',
+          currency: 'TRY',
+        }).format(100)
+      )
     })
   })
 

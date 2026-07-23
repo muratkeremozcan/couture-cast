@@ -1,7 +1,11 @@
 import React from 'react'
 import { StyleSheet, Platform } from 'react-native'
 import { Text, View } from '@/components/themed'
-import type { WeatherCurrent } from '@couture/api-client/contracts/http'
+import {
+  defaultSupportedLocale,
+  resolveSupportedLocale,
+  type WeatherCurrent,
+} from '@couture/api-client/contracts/http'
 import { useHeroPalette } from './hero-theme'
 import { weatherConditionGlyphs } from './weather-glyphs'
 import { useTranslation } from 'react-i18next'
@@ -17,7 +21,10 @@ export function formatTemperature(celsius: number, forceFahrenheit?: boolean) {
   if (forceFahrenheit !== undefined) {
     return localizedFormatTemperature(celsius, forceFahrenheit ? 'en-US' : 'tr-TR')
   }
-  return localizedFormatTemperature(celsius, i18n.language)
+  const locale =
+    resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
+    defaultSupportedLocale
+  return localizedFormatTemperature(celsius, locale)
 }
 
 const conditionNames: Record<string, string> = {

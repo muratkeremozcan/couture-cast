@@ -56,6 +56,7 @@ export default function TabLayout() {
         name="two"
         options={{
           title: t('tabs.tab_two', { defaultValue: 'Tab Two' }),
+          tabBarButtonTestID: 'settings-tab',
           tabBarIcon: ({ color }: { color: string }) => (
             <TabBarIcon name="code" color={color} />
           ),

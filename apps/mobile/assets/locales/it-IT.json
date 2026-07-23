@@ -31,7 +31,7 @@
     "alert_title": "Allerta Meteo Grave",
     "offline_toast": "Utilizzo dei dati meteo memorizzati di recente",
     "loading": "Caricamento raccomandazioni...",
-    "garment_swap_title": "Scegli capo alternativo",
+    "garment_swap_title": "Scegli alternativa per {{category}}",
     "feels_like": "Percepito",
     "precipitation": "Precipitazione"
   },
@@ -39,6 +39,7 @@
     "title": "Impostazioni",
     "language": "Lingua",
     "locale_sync_error": "La lingua è stata cambiata su questo dispositivo. La sincronizzazione del profilo verrà ritentata più tardi.",
+    "locale_change_error": "Impossibile cambiare la lingua. Riprova.",
     "region_units": "Regione e Unità",
     "languages": {
       "en-US": "Inglese (USA)",

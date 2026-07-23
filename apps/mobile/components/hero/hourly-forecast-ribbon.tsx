@@ -17,7 +17,7 @@ type HourlyForecastRibbonProps = {
 function formatHour(isoString: string) {
   try {
     const date = new Date(isoString)
-    return new Intl.DateTimeFormat(i18n.language, {
+    return new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
       hour: 'numeric',
       timeZone: 'UTC', // contract specifies UTC timestamps
     }).format(date)

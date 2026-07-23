@@ -31,7 +31,7 @@
     "alert_title": "Unwetterwarnung",
     "offline_toast": "Kürzlich zwischengespeicherte Wetterdaten werden verwendet",
     "loading": "Empfehlungen werden geladen...",
-    "garment_swap_title": "Alternatives Kleidungsstück wählen",
+    "garment_swap_title": "Alternative für {{category}} wählen",
     "feels_like": "Gefühlt wie",
     "precipitation": "Niederschlag"
   },
@@ -39,6 +39,7 @@
     "title": "Einstellungen",
     "language": "Sprache",
     "locale_sync_error": "Die Sprache wurde auf diesem Gerät geändert. Die Profilsynchronisierung wird später erneut versucht.",
+    "locale_change_error": "Die Sprache konnte nicht geändert werden. Bitte versuche es erneut.",
     "region_units": "Region & Einheiten",
     "languages": {
       "en-US": "Englisch (USA)",

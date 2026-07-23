@@ -31,7 +31,7 @@
     "alert_title": "Alerta de Clima Severo",
     "offline_toast": "Usando dados climáticos salvos recentemente",
     "loading": "Carregando recomendações...",
-    "garment_swap_title": "Escolher peça alternativa",
+    "garment_swap_title": "Escolher alternativa para {{category}}",
     "feels_like": "Sensação térmica",
     "precipitation": "Precipitação"
   },
@@ -39,6 +39,7 @@
     "title": "Configurações",
     "language": "Idioma",
     "locale_sync_error": "O idioma foi alterado neste dispositivo. A sincronização do perfil será tentada novamente mais tarde.",
+    "locale_change_error": "Não foi possível alterar o idioma. Tente novamente.",
     "region_units": "Região e Unidades",
     "languages": {
       "en-US": "Inglês (EUA)",

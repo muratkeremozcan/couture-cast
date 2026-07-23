@@ -2621,11 +2621,21 @@ export type UserPreferencesInputLocaleEnum =
 export interface UserPreferencesResponse {
   /**
    *
-   * @type {boolean}
+   * @type {UserPreferencesResponseSuccessEnum}
    * @memberof UserPreferencesResponse
    */
-  success: boolean
+  success: UserPreferencesResponseSuccessEnum
 }
+
+/**
+ * @export
+ */
+export const UserPreferencesResponseSuccessEnum = {
+  true: true,
+} as const
+export type UserPreferencesResponseSuccessEnum =
+  (typeof UserPreferencesResponseSuccessEnum)[keyof typeof UserPreferencesResponseSuccessEnum]
+
 /**
  *
  * @export
