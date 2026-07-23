@@ -1,6 +1,11 @@
 import { useMemo, type PropsWithChildren } from 'react'
 import { PostHogProvider, usePostHog } from 'posthog-react-native'
 import { posthogProviderClient } from '../config/posthog'
+import i18n from '../lib/i18n'
+import {
+  defaultSupportedLocale,
+  resolveSupportedLocale,
+} from '@couture/api-client/contracts/http'
 import { recordMobileAnalyticsEvent } from './mobile-analytics-diagnostics'
 
 type MobileAnalyticsValue =
@@ -12,6 +17,13 @@ type MobileAnalyticsValue =
   | { [key: string]: MobileAnalyticsValue }
 
 type MobileAnalyticsProperties = Record<string, MobileAnalyticsValue>
+
+function withLocaleContext(properties?: MobileAnalyticsProperties) {
+  const locale =
+    resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
+    defaultSupportedLocale
+  return { ...properties, locale }
+}
 
 type MobileAnalyticsRuntime = {
   capture: (event: string, properties?: MobileAnalyticsProperties) => void
@@ -47,11 +59,12 @@ export function createMobileAnalyticsClient(
 ): MobileAnalyticsClient {
   return {
     capture(event, properties) {
-      recordMobileAnalyticsEvent(event, properties)
-      client.capture(event, properties)
+      const contextualProperties = withLocaleContext(properties)
+      recordMobileAnalyticsEvent(event, contextualProperties)
+      client.capture(event, contextualProperties)
     },
     screen(screenName, properties) {
-      return client.screen(screenName, properties)
+      return client.screen(screenName, withLocaleContext(properties))
     },
     getDistinctId() {
       const distinctId = client.getDistinctId()

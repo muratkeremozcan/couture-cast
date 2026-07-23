@@ -1,0 +1,47 @@
+# Story 3.2: End-user localization verification flow
+appId: ${MAESTRO_APP_ID}
+name: 'Mobile locale switch and localized hero'
+tags:
+  - e2e
+  - localization
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu if it appears'
+- tapOn:
+    text: 'Open app'
+    optional: true
+    label: 'Dismiss Expo Go developer sheet if it appears'
+
+- tapOn:
+    id: 'settings-tab'
+    retryTapIfNoChange: true
+    label: 'Open language settings'
+
+- tapOn:
+    id: 'locale-btn-tr-TR'
+    retryTapIfNoChange: true
+
+- assertVisible: 'Ayarlar'
+- assertVisible: 'Dil'
+- assertVisible: 'Türkçe'
+
+- tapOn:
+    text: 'Ana Sayfa'
+    retryTapIfNoChange: true
+
+- assertVisible: 'Sabah gezisi'
+- assertVisible: 'Saatlik tahmin'
+- assertVisible: 'Genişlet (48 sa)'
+
+- takeScreenshot:
+    path: maestro/artifacts/localization-tr-TR

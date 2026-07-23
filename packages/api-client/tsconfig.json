@@ -3,5 +3,11 @@
   "compilerOptions": {
     "composite": true
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "testing/**/*.ts", "vitest.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.json",
+    "scripts/**/*.ts",
+    "testing/**/*.ts",
+    "vitest.config.ts"
+  ]
 }

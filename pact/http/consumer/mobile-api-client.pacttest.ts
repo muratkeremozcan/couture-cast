@@ -9,8 +9,10 @@ import {
   verifyEventsPollInteraction,
   verifyInvalidCursorInteraction,
   verifyRitualInteraction,
+  verifyRitualLocalizationInteraction,
   verifyGetComfortPreferencesInteraction,
   verifyUpdateComfortPreferencesInteraction,
+  verifyUpdateUserPreferencesInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -44,11 +46,19 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
     await verifyRitualInteraction(pact, createMobileClientForMockServer)
   })
 
+  it('gets daily scenario outfit recommendations with an explicit locale', async () => {
+    await verifyRitualLocalizationInteraction(pact, createMobileClientForMockServer)
+  })
+
   it('reads user comfort preferences', async () => {
     await verifyGetComfortPreferencesInteraction(pact, createMobileClientForMockServer)
   })
 
   it('updates user comfort preferences', async () => {
     await verifyUpdateComfortPreferencesInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('persists the selected mobile locale', async () => {
+    await verifyUpdateUserPreferencesInteraction(pact, createMobileClientForMockServer)
   })
 })

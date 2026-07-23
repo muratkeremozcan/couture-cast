@@ -1,0 +1,42 @@
+{
+  "en-US": {
+    "language": "en",
+    "defaultForLanguage": true
+  },
+  "en-CA": {
+    "language": "en",
+    "regions": ["CA"]
+  },
+  "es-419": {
+    "language": "es",
+    "defaultForLanguage": true
+  },
+  "fr-CA": {
+    "language": "fr",
+    "regions": ["CA"]
+  },
+  "fr-FR": {
+    "language": "fr",
+    "defaultForLanguage": true
+  },
+  "tr-TR": {
+    "language": "tr",
+    "defaultForLanguage": true
+  },
+  "de-DE": {
+    "language": "de",
+    "defaultForLanguage": true
+  },
+  "it-IT": {
+    "language": "it",
+    "defaultForLanguage": true
+  },
+  "pt-BR": {
+    "language": "pt",
+    "regions": ["BR"]
+  },
+  "pt-PT": {
+    "language": "pt",
+    "defaultForLanguage": true
+  }
+}

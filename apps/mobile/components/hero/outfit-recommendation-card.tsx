@@ -4,6 +4,7 @@ import { Text, View } from '@/components/themed'
 import type { ScenarioOutfit } from '@couture/api-client/contracts/http'
 import { GarmentItemTile } from './garment-item-tile'
 import { useHeroPalette } from './hero-theme'
+import { useTranslation } from 'react-i18next'
 
 type OutfitRecommendationCardProps = {
   outfit?: ScenarioOutfit
@@ -17,6 +18,7 @@ export function OutfitRecommendationCard({
   isLoading,
 }: OutfitRecommendationCardProps) {
   const [selectedBadgeKey, setSelectedBadgeKey] = useState<string | null>(null)
+  const { t } = useTranslation()
   const palette = useHeroPalette()
 
   if (isLoading) {
@@ -100,7 +102,10 @@ export function OutfitRecommendationCard({
               testID="badge-details-panel"
             >
               <Text style={styles.detailsTitle}>
-                {activeBadgeInfo.label} Justification:
+                {t('hero.badge_justification', {
+                  label: activeBadgeInfo.label,
+                  defaultValue: `${activeBadgeInfo.label} justification:`,
+                })}
               </Text>
               {activeBadgeInfo.bullets.map((bullet, idx) => (
                 <Text key={idx} style={[styles.bulletText, { color: palette.text }]}>

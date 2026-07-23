@@ -1,0 +1,65 @@
+{
+  "tabs": {
+    "tab_one": "Scheda Uno",
+    "tab_two": "Impostazioni"
+  },
+  "hero": {
+    "scenarios": {
+      "morning": "Pendolarismo mattutino",
+      "midday": "Mezzogiorno",
+      "evening": "Piani serali"
+    },
+    "conditions": {
+      "clear": "Cielo sereno",
+      "partly_cloudy": "Parzialmente nuvoloso",
+      "cloudy": "Nuvoloso",
+      "fog": "Nebbia",
+      "drizzle": "Pioggerella",
+      "rain": "Pioggia",
+      "sleet": "Nevischio",
+      "snow": "Neve",
+      "thunderstorm": "Temporale",
+      "wind": "Ventoso",
+      "unknown": "Sconosciuto"
+    },
+    "hourly_forecast": "Previsioni orarie",
+    "expand_hours": "Espandi ({{hours}} h)",
+    "collapse": "Riduci",
+    "load_error": "Impossibile caricare i consigli giornalieri",
+    "retry": "Riprova",
+    "badge_justification": "Motivazione di {{label}}:",
+    "alert_title": "Allerta Meteo Grave",
+    "offline_toast": "Utilizzo dei dati meteo memorizzati di recente",
+    "loading": "Caricamento raccomandazioni...",
+    "garment_swap_title": "Scegli alternativa per {{category}}",
+    "feels_like": "Percepito",
+    "precipitation": "Precipitazione"
+  },
+  "settings": {
+    "title": "Impostazioni",
+    "language": "Lingua",
+    "locale_sync_error": "La lingua è stata cambiata su questo dispositivo. La sincronizzazione del profilo verrà ritentata più tardi.",
+    "locale_change_error": "Impossibile cambiare la lingua. Riprova.",
+    "region_units": "Regione e Unità",
+    "languages": {
+      "en-US": "Inglese (USA)",
+      "en-CA": "Inglese (Canada)",
+      "es-419": "Spagnolo (LatAm)",
+      "fr-CA": "Francese (Canada)",
+      "fr-FR": "Francese (Europa)",
+      "tr-TR": "Turco",
+      "de-DE": "Tedesco",
+      "it-IT": "Italiano",
+      "pt-BR": "Portoghese (Brasile)",
+      "pt-PT": "Portoghese (Portogallo)"
+    },
+    "api_health": "Verifica dello stato dell'API...",
+    "api_health_status": "Stato dell'API: {{status}}",
+    "api_health_unavailable": "Stato dell'API non disponibile",
+    "diagnostic_alert_btn": "Registra analisi allerta meteo",
+    "diagnostic_info": "Il tracciamento alert_received è collegato ai listener di ricezione delle notifiche push reali."
+  },
+  "common": {
+    "cancel": "Annulla"
+  }
+}

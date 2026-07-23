@@ -30,6 +30,7 @@ export const analyticsEventNameSchema = z.enum([
   'alert_sent',
   'location_switched',
   'api_error_occurred',
+  'locale_switched',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -153,6 +154,15 @@ export const apiErrorOccurredEventSchema = z.object({
 
 export type ApiErrorOccurredEvent = z.infer<typeof apiErrorOccurredEventSchema>
 
+export const localeSwitchedEventSchema = z.object({
+  userId: nonEmptyString,
+  fromLocale: nonEmptyString,
+  toLocale: nonEmptyString,
+  timestamp: isoTimestamp,
+})
+
+export type LocaleSwitchedEvent = z.infer<typeof localeSwitchedEventSchema>
+
 export const analyticsEventSchemas = {
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
@@ -165,6 +175,7 @@ export const analyticsEventSchemas = {
   alert_sent: alertSentEventSchema,
   location_switched: locationSwitchedEventSchema,
   api_error_occurred: apiErrorOccurredEventSchema,
+  locale_switched: localeSwitchedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -281,6 +292,15 @@ export const apiErrorOccurredPropertiesSchema = z.object({
 })
 
 export type ApiErrorOccurredProperties = z.infer<typeof apiErrorOccurredPropertiesSchema>
+
+export const localeSwitchedPropertiesSchema = z.object({
+  user_id: nonEmptyString,
+  from_locale: nonEmptyString,
+  to_locale: nonEmptyString,
+  timestamp: isoTimestamp,
+})
+
+export type LocaleSwitchedProperties = z.infer<typeof localeSwitchedPropertiesSchema>
 
 // Flow ref S0.7/T2/2: normalize domain inputs to snake_case analytics
 // properties in the shared wrappers below.
@@ -478,6 +498,23 @@ export function trackApiErrorOccurred(
       method: parsed.method,
       status_code: parsed.statusCode,
       error_code: parsed.errorCode,
+      timestamp: parsed.timestamp,
+    }),
+  }
+}
+
+export function trackLocaleSwitched(
+  event: LocaleSwitchedEvent
+): AnalyticsCapturePayload<'locale_switched', LocaleSwitchedProperties> {
+  const parsed = localeSwitchedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.userId,
+    event: 'locale_switched',
+    properties: localeSwitchedPropertiesSchema.parse({
+      user_id: parsed.userId,
+      from_locale: parsed.fromLocale,
+      to_locale: parsed.toLocale,
       timestamp: parsed.timestamp,
     }),
   }

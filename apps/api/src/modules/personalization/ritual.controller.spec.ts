@@ -164,6 +164,13 @@ describe('RitualController', () => {
           updated_at: new Date('2026-07-15T12:00:00.000Z'),
         }),
       },
+      userProfile: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'profile-1',
+          user_id: 'user-1',
+          preferences: { locale: 'en-US' },
+        }),
+      },
       garmentItem: {
         findMany: vi.fn().mockResolvedValue([]),
         findFirst: vi.fn().mockResolvedValue(null),
@@ -298,7 +305,7 @@ describe('RitualController', () => {
     expect(persistedRecommendations).toHaveLength(3)
     expect(outfitRecommendationCreateMock).toHaveBeenCalledTimes(3)
 
-    const cacheKey = 'ritual:user-1:chicago-il:07/16/2026'
+    const cacheKey = 'ritual:user-1:chicago-il:07/16/2026:en-US'
     expect(redisStore[cacheKey]).toBeDefined()
     expect(redisStore[cacheKey]?.ttl).toBe(900)
 
@@ -309,5 +316,30 @@ describe('RitualController', () => {
 
     expect(cachedResponse.status).toBe(200)
     expect(outfitRecommendationCreateMock).not.toHaveBeenCalled()
+  })
+
+  it('uses an explicit locale query and isolates the localized cache entry', async () => {
+    const response = await request(getHttpServer())
+      .get('/api/v1/ritual')
+      .query({ locale: 'tr-TR' })
+      .set({
+        authorization: 'Bearer ritual-token',
+        'accept-language': 'fr-FR',
+      })
+
+    expect(response.status).toBe(200)
+    const parsed = ritualResponseSchema.parse(response.body)
+    expect(parsed.data.outfits[0]?.comfortNotes).toContain('Hissedilen sıcaklık')
+    expect(redisStore['ritual:user-1:chicago-il:07/16/2026:tr-TR']).toBeDefined()
+    expect(redisStore['ritual:user-1:chicago-il:07/16/2026:en-US']).toBeUndefined()
+  })
+
+  it('rejects unsupported explicit locales', async () => {
+    const response = await request(getHttpServer())
+      .get('/api/v1/ritual')
+      .query({ locale: 'ja-JP' })
+      .set({ authorization: 'Bearer ritual-token' })
+
+    expect(response.status).toBe(400)
   })
 })

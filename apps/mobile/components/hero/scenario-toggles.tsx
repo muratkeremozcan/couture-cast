@@ -2,6 +2,7 @@ import React from 'react'
 import { StyleSheet, Pressable, Platform } from 'react-native'
 import { Text, View } from '@/components/themed'
 import { useHeroPalette } from './hero-theme'
+import { useTranslation } from 'react-i18next'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
 
@@ -10,16 +11,17 @@ type ScenarioTogglesProps = {
   onScenarioChange: (scenario: ScenarioType) => void
 }
 
-const scenarios: { key: ScenarioType; label: string }[] = [
-  { key: 'morning', label: 'Morning commute' },
-  { key: 'midday', label: 'Midday' },
-  { key: 'evening', label: 'Evening plans' },
+const scenarios: { key: ScenarioType; labelKey: string; defaultLabel: string }[] = [
+  { key: 'morning', labelKey: 'hero.scenarios.morning', defaultLabel: 'Morning commute' },
+  { key: 'midday', labelKey: 'hero.scenarios.midday', defaultLabel: 'Midday' },
+  { key: 'evening', labelKey: 'hero.scenarios.evening', defaultLabel: 'Evening plans' },
 ]
 
 export function ScenarioToggles({
   activeScenario,
   onScenarioChange,
 }: ScenarioTogglesProps) {
+  const { t } = useTranslation()
   const palette = useHeroPalette()
 
   return (
@@ -47,7 +49,7 @@ export function ScenarioToggles({
                 isActive && { color: palette.text },
               ]}
             >
-              {tab.label}
+              {t(tab.labelKey, { defaultValue: tab.defaultLabel })}
             </Text>
             {isActive && <View style={styles.activeUnderline} />}
           </Pressable>

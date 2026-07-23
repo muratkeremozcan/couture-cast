@@ -3,6 +3,10 @@ import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
+vi.mock('expo-localization', () => ({
+  getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
+}))
+
 const {
   providerCaptureMock,
   providerScreenMock,
@@ -66,8 +70,14 @@ describe('mobile analytics facade', () => {
     client.capture('tab_one_viewed', { source: 'test' })
     await client.screen('tab-one', { previous_screen: null })
 
-    expect(capture).toHaveBeenCalledWith('tab_one_viewed', { source: 'test' })
-    expect(screen).toHaveBeenCalledWith('tab-one', { previous_screen: null })
+    expect(capture).toHaveBeenCalledWith('tab_one_viewed', {
+      source: 'test',
+      locale: 'en-US',
+    })
+    expect(screen).toHaveBeenCalledWith('tab-one', {
+      previous_screen: null,
+      locale: 'en-US',
+    })
     expect(client.getDistinctId()).toBe('runtime-user')
   })
 
@@ -84,7 +94,9 @@ describe('mobile analytics facade', () => {
   it('adapts the provider-backed client once for app-level consumers', () => {
     mobileAnalyticsClient.capture('app_opened')
 
-    expect(providerCaptureMock).toHaveBeenCalledWith('app_opened', undefined)
+    expect(providerCaptureMock).toHaveBeenCalledWith('app_opened', {
+      locale: 'en-US',
+    })
     expect(mobileAnalyticsClient.getDistinctId()).toBe('provider-user')
   })
 
@@ -113,8 +125,12 @@ describe('mobile analytics facade', () => {
     result.current.capture('modal_opened')
     void result.current.screen('modal')
 
-    expect(hookCaptureMock).toHaveBeenCalledWith('modal_opened', undefined)
-    expect(hookScreenMock).toHaveBeenCalledWith('modal', undefined)
+    expect(hookCaptureMock).toHaveBeenCalledWith('modal_opened', {
+      locale: 'en-US',
+    })
+    expect(hookScreenMock).toHaveBeenCalledWith('modal', {
+      locale: 'en-US',
+    })
     expect(result.current.getDistinctId()).toBe('hook-user')
   })
 })

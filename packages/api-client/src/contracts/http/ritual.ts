@@ -1,6 +1,7 @@
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { nonEmptyStringSchema, type RegisteredCommonHttpSchemas } from './common'
+import { supportedLocaleSchema } from './localization'
 import { weatherSnapshotSchema } from './weather'
 
 export const scenarioNameSchema = z.enum(['morning', 'midday', 'evening'])
@@ -56,6 +57,9 @@ export const ritualQueryParamsSchema = z
     locationId: nonEmptyStringSchema
       .optional()
       .describe('Optional ID of a saved user location key or preferences reference.'),
+    locale: supportedLocaleSchema
+      .optional()
+      .describe('Optional locale override for this localized ritual response.'),
   })
   .strict()
 

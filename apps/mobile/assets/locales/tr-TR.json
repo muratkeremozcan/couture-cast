@@ -1,0 +1,65 @@
+{
+  "tabs": {
+    "tab_one": "Ana Sayfa",
+    "tab_two": "Ayarlar"
+  },
+  "hero": {
+    "scenarios": {
+      "morning": "Sabah gezisi",
+      "midday": "Öğle vakti",
+      "evening": "Akşam planları"
+    },
+    "conditions": {
+      "clear": "Açık",
+      "partly_cloudy": "Parçalı bulutlu",
+      "cloudy": "Bulutlu",
+      "fog": "Sisli",
+      "drizzle": "Çisenti",
+      "rain": "Yağmurlu",
+      "sleet": "Karla karışık yağmur",
+      "snow": "Karlı",
+      "thunderstorm": "Gök gürültülü fırtına",
+      "wind": "Rüzgarlı",
+      "unknown": "Bilinmiyor"
+    },
+    "hourly_forecast": "Saatlik tahmin",
+    "expand_hours": "Genişlet ({{hours}} sa)",
+    "collapse": "Daralt",
+    "load_error": "Günlük öneriler yüklenemedi",
+    "retry": "Tekrar dene",
+    "badge_justification": "{{label}} gerekçesi:",
+    "alert_title": "Şiddetli Hava Uyarısı",
+    "offline_toast": "Yakın zamanda önbelleğe alınmış hava durumu verileri kullanılıyor",
+    "loading": "Öneriler yükleniyor...",
+    "garment_swap_title": "{{category}} için alternatif seçin",
+    "feels_like": "Hissedilen sıcaklık",
+    "precipitation": "Yağış oranı"
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "language": "Dil",
+    "locale_sync_error": "Dil bu cihazda değiştirildi. Profil eşitlemesi daha sonra yeniden denenecek.",
+    "locale_change_error": "Dil değiştirilemedi. Lütfen tekrar deneyin.",
+    "region_units": "Bölge ve Birimler",
+    "languages": {
+      "en-US": "İngilizce (ABD)",
+      "en-CA": "İngilizce (Kanada)",
+      "es-419": "İspanyolca (LatAm)",
+      "fr-CA": "Fransızca (Kanada)",
+      "fr-FR": "Fransızca (Avrupa)",
+      "tr-TR": "Türkçe",
+      "de-DE": "Almanca",
+      "it-IT": "İtalyanca",
+      "pt-BR": "Portekizce (Brezilya)",
+      "pt-PT": "Portekizce (Portekiz)"
+    },
+    "api_health": "API durumu kontrol ediliyor...",
+    "api_health_status": "API durumu: {{status}}",
+    "api_health_unavailable": "API kullanılabilir değil",
+    "diagnostic_alert_btn": "Hava uyarısı analitiğini kaydet",
+    "diagnostic_info": "alert_received takibi, gerçek anlık bildirim alıcılarına bağlıdır."
+  },
+  "common": {
+    "cancel": "İptal"
+  }
+}

@@ -1,3 +1,4 @@
+// Step 22 step 6 owner: mock localized database state response in Pact provider tests in pact/http/provider/provider-helper.ts
 import type { INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import type { Prisma } from '@prisma/client'
@@ -15,6 +16,8 @@ import { RitualController } from '../../../apps/api/src/modules/personalization/
 import { RitualService } from '../../../apps/api/src/modules/personalization/ritual.service'
 import { ComfortController } from '../../../apps/api/src/modules/personalization/comfort.controller'
 import { ComfortService } from '../../../apps/api/src/modules/personalization/comfort.service'
+import { UserController } from '../../../apps/api/src/modules/user/user.controller'
+import { UserService } from '../../../apps/api/src/modules/user/user.service'
 
 export type PactEvent = {
   id: string
@@ -125,7 +128,88 @@ export async function startLocalPactProvider({
 
   // Story 2.3 Task 3 step 2 owner: update provider mock responses
   const mockRitualService = {
-    getOrCreateRitual: (_userId: string, _locationId?: string) => {
+    getOrCreateRitual: (
+      _userId: string,
+      _locationId?: string,
+      acceptLanguage?: string,
+      localeOverride?: string
+    ) => {
+      const selectedLocale = localeOverride ?? acceptLanguage
+      const isTurkish = selectedLocale?.toLowerCase().startsWith('tr') ?? false
+      const outfits = isTurkish
+        ? [
+            {
+              id: 'rec-morning-1',
+              scenario: 'morning',
+              garmentIds: ['g-1'],
+              reasoningBadges: [
+                {
+                  key: 'wind_layer',
+                  label: 'Rüzgarlık',
+                  bullets: ['Yüksek rüzgar nedeniyle rüzgar kesici bir katman önerilir'],
+                },
+              ],
+              comfortNotes: 'Hafif rüzgarlı serin sabah. Trençkot önerilir.',
+            },
+            {
+              id: 'rec-midday-1',
+              scenario: 'midday',
+              garmentIds: ['g-2'],
+              reasoningBadges: [
+                { key: 'light_layers', label: 'Hafif Katmanlar', bullets: ['Ilık gün'] },
+              ],
+              comfortNotes: 'Ilık ve keyifli bir öğleden sonra.',
+            },
+            {
+              id: 'rec-evening-1',
+              scenario: 'evening',
+              garmentIds: ['g-3'],
+              reasoningBadges: [
+                {
+                  key: 'evening_chill',
+                  label: 'Akşam Serinliği',
+                  bullets: ['Serin akşam'],
+                },
+              ],
+              comfortNotes: 'Serin akşam.',
+            },
+          ]
+        : [
+            {
+              id: 'rec-morning-1',
+              scenario: 'morning',
+              garmentIds: ['g-1'],
+              reasoningBadges: [
+                { key: 'wind_layer', label: 'Wind layer', bullets: ['Wind is high'] },
+              ],
+              comfortNotes: 'Chilly morning',
+            },
+            {
+              id: 'rec-midday-1',
+              scenario: 'midday',
+              garmentIds: ['g-2'],
+              reasoningBadges: [
+                { key: 'light_layers', label: 'Light layers', bullets: ['Mild day'] },
+              ],
+              comfortNotes: 'Pleasant midday',
+            },
+            {
+              id: 'rec-evening-1',
+              scenario: 'evening',
+              garmentIds: ['g-3'],
+              reasoningBadges: [
+                {
+                  key: 'evening_chill',
+                  label: 'Evening chill',
+                  bullets: ['Cool evening'],
+                },
+              ],
+              comfortNotes: 'Cool evening',
+            },
+          ]
+
+      const badges = isTurkish ? ['Rüzgarlık'] : ['Wind layer', 'Mild', 'Evening']
+
       return Promise.resolve({
         weather: {
           locationKey: 'chicago-il',
@@ -154,36 +238,8 @@ export async function startLocalPactProvider({
           })),
           alerts: [],
         },
-        outfits: [
-          {
-            id: 'rec-morning-1',
-            scenario: 'morning',
-            garmentIds: ['g-1'],
-            reasoningBadges: [
-              { key: 'wind_layer', label: 'Wind layer', bullets: ['Wind is high'] },
-            ],
-            comfortNotes: 'Chilly morning',
-          },
-          {
-            id: 'rec-midday-1',
-            scenario: 'midday',
-            garmentIds: ['g-2'],
-            reasoningBadges: [
-              { key: 'light_layers', label: 'Light layers', bullets: ['Mild day'] },
-            ],
-            comfortNotes: 'Pleasant midday',
-          },
-          {
-            id: 'rec-evening-1',
-            scenario: 'evening',
-            garmentIds: ['g-3'],
-            reasoningBadges: [
-              { key: 'evening_chill', label: 'Evening chill', bullets: ['Cool evening'] },
-            ],
-            comfortNotes: 'Cool evening',
-          },
-        ],
-        badges: ['Wind layer', 'Mild', 'Evening'],
+        outfits,
+        badges,
       })
     },
   } as unknown as RitualService
@@ -212,6 +268,11 @@ export async function startLocalPactProvider({
     },
   }
 
+  const mockUserService = {
+    updatePreferences: (_userId: string, _input: { locale: string }) =>
+      Promise.resolve({ success: true }),
+  } as unknown as UserService
+
   const moduleFixture = await Test.createTestingModule({
     controllers: [
       ApiHealthController,
@@ -219,6 +280,7 @@ export async function startLocalPactProvider({
       EventsController,
       RitualController,
       ComfortController,
+      UserController,
     ],
     providers: [
       EventsService,
@@ -241,6 +303,10 @@ export async function startLocalPactProvider({
       {
         provide: ComfortService,
         useValue: mockComfortService,
+      },
+      {
+        provide: UserService,
+        useValue: mockUserService,
       },
     ],
   })

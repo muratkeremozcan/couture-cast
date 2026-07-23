@@ -5,6 +5,8 @@ import type { WeatherHourlyEntry } from '@couture/api-client/contracts/http'
 import { formatTemperature } from './weather-header'
 import { useHeroPalette } from './hero-theme'
 import { weatherConditionGlyphs } from './weather-glyphs'
+import { useTranslation } from 'react-i18next'
+import i18n from '@/src/lib/i18n'
 
 type HourlyForecastRibbonProps = {
   hourly?: WeatherHourlyEntry[]
@@ -15,9 +17,8 @@ type HourlyForecastRibbonProps = {
 function formatHour(isoString: string) {
   try {
     const date = new Date(isoString)
-    return new Intl.DateTimeFormat('en', {
+    return new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
       hour: 'numeric',
-      hour12: true,
       timeZone: 'UTC', // contract specifies UTC timestamps
     }).format(date)
   } catch {
@@ -30,6 +31,7 @@ export function HourlyForecastRibbon({
   isLoading,
   onToggleExpand,
 }: HourlyForecastRibbonProps) {
+  const { t } = useTranslation()
   const [isExpanded, setIsExpanded] = useState(false)
   const palette = useHeroPalette()
 
@@ -66,14 +68,21 @@ export function HourlyForecastRibbon({
   return (
     <View style={styles.container} testID="hourly-forecast-ribbon">
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: palette.text }]}>Hourly Forecast</Text>
+        <Text style={[styles.title, { color: palette.text }]}>
+          {t('hero.hourly_forecast', { defaultValue: 'Hourly Forecast' })}
+        </Text>
         <Pressable
           onPress={handleToggle}
           style={[styles.toggleButton, { backgroundColor: palette.subtleSurface }]}
           testID="ribbon-expand-toggle"
         >
           <Text style={styles.toggleText}>
-            {isExpanded ? 'Collapse' : `Expand (${hourly.length}h)`}
+            {isExpanded
+              ? t('hero.collapse', { defaultValue: 'Collapse' })
+              : t('hero.expand_hours', {
+                  hours: hourly.length,
+                  defaultValue: `Expand (${hourly.length}h)`,
+                })}
           </Text>
         </Pressable>
       </View>

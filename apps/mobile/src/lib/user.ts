@@ -1,8 +1,11 @@
 import {
   userProfileResponseSchema,
+  userPreferencesResponseSchema,
+  type SupportedLocale,
   type UserProfileResponse,
 } from '@couture/api-client/contracts/http'
-import { resolveMobileApiBaseUrl } from './api-client'
+import { createMobileApiClient, resolveMobileApiBaseUrl } from './api-client'
+import { resolveMobileAccessToken } from './mobile-auth'
 
 async function readErrorMessage(response: Response) {
   try {
@@ -25,4 +28,14 @@ export async function getUserProfileFromMobile(
   }
 
   return userProfileResponseSchema.parse(await response.json())
+}
+
+export async function updatePreferredLocaleFromMobile(locale: SupportedLocale) {
+  const client = createMobileApiClient({
+    accessToken: async () => (await resolveMobileAccessToken()) || '',
+  })
+  const response = await client.apiV1UserPreferencesPut({
+    userPreferencesInput: { locale },
+  })
+  return userPreferencesResponseSchema.parse(response)
 }

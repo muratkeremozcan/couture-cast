@@ -1,6 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common'
+import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
-import { userProfileResponseSchema } from '../../contracts/http'
+import {
+  userProfileResponseSchema,
+  type UserPreferencesInput,
+} from '../../contracts/http.js'
 import type { RequestAuthContext } from '../auth/security.types'
 
 // Story 0.9 Task 5 step 4 owner:
@@ -47,5 +51,33 @@ export class UserService {
         consentGrantedAt: consent.consent_granted_at?.toISOString() ?? null,
       })),
     })
+  }
+
+  async updatePreferences(userId: string, input: UserPreferencesInput) {
+    const profileId = randomUUID()
+    await this.prisma.$executeRaw`
+      INSERT INTO "UserProfile" (
+        "id",
+        "user_id",
+        "preferences",
+        "created_at",
+        "updated_at"
+      )
+      VALUES (
+        ${profileId},
+        ${userId},
+        jsonb_build_object('locale', ${input.locale}),
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP
+      )
+      ON CONFLICT ("user_id")
+      DO UPDATE SET
+        "preferences" =
+          COALESCE("UserProfile"."preferences", '{}'::jsonb) ||
+          jsonb_build_object('locale', ${input.locale}),
+        "updated_at" = CURRENT_TIMESTAMP
+    `
+
+    return { success: true }
   }
 }

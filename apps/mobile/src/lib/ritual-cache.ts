@@ -2,6 +2,7 @@ import { Platform } from 'react-native'
 import {
   ritualResponseSchema,
   type RitualResponse,
+  type SupportedLocale,
 } from '@couture/api-client/contracts/http'
 
 const cachePrefix = 'ritual'
@@ -13,14 +14,18 @@ export type RitualCacheEntry = {
 }
 
 const memoryCache: Record<string, RitualCacheEntry> = {}
-const latestLocationByUser: Record<string, string> = {}
+const latestLocationByUserLocale: Record<string, string> = {}
 
-function ritualCacheKey(userId: string, locationKey: string) {
-  return `${cachePrefix}:${userId}:${locationKey}`
+function ritualCacheKey(userId: string, locale: SupportedLocale, locationKey: string) {
+  return `${cachePrefix}:${userId}:${locale}:${locationKey}`
 }
 
-function latestLocationCacheKey(userId: string) {
-  return `${cachePrefix}:${userId}:${latestLocationKey}`
+function userLocaleKey(userId: string, locale: SupportedLocale) {
+  return `${userId}:${locale}`
+}
+
+function latestLocationCacheKey(userId: string, locale: SupportedLocale) {
+  return `${cachePrefix}:${userId}:${locale}:${latestLocationKey}`
 }
 
 function storageFileName(key: string) {
@@ -94,14 +99,17 @@ function parseCacheEntry(value: string | null): RitualCacheEntry | null {
 }
 
 export async function readLatestRitualCache(
-  userId: string
+  userId: string,
+  locale: SupportedLocale
 ): Promise<RitualCacheEntry | null> {
   try {
-    let locationKey = latestLocationByUser[userId]
+    const localeKey = userLocaleKey(userId, locale)
+    let locationKey = latestLocationByUserLocale[localeKey]
     if (!locationKey) {
-      locationKey = (await readStoredValue(latestLocationCacheKey(userId))) ?? undefined
+      locationKey =
+        (await readStoredValue(latestLocationCacheKey(userId, locale))) ?? undefined
       if (locationKey) {
-        latestLocationByUser[userId] = locationKey
+        latestLocationByUserLocale[localeKey] = locationKey
       }
     }
 
@@ -109,7 +117,7 @@ export async function readLatestRitualCache(
       return null
     }
 
-    const key = ritualCacheKey(userId, locationKey)
+    const key = ritualCacheKey(userId, locale, locationKey)
     if (memoryCache[key]) {
       return memoryCache[key]
     }
@@ -124,15 +132,20 @@ export async function readLatestRitualCache(
   }
 }
 
-export async function saveRitualCache(userId: string, entry: RitualCacheEntry) {
+export async function saveRitualCache(
+  userId: string,
+  locale: SupportedLocale,
+  entry: RitualCacheEntry
+) {
   const locationKey = entry.data.data.weather.locationKey
-  const key = ritualCacheKey(userId, locationKey)
+  const key = ritualCacheKey(userId, locale, locationKey)
+  const localeKey = userLocaleKey(userId, locale)
   memoryCache[key] = entry
-  latestLocationByUser[userId] = locationKey
+  latestLocationByUserLocale[localeKey] = locationKey
 
   await Promise.all([
     writeStoredValue(key, JSON.stringify(entry)),
-    writeStoredValue(latestLocationCacheKey(userId), locationKey),
+    writeStoredValue(latestLocationCacheKey(userId, locale), locationKey),
   ])
 }
 
@@ -140,7 +153,7 @@ export function clearRitualMemoryCache() {
   for (const key of Object.keys(memoryCache)) {
     delete memoryCache[key]
   }
-  for (const userId of Object.keys(latestLocationByUser)) {
-    delete latestLocationByUser[userId]
+  for (const localeKey of Object.keys(latestLocationByUserLocale)) {
+    delete latestLocationByUserLocale[localeKey]
   }
 }

@@ -1851,7 +1851,32 @@ export interface RitualQueryParams {
    * @memberof RitualQueryParams
    */
   locationId?: string
+  /**
+   * Optional locale override for this localized ritual response.
+   * @type {RitualQueryParamsLocaleEnum}
+   * @memberof RitualQueryParams
+   */
+  locale?: RitualQueryParamsLocaleEnum
 }
+
+/**
+ * @export
+ */
+export const RitualQueryParamsLocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type RitualQueryParamsLocaleEnum =
+  (typeof RitualQueryParamsLocaleEnum)[keyof typeof RitualQueryParamsLocaleEnum]
+
 /**
  *
  * @export
@@ -2556,6 +2581,61 @@ export interface UpdateSavedLocationResponse {
    */
   data: ListSavedLocationsResponseDataInner
 }
+/**
+ *
+ * @export
+ * @interface UserPreferencesInput
+ */
+export interface UserPreferencesInput {
+  /**
+   *
+   * @type {UserPreferencesInputLocaleEnum}
+   * @memberof UserPreferencesInput
+   */
+  locale: UserPreferencesInputLocaleEnum
+}
+
+/**
+ * @export
+ */
+export const UserPreferencesInputLocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type UserPreferencesInputLocaleEnum =
+  (typeof UserPreferencesInputLocaleEnum)[keyof typeof UserPreferencesInputLocaleEnum]
+
+/**
+ *
+ * @export
+ * @interface UserPreferencesResponse
+ */
+export interface UserPreferencesResponse {
+  /**
+   *
+   * @type {UserPreferencesResponseSuccessEnum}
+   * @memberof UserPreferencesResponse
+   */
+  success: UserPreferencesResponseSuccessEnum
+}
+
+/**
+ * @export
+ */
+export const UserPreferencesResponseSuccessEnum = {
+  true: true,
+} as const
+export type UserPreferencesResponseSuccessEnum =
+  (typeof UserPreferencesResponseSuccessEnum)[keyof typeof UserPreferencesResponseSuccessEnum]
+
 /**
  *
  * @export

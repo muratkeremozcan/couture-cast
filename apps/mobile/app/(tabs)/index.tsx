@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Pressable,
   StyleSheet,
@@ -13,6 +14,8 @@ import { createMobileApiClient } from '@/src/lib/api-client'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
 import { readLatestRitualCache, saveRitualCache } from '@/src/lib/ritual-cache'
 import {
+  defaultSupportedLocale,
+  resolveSupportedLocale,
   ritualResponseSchema,
   type RitualResponse,
 } from '@couture/api-client/contracts/http'
@@ -48,7 +51,11 @@ const alternateGarments: Record<string, string[]> = {
 
 export default function TabOneScreen() {
   const analytics = useMobileAnalytics()
+  const { i18n, t } = useTranslation()
   const analyticsUserId = analytics.getDistinctId() || 'mobile-anonymous-user'
+  const activeLocale =
+    resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
+    defaultSupportedLocale
   const palette = useHeroPalette()
   const latestLoadId = useRef(0)
   const hasTrackedTabView = useRef(false)
@@ -72,7 +79,10 @@ export default function TabOneScreen() {
 
     try {
       // Omitting locationId deliberately selects the user's primary saved location.
-      const response = await client.apiV1RitualGet({}, { signal: controller.signal })
+      const response = await client.apiV1RitualGet(
+        { locale: activeLocale },
+        { signal: controller.signal }
+      )
       return ritualResponseSchema.parse(response)
     } finally {
       clearTimeout(timeout)
@@ -85,7 +95,7 @@ export default function TabOneScreen() {
     setError(null)
     setIsStale(false)
 
-    const cached = await readLatestRitualCache(analyticsUserId)
+    const cached = await readLatestRitualCache(analyticsUserId, activeLocale)
     const now = Date.now()
 
     if (!forceRefresh && cached && now - cached.timestamp < 15 * 60 * 1000) {
@@ -103,9 +113,10 @@ export default function TabOneScreen() {
       }
 
       setRitual(data)
-      void saveRitualCache(analyticsUserId, { data, timestamp: now }).catch(
-        () => undefined
-      )
+      void saveRitualCache(analyticsUserId, activeLocale, {
+        data,
+        timestamp: now,
+      }).catch(() => undefined)
 
       trackMobileRitualCreated(analytics, {
         userId: analyticsUserId,
@@ -113,7 +124,7 @@ export default function TabOneScreen() {
         ritualType: 'daily_outfit',
         weatherContext: data.data.weather.current.condition,
       })
-    } catch (err) {
+    } catch {
       if (loadId !== latestLoadId.current) {
         return
       }
@@ -124,7 +135,9 @@ export default function TabOneScreen() {
         setIsStale(true)
       } else {
         setError(
-          err instanceof Error ? err.message : 'Unable to load daily recommendations'
+          t('hero.load_error', {
+            defaultValue: 'Unable to load daily recommendations',
+          })
         )
       }
     } finally {
@@ -141,7 +154,7 @@ export default function TabOneScreen() {
       analytics.capture('tab_one_viewed')
     }
     void loadData()
-  }, [analyticsUserId])
+  }, [activeLocale, analyticsUserId])
 
   const handleScenarioChange = (scenario: ScenarioType) => {
     setActiveScenario(scenario)
@@ -189,7 +202,7 @@ export default function TabOneScreen() {
 
     setRitual(updatedRitual)
 
-    void saveRitualCache(analyticsUserId, {
+    void saveRitualCache(analyticsUserId, activeLocale, {
       data: updatedRitual,
       timestamp: Date.now(),
     }).catch(() => undefined)
@@ -226,7 +239,11 @@ export default function TabOneScreen() {
         {/* Stale Cache Banner */}
         {isStale && (
           <View style={styles.staleBanner} testID="stale-cache-banner">
-            <Text style={styles.staleText}>Using recently cached weather data</Text>
+            <Text style={styles.staleText}>
+              {t('hero.offline_toast', {
+                defaultValue: 'Using recently cached weather data',
+              })}
+            </Text>
           </View>
         )}
 
@@ -235,7 +252,9 @@ export default function TabOneScreen() {
           <View style={styles.errorBanner} testID="error-banner">
             <Text style={styles.errorText}>{error}</Text>
             <Pressable style={styles.retryButton} onPress={handleRetry}>
-              <Text style={styles.retryText}>Retry</Text>
+              <Text style={styles.retryText}>
+                {t('hero.retry', { defaultValue: 'Retry' })}
+              </Text>
             </Pressable>
           </View>
         )}
@@ -280,7 +299,12 @@ export default function TabOneScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent} testID="garment-swap-modal">
-            <Text style={styles.modalTitle}>Choose Alternate {swapCategory}</Text>
+            <Text style={styles.modalTitle}>
+              {t('hero.garment_swap_title', {
+                category: swapCategory,
+                defaultValue: `Choose alternate ${swapCategory}`,
+              })}
+            </Text>
             <ScrollView style={styles.modalScroll}>
               {swapOptions.map((option) => {
                 const isCurrent = option === swappingGarmentId
@@ -309,7 +333,9 @@ export default function TabOneScreen() {
               style={styles.closeButton}
               onPress={() => setIsSwapModalVisible(false)}
             >
-              <Text style={styles.closeButtonText}>Cancel</Text>
+              <Text style={styles.closeButtonText}>
+                {t('common.cancel', { defaultValue: 'Cancel' })}
+              </Text>
             </Pressable>
           </View>
         </View>

@@ -1,0 +1,65 @@
+{
+  "tabs": {
+    "tab_one": "Pestaña Uno",
+    "tab_two": "Configuración"
+  },
+  "hero": {
+    "scenarios": {
+      "morning": "Viaje matutino",
+      "midday": "Mediodía",
+      "evening": "Planes nocturnos"
+    },
+    "conditions": {
+      "clear": "Cielo despejado",
+      "partly_cloudy": "Parcialmente nublado",
+      "cloudy": "Nublado",
+      "fog": "Niebla",
+      "drizzle": "Llovizna",
+      "rain": "Lluvia",
+      "sleet": "Aguanieve",
+      "snow": "Nieve",
+      "thunderstorm": "Tormenta eléctrica",
+      "wind": "Ventoso",
+      "unknown": "Desconocido"
+    },
+    "hourly_forecast": "Pronóstico por hora",
+    "expand_hours": "Ampliar ({{hours}} h)",
+    "collapse": "Contraer",
+    "load_error": "No se pudieron cargar las recomendaciones diarias",
+    "retry": "Reintentar",
+    "badge_justification": "Justificación de {{label}}:",
+    "alert_title": "Advertencia de Clima Severo",
+    "offline_toast": "Usando datos climáticos recientemente guardados",
+    "loading": "Cargando recomendaciones...",
+    "garment_swap_title": "Elegir alternativa para {{category}}",
+    "feels_like": "Sensación térmica",
+    "precipitation": "Precipitación"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "language": "Idioma",
+    "locale_sync_error": "El idioma cambió en este dispositivo. La sincronización del perfil se reintentará más tarde.",
+    "locale_change_error": "No se pudo cambiar el idioma. Inténtalo de nuevo.",
+    "region_units": "Región y Unidades",
+    "languages": {
+      "en-US": "Inglés (EE. UU.)",
+      "en-CA": "Inglés (Canadá)",
+      "es-419": "Español (LatAm)",
+      "fr-CA": "Francés (Canadá)",
+      "fr-FR": "Francés (Europa)",
+      "tr-TR": "Turco",
+      "de-DE": "Alemán",
+      "it-IT": "Italiano",
+      "pt-BR": "Português (Brasil)",
+      "pt-PT": "Português (Portugal)"
+    },
+    "api_health": "Comprobando estado de API...",
+    "api_health_status": "Estado de API: {{status}}",
+    "api_health_unavailable": "API no disponible",
+    "diagnostic_alert_btn": "Registrar análisis de alertas climáticas",
+    "diagnostic_info": "El seguimiento de alert_received está conectado a receptores reales de notificaciones push."
+  },
+  "common": {
+    "cancel": "Cancelar"
+  }
+}
