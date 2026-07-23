@@ -11,6 +11,7 @@ import {
   alertSentPropertiesSchema,
   locationSwitchedPropertiesSchema,
   apiErrorOccurredPropertiesSchema,
+  localeSwitchedPropertiesSchema,
   type AnalyticsEventName,
 } from '../types/analytics-events'
 import type { ExpectLike } from './expect-like'
@@ -38,6 +39,7 @@ const analyticsPropertySchemas = {
   alert_sent: alertSentPropertiesSchema,
   location_switched: locationSwitchedPropertiesSchema,
   api_error_occurred: apiErrorOccurredPropertiesSchema,
+  locale_switched: localeSwitchedPropertiesSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

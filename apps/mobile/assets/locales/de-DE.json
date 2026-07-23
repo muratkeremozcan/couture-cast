@@ -1,0 +1,64 @@
+{
+  "tabs": {
+    "tab_one": "Register Eins",
+    "tab_two": "Einstellungen"
+  },
+  "hero": {
+    "scenarios": {
+      "morning": "Morgenpendeln",
+      "midday": "Mittags",
+      "evening": "Abendpläne"
+    },
+    "conditions": {
+      "clear": "Klarer Himmel",
+      "partly_cloudy": "Teilweise bewölkt",
+      "cloudy": "Bewölkt",
+      "fog": "Neblig",
+      "drizzle": "Nieselregen",
+      "rain": "Regnerisch",
+      "sleet": "Schneeregen",
+      "snow": "Schnee",
+      "thunderstorm": "Gewitter",
+      "wind": "Windig",
+      "unknown": "Unbekannt"
+    },
+    "hourly_forecast": "Stündliche Vorhersage",
+    "expand_hours": "Erweitern ({{hours}} Std.)",
+    "collapse": "Reduzieren",
+    "load_error": "Tägliche Empfehlungen konnten nicht geladen werden",
+    "retry": "Erneut versuchen",
+    "badge_justification": "Begründung für {{label}}:",
+    "alert_title": "Unwetterwarnung",
+    "offline_toast": "Kürzlich zwischengespeicherte Wetterdaten werden verwendet",
+    "loading": "Empfehlungen werden geladen...",
+    "garment_swap_title": "Alternatives Kleidungsstück wählen",
+    "feels_like": "Gefühlt wie",
+    "precipitation": "Niederschlag"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "language": "Sprache",
+    "locale_sync_error": "Die Sprache wurde auf diesem Gerät geändert. Die Profilsynchronisierung wird später erneut versucht.",
+    "region_units": "Region & Einheiten",
+    "languages": {
+      "en-US": "Englisch (USA)",
+      "en-CA": "Englisch (Kanada)",
+      "es-419": "Spanisch (LatAm)",
+      "fr-CA": "Französisch (Kanada)",
+      "fr-FR": "Französisch (Europa)",
+      "tr-TR": "Türkisch",
+      "de-DE": "Deutsch",
+      "it-IT": "Italienisch",
+      "pt-BR": "Portugiesisch (Brasilien)",
+      "pt-PT": "Portugiesisch (Portugal)"
+    },
+    "api_health": "API-Status wird überprüft...",
+    "api_health_status": "API-Status: {{status}}",
+    "api_health_unavailable": "API-Status nicht verfügbar",
+    "diagnostic_alert_btn": "Wetterwarnungsanalysen aufzeichnen",
+    "diagnostic_info": "Das Tracking für alert_received ist mit den echten Push-Benachrichtigungsempfängern verknüpft."
+  },
+  "common": {
+    "cancel": "Abbrechen"
+  }
+}

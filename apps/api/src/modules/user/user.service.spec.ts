@@ -76,4 +76,30 @@ describe('UserService', () => {
       })
     ).rejects.toThrow(NotFoundException)
   })
+
+  describe('updatePreferences', () => {
+    it('atomically merges locale without replacing unrelated profile preferences', async () => {
+      const executeRaw = vi.fn().mockResolvedValue(1)
+      const prisma = {
+        $executeRaw: executeRaw,
+      } as unknown as PrismaClient
+      const service = new UserService(prisma)
+
+      const result = await service.updatePreferences('user-1', { locale: 'tr-TR' })
+
+      expect(executeRaw).toHaveBeenCalledTimes(1)
+      const [queryParts, ...values] = executeRaw.mock.calls[0] as [
+        TemplateStringsArray,
+        ...unknown[],
+      ]
+      const query = queryParts.join('?')
+      expect(query).toContain('ON CONFLICT ("user_id")')
+      expect(query).toMatch(
+        /COALESCE\("UserProfile"\."preferences", '\{\}'::jsonb\) \|\|/
+      )
+      expect(values).toContain('user-1')
+      expect(values.filter((value) => value === 'tr-TR')).toHaveLength(2)
+      expect(result).toEqual({ success: true })
+    })
+  })
 })

@@ -2000,6 +2000,40 @@
           "linkedTeens"
         ]
       },
+      "UserPreferencesInput": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en-US",
+              "en-CA",
+              "es-419",
+              "fr-CA",
+              "fr-FR",
+              "tr-TR",
+              "de-DE",
+              "it-IT",
+              "pt-BR",
+              "pt-PT"
+            ]
+          }
+        },
+        "required": [
+          "locale"
+        ]
+      },
+      "UserPreferencesResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
       "LatestWeatherPathParams": {
         "type": "object",
         "properties": {
@@ -3376,6 +3410,22 @@
             "type": "string",
             "minLength": 1,
             "description": "Optional ID of a saved user location key or preferences reference."
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en-US",
+              "en-CA",
+              "es-419",
+              "fr-CA",
+              "fr-FR",
+              "tr-TR",
+              "de-DE",
+              "it-IT",
+              "pt-BR",
+              "pt-PT"
+            ],
+            "description": "Optional locale override for this localized ritual response."
           }
         },
         "additionalProperties": false
@@ -4640,6 +4690,72 @@
         }
       }
     },
+    "/api/v1/user/preferences": {
+      "put": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Update user settings and preferences",
+        "description": "Updates language locale or other UI preferences in UserProfile.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserPreferencesInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preferences updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPreferencesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid preferences payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/weather/{locationKey}": {
       "get": {
         "tags": [
@@ -4731,6 +4847,28 @@
             "required": false,
             "description": "Optional ID of a saved user location key or preferences reference.",
             "name": "locationId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en-US",
+                "en-CA",
+                "es-419",
+                "fr-CA",
+                "fr-FR",
+                "tr-TR",
+                "de-DE",
+                "it-IT",
+                "pt-BR",
+                "pt-PT"
+              ],
+              "description": "Optional locale override for this localized ritual response."
+            },
+            "required": false,
+            "description": "Optional locale override for this localized ritual response.",
+            "name": "locale",
             "in": "query"
           }
         ],

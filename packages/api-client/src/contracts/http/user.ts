@@ -5,6 +5,7 @@ import {
   nonEmptyStringSchema,
   type RegisteredCommonHttpSchemas,
 } from './common'
+import { supportedLocaleSchema } from './localization'
 
 // Story 0.9 Task 5 step 3 owner:
 // define the first shared user REST contract here so future authenticated dashboards start from
@@ -40,11 +41,21 @@ export const userProfileResponseSchema = z.object({
   linkedTeens: z.array(linkedTeenSchema),
 })
 
+export const userPreferencesInputSchema = z.object({
+  locale: supportedLocaleSchema,
+})
+
+export const userPreferencesResponseSchema = z.object({
+  success: z.boolean(),
+})
+
 export type ApiRole = z.infer<typeof apiRoleSchema>
 export type GuardianConsentStatus = z.infer<typeof guardianConsentStatusSchema>
 export type LinkedGuardian = z.infer<typeof linkedGuardianSchema>
 export type LinkedTeen = z.infer<typeof linkedTeenSchema>
 export type UserProfileResponse = z.infer<typeof userProfileResponseSchema>
+export type UserPreferencesInput = z.infer<typeof userPreferencesInputSchema>
+export type UserPreferencesResponse = z.infer<typeof userPreferencesResponseSchema>
 
 export function registerUserContracts(
   registry: OpenAPIRegistry,
@@ -55,6 +66,14 @@ export function registerUserContracts(
   const registeredUserProfileResponseSchema = registry.register(
     'UserProfileResponse',
     userProfileResponseSchema
+  )
+  const registeredUserPreferencesInputSchema = registry.register(
+    'UserPreferencesInput',
+    userPreferencesInputSchema
+  )
+  const registeredUserPreferencesResponseSchema = registry.register(
+    'UserPreferencesResponse',
+    userPreferencesResponseSchema
   )
 
   registry.registerPath({
@@ -86,6 +105,59 @@ export function registerUserContracts(
         content: {
           'application/json': {
             schema: commonSchemas.notFoundHttpErrorSchema,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'put',
+    path: '/api/v1/user/preferences',
+    tags: ['user'],
+    summary: 'Update user settings and preferences',
+    description: 'Updates language locale or other UI preferences in UserProfile.',
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: registeredUserPreferencesInputSchema,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Preferences updated successfully',
+        content: {
+          'application/json': {
+            schema: registeredUserPreferencesResponseSchema,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid preferences payload',
+        content: {
+          'application/json': {
+            schema: commonSchemas.badRequestHttpErrorSchema,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      500: {
+        description: 'Internal server error',
+        content: {
+          'application/json': {
+            schema: commonSchemas.internalServerErrorHttpErrorSchema,
           },
         },
       },

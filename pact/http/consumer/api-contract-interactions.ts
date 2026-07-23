@@ -1,3 +1,4 @@
+// Step 22 step 5 owner: check Accept-Language header propagation in Pact consumer tests in pact/http/consumer/api-contract-interactions.ts
 import { MatchersV3, type PactV4, type V3MockServer } from '@pact-foundation/pact'
 import { createProviderState, setJsonContent } from '@seontechnologies/pactjs-utils'
 import type { DefaultApi } from '@couture/api-client'
@@ -7,6 +8,7 @@ import {
   eventsPollResponseSchema,
   comfortPreferencesResponseSchema,
   updateComfortPreferencesResponseSchema,
+  userPreferencesResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { expect } from 'vitest'
 
@@ -29,6 +31,7 @@ type ContractApiClient = Pick<
   | 'apiV1RitualGet'
   | 'apiV1PersonalizationComfortGet'
   | 'apiV1PersonalizationComfortPut'
+  | 'apiV1UserPreferencesPut'
 >
 type CreateClient = (mockServer: V3MockServer) => ContractApiClient
 
@@ -376,5 +379,151 @@ export async function verifyUpdateComfortPreferencesInteraction(
           precipPreparedness: 'high',
         },
       })
+    })
+}
+
+export async function verifyUpdateUserPreferencesInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  const input = { locale: 'tr-TR' as const }
+
+  await pact
+    .addInteraction()
+    .uponReceiving('a request to persist the selected mobile locale')
+    .withRequest(
+      'PUT',
+      '/api/v1/user/preferences',
+      setJsonContent({
+        headers: pactEventHeaders,
+        body: input,
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          success: true,
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1UserPreferencesPut({
+        userPreferencesInput: input,
+      })
+
+      expect(userPreferencesResponseSchema.parse(response)).toEqual({
+        success: true,
+      })
+    })
+}
+
+export async function verifyRitualLocalizationInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  const weatherSnapshot = {
+    locationKey: 'chicago-il',
+    latitude: 41.878,
+    longitude: -87.63,
+    timezone: 'America/Chicago',
+    provider: 'weatherapi',
+    providerUpdatedAt: '2026-07-16T12:00:00.000Z',
+    fetchedAt: '2026-07-16T12:00:00.000Z',
+    current: {
+      temperature: 16,
+      condition: 'clear',
+    },
+    hourly: Array.from({ length: 48 }, (_, i) => ({
+      forecastAt: new Date(
+        new Date('2026-07-16T12:00:00.000Z').getTime() + i * 3600 * 1000
+      ).toISOString(),
+      temperature: 16,
+      feelsLike: 15,
+      precipitationProbability: 0.1,
+      precipitationAmount: 0.0,
+      windSpeed: 5.0,
+      windGust: null,
+      condition: 'clear',
+      providerWeatherCode: '1000',
+    })),
+    alerts: [],
+  }
+
+  const outfitMorningTurkish = {
+    id: 'rec-morning-1',
+    scenario: 'morning',
+    garmentIds: ['g-1'],
+    reasoningBadges: [
+      {
+        key: 'wind_layer',
+        label: 'Rüzgarlık',
+        bullets: ['Yüksek rüzgar nedeniyle rüzgar kesici bir katman önerilir'],
+      },
+    ],
+    comfortNotes: 'Hafif rüzgarlı serin sabah. Trençkot önerilir.',
+  }
+  const outfitMiddayTurkish = {
+    id: 'rec-midday-1',
+    scenario: 'midday',
+    garmentIds: ['g-2'],
+    reasoningBadges: [
+      { key: 'light_layers', label: 'Hafif Katmanlar', bullets: ['Ilık gün'] },
+    ],
+    comfortNotes: 'Ilık ve keyifli bir öğleden sonra.',
+  }
+  const outfitEveningTurkish = {
+    id: 'rec-evening-1',
+    scenario: 'evening',
+    garmentIds: ['g-3'],
+    reasoningBadges: [
+      { key: 'evening_chill', label: 'Akşam Serinliği', bullets: ['Serin akşam'] },
+    ],
+    comfortNotes: 'Serin akşam.',
+  }
+
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Daily scenario outfit recommendations exist for user',
+        params: { userId: 'guardian-1', locationId: 'loc-1' },
+      })
+    )
+    .uponReceiving(
+      'a request to get daily scenario outfit recommendations with an explicit Turkish locale'
+    )
+    .withRequest(
+      'GET',
+      '/api/v1/ritual',
+      setJsonContent({
+        headers: pactEventHeaders,
+        query: { locationId: 'loc-1', locale: 'tr-TR' },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: {
+            weather: like(weatherSnapshot),
+            outfits: [
+              like(outfitMorningTurkish),
+              like(outfitMiddayTurkish),
+              like(outfitEveningTurkish),
+            ],
+            badges: eachLike('Rüzgarlık'),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1RitualGet({
+        locationId: 'loc-1',
+        locale: 'tr-TR',
+      })
+
+      expect(response).toBeDefined()
+      expect(response.data?.outfits?.[0]?.comfortNotes).toContain('serin sabah')
     })
 }

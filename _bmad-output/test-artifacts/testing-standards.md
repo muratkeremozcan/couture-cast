@@ -1,6 +1,6 @@
 # Testing standards
 
-Updated: 2026-05-05 - Made auth-session the standard Playwright fixture path for Story 0.14 Task 2.
+Updated: 2026-07-23 - Added Intentional test exclusions and concessions section.
 
 Status: active
 
@@ -64,7 +64,29 @@ inline data for a contract edge case, the diff should make that reason obvious.
 
 ## Reviewer guidance
 
-- Treat repeated inline teen/guardian literals as a refactor target unless there is a strong
-  contract-test reason to keep them inline.
-- Favor one shared fixture helper over multiple copied object literals inside the same suite.
+- Treat repeated inline teen/guardian literals as a refactor target unless there
+  is a strong contract-test reason to keep them inline.
+- Favor one shared fixture helper over multiple copied object literals inside
+  the same suite.
 - If a test persists data, verify the teardown path in the same diff.
+
+## Intentional test exclusions and concessions
+
+To maintain high pipeline velocity and prevent flaky tests, we explicitly
+document test layers that are intentionally omitted along with the alternative
+quality gates that cover their risks:
+
+1. **Mobile UI E2E tests for multi-locale rendering:**
+   - _Omitted:_ Full end-to-end user flows clicking settings buttons.
+   - _Alternative Gate:_ Vitest browser-based screen tests (running in headless
+     Chromium) asserting translation keys switch dynamically and element layout
+     scroll widths are within boundaries.
+2. **Dedicated API E2E/integration suites for language header parsing:**
+   - _Omitted:_ Custom API test runners verifying header propagation.
+   - _Alternative Gate:_ Pact HTTP contract tests (consumer + provider) running
+     against a local NestJS instance to assert Accept-Language headers and
+     controller responses.
+3. **Visual regression testing (VRT) for all translation screens:**
+   - _Omitted:_ Pixel-matching image diffing tools.
+   - _Alternative Gate:_ Low-cost scrollWidth vs clientWidth assertions within
+     browser unit tests to catch overflow and truncation programmatically.

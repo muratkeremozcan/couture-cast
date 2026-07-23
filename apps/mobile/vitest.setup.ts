@@ -1,3 +1,8 @@
+const browserGlobal = globalThis as typeof globalThis & {
+  global?: typeof globalThis
+}
+browserGlobal.global ??= globalThis
+
 import '@testing-library/jest-dom/vitest'
 import { cleanup as cleanupDom } from '@testing-library/react'
 import { cleanup as cleanupBrowser } from 'vitest-browser-react'

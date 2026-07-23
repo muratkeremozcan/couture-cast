@@ -1,40 +1,23 @@
 import React from 'react'
-import { StyleSheet, Platform, NativeModules } from 'react-native'
+import { StyleSheet, Platform } from 'react-native'
 import { Text, View } from '@/components/themed'
 import type { WeatherCurrent } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from './hero-theme'
 import { weatherConditionGlyphs } from './weather-glyphs'
+import { useTranslation } from 'react-i18next'
+import { formatTemperature as localizedFormatTemperature } from '@/src/lib/formatters'
+import i18n from '@/src/lib/i18n'
 
 type WeatherHeaderProps = {
   current?: WeatherCurrent
   isLoading?: boolean
 }
 
-const getIsFahrenheitLocale = () => {
-  try {
-    /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
-    const locale =
-      Platform.OS === 'ios'
-        ? NativeModules.SettingsManager?.settings?.AppleLocale ||
-          NativeModules.SettingsManager?.settings?.AppleLanguages?.[0]
-        : NativeModules.I18nManager?.localeIdentifier
-    if (locale && (locale.includes('US') || locale.includes('en-US'))) {
-      return true
-    }
-    /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
-  } catch {
-    // ignore
-  }
-  return false
-}
-
 export function formatTemperature(celsius: number, forceFahrenheit?: boolean) {
-  const isFahrenheit = forceFahrenheit ?? getIsFahrenheitLocale()
-  if (isFahrenheit) {
-    const fahrenheit = (celsius * 9) / 5 + 32
-    return `${Math.round(fahrenheit)}°F`
+  if (forceFahrenheit !== undefined) {
+    return localizedFormatTemperature(celsius, forceFahrenheit ? 'en-US' : 'tr-TR')
   }
-  return `${Math.round(celsius)}°C`
+  return localizedFormatTemperature(celsius, i18n.language)
 }
 
 const conditionNames: Record<string, string> = {
@@ -52,6 +35,7 @@ const conditionNames: Record<string, string> = {
 }
 
 export function WeatherHeader({ current, isLoading }: WeatherHeaderProps) {
+  const { t } = useTranslation()
   const palette = useHeroPalette()
 
   if (isLoading) {
@@ -68,7 +52,9 @@ export function WeatherHeader({ current, isLoading }: WeatherHeaderProps) {
   }
 
   const glyph = weatherConditionGlyphs[current.condition] || '❓'
-  const text = conditionNames[current.condition] || 'Unknown'
+  const text = t(`hero.conditions.${current.condition}`, {
+    defaultValue: conditionNames[current.condition] || 'Unknown',
+  })
 
   return (
     <View style={styles.container} testID="weather-header">

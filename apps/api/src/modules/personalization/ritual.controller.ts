@@ -6,6 +6,7 @@ import {
   UseGuards,
   InternalServerErrorException,
   Logger,
+  Headers,
 } from '@nestjs/common'
 import {
   ritualQueryParamsSchema,
@@ -32,7 +33,8 @@ export class RitualController {
   @Get()
   async getOrCreateRitual(
     @AuthContext() auth: RequestAuthContext,
-    @Query() query: unknown
+    @Query() query: unknown,
+    @Headers('accept-language') acceptLanguage?: string
   ): Promise<RitualResponse> {
     let parsedQuery: RitualQueryParams
     try {
@@ -43,7 +45,9 @@ export class RitualController {
 
     const data = await this.ritualService.getOrCreateRitual(
       auth.userId,
-      parsedQuery.locationId
+      parsedQuery.locationId,
+      acceptLanguage,
+      parsedQuery.locale
     )
 
     try {

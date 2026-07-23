@@ -1,6 +1,7 @@
 // Step 8 app reuse owner: searchable owner anchor
 import {
   trackAlertReceived,
+  trackLocaleSwitched,
   trackRitualCreated,
   trackWardrobeUploadStarted,
 } from '@couture/api-client'
@@ -79,6 +80,24 @@ export function trackMobileAlertReceived(
     alertType: input.alertType,
     severity: input.severity,
     weatherSeverity: input.weatherSeverity,
+    timestamp: new Date().toISOString(),
+  })
+
+  client.capture(payload.event, payload.properties)
+}
+
+export function trackMobileLocaleSwitched(
+  client: MobileAnalyticsCaptureClient,
+  input: {
+    userId: string
+    fromLocale: string
+    toLocale: string
+  }
+) {
+  const payload = trackLocaleSwitched({
+    userId: input.userId,
+    fromLocale: input.fromLocale,
+    toLocale: input.toLocale,
     timestamp: new Date().toISOString(),
   })
 

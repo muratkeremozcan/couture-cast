@@ -12,12 +12,89 @@
  */
 
 import * as runtime from '../runtime'
-import type { UserProfileResponse } from '../models/index'
+import type {
+  UserPreferencesInput,
+  UserPreferencesResponse,
+  UserProfileResponse,
+} from '../models/index'
+
+export interface ApiV1UserPreferencesPutRequest {
+  userPreferencesInput: UserPreferencesInput
+}
 
 /**
  *
  */
 export class UserApi extends runtime.BaseAPI {
+  /**
+   * Creates request options for apiV1UserPreferencesPut without sending the request
+   */
+  async apiV1UserPreferencesPutRequestOpts(
+    requestParameters: ApiV1UserPreferencesPutRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['userPreferencesInput'] == null) {
+      throw new runtime.RequiredError(
+        'userPreferencesInput',
+        'Required parameter "userPreferencesInput" was null or undefined when calling apiV1UserPreferencesPut().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/user/preferences`
+
+    return {
+      path: urlPath,
+      method: 'PUT',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['userPreferencesInput'],
+    }
+  }
+
+  /**
+   * Updates language locale or other UI preferences in UserProfile.
+   * Update user settings and preferences
+   */
+  async apiV1UserPreferencesPutRaw(
+    requestParameters: ApiV1UserPreferencesPutRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<UserPreferencesResponse>> {
+    const requestOptions =
+      await this.apiV1UserPreferencesPutRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Updates language locale or other UI preferences in UserProfile.
+   * Update user settings and preferences
+   */
+  async apiV1UserPreferencesPut(
+    requestParameters: ApiV1UserPreferencesPutRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<UserPreferencesResponse> {
+    const response = await this.apiV1UserPreferencesPutRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
   /**
    * Creates request options for apiV1UserProfileGet without sending the request
    */

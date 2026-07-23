@@ -14,7 +14,7 @@ import { useFonts } from 'expo-font'
 import type { Notification } from 'expo-notifications'
 import { Stack, usePathname } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import 'react-native-reanimated'
 
 import { Platform, useColorScheme } from 'react-native'
@@ -23,6 +23,7 @@ import {
   mobileAnalyticsClient,
 } from '@/src/analytics/mobile-analytics'
 import { trackMobileAlertReceived } from '@/src/analytics/track-events'
+import { initI18n } from '@/src/lib/i18n'
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -52,18 +53,30 @@ export default function RootLayout() {
   const [loaded, fontError]: FontLoadTuple = fontLoadResult
   /* eslint-enable @typescript-eslint/no-unsafe-assignment */
 
+  const [i18nLoaded, setI18nLoaded] = useState(false)
+
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (fontError) throw fontError
   }, [fontError])
 
   useEffect(() => {
-    if (loaded) {
+    void initI18n()
+      .catch((error: unknown) => {
+        console.warn('[i18n] unable to initialize localization', error)
+      })
+      .finally(() => {
+        setI18nLoaded(true)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (loaded && i18nLoaded) {
       void SplashScreen.hideAsync()
     }
-  }, [loaded])
+  }, [loaded, i18nLoaded])
 
-  if (!loaded) {
+  if (!loaded || !i18nLoaded) {
     return null
   }
 

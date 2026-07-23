@@ -1,0 +1,64 @@
+{
+  "tabs": {
+    "tab_one": "Onglet Un",
+    "tab_two": "Paramètres"
+  },
+  "hero": {
+    "scenarios": {
+      "morning": "Trajet du matin",
+      "midday": "Midi",
+      "evening": "Projets de soirée"
+    },
+    "conditions": {
+      "clear": "Ciel dégagé",
+      "partly_cloudy": "Partiellement nuageux",
+      "cloudy": "Nuageux",
+      "fog": "Brouillard",
+      "drizzle": "Bruine",
+      "rain": "Pluie",
+      "sleet": "Grésil",
+      "snow": "Neige",
+      "thunderstorm": "Orage",
+      "wind": "Venteux",
+      "unknown": "Inconnu"
+    },
+    "hourly_forecast": "Prévisions horaires",
+    "expand_hours": "Développer ({{hours}} h)",
+    "collapse": "Réduire",
+    "load_error": "Impossible de charger les recommandations quotidiennes",
+    "retry": "Réessayer",
+    "badge_justification": "Justification de {{label}} :",
+    "alert_title": "Alerte Météo Violente",
+    "offline_toast": "Utilisation des données météo récemment mises en cache",
+    "loading": "Chargement des recommandations...",
+    "garment_swap_title": "Choisir un vêtement alternatif",
+    "feels_like": "Ressenti",
+    "precipitation": "Précipitations"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "language": "Langue",
+    "locale_sync_error": "La langue a changé sur cet appareil. La synchronisation du profil sera réessayée plus tard.",
+    "region_units": "Région et Unités",
+    "languages": {
+      "en-US": "Anglais (É.-U.)",
+      "en-CA": "Anglais (Canada)",
+      "es-419": "Espagnol (LatAm)",
+      "fr-CA": "Français (Canada)",
+      "fr-FR": "Français (Europe)",
+      "tr-TR": "Turc",
+      "de-DE": "Allemand",
+      "it-IT": "Italien",
+      "pt-BR": "Portugais (Brésil)",
+      "pt-PT": "Portugais (Portugal)"
+    },
+    "api_health": "Vérification de l'état de l'API...",
+    "api_health_status": "État de l'API: {{status}}",
+    "api_health_unavailable": "API indisponible",
+    "diagnostic_alert_btn": "Enregistrer l'analyse d'alerte météo",
+    "diagnostic_info": "Le suivi alert_received est relié aux écouteurs de réception de notifications push réels."
+  },
+  "common": {
+    "cancel": "Annuler"
+  }
+}

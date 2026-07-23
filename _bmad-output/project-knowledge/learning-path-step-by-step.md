@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-07-21 - Step 19, Step 20, and Step 21 capture the complete Epic 2 personalization features: scenario outfit generator, comfort calibration settings, and reasoning badges/explanations.
+Updated: 2026-07-23 - Step 19, Step 20, Step 21, and Step 22 capture personalization features and the complete localization infrastructure.
 
 ## LLM collaborator prompt
 
@@ -2159,3 +2159,51 @@ Task owner map:
 - Story 2.3 Task 3 step 1 owner: update consumer contract pact expectations in `pact/http/consumer/api-contract-interactions.ts`
 - Story 2.3 Task 3 step 2 owner: update provider mock responses in `pact/http/provider/provider-helper.ts`
 - Story 2.3 Task 4 step 1 owner: test badge keys, labels, and bullet interpolation rules in `apps/api/src/modules/personalization/ritual.service.spec.ts`
+
+## Step 22 - Localization infrastructure and quality gates
+
+User/business impact:
+
+Allows CoutureCast to expand across multiple regions (Turkish, German, Italian, Portuguese) with localized language resources, currency settings, and regional measurement metrics. The business gains absolute global scalability and avoids broken layouts, missing dictionary entries, or translation drifts by enforcing rigorous automated quality checks.
+
+Key takeaways:
+
+1. Multi-locale formatting engine: Dynamic locales and fallback rules mapped in frontend i18n configurations and currency/temperature formatting libraries.
+2. Typo-safe and complete dictionary assertions: Programmatic unit tests validating key parity and replacement variable placeholders ({feelsLike}) across all supported languages.
+3. Realtime browser layout overflow verification: Headless browser integration tests asserting scroll width matches view boundaries to catch text-overflow or layout breakage automatically on CI/CD PR checks.
+4. Contextual contract headers: Pact HTTP consumer/provider integrations ensuring locale selection header (Accept-Language) propagates correctly from Expo to NestJS.
+
+Story/Task mapping:
+
+- Story 3.2
+- Task 1 (Client i18n framework & Translation Catalogs)
+- Task 2 (Dynamic unit, currency formatting, and layout assertions)
+- Task 3 (Backend API interceptors, dictionaries, and contract checks)
+- Task 4 (Quality gates, unit validations, and verification checklists)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/3-2-localization-infrastructure.md`
+
+Cross-links:
+
+- Step 19 introduces the outfit recommendations service.
+- Step 20 defines comfort preferences settings.
+
+Sequence to follow:
+
+1. Review translation keys registration inside `apps/mobile/src/lib/i18n.ts` and language assets.
+2. Inspect dynamic unit formatter logic and test suites in `apps/mobile/src/lib/formatters.ts` and `apps/mobile/src/lib/formatters.test.ts`.
+3. Look at translation parity and placeholder replacement verification test suite in `apps/api/src/modules/personalization/ritual.service.spec.ts`.
+4. Inspect the custom headless browser layout testing in `apps/mobile/src/screens/tab-two-screen.test.tsx` verifying scroll boundaries across all locales.
+5. Check consumer and provider Pact validation rules in `pact/http/consumer/api-contract-interactions.ts` and `pact/http/provider/provider-helper.ts`.
+
+Task owner map:
+
+- Step 22 step 1 owner: define language resources and system defaults in `apps/mobile/src/lib/i18n.ts`
+- Step 22 step 2 owner: implement locale-aware currency and temperature formatting in `apps/mobile/src/lib/formatters.ts`
+- Step 22 step 3 owner: define localized comfort notes and intercept headers in `apps/api/src/modules/personalization/ritual.service.ts`
+- Step 22 step 4 owner: verify translation key parity and placeholder replacements in `apps/api/src/modules/personalization/ritual.service.spec.ts`
+- Step 22 step 5 owner: check Accept-Language header propagation in Pact consumer tests in `pact/http/consumer/api-contract-interactions.ts`
+- Step 22 step 6 owner: mock localized database state response in Pact provider tests in `pact/http/provider/provider-helper.ts`
+- Step 22 step 7 owner: verify Settings screen layout boundaries in headless Chromium in `apps/mobile/src/screens/tab-two-screen.test.tsx`

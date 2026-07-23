@@ -1,5 +1,10 @@
+// Step 22 step 4 owner: verify translation key parity and placeholder replacements in apps/api/src/modules/personalization/ritual.service.spec.ts
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { RitualService } from './ritual.service.js'
+import {
+  RitualService,
+  comfortNotesTranslations,
+  badgeTranslations,
+} from './ritual.service.js'
 import type { PrismaClient, Prisma } from '@prisma/client'
 import type { WeatherQueryService } from '../weather/weather-query.service.js'
 import type { LocationPreferencesService } from '../location-preferences/location-preferences.service.js'
@@ -201,6 +206,9 @@ describe('RitualService', () => {
         create: vi.fn(),
         update: vi.fn(),
       },
+      userProfile: {
+        findUnique: vi.fn().mockResolvedValue(null),
+      },
       garmentItem: {
         findMany: garmentItemFindMany,
         findFirst: garmentItemFindFirst,
@@ -281,8 +289,8 @@ describe('RitualService', () => {
 
     const result = await service.getOrCreateRitual('user-1')
 
-    expect(result.outfits[0]!.comfortNotes).toContain('adjusted to 11°C for comfort')
-    expect(result.outfits[1]!.comfortNotes).toContain('adjusted to 18°C for comfort')
+    expect(result.outfits[0]!.comfortNotes).toContain('adjusted to 52°F for comfort')
+    expect(result.outfits[1]!.comfortNotes).toContain('adjusted to 64°F for comfort')
   })
 
   it('respects runs_warm preference (+3C effective feels-like calibration)', async () => {
@@ -297,8 +305,8 @@ describe('RitualService', () => {
 
     const result = await service.getOrCreateRitual('user-1')
 
-    expect(result.outfits[0]!.comfortNotes).toContain('adjusted to 17°C for comfort')
-    expect(result.outfits[1]!.comfortNotes).toContain('adjusted to 24°C for comfort')
+    expect(result.outfits[0]!.comfortNotes).toContain('adjusted to 63°F for comfort')
+    expect(result.outfits[1]!.comfortNotes).toContain('adjusted to 75°F for comfort')
   })
 
   it('correctly maps wind tolerance alert badge based on user tolerance setting', async () => {
@@ -359,9 +367,9 @@ describe('RitualService', () => {
     vi.setSystemTime(new Date('2026-07-16T12:59:00.000Z'))
     await customService.getOrCreateRitual('user-1')
 
-    expect(getSpy).toHaveBeenLastCalledWith('ritual:user-1:chicago-il:07/16/2026')
+    expect(getSpy).toHaveBeenLastCalledWith('ritual:user-1:chicago-il:07/16/2026:en-US')
     expect(setSpy).toHaveBeenLastCalledWith(
-      'ritual:user-1:chicago-il:07/16/2026',
+      'ritual:user-1:chicago-il:07/16/2026:en-US',
       expect.any(String),
       'EX',
       900
@@ -370,9 +378,9 @@ describe('RitualService', () => {
     vi.setSystemTime(new Date('2026-07-16T13:00:00.000Z'))
     await customService.getOrCreateRitual('user-1')
 
-    expect(getSpy).toHaveBeenLastCalledWith('ritual:user-1:chicago-il:07/17/2026')
+    expect(getSpy).toHaveBeenLastCalledWith('ritual:user-1:chicago-il:07/17/2026:en-US')
     expect(setSpy).toHaveBeenLastCalledWith(
-      'ritual:user-1:chicago-il:07/17/2026',
+      'ritual:user-1:chicago-il:07/17/2026:en-US',
       expect.any(String),
       'EX',
       900
@@ -572,13 +580,188 @@ describe('RitualService', () => {
     })
   })
 
+  describe('localization support', () => {
+    it('translates comfort notes and reasoning badges using UserProfile locale preference', async () => {
+      const redis = new Redis()
+      const localPrisma = {
+        ...prismaMock,
+        userProfile: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: 'profile-1',
+            user_id: 'user-1',
+            preferences: { locale: 'tr-TR' },
+          }),
+        },
+      } as unknown as PrismaClient
+
+      const customService = new RitualService(
+        localPrisma,
+        weatherQueryMock,
+        locationPreferencesMock,
+        redis as unknown as Redis
+      )
+
+      const result = await customService.getOrCreateRitual('user-1')
+      expect(result).toBeDefined()
+      const morningOutfit = result.outfits.find((o) => o.scenario === 'morning')
+      expect(morningOutfit).toBeDefined()
+      expect(morningOutfit?.comfortNotes).toContain('Hissedilen sıcaklık')
+      const baseBadge = morningOutfit?.reasoningBadges.find((b) => b.key === 'daily_base')
+      expect(baseBadge).toBeDefined()
+      expect(baseBadge?.label).toBe('Günlük temel')
+      expect(baseBadge?.bullets[0]).toBe('Gün için uygun standart üst ve alt giysi')
+    })
+
+    it('translates comfort notes and reasoning badges using Accept-Language header fallback', async () => {
+      const redis = new Redis()
+      const localPrisma = {
+        ...prismaMock,
+        userProfile: {
+          findUnique: vi.fn().mockResolvedValue(null),
+        },
+      } as unknown as PrismaClient
+
+      const customService = new RitualService(
+        localPrisma,
+        weatherQueryMock,
+        locationPreferencesMock,
+        redis as unknown as Redis
+      )
+
+      const result = await customService.getOrCreateRitual('user-1', undefined, 'es-419')
+      expect(result).toBeDefined()
+      const morningOutfit = result.outfits.find((o) => o.scenario === 'morning')
+      expect(morningOutfit).toBeDefined()
+      expect(morningOutfit?.comfortNotes).toContain('Sensación térmica')
+      const baseBadge = morningOutfit?.reasoningBadges.find((b) => b.key === 'daily_base')
+      expect(baseBadge).toBeDefined()
+      expect(baseBadge?.label).toBe('Base diaria')
+      expect(baseBadge?.bullets[0]).toBe(
+        'Prenda superior e inferior estándar adecuadas para el día'
+      )
+    })
+
+    it('keeps an explicitly saved en-US locale ahead of Accept-Language', async () => {
+      const redis = new Redis()
+      const localPrisma = {
+        ...prismaMock,
+        userProfile: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: 'profile-1',
+            user_id: 'user-1',
+            preferences: { locale: 'en-US' },
+          }),
+        },
+      } as unknown as PrismaClient
+      const customService = new RitualService(
+        localPrisma,
+        weatherQueryMock,
+        locationPreferencesMock,
+        redis as unknown as Redis
+      )
+
+      const result = await customService.getOrCreateRitual('user-1', undefined, 'tr-TR')
+
+      expect(result.outfits[0]?.comfortNotes).toContain('Feels like')
+      expect(result.outfits[0]?.comfortNotes).toContain('°F')
+      expect(result.outfits[0]?.comfortNotes).not.toContain('Hissedilen sıcaklık')
+    })
+
+    it('honors weighted case-insensitive Accept-Language values', async () => {
+      const redis = new Redis()
+      const customService = new RitualService(
+        prismaMock,
+        weatherQueryMock,
+        locationPreferencesMock,
+        redis as unknown as Redis
+      )
+
+      const result = await customService.getOrCreateRitual(
+        'user-1',
+        undefined,
+        'ja-JP, TR-tr;q=0.9, fr-FR;q=0.4'
+      )
+
+      expect(result.outfits[0]?.comfortNotes).toContain('Hissedilen sıcaklık')
+    })
+
+    it('gives an explicit query locale precedence and keeps cache entries isolated', async () => {
+      const redis = new Redis()
+      const customService = new RitualService(
+        prismaMock,
+        weatherQueryMock,
+        locationPreferencesMock,
+        redis as unknown as Redis
+      )
+
+      const englishResult = await customService.getOrCreateRitual(
+        'user-1',
+        undefined,
+        'fr-FR',
+        'en-US'
+      )
+      const turkishResult = await customService.getOrCreateRitual(
+        'user-1',
+        undefined,
+        'fr-FR',
+        'tr-TR'
+      )
+      const store = (redis as unknown as { store: Record<string, string> }).store
+
+      expect(englishResult.outfits[0]?.comfortNotes).toContain('°F')
+      expect(turkishResult.outfits[0]?.comfortNotes).toContain('Hissedilen sıcaklık')
+      expect(Object.keys(store).filter((key) => key.endsWith(':en-US'))).toHaveLength(1)
+      expect(Object.keys(store).filter((key) => key.endsWith(':tr-TR'))).toHaveLength(1)
+    })
+
+    it('preserves custom badge bullets when localizing a non-English response', async () => {
+      const redis = new Redis()
+      const customService = new RitualService(
+        prismaMock,
+        weatherQueryMock,
+        locationPreferencesMock,
+        redis as unknown as Redis
+      )
+      outfitRecommendationFindFirst.mockResolvedValue({
+        id: 'rec-custom',
+        user_id: 'user-1',
+        forecast_segment_id: 'seg-morning',
+        scenario: 'morning',
+        garment_ids: ['default-top'],
+        reasoning_badges: [
+          {
+            key: 'stylist_note',
+            label: 'Silk scarf',
+            bullets: ['Balances the custom evening silhouette'],
+          },
+        ],
+        created_at: new Date('2026-07-16T04:00:00.000Z'),
+        updated_at: new Date('2026-07-16T04:00:00.000Z'),
+      })
+
+      const result = await customService.getOrCreateRitual(
+        'user-1',
+        undefined,
+        undefined,
+        'tr-TR'
+      )
+      const badge = result.outfits[0]?.reasoningBadges[0]
+
+      expect(badge).toEqual({
+        key: 'stylist_note',
+        label: 'Silk scarf',
+        bullets: ['Balances the custom evening silhouette'],
+      })
+    })
+  })
+
   describe('invalidateUserCache', () => {
     it('should scan and delete matching user cache keys', async () => {
       const redis = new Redis()
       const mockRedisInstance = redis as unknown as { store: Record<string, string> }
-      mockRedisInstance.store['ritual:user-1:chicago:07/16/2026'] = 'data1'
-      mockRedisInstance.store['ritual:user-1:ny:07/16/2026'] = 'data2'
-      mockRedisInstance.store['ritual:user-2:chicago:07/16/2026'] = 'data3'
+      mockRedisInstance.store['ritual:user-1:chicago:07/16/2026:en-US'] = 'data1'
+      mockRedisInstance.store['ritual:user-1:ny:07/16/2026:tr-TR'] = 'data2'
+      mockRedisInstance.store['ritual:user-2:chicago:07/16/2026:en-US'] = 'data3'
 
       const customService = new RitualService(
         prismaMock,
@@ -594,13 +777,85 @@ describe('RitualService', () => {
 
       expect(scanSpy).toHaveBeenCalledWith('0', 'MATCH', 'ritual:user-1:*', 'COUNT', 100)
       expect(delSpy).toHaveBeenCalledWith([
-        'ritual:user-1:chicago:07/16/2026',
-        'ritual:user-1:ny:07/16/2026',
+        'ritual:user-1:chicago:07/16/2026:en-US',
+        'ritual:user-1:ny:07/16/2026:tr-TR',
       ])
 
-      expect(mockRedisInstance.store['ritual:user-1:chicago:07/16/2026']).toBeUndefined()
-      expect(mockRedisInstance.store['ritual:user-1:ny:07/16/2026']).toBeUndefined()
-      expect(mockRedisInstance.store['ritual:user-2:chicago:07/16/2026']).toBe('data3')
+      expect(
+        mockRedisInstance.store['ritual:user-1:chicago:07/16/2026:en-US']
+      ).toBeUndefined()
+      expect(mockRedisInstance.store['ritual:user-1:ny:07/16/2026:tr-TR']).toBeUndefined()
+      expect(mockRedisInstance.store['ritual:user-2:chicago:07/16/2026:en-US']).toBe(
+        'data3'
+      )
+    })
+  })
+
+  describe('Translation Catalog Parity and Interpolation checks', () => {
+    const expectedLocales = [
+      'en-US',
+      'en-CA',
+      'es-419',
+      'fr-CA',
+      'fr-FR',
+      'tr-TR',
+      'de-DE',
+      'it-IT',
+      'pt-BR',
+      'pt-PT',
+    ]
+
+    it('verifies that all expected locales are present in translation dictionaries', () => {
+      const comfortLocales = Object.keys(comfortNotesTranslations)
+      const badgeLocales = Object.keys(badgeTranslations)
+      expect(comfortLocales).toEqual(expect.arrayContaining(expectedLocales))
+      expect(badgeLocales).toEqual(expect.arrayContaining(expectedLocales))
+    })
+
+    it('verifies comfortNotesTranslations has key parity across all locales', () => {
+      const enUsNotes = comfortNotesTranslations['en-US']
+      if (!enUsNotes) throw new Error('en-US comfort notes are missing')
+      const sourceKeys = Object.keys(enUsNotes).sort()
+
+      Object.values(comfortNotesTranslations).forEach((targetNotes) => {
+        const targetKeys = Object.keys(targetNotes).sort()
+        expect(targetKeys).toEqual(sourceKeys)
+      })
+    })
+
+    it('verifies comfortNotesTranslations interpolation placeholder matches across all locales', () => {
+      const extractPlaceholderNames = (str: string) => {
+        const regex = /\{([^}]+)\}/g
+        return [...str.matchAll(regex)].map((m) => m[1]).sort()
+      }
+
+      const enUsNotes = comfortNotesTranslations['en-US']
+      if (!enUsNotes) throw new Error('en-US comfort notes are missing')
+      type ComfortNoteKey = keyof typeof enUsNotes
+      const comfortNoteKeys = Object.keys(enUsNotes) as ComfortNoteKey[]
+
+      comfortNoteKeys.forEach((key) => {
+        const sourceString = enUsNotes[key]
+        const sourcePlaceholders = extractPlaceholderNames(sourceString)
+        if (sourcePlaceholders.length === 0) return
+
+        Object.values(comfortNotesTranslations).forEach((targetNotes) => {
+          const targetString = targetNotes[key]
+          const targetPlaceholders = extractPlaceholderNames(targetString)
+          expect(targetPlaceholders).toEqual(sourcePlaceholders)
+        })
+      })
+    })
+
+    it('verifies badgeTranslations has key parity across all locales', () => {
+      const enUsBadges = badgeTranslations['en-US']
+      if (!enUsBadges) throw new Error('en-US badge translations are missing')
+      const sourceKeys = Object.keys(enUsBadges).sort()
+
+      Object.values(badgeTranslations).forEach((targetBadges) => {
+        const targetKeys = Object.keys(targetBadges).sort()
+        expect(targetKeys).toEqual(sourceKeys)
+      })
     })
   })
 })

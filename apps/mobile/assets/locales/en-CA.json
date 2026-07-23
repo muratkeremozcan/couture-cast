@@ -1,0 +1,64 @@
+{
+  "tabs": {
+    "tab_one": "Tab One",
+    "tab_two": "Tab Two"
+  },
+  "hero": {
+    "scenarios": {
+      "morning": "Morning commute",
+      "midday": "Midday",
+      "evening": "Evening plans"
+    },
+    "conditions": {
+      "clear": "Clear Sky",
+      "partly_cloudy": "Partly Cloudy",
+      "cloudy": "Cloudy",
+      "fog": "Foggy",
+      "drizzle": "Drizzle",
+      "rain": "Rainy",
+      "sleet": "Sleet",
+      "snow": "Snowy",
+      "thunderstorm": "Thunderstorm",
+      "wind": "Windy",
+      "unknown": "Unknown"
+    },
+    "hourly_forecast": "Hourly Forecast",
+    "expand_hours": "Expand ({{hours}}h)",
+    "collapse": "Collapse",
+    "load_error": "Unable to load daily recommendations",
+    "retry": "Retry",
+    "badge_justification": "{{label}} justification:",
+    "alert_title": "Severe Weather Warning",
+    "offline_toast": "Using recently cached weather data",
+    "loading": "Loading recommendations...",
+    "garment_swap_title": "Choose alternate garment",
+    "feels_like": "Feels like",
+    "precipitation": "Precipitation"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "locale_sync_error": "Language changed on this device. Profile sync will retry later.",
+    "region_units": "Region & Units",
+    "languages": {
+      "en-US": "English (US)",
+      "en-CA": "English (Canada)",
+      "es-419": "Español (LatAm)",
+      "fr-CA": "Français (Canada)",
+      "fr-FR": "Français (Europe)",
+      "tr-TR": "Türkçe",
+      "de-DE": "German",
+      "it-IT": "Italian",
+      "pt-BR": "Portuguese (Brazil)",
+      "pt-PT": "Portuguese (Portugal)"
+    },
+    "api_health": "Checking API health...",
+    "api_health_status": "API health: {{status}}",
+    "api_health_unavailable": "API health unavailable",
+    "diagnostic_alert_btn": "Record weather alert analytics",
+    "diagnostic_info": "alert_received tracking is wired to real push notification receipt listeners."
+  },
+  "common": {
+    "cancel": "Cancel"
+  }
+}

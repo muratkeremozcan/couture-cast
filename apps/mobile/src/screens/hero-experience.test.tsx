@@ -9,6 +9,11 @@ import TabOneScreen from '@/app/(tabs)/index'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { clearRitualMemoryCache, saveRitualCache } from '@/src/lib/ritual-cache'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
+import i18n, { initI18n } from '@/src/lib/i18n'
+
+vi.mock('expo-localization', () => ({
+  getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
+}))
 
 // Mock analytics hook
 const mockCapture = vi.fn()
@@ -23,13 +28,15 @@ vi.mock('@/src/analytics/mobile-analytics', () => ({
 }))
 
 describe('Mobile Hero Experience (TabOneScreen)', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     process.env.EXPO_PUBLIC_API_BASE_URL =
       typeof window !== 'undefined' ? window.location.origin : 'https://mock-api.test'
+    await initI18n()
   })
 
-  beforeEach(() => {
+  beforeEach(async () => {
     setMobileAccessTokenResolver(() => 'session-token')
+    await i18n.changeLanguage('en-US')
   })
 
   afterEach(() => {
@@ -52,7 +59,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     })
 
     // Verify temperature display
-    expect(screen.getByTestId('current-temperature').textContent).toBe('21°C')
+    expect(screen.getByTestId('current-temperature').textContent).toBe('70°F')
     expect(screen.getByText('Clear Sky')).toBeTruthy()
 
     // Verify hourly forecast is present (default shows 8 items)
@@ -159,7 +166,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
   it('verifies offline fallback banner and stale state display when API request fails', async () => {
     // Populate the cache with a stale entry (older than 15 mins)
-    await saveRitualCache('test-user-id', {
+    await saveRitualCache('test-user-id', 'en-US', {
       data: mockRitualResponse,
       timestamp: Date.now() - 20 * 60 * 1000, // 20 minutes ago (stale!)
     })
@@ -179,6 +186,27 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     })
     expect(screen.getByText('Using recently cached weather data')).toBeTruthy()
     expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+  })
+
+  it('requests and renders the active locale across the hero experience', async () => {
+    await i18n.changeLanguage('tr-TR')
+    let requestedLocale: string | null = null
+    server.use(
+      http.get('*/api/v1/ritual', ({ request }) => {
+        requestedLocale = new URL(request.url).searchParams.get('locale')
+        return HttpResponse.json(mockRitualResponse)
+      })
+    )
+
+    await render(<TabOneScreen />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('weather-header')).toBeTruthy()
+    })
+    expect(requestedLocale).toBe('tr-TR')
+    expect(screen.getByText('Açık')).toBeTruthy()
+    expect(screen.getByText('Saatlik tahmin')).toBeTruthy()
+    expect(screen.getByText('Genişlet (48 sa)')).toBeTruthy()
   })
 
   it('displays Merlot warning banner when weather alerts are active', async () => {
