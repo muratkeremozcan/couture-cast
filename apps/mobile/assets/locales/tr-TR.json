@@ -35,6 +35,13 @@
     "feels_like": "Hissedilen sıcaklık",
     "precipitation": "Yağış oranı"
   },
+  "widget": {
+    "now": "ŞİMDİ",
+    "next_hour": "SONRAKİ SAAT",
+    "stale": "Güncel değil",
+    "unavailable": "Öneriler için uygulamayı açın",
+    "precipitation": "Yağış"
+  },
   "settings": {
     "title": "Ayarlar",
     "language": "Dil",

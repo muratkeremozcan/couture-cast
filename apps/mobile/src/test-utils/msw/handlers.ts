@@ -1,10 +1,12 @@
 import { http, HttpResponse } from 'msw'
 
+const MOCK_FORECAST_START_MS = Date.parse('2026-07-24T17:00:00.000Z')
+
 const generateMockHourly = () => {
   const hourly = []
   for (let i = 0; i < 48; i++) {
     hourly.push({
-      forecastAt: new Date(Date.now() + i * 3600000).toISOString(),
+      forecastAt: new Date(MOCK_FORECAST_START_MS + i * 3600000).toISOString(),
       temperature: 20 + Math.sin(i / 4) * 5,
       feelsLike: 20 + Math.sin(i / 4) * 5,
       precipitationProbability: 0.1,

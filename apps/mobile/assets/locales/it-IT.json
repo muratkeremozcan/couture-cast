@@ -35,6 +35,13 @@
     "feels_like": "Percepito",
     "precipitation": "Precipitazione"
   },
+  "widget": {
+    "now": "ORA",
+    "next_hour": "PROSSIMA ORA",
+    "stale": "Non aggiornato",
+    "unavailable": "Apri l’app per i consigli",
+    "precipitation": "Precipitazioni"
+  },
   "settings": {
     "title": "Impostazioni",
     "language": "Lingua",

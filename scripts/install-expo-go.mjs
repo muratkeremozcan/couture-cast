@@ -6,7 +6,7 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 
 const EXPO_GO_SDK_54_URL =
-  'https://github.com/expo/expo-go-releases/releases/download/Expo-Go-54.0.7/Expo-Go-54.0.7.apk'
+  'https://github.com/expo/expo-go-releases/releases/download/Expo-Go-54.0.8/Expo-Go-54.0.8.apk'
 const DOWNLOAD_PATH = path.join('/tmp', 'ExpoGo-latest.apk')
 
 const log = (msg) => console.log(`[expo-go] ${msg}`)

@@ -11,7 +11,14 @@ export default defineConfig({
     include: [/\.[jt]sx?$/, /node_modules\/expo-router\/.*\.js$/],
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react/jsx-dev-runtime', 'vitest-browser-react'],
+    include: [
+      'expo-background-fetch',
+      'expo-task-manager',
+      'react',
+      'react-dom',
+      'react/jsx-dev-runtime',
+      'vitest-browser-react',
+    ],
     esbuildOptions: {
       loader: {
         '.js': 'jsx',
@@ -53,6 +60,13 @@ export default defineConfig({
         replacement: path.resolve(
           __dirname,
           './src/test-utils/mocks/react-native-libraries.js'
+        ),
+      },
+      {
+        find: /^react-native-safe-area-context$/,
+        replacement: path.resolve(
+          __dirname,
+          './src/test-utils/mocks/react-native-safe-area-context.jsx'
         ),
       },
       {

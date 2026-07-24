@@ -35,6 +35,13 @@
     "feels_like": "Gefühlt wie",
     "precipitation": "Niederschlag"
   },
+  "widget": {
+    "now": "JETZT",
+    "next_hour": "NÄCHSTE STUNDE",
+    "stale": "Veraltet",
+    "unavailable": "App für Empfehlungen öffnen",
+    "precipitation": "Niederschlag"
+  },
   "settings": {
     "title": "Einstellungen",
     "language": "Sprache",

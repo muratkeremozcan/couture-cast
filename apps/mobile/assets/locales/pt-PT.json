@@ -35,6 +35,13 @@
     "feels_like": "Sensação térmica",
     "precipitation": "Precipitação"
   },
+  "widget": {
+    "now": "AGORA",
+    "next_hour": "PRÓXIMA HORA",
+    "stale": "Desatualizado",
+    "unavailable": "Abra a aplicação para recomendações",
+    "precipitation": "Precipitação"
+  },
   "settings": {
     "title": "Definições",
     "language": "Idioma",

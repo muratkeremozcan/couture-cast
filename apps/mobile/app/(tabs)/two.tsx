@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, SafeAreaView, ScrollView, StyleSheet } from 'react-native'
+import { Pressable, ScrollView, StyleSheet } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import {
   defaultSupportedLocale,
@@ -7,7 +8,6 @@ import {
   type SupportedLocale,
 } from '@couture/api-client/contracts/http'
 
-import EditScreenInfo from '@/components/edit-screen-info'
 import { Text, View } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import {
@@ -203,16 +203,7 @@ export default function TabTwoScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.container}>
-          <Text style={styles.title}>
-            {t('tabs.tab_two', { defaultValue: 'Tab Two' })}
-          </Text>
-          <View
-            style={styles.separator}
-            lightColor="#eee"
-            darkColor="rgba(255,255,255,0.1)"
-          />
-
+        <View style={styles.container} testID="settings-screen">
           <View style={styles.settingsSection}>
             <Text style={styles.sectionTitle}>
               {t('settings.language', { defaultValue: 'Language' })}
@@ -256,7 +247,6 @@ export default function TabTwoScreen() {
               {localeError}
             </Text>
           ) : null}
-          <EditScreenInfo path="app/(tabs)/two.tsx" />
           <Text style={styles.infoText}>{apiHealthMessage}</Text>
           <Text style={styles.infoText}>
             {t('settings.diagnostic_info', {
@@ -297,18 +287,10 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  separator: {
-    marginVertical: 15,
-    height: 1,
-    width: '80%',
-  },
   settingsSection: {
     width: '90%',
-    marginVertical: 15,
+    marginTop: 8,
+    marginBottom: 15,
     alignItems: 'stretch',
     backgroundColor: 'transparent',
   },

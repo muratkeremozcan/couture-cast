@@ -35,6 +35,13 @@
     "feels_like": "Sensación térmica",
     "precipitation": "Precipitación"
   },
+  "widget": {
+    "now": "AHORA",
+    "next_hour": "PRÓXIMA HORA",
+    "stale": "Desactualizado",
+    "unavailable": "Abre la app para ver recomendaciones",
+    "precipitation": "Precipitación"
+  },
   "settings": {
     "title": "Ajustes",
     "language": "Idioma",

@@ -1,0 +1,52 @@
+# Story 3.3 Task 5 step 2 owner: define E2E Maestro routing verification scenarios in maestro/widget-deep-link.yaml
+appId: ${MAESTRO_APP_ID}
+name: 'Widget Deep Link Hydration'
+tags:
+  - e2e
+  - widget
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    # Clearing Expo Go state on iOS removes the project Expo CLI just opened and
+    # leaves the simulator on the Expo shell. The runner supplies a fresh API
+    # identity and Metro bundle for each invocation, so wrapper state is retained.
+    clearState: false
+    stopApp: false
+
+- openLink: ${APP_URL}
+
+# Dismiss Expo developer sheets/menus if they appear
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu if it appears'
+- tapOn:
+    text: 'Open app'
+    optional: true
+    label: 'Dismiss Expo Go developer sheet if it appears'
+
+# Verify default state
+- assertVisible: 'Morning commute'
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss delayed Expo Go developer menu if it appears'
+
+# Trigger the small-widget contract. The runner uses the production mobile://
+# URL on Android and Expo Go's equivalent routed URL on iOS, where a third-party
+# host app cannot register CoutureCast's native URL scheme.
+- openLink: ${WIDGET_NOW_URL}
+
+- assertVisible:
+    id: 'scenario-toggles'
+- takeScreenshot:
+    path: maestro/artifacts/widget-deep-link-now
+
+# Trigger the medium next-hour contract.
+- openLink: ${WIDGET_NEXT_URL}
+
+- assertVisible:
+    id: 'scenario-toggles'
+- takeScreenshot:
+    path: maestro/artifacts/widget-deep-link-next

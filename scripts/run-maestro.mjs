@@ -17,6 +17,7 @@
  *   readable in one place.
  */
 import { spawn } from 'node:child_process'
+import { createRequire } from 'node:module'
 import fs from 'node:fs'
 import net from 'node:net'
 import { request as httpRequest } from 'node:http'
@@ -27,6 +28,14 @@ import path from 'node:path'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
+const require = createRequire(import.meta.url)
+const mobilePackageJson = JSON.parse(
+  fs.readFileSync(path.join(projectRoot, 'apps/mobile/package.json'), 'utf8')
+)
+const expoSdkMajor = String(mobilePackageJson.dependencies?.expo ?? '').match(/\d+/)?.[0]
+const EXPO_SDK_VERSION =
+  process.env.MOBILE_E2E_EXPO_SDK_VERSION ||
+  (expoSdkMajor ? `${expoSdkMajor}.0.0` : '54.0.0')
 const cliArgs = process.argv.slice(2)
 let cliPlatform
 const FLOW_PATHS = []
@@ -52,7 +61,7 @@ const MAESTRO_ARTIFACT_DIR = process.env.MAESTRO_ARTIFACT_DIR || 'maestro/artifa
 const START_SERVER = process.env.MOBILE_E2E_SKIP_SERVER !== '1'
 const AUTO_BOOT_ANDROID = process.env.MOBILE_E2E_AUTO_BOOT_ANDROID !== '0'
 const REQUESTED_PLATFORM = process.env.MOBILE_E2E_PLATFORM || cliPlatform
-const EXPECTED_EXPO_GO_VERSION = process.env.MOBILE_E2E_EXPO_GO_VERSION || '54.0.7'
+const EXPECTED_EXPO_GO_VERSION = process.env.MOBILE_E2E_EXPO_GO_VERSION || '54.0.8'
 
 const log = (msg) => console.log(`[maestro:runner] ${msg}`)
 const isMac = os.platform() === 'darwin'
@@ -156,15 +165,124 @@ const getLocalAppUrl = (platform, port) => {
   const host =
     platform === 'android'
       ? process.env.MOBILE_E2E_ANDROID_HOST || '10.0.2.2'
-      : '127.0.0.1'
+      : process.env.MOBILE_E2E_IOS_HOST || '127.0.0.1'
   return `exp://${host}:${port}/--/`
 }
+
+const getLocalApiUrl = (platform) => {
+  const host =
+    platform === 'android'
+      ? process.env.MOBILE_E2E_ANDROID_HOST || '10.0.2.2'
+      : '127.0.0.1'
+  return `http://${host}:4000`
+}
+
+const managedProcesses = new Map()
+
+/**
+ * Signal a managed process and every descendant it spawned.
+ *
+ * npm scripts add multiple wrapper processes around the actual Expo and API
+ * servers. Starting each managed process in its own process group lets teardown
+ * stop the entire tree instead of leaving a nested Node server alive.
+ *
+ * @param {import('node:child_process').ChildProcess} child
+ * @param {NodeJS.Signals} signal
+ */
+const signalManagedProcess = (child, signal) => {
+  if (!child.pid || child.exitCode !== null || child.signalCode !== null) return
+
+  try {
+    if (process.platform === 'win32') {
+      child.kill(signal)
+    } else {
+      process.kill(-child.pid, signal)
+    }
+  } catch (error) {
+    if (error?.code !== 'ESRCH') throw error
+  }
+}
+
+/**
+ * Wait briefly for a managed process to exit.
+ *
+ * @param {import('node:child_process').ChildProcess} child
+ * @param {number} timeoutMs
+ * @returns {Promise<boolean>}
+ */
+const waitForManagedProcessExit = (child, timeoutMs) =>
+  new Promise((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve(true)
+      return
+    }
+
+    const timeout = setTimeout(() => {
+      child.removeListener('exit', onExit)
+      resolve(false)
+    }, timeoutMs)
+    const onExit = () => {
+      clearTimeout(timeout)
+      resolve(true)
+    }
+    child.once('exit', onExit)
+  })
+
+/**
+ * Stop a managed process tree with bounded, escalating signals.
+ *
+ * @param {import('node:child_process').ChildProcess | undefined} child
+ * @param {string} label
+ * @returns {Promise<void>}
+ */
+const stopManagedProcess = async (child, label) => {
+  if (!child) return
+  if (child.exitCode !== null || child.signalCode !== null) {
+    managedProcesses.delete(child)
+    return
+  }
+
+  try {
+    for (const [signal, timeoutMs] of [
+      ['SIGINT', 5_000],
+      ['SIGTERM', 3_000],
+      ['SIGKILL', 2_000],
+    ]) {
+      signalManagedProcess(child, signal)
+      if (await waitForManagedProcessExit(child, timeoutMs)) return
+    }
+
+    throw new Error(`${label} process tree did not exit after SIGKILL`)
+  } finally {
+    managedProcesses.delete(child)
+  }
+}
+
+let interruptCleanup
+const handleTerminationSignal = (signal) => {
+  if (interruptCleanup) return
+
+  interruptCleanup = (async () => {
+    log(`Received ${signal}; stopping managed process trees`)
+    const results = await Promise.allSettled(
+      [...managedProcesses].map(([child, label]) => stopManagedProcess(child, label))
+    )
+    const failures = results.filter((result) => result.status === 'rejected')
+    for (const failure of failures) {
+      console.error('[maestro:runner] Failed during interrupted cleanup', failure.reason)
+    }
+    process.exit(signal === 'SIGINT' ? 130 : 143)
+  })()
+}
+
+process.once('SIGINT', () => handleTerminationSignal('SIGINT'))
+process.once('SIGTERM', () => handleTerminationSignal('SIGTERM'))
 
 /**
  * Poll an HTTP(S) endpoint until it stops returning a server error.
  *
- * In this script, "healthy enough" means the Expo dev server is listening and
- * able to answer requests, not that the mobile app itself has loaded yet.
+ * In this script, "healthy enough" means the HTTP server is listening and able
+ * to answer requests, not that a downstream client has loaded yet.
  *
  * @param {string} url
  * @param {number} [timeoutMs=120000]
@@ -181,10 +299,10 @@ const waitForHealth = (url, timeoutMs = 120000, intervalMs = 2000) =>
       const req = requester(urlObj, (res) => {
         res.resume()
         if ((res.statusCode ?? 500) < 500) {
-          log(`Detected Expo dev server at ${urlObj.href}`)
+          log(`Detected HTTP server at ${urlObj.href}`)
           resolve()
         } else if (Date.now() > deadline) {
-          reject(new Error(`Expo dev server not ready before timeout (${timeoutMs}ms)`))
+          reject(new Error(`HTTP server not ready before timeout (${timeoutMs}ms)`))
         } else {
           setTimeout(attempt, intervalMs)
         }
@@ -192,7 +310,7 @@ const waitForHealth = (url, timeoutMs = 120000, intervalMs = 2000) =>
 
       req.on('error', (err) => {
         if (Date.now() > deadline) {
-          reject(new Error(`Failed to reach Expo dev server: ${err.message}`))
+          reject(new Error(`Failed to reach HTTP server: ${err.message}`))
         } else {
           setTimeout(attempt, intervalMs)
         }
@@ -203,6 +321,61 @@ const waitForHealth = (url, timeoutMs = 120000, intervalMs = 2000) =>
 
     attempt()
   })
+
+const requestJson = async (url, init) => {
+  const response = await fetch(url, init)
+  const body = await response.json().catch(() => undefined)
+
+  if (!response.ok) {
+    throw new Error(
+      `Mobile E2E setup request failed (${response.status} ${url}): ${JSON.stringify(body)}`
+    )
+  }
+
+  return body
+}
+
+const setupMobileE2EIdentity = async (apiBaseUrl) => {
+  const email = `mobile-e2e-${Date.now()}-${process.pid}@example.com`
+  const signup = await requestJson(`${apiBaseUrl}/api/v1/auth/signup`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      birthdate: '2000-01-15',
+    }),
+  })
+  const userId = signup?.userId
+  if (typeof userId !== 'string' || userId.length === 0) {
+    throw new Error('Mobile E2E signup did not return a userId')
+  }
+
+  const accessToken = `test-token:guardian:${userId}`
+  const authorization = `Bearer ${accessToken}`
+  await requestJson(`${apiBaseUrl}/api/v1/locations`, {
+    method: 'POST',
+    headers: {
+      authorization,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      label: 'Chicago',
+      locationKey: 'chicago-il',
+      latitude: 41.878,
+      longitude: -87.63,
+      timezone: 'America/Chicago',
+      city: 'Chicago',
+      region: 'Illinois',
+      country: 'United States',
+    }),
+  })
+
+  await requestJson(`${apiBaseUrl}/api/v1/ritual?locale=en-US`, {
+    headers: { authorization },
+  })
+
+  return accessToken
+}
 
 /**
  * Poll an async condition until it returns true or the timeout expires.
@@ -540,26 +713,113 @@ const ensureIosSimulatorTooling = async () => {
 }
 
 /**
- * Detect whether Expo Go is installed on the currently booted iOS simulator.
+ * Read the Expo Go version installed on the booted iOS simulator.
  *
- * This is separate from "simulator is booted" because Expo CLI may still need
- * to fetch and install Expo Go the first time the smoke runs.
+ * @returns {Promise<string | null>}
+ */
+const getInstalledExpoGoVersionOnIos = async () => {
+  if (!isMac) return null
+
+  try {
+    const appContainer = await captureProcess(
+      'xcrun',
+      ['simctl', 'get_app_container', 'booted', 'host.exp.Exponent', 'app'],
+      { timeoutMs: 5000 }
+    )
+    const version = await captureProcess(
+      '/usr/libexec/PlistBuddy',
+      [
+        '-c',
+        'Print :CFBundleShortVersionString',
+        path.join(appContainer.stdout.trim(), 'Info.plist'),
+      ],
+      { timeoutMs: 5000 }
+    )
+    return version.stdout.trim() || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Install the SDK-compatible Expo Go build on the booted iOS simulator.
+ *
+ * Expo CLI normally prompts before replacing an old simulator build. Local E2E
+ * runs are non-interactive, so resolve the same release metadata Expo uses,
+ * download its simulator app, and install it before Metro starts.
  *
  * @returns {Promise<boolean>}
  */
-const hasExpoGoOnIos = async () => {
+const ensureExpoGoOnIos = async () => {
   if (!isMac) return false
 
+  const expoGoUtilsPath = path.join(
+    projectRoot,
+    'node_modules/@expo/cli/build/src/utils/downloadExpoGoAsync.js'
+  )
+  let expoGoUtils
   try {
-    await captureProcess(
-      'xcrun',
-      ['simctl', 'get_app_container', 'booted', 'host.exp.Exponent'],
-      { timeoutMs: 5000 }
+    // Expo CLI does not currently export a supported simulator-download API.
+    // Keep this dependency guarded so an Expo upgrade fails with an actionable
+    // message instead of a bare MODULE_NOT_FOUND or response-shape error.
+    expoGoUtils = require(expoGoUtilsPath)
+  } catch (cause) {
+    throw new Error(
+      `Expo SDK ${EXPO_SDK_VERSION} no longer exposes the iOS Expo Go installer used by local E2E. Update ensureExpoGoOnIos in scripts/run-maestro.mjs for the installed @expo/cli version.`,
+      { cause }
     )
-    return true
-  } catch {
-    return false
   }
+  const { downloadExpoGoAsync, getExpoGoVersionEntryAsync } = expoGoUtils
+  if (
+    typeof downloadExpoGoAsync !== 'function' ||
+    typeof getExpoGoVersionEntryAsync !== 'function'
+  ) {
+    throw new Error(
+      `The installed @expo/cli does not provide the expected Expo Go download functions for SDK ${EXPO_SDK_VERSION}. Update ensureExpoGoOnIos in scripts/run-maestro.mjs.`
+    )
+  }
+  const release = await getExpoGoVersionEntryAsync(EXPO_SDK_VERSION)
+  if (
+    !release ||
+    typeof release.iosClientUrl !== 'string' ||
+    typeof release.iosClientVersion !== 'string'
+  ) {
+    throw new Error(
+      `Expo returned incomplete iOS Expo Go metadata for SDK ${EXPO_SDK_VERSION}. Set MOBILE_E2E_IOS_EXPO_GO_VERSION after updating the local installer integration.`
+    )
+  }
+  const expectedVersion =
+    process.env.MOBILE_E2E_IOS_EXPO_GO_VERSION || release.iosClientVersion
+  const installedVersion = await getInstalledExpoGoVersionOnIos()
+
+  if (installedVersion === expectedVersion) {
+    log(`Expo Go ${installedVersion} already installed on the iOS simulator`)
+    return true
+  }
+
+  log(
+    installedVersion
+      ? `Expo Go ${installedVersion} found on iOS; expected ${expectedVersion}`
+      : 'Expo Go not found on the booted iOS simulator'
+  )
+  const binaryPath = await downloadExpoGoAsync('ios', {
+    sdkVersion: EXPO_SDK_VERSION,
+    url: release.iosClientUrl,
+  })
+  log(`Installing Expo Go ${expectedVersion} on the booted iOS simulator`)
+  await spawnProcess('xcrun', ['simctl', 'install', 'booted', binaryPath], {
+    timeoutMs: 120_000,
+  })
+
+  const verifiedVersion = await getInstalledExpoGoVersionOnIos()
+  if (verifiedVersion !== expectedVersion) {
+    throw new Error(
+      `Expo Go install finished, but iOS reports ${verifiedVersion ?? 'no version'}; expected ${expectedVersion}.`
+    )
+  }
+
+  log(`Expo Go ${verifiedVersion} installed on the iOS simulator`)
+  return true
 }
 
 /**
@@ -599,12 +859,8 @@ const resolveTarget = async () => {
   await ensureIosSimulatorTooling()
 
   if (await hasBootedIosSimulator()) {
-    const expoGoReady = await hasExpoGoOnIos()
-    log(
-      expoGoReady
-        ? 'Using booted iOS simulator for Maestro run'
-        : 'Using booted iOS simulator; Expo Go will be launched via Expo CLI'
-    )
+    const expoGoReady = await ensureExpoGoOnIos()
+    log('Using booted iOS simulator for Maestro run')
     return { platform: 'ios', appId: 'host.exp.Exponent', expoGoReady }
   }
 
@@ -612,12 +868,8 @@ const resolveTarget = async () => {
   await spawnProcess('bash', ['./scripts/start-ios-simulator.sh'], { timeoutMs: 60_000 })
 
   if (await hasBootedIosSimulator()) {
-    const expoGoReady = await hasExpoGoOnIos()
-    log(
-      expoGoReady
-        ? 'Booted iOS simulator for Maestro run'
-        : 'Booted iOS simulator; Expo Go will be launched via Expo CLI'
-    )
+    const expoGoReady = await ensureExpoGoOnIos()
+    log('Booted iOS simulator for Maestro run')
     return { platform: 'ios', appId: 'host.exp.Exponent', expoGoReady }
   }
 
@@ -662,10 +914,11 @@ const runMaestroCommand = async (args, options = {}) => {
  * High-level order:
  * 1) choose a Metro port,
  * 2) resolve a mobile target,
- * 3) start or reuse Expo,
- * 4) wait until Expo Go is actually usable,
- * 5) run Maestro,
- * 6) stop the local Expo process on the way out.
+ * 3) start or reuse the local API and create an authenticated fixture,
+ * 4) start or reuse Expo,
+ * 5) wait until Expo Go is actually usable,
+ * 6) run Maestro,
+ * 7) stop local processes on the way out.
  *
  * @returns {Promise<void>}
  */
@@ -673,6 +926,54 @@ const run = async () => {
   const metroPort = await chooseMetroPort()
   process.env.MOBILE_E2E_METRO_PORT = String(metroPort)
   const target = await ensureMaestroTarget()
+  const apiHealthUrl = 'http://127.0.0.1:4000/api/health'
+  const apiSetupBaseUrl = 'http://127.0.0.1:4000'
+  let apiProcess
+
+  try {
+    if (process.env.MOBILE_E2E_SKIP_API !== '1') {
+      try {
+        await waitForHealth(apiHealthUrl, 2_000, 250)
+        log(`Detected existing local API at ${apiHealthUrl}, reusing it`)
+      } catch {
+        log('Starting local API for mobile E2E')
+        apiProcess = spawn('npm', ['run', 'start:api:e2e'], {
+          cwd: projectRoot,
+          detached: process.platform !== 'win32',
+          stdio: 'inherit',
+          env: {
+            ...process.env,
+            ALLOW_DEV_GUARDIAN_SECRET: 'true',
+            DATABASE_URL:
+              process.env.MOBILE_E2E_DATABASE_URL ||
+              'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+            GUARDIAN_INVITE_WEB_BASE_URL: 'http://127.0.0.1:3005',
+            TEST_ENV: 'local',
+          },
+        })
+        managedProcesses.set(apiProcess, 'Local API')
+        apiProcess.on('exit', (code) => {
+          if (code !== null && code !== 0) {
+            console.error(`[maestro:runner] Local API exited early with code ${code}`)
+          }
+        })
+        await waitForHealth(apiHealthUrl, 180_000, 1_000)
+        log(`Local API reachable on ${apiHealthUrl}`)
+      }
+
+      process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN =
+        await setupMobileE2EIdentity(apiSetupBaseUrl)
+      process.env.EXPO_PUBLIC_API_BASE_URL = getLocalApiUrl(target.platform)
+      log('Created authenticated mobile E2E fixture')
+    } else if (!process.env.EXPO_PUBLIC_API_BASE_URL) {
+      throw new Error(
+        'MOBILE_E2E_SKIP_API=1 requires EXPO_PUBLIC_API_BASE_URL and an externally managed test identity.'
+      )
+    }
+  } catch (error) {
+    await stopManagedProcess(apiProcess, 'Local API')
+    throw error
+  }
 
   // Maestro needs both an app URL and a health URL. We probe the explicit env
   // override first, then the chosen Metro port, then the default Expo port.
@@ -718,12 +1019,14 @@ const run = async () => {
     if (startServer) {
       log(`Starting Expo dev server for mobile smoke (metro port ${metroPort})`)
       serverProcess = spawn('npm', ['run', 'start:mobile:server'], {
+        detached: process.platform !== 'win32',
         stdio: 'inherit',
         env: {
           ...process.env,
           MOBILE_E2E_PLATFORM: target.platform,
         },
       })
+      managedProcesses.set(serverProcess, 'Expo dev server')
       serverProcess.on('exit', (code) => {
         if (code !== null && code !== 0) {
           console.error(`[maestro:runner] Expo dev server exited early with code ${code}`)
@@ -764,6 +1067,12 @@ const run = async () => {
     process.env.MOBILE_E2E_APP_URL = resolvedPair.app
     process.env.MOBILE_E2E_HEALTH_URL = resolvedPair.health
     process.env.APP_URL = resolvedPair.app
+    const widgetUrl = (size, slot) =>
+      target.platform === 'ios'
+        ? `${resolvedPair.app}(tabs)?source=widget&size=${size}&slot=${slot}`
+        : `mobile://(tabs)?source=widget&size=${size}&slot=${slot}`
+    process.env.WIDGET_NOW_URL = widgetUrl('small', 'now')
+    process.env.WIDGET_NEXT_URL = widgetUrl('medium', 'next')
     if (!process.env.MAESTRO_APP_ID) {
       process.env.MAESTRO_APP_ID = target.appId
     }
@@ -773,7 +1082,7 @@ const run = async () => {
     const iosExpoGoReady =
       target.platform !== 'ios' ||
       (await waitForCondition(
-        () => hasExpoGoOnIos(),
+        async () => (await getInstalledExpoGoVersionOnIos()) !== null,
         target.expoGoReady ? 10_000 : 90_000,
         2_000
       ))
@@ -813,6 +1122,8 @@ const run = async () => {
           maestroArgs.push('--platform', target.platform, 'test')
           maestroArgs.push('-e', `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`)
           maestroArgs.push('-e', `APP_URL=${process.env.APP_URL}`)
+          maestroArgs.push('-e', `WIDGET_NOW_URL=${process.env.WIDGET_NOW_URL}`)
+          maestroArgs.push('-e', `WIDGET_NEXT_URL=${process.env.WIDGET_NEXT_URL}`)
           if (WRITE_ARTIFACTS) {
             fs.mkdirSync(path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR), {
               recursive: true,
@@ -843,7 +1154,11 @@ const run = async () => {
   } finally {
     if (serverProcess) {
       log('Stopping Expo dev server')
-      serverProcess.kill('SIGINT')
+      await stopManagedProcess(serverProcess, 'Expo dev server')
+    }
+    if (apiProcess) {
+      log('Stopping local API')
+      await stopManagedProcess(apiProcess, 'Local API')
     }
   }
 }

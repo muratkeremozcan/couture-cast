@@ -35,6 +35,13 @@
     "feels_like": "Feels like",
     "precipitation": "Precipitation"
   },
+  "widget": {
+    "now": "NOW",
+    "next_hour": "NEXT HOUR",
+    "stale": "Stale",
+    "unavailable": "Open app for recommendations",
+    "precipitation": "Precipitation"
+  },
   "settings": {
     "title": "Settings",
     "language": "Language",
