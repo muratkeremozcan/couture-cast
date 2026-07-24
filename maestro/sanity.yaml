@@ -5,7 +5,7 @@ tags:
   - smoke
   - maestro
 env:
-  TAB_TWO_PATH: 'app/(tabs)/two.tsx'
+  SETTINGS_TITLE: 'Language'
 ---
 - launchApp:
     appId: ${MAESTRO_APP_ID}
@@ -28,9 +28,7 @@ env:
     point: '75%,94%'
     retryTapIfNoChange: true
 
-# The screen path text is more stable than the generic "Tab Two" title, which
-# also appears in the tab bar accessibility tree.
-- assertVisible: ${TAB_TWO_PATH}
+- assertVisible: ${SETTINGS_TITLE}
 
 - takeScreenshot:
     path: maestro/artifacts/tab-navigation.png

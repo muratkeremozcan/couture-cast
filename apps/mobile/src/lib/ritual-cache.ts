@@ -4,6 +4,7 @@ import {
   type RitualResponse,
   type SupportedLocale,
 } from '@couture/api-client/contracts/http'
+import { shareWidgetData } from './widget-share'
 
 const cachePrefix = 'ritual'
 const latestLocationKey = 'latest-location'
@@ -147,6 +148,8 @@ export async function saveRitualCache(
     writeStoredValue(key, JSON.stringify(entry)),
     writeStoredValue(latestLocationCacheKey(userId, locale), locationKey),
   ])
+  // Story 3.3 Task 1 step 2 owner: update widgets only after the durable cache writes finish.
+  await shareWidgetData(entry.data, locale, entry.timestamp)
 }
 
 export function clearRitualMemoryCache() {

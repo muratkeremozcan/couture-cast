@@ -1,18 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Pressable,
-  StyleSheet,
-  ScrollView,
-  SafeAreaView,
-  Modal,
-  Platform,
-} from 'react-native'
+import { Pressable, StyleSheet, ScrollView, Modal, Platform } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { Text, View } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { createMobileApiClient } from '@/src/lib/api-client'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
 import { readLatestRitualCache, saveRitualCache } from '@/src/lib/ritual-cache'
+import { resolveWidgetScenario, type WidgetSlot } from '@/src/lib/widget-share'
 import {
   defaultSupportedLocale,
   resolveSupportedLocale,
@@ -20,6 +15,7 @@ import {
   type RitualResponse,
 } from '@couture/api-client/contracts/http'
 import { trackMobileRitualCreated } from '@/src/analytics/track-events'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 
 // Import components
 import { WeatherHeader } from '@/components/hero/weather-header'
@@ -31,8 +27,17 @@ import { parseGarmentId } from '@/components/hero/garment-item-tile'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
+type WidgetSize = 'small' | 'medium'
 
 const ritualRequestTimeoutMs = 15_000
+
+function isWidgetSlot(value: unknown): value is WidgetSlot {
+  return value === 'now' || value === 'next'
+}
+
+function isWidgetSize(value: unknown): value is WidgetSize {
+  return value === 'small' || value === 'medium'
+}
 
 const alternateGarments: Record<string, string[]> = {
   Outerwear: [
@@ -51,7 +56,10 @@ const alternateGarments: Record<string, string[]> = {
 
 export default function TabOneScreen() {
   const analytics = useMobileAnalytics()
+  const router = useRouter()
   const { i18n, t } = useTranslation()
+  const params = useLocalSearchParams()
+  const { source, size, slot } = params
   const analyticsUserId = analytics.getDistinctId() || 'mobile-anonymous-user'
   const activeLocale =
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
@@ -64,6 +72,7 @@ export default function TabOneScreen() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeScenario, setActiveScenario] = useState<ScenarioType>('morning')
+  const [pendingWidgetSlot, setPendingWidgetSlot] = useState<WidgetSlot | null>(null)
   const [isStale, setIsStale] = useState(false)
 
   // Garment swap modal states
@@ -156,6 +165,36 @@ export default function TabOneScreen() {
     void loadData()
   }, [activeLocale, analyticsUserId])
 
+  // Story 3.3 Task 4 step 1 owner: validate each widget deep link before hydration or analytics.
+  useEffect(() => {
+    if (source !== 'widget') {
+      return
+    }
+
+    if (isWidgetSize(size) && isWidgetSlot(slot)) {
+      setPendingWidgetSlot(slot)
+      analytics.capture('hero_interaction', {
+        interactionType: 'widget_tap',
+        widgetSize: size,
+        slot,
+        locale: activeLocale,
+      })
+    }
+
+    // Consuming the parameters lets the same widget URL trigger again while this tab
+    // stays mounted.
+    router.setParams({ source: undefined, size: undefined, slot: undefined })
+  }, [source, size, slot, activeLocale, analytics, router])
+
+  useEffect(() => {
+    if (!ritual || !pendingWidgetSlot) {
+      return
+    }
+
+    setActiveScenario(resolveWidgetScenario(ritual, pendingWidgetSlot))
+    setPendingWidgetSlot(null)
+  }, [ritual, pendingWidgetSlot])
+
   const handleScenarioChange = (scenario: ScenarioType) => {
     setActiveScenario(scenario)
     analytics.capture('hero_interaction', {
@@ -247,47 +286,61 @@ export default function TabOneScreen() {
           </View>
         )}
 
-        {/* Error State Banner */}
-        {error && (
-          <View style={styles.errorBanner} testID="error-banner">
-            <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retryButton} onPress={handleRetry}>
-              <Text style={styles.retryText}>
+        {error && !ritual ? (
+          <View
+            style={[
+              styles.errorState,
+              { backgroundColor: palette.surface, borderColor: palette.divider },
+            ]}
+            testID="hero-error-state"
+          >
+            <View style={[styles.errorMark, { borderColor: palette.divider }]}>
+              <Text style={[styles.errorMarkText, { color: palette.text }]}>!</Text>
+            </View>
+            <Text style={[styles.errorText, { color: palette.text }]}>{error}</Text>
+            <Pressable
+              style={[styles.retryButton, { backgroundColor: palette.text }]}
+              onPress={handleRetry}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.retryText, { color: palette.background }]}>
                 {t('hero.retry', { defaultValue: 'Retry' })}
               </Text>
             </Pressable>
           </View>
+        ) : (
+          <>
+            {/* Weather Alert Banner */}
+            {ritual?.data.weather.alerts && (
+              <WeatherAlertBanner alerts={ritual.data.weather.alerts} />
+            )}
+
+            {/* Weather Header */}
+            <WeatherHeader current={ritual?.data.weather.current} isLoading={isLoading} />
+
+            {/* Hourly Forecast Ribbon */}
+            <HourlyForecastRibbon
+              hourly={ritual?.data.weather.hourly}
+              isLoading={isLoading}
+              onToggleExpand={handleRibbonToggle}
+            />
+
+            {/* Scenario Quick Toggles */}
+            {!isLoading && ritual && (
+              <ScenarioToggles
+                activeScenario={activeScenario}
+                onScenarioChange={handleScenarioChange}
+              />
+            )}
+
+            {/* Primary Outfit Card */}
+            <OutfitRecommendationCard
+              outfit={activeOutfit}
+              onSwapGarment={handleSwapGarment}
+              isLoading={isLoading}
+            />
+          </>
         )}
-
-        {/* Weather Alert Banner */}
-        {ritual?.data.weather.alerts && (
-          <WeatherAlertBanner alerts={ritual.data.weather.alerts} />
-        )}
-
-        {/* Weather Header */}
-        <WeatherHeader current={ritual?.data.weather.current} isLoading={isLoading} />
-
-        {/* Hourly Forecast Ribbon */}
-        <HourlyForecastRibbon
-          hourly={ritual?.data.weather.hourly}
-          isLoading={isLoading}
-          onToggleExpand={handleRibbonToggle}
-        />
-
-        {/* Scenario Quick Toggles */}
-        {!isLoading && ritual && (
-          <ScenarioToggles
-            activeScenario={activeScenario}
-            onScenarioChange={handleScenarioChange}
-          />
-        )}
-
-        {/* Primary Outfit Card */}
-        <OutfitRecommendationCard
-          outfit={activeOutfit}
-          onSwapGarment={handleSwapGarment}
-          isLoading={isLoading}
-        />
       </ScrollView>
 
       {/* Garment Swap Modal */}
@@ -374,32 +427,46 @@ const styles = StyleSheet.create({
       web: 'Inter, -apple-system, sans-serif',
     }),
   },
-  errorBanner: {
-    backgroundColor: '#FEF2F2',
-    borderBottomWidth: 1,
-    borderBottomColor: '#FCA5A5',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  errorState: {
+    minHeight: 320,
+    marginHorizontal: 20,
+    marginTop: 28,
+    paddingHorizontal: 28,
+    paddingVertical: 36,
+    borderWidth: 1,
+    borderRadius: 20,
+    justifyContent: 'center',
     alignItems: 'center',
   },
+  errorMark: {
+    width: 52,
+    height: 52,
+    borderWidth: 1,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  errorMarkText: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
   errorText: {
-    color: '#DC2626',
-    fontSize: 12,
-    fontWeight: '600',
-    flex: 1,
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 24,
+    textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#DC2626',
-    borderRadius: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginLeft: 12,
+    minWidth: 120,
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginTop: 24,
+    alignItems: 'center',
   },
   retryText: {
-    color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '700',
   },
   modalOverlay: {

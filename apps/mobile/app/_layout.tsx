@@ -24,6 +24,7 @@ import {
 } from '@/src/analytics/mobile-analytics'
 import { trackMobileAlertReceived } from '@/src/analytics/track-events'
 import { initI18n } from '@/src/lib/i18n'
+import { registerBackgroundFetchAsync } from '@/src/lib/background-fetch'
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -73,6 +74,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded && i18nLoaded) {
       void SplashScreen.hideAsync()
+      void registerBackgroundFetchAsync()
     }
   }, [loaded, i18nLoaded])
 

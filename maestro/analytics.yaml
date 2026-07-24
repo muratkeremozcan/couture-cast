@@ -5,7 +5,7 @@ tags:
   - analytics
   - maestro
 env:
-  TAB_TWO_PATH: 'app/(tabs)/two.tsx'
+  SETTINGS_TITLE: 'Language'
   ALERT_EVENT: 'Analytics event: alert_received'
 ---
 - launchApp:
@@ -36,12 +36,17 @@ env:
 - tapOn:
     point: '75%,94%'
     retryTapIfNoChange: true
-- assertVisible: ${TAB_TWO_PATH}
+- assertVisible: ${SETTINGS_TITLE}
 - assertVisible: 'Mobile analytics diagnostics'
 
 - tapOn:
     text: 'Record weather alert analytics'
     retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      text: ${ALERT_EVENT}
+    direction: DOWN
+    timeout: 10000
 - assertVisible: ${ALERT_EVENT}
 - takeScreenshot:
     path: maestro/artifacts/mobile-analytics-alert

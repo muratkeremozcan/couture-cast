@@ -35,6 +35,13 @@
     "feels_like": "Ressenti",
     "precipitation": "Précipitations"
   },
+  "widget": {
+    "now": "MAINTENANT",
+    "next_hour": "HEURE SUIVANTE",
+    "stale": "Données anciennes",
+    "unavailable": "Ouvrez l’app pour les recommandations",
+    "precipitation": "Précipitations"
+  },
   "settings": {
     "title": "Paramètres",
     "language": "Langue",

@@ -85,7 +85,7 @@ describe('TabTwoScreen', () => {
 
     fireEvent.click(screen.getByTestId('locale-btn-tr-TR'))
 
-    await screen.findByText('Ayarlar')
+    await screen.findByText('Dil')
     await waitFor(() => {
       expect(updatePreferredLocaleMock).toHaveBeenCalledWith('tr-TR')
     })

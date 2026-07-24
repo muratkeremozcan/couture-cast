@@ -11,8 +11,15 @@ import { clearRitualMemoryCache, saveRitualCache } from '@/src/lib/ritual-cache'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
 import i18n, { initI18n } from '@/src/lib/i18n'
 
+const mockRouter = { setParams: vi.fn() }
+
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
+}))
+
+vi.mock('expo-router', () => ({
+  useLocalSearchParams: () => ({}),
+  useRouter: () => mockRouter,
 }))
 
 // Mock analytics hook
@@ -187,6 +194,24 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     })
     expect(screen.getByText('Using recently cached weather data')).toBeTruthy()
     expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+  })
+
+  it('renders a complete retry state when recommendations cannot be loaded', async () => {
+    server.use(
+      http.get('*/api/v1/ritual', () => {
+        return new HttpResponse(null, { status: 500 })
+      })
+    )
+
+    await render(<TabOneScreen />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('hero-error-state')).toBeTruthy()
+    })
+    expect(screen.getByText('Unable to load daily recommendations')).toBeTruthy()
+    expect(screen.getByText('Retry')).toBeTruthy()
+    expect(screen.queryByTestId('weather-header-skeleton')).toBeNull()
+    expect(screen.queryByTestId('outfit-recommendation-card-skeleton')).toBeNull()
   })
 
   it('requests and renders the active locale across the hero experience', async () => {

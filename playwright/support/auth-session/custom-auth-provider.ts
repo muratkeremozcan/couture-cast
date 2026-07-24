@@ -26,6 +26,10 @@ function env(name: string): string | undefined {
   return value && value.length > 0 ? value : undefined
 }
 
+function getAuthCookieName(): string {
+  return env('AUTH_SESSION_COOKIE_NAME') ?? DEFAULT_AUTH_SESSION_COOKIE_NAME
+}
+
 function slugify(value: string): string {
   const slug = value
     .toLowerCase()
@@ -97,7 +101,7 @@ function createSyntheticAuthState(options: Partial<AuthOptions>): PlaywrightStor
         domain: appUrl.hostname,
         expires,
         httpOnly: true,
-        name: env('AUTH_SESSION_COOKIE_NAME') ?? DEFAULT_AUTH_SESSION_COOKIE_NAME,
+        name: getAuthCookieName(),
         path: '/',
         sameSite: 'Lax',
         secure: appUrl.protocol === 'https:',
@@ -117,8 +121,9 @@ function extractToken(tokenData: Record<string, unknown>) {
     return null
   }
 
-  const cookieName = env('AUTH_SESSION_COOKIE_NAME') ?? DEFAULT_AUTH_SESSION_COOKIE_NAME
-  return tokenData.cookies.find((cookie) => cookie.name === cookieName)?.value ?? null
+  return (
+    tokenData.cookies.find((cookie) => cookie.name === getAuthCookieName())?.value ?? null
+  )
 }
 
 function isJwtExpired(rawToken: string) {
@@ -146,8 +151,16 @@ function readCachedState(tokenPath: string) {
   }
 
   const storageState = readStorageState(tokenPath)
-  const token = extractToken(storageState)
-  return token && !isJwtExpired(token) ? storageState : undefined
+  const authCookie = storageState.cookies.find(
+    (cookie) => cookie.name === getAuthCookieName()
+  )
+  const token = authCookie?.value
+  const cookieExpiresSoon =
+    typeof authCookie?.expires === 'number' &&
+    authCookie.expires !== -1 &&
+    authCookie.expires <= Math.floor(Date.now() / 1000) + 60
+
+  return token && !cookieExpiresSoon && !isJwtExpired(token) ? storageState : undefined
 }
 
 function authResult(storageState: PlaywrightStorageState) {

@@ -3,7 +3,13 @@ export type MobileAccessTokenResolver = () =>
   | undefined
   | Promise<string | undefined>
 
-let accessTokenResolver: MobileAccessTokenResolver = () => undefined
+let accessTokenResolver: MobileAccessTokenResolver = () => {
+  if (!__DEV__) {
+    return undefined
+  }
+
+  return process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN?.trim() || undefined
+}
 
 /**
  * Authentication owns the session lifecycle; API consumers only request the
