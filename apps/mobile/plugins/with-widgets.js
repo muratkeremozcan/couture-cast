@@ -20,6 +20,7 @@ const androidWidgetClasses = [
   'OutfitWidgetProviderMedium',
   'WidgetSharedModule',
   'WidgetSharedPackage',
+  'WidgetConstants',
 ]
 
 function ensureDirectory(directory) {
@@ -117,19 +118,34 @@ function addFileReference(project, fileName, groupKey) {
   }
 }
 
-function configureExtensionBuildSettings(project, target) {
+function targetBuildConfigurations(project, target) {
   const configurationList =
     project.pbxXCConfigurationList()[target.pbxNativeTarget.buildConfigurationList]
   const configurations = project.pbxXCBuildConfigurationSection()
-  for (const configurationReference of configurationList.buildConfigurations) {
-    const configuration = configurations[configurationReference.value]
+  return configurationList.buildConfigurations.map(
+    (configurationReference) => configurations[configurationReference.value]
+  )
+}
+
+function resolveDeploymentTarget(project, target) {
+  const deploymentTarget = targetBuildConfigurations(project, target)
+    .map((configuration) => configuration.buildSettings.IPHONEOS_DEPLOYMENT_TARGET)
+    .find(Boolean)
+  if (!deploymentTarget) {
+    throw new Error('Unable to resolve the main iOS deployment target')
+  }
+  return deploymentTarget
+}
+
+function configureExtensionBuildSettings(project, target, deploymentTarget) {
+  for (const configuration of targetBuildConfigurations(project, target)) {
     Object.assign(configuration.buildSettings, {
       APPLICATION_EXTENSION_API_ONLY: 'YES',
       CODE_SIGN_ENTITLEMENTS: `"${extensionName}/${extensionName}.entitlements"`,
       CODE_SIGN_STYLE: 'Automatic',
       CURRENT_PROJECT_VERSION: '1',
       GENERATE_INFOPLIST_FILE: 'NO',
-      IPHONEOS_DEPLOYMENT_TARGET: '15.1',
+      IPHONEOS_DEPLOYMENT_TARGET: deploymentTarget,
       MARKETING_VERSION: '1.0',
       PRODUCT_BUNDLE_IDENTIFIER: `"${extensionBundleIdentifier}"`,
       PRODUCT_NAME: `"${extensionName}"`,
@@ -177,7 +193,7 @@ function writeIosExtensionFiles(projectRoot, iosDirectory) {
   )
 }
 
-function addIosExtensionTarget(project, mainGroupKey) {
+function addIosExtensionTarget(project, mainGroupKey, deploymentTarget) {
   let target = findTarget(project, extensionName)
   if (!target) {
     target = project.addTarget(
@@ -211,7 +227,7 @@ function addIosExtensionTarget(project, mainGroupKey) {
   }
   addFileReference(project, `${extensionName}-Info.plist`, groupKey)
   addFileReference(project, `${extensionName}.entitlements`, groupKey)
-  configureExtensionBuildSettings(project, target)
+  configureExtensionBuildSettings(project, target, deploymentTarget)
 }
 
 function addIosBridgeFiles(project, projectRoot, iosDirectory, mainGroupName) {
@@ -239,6 +255,11 @@ function withIosWidgetFiles(config) {
     const projectRoot = modConfig.modRequest.projectRoot
     const iosDirectory = modConfig.modRequest.platformProjectRoot
     const mainGroupName = modConfig.modRequest.projectName
+    const mainTarget = findTarget(project, mainGroupName)
+    if (!mainTarget) {
+      throw new Error(`Unable to locate the main iOS target ${mainGroupName}`)
+    }
+    const deploymentTarget = resolveDeploymentTarget(project, mainTarget)
     writeIosExtensionFiles(projectRoot, iosDirectory)
     const mainGroupKey = addIosBridgeFiles(
       project,
@@ -246,7 +267,7 @@ function withIosWidgetFiles(config) {
       iosDirectory,
       mainGroupName
     )
-    addIosExtensionTarget(project, mainGroupKey)
+    addIosExtensionTarget(project, mainGroupKey, deploymentTarget)
     return modConfig
   })
 }
@@ -312,6 +333,10 @@ function withAndroidWidgetPackage(config) {
     }
     const packageRegistration = 'add(WidgetSharedPackage())'
     if (!modConfig.modResults.contents.includes(packageRegistration)) {
+      // Expo SDK 54 / React Native 0.81 generates this package-list shape.
+      // Keep the explicit failure below so a future native template change is
+      // detected during clean-prebuild validation instead of silently omitting
+      // the widget bridge package.
       const packageListPattern = /(PackageList\(this\)\.packages\.apply\s*\{)/
       if (!packageListPattern.test(modConfig.modResults.contents)) {
         throw new Error('Unable to locate the React Native package list')

@@ -156,6 +156,8 @@ Gemini 3.5 Flash (High)
 - Wrote screen tests in `widget-deep-link.test.tsx` verifying deep-link parameter scenario hydration and analytics triggers.
 - Authored Maestro workflow `widget-deep-link.yaml` to verify end-to-end deep link integration.
 - Resolved all 16 adversarial review findings across native target generation, atomic storage, cache identity and freshness, runtime validation, localization, brand fidelity, and deep-link behavior.
+- Addressed all valid CodeRabbit findings across widget payload fallbacks, native accessibility and localization, clean-prebuild generation, deterministic local E2E, and review-focused regression coverage.
+- Repaired SDK 54 native file persistence by replacing the Metro-opaque FileSystem loader with a literal lazy legacy-module import and native-path regression tests.
 - Made local Maestro runs self-contained with deterministic API identities, SDK-compatible Expo Go installation, platform-correct networking, robust process cleanup, and Android/iOS widget-link coverage.
 - Replaced the broken blank mobile error view and starter Tab Two content with polished, testable states.
 - Verified `npm run validate`, Playwright E2E (29/29), mobile E2E on Android and iOS, Pact contracts, k6 thresholds, clean Expo prebuild, iOS widget compilation, and Android Kotlin compilation.
@@ -167,12 +169,15 @@ Gemini 3.5 Flash (High)
 - `apps/mobile/src/lib/widget-copy.ts`
 - `apps/mobile/src/lib/widget-cache-freshness.ts`
 - `apps/mobile/src/lib/ritual-cache.ts`
+- `apps/mobile/src/lib/native-file-storage.test.ts`
+- `apps/mobile/src/lib/settings-storage.ts`
 - `apps/mobile/src/lib/background-fetch.ts`
 - `apps/mobile/src/lib/background-fetch.test.ts`
 - `apps/mobile/src/lib/mobile-auth.ts`
 - `apps/mobile/src/screens/widget-deep-link.test.tsx`
 - `apps/mobile/src/screens/hero-experience.test.tsx`
 - `apps/mobile/src/screens/tab-two-screen.test.tsx`
+- `apps/mobile/expo-file-system-legacy.d.ts`
 - `apps/mobile/app/_layout.tsx`
 - `apps/mobile/app/(tabs)/index.tsx`
 - `apps/mobile/app/(tabs)/two.tsx`
@@ -181,6 +186,7 @@ Gemini 3.5 Flash (High)
 - `apps/mobile/targets/widgets/android/java/OutfitWidgetProviderMedium.kt`
 - `apps/mobile/targets/widgets/android/java/WidgetSharedModule.kt`
 - `apps/mobile/targets/widgets/android/java/WidgetSharedPackage.kt`
+- `apps/mobile/targets/widgets/android/java/WidgetConstants.kt`
 - `apps/mobile/targets/widgets/android/res/xml/widget_info_small.xml`
 - `apps/mobile/targets/widgets/android/res/xml/widget_info_medium.xml`
 - `apps/mobile/targets/widgets/android/res/layout/widget_small.xml`

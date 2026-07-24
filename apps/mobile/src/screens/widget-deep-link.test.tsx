@@ -23,12 +23,13 @@ vi.mock('expo-localization', () => ({
 }))
 
 const mockCapture = vi.fn()
+const mockAnalytics = {
+  capture: mockCapture,
+  getDistinctId: () => 'test-user-id',
+  screen: vi.fn(),
+}
 vi.mock('@/src/analytics/mobile-analytics', () => ({
-  useMobileAnalytics: () => ({
-    capture: mockCapture,
-    getDistinctId: () => 'test-user-id',
-    screen: vi.fn(),
-  }),
+  useMobileAnalytics: () => mockAnalytics,
   MobileAnalyticsDiagnosticsPanel: () => null,
 }))
 
@@ -40,6 +41,8 @@ describe('Widget Deep Link Hydration', () => {
   })
 
   beforeEach(() => {
+    mockCapture.mockClear()
+    mockSetParams.mockClear()
     vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-07-24T17:30:00.000Z'))
     setMobileAccessTokenResolver(() => 'session-token')
     mockParams = {}
@@ -67,6 +70,11 @@ describe('Widget Deep Link Hydration', () => {
       slot: 'now',
       locale: 'en-US',
     })
+    const widgetTapCalls = mockCapture.mock.calls.filter(
+      ([event, properties]) =>
+        event === 'hero_interaction' && properties?.interactionType === 'widget_tap'
+    )
+    expect(widgetTapCalls).toHaveLength(1)
     expect(mockSetParams).toHaveBeenCalledWith({
       source: undefined,
       size: undefined,

@@ -24,6 +24,7 @@ export interface WidgetData {
   nextHourTime: string
   nextHourTemp: string
   nextHourIcon: string
+  nextConditionText: string
   nextHourPrecipitation: string
   nextOutfitSummary: string
   lastUpdated: string
@@ -156,6 +157,9 @@ export function createWidgetData(
   const nextHourEntry = findNextHourlyEntry(ritual, nowMs)
   const nowScenario = resolveWidgetScenario(ritual, 'now', nowMs)
   const nextScenario = resolveWidgetScenario(ritual, 'next', nowMs)
+  const nextCopy = nextHourEntry
+    ? getWidgetCopy(locale, nextHourEntry.condition)
+    : undefined
 
   return {
     currentTemp: formatTemperature(current.temperature, locale),
@@ -174,11 +178,13 @@ export function createWidgetData(
       ? formatTemperature(nextHourEntry.temperature, locale)
       : '',
     nextHourIcon: nextHourEntry?.condition ?? 'unknown',
+    nextConditionText: nextCopy?.condition ?? '',
     nextHourPrecipitation: nextHourEntry
       ? formatPrecipitation(nextHourEntry.precipitationProbability, locale)
       : '',
-    nextOutfitSummary:
-      outfits.find((outfit) => outfit.scenario === nextScenario)?.comfortNotes ?? '',
+    nextOutfitSummary: nextHourEntry
+      ? (outfits.find((outfit) => outfit.scenario === nextScenario)?.comfortNotes ?? '')
+      : '',
     lastUpdated: new Date(lastUpdatedMs).toISOString(),
     locale,
     nowLabel: copy.now,

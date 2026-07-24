@@ -18,6 +18,7 @@ struct WidgetData: Codable {
   let nextHourTime: String
   let nextHourTemp: String
   let nextHourIcon: String
+  let nextConditionText: String?
   let nextHourPrecipitation: String
   let nextOutfitSummary: String
   let lastUpdated: String
@@ -39,6 +40,7 @@ struct WidgetData: Codable {
       nextHourTime: "",
       nextHourTemp: "--",
       nextHourIcon: "unknown",
+      nextConditionText: copy.unavailable,
       nextHourPrecipitation: "--",
       nextOutfitSummary: copy.unavailable,
       lastUpdated: "",
@@ -54,13 +56,17 @@ struct WidgetData: Codable {
   func isStale(at date: Date) -> Bool {
     guard let updatedAt = ISO8601DateFormatter.widgetFormatter.date(from: lastUpdated)
     else {
-      return false
+      return !lastUpdated.isEmpty
     }
-    return date.timeIntervalSince(updatedAt) >= staleInterval
+    let age = date.timeIntervalSince(updatedAt)
+    return age < 0 || age >= staleInterval
   }
 }
 
 private struct WidgetCopy {
+  // Native bootstrap copy is intentionally compiled into the extension so an
+  // empty widget can render before JavaScript writes its first payload. The
+  // clean-prebuild test enforces parity with assets/locales/*.json.
   let now: String
   let nextHour: String
   let stale: String
@@ -70,6 +76,17 @@ private struct WidgetCopy {
 
   init(locale: String) {
     let language = Locale(identifier: locale).languageCode ?? "en"
+    if locale.caseInsensitiveCompare("pt-PT") == .orderedSame {
+      self.init(
+        now: "AGORA",
+        nextHour: "PRÓXIMA HORA",
+        stale: "Desatualizado",
+        unavailable: "Abra a aplicação para recomendações",
+        precipitation: "Precipitação",
+        configurationDescription: "Clima e recomendações de looks de relance."
+      )
+      return
+    }
     switch language {
     case "de":
       self.init(
@@ -324,6 +341,9 @@ private struct NextColumn: View {
       HStack {
         Image(systemName: weatherSymbol(for: entry.data.nextHourIcon))
           .foregroundStyle(gold)
+          .accessibilityLabel(
+            entry.data.nextConditionText ?? entry.data.unavailableLabel
+          )
         Text(entry.data.nextHourTemp)
           .font(.custom("Space Grotesk", size: 17).weight(.bold))
           .foregroundStyle(onyx)

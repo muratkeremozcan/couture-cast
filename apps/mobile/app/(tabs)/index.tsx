@@ -157,7 +157,7 @@ export default function TabOneScreen() {
   }
 
   useEffect(() => {
-    // Track when user views Tab One — top of the engagement funnel
+    // Track when user views Tab One - top of the engagement funnel
     if (!hasTrackedTabView.current) {
       hasTrackedTabView.current = true
       analytics.capture('tab_one_viewed')

@@ -40,6 +40,7 @@ describe('widget share serialization', () => {
       nextHourLabel: 'SONRAKİ SAAT',
       staleLabel: 'Güncel değil',
       nextHourIcon: 'rain',
+      nextConditionText: 'Yağmurlu',
       lastUpdated: new Date(lastUpdated).toISOString(),
     })
     expect(parsed.currentTemp).toContain('°C')
@@ -82,6 +83,8 @@ describe('widget share serialization', () => {
     expect(widgetData.nextHourTime).toBe('')
     expect(widgetData.nextHourTemp).toBe('')
     expect(widgetData.nextHourIcon).toBe('unknown')
+    expect(widgetData.nextConditionText).toBe('')
     expect(widgetData.nextHourPrecipitation).toBe('')
+    expect(widgetData.nextOutfitSummary).toBe('')
   })
 })

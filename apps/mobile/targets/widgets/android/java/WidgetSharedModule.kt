@@ -9,9 +9,6 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 
-private const val WIDGET_PREFERENCES = "OutfitWidgetPrefs"
-private const val WIDGET_PAYLOAD_KEY = "widgetPayload"
-
 class WidgetSharedModule(
     reactContext: ReactApplicationContext,
 ) : ReactContextBaseJavaModule(reactContext) {
@@ -20,11 +17,17 @@ class WidgetSharedModule(
     @ReactMethod
     fun setWidgetData(payload: String, promise: Promise) {
         val preferences = reactApplicationContext.getSharedPreferences(
-            WIDGET_PREFERENCES,
+            WidgetConstants.WIDGET_PREFERENCES,
             Context.MODE_PRIVATE,
         )
-        val written = preferences.edit().putString(WIDGET_PAYLOAD_KEY, payload).commit()
-        if (!written || preferences.getString(WIDGET_PAYLOAD_KEY, null) != payload) {
+        val written = preferences
+            .edit()
+            .putString(WidgetConstants.WIDGET_PAYLOAD_KEY, payload)
+            .commit()
+        if (
+            !written ||
+            preferences.getString(WidgetConstants.WIDGET_PAYLOAD_KEY, null) != payload
+        ) {
             promise.reject(
                 "widget_storage_write_failed",
                 "The widget payload could not be saved.",

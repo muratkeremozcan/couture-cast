@@ -52,13 +52,45 @@ test(
     )
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
 
+    const swiftWidgetSource = fs.readFileSync(
+      path.join(mobileRoot, 'targets/widgets/OutfitWidget.swift'),
+      'utf8'
+    )
+    const kotlinWidgetSource = fs.readFileSync(
+      path.join(mobileRoot, 'targets/widgets/android/java/OutfitWidgetProvider.kt'),
+      'utf8'
+    )
+    for (const localeFile of fs.readdirSync(path.join(mobileRoot, 'assets/locales'))) {
+      if (!localeFile.endsWith('.json')) continue
+      const locale = JSON.parse(
+        fs.readFileSync(path.join(mobileRoot, 'assets/locales', localeFile), 'utf8')
+      )
+      for (const value of Object.values(locale.widget)) {
+        assert.ok(
+          swiftWidgetSource.includes(value),
+          `${localeFile} widget copy is missing from iOS fallback`
+        )
+        assert.ok(
+          kotlinWidgetSource.includes(value),
+          `${localeFile} widget copy is missing from Android fallback`
+        )
+      }
+    }
+
     const xcodeProject = fs.readFileSync(
       path.join(fixtureRoot, 'ios/CoutureCast.xcodeproj/project.pbxproj'),
       'utf8'
     )
     assert.match(xcodeProject, /OutfitWidget\.appex in Copy Files/)
     assert.match(xcodeProject, /OutfitWidget\.swift in Sources/)
+    assert.match(xcodeProject, /WidgetSharedModule\.m in Sources/)
+    assert.match(xcodeProject, /WidgetSharedModule\.swift in Sources/)
     assert.match(xcodeProject, /SpaceGrotesk-Regular\.ttf in Resources/)
+    const deploymentTargets = [
+      ...xcodeProject.matchAll(/IPHONEOS_DEPLOYMENT_TARGET = ([^;]+);/g),
+    ].map((match) => match[1])
+    assert.ok(deploymentTargets.length > 0)
+    assert.equal(new Set(deploymentTargets).size, 1)
 
     const mainEntitlements = fs.readFileSync(
       path.join(fixtureRoot, 'ios/CoutureCast/CoutureCast.entitlements'),
@@ -71,6 +103,16 @@ test(
     )
     assert.ok(
       fs.existsSync(path.join(fixtureRoot, 'ios/OutfitWidget/OutfitWidget.entitlements'))
+    )
+    assert.ok(
+      fs.existsSync(
+        path.join(fixtureRoot, 'ios/CoutureCast/WidgetBridge/WidgetSharedModule.m')
+      )
+    )
+    assert.ok(
+      fs.existsSync(
+        path.join(fixtureRoot, 'ios/CoutureCast/WidgetBridge/WidgetSharedModule.swift')
+      )
     )
 
     const androidMain = fs.readFileSync(
@@ -92,6 +134,14 @@ test(
         path.join(
           fixtureRoot,
           'android/app/src/main/java/com/anonymous/mobile/WidgetSharedModule.kt'
+        )
+      )
+    )
+    assert.ok(
+      fs.existsSync(
+        path.join(
+          fixtureRoot,
+          'android/app/src/main/java/com/anonymous/mobile/WidgetConstants.kt'
         )
       )
     )

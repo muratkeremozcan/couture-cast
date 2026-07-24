@@ -6,15 +6,6 @@ import {
 
 const settingsFile = 'couture-cast-settings.json'
 
-interface FileSystemShim {
-  documentDirectory: string | null
-  getInfoAsync(fileUri: string): Promise<{ exists: boolean }>
-  readAsStringAsync(fileUri: string): Promise<string>
-  writeAsStringAsync(fileUri: string, value: string): Promise<void>
-}
-
-const legacyFileSystemPath = 'expo-file-system/legacy'
-
 export type SettingsData = {
   locale: SupportedLocale | null
   localeSyncPending: boolean
@@ -25,15 +16,18 @@ const defaultSettings: SettingsData = {
   localeSyncPending: false,
 }
 
+function loadNativeFileSystem() {
+  // The literal import lets Metro bundle the SDK 54 legacy module while keeping it out of web runs.
+  return import('expo-file-system/legacy')
+}
+
 async function readStoredSettings(): Promise<string | null> {
   try {
     if (Platform.OS === 'web') {
       return globalThis.localStorage?.getItem(settingsFile) ?? null
     }
 
-    const fileSystem = (await import(
-      /* @vite-ignore */ /* @metro-ignore */ legacyFileSystemPath
-    )) as unknown as FileSystemShim
+    const fileSystem = await loadNativeFileSystem()
     if (!fileSystem.documentDirectory) {
       return null
     }
@@ -57,9 +51,7 @@ async function writeStoredSettings(value: string): Promise<boolean> {
       return true
     }
 
-    const fileSystem = (await import(
-      /* @vite-ignore */ /* @metro-ignore */ legacyFileSystemPath
-    )) as unknown as FileSystemShim
+    const fileSystem = await loadNativeFileSystem()
     if (!fileSystem.documentDirectory) {
       return false
     }

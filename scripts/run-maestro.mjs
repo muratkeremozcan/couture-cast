@@ -162,13 +162,10 @@ const chooseMetroPort = async () => {
 }
 
 const getLocalAppUrl = (platform, port) => {
-  const iosLanHost = Object.values(os.networkInterfaces())
-    .flat()
-    .find((address) => address?.family === 'IPv4' && !address.internal)?.address
   const host =
     platform === 'android'
       ? process.env.MOBILE_E2E_ANDROID_HOST || '10.0.2.2'
-      : process.env.MOBILE_E2E_IOS_HOST || iosLanHost || '127.0.0.1'
+      : process.env.MOBILE_E2E_IOS_HOST || '127.0.0.1'
   return `exp://${host}:${port}/--/`
 }
 
@@ -760,8 +757,37 @@ const ensureExpoGoOnIos = async () => {
     projectRoot,
     'node_modules/@expo/cli/build/src/utils/downloadExpoGoAsync.js'
   )
-  const { downloadExpoGoAsync, getExpoGoVersionEntryAsync } = require(expoGoUtilsPath)
+  let expoGoUtils
+  try {
+    // Expo CLI does not currently export a supported simulator-download API.
+    // Keep this dependency guarded so an Expo upgrade fails with an actionable
+    // message instead of a bare MODULE_NOT_FOUND or response-shape error.
+    expoGoUtils = require(expoGoUtilsPath)
+  } catch (cause) {
+    throw new Error(
+      `Expo SDK ${EXPO_SDK_VERSION} no longer exposes the iOS Expo Go installer used by local E2E. Update ensureExpoGoOnIos in scripts/run-maestro.mjs for the installed @expo/cli version.`,
+      { cause }
+    )
+  }
+  const { downloadExpoGoAsync, getExpoGoVersionEntryAsync } = expoGoUtils
+  if (
+    typeof downloadExpoGoAsync !== 'function' ||
+    typeof getExpoGoVersionEntryAsync !== 'function'
+  ) {
+    throw new Error(
+      `The installed @expo/cli does not provide the expected Expo Go download functions for SDK ${EXPO_SDK_VERSION}. Update ensureExpoGoOnIos in scripts/run-maestro.mjs.`
+    )
+  }
   const release = await getExpoGoVersionEntryAsync(EXPO_SDK_VERSION)
+  if (
+    !release ||
+    typeof release.iosClientUrl !== 'string' ||
+    typeof release.iosClientVersion !== 'string'
+  ) {
+    throw new Error(
+      `Expo returned incomplete iOS Expo Go metadata for SDK ${EXPO_SDK_VERSION}. Set MOBILE_E2E_IOS_EXPO_GO_VERSION after updating the local installer integration.`
+    )
+  }
   const expectedVersion =
     process.env.MOBILE_E2E_IOS_EXPO_GO_VERSION || release.iosClientVersion
   const installedVersion = await getInstalledExpoGoVersionOnIos()

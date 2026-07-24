@@ -14,8 +14,6 @@ import java.util.Locale
 import java.util.TimeZone
 import org.json.JSONObject
 
-private const val WIDGET_PREFERENCES = "OutfitWidgetPrefs"
-private const val WIDGET_PAYLOAD_KEY = "widgetPayload"
 private const val STALE_INTERVAL_MS = 30 * 60 * 1000L
 
 private data class WidgetData(
@@ -27,6 +25,7 @@ private data class WidgetData(
     val nextHourTime: String,
     val nextHourTemp: String,
     val nextHourIcon: String,
+    val nextConditionText: String,
     val nextHourPrecipitation: String,
     val nextOutfitSummary: String,
     val lastUpdated: String,
@@ -42,8 +41,9 @@ private data class WidgetData(
             isLenient = false
         }
         val updatedAt = runCatching { formatter.parse(lastUpdated)?.time }.getOrNull()
-            ?: return false
-        return now - updatedAt >= STALE_INTERVAL_MS
+            ?: return lastUpdated.isNotEmpty()
+        val age = now - updatedAt
+        return age < 0 || age >= STALE_INTERVAL_MS
     }
 
     companion object {
@@ -58,6 +58,10 @@ private data class WidgetData(
                 nextHourTime = json.getString("nextHourTime"),
                 nextHourTemp = json.getString("nextHourTemp"),
                 nextHourIcon = json.getString("nextHourIcon"),
+                nextConditionText = json.optString(
+                    "nextConditionText",
+                    json.optString("currentConditionText"),
+                ),
                 nextHourPrecipitation = json.getString("nextHourPrecipitation"),
                 nextOutfitSummary = json.getString("nextOutfitSummary"),
                 lastUpdated = json.getString("lastUpdated"),
@@ -70,7 +74,7 @@ private data class WidgetData(
         }
 
         fun empty(): WidgetData {
-            val copy = NativeWidgetCopy.forLanguage(Locale.getDefault().language)
+            val copy = NativeWidgetCopy.forLocale(Locale.getDefault().toLanguageTag())
             return WidgetData(
                 currentTemp = "--",
                 feelsLikeTemp = "--",
@@ -80,6 +84,7 @@ private data class WidgetData(
                 nextHourTime = "",
                 nextHourTemp = "--",
                 nextHourIcon = "unknown",
+                nextConditionText = copy.unavailable,
                 nextHourPrecipitation = "--",
                 nextOutfitSummary = copy.unavailable,
                 lastUpdated = "",
@@ -94,6 +99,8 @@ private data class WidgetData(
 }
 
 private data class NativeWidgetCopy(
+    // Native bootstrap copy is required before JavaScript writes its first
+    // payload. The clean-prebuild test enforces parity with assets/locales/*.json.
     val now: String,
     val nextHour: String,
     val stale: String,
@@ -101,43 +108,50 @@ private data class NativeWidgetCopy(
     val precipitation: String,
 ) {
     companion object {
-        fun forLanguage(language: String): NativeWidgetCopy = when (language) {
-            "de" -> NativeWidgetCopy(
+        fun forLocale(localeTag: String): NativeWidgetCopy = when {
+            localeTag.equals("pt-PT", ignoreCase = true) -> NativeWidgetCopy(
+                "AGORA",
+                "PRÓXIMA HORA",
+                "Desatualizado",
+                "Abra a aplicação para recomendações",
+                "Precipitação",
+            )
+            Locale.forLanguageTag(localeTag).language == "de" -> NativeWidgetCopy(
                 "JETZT",
                 "NÄCHSTE STUNDE",
                 "Veraltet",
                 "App für Empfehlungen öffnen",
                 "Niederschlag",
             )
-            "es" -> NativeWidgetCopy(
+            Locale.forLanguageTag(localeTag).language == "es" -> NativeWidgetCopy(
                 "AHORA",
                 "PRÓXIMA HORA",
                 "Desactualizado",
                 "Abre la app para ver recomendaciones",
                 "Precipitación",
             )
-            "fr" -> NativeWidgetCopy(
+            Locale.forLanguageTag(localeTag).language == "fr" -> NativeWidgetCopy(
                 "MAINTENANT",
                 "HEURE SUIVANTE",
                 "Données anciennes",
-                "Ouvrez l’application pour les recommandations",
+                "Ouvrez l’app pour les recommandations",
                 "Précipitations",
             )
-            "it" -> NativeWidgetCopy(
+            Locale.forLanguageTag(localeTag).language == "it" -> NativeWidgetCopy(
                 "ORA",
                 "PROSSIMA ORA",
                 "Non aggiornato",
                 "Apri l’app per i consigli",
                 "Precipitazioni",
             )
-            "pt" -> NativeWidgetCopy(
+            Locale.forLanguageTag(localeTag).language == "pt" -> NativeWidgetCopy(
                 "AGORA",
                 "PRÓXIMA HORA",
                 "Desatualizado",
                 "Abra o app para recomendações",
                 "Precipitação",
             )
-            "tr" -> NativeWidgetCopy(
+            Locale.forLanguageTag(localeTag).language == "tr" -> NativeWidgetCopy(
                 "ŞİMDİ",
                 "SONRAKİ SAAT",
                 "Güncel değil",
@@ -165,8 +179,8 @@ abstract class OutfitWidgetProvider : AppWidgetProvider() {
         appWidgetIds: IntArray,
     ) {
         val payload = context
-            .getSharedPreferences(WIDGET_PREFERENCES, Context.MODE_PRIVATE)
-            .getString(WIDGET_PAYLOAD_KEY, null)
+            .getSharedPreferences(WidgetConstants.WIDGET_PREFERENCES, Context.MODE_PRIVATE)
+            .getString(WidgetConstants.WIDGET_PAYLOAD_KEY, null)
         val data = payload
             ?.let { runCatching { WidgetData.fromJson(it) }.getOrNull() }
             ?: WidgetData.empty()
@@ -212,6 +226,10 @@ abstract class OutfitWidgetProvider : AppWidgetProvider() {
 
     private fun bindMediumViews(views: RemoteViews, data: WidgetData) {
         views.setTextViewText(R.id.widget_next_icon, weatherGlyph(data.nextHourIcon))
+        views.setContentDescription(
+            R.id.widget_next_icon,
+            data.nextConditionText.ifBlank { data.unavailableLabel },
+        )
         views.setTextViewText(R.id.widget_next_temp, data.nextHourTemp)
         views.setTextViewText(R.id.widget_next_time, data.nextHourTime)
         views.setTextViewText(

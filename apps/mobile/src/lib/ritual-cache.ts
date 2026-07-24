@@ -33,24 +33,17 @@ function storageFileName(key: string) {
   return `couture-cast-${encodeURIComponent(key)}.json`
 }
 
-interface FileSystemShim {
-  documentDirectory: string | null
-  getInfoAsync(fileUri: string): Promise<{ exists: boolean }>
-  readAsStringAsync(fileUri: string): Promise<string>
-  writeAsStringAsync(fileUri: string, value: string): Promise<void>
+function loadNativeFileSystem() {
+  // The literal import lets Metro bundle the SDK 54 legacy module while keeping it out of web runs.
+  return import('expo-file-system/legacy')
 }
-
-// Bypasses static TS analysis to avoid "module not found" errors
-const legacyFileSystemPath = 'expo-file-system/legacy'
 
 async function readStoredValue(key: string): Promise<string | null> {
   if (Platform.OS === 'web') {
     return globalThis.localStorage?.getItem(key) ?? null
   }
 
-  const fileSystem = (await import(
-    /* @vite-ignore */ /* @metro-ignore */ legacyFileSystemPath
-  )) as unknown as FileSystemShim
+  const fileSystem = await loadNativeFileSystem()
   if (!fileSystem.documentDirectory) {
     return null
   }
@@ -66,9 +59,7 @@ async function writeStoredValue(key: string, value: string) {
     return
   }
 
-  const fileSystem = (await import(
-    /* @vite-ignore */ /* @metro-ignore */ legacyFileSystemPath
-  )) as unknown as FileSystemShim
+  const fileSystem = await loadNativeFileSystem()
   if (!fileSystem.documentDirectory) {
     return
   }
@@ -77,6 +68,22 @@ async function writeStoredValue(key: string, value: string) {
     `${fileSystem.documentDirectory}${storageFileName(key)}`,
     value
   )
+}
+
+async function publishWidgetData(
+  entry: RitualCacheEntry,
+  locale: SupportedLocale
+): Promise<void> {
+  try {
+    await shareWidgetData(entry.data, locale, entry.timestamp)
+  } catch (error) {
+    console.warn(
+      '[RitualCache] Durable cache saved, but widget publication failed',
+      error
+    )
+    // Background refresh must report a failed widget update instead of claiming NewData.
+    throw error
+  }
 }
 
 function parseCacheEntry(value: string | null): RitualCacheEntry | null {
@@ -144,12 +151,17 @@ export async function saveRitualCache(
   memoryCache[key] = entry
   latestLocationByUserLocale[localeKey] = locationKey
 
-  await Promise.all([
-    writeStoredValue(key, JSON.stringify(entry)),
-    writeStoredValue(latestLocationCacheKey(userId, locale), locationKey),
-  ])
+  try {
+    await Promise.all([
+      writeStoredValue(key, JSON.stringify(entry)),
+      writeStoredValue(latestLocationCacheKey(userId, locale), locationKey),
+    ])
+  } catch (error) {
+    console.warn('[RitualCache] Durable cache write failed', error)
+    throw error
+  }
   // Story 3.3 Task 1 step 2 owner: update widgets only after the durable cache writes finish.
-  await shareWidgetData(entry.data, locale, entry.timestamp)
+  await publishWidgetData(entry, locale)
 }
 
 export function clearRitualMemoryCache() {
