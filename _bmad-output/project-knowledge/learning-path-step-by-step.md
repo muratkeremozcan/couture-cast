@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-07-23 - Step 19, Step 20, Step 21, and Step 22 capture personalization features and the complete localization infrastructure.
+Updated: 2026-07-24 - Step 23 captures the home/lock-screen widgets implementation, background sync task, and telemetry hooks.
 
 ## LLM collaborator prompt
 
@@ -2207,3 +2207,56 @@ Task owner map:
 - Step 22 step 5 owner: check Accept-Language header propagation in Pact consumer tests in `pact/http/consumer/api-contract-interactions.ts`
 - Step 22 step 6 owner: mock localized database state response in Pact provider tests in `pact/http/provider/provider-helper.ts`
 - Step 22 step 7 owner: verify Settings screen layout boundaries in headless Chromium in `apps/mobile/src/screens/tab-two-screen.test.tsx`
+
+## Step 23 - Home/lock-screen widgets
+
+User/business impact:
+
+Glanceable widgets on the home and lock screen keep outfit recommendations and real-time weather details front and center for users without opening the app. The business drives application engagement and retention by providing premium glanceable content that deep links directly into localized, context-aware plans.
+
+Key takeaways:
+
+1. Widget Isolation Principle: Keep Kotlin/Swift native widget code purely as a presenter layer. Avoid calling APIs or running formatting logic natively. Serialize and sync formatted state from the main JavaScript/TypeScript layer.
+2. Cross-Platform Native Modules: Expose custom bridge interfaces (`WidgetSharedModule`) to persist weather/outfit state to Shared SharedPreferences (Android) and App Group UserDefaults (iOS).
+3. Background Fetch Sync: Run lightweight task loops (`expo-background-fetch`) to keep widget state fresh even when the app is suspended, respecting system battery optimization.
+4. Deep-Link Hydration: Hydrate active scenario context automatically and trigger telemetry captures when users navigate from a widget tap.
+
+Story/Task mapping:
+
+- Story 3.3
+- Task 1 (Shared Widget Data Utility)
+- Task 2 (Native Widget Implementations)
+- Task 3 (Background Sync Task)
+- Task 4 (App Deep-Link Hydration & Telemetry)
+- Task 5 (Vitest & Maestro Verification)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/3-3-home-lock-screen-widgets.md`
+
+Cross-links:
+
+- Step 22 establishes localization dictionary files and currency/temperature formatters.
+- Step 8 defines shared analytics tracking contracts.
+
+Sequence to follow:
+
+1. Inspect the serialization schema and time-of-day scenario mapping in `apps/mobile/src/lib/widget-share.ts`.
+2. Trace the widget-sharing hook integrated within `saveRitualCache` in `apps/mobile/src/lib/ritual-cache.ts`.
+3. Check the custom bridge package definition and widget providers under `apps/mobile/android/app/src/main/java/com/anonymous/mobile/`.
+4. Review the SwiftUI widget layout views and the iOS App Group entitlements configuration in `apps/mobile/targets/widgets/OutfitWidget.swift` and `apps/mobile/plugins/with-widgets.js`.
+5. Trace the background fetch loop registration on app start in `apps/mobile/app/_layout.tsx` and the task logic in `apps/mobile/src/lib/background-fetch.ts`.
+6. Inspect the parameter parsing logic and PostHog capture triggers in `apps/mobile/app/(tabs)/index.tsx`.
+7. Verify screen-level deep-link routing assertions in `apps/mobile/src/screens/widget-deep-link.test.tsx` and E2E flows in `maestro/widget-deep-link.yaml`.
+
+Task owner map:
+
+- Story 3.3 Task 1 step 1 owner: implement the shareWidgetData serialization utility in `apps/mobile/src/lib/widget-share.ts`
+- Story 3.3 Task 1 step 2 owner: call the widget share utility inside saveRitualCache in `apps/mobile/src/lib/ritual-cache.ts`
+- Story 3.3 Task 2 step 1 owner: implement base OutfitWidgetProvider update and deep-link launcher logic in `apps/mobile/android/app/src/main/java/com/anonymous/mobile/OutfitWidgetProvider.kt`
+- Story 3.3 Task 2 step 2 owner: configure iOS App Group entitlements and Swift bridge files copy during prebuilds in `apps/mobile/plugins/with-widgets.js`
+- Story 3.3 Task 2 step 3 owner: define SwiftUI small and medium layouts in `apps/mobile/targets/widgets/OutfitWidget.swift`
+- Story 3.3 Task 3 step 1 owner: define background fetch task using task manager in `apps/mobile/src/lib/background-fetch.ts`
+- Story 3.3 Task 4 step 1 owner: read deep link query parameters to hydrate active scenario in `apps/mobile/app/(tabs)/index.tsx`
+- Story 3.3 Task 5 step 1 owner: verify widget deep link hydration and telemetry triggers in screen tests in `apps/mobile/src/screens/widget-deep-link.test.tsx`
+- Story 3.3 Task 5 step 2 owner: define E2E Maestro routing verification scenarios in `maestro/widget-deep-link.yaml`
