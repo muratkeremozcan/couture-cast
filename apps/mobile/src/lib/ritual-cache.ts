@@ -1,6 +1,8 @@
 import { Platform } from 'react-native'
 import {
+  alertPreferencesSchema,
   ritualResponseSchema,
+  type AlertPreferences,
   type RitualResponse,
   type SupportedLocale,
 } from '@couture/api-client/contracts/http'
@@ -12,6 +14,7 @@ const latestLocationKey = 'latest-location'
 export type RitualCacheEntry = {
   data: RitualResponse
   timestamp: number
+  alertPreferences?: AlertPreferences
 }
 
 const memoryCache: Record<string, RitualCacheEntry> = {}
@@ -75,7 +78,7 @@ async function publishWidgetData(
   locale: SupportedLocale
 ): Promise<void> {
   try {
-    await shareWidgetData(entry.data, locale, entry.timestamp)
+    await shareWidgetData(entry.data, locale, entry.timestamp, entry.alertPreferences)
   } catch (error) {
     console.warn(
       '[RitualCache] Durable cache saved, but widget publication failed',
@@ -97,9 +100,11 @@ function parseCacheEntry(value: string | null): RitualCacheEntry | null {
       return null
     }
 
+    const alertPreferences = alertPreferencesSchema.safeParse(parsed.alertPreferences)
     return {
       timestamp: parsed.timestamp,
       data: ritualResponseSchema.parse(parsed.data),
+      alertPreferences: alertPreferences.success ? alertPreferences.data : undefined,
     }
   } catch {
     return null

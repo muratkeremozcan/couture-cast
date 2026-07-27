@@ -100,6 +100,23 @@ describe('Widget Deep Link Hydration', () => {
     })
   })
 
+  it('hydrates a watch handoff without requiring widget dimensions', async () => {
+    mockParams = { source: 'watch', slot: 'next' }
+
+    await render(<TabOneScreen />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Warm and sunny midday. Light tee is perfect.')
+      ).toBeTruthy()
+    })
+    expect(mockCapture).toHaveBeenCalledWith('hero_interaction', {
+      interactionType: 'watch_tap',
+      slot: 'next',
+      locale: 'en-US',
+    })
+  })
+
   it('tracks a later widget link while the tab remains mounted', async () => {
     mockParams = { source: 'widget', size: 'small', slot: 'now' }
     const view = await render(<TabOneScreen />)

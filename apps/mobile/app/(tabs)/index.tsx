@@ -7,6 +7,7 @@ import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { createMobileApiClient } from '@/src/lib/api-client'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
 import { readLatestRitualCache, saveRitualCache } from '@/src/lib/ritual-cache'
+import { loadWidgetAlertPreferences } from '@/src/lib/widget-alert-preferences'
 import { resolveWidgetScenario, type WidgetSlot } from '@/src/lib/widget-share'
 import {
   defaultSupportedLocale,
@@ -88,11 +89,14 @@ export default function TabOneScreen() {
 
     try {
       // Omitting locationId deliberately selects the user's primary saved location.
-      const response = await client.apiV1RitualGet(
-        { locale: activeLocale },
-        { signal: controller.signal }
-      )
-      return ritualResponseSchema.parse(response)
+      const [response, alertPreferences] = await Promise.all([
+        client.apiV1RitualGet({ locale: activeLocale }, { signal: controller.signal }),
+        loadWidgetAlertPreferences(client, controller.signal),
+      ])
+      return {
+        data: ritualResponseSchema.parse(response),
+        alertPreferences,
+      }
     } finally {
       clearTimeout(timeout)
     }
@@ -116,7 +120,7 @@ export default function TabOneScreen() {
     }
 
     try {
-      const data = await fetchRitual()
+      const { data, alertPreferences } = await fetchRitual()
       if (loadId !== latestLoadId.current) {
         return
       }
@@ -125,6 +129,7 @@ export default function TabOneScreen() {
       void saveRitualCache(analyticsUserId, activeLocale, {
         data,
         timestamp: now,
+        alertPreferences,
       }).catch(() => undefined)
 
       trackMobileRitualCreated(analytics, {
@@ -167,11 +172,18 @@ export default function TabOneScreen() {
 
   // Story 3.3 Task 4 step 1 owner: validate each widget deep link before hydration or analytics.
   useEffect(() => {
-    if (source !== 'widget') {
+    if (source !== 'widget' && source !== 'watch') {
       return
     }
 
-    if (isWidgetSize(size) && isWidgetSlot(slot)) {
+    if (source === 'watch' && isWidgetSlot(slot)) {
+      setPendingWidgetSlot(slot)
+      analytics.capture('hero_interaction', {
+        interactionType: 'watch_tap',
+        slot,
+        locale: activeLocale,
+      })
+    } else if (isWidgetSize(size) && isWidgetSlot(slot)) {
       setPendingWidgetSlot(slot)
       analytics.capture('hero_interaction', {
         interactionType: 'widget_tap',

@@ -30,4 +30,29 @@ describe('ritual cache localization', () => {
       timestamp: 200,
     })
   })
+
+  it('preserves validated alert preferences with the cached ritual', async () => {
+    await saveRitualCache('user-1', 'en-US', {
+      data: mockRitualResponse,
+      timestamp: 300,
+      alertPreferences: {
+        pushEnabled: false,
+        quietHoursEnabled: true,
+        quietHoursStart: '20:00',
+        quietHoursEnd: '06:00',
+        timezone: 'America/Chicago',
+      },
+    })
+    clearRitualMemoryCache()
+
+    await expect(readLatestRitualCache('user-1', 'en-US')).resolves.toMatchObject({
+      alertPreferences: {
+        pushEnabled: false,
+        quietHoursEnabled: true,
+        quietHoursStart: '20:00',
+        quietHoursEnd: '06:00',
+        timezone: 'America/Chicago',
+      },
+    })
+  })
 })

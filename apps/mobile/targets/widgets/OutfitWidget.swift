@@ -28,6 +28,37 @@ struct WidgetData: Codable {
   let staleLabel: String
   let unavailableLabel: String
   let precipitationLabel: String
+  let hasSevereAlert: Bool
+  let quietHoursEnabled: Bool
+  let quietHoursStart: String
+  let quietHoursEnd: String
+  let timezone: String
+
+  private enum CodingKeys: String, CodingKey {
+    case currentTemp
+    case feelsLikeTemp
+    case currentConditionIcon
+    case currentConditionText
+    case nowOutfitSummary
+    case nextHourTime
+    case nextHourTemp
+    case nextHourIcon
+    case nextConditionText
+    case nextHourPrecipitation
+    case nextOutfitSummary
+    case lastUpdated
+    case locale
+    case nowLabel
+    case nextHourLabel
+    case staleLabel
+    case unavailableLabel
+    case precipitationLabel
+    case hasSevereAlert
+    case quietHoursEnabled
+    case quietHoursStart
+    case quietHoursEnd
+    case timezone
+  }
 
   static func empty(locale: String = Locale.current.identifier) -> WidgetData {
     let copy = WidgetCopy(locale: locale)
@@ -49,7 +80,12 @@ struct WidgetData: Codable {
       nextHourLabel: copy.nextHour,
       staleLabel: copy.stale,
       unavailableLabel: copy.unavailable,
-      precipitationLabel: copy.precipitation
+      precipitationLabel: copy.precipitation,
+      hasSevereAlert: false,
+      quietHoursEnabled: false,
+      quietHoursStart: "22:00",
+      quietHoursEnd: "07:00",
+      timezone: "UTC"
     )
   }
 
@@ -60,6 +96,53 @@ struct WidgetData: Codable {
     }
     let age = date.timeIntervalSince(updatedAt)
     return age < 0 || age >= staleInterval
+  }
+}
+
+extension WidgetData {
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    currentTemp = try container.decode(String.self, forKey: .currentTemp)
+    feelsLikeTemp = try container.decode(String.self, forKey: .feelsLikeTemp)
+    currentConditionIcon =
+      try container.decode(String.self, forKey: .currentConditionIcon)
+    currentConditionText =
+      try container.decode(String.self, forKey: .currentConditionText)
+    nowOutfitSummary =
+      try container.decode(String.self, forKey: .nowOutfitSummary)
+    nextHourTime = try container.decode(String.self, forKey: .nextHourTime)
+    nextHourTemp = try container.decode(String.self, forKey: .nextHourTemp)
+    nextHourIcon = try container.decode(String.self, forKey: .nextHourIcon)
+    nextConditionText =
+      try container.decodeIfPresent(String.self, forKey: .nextConditionText)
+    nextHourPrecipitation =
+      try container.decode(String.self, forKey: .nextHourPrecipitation)
+    nextOutfitSummary =
+      try container.decode(String.self, forKey: .nextOutfitSummary)
+    lastUpdated = try container.decode(String.self, forKey: .lastUpdated)
+    locale = try container.decode(String.self, forKey: .locale)
+    nowLabel = try container.decode(String.self, forKey: .nowLabel)
+    nextHourLabel = try container.decode(String.self, forKey: .nextHourLabel)
+    staleLabel = try container.decode(String.self, forKey: .staleLabel)
+    unavailableLabel =
+      try container.decode(String.self, forKey: .unavailableLabel)
+    precipitationLabel =
+      try container.decode(String.self, forKey: .precipitationLabel)
+    hasSevereAlert =
+      try container.decodeIfPresent(Bool.self, forKey: .hasSevereAlert)
+      ?? false
+    quietHoursEnabled =
+      try container.decodeIfPresent(Bool.self, forKey: .quietHoursEnabled)
+      ?? false
+    quietHoursStart =
+      try container.decodeIfPresent(String.self, forKey: .quietHoursStart)
+      ?? "22:00"
+    quietHoursEnd =
+      try container.decodeIfPresent(String.self, forKey: .quietHoursEnd)
+      ?? "07:00"
+    timezone =
+      try container.decodeIfPresent(String.self, forKey: .timezone)
+      ?? "UTC"
   }
 }
 
@@ -171,8 +254,8 @@ private struct WidgetCopy {
   }
 }
 
-private extension ISO8601DateFormatter {
-  static let widgetFormatter: ISO8601DateFormatter = {
+extension ISO8601DateFormatter {
+  fileprivate static let widgetFormatter: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     return formatter
@@ -199,7 +282,8 @@ struct Provider: TimelineProvider {
   ) {
     let now = Date()
     let entry = SimpleEntry(date: now, data: loadWidgetData())
-    let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: now)
+    let nextUpdate =
+      Calendar.current.date(byAdding: .minute, value: 15, to: now)
       ?? now.addingTimeInterval(15 * 60)
     completion(Timeline(entries: [entry], policy: .after(nextUpdate)))
   }
@@ -413,9 +497,9 @@ struct OutfitWidgetEntryView: View {
   }
 }
 
-private extension View {
+extension View {
   @ViewBuilder
-  func widgetCanvas() -> some View {
+  fileprivate func widgetCanvas() -> some View {
     if #available(iOSApplicationExtension 17.0, *) {
       containerBackground(for: .widget) {
         Color.white

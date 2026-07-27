@@ -1,8 +1,10 @@
 // Story 3.3 Task 1 step 1 owner: serialize localized widget data and persist one atomic native payload.
 import { NativeModules, Platform } from 'react-native'
 import type {
+  AlertPreferences,
   RitualResponse,
   SupportedLocale,
+  WeatherAlert,
   WeatherHourlyEntry,
 } from '@couture/api-client/contracts/http'
 import { formatTemperature } from './formatters'
@@ -34,6 +36,17 @@ export interface WidgetData {
   staleLabel: string
   unavailableLabel: string
   precipitationLabel: string
+  alertsEnabled: boolean
+  hasSevereAlert: boolean
+  severeAlertId: string | null
+  severeAlertTitle: string
+  severeAlertDescription: string
+  severeAlertStart: string | null
+  severeAlertEnd: string | null
+  quietHoursEnabled: boolean
+  quietHoursStart: string
+  quietHoursEnd: string
+  timezone: string
 }
 
 type TimestampedHourlyEntry = {
@@ -143,11 +156,66 @@ function formatForecastTime(
   })
 }
 
+function findActiveSevereAlert(
+  alerts: readonly WeatherAlert[],
+  nowMs: number
+): WeatherAlert | undefined {
+  return alerts.find((alert) => {
+    const start = Date.parse(alert.start)
+    const end = Date.parse(alert.end)
+    return (
+      alert.severity === 'high' &&
+      Number.isFinite(start) &&
+      Number.isFinite(end) &&
+      start <= nowMs &&
+      nowMs < end
+    )
+  })
+}
+
+function createSevereAlertPayload(alert: WeatherAlert | undefined) {
+  if (!alert) {
+    return {
+      hasSevereAlert: false,
+      severeAlertId: null,
+      severeAlertTitle: '',
+      severeAlertDescription: '',
+      severeAlertStart: null,
+      severeAlertEnd: null,
+    }
+  }
+  return {
+    hasSevereAlert: true,
+    severeAlertId: `${alert.event}|${alert.start}|${alert.end}`,
+    severeAlertTitle: alert.event,
+    severeAlertDescription: alert.description,
+    severeAlertStart: alert.start,
+    severeAlertEnd: alert.end,
+  }
+}
+
+function resolveAlertPreferences(
+  alertPreferences: AlertPreferences | undefined,
+  timezone: string
+): AlertPreferences {
+  if (alertPreferences) {
+    return alertPreferences
+  }
+  return {
+    pushEnabled: false,
+    quietHoursEnabled: false,
+    quietHoursStart: '22:00',
+    quietHoursEnd: '07:00',
+    timezone,
+  }
+}
+
 export function createWidgetData(
   ritual: RitualResponse,
   locale: SupportedLocale,
   lastUpdatedMs = Date.now(),
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  alertPreferences?: AlertPreferences
 ): WidgetData {
   const weather = ritual.data.weather
   const current = weather.current
@@ -160,6 +228,8 @@ export function createWidgetData(
   const nextCopy = nextHourEntry
     ? getWidgetCopy(locale, nextHourEntry.condition)
     : undefined
+  const severeAlert = findActiveSevereAlert(weather.alerts, nowMs)
+  const preferences = resolveAlertPreferences(alertPreferences, weather.timezone)
 
   return {
     currentTemp: formatTemperature(current.temperature, locale),
@@ -192,15 +262,28 @@ export function createWidgetData(
     staleLabel: copy.stale,
     unavailableLabel: copy.unavailable,
     precipitationLabel: copy.precipitation,
+    alertsEnabled: preferences.pushEnabled,
+    ...createSevereAlertPayload(severeAlert),
+    quietHoursEnabled: preferences.quietHoursEnabled,
+    quietHoursStart: preferences.quietHoursStart,
+    quietHoursEnd: preferences.quietHoursEnd,
+    timezone: preferences.timezone,
   }
 }
 
 export async function shareWidgetData(
   ritual: RitualResponse,
   locale: SupportedLocale,
-  lastUpdatedMs = Date.now()
+  lastUpdatedMs = Date.now(),
+  alertPreferences?: AlertPreferences
 ): Promise<void> {
-  const widgetData = createWidgetData(ritual, locale, lastUpdatedMs)
+  const widgetData = createWidgetData(
+    ritual,
+    locale,
+    lastUpdatedMs,
+    Date.now(),
+    alertPreferences
+  )
   const payload = JSON.stringify(widgetData)
 
   if (Platform.OS === 'web') {
