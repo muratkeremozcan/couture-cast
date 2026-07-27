@@ -42,6 +42,3 @@ yarn-error.*
 # generated native folders
 /ios
 /android
-
-# Native test artifacts
-/artifacts/

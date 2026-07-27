@@ -23,9 +23,6 @@ struct WatchApp: App {
 
 class WatchAppDelegate: NSObject, WKApplicationDelegate {
   func applicationDidFinishLaunching() {
-    guard !WatchUITestConfiguration.isEnabled else {
-      return
-    }
     WatchConnectivityManager.shared.activate()
   }
 }

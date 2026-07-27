@@ -8,16 +8,13 @@ import WidgetKit
 class WidgetSharedModule: NSObject, WCSessionDelegate {
   private let appGroup = "group.com.anonymous.mobile"
   private let payloadKey = "widgetPayload"
-  private var watchTransfer: WidgetWatchTransferCoordinator?
+  private let pendingWatchPayload = PendingWatchPayload()
 
   override init() {
     super.init()
     if WCSession.isSupported() {
       let session = WCSession.default
       session.delegate = self
-      watchTransfer = WidgetWatchTransferCoordinator(
-        session: WidgetWatchTransferSession(session: session)
-      )
       session.activate()
     }
   }
@@ -42,20 +39,67 @@ class WidgetSharedModule: NSObject, WCSessionDelegate {
       return
     }
 
-    let writer = WidgetPayloadWriteCoordinator(
-      storage: UserDefaultsWidgetPayloadStorage(
-        defaults: sharedDefaults,
-        payloadKey: payloadKey
-      ),
-      timeline: WidgetKitTimelineReloader(),
-      watchSynchronization: watchTransfer ?? NoopWatchPayloadSynchronizer()
-    )
-    guard writer.write(payload) == .success else {
+    sharedDefaults.set(payload, forKey: payloadKey)
+    guard sharedDefaults.synchronize(),
+      sharedDefaults.string(forKey: payloadKey) == payload
+    else {
       reject("widget_storage_write_failed", "The widget payload could not be saved.", nil)
       return
     }
 
+    WidgetCenter.shared.reloadAllTimelines()
+
+    synchronizeWatch(with: payload)
+
     resolve(nil)
+  }
+
+  private func synchronizeWatch(with payload: String) {
+    guard WCSession.isSupported() else {
+      return
+    }
+    guard
+      let optimizedPayload = WatchPayloadProjection.optimizedPayload(
+        from: payload
+      )
+    else {
+      print("[WidgetSharedModule] Watch payload projection failed.")
+      return
+    }
+
+    let session = WCSession.default
+    guard session.activationState == .activated else {
+      pendingWatchPayload.replace(with: optimizedPayload)
+      session.activate()
+      return
+    }
+    if !sendWatchPayload(optimizedPayload, through: session) {
+      pendingWatchPayload.replace(with: optimizedPayload)
+    }
+  }
+
+  @discardableResult
+  private func sendWatchPayload(
+    _ payload: String,
+    through session: WCSession
+  ) -> Bool {
+    let context = [payloadKey: payload]
+    do {
+      try session.updateApplicationContext(context)
+    } catch {
+      print(
+        "[WidgetSharedModule] Failed to update watch context: "
+          + error.localizedDescription
+      )
+      return false
+    }
+
+    if session.isComplicationEnabled,
+      session.remainingComplicationUserInfoTransfers > 0
+    {
+      session.transferCurrentComplicationUserInfo(context)
+    }
+    return true
   }
 
   private func openWatchHandoff(_ message: [String: Any]) {
@@ -65,6 +109,17 @@ class WidgetSharedModule: NSObject, WCSessionDelegate {
     }
     DispatchQueue.main.async {
       UIApplication.shared.open(url, options: [:])
+    }
+  }
+
+  private func drainPendingPayload(through session: WCSession) {
+    guard session.activationState == .activated,
+      let payload = pendingWatchPayload.take()
+    else {
+      return
+    }
+    if !sendWatchPayload(payload, through: session) {
+      pendingWatchPayload.replace(with: payload)
     }
   }
 
@@ -79,7 +134,7 @@ class WidgetSharedModule: NSObject, WCSessionDelegate {
       print("[WidgetSharedModule] WCSession activation failed: \(error.localizedDescription)")
       return
     }
-    watchTransfer?.activationDidComplete()
+    drainPendingPayload(through: session)
   }
 
   func sessionDidBecomeInactive(_ session: WCSession) {
@@ -90,12 +145,13 @@ class WidgetSharedModule: NSObject, WCSessionDelegate {
     print("[WidgetSharedModule] WCSession deactivated. Reactivating.")
     let defaultSession = WCSession.default
     defaultSession.activate()
+    drainPendingPayload(through: defaultSession)
   }
 
   func sessionReachabilityDidChange(_ session: WCSession) {
     print("[WidgetSharedModule] WCSession reachability changed: \(session.isReachable)")
     if session.isReachable {
-      watchTransfer?.activationDidComplete()
+      drainPendingPayload(through: session)
     }
   }
 
@@ -117,62 +173,5 @@ class WidgetSharedModule: NSObject, WCSessionDelegate {
     didReceiveUserInfo userInfo: [String: Any]
   ) {
     openWatchHandoff(userInfo)
-  }
-}
-
-private final class UserDefaultsWidgetPayloadStorage: WidgetPayloadStoring {
-  private let defaults: UserDefaults
-  private let payloadKey: String
-
-  init(defaults: UserDefaults, payloadKey: String) {
-    self.defaults = defaults
-    self.payloadKey = payloadKey
-  }
-
-  func store(_ payload: String) -> Bool {
-    defaults.set(payload, forKey: payloadKey)
-    return defaults.synchronize() && defaults.string(forKey: payloadKey) == payload
-  }
-}
-
-private struct WidgetKitTimelineReloader: WidgetTimelineReloading {
-  func reloadAllTimelines() {
-    WidgetCenter.shared.reloadAllTimelines()
-  }
-}
-
-private struct NoopWatchPayloadSynchronizer: WatchPayloadSynchronizing {
-  func synchronize(_ payload: String) {}
-}
-
-private final class WidgetWatchTransferSession: WatchTransferSession {
-  private let session: WCSession
-
-  init(session: WCSession) {
-    self.session = session
-  }
-
-  var activationState: WatchTransferActivationState {
-    session.activationState == .activated ? .activated : .inactive
-  }
-
-  var isComplicationEnabled: Bool {
-    session.isComplicationEnabled
-  }
-
-  var remainingComplicationTransfers: Int {
-    session.remainingComplicationUserInfoTransfers
-  }
-
-  func activate() {
-    session.activate()
-  }
-
-  func updateApplicationContext(_ context: [String: String]) throws {
-    try session.updateApplicationContext(context)
-  }
-
-  func transferCurrentComplicationUserInfo(_ context: [String: String]) {
-    session.transferCurrentComplicationUserInfo(context)
   }
 }

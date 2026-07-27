@@ -28,14 +28,9 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      env:
-        USE_NPM_CI: ${{ inputs.use-npm-ci }}
       run: |
-        case "$USE_NPM_CI" in
-          true) npm ci ;;
-          false) npm install ;;
-          *)
-            echo "Unsupported use-npm-ci value: $USE_NPM_CI"
-            exit 1
-            ;;
-        esac
+        if [ "${{ inputs.use-npm-ci }}" == "true" ]; then
+          npm ci
+        else
+          npm install
+        fi

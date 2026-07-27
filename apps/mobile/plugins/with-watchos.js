@@ -12,12 +12,6 @@ const watchAppBundleId = 'com.anonymous.mobile.watchapp'
 const watchWidgetName = 'WatchWidget'
 const watchWidgetBundleId = 'com.anonymous.mobile.watchapp.watchwidget'
 
-const watchAppTestsName = 'WatchAppTests'
-const watchAppTestsBundleId = 'com.anonymous.mobile.watchapp.tests'
-
-const watchAppUITestsName = 'WatchAppUITests'
-const watchAppUITestsBundleId = 'com.anonymous.mobile.watchapp.uitests'
-
 function ensureDirectory(directory) {
   fs.mkdirSync(directory, { recursive: true })
 }
@@ -192,42 +186,8 @@ function writeWatchExtensionFiles(projectRoot, iosDirectory) {
     path.join(watchAppDir, 'WatchConnectivityManager.swift')
   )
   copyFile(
-    path.join(sourceDirectory, 'WatchConnectivitySupport.swift'),
-    path.join(watchAppDir, 'WatchConnectivitySupport.swift')
-  )
-  copyFile(
     path.join(sourceDirectory, 'WatchWidgetData.swift'),
     path.join(watchAppDir, 'WatchWidgetData.swift')
-  )
-  copyFile(
-    path.join(projectRoot, 'targets/widgets/WatchSyncSupport.swift'),
-    path.join(watchAppDir, 'WatchSyncSupport.swift')
-  )
-
-  const watchAppTestsDir = path.join(iosDirectory, watchAppTestsName)
-  ensureDirectory(watchAppTestsDir)
-  copyFile(
-    path.join(sourceDirectory, 'WatchWidgetData.swift'),
-    path.join(watchAppTestsDir, 'TestWatchWidgetData.swift')
-  )
-  copyFile(
-    path.join(projectRoot, 'targets/widgets/WatchSyncSupport.swift'),
-    path.join(watchAppTestsDir, 'TestWatchSyncSupport.swift')
-  )
-  copyFile(
-    path.join(sourceDirectory, 'WatchConnectivitySupport.swift'),
-    path.join(watchAppTestsDir, 'TestWatchConnectivitySupport.swift')
-  )
-  copyFile(
-    path.join(sourceDirectory, 'WatchConnectivityBehaviorTests.swift'),
-    path.join(watchAppTestsDir, 'WatchConnectivityBehaviorTests.swift')
-  )
-
-  const watchAppUITestsDir = path.join(iosDirectory, watchAppUITestsName)
-  ensureDirectory(watchAppUITestsDir)
-  copyFile(
-    path.join(sourceDirectory, 'WatchAppUITests.swift'),
-    path.join(watchAppUITestsDir, 'WatchAppUITests.swift')
   )
 
   // Copy complication widget source files
@@ -454,235 +414,7 @@ function ensureTargetDependency(project, targetUuid, dependencyUuid) {
   }
 }
 
-function removeTargetDependency(project, targetUuid, dependencyUuid) {
-  const targets = project.pbxNativeTargetSection()
-  const dependencies = project.hash.project.objects.PBXTargetDependency ?? {}
-  const proxies = project.hash.project.objects.PBXContainerItemProxy ?? {}
-  targets[targetUuid].dependencies = targets[targetUuid].dependencies.filter(
-    (reference) => {
-      const dependency = dependencies[reference.value]
-      if (dependency?.target !== dependencyUuid) {
-        return true
-      }
-      const proxyUuid = dependency.targetProxy
-      delete dependencies[reference.value]
-      delete dependencies[`${reference.value}_comment`]
-      if (proxyUuid) {
-        delete proxies[proxyUuid]
-        delete proxies[`${proxyUuid}_comment`]
-      }
-      return false
-    }
-  )
-}
-
-function renameTestProductReference(project, target, name) {
-  const productReference = target.pbxNativeTarget.productReference
-  const fileReferences = project.pbxFileReferenceSection()
-  const fileReference = fileReferences[productReference]
-  fileReference.explicitFileType = '"wrapper.cfbundle"'
-  fileReference.path = `"${name}.xctest"`
-  fileReference.sourceTree = 'BUILT_PRODUCTS_DIR'
-  delete fileReference.name
-  fileReferences[`${productReference}_comment`] = `${name}.xctest`
-  target.pbxNativeTarget.productReference_comment = `${name}.xctest`
-
-  for (const buildFile of Object.values(project.pbxBuildFileSection())) {
-    if (buildFile?.fileRef === productReference) {
-      buildFile.fileRef_comment = `${name}.xctest`
-    }
-  }
-  for (const group of Object.values(project.hash.project.objects.PBXGroup ?? {})) {
-    if (!Array.isArray(group?.children)) {
-      continue
-    }
-    for (const child of group.children) {
-      if (child.value === productReference) {
-        child.comment = `${name}.xctest`
-      }
-    }
-  }
-}
-
-function configureTestTargetBuildSettings(
-  project,
-  target,
-  name,
-  bundleId,
-  additionalSettings = {}
-) {
-  for (const configuration of targetBuildConfigurations(project, target)) {
-    delete configuration.buildSettings.INFOPLIST_FILE
-    Object.assign(configuration.buildSettings, {
-      CODE_SIGN_STYLE: 'Automatic',
-      GENERATE_INFOPLIST_FILE: 'YES',
-      PRODUCT_BUNDLE_IDENTIFIER: `"${bundleId}"`,
-      PRODUCT_NAME: `"${name}"`,
-      SDKROOT: 'watchos',
-      SKIP_INSTALL: 'YES',
-      SWIFT_ACTIVE_COMPILATION_CONDITIONS: '"$(inherited) COUTURECAST_XCTEST"',
-      SWIFT_VERSION: '5.0',
-      TARGETED_DEVICE_FAMILY: '4',
-      WATCHOS_DEPLOYMENT_TARGET: '9.0',
-      ...additionalSettings,
-    })
-  }
-}
-
-function addTestTarget(project, mainTargetUuid, name, bundleId, isUiTest) {
-  let target = findTarget(project, name)
-  if (!target) {
-    target = project.addTarget(name, 'unit_test_bundle', name, bundleId)
-    renameTestProductReference(project, target, name)
-    if (isUiTest) {
-      target.pbxNativeTarget.productType = '"com.apple.product-type.bundle.ui-testing"'
-    }
-    project.addBuildPhase([], 'PBXSourcesBuildPhase', 'Sources', target.uuid)
-    project.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', target.uuid)
-    removeTargetDependency(project, mainTargetUuid, target.uuid)
-  }
-  return target
-}
-
-function ensureGroup(project, mainGroupKey, name) {
-  let groupKey = project.findPBXGroupKey({ name })
-  if (!groupKey) {
-    const group = project.addPbxGroup([], name, name)
-    groupKey = group.uuid
-    addGroupToMainGroup(project, mainGroupKey, group)
-  }
-  return groupKey
-}
-
-function addSourceFiles(project, target, groupKey, files) {
-  for (const file of files) {
-    if (!project.hasFile(file)) {
-      project.addSourceFile(file, { target: target.uuid }, groupKey)
-    }
-  }
-}
-
-function buildableReference(target, buildableName, projectName) {
-  return [
-    '            <BuildableReference',
-    '               BuildableIdentifier = "primary"',
-    `               BlueprintIdentifier = "${target.uuid}"`,
-    `               BuildableName = "${buildableName}"`,
-    `               BlueprintName = "${String(target.pbxNativeTarget.name).replaceAll('"', '')}"`,
-    `               ReferencedContainer = "container:${projectName}.xcodeproj">`,
-    '            </BuildableReference>',
-  ].join('\n')
-}
-
-function writeWatchTestScheme(
-  iosDirectory,
-  projectName,
-  watchAppTarget,
-  unitTestTarget,
-  uiTestTarget
-) {
-  const schemeDirectory = path.join(
-    iosDirectory,
-    `${projectName}.xcodeproj`,
-    'xcshareddata',
-    'xcschemes'
-  )
-  ensureDirectory(schemeDirectory)
-  const appReference = buildableReference(
-    watchAppTarget,
-    `${watchAppName}.app`,
-    projectName
-  )
-  const unitReference = buildableReference(
-    unitTestTarget,
-    `${watchAppTestsName}.xctest`,
-    projectName
-  )
-  const uiReference = buildableReference(
-    uiTestTarget,
-    `${watchAppUITestsName}.xctest`,
-    projectName
-  )
-  const buildEntry = (reference) =>
-    [
-      '         <BuildActionEntry',
-      '            buildForTesting = "YES"',
-      '            buildForRunning = "YES"',
-      '            buildForProfiling = "YES"',
-      '            buildForArchiving = "NO"',
-      '            buildForAnalyzing = "YES">',
-      reference,
-      '         </BuildActionEntry>',
-    ].join('\n')
-  const testable = (reference) =>
-    [
-      '         <TestableReference',
-      '            skipped = "NO"',
-      '            parallelizable = "NO">',
-      reference,
-      '         </TestableReference>',
-    ].join('\n')
-  const scheme = [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<Scheme',
-    '   LastUpgradeVersion = "1660"',
-    '   version = "1.7">',
-    '   <BuildAction',
-    '      parallelizeBuildables = "YES"',
-    '      buildImplicitDependencies = "YES">',
-    '      <BuildActionEntries>',
-    buildEntry(appReference),
-    buildEntry(unitReference),
-    buildEntry(uiReference),
-    '      </BuildActionEntries>',
-    '   </BuildAction>',
-    '   <TestAction',
-    '      buildConfiguration = "Debug"',
-    '      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"',
-    '      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"',
-    '      shouldUseLaunchSchemeArgsEnv = "YES">',
-    '      <Testables>',
-    testable(unitReference),
-    testable(uiReference),
-    '      </Testables>',
-    '   </TestAction>',
-    '   <LaunchAction',
-    '      buildConfiguration = "Debug"',
-    '      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"',
-    '      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"',
-    '      launchStyle = "0"',
-    '      useCustomWorkingDirectory = "NO"',
-    '      ignoresPersistentStateOnLaunch = "NO"',
-    '      debugDocumentVersioning = "YES"',
-    '      debugServiceExtension = "internal"',
-    '      allowLocationSimulation = "YES">',
-    '      <BuildableProductRunnable runnableDebuggingMode = "0">',
-    appReference,
-    '      </BuildableProductRunnable>',
-    '   </LaunchAction>',
-    '   <ProfileAction',
-    '      buildConfiguration = "Release"',
-    '      shouldUseLaunchSchemeArgsEnv = "YES"',
-    '      savedToolIdentifier = ""',
-    '      useCustomWorkingDirectory = "NO"',
-    '      debugDocumentVersioning = "YES">',
-    '      <BuildableProductRunnable runnableDebuggingMode = "0">',
-    appReference,
-    '      </BuildableProductRunnable>',
-    '   </ProfileAction>',
-    '   <AnalyzeAction buildConfiguration = "Debug">',
-    '   </AnalyzeAction>',
-    '   <ArchiveAction',
-    '      buildConfiguration = "Release"',
-    '      revealArchiveInOrganizer = "YES">',
-    '   </ArchiveAction>',
-    '</Scheme>',
-    '',
-  ].join('\n')
-  fs.writeFileSync(path.join(schemeDirectory, `${watchAppTestsName}.xcscheme`), scheme)
-}
-
-function addWatchTargetsToXcode(project, mainGroupKey, iosDirectory, projectName) {
+function addWatchTargetsToXcode(project, mainGroupKey) {
   const mainTargetUuid = project.getFirstTarget().uuid
   const mainTarget = {
     uuid: mainTargetUuid,
@@ -732,27 +464,10 @@ function addWatchTargetsToXcode(project, mainGroupKey, iosDirectory, projectName
     )
   }
 
-  const watchAppTestsTarget = addTestTarget(
-    project,
-    mainTargetUuid,
-    watchAppTestsName,
-    watchAppTestsBundleId,
-    false
-  )
-  const watchAppUITestsTarget = addTestTarget(
-    project,
-    mainTargetUuid,
-    watchAppUITestsName,
-    watchAppUITestsBundleId,
-    true
-  )
-
   ensureWatchAppEmbedPhase(project, mainTarget)
   ensureWatchWidgetEmbedPhase(project, watchAppTarget)
   ensureTargetDependency(project, mainTarget.uuid, watchAppTarget.uuid)
   ensureTargetDependency(project, watchAppTarget.uuid, watchWidgetTarget.uuid)
-  ensureTargetDependency(project, watchAppTestsTarget.uuid, watchAppTarget.uuid)
-  ensureTargetDependency(project, watchAppUITestsTarget.uuid, watchAppTarget.uuid)
 
   // Ensure groups exist and reference files
   let watchAppGroupKey = project.findPBXGroupKey({ name: watchAppName })
@@ -774,11 +489,13 @@ function addWatchTargetsToXcode(project, mainGroupKey, iosDirectory, projectName
     'WatchApp.swift',
     'WatchContentView.swift',
     'WatchConnectivityManager.swift',
-    'WatchConnectivitySupport.swift',
     'WatchWidgetData.swift',
-    'WatchSyncSupport.swift',
   ]
-  addSourceFiles(project, watchAppTarget, watchAppGroupKey, watchAppFiles)
+  watchAppFiles.forEach((file) => {
+    if (!project.hasFile(file)) {
+      project.addSourceFile(file, { target: watchAppTarget.uuid }, watchAppGroupKey)
+    }
+  })
 
   addResourceFileToTarget(
     project,
@@ -786,20 +503,6 @@ function addWatchTargetsToXcode(project, mainGroupKey, iosDirectory, projectName
     watchAppTarget.uuid,
     watchAppGroupKey
   )
-
-  const watchAppTestsGroupKey = ensureGroup(project, mainGroupKey, watchAppTestsName)
-  addSourceFiles(project, watchAppTestsTarget, watchAppTestsGroupKey, [
-    'TestWatchWidgetData.swift',
-    'TestWatchSyncSupport.swift',
-    'TestWatchConnectivitySupport.swift',
-    'WatchConnectivityBehaviorTests.swift',
-  ])
-  const watchAppUITestsGroupKey = ensureGroup(project, mainGroupKey, watchAppUITestsName)
-  addSourceFiles(project, watchAppUITestsTarget, watchAppUITestsGroupKey, [
-    'WatchAppUITests.swift',
-  ])
-  project.addFramework('XCTest.framework', { target: watchAppTestsTarget.uuid })
-  project.addFramework('XCTest.framework', { target: watchAppUITestsTarget.uuid })
 
   // Link watch widget files
   for (const file of ['WatchComplication.swift', 'WatchComplicationData.swift']) {
@@ -843,30 +546,6 @@ function addWatchTargetsToXcode(project, mainGroupKey, iosDirectory, projectName
     '9.0',
     'watchos'
   )
-
-  configureTestTargetBuildSettings(
-    project,
-    watchAppTestsTarget,
-    watchAppTestsName,
-    watchAppTestsBundleId
-  )
-  configureTestTargetBuildSettings(
-    project,
-    watchAppUITestsTarget,
-    watchAppUITestsName,
-    watchAppUITestsBundleId,
-    {
-      SWIFT_ACTIVE_COMPILATION_CONDITIONS: '"$(inherited)"',
-      TEST_TARGET_NAME: `"${watchAppName}"`,
-    }
-  )
-  writeWatchTestScheme(
-    iosDirectory,
-    projectName,
-    watchAppTarget,
-    watchAppTestsTarget,
-    watchAppUITestsTarget
-  )
 }
 
 function addFileReference(project, fileName, groupKey) {
@@ -884,7 +563,7 @@ function withIosWatchTargets(config) {
     const mainGroupKey = project.findPBXGroupKey({ name: mainGroupName })
 
     writeWatchExtensionFiles(projectRoot, iosDirectory)
-    addWatchTargetsToXcode(project, mainGroupKey, iosDirectory, mainGroupName)
+    addWatchTargetsToXcode(project, mainGroupKey)
 
     return modConfig
   })

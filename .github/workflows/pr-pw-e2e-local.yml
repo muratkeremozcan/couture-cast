@@ -23,6 +23,8 @@ jobs:
     outputs:
       SKIP_BURN_IN: ${{ steps.check_skip_label.outputs.SKIP_BURN_IN || 'false' }}
       test_env: local
+      test_command: npm run test:pw-local --
+      install_command: npm ci
     steps:
       - name: Check for SKIP_BURN_IN label (PRs only)
         id: check_skip_label
@@ -42,6 +44,8 @@ jobs:
     uses: ./.github/workflows/rwf-burn-in.yml
     with:
       base-ref: ${{ github.event.pull_request.base.sha || github.base_ref || 'main' }}
+      test-directory: 'playwright/'
+      install-command: ${{ needs.vars.outputs.install_command }}
     secrets: inherit
 
   pw-e2e:
@@ -81,6 +85,8 @@ jobs:
 
       - name: Setup Node environment
         uses: ./.github/actions/install
+        with:
+          install-command: ${{ needs.vars.outputs.install_command }}
 
       - name: Cache Playwright browsers
         uses: ./.github/actions/setup-playwright-browsers
@@ -134,6 +140,8 @@ jobs:
 
       - name: Setup Node environment
         uses: ./.github/actions/install
+        with:
+          install-command: ${{ needs.vars.outputs.install_command }}
 
       - name: Merge, upload, and comment
         uses: ./.github/actions/playwright-merge-report-comment

@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-07-27 - Step 24 captures the watchOS companion app, swipe page-view layout, background sync, complications, and validation setup.
+Updated: 2026-07-24 - Step 23 captures the home/lock-screen widgets implementation, background sync task, and telemetry hooks.
 
 ## LLM collaborator prompt
 
@@ -2260,55 +2260,3 @@ Task owner map:
 - Story 3.3 Task 4 step 1 owner: read deep link query parameters to hydrate active scenario in `apps/mobile/app/(tabs)/index.tsx`
 - Story 3.3 Task 5 step 1 owner: verify widget deep link hydration and telemetry triggers in screen tests in `apps/mobile/src/screens/widget-deep-link.test.tsx`
 - Story 3.3 Task 5 step 2 owner: define E2E Maestro routing verification scenarios in `maestro/widget-deep-link.yaml`
-
-## Step 24 - watchOS companion app and complications
-
-User/business impact:
-
-Glancing at the wrist gives users immediate access to outfit recommendations and weather details without needing to open their mobile app. The business drives high retention and daily active usage by delivering context-aware severe weather alerts, quiet-hour protection, and seamless handoff interactions directly from watchOS complications.
-
-Key takeaways:
-
-1. WCSession Bridge Activation: Establish reliable, bidirectionally active `WatchConnectivity` channels. Ensure the iOS app implements all required delegate methods and queues callbacks correctly so that context and user info transfers do not exhaust system budgets.
-2. Watch Isolation: The watch companion app runs fully offline from the web API. It consumes and presents local projections received via `WCSession`, caching them to `group.com.anonymous.mobile.watch` to save battery.
-3. Severe Weather & Quiet Hours: Perform native haptic notifications only when the watch app is foreground-active. Fall back to local User Notifications for background delivery, and honor quiet hours to protect user experience.
-4. Complication Tinting: Complications should dynamically adapt to watch-face personalization. Use `.foregroundStyle(.primary)` and `.secondary` inside SwiftUI instead of hardcoded branding colors, and utilize system-compatible backgrounds.
-5. Config Plugin Scaffolding: Automate watch target compilation, framework linking, and entitlement merging through a custom Expo config plugin (`with-watchos.js`) to keep native files out of version control.
-
-Story/Task mapping:
-
-- Story 3.4
-- Task 1 (iOS-side WatchConnectivity Integration)
-- Task 2 (watchOS Companion App SwiftUI)
-- Task 3 (watchOS Complications & WidgetKit)
-- Task 4 (Expo Config Plugin for watchOS)
-- Task 5 (Verification & Documentation)
-
-Story reference:
-
-- `_bmad-output/implementation-artifacts/3-4-watchos-glance.md`
-
-Cross-links:
-
-- Step 23 establishes the baseline `WidgetSharedModule.swift` bridge class.
-- Step 8 defines engaging analytics and event payload structures.
-
-Sequence to follow:
-
-1. Inspect `WCSessionDelegate` callbacks and the budget-checked user info transfer logic in `apps/mobile/targets/widgets/WidgetSharedModule.swift`.
-2. Trace watch connectivity message synchronization and haptic/notification logic in `apps/mobile/targets/watchos/WatchConnectivityManager.swift`.
-3. Check the page-swiping TabView implementation in `apps/mobile/targets/watchos/WatchContentView.swift`.
-4. Review circular, corner, and rectangular complication views in `apps/mobile/targets/watchos/WatchComplication.swift`.
-5. Examine the custom watchOS target configuration and asset linkage code in `apps/mobile/plugins/with-watchos.js`.
-6. Trace watch deep-link parameter validation and PostHog analytics capture in `apps/mobile/app/(tabs)/index.tsx`.
-7. Verify target generation assertions in `apps/mobile/plugins/with-watchos.test.js` and deep-link routing unit tests in `apps/mobile/src/screens/widget-deep-link.test.tsx`.
-
-Task owner map:
-
-- Story 3.4 Task 1 step 1 owner: implement iOS-side WCSession delegate callbacks and payload transfer logic in `apps/mobile/targets/widgets/WidgetSharedModule.swift`
-- Story 3.4 Task 2 step 1 owner: build the Now and Next Hour swipeable pages in `apps/mobile/targets/watchos/WatchContentView.swift`
-- Story 3.4 Task 2 step 2 owner: coordinate serial callback updates and fingerprint alert writes in `apps/mobile/targets/watchos/WatchConnectivityManager.swift`
-- Story 3.4 Task 3 step 1 owner: define circular, corner, and rectangular complication layouts in `apps/mobile/targets/watchos/WatchComplication.swift`
-- Story 3.4 Task 4 step 1 owner: configure EAS watch targets, app groups, and SpaceGrotesk font during prebuilds in `apps/mobile/plugins/with-watchos.js`
-- Story 3.4 Task 4 step 2 owner: verify watch target generation and entitlement merging in `apps/mobile/plugins/with-watchos.test.js`
-- Story 3.4 Task 5 step 1 owner: document manual simulator verification procedures in `maestro/watchos-validation.md`

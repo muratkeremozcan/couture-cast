@@ -59,9 +59,7 @@ test(
     assert.match(xcodeProject, /WatchApp\.swift in Sources/)
     assert.match(xcodeProject, /WatchContentView\.swift in Sources/)
     assert.match(xcodeProject, /WatchConnectivityManager\.swift in Sources/)
-    assert.match(xcodeProject, /WatchConnectivitySupport\.swift in Sources/)
     assert.match(xcodeProject, /WatchWidgetData\.swift in Sources/)
-    assert.match(xcodeProject, /WatchSyncSupport\.swift in Sources/)
     assert.match(xcodeProject, /WatchComplication\.swift in Sources/)
     assert.match(xcodeProject, /WatchComplicationData\.swift in Sources/)
     assert.match(xcodeProject, /SpaceGrotesk-WatchApp\.ttf in Resources/)
@@ -71,21 +69,9 @@ test(
     const mainTarget = findTarget(parsedProject, 'CoutureCast')
     const watchAppTarget = findTarget(parsedProject, 'WatchApp')
     const watchWidgetTarget = findTarget(parsedProject, 'WatchWidget')
-    const watchAppTestsTarget = findTarget(parsedProject, 'WatchAppTests')
-    const watchAppUITestsTarget = findTarget(parsedProject, 'WatchAppUITests')
     assert.ok(mainTarget)
     assert.ok(watchAppTarget)
     assert.ok(watchWidgetTarget)
-    assert.ok(watchAppTestsTarget)
-    assert.ok(watchAppUITestsTarget)
-    assert.equal(
-      watchAppTestsTarget.productType,
-      '"com.apple.product-type.bundle.unit-test"'
-    )
-    assert.equal(
-      watchAppUITestsTarget.productType,
-      '"com.apple.product-type.bundle.ui-testing"'
-    )
     const targetDependencies =
       parsedProject.hash.project.objects.PBXTargetDependency ?? {}
     const watchDependencyNames = watchAppTarget.dependencies.map(
@@ -94,20 +80,6 @@ test(
     assert.ok(
       watchDependencyNames.some((name) => String(name).includes('WatchWidget')),
       JSON.stringify(watchDependencyNames)
-    )
-    const unitTestDependencyNames = watchAppTestsTarget.dependencies.map(
-      (dependency) => targetDependencies[dependency.value]?.target_comment
-    )
-    const uiTestDependencyNames = watchAppUITestsTarget.dependencies.map(
-      (dependency) => targetDependencies[dependency.value]?.target_comment
-    )
-    assert.ok(
-      unitTestDependencyNames.some((name) => String(name).includes('WatchApp')),
-      JSON.stringify(unitTestDependencyNames)
-    )
-    assert.ok(
-      uiTestDependencyNames.some((name) => String(name).includes('WatchApp')),
-      JSON.stringify(uiTestDependencyNames)
     )
 
     const mainEmbeds = buildPhaseFiles(
@@ -172,29 +144,6 @@ test(
     assert.ok(fs.existsSync(path.join(fixtureRoot, 'ios/WatchApp/WatchApp-Info.plist')))
     assert.ok(fs.existsSync(path.join(fixtureRoot, 'ios/WatchApp/WatchApp.entitlements')))
     assert.ok(
-      fs.existsSync(path.join(fixtureRoot, 'ios/WatchApp/WatchConnectivitySupport.swift'))
-    )
-    assert.ok(
-      fs.existsSync(path.join(fixtureRoot, 'ios/WatchApp/WatchSyncSupport.swift'))
-    )
-    assert.ok(
-      fs.existsSync(
-        path.join(fixtureRoot, 'ios/WatchAppTests/WatchConnectivityBehaviorTests.swift')
-      )
-    )
-    assert.ok(
-      fs.existsSync(path.join(fixtureRoot, 'ios/WatchAppUITests/WatchAppUITests.swift'))
-    )
-    assert.ok(
-      fs.existsSync(
-        path.join(
-          fixtureRoot,
-          'ios/CoutureCast.xcodeproj/xcshareddata/xcschemes/WatchAppTests.xcscheme'
-        )
-      )
-    )
-
-    assert.ok(
       fs.existsSync(path.join(fixtureRoot, 'ios/WatchWidget/WatchComplication.swift'))
     )
     assert.ok(
@@ -225,8 +174,6 @@ test(
             '-target',
             'arm64-apple-watchos9.0',
             path.join(fixtureRoot, 'ios/WatchApp/WatchWidgetData.swift'),
-            path.join(fixtureRoot, 'ios/WatchApp/WatchSyncSupport.swift'),
-            path.join(fixtureRoot, 'ios/WatchApp/WatchConnectivitySupport.swift'),
             path.join(fixtureRoot, 'ios/WatchApp/WatchApp.swift'),
             path.join(fixtureRoot, 'ios/WatchApp/WatchConnectivityManager.swift'),
             path.join(fixtureRoot, 'ios/WatchApp/WatchContentView.swift'),
@@ -277,30 +224,6 @@ test(
           { encoding: 'utf8', timeout: 120_000 }
         ),
         'Generated WatchApp target build failed'
-      )
-      assertCommand(
-        spawnSync(
-          'xcodebuild',
-          [
-            '-project',
-            path.join(fixtureRoot, 'ios/CoutureCast.xcodeproj'),
-            '-target',
-            'WatchAppTests',
-            '-target',
-            'WatchAppUITests',
-            '-configuration',
-            'Debug',
-            '-sdk',
-            'watchsimulator',
-            `SYMROOT=${path.join(fixtureRoot, 'build/test-products')}`,
-            `OBJROOT=${path.join(fixtureRoot, 'build/test-intermediates')}`,
-            'CODE_SIGNING_ALLOWED=NO',
-            'build',
-            '-quiet',
-          ],
-          { encoding: 'utf8', timeout: 120_000 }
-        ),
-        'Generated watchOS test target compilation failed'
       )
     }
   }
@@ -361,33 +284,5 @@ test('watch payload and transfer support pass native behavior tests', (t) => {
       timeout: 10_000,
     }),
     'Watch transfer behavior tests failed'
-  )
-
-  const connectivityBehaviorBinary = path.join(
-    testDirectory,
-    'watch-connectivity-behavior-tests'
-  )
-  assertCommand(
-    spawnSync(
-      'xcrun',
-      [
-        'swiftc',
-        path.join(mobileRoot, 'targets/watchos/WatchWidgetData.swift'),
-        path.join(mobileRoot, 'targets/widgets/WatchSyncSupport.swift'),
-        path.join(mobileRoot, 'targets/watchos/WatchConnectivitySupport.swift'),
-        path.join(mobileRoot, 'targets/watchos/WatchConnectivityBehaviorTests.swift'),
-        '-o',
-        connectivityBehaviorBinary,
-      ],
-      { encoding: 'utf8', timeout: 50_000 }
-    ),
-    'Watch connectivity behavior test compilation failed'
-  )
-  assertCommand(
-    spawnSync(connectivityBehaviorBinary, [], {
-      encoding: 'utf8',
-      timeout: 10_000,
-    }),
-    'Watch connectivity behavior tests failed'
   )
 })

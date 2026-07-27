@@ -38,7 +38,7 @@ if [ "$RUNS" -lt 2 ]; then
 fi
 
 hash_pact_file() {
-  jq -S -c '
+  jq -c '
     if .interactions then
       .interactions |= sort_by(
         (.providerStates // [] | map(.name) | join("|"))

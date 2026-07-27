@@ -33,6 +33,7 @@ jobs:
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: "prod"
+      test_command: "npm run test:pw-prod"
       gh_ref: ${{ github.sha }}
       deployment_ref: main
       custom_base_url: ''

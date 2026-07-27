@@ -5,25 +5,10 @@ private let gold = Color(red: 201 / 255, green: 161 / 255, blue: 74 / 255)
 private let cloud = Color(red: 240 / 255, green: 240 / 255, blue: 245 / 255)
 
 struct WatchContentView: View {
-  @ObservedObject var connectivityManager: WatchConnectivityManager
+  @ObservedObject var connectivityManager = WatchConnectivityManager.shared
   @State private var selectedTab = 0
-  private let injectedData: WidgetData?
-
-  init(
-    connectivityManager: WatchConnectivityManager = .shared,
-    injectedPayload: String? = WatchUITestConfiguration.payload
-  ) {
-    self.connectivityManager = connectivityManager
-    injectedData =
-      injectedPayload
-      .flatMap { $0.data(using: .utf8) }
-      .flatMap { try? JSONDecoder().decode(WidgetData.self, from: $0) }
-  }
 
   var data: WidgetData {
-    if let injectedData {
-      return injectedData
-    }
     if let payload = connectivityManager.currentPayload,
       let data = payload.data(using: .utf8),
       let decoded = try? JSONDecoder().decode(WidgetData.self, from: data),
@@ -90,12 +75,10 @@ struct NowView: View {
               .font(.custom("SpaceGrotesk-Regular", size: 10).weight(.bold))
               .tracking(1)
               .foregroundColor(onyx)
-              .accessibilityIdentifier("watch.now.label")
 
             Text(data.feelsLikeTemp)
               .font(.custom("SpaceGrotesk-Regular", size: 28).weight(.bold))
               .foregroundColor(onyx)
-              .accessibilityIdentifier("watch.now.feelsLikeTemp")
           }
 
           Spacer()
@@ -104,7 +87,6 @@ struct NowView: View {
             .font(.system(size: 26))
             .foregroundColor(gold)
             .accessibilityLabel(data.currentConditionText)
-            .accessibilityIdentifier("watch.now.condition")
         }
 
         Divider()
@@ -114,7 +96,6 @@ struct NowView: View {
           .font(.custom("SpaceGrotesk-Regular", size: 12))
           .foregroundColor(onyx.opacity(0.85))
           .fixedSize(horizontal: false, vertical: true)
-          .accessibilityIdentifier("watch.now.outfitSummary")
 
         Button(action: {
           WatchConnectivityManager.shared.handoffToPhone(slot: "now")
@@ -132,12 +113,10 @@ struct NowView: View {
         }
         .buttonStyle(PlainButtonStyle())
         .padding(.top, 4)
-        .accessibilityIdentifier("watch.now.handoff")
       }
       .padding(.horizontal, 8)
       .padding(.top, 4)
     }
-    .accessibilityIdentifier("watch.page.now")
   }
 }
 
@@ -159,18 +138,15 @@ struct NextView: View {
               )
               .font(.custom("SpaceGrotesk-Regular", size: 10).weight(.bold))
               .foregroundColor(onyx)
-              .accessibilityIdentifier("watch.next.label")
 
               Text(data.nextHourTime)
                 .font(.custom("SpaceGrotesk-Regular", size: 9))
                 .foregroundColor(onyx.opacity(0.6))
-                .accessibilityIdentifier("watch.next.time")
             }
 
             Text(data.nextHourTemp.isEmpty ? "--" : data.nextHourTemp)
               .font(.custom("SpaceGrotesk-Regular", size: 26).weight(.bold))
               .foregroundColor(onyx)
-              .accessibilityIdentifier("watch.next.temperature")
           }
 
           Spacer()
@@ -183,14 +159,12 @@ struct NextView: View {
                 ? data.unavailableLabel
                 : data.nextConditionText
             )
-            .accessibilityIdentifier("watch.next.condition")
         }
 
         if !data.nextHourPrecipitation.isEmpty && data.nextHourPrecipitation != "--" {
           Text("\(data.precipitationLabel) \(data.nextHourPrecipitation)")
             .font(.custom("SpaceGrotesk-Regular", size: 9))
             .foregroundColor(onyx.opacity(0.6))
-            .accessibilityIdentifier("watch.next.precipitation")
         }
 
         Divider()
@@ -204,7 +178,6 @@ struct NextView: View {
         .font(.custom("SpaceGrotesk-Regular", size: 12))
         .foregroundColor(onyx.opacity(0.85))
         .fixedSize(horizontal: false, vertical: true)
-        .accessibilityIdentifier("watch.next.outfitSummary")
 
         Button(action: {
           WatchConnectivityManager.shared.handoffToPhone(slot: "next")
@@ -222,25 +195,10 @@ struct NextView: View {
         }
         .buttonStyle(PlainButtonStyle())
         .padding(.top, 4)
-        .accessibilityIdentifier("watch.next.handoff")
       }
       .padding(.horizontal, 8)
       .padding(.top, 4)
     }
-    .accessibilityIdentifier("watch.page.next")
-  }
-}
-
-enum WatchUITestConfiguration {
-  static var isEnabled: Bool {
-    ProcessInfo.processInfo.arguments.contains("-CoutureCastWatchUITestMode")
-  }
-
-  static var payload: String? {
-    guard isEnabled else {
-      return nil
-    }
-    return ProcessInfo.processInfo.environment["COUTURECAST_WATCH_UI_TEST_PAYLOAD"]
   }
 }
 

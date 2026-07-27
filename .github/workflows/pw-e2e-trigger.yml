@@ -27,6 +27,7 @@ jobs:
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: ${{ inputs.test_env }}
+      test_command: "npm run test:pw-preview"
       gh_ref: ${{ github.ref_name }}
       custom_base_url: ${{ inputs.custom_base_url }}
     secrets: inherit
@@ -36,6 +37,7 @@ jobs:
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: ${{ inputs.test_env }}
+      test_command: "npm run test:pw-prod"
       gh_ref: ${{ github.ref_name }}
       custom_base_url: ${{ inputs.custom_base_url }}
     secrets: inherit

@@ -17,20 +17,11 @@ jobs:
   watchos-native:
     name: watchOS native
     runs-on: macos-15
-    timeout-minutes: 30
-    env:
-      CI: 'true'
-      EXPO_NO_TELEMETRY: '1'
-      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
-      WATCHOS_ALLOW_RUNTIME_DOWNLOAD: '1'
-      WATCHOS_ARTIFACT_DIR: artifacts/watchos
-      WATCHOS_BURN_IN_COUNT: '10'
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -41,35 +32,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Compile native watchOS targets and behavior tests
+      - name: Validate watchOS prebuild
         run: npm run test:watchos-prebuild --workspace mobile
-
-      - name: Execute watchOS unit and UI tests
-        run: npm run test:watchos-xctest --workspace mobile
-
-      - name: Upload watchOS test evidence
-        id: upload-watchos-evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: watchos-native-${{ github.event.pull_request.number || github.sha }}-${{ github.run_attempt }}
-          path: apps/mobile/artifacts/watchos/**
-          if-no-files-found: warn
-          retention-days: 5
-
-      - name: Publish watchOS evidence link
-        if: always()
-        env:
-          ARTIFACT_URL: ${{ steps.upload-watchos-evidence.outputs.artifact-url }}
-        run: |
-          {
-            echo "## watchOS native quality gate"
-            echo
-            echo "XCTest burn-in iterations: ${WATCHOS_BURN_IN_COUNT}"
-            echo
-            if [[ -n "$ARTIFACT_URL" ]]; then
-              echo "[Download XCTest results, logs, and screenshots]($ARTIFACT_URL)"
-            else
-              echo "No watchOS evidence artifact was produced."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
