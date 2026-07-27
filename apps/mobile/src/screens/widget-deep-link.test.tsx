@@ -110,11 +110,18 @@ describe('Widget Deep Link Hydration', () => {
         screen.getByText('Warm and sunny midday. Light tee is perfect.')
       ).toBeTruthy()
     })
-    expect(mockCapture).toHaveBeenCalledWith('hero_interaction', {
-      interactionType: 'watch_tap',
-      slot: 'next',
-      locale: 'en-US',
-    })
+    const heroInteractionCalls = mockCapture.mock.calls.filter(
+      ([event]) => event === 'hero_interaction'
+    )
+    expect(heroInteractionCalls).toHaveLength(1)
+    expect(heroInteractionCalls[0]).toEqual([
+      'hero_interaction',
+      {
+        interactionType: 'watch_tap',
+        slot: 'next',
+        locale: 'en-US',
+      },
+    ])
   })
 
   it('tracks a later widget link while the tab remains mounted', async () => {

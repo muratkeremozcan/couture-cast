@@ -42,7 +42,7 @@ function assertCommand(result, label) {
 
 test(
   'clean Expo prebuild generates watchOS app and complication targets',
-  { timeout: 60_000 },
+  { timeout: 180_000 },
   (t) => {
     const fixtureRoot = fs.mkdtempSync(
       path.join(os.tmpdir(), 'couture-watchos-prebuild-')

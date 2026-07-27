@@ -229,6 +229,7 @@ function writeWatchExtensionFiles(projectRoot, iosDirectory) {
         },
       ],
       WKCompanionAppBundleIdentifier: 'com.anonymous.mobile',
+      WKApplication: true,
       UIAppFonts: ['SpaceGrotesk-WatchApp.ttf'],
     })
   )

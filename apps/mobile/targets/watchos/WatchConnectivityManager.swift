@@ -11,6 +11,7 @@ class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableObject {
   private let payloadKey = "widgetPayload"
   private let lastAlertFingerprintKey = "lastSevereAlertFingerprint"
   private var pendingHandoffMessage: [String: Any]?
+  private let syncQueue = DispatchQueue(label: "com.anonymous.mobile.watch.connectivity.sync")
 
   @Published var currentPayload: String?
 
@@ -30,6 +31,12 @@ class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableObject {
   }
 
   private func persistPayload(_ payload: String) {
+    syncQueue.async { [weak self] in
+      self?.persistPayloadSync(payload)
+    }
+  }
+
+  private func persistPayloadSync(_ payload: String) {
     guard let sharedDefaults = UserDefaults(suiteName: appGroup) else {
       print("[WatchConnectivityManager] Watch App Group store is unavailable.")
       return
@@ -102,10 +109,12 @@ class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableObject {
       return
     }
 
+    // Set fingerprint immediately on the syncQueue to prevent concurrent duplicates
+    defaults.set(fingerprint, forKey: self.lastAlertFingerprintKey)
+
     DispatchQueue.main.async {
       if WKApplication.shared().applicationState == .active {
         WKInterfaceDevice.current().play(.notification)
-        defaults.set(fingerprint, forKey: self.lastAlertFingerprintKey)
       } else {
         self.dispatchLocalNotification(
           for: data,
@@ -178,8 +187,6 @@ class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableObject {
           "[WatchConnectivityManager] Notification scheduling failed: "
             + error.localizedDescription
         )
-      } else {
-        defaults.set(fingerprint, forKey: self.lastAlertFingerprintKey)
       }
     }
   }

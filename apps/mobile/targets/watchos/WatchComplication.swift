@@ -56,10 +56,8 @@ struct ComplicationView: View {
         VStack(spacing: 0) {
           Image(systemName: "tshirt.fill")
             .font(.system(size: 11))
-            .foregroundColor(gold)
           Text(entry.data.feelsLikeTemp)
             .font(.custom("SpaceGrotesk-Regular", size: 9).weight(.bold))
-            .foregroundColor(onyx)
             .minimumScaleFactor(0.7)
         }
         .widgetCanvas()
@@ -67,10 +65,8 @@ struct ComplicationView: View {
       case .accessoryCorner:
         Image(systemName: "tshirt.fill")
           .font(.system(size: 14))
-          .foregroundColor(gold)
           .widgetLabel {
             Text(entry.data.feelsLikeTemp)
-              .foregroundColor(onyx)
           }
 
       case .accessoryInline:
@@ -89,20 +85,16 @@ struct ComplicationView: View {
           HStack(spacing: 3) {
             Image(systemName: "tshirt.fill")
               .font(.system(size: 11))
-              .foregroundColor(gold)
             Image(systemName: weatherSymbol(for: entry.data.currentConditionIcon))
               .font(.system(size: 12))
-              .foregroundColor(gold)
             Text(entry.data.feelsLikeTemp)
               .font(.custom("SpaceGrotesk-Regular", size: 12).weight(.bold))
-              .foregroundColor(onyx)
             Text(entry.data.nowLabel)
               .font(.custom("SpaceGrotesk-Regular", size: 7).weight(.semibold))
-              .foregroundColor(onyx.opacity(0.6))
+              .foregroundStyle(.secondary)
           }
           Text(entry.data.nowOutfitSummary)
             .font(.custom("SpaceGrotesk-Regular", size: 9))
-            .foregroundColor(onyx)
             .lineLimit(2)
         }
         .widgetCanvas()
@@ -111,10 +103,8 @@ struct ComplicationView: View {
         VStack(spacing: 0) {
           Image(systemName: "tshirt.fill")
             .font(.system(size: 11))
-            .foregroundColor(gold)
           Text(entry.data.feelsLikeTemp)
             .font(.custom("SpaceGrotesk-Regular", size: 9).weight(.bold))
-            .foregroundColor(onyx)
         }
         .widgetCanvas()
       }
@@ -127,11 +117,7 @@ extension View {
   @ViewBuilder
   fileprivate func widgetCanvas() -> some View {
     if #available(watchOS 10.0, *) {
-      containerBackground(for: .widget) {
-        Color.white
-      }
-    } else {
-      background(Color.white)
+      containerBackground(for: .widget) {}
     }
   }
 }

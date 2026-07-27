@@ -112,6 +112,17 @@ class WidgetSharedModule: NSObject, WCSessionDelegate {
     }
   }
 
+  private func drainPendingPayload(through session: WCSession) {
+    guard session.activationState == .activated,
+      let payload = pendingWatchPayload.take()
+    else {
+      return
+    }
+    if !sendWatchPayload(payload, through: session) {
+      pendingWatchPayload.replace(with: payload)
+    }
+  }
+
   // MARK: - WCSessionDelegate
 
   func session(
@@ -123,14 +134,7 @@ class WidgetSharedModule: NSObject, WCSessionDelegate {
       print("[WidgetSharedModule] WCSession activation failed: \(error.localizedDescription)")
       return
     }
-    guard activationState == .activated,
-      let payload = pendingWatchPayload.take()
-    else {
-      return
-    }
-    if !sendWatchPayload(payload, through: session) {
-      pendingWatchPayload.replace(with: payload)
-    }
+    drainPendingPayload(through: session)
   }
 
   func sessionDidBecomeInactive(_ session: WCSession) {
@@ -139,7 +143,16 @@ class WidgetSharedModule: NSObject, WCSessionDelegate {
 
   func sessionDidDeactivate(_ session: WCSession) {
     print("[WidgetSharedModule] WCSession deactivated. Reactivating.")
-    WCSession.default.activate()
+    let defaultSession = WCSession.default
+    defaultSession.activate()
+    drainPendingPayload(through: defaultSession)
+  }
+
+  func sessionReachabilityDidChange(_ session: WCSession) {
+    print("[WidgetSharedModule] WCSession reachability changed: \(session.isReachable)")
+    if session.isReachable {
+      drainPendingPayload(through: session)
+    }
   }
 
   func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
@@ -157,7 +170,7 @@ class WidgetSharedModule: NSObject, WCSessionDelegate {
 
   func session(
     _ session: WCSession,
-    didReceiveUserInfo userInfo: [String: Any] = [:]
+    didReceiveUserInfo userInfo: [String: Any]
   ) {
     openWatchHandoff(userInfo)
   }

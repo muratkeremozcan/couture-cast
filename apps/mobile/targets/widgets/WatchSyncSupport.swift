@@ -76,16 +76,28 @@ enum WatchHandoff {
 
   static func validatedURL(from message: [String: Any]) -> URL? {
     guard let rawURL = message[messageKey] as? String,
-      let components = URLComponents(string: rawURL),
-      components.scheme == "mobile",
-      components.host == "(tabs)",
-      components.queryItems?.contains(
-        where: { $0.name == "source" && $0.value == "watch" }
-      ) == true,
-      let url = components.url
+      let url = URL(string: rawURL),
+      url.scheme == "mobile"
     else {
       return nil
     }
+
+    let host = url.host
+    guard host == "(tabs)" || host == "%28tabs%29" else {
+      return nil
+    }
+
+    // Bypass URLComponents limitation by substituting the host for validation
+    let standardURLString = rawURL.replacingOccurrences(of: "(tabs)", with: "tabs")
+    guard let standardURL = URL(string: standardURLString),
+      let components = URLComponents(url: standardURL, resolvingAgainstBaseURL: false),
+      components.queryItems?.contains(
+        where: { $0.name == "source" && $0.value == "watch" }
+      ) == true
+    else {
+      return nil
+    }
+
     return url
   }
 }

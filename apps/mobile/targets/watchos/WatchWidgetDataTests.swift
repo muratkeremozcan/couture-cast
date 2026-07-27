@@ -75,6 +75,48 @@ struct WatchWidgetDataTests {
       severe.hasActiveSevereAlert(at: now),
       "Active opted-in severe alerts must be actionable"
     )
+
+    let alertsDisabledPayload = """
+      {
+        "lastUpdated": "2026-07-27T12:15:00.000Z",
+        "alertsEnabled": false,
+        "hasSevereAlert": true,
+        "severeAlertId": "storm|start|end",
+        "severeAlertTitle": "Severe storm",
+        "severeAlertDescription": "Seek shelter",
+        "severeAlertStart": "2026-07-27T12:00:00.000Z",
+        "severeAlertEnd": "2026-07-27T13:00:00.000Z"
+      }
+      """
+    let disabledAlerts = try JSONDecoder().decode(
+      WidgetData.self,
+      from: Data(alertsDisabledPayload.utf8)
+    )
+    require(
+      !disabledAlerts.hasActiveSevereAlert(at: now),
+      "Disabled alert settings must suppress severe alerts"
+    )
+
+    let endedAlertPayload = """
+      {
+        "lastUpdated": "2026-07-27T12:15:00.000Z",
+        "alertsEnabled": true,
+        "hasSevereAlert": true,
+        "severeAlertId": "storm|start|end",
+        "severeAlertTitle": "Severe storm",
+        "severeAlertDescription": "Seek shelter",
+        "severeAlertStart": "2026-07-27T11:00:00.000Z",
+        "severeAlertEnd": "2026-07-27T12:00:00.000Z"
+      }
+      """
+    let endedAlert = try JSONDecoder().decode(
+      WidgetData.self,
+      from: Data(endedAlertPayload.utf8)
+    )
+    require(
+      !endedAlert.hasActiveSevereAlert(at: now),
+      "Out of window alerts must not be active"
+    )
     require(
       WatchPayloadAcceptance.shouldAccept(incoming: severe, current: legacy),
       "A newer payload must replace an older payload"

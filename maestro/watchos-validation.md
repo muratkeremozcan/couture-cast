@@ -11,7 +11,7 @@ alerts, and handoff behavior.
 
 ## Step 1: Run automated native validation
 
-Run the watchOS regression suite:
+Run the watchOS regression suite from the repository root:
 
 ```bash
 npm run test:watchos-prebuild --workspace mobile
@@ -64,10 +64,13 @@ references, target dependencies, embed phases, and App Group entitlements.
 2. Long-press the watch face and select **Edit**.
 3. Select circular, corner, rectangular, or inline slots and search for **CoutureCast**.
 4. Confirm complications display current weather details and outfit summary cues.
-5. Tap a complication. Verify the watch app forwards the selected slot to the paired iOS
-   app and the mobile hero canvas opens.
-6. Repeat with the paired phone temporarily unreachable. Reconnect it and verify the
-   queued handoff opens the hero canvas.
+5. Tap a complication. Verify the watch app forwards the selected slot to the
+   paired iOS app and the mobile hero canvas opens. Check logs to confirm
+   exactly one matching `hero_interaction` `watch_tap` event is captured with
+   `slot` (e.g. `next`) and `locale` (e.g. `en-US`).
+6. Repeat with the paired phone temporarily unreachable. Reconnect it and
+   verify the queued handoff opens the hero canvas and captures the deferred
+   `hero_interaction` `watch_tap` event.
 
 ## Step 6: verify severe weather alerts and quiet hours
 
@@ -85,7 +88,7 @@ references, target dependencies, embed phases, and App Group entitlements.
 
 ## Step 7: run repository validation
 
-Before merging, run:
+Before merging, run from the repository root:
 
 ```bash
 npm run verify:changed

@@ -14,6 +14,7 @@ import {
   resolveSupportedLocale,
   ritualResponseSchema,
   type RitualResponse,
+  type AlertPreferences,
 } from '@couture/api-client/contracts/http'
 import { trackMobileRitualCreated } from '@/src/analytics/track-events'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -75,6 +76,9 @@ export default function TabOneScreen() {
   const [activeScenario, setActiveScenario] = useState<ScenarioType>('morning')
   const [pendingWidgetSlot, setPendingWidgetSlot] = useState<WidgetSlot | null>(null)
   const [isStale, setIsStale] = useState(false)
+  const [alertPreferences, setAlertPreferences] = useState<AlertPreferences | undefined>(
+    undefined
+  )
 
   // Garment swap modal states
   const [isSwapModalVisible, setIsSwapModalVisible] = useState(false)
@@ -114,22 +118,24 @@ export default function TabOneScreen() {
     if (!forceRefresh && cached && now - cached.timestamp < 15 * 60 * 1000) {
       if (loadId === latestLoadId.current) {
         setRitual(cached.data)
+        setAlertPreferences(cached.alertPreferences)
         setIsLoading(false)
       }
       return
     }
 
     try {
-      const { data, alertPreferences } = await fetchRitual()
+      const { data, alertPreferences: fetchedPreferences } = await fetchRitual()
       if (loadId !== latestLoadId.current) {
         return
       }
 
       setRitual(data)
+      setAlertPreferences(fetchedPreferences)
       void saveRitualCache(analyticsUserId, activeLocale, {
         data,
         timestamp: now,
-        alertPreferences,
+        alertPreferences: fetchedPreferences,
       }).catch(() => undefined)
 
       trackMobileRitualCreated(analytics, {
@@ -146,6 +152,7 @@ export default function TabOneScreen() {
       // Offline fallback: try using cached data if available, even if stale
       if (cached) {
         setRitual(cached.data)
+        setAlertPreferences(cached.alertPreferences)
         setIsStale(true)
       } else {
         setError(
@@ -176,19 +183,20 @@ export default function TabOneScreen() {
       return
     }
 
-    if (source === 'watch' && isWidgetSlot(slot)) {
-      setPendingWidgetSlot(slot)
+    const resolvedSlot = Array.isArray(slot) ? undefined : slot
+    if (source === 'watch' && isWidgetSlot(resolvedSlot)) {
+      setPendingWidgetSlot(resolvedSlot)
       analytics.capture('hero_interaction', {
         interactionType: 'watch_tap',
-        slot,
+        slot: resolvedSlot,
         locale: activeLocale,
       })
-    } else if (isWidgetSize(size) && isWidgetSlot(slot)) {
-      setPendingWidgetSlot(slot)
+    } else if (isWidgetSize(size) && isWidgetSlot(resolvedSlot)) {
+      setPendingWidgetSlot(resolvedSlot)
       analytics.capture('hero_interaction', {
         interactionType: 'widget_tap',
         widgetSize: size,
-        slot,
+        slot: resolvedSlot,
         locale: activeLocale,
       })
     }
@@ -256,6 +264,7 @@ export default function TabOneScreen() {
     void saveRitualCache(analyticsUserId, activeLocale, {
       data: updatedRitual,
       timestamp: Date.now(),
+      alertPreferences,
     }).catch(() => undefined)
 
     analytics.capture('hero_interaction', {
