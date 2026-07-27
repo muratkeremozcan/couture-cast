@@ -1,12 +1,12 @@
 # Step 7 support owner: searchable owner anchor
 name: Install
-description: Install dependencies using npm ci or a custom command
+description: Install repository dependencies with a fixed npm command
 
 inputs:
-  install-command:
-    description: 'Command to install dependencies (default npm ci)'
+  install-mode:
+    description: 'Dependency install mode: ci or install'
     required: false
-    default: 'npm ci'
+    default: 'ci'
   node-version-file:
     description: 'Path to .nvmrc or version file'
     required: false
@@ -23,4 +23,14 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: ${{ inputs.install-command }}
+      env:
+        INSTALL_MODE: ${{ inputs.install-mode }}
+      run: |
+        case "$INSTALL_MODE" in
+          ci) npm ci ;;
+          install) npm install ;;
+          *)
+            echo "Unsupported install mode: $INSTALL_MODE"
+            exit 1
+            ;;
+        esac

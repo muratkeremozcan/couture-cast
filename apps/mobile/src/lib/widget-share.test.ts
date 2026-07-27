@@ -15,6 +15,7 @@ describe('widget share serialization', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    localStorage.clear()
   })
 
   it('serializes the complete localized payload with its source cache timestamp', async () => {

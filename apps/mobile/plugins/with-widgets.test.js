@@ -1,37 +1,21 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
-const { spawnSync } = require('node:child_process')
 const test = require('node:test')
-
-const mobileRoot = path.resolve(__dirname, '..')
-const repositoryRoot = path.resolve(mobileRoot, '../..')
-const expoCli = require.resolve('expo/bin/cli', { paths: [repositoryRoot] })
-
-function copyFixtureEntry(fixtureRoot, entry) {
-  fs.cpSync(path.join(mobileRoot, entry), path.join(fixtureRoot, entry), {
-    recursive: true,
-  })
-}
+const {
+  assertCommand,
+  createExpoPrebuildFixture,
+  mobileRoot,
+  runExpoPrebuild,
+} = require('./prebuild-test-helpers')
 
 test(
   'clean Expo prebuild generates both widget integrations',
   { timeout: 60_000 },
   (t) => {
-    const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'couture-widget-prebuild-'))
-    t.after(() => {
-      assert.match(fixtureRoot, /couture-widget-prebuild-/)
-      fs.rmSync(fixtureRoot, { recursive: true, force: true })
+    const fixtureRoot = createExpoPrebuildFixture(t, {
+      prefix: 'couture-widget-prebuild-',
     })
-
-    for (const entry of ['app.json', 'package.json', 'plugins', 'targets', 'assets']) {
-      copyFixtureEntry(fixtureRoot, entry)
-    }
-    fs.symlinkSync(
-      path.join(repositoryRoot, 'node_modules'),
-      path.join(fixtureRoot, 'node_modules')
-    )
 
     const appJsonPath = path.join(fixtureRoot, 'app.json')
     const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'))
@@ -40,17 +24,10 @@ test(
     }
     fs.writeFileSync(appJsonPath, `${JSON.stringify(appJson, null, 2)}\n`)
 
-    const result = spawnSync(
-      process.execPath,
-      [expoCli, 'prebuild', '--platform', 'all', '--no-install'],
-      {
-        cwd: fixtureRoot,
-        encoding: 'utf8',
-        env: { ...process.env, CI: '1' },
-        timeout: 50_000,
-      }
+    assertCommand(
+      runExpoPrebuild(fixtureRoot, { platform: 'all' }),
+      'Expo widget prebuild failed'
     )
-    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
 
     const swiftWidgetSource = fs.readFileSync(
       path.join(mobileRoot, 'targets/widgets/OutfitWidget.swift'),
@@ -85,6 +62,7 @@ test(
     assert.match(xcodeProject, /OutfitWidget\.swift in Sources/)
     assert.match(xcodeProject, /WidgetSharedModule\.m in Sources/)
     assert.match(xcodeProject, /WidgetSharedModule\.swift in Sources/)
+    assert.match(xcodeProject, /WatchSyncSupport\.swift in Sources/)
     assert.match(xcodeProject, /SpaceGrotesk-Regular\.ttf in Resources/)
     const deploymentTargets = [
       ...xcodeProject.matchAll(/IPHONEOS_DEPLOYMENT_TARGET = ([^;]+);/g),
@@ -112,6 +90,11 @@ test(
     assert.ok(
       fs.existsSync(
         path.join(fixtureRoot, 'ios/CoutureCast/WidgetBridge/WidgetSharedModule.swift')
+      )
+    )
+    assert.ok(
+      fs.existsSync(
+        path.join(fixtureRoot, 'ios/CoutureCast/WidgetBridge/WatchSyncSupport.swift')
       )
     )
 

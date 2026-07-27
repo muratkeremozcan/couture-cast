@@ -1,5 +1,5 @@
 name: "Reusable E2E (Playwright)"
-run-name: E2E - ${{ inputs.test_env }} - ${{ inputs.test_command }}
+run-name: E2E - ${{ inputs.test_env }}
 
 on:
   workflow_call:
@@ -7,10 +7,6 @@ on:
       test_env:
         type: string
         description: "Test environment (local|preview|prod)"
-        required: true
-      test_command:
-        type: string
-        description: "Playwright command to run (e.g., npm run test:pw-preview)"
         required: true
       gh_ref:
         type: string
@@ -97,12 +93,14 @@ jobs:
         if: inputs.deployment_ref != ''
         shell: bash
         env:
+          CHECKOUT_REF: ${{ inputs.gh_ref }}
+          DEPLOYMENT_REF: ${{ inputs.deployment_ref }}
           GH_TOKEN: ${{ github.token }}
         run: |
           # deployment_ref might be a SHA, not a branch name
           # Query GitHub API to find which branch has this commit as HEAD
-          sha="${{ inputs.gh_ref }}"
-          deployment_ref="${{ inputs.deployment_ref }}"
+          sha="$CHECKOUT_REF"
+          deployment_ref="$DEPLOYMENT_REF"
 
           branch_name=""
 
@@ -143,6 +141,8 @@ jobs:
           VERCEL_WEB_PROJECT_SLUG: ${{ inputs.vercel_web_project_slug }}
           VERCEL_API_PROJECT_SLUG: ${{ inputs.vercel_api_project_slug }}
           VERCEL_TEAM_SLUG: ${{ inputs.vercel_team_slug }}
+          CUSTOM_BASE_URL: ${{ inputs.custom_base_url }}
+          CUSTOM_API_BASE_URL: ${{ inputs.custom_api_base_url }}
           # Pass resolved branch name for URL construction
           VERCEL_GIT_COMMIT_REF: ${{ steps.resolve_branch.outputs.branch }}
           # Enable debug logging for URL resolution scripts
@@ -162,12 +162,12 @@ jobs:
             echo "Warning: DATABASE_URL is empty for TEST_ENV=$TEST_ENV"
           fi
 
-          custom_base_url="${{ inputs.custom_base_url }}"
-          custom_api_base_url="${{ inputs.custom_api_base_url }}"
+          custom_base_url="$CUSTOM_BASE_URL"
+          custom_api_base_url="$CUSTOM_API_BASE_URL"
           # Callers can pin the exact URLs they already resolved and waited for.
           # That is stronger than letting the test command rediscover previews on its own.
           if [ -n "$custom_base_url" ]; then
-            case "${{ inputs.test_env }}" in
+            case "$TEST_ENV" in
               local) export WEB_E2E_BASE_URL="$custom_base_url" ;;
               preview)
                 export PREVIEW_WEB_E2E_BASE_URL="$custom_base_url"
@@ -177,7 +177,7 @@ jobs:
           fi
 
           if [ -n "$custom_api_base_url" ]; then
-            case "${{ inputs.test_env }}" in
+            case "$TEST_ENV" in
               local) export API_BASE_URL="$custom_api_base_url" ;;
               preview)
                 export PREVIEW_API_BASE_URL="$custom_api_base_url"
@@ -186,7 +186,7 @@ jobs:
                 ;;
               prod) export PROD_API_BASE_URL="$custom_api_base_url" ;;
             esac
-          elif [ "${{ inputs.test_env }}" = "preview" ] && [ -z "$PREVIEW_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
+          elif [ "$TEST_ENV" = "preview" ] && [ -z "$PREVIEW_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
             # Fallback path: if the caller did not pin an API preview URL, resolve one
             # here so preview tests still have an API origin to target.
             echo "Resolving API URL via Vercel REST API..."
@@ -201,7 +201,11 @@ jobs:
           fi
 
           # DEBUG env var already set at workflow level
-          ${{ inputs.test_command }}
+          case "$TEST_ENV" in
+            local) npm run test:pw-local ;;
+            preview) npm run test:pw-preview ;;
+            prod) npm run test:pw-prod ;;
+          esac
 
       - name: Upload Playwright artifacts
         if: always()

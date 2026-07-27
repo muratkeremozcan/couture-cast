@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mockRitualResponse } from '../test-utils/msw/handlers'
 import {
   clearRitualMemoryCache,
@@ -8,6 +8,11 @@ import {
 
 describe('ritual cache localization', () => {
   beforeEach(() => {
+    localStorage.clear()
+    clearRitualMemoryCache()
+  })
+
+  afterEach(() => {
     localStorage.clear()
     clearRitualMemoryCache()
   })

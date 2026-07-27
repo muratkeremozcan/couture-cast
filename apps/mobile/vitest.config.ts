@@ -121,7 +121,7 @@ export default defineConfig({
   },
   define: {
     __DEV__: JSON.stringify(true),
-    'process.env': {},
+    'process.env': 'import.meta.env',
     __VITEST_WATCH__: JSON.stringify(isWatchMode),
   },
   test: {
