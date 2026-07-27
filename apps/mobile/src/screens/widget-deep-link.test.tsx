@@ -3,7 +3,16 @@
 import React from 'react'
 import { screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import TabOneScreen from '@/app/(tabs)/index'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { clearRitualMemoryCache } from '@/src/lib/ritual-cache'
@@ -12,6 +21,10 @@ import { initI18n } from '@/src/lib/i18n'
 let mockParams: Record<string, string> = {}
 const mockSetParams = vi.fn()
 const mockRouter = { setParams: mockSetParams }
+
+function deepLinkParams(params: Record<string, string>) {
+  return params
+}
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
@@ -33,70 +46,86 @@ vi.mock('@/src/analytics/mobile-analytics', () => ({
   MobileAnalyticsDiagnosticsPanel: () => null,
 }))
 
+let restoreAccessTokenResolver: (() => void) | undefined
+
 describe('Widget Deep Link Hydration', () => {
   beforeAll(async () => {
-    process.env.EXPO_PUBLIC_API_BASE_URL =
+    const apiBaseUrl =
       typeof window !== 'undefined' ? window.location.origin : 'https://mock-api.test'
+    vi.stubEnv('EXPO_PUBLIC_API_BASE_URL', apiBaseUrl)
+    process.env.EXPO_PUBLIC_API_BASE_URL = apiBaseUrl
     await initI18n()
+  })
+
+  afterAll(() => {
+    vi.unstubAllEnvs()
   })
 
   beforeEach(() => {
     mockCapture.mockClear()
     mockSetParams.mockClear()
     vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-07-24T17:30:00.000Z'))
-    setMobileAccessTokenResolver(() => 'session-token')
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => 'session-token')
     mockParams = {}
   })
 
   afterEach(() => {
+    restoreAccessTokenResolver?.()
+    restoreAccessTokenResolver = undefined
     vi.restoreAllMocks()
     clearRitualMemoryCache()
     localStorage.clear()
   })
 
-  it('hydrates the current location-time scenario from slot=now', async () => {
-    mockParams = { source: 'widget', size: 'small', slot: 'now' }
+  it.each([
+    {
+      name: 'current widget scenario',
+      params: deepLinkParams({ source: 'widget', size: 'small', slot: 'now' }),
+      expectedCopy: 'Mild morning with gentle winds. Trench coat recommended.',
+      expectedProperties: {
+        interactionType: 'widget_tap',
+        widgetSize: 'small',
+        slot: 'now',
+        locale: 'en-US',
+      },
+    },
+    {
+      name: 'next widget scenario',
+      params: deepLinkParams({ source: 'widget', size: 'medium', slot: 'next' }),
+      expectedCopy: 'Warm and sunny midday. Light tee is perfect.',
+      expectedProperties: {
+        interactionType: 'widget_tap',
+        widgetSize: 'medium',
+        slot: 'next',
+        locale: 'en-US',
+      },
+    },
+    {
+      name: 'watch handoff without widget dimensions',
+      params: deepLinkParams({ source: 'watch', slot: 'next' }),
+      expectedCopy: 'Warm and sunny midday. Light tee is perfect.',
+      expectedProperties: {
+        interactionType: 'watch_tap',
+        slot: 'next',
+        locale: 'en-US',
+      },
+    },
+  ])('hydrates the $name', async ({ params, expectedCopy, expectedProperties }) => {
+    mockParams = params
 
     await render(<TabOneScreen />)
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Mild morning with gentle winds. Trench coat recommended.')
-      ).toBeTruthy()
+      expect(screen.getByText(expectedCopy)).toBeTruthy()
     })
-    expect(mockCapture).toHaveBeenCalledWith('hero_interaction', {
-      interactionType: 'widget_tap',
-      widgetSize: 'small',
-      slot: 'now',
-      locale: 'en-US',
-    })
-    const widgetTapCalls = mockCapture.mock.calls.filter(
-      ([event, properties]) =>
-        event === 'hero_interaction' && properties?.interactionType === 'widget_tap'
+    const heroInteractionCalls = mockCapture.mock.calls.filter(
+      ([event]) => event === 'hero_interaction'
     )
-    expect(widgetTapCalls).toHaveLength(1)
+    expect(heroInteractionCalls).toEqual([['hero_interaction', expectedProperties]])
     expect(mockSetParams).toHaveBeenCalledWith({
       source: undefined,
       size: undefined,
       slot: undefined,
-    })
-  })
-
-  it('hydrates the next forecast scenario from slot=next', async () => {
-    mockParams = { source: 'widget', size: 'medium', slot: 'next' }
-
-    await render(<TabOneScreen />)
-
-    await waitFor(() => {
-      expect(
-        screen.getByText('Warm and sunny midday. Light tee is perfect.')
-      ).toBeTruthy()
-    })
-    expect(mockCapture).toHaveBeenCalledWith('hero_interaction', {
-      interactionType: 'widget_tap',
-      widgetSize: 'medium',
-      slot: 'next',
-      locale: 'en-US',
     })
   })
 
@@ -124,8 +153,17 @@ describe('Widget Deep Link Hydration', () => {
     })
   })
 
-  it('rejects malformed widget parameters before analytics or hydration', async () => {
-    mockParams = { source: 'widget', size: 'huge', slot: 'evening' }
+  it.each([
+    {
+      name: 'malformed widget parameters',
+      params: deepLinkParams({ source: 'widget', size: 'huge', slot: 'evening' }),
+    },
+    {
+      name: 'parameters from an unknown source',
+      params: deepLinkParams({ source: 'other', size: 'medium', slot: 'next' }),
+    },
+  ])('ignores $name before analytics or hydration', async ({ params }) => {
+    mockParams = params
 
     await render(<TabOneScreen />)
 
@@ -139,19 +177,5 @@ describe('Widget Deep Link Hydration', () => {
     expect(
       screen.getByText('Mild morning with gentle winds. Trench coat recommended.')
     ).toBeTruthy()
-  })
-
-  it('ignores widget parameters when source is not widget', async () => {
-    mockParams = { source: 'other', size: 'medium', slot: 'next' }
-
-    await render(<TabOneScreen />)
-
-    await waitFor(() => {
-      expect(screen.getByTestId('weather-header')).toBeTruthy()
-    })
-    expect(mockCapture).not.toHaveBeenCalledWith(
-      'hero_interaction',
-      expect.objectContaining({ interactionType: 'widget_tap' })
-    )
   })
 })

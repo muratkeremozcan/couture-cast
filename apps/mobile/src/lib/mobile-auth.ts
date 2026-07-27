@@ -3,7 +3,7 @@ export type MobileAccessTokenResolver = () =>
   | undefined
   | Promise<string | undefined>
 
-let accessTokenResolver: MobileAccessTokenResolver = () => {
+const defaultAccessTokenResolver: MobileAccessTokenResolver = () => {
   if (!__DEV__) {
     return undefined
   }
@@ -11,12 +11,18 @@ let accessTokenResolver: MobileAccessTokenResolver = () => {
   return process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN?.trim() || undefined
 }
 
+let accessTokenResolver = defaultAccessTokenResolver
+
 /**
  * Authentication owns the session lifecycle; API consumers only request the
  * current bearer token through this boundary.
  */
 export function setMobileAccessTokenResolver(resolver: MobileAccessTokenResolver) {
+  const previousResolver = accessTokenResolver
   accessTokenResolver = resolver
+  return () => {
+    accessTokenResolver = previousResolver
+  }
 }
 
 export async function resolveMobileAccessToken() {

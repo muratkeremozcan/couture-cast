@@ -236,7 +236,11 @@ function addIosBridgeFiles(project, projectRoot, iosDirectory, mainGroupName) {
   const mainGroupKey = project.findPBXGroupKey({ name: mainGroupName })
   ensureDirectory(destinationDirectory)
 
-  for (const fileName of ['WidgetSharedModule.swift', 'WidgetSharedModule.m']) {
+  for (const fileName of [
+    'WidgetSharedModule.swift',
+    'WidgetSharedModule.m',
+    'WatchSyncSupport.swift',
+  ]) {
     copyFile(
       path.join(sourceDirectory, fileName),
       path.join(destinationDirectory, fileName)

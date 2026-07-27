@@ -15,6 +15,7 @@ describe('widget share serialization', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    localStorage.clear()
   })
 
   it('serializes the complete localized payload with its source cache timestamp', async () => {
@@ -86,5 +87,67 @@ describe('widget share serialization', () => {
     expect(widgetData.nextConditionText).toBe('')
     expect(widgetData.nextHourPrecipitation).toBe('')
     expect(widgetData.nextOutfitSummary).toBe('')
+  })
+
+  it('syncs user alert preferences and includes only an active severe alert', () => {
+    const now = Date.parse('2026-07-27T12:00:00.000Z')
+    const ritual = cloneRitual()
+    ritual.data.weather.alerts = [
+      {
+        event: 'Expired storm',
+        description: 'No longer active',
+        start: '2026-07-27T08:00:00.000Z',
+        end: '2026-07-27T09:00:00.000Z',
+        severity: 'high',
+      },
+      {
+        event: 'Severe thunderstorm',
+        description: 'Seek shelter indoors',
+        start: '2026-07-27T11:30:00.000Z',
+        end: '2026-07-27T13:30:00.000Z',
+        severity: 'high',
+      },
+    ]
+
+    const widgetData = createWidgetData(ritual, 'en-US', now, now, {
+      pushEnabled: true,
+      quietHoursEnabled: true,
+      quietHoursStart: '21:30',
+      quietHoursEnd: '06:15',
+      timezone: 'America/Chicago',
+    })
+
+    expect(widgetData).toMatchObject({
+      alertsEnabled: true,
+      hasSevereAlert: true,
+      severeAlertTitle: 'Severe thunderstorm',
+      severeAlertDescription: 'Seek shelter indoors',
+      severeAlertStart: '2026-07-27T11:30:00.000Z',
+      severeAlertEnd: '2026-07-27T13:30:00.000Z',
+      quietHoursEnabled: true,
+      quietHoursStart: '21:30',
+      quietHoursEnd: '06:15',
+      timezone: 'America/Chicago',
+    })
+    expect(widgetData.severeAlertId).toContain('Severe thunderstorm')
+  })
+
+  it('fails closed when notification preferences are unavailable', () => {
+    const now = Date.parse('2026-07-27T12:00:00.000Z')
+    const ritual = cloneRitual()
+    ritual.data.weather.alerts = [
+      {
+        event: 'Severe thunderstorm',
+        description: 'Seek shelter indoors',
+        start: '2026-07-27T11:30:00.000Z',
+        end: '2026-07-27T13:30:00.000Z',
+        severity: 'high',
+      },
+    ]
+
+    const widgetData = createWidgetData(ritual, 'en-US', now, now)
+
+    expect(widgetData.alertsEnabled).toBe(false)
+    expect(widgetData.quietHoursEnabled).toBe(false)
   })
 })

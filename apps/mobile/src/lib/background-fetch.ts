@@ -5,6 +5,7 @@ import { getSavedSettings } from './settings-storage'
 import { readLatestRitualCache, saveRitualCache } from './ritual-cache'
 import { createMobileApiClient } from './api-client'
 import { resolveMobileAccessToken } from './mobile-auth'
+import { loadWidgetAlertPreferences } from './widget-alert-preferences'
 import { mobileAnalyticsClient } from '../analytics/mobile-analytics'
 import { isWidgetCacheFresh } from './widget-cache-freshness'
 import {
@@ -31,11 +32,16 @@ TaskManager.defineTask(RITUAL_BACKGROUND_FETCH_TASK, async () => {
       accessToken: () => Promise.resolve(token || ''),
     })
 
-    const response = ritualResponseSchema.parse(await client.apiV1RitualGet({ locale }))
+    const [ritualResult, alertPreferences] = await Promise.all([
+      client.apiV1RitualGet({ locale }),
+      loadWidgetAlertPreferences(client),
+    ])
+    const response = ritualResponseSchema.parse(ritualResult)
 
     await saveRitualCache(userId, locale, {
       data: response,
       timestamp: Date.now(),
+      alertPreferences,
     })
 
     return BackgroundFetch.BackgroundFetchResult.NewData

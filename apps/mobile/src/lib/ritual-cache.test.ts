@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mockRitualResponse } from '../test-utils/msw/handlers'
 import {
   clearRitualMemoryCache,
@@ -8,6 +8,11 @@ import {
 
 describe('ritual cache localization', () => {
   beforeEach(() => {
+    localStorage.clear()
+    clearRitualMemoryCache()
+  })
+
+  afterEach(() => {
     localStorage.clear()
     clearRitualMemoryCache()
   })
@@ -28,6 +33,31 @@ describe('ritual cache localization', () => {
     })
     await expect(readLatestRitualCache('user-1', 'tr-TR')).resolves.toMatchObject({
       timestamp: 200,
+    })
+  })
+
+  it('preserves validated alert preferences with the cached ritual', async () => {
+    await saveRitualCache('user-1', 'en-US', {
+      data: mockRitualResponse,
+      timestamp: 300,
+      alertPreferences: {
+        pushEnabled: false,
+        quietHoursEnabled: true,
+        quietHoursStart: '20:00',
+        quietHoursEnd: '06:00',
+        timezone: 'America/Chicago',
+      },
+    })
+    clearRitualMemoryCache()
+
+    await expect(readLatestRitualCache('user-1', 'en-US')).resolves.toMatchObject({
+      alertPreferences: {
+        pushEnabled: false,
+        quietHoursEnabled: true,
+        quietHoursStart: '20:00',
+        quietHoursEnd: '06:00',
+        timezone: 'America/Chicago',
+      },
     })
   })
 })
