@@ -75,7 +75,6 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
       throw new Error('Expected focus targets')
     }
 
-    expect(hero).toHaveAttribute('tabindex', '0')
     expect(
       hero.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()

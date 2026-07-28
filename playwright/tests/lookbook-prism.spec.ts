@@ -25,18 +25,24 @@ test.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
     await expect(heroSection).toBeVisible()
     await expect(communitySection).toBeVisible()
 
-    const tabletHeroBox = await heroSection.boundingBox()
-    const tabletCommunityBox = await communitySection.boundingBox()
-    expect(tabletCommunityBox?.y).toBeGreaterThanOrEqual(
-      (tabletHeroBox?.y ?? 0) + (tabletHeroBox?.height ?? 0)
-    )
+    await expect
+      .poll(async () => {
+        const heroBox = await heroSection.boundingBox()
+        const communityBox = await communitySection.boundingBox()
+        if (!heroBox || !communityBox) return false
+        return communityBox.y >= heroBox.y + heroBox.height
+      })
+      .toBe(true)
 
     await page.setViewportSize({ width: 1280, height: 900 })
-    const desktopHeroBox = await heroSection.boundingBox()
-    const desktopCommunityBox = await communitySection.boundingBox()
-    expect(desktopCommunityBox?.x).toBeGreaterThan(
-      (desktopHeroBox?.x ?? 0) + (desktopHeroBox?.width ?? 0) / 2
-    )
+    await expect
+      .poll(async () => {
+        const heroBox = await heroSection.boundingBox()
+        const communityBox = await communitySection.boundingBox()
+        if (!heroBox || !communityBox) return false
+        return communityBox.x > heroBox.x + heroBox.width / 2
+      })
+      .toBe(true)
     await expect(page.getByRole('complementary', { name: /planner rail/i })).toBeHidden()
 
     await page.setViewportSize({ width: 1440, height: 900 })
@@ -50,11 +56,14 @@ test.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
 
     await page.setViewportSize({ width: 700, height: 812 })
     const cards = communitySection.locator('article')
-    const firstCardBox = await cards.nth(0).boundingBox()
-    const secondCardBox = await cards.nth(1).boundingBox()
-    expect(secondCardBox?.y).toBeGreaterThanOrEqual(
-      (firstCardBox?.y ?? 0) + (firstCardBox?.height ?? 0)
-    )
+    await expect
+      .poll(async () => {
+        const firstCardBox = await cards.nth(0).boundingBox()
+        const secondCardBox = await cards.nth(1).boundingBox()
+        if (!firstCardBox || !secondCardBox) return false
+        return secondCardBox.y >= firstCardBox.y + firstCardBox.height
+      })
+      .toBe(true)
     await expect(page.locator('h1')).toHaveCount(1)
   })
 })

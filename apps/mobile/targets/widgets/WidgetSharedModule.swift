@@ -40,10 +40,13 @@ class WidgetSharedModule: NSObject, WCSessionDelegate {
       return
     }
 
+    guard WatchPayloadProjection.optimizedPayload(from: payload) != nil else {
+      reject("widget_payload_invalid", "The widget payload is malformed or invalid.", nil)
+      return
+    }
+
     sharedDefaults.set(payload, forKey: payloadKey)
-    guard sharedDefaults.synchronize(),
-      sharedDefaults.string(forKey: payloadKey) == payload
-    else {
+    guard sharedDefaults.string(forKey: payloadKey) == payload else {
       reject("widget_storage_write_failed", "The widget payload could not be saved.", nil)
       return
     }

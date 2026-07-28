@@ -68,8 +68,7 @@ export function LookbookPrismLayout() {
         {/* Left Column / Slot 1: Hero Ritual Canvas */}
         <section
           aria-label="Hero Ritual Canvas"
-          tabIndex={0}
-          className={`flex flex-col gap-6 rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] p-6 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
+          className={`flex flex-col gap-6 rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] p-6 shadow-sm ${
             isMobilePreview ? '' : 'sm:p-8'
           }`}
         >

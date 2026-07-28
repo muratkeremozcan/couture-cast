@@ -30,5 +30,5 @@ export default defineConfig({
     env: {
       DISABLE_WEBSOCKETS: 'true',
     },
-  },
+  } as any,
 })

@@ -2,7 +2,6 @@
 'use client'
 
 import Image from 'next/image'
-import type { ImageLoaderProps } from 'next/image'
 import posthog from 'posthog-js'
 
 export type FilterCategory = 'New' | 'Following' | 'Near me' | 'Brands'
@@ -20,10 +19,6 @@ export interface LookbookCardItem {
 }
 
 const FILTER_TABS: FilterCategory[] = ['New', 'Following', 'Near me', 'Brands']
-
-function passthroughImageLoader({ src }: ImageLoaderProps) {
-  return src
-}
 
 const MOCK_LOOKBOOK_ITEMS: Record<FilterCategory, LookbookCardItem[]> = {
   New: [
@@ -211,7 +206,6 @@ export function CommunityLookbookGrid({
                 CC
               </span>
               <Image
-                loader={passthroughImageLoader}
                 src={item.imageUrl}
                 alt=""
                 fill

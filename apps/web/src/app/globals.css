@@ -29,7 +29,7 @@ body {
 }
 
 .lookbook-metrics {
-  font-family: 'Space Grotesk', 'SFMono-Regular', Consolas, monospace;
+  font-family: 'Space Grotesk', SFMono-Regular, Consolas, monospace;
 }
 
 @keyframes planner-rail-in {
