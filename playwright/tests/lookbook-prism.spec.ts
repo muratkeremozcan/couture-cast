@@ -47,7 +47,12 @@ test.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
 
     await page.setViewportSize({ width: 1440, height: 900 })
     await expect(page.getByRole('complementary', { name: /planner rail/i })).toBeVisible()
-    expect((await container.boundingBox())?.width).toBeGreaterThanOrEqual(1300)
+    await expect
+      .poll(async () => {
+        const box = await container.boundingBox()
+        return box?.width ?? 0
+      })
+      .toBeGreaterThanOrEqual(1300)
 
     const comparisonToggle = page.getByRole('button', { name: /comparison mode/i })
     await expect(comparisonToggle).toBeVisible()

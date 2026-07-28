@@ -46,7 +46,7 @@ export default function Home() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 pb-16 space-y-16">
-        <div className="w-full max-w-[1440px] mx-auto">
+        <div className="relative left-1/2 w-[100vw] max-w-[1440px] -translate-x-1/2">
           <LookbookPrismLayout />
         </div>
 
