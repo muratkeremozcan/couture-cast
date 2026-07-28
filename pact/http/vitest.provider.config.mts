@@ -26,9 +26,10 @@ export default defineConfig({
     hookTimeout: 30000,
     fileParallelism: false,
     pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    poolOptions: { forks: { singleFork: true } } as any,
     env: {
       DISABLE_WEBSOCKETS: 'true',
     },
-  } as any,
+  },
 })
