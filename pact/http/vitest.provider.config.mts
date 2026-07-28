@@ -26,8 +26,8 @@ export default defineConfig({
     hookTimeout: 30000,
     fileParallelism: false,
     pool: 'forks',
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-    poolOptions: { forks: { singleFork: true } } as any,
+    // @ts-expect-error -- Vitest 4 InlineConfig types omit poolOptions singleFork
+    poolOptions: { forks: { singleFork: true } },
     env: {
       DISABLE_WEBSOCKETS: 'true',
     },
