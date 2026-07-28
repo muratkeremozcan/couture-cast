@@ -1,3 +1,4 @@
+// Story 3.4 Task 2 step 2 owner: render watchOS SwiftUI glance and next-hour forecast views in apps/mobile/targets/watchos/WatchContentView.swift
 import SwiftUI
 
 private let onyx = Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255)

@@ -1,3 +1,4 @@
+// Story 3.4 Task 1 step 1 owner: activate WatchConnectivity session and transfer payloads in apps/mobile/targets/widgets/WidgetSharedModule.swift
 import Foundation
 import React
 import UIKit

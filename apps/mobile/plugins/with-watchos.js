@@ -1,3 +1,4 @@
+// Story 3.4 Task 4 step 1 owner: generate watchOS targets and link font resources in Expo config plugin in apps/mobile/plugins/with-watchos.js
 const { withXcodeProject, withEntitlementsPlist } = require('@expo/config-plugins')
 const plist = require('@expo/plist').default
 const fs = require('fs')
