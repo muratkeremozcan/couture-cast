@@ -1,3 +1,4 @@
+// Story 3.4 Task 2 step 1 owner: handle watch-side WCSession delegate callbacks and App Group storage in apps/mobile/targets/watchos/WatchConnectivityManager.swift
 import Foundation
 import UserNotifications
 import WatchConnectivity

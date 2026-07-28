@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { AnalyticsEventActions } from './components/analytics-event-actions'
 import { PostHogClickTracker } from './components/posthog-click-tracker'
+import { LookbookPrismLayout } from './components/lookbook-prism-layout'
 
 const navLinks = [
   { href: '#ritual', label: 'Daily ritual', testId: 'nav-ritual' },
@@ -10,7 +11,7 @@ const navLinks = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-neutral-950 via-black to-neutral-900 text-white font-[family-name:var(--font-geist-sans)]">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-neutral-950 via-black to-neutral-900 text-white font-[family-name:var(--font-geist-sans)]">
       <header className="max-w-6xl mx-auto flex items-center justify-between px-6 py-6">
         <div className="flex flex-col gap-2">
           <p
@@ -45,6 +46,10 @@ export default function Home() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 pb-16 space-y-16">
+        <div className="relative left-1/2 w-[100vw] max-w-[1440px] -translate-x-1/2">
+          <LookbookPrismLayout />
+        </div>
+
         <section id="ritual" data-testid="hero-section" className="space-y-6">
           <p className="text-xs uppercase tracking-[0.4em] text-amber-300">
             Daily ritual

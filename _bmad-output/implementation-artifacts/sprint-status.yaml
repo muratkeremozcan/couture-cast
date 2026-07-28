@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-07-27
+last_updated: 2026-07-28
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -74,7 +74,7 @@ development_status:
   3-2-localization-infrastructure: done
   3-3-home-lock-screen-widgets: done
   3-4-watchos-glance: done
-  3-5-lookbook-prism-responsive-layout: backlog
+  3-5-lookbook-prism-responsive-layout: done
   3-6-chip-navigation-sticky-bottom-nav: backlog
   3-7-widget-notification-deep-link-handling: backlog
   3-8-accessibility-hardening: backlog

@@ -25,6 +25,7 @@ export default defineConfig({
     testTimeout: 30000,
     fileParallelism: false,
     pool: 'forks',
-    maxWorkers: 1,
+    // @ts-expect-error -- Vitest 4 InlineConfig types omit poolOptions singleFork
+    poolOptions: { forks: { singleFork: true } },
   },
 })

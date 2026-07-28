@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-07-24 - Step 23 captures the home/lock-screen widgets implementation, background sync task, and telemetry hooks.
+Updated: 2026-07-28 - Step 24 captures the watchOS glance companion app, WCSession sync, and complication targets; Step 25 captures the Lookbook Prism responsive layout, comparison mode, mobile preview, and community grid.
 
 ## LLM collaborator prompt
 
@@ -2260,3 +2260,123 @@ Task owner map:
 - Story 3.3 Task 4 step 1 owner: read deep link query parameters to hydrate active scenario in `apps/mobile/app/(tabs)/index.tsx`
 - Story 3.3 Task 5 step 1 owner: verify widget deep link hydration and telemetry triggers in screen tests in `apps/mobile/src/screens/widget-deep-link.test.tsx`
 - Story 3.3 Task 5 step 2 owner: define E2E Maestro routing verification scenarios in `maestro/widget-deep-link.yaml`
+
+## Step 24 - watchOS glance companion app & complications
+
+User/business impact:
+
+Delivers an instant wrist glance of current feels-like conditions and outfit recommendations without pulling out a smartphone. The business increases daily active engagement and user touchpoints by embedding CoutureCast context into watchOS watch faces and complications.
+
+Key takeaways:
+
+1. Watch Isolation Principle: watchOS companion targets do not invoke remote API endpoints directly; they rely strictly on `WatchConnectivity` transfers from the iOS host app to preserve watch battery life and load instantaneously.
+2. Bi-directional WatchConnectivity: iOS updates transmit cached payload dictionaries using `updateApplicationContext` for state sync and `transferCurrentComplicationUserInfo` for high-priority complication updates.
+3. WatchKit Complications: Complications read serialized payload data from a watch-scoped App Group container (`group.com.anonymous.mobile.watch`) supporting circular, modular, and rectangular complication families.
+4. Severe Alert Haptics & Quiet Hours: Severe weather notifications play wrist haptic feedback (`WKInterfaceDevice.current().play(.notification)`) only after validating against user quiet-hour window rules.
+
+Story/Task mapping:
+
+- Story 3.4
+- Task 1 (iOS-side WatchConnectivity Integration)
+- Task 2 (watchOS Companion App SwiftUI)
+- Task 3 (watchOS Complications & WidgetKit)
+- Task 4 (Expo Config Plugin for watchOS)
+- Task 5 (Verification & Documentation)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/3-4-watchos-glance.md`
+
+Cross-links:
+
+- Step 23 introduces the shared widget serialization payload and iOS App Group bridge.
+- Step 25 extends responsive surface coverage across desktop, tablet, and mobile.
+
+Sequence to follow:
+
+1. Read `apps/mobile/plugins/with-watchos.js` to see how the Expo config plugin configures watchOS Xcode targets and App Group entitlements.
+2. Inspect `apps/mobile/targets/widgets/WidgetSharedModule.swift` to trace `WCSessionDelegate` activation and `WatchConnectivity` transfers.
+3. Open `apps/mobile/targets/watchos/WatchConnectivityManager.swift` to see payload reception, App Group persistence, and timeline reloads on watchOS.
+4. Read `apps/mobile/targets/watchos/WatchContentView.swift` for the SwiftUI layout displaying current and next-hour outfit cues with haptic alerts.
+5. Inspect `apps/mobile/targets/watchos/WatchComplication.swift` to trace circular, modular, and rectangular complication timeline providers.
+
+Task owner map:
+
+- Story 3.4 Task 1 step 1 owner: activate WatchConnectivity session and transfer payloads in `apps/mobile/targets/widgets/WidgetSharedModule.swift`
+- Story 3.4 Task 2 step 1 owner: handle watch-side WCSession delegate callbacks and App Group storage in `apps/mobile/targets/watchos/WatchConnectivityManager.swift`
+- Story 3.4 Task 2 step 2 owner: render watchOS SwiftUI glance and next-hour forecast views in `apps/mobile/targets/watchos/WatchContentView.swift`
+- Story 3.4 Task 3 step 1 owner: provide WidgetKit watch complications reading from watch App Group in `apps/mobile/targets/watchos/WatchComplication.swift`
+- Story 3.4 Task 4 step 1 owner: generate watchOS targets and link font resources in Expo config plugin in `apps/mobile/plugins/with-watchos.js`
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  iOSApp[iOS App / WidgetSharedModule] -->|WCSession updateApplicationContext| WCSession[WatchConnectivity Session]
+  WCSession -->|transferCurrentComplicationUserInfo| WatchManager[WatchConnectivityManager.swift]
+  WatchManager -->|persists JSON payload| WatchGroup[App Group: group.com.anonymous.mobile.watch]
+  WatchGroup --> WatchView[WatchContentView.swift\nSwiftUI Glance & Forecast]
+  WatchGroup --> WatchWidget[WatchComplication.swift\nWidgetKit Complications]
+```
+
+## Step 25 - Lookbook Prism responsive layout & community grid
+
+User/business impact:
+
+Ensures the hero ritual and living community lookbook adapt seamlessly across desktop, tablet, mobile, and ultrawide viewports. The business enhances cross-device user retention, content discovery, and engagement by providing fluid split layouts, side-by-side outfit comparison modes, and inline mobile preview tools.
+
+Key takeaways:
+
+1. Lookbook Prism Orchestrator: Combines hero outfit ritual recommendations and community lookbook feeds into a unified, non-blocking responsive engine (`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-[1fr_1fr_320px]`).
+2. Luxury Design System & Token Compliance: Applies CoutureCast Surface tokens (`#FFFFFF` background, `#F5F5F7` elevated surface, `#111111` Onyx text, `#C9A14A` Gold accent, `#E6E6ED` Cloud rules) with 8px corner radii and 2dp elevations.
+3. Interactive Comparison & Preview Controls: Allows users to inspect two outfit options side-by-side in Comparison Mode, or constrain desktop layout to a simulated 375px Mobile Preview container.
+4. Accessible & Motion-Aware UI: Hardens WCAG 2.1 AA compliance with gold (`#C9A14A`) focus rings, `aria-live="polite"` status announcements for filter shifts, and `prefers-reduced-motion` detection.
+
+Story/Task mapping:
+
+- Story 3.5
+- Task 1 (Shared Layout Engine & Breakpoint Strategy)
+- Task 2 (Responsive Community Lookbook Component)
+- Task 3 (Interactive Comparison Mode & Mobile Viewport Toggle)
+- Task 4 (Performance, Motion, & Accessibility Hardening)
+- Task 5 (Cross-Surface Synchronization & Telemetry)
+- Task 6 (Vitest & Quality Gate Test Automation)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/3-5-lookbook-prism-responsive-layout.md`
+
+Cross-links:
+
+- Step 23 provides home and lock-screen widget deep-linking into hero ritual contexts.
+- Step 24 provides wrist-based glanceable outfit cues.
+
+Sequence to follow:
+
+1. Read `apps/web/src/app/components/lookbook-prism-layout.tsx` to understand the multi-breakpoint grid orchestrator, reduced motion handling, and telemetry integration.
+2. Inspect `apps/web/src/app/components/community-lookbook-grid.tsx` for filter tab navigation (`New`, `Following`, `Near me`, `Brands`), ARIA status regions, and card grids.
+3. Read `apps/web/src/app/components/layout-controls.tsx` for Comparison Mode and Mobile Preview toggle triggers and PostHog event dispatches.
+4. Inspect `apps/web/src/app/components/planner-rail.tsx` for the ultrawide (`≥1440px`) 7-day outfit planning drawer.
+5. Review test suites in `apps/web/src/app/components/layout-controls.test.tsx`, `community-lookbook-grid.test.tsx`, `lookbook-prism-layout.test.tsx`, and `playwright/tests/lookbook-prism.spec.ts`.
+
+Task owner map:
+
+- Story 3.5 Task 1 step 1 owner: orchestrate responsive grid breakpoints and hero/community panels in `apps/web/src/app/components/lookbook-prism-layout.tsx`
+- Story 3.5 Task 1 step 2 owner: implement ultrawide 7-day planning drawer in `apps/web/src/app/components/planner-rail.tsx`
+- Story 3.5 Task 2 step 1 owner: implement community lookbook filter chips, card grid, and ARIA live regions in `apps/web/src/app/components/community-lookbook-grid.tsx`
+- Story 3.5 Task 3 step 1 owner: implement comparison mode and mobile preview toggle controls with telemetry in `apps/web/src/app/components/layout-controls.tsx`
+- Story 3.5 Task 6 step 1 owner: unit-test layout controls and PostHog event triggers in `apps/web/src/app/components/layout-controls.test.tsx`
+- Story 3.5 Task 6 step 2 owner: unit-test community lookbook filter chip interactions and ARIA status in `apps/web/src/app/components/community-lookbook-grid.test.tsx`
+- Story 3.5 Task 6 step 3 owner: integration-test Lookbook Prism responsive layout, comparison mode, and focus rings in `apps/web/src/app/components/lookbook-prism-layout.test.tsx`
+- Story 3.5 Task 6 step 4 owner: E2E smoke test responsive layout boundaries across viewports in `playwright/tests/lookbook-prism.spec.ts`
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Page["apps/web/src/app/page.tsx"] --> Layout["LookbookPrismLayout"]
+  Layout --> Controls["LayoutControls\nComparison Mode & Mobile Preview Toggles"]
+  Layout --> HeroSlot["Hero Ritual Canvas\n(Primary Recommended Look / Dual Comparison Cards)"]
+  Layout --> CommunitySlot["CommunityLookbookGrid\n(Filter Chips + Responsive Lookbook Cards)"]
+  Layout --> PlannerSlot["PlannerRail\n(Ultrawide ≥1440px Container)"]
+```
