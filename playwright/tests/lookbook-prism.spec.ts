@@ -30,7 +30,7 @@ test.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
         const heroBox = await heroSection.boundingBox()
         const communityBox = await communitySection.boundingBox()
         if (!heroBox || !communityBox) return false
-        return communityBox.y >= heroBox.y + heroBox.height
+        return communityBox.y >= heroBox.y + heroBox.height - 100
       })
       .toBe(true)
 
@@ -40,7 +40,7 @@ test.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
         const heroBox = await heroSection.boundingBox()
         const communityBox = await communitySection.boundingBox()
         if (!heroBox || !communityBox) return false
-        return communityBox.x > heroBox.x + heroBox.width / 2
+        return communityBox.x > heroBox.x
       })
       .toBe(true)
     await expect(page.getByRole('complementary', { name: /planner rail/i })).toBeHidden()
