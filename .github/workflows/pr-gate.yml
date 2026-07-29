@@ -32,6 +32,6 @@ jobs:
       checks: write
       actions: read
     steps:
-      - uses: muratkeremozcan/pr-gate@22b604cea3b428f0f95a9dc74eff600ca1c6213a
+      - uses: muratkeremozcan/pr-gate@main
         with:
           mode: watch
