@@ -1,25 +1,37 @@
-# Single gate that waits for ALL other workflow jobs to complete.
-# This is the ONE required check in the branch ruleset.
+# Event-driven gate: recomputes the verdict on each CI completion event and
+# publishes it as the `gate` check run, the ONE required check in the ruleset.
+# Uses pr-gate in watch mode, replacing kachick/wait-other-jobs. Seconds per
+# event instead of holding a runner for the length of the slowest job.
 name: PR Gate
 
 on:
   pull_request:
-  push:
-    branches: [master]
+    types: [opened, synchronize, reopened]
+  workflow_run:
+    types: [completed]
+    workflows: ['**'] # every workflow; an omitted list disables the trigger
+  # workflow_run cannot fire for a file that is not yet on the default branch,
+  # so pull_request exercises the gate on this branch before it is merged.
+
+# Serializes per commit so two events cannot race the same check run.
+# cancel-in-progress would drop a terminal verdict and leave the PR pending.
+concurrency:
+  group: pr-gate-${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
+  cancel-in-progress: false
 
 jobs:
-  gate:
-    name: gate
+  watch:
+    name: watch
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Do not re-trigger on your own completion. workflow_run fires for this
+    # workflow too, and GitHub chains it three levels deep before stopping.
+    if: github.event.workflow_run.path != '.github/workflows/pr-gate.yml'
+    permissions:
+      contents: read
+      checks: write
+      actions: read
     steps:
-      - uses: kachick/wait-other-jobs@v3
+      - uses: muratkeremozcan/pr-gate@22b604cea3b428f0f95a9dc74eff600ca1c6213a
         with:
-          skip-same-workflow: true
-          skip-list: |
-            [
-              {
-                "workflowFile": "claude-code-review.yml",
-                "jobName": "claude-review",
-                "jobMatchMode": "prefix"
-              }
-            ]
+          mode: watch
