@@ -113,6 +113,26 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     })
   })
 
+  it('keeps mobile chip selection synchronized with the displayed recommendation', async () => {
+    await render(<TabOneScreen />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Mild morning with gentle winds. Trench coat recommended.')
+      ).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByTestId('chip-sponsored'))
+
+    expect(screen.getByText('Cool evening ahead. Sweater recommended.')).toBeTruthy()
+    expect(screen.getByTestId('chip-sponsored')).toHaveAttribute('aria-selected', 'true')
+    expect(mockCapture).toHaveBeenCalledWith('chip_changed', {
+      chipCategory: 'Sponsored',
+      previousCategory: 'Personal',
+      surface: 'mobile',
+    })
+  })
+
   it('verifies hourly ribbon expands and collapses and triggers telemetry', async () => {
     await render(<TabOneScreen />)
 

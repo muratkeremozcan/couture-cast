@@ -3,6 +3,7 @@
 
 import Image from 'next/image'
 import posthog from 'posthog-js'
+import type { ChipCategory } from './chip-navigation'
 
 export type FilterCategory = 'New' | 'Following' | 'Near me' | 'Brands'
 
@@ -124,7 +125,7 @@ export function LookbookFilterNav({
   return (
     <nav
       aria-label="Lookbook Filters"
-      className="sticky top-0 z-20 flex flex-col gap-3 border-b border-[#E6E6ED] bg-[#FFFFFF]/95 py-3 backdrop-blur"
+      className="sticky top-[92px] z-10 flex flex-col gap-3 border-b border-[#E6E6ED] bg-[#FFFFFF]/95 py-3 backdrop-blur"
     >
       <div className="flex items-center justify-between">
         <h2 className="lookbook-display text-2xl font-semibold text-[#111111]">
@@ -171,11 +172,13 @@ export function LookbookFilterNav({
 export interface CommunityLookbookGridProps {
   activeTab: FilterCategory
   isMobilePreview: boolean
+  chipCategory?: ChipCategory
 }
 
 export function CommunityLookbookGrid({
   activeTab,
   isMobilePreview,
+  chipCategory = 'Personal',
 }: CommunityLookbookGridProps) {
   const currentItems = MOCK_LOOKBOOK_ITEMS[activeTab]
 
@@ -183,6 +186,7 @@ export function CommunityLookbookGrid({
     <aside aria-label="Community Lookbook" className="flex flex-col gap-6">
       <div
         data-testid="community-card-grid"
+        data-chip-category={chipCategory}
         className={`grid gap-6 ${
           isMobilePreview ? 'grid-cols-1' : 'grid-cols-1 min-[768px]:grid-cols-2'
         }`}

@@ -10,6 +10,10 @@ vi.mock('posthog-js', () => ({
   },
 }))
 
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/',
+}))
+
 describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -49,6 +53,9 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
 
     const container = screen.getByTestId('lookbook-prism-container')
     expect(container).toHaveClass('max-w-[375px]')
+    expect(container).toHaveClass('max-h-[812px]')
+    expect(container).toHaveClass('overflow-y-auto')
+    expect(screen.getByTestId('sticky-bottom-nav')).toHaveClass('sticky')
     expect(screen.getByTestId('community-card-grid')).not.toHaveClass(
       'min-[768px]:grid-cols-2'
     )
@@ -98,5 +105,25 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
     expect(
       screen.getByRole('complementary', { name: /planner rail/i })
     ).toBeInTheDocument()
+  })
+
+  it('synchronizes chip selection across hero and community content', () => {
+    render(<LookbookPrismLayout />)
+
+    expect(screen.getByTestId('hero-recommendation-title')).toHaveTextContent(
+      'Double-Breasted Blazer & Silk Knit'
+    )
+    expect(screen.getByText('Milan Autumn Wool Trench')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('chip-community'))
+
+    expect(screen.getByTestId('hero-recommendation-title')).toHaveTextContent(
+      'Parisian Silk & Cashmere Blend'
+    )
+    expect(screen.getAllByText('Parisian Silk & Cashmere Blend')).toHaveLength(2)
+    expect(screen.getByTestId('community-card-grid')).toHaveAttribute(
+      'data-chip-category',
+      'Community'
+    )
   })
 })
