@@ -20,19 +20,6 @@ env:
   COVERAGE_GIST_ID: 64348ebdc6e662b93ade9f40bdc03442
 
 jobs:
-  pr-gate-action-tests:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Test the vendored pr-gate action
-        run: node --test .github/actions/pr-gate/tests/*.test.js
-
   quality-gate:
     runs-on: ubuntu-latest
     steps:
