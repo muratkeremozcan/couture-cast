@@ -1,18 +1,72 @@
 // Story 3.5 Task 1 step 1 owner: orchestrate responsive grid breakpoints and hero/community panels in apps/web/src/app/components/lookbook-prism-layout.tsx
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import posthog from 'posthog-js'
 import { LayoutControls } from './layout-controls'
 import { CommunityLookbookGrid, LookbookFilterNav } from './community-lookbook-grid'
 import type { FilterCategory } from './community-lookbook-grid'
 import { PlannerRail } from './planner-rail'
+import { ChipNavigation } from './chip-navigation'
+import type { ChipCategory } from './chip-navigation'
+import { StickyBottomNav } from './sticky-bottom-nav'
+
+const CHIP_DEFAULT_FILTER: Record<ChipCategory, FilterCategory> = {
+  Personal: 'New',
+  Community: 'Following',
+  Sponsored: 'Brands',
+}
+
+const HERO_RECOMMENDATIONS: Record<
+  ChipCategory,
+  { eyebrow: string; score: string; title: string; description: string }
+> = {
+  Personal: {
+    eyebrow: 'Commute Ready',
+    score: '96%',
+    title: 'Double-Breasted Blazer & Silk Knit',
+    description:
+      'Optimized for 18°C morning train commute transitioning into air-conditioned office.',
+  },
+  Community: {
+    eyebrow: 'Community Trending',
+    score: '93%',
+    title: 'Parisian Silk & Cashmere Blend',
+    description:
+      'Community favorites pair light cashmere with a pleated midi skirt for the breezy forecast.',
+  },
+  Sponsored: {
+    eyebrow: 'Sponsored Selection',
+    score: '90%',
+    title: 'Couture House Archive Ensemble',
+    description:
+      'A clearly labeled brand selection featuring recycled wool and signature gold details.',
+  },
+}
 
 export function LookbookPrismLayout() {
+  const containerRef = useRef<HTMLDivElement>(null)
   const [isComparisonMode, setIsComparisonMode] = useState(false)
   const [isMobilePreview, setIsMobilePreview] = useState(false)
   const [isPlannerRailOpen, setIsPlannerRailOpen] = useState(true)
   const [activeTab, setActiveTab] = useState<FilterCategory>('New')
+  const [chipCategory, setChipCategory] = useState<ChipCategory>('Personal')
+  const heroRecommendation = HERO_RECOMMENDATIONS[chipCategory]
+
+  const handleChipCategoryChange = (category: ChipCategory) => {
+    setChipCategory(category)
+    setActiveTab(CHIP_DEFAULT_FILTER[category])
+  }
+
+  const handleMobilePreviewToggle = () => {
+    const willEnablePreview = !isMobilePreview
+    setIsMobilePreview(willEnablePreview)
+    if (willEnablePreview) {
+      requestAnimationFrame(() => {
+        containerRef.current?.scrollIntoView({ block: 'start' })
+      })
+    }
+  }
 
   useEffect(() => {
     try {
@@ -34,10 +88,11 @@ export function LookbookPrismLayout() {
 
   return (
     <div
+      ref={containerRef}
       data-testid="lookbook-prism-container"
-      className={`lookbook-body w-full bg-[#FFFFFF] text-[#111111] motion-safe:transition-[max-width,box-shadow] motion-safe:duration-300 motion-reduce:transition-none ${
+      className={`lookbook-body relative w-full bg-[#FFFFFF] text-[#111111] motion-safe:transition-[max-width,box-shadow] motion-safe:duration-300 motion-reduce:transition-none ${
         isMobilePreview
-          ? 'my-6 mx-auto max-w-[375px] overflow-hidden rounded-[32px] border-4 border-[#111111] bg-[#FFFFFF] p-4 shadow-2xl'
+          ? 'my-6 mx-auto max-h-[812px] max-w-[375px] overflow-x-hidden overflow-y-auto rounded-[32px] border-4 border-[#111111] bg-[#FFFFFF] p-4 shadow-2xl'
           : 'mx-auto max-w-[1440px] px-4 py-8 sm:px-6'
       }`}
     >
@@ -55,6 +110,12 @@ export function LookbookPrismLayout() {
           </h2>
         </div>
       </div>
+
+      <ChipNavigation
+        activeCategory={chipCategory}
+        onCategoryChange={handleChipCategoryChange}
+        surface="web"
+      />
 
       {/* Main Grid Engine */}
       <div
@@ -122,18 +183,20 @@ export function LookbookPrismLayout() {
                 >
                   <div className="mb-4 flex items-center justify-between">
                     <span className="lookbook-metrics text-xs uppercase text-[#8A691F]">
-                      Commute Ready
+                      {heroRecommendation.eyebrow}
                     </span>
                     <span className="lookbook-metrics text-xs text-[#5C5C66]">
-                      Match Score: 96%
+                      Match Score: {heroRecommendation.score}
                     </span>
                   </div>
-                  <h4 className="lookbook-display mb-2 text-lg font-semibold text-[#111111]">
-                    Double-Breasted Blazer & Silk Knit
+                  <h4
+                    data-testid="hero-recommendation-title"
+                    className="lookbook-display mb-2 text-lg font-semibold text-[#111111]"
+                  >
+                    {heroRecommendation.title}
                   </h4>
                   <p className="mb-4 text-xs leading-relaxed text-[#36363D]">
-                    Optimized for 18°C morning train commute transitioning into
-                    air-conditioned office.
+                    {heroRecommendation.description}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <span className="lookbook-metrics rounded-md border border-[#E6E6ED] bg-[#F5F5F7] px-2.5 py-1 text-[11px] text-[#36363D]">
@@ -201,6 +264,7 @@ export function LookbookPrismLayout() {
           <CommunityLookbookGrid
             activeTab={activeTab}
             isMobilePreview={isMobilePreview}
+            chipCategory={chipCategory}
           />
         </section>
 
@@ -227,11 +291,11 @@ export function LookbookPrismLayout() {
           isComparisonMode={isComparisonMode}
           onToggleComparison={() => setIsComparisonMode((currentValue) => !currentValue)}
           isMobilePreview={isMobilePreview}
-          onToggleMobilePreview={() =>
-            setIsMobilePreview((currentValue) => !currentValue)
-          }
+          onToggleMobilePreview={handleMobilePreviewToggle}
         />
       </div>
+
+      {isMobilePreview && <StickyBottomNav isMobilePreview />}
     </div>
   )
 }

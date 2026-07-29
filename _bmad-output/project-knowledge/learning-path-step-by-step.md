@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-07-28 - Step 24 captures the watchOS glance companion app, WCSession sync, and complication targets; Step 25 captures the Lookbook Prism responsive layout, comparison mode, mobile preview, and community grid.
+Updated: 2026-07-29 - Step 25 captures the Lookbook Prism responsive layout, comparison mode, mobile preview, and community grid; Step 26 captures chip navigation (Personal/Community/Sponsored), sticky bottom nav on mobile, keyboard arrow traversal, safe-area insets, and cross-surface telemetry.
 
 ## LLM collaborator prompt
 
@@ -2379,4 +2379,66 @@ flowchart TD
   Layout --> HeroSlot["Hero Ritual Canvas\n(Primary Recommended Look / Dual Comparison Cards)"]
   Layout --> CommunitySlot["CommunityLookbookGrid\n(Filter Chips + Responsive Lookbook Cards)"]
   Layout --> PlannerSlot["PlannerRail\n(Ultrawide ≥1440px Container)"]
+```
+
+## Step 26 - Chip navigation & sticky bottom nav
+
+User/business impact:
+
+Keeps category filters and mobile primary navigation accessible during rapid browsing, touch scrolling, and keyboard-driven site exploration. The business drives view engagement, content pivot speed, and retention across mobile and web surfaces by enforcing touch snap points, sticky positioning, safe-area insets, and robust analytics event dispatches.
+
+Key takeaways:
+
+1. Category Chip Filtering: Pinned sticky chip navigation bar presenting `Personal`, `Community`, and `Sponsored` filter chips with CSS scroll-snap (`snap-x snap-mandatory`).
+2. Accessibility & Keyboard Traversal: Full keyboard arrow navigation (`ArrowLeft`, `ArrowRight`, `Home`, `End`) with `aria-pressed` states, visible gold focus rings (`focus-visible:outline-[#C9A14A]`), and screen reader status announcements via hidden `aria-live="polite"` regions.
+3. Mobile Sticky Bottom Navigation: Viewport-anchored bottom navigation bar (`fixed bottom-0 left-0 right-0 z-30`) visible on mobile viewports (`<768px`) and mobile preview, featuring a solid gold active underline indicator (`#C9A14A`) and safe-area inset bottom padding (`pb-[env(safe-area-inset-bottom,0.75rem)]`).
+4. Cross-Surface Telemetry & Resilience: Dispatches `chip_changed` and `bottom_nav_clicked` PostHog events wrapped in exception-isolation guards so analytics non-availability never breaks rendering.
+
+Story/Task mapping:
+
+- Story 3.6
+- Task 1 (Web Chip Navigation Component)
+- Task 2 (Web Mobile Sticky Bottom Navigation Component)
+- Task 3 (Mobile Expo Bottom Tab Bar & Chip Component)
+- Task 4 (State Sync & Feed Module Filtering)
+- Task 5 (Vitest Unit & Integration Test Automation)
+- Task 6 (E2E Playwright & Maestro Test Verification)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/3-6-chip-navigation-sticky-bottom-nav.md`
+
+Cross-links:
+
+- Step 25 provides the Lookbook Prism multi-breakpoint grid and community lookbook card feeds that chip filters pivot.
+- Step 21 provides the mobile hero landing screen and scenario recommendation cards.
+
+Sequence to follow:
+
+1. Read `apps/web/src/app/components/chip-navigation.tsx` to understand the sticky container, scroll-snap layout, keyboard arrow listeners, and PostHog event dispatches.
+2. Inspect `apps/web/src/app/components/sticky-bottom-nav.tsx` for fixed mobile positioning, gold active underline styling, and safe-area inset handling.
+3. Inspect `apps/mobile/components/chip-navigation.tsx` and `apps/mobile/app/(tabs)/_layout.tsx` for React Native ScrollView chips and Expo gold active tint configuration.
+4. Read `apps/web/src/app/components/lookbook-prism-layout.tsx` to see state sync between chip selection, hero recommendations, and community lookbook feeds.
+5. Review test suites in `apps/web/src/app/components/chip-navigation.test.tsx`, `sticky-bottom-nav.test.tsx`, `apps/mobile/components/chip-navigation.test.tsx`, and `playwright/tests/chip-navigation-bottom-nav.spec.ts`.
+
+Task owner map:
+
+- Story 3.6 Task 1 step 1 owner: implement sticky chip navigation with keyboard arrow traversal and telemetry in `apps/web/src/app/components/chip-navigation.tsx`
+- Story 3.6 Task 2 step 1 owner: implement mobile sticky bottom navigation bar with gold active indicator and safe-area insets in `apps/web/src/app/components/sticky-bottom-nav.tsx`
+- Story 3.6 Task 3 step 1 owner: implement mobile React Native chip navigation component with touch snap scrolling in `apps/mobile/components/chip-navigation.tsx`
+- Story 3.6 Task 5 step 1 owner: unit-test web chip navigation keyboard traversal, ARIA live updates, and telemetry error isolation in `apps/web/src/app/components/chip-navigation.test.tsx`
+- Story 3.6 Task 5 step 2 owner: unit-test web sticky bottom navigation mobile visibility and telemetry in `apps/web/src/app/components/sticky-bottom-nav.test.tsx`
+- Story 3.6 Task 5 step 3 owner: unit-test mobile React Native chip navigation pressables and selection state in `apps/mobile/components/chip-navigation.test.tsx`
+- Story 3.6 Task 6 step 1 owner: E2E test sticky bottom nav viewport visibility, chip keyboard navigation, and reduced motion in `playwright/tests/chip-navigation-bottom-nav.spec.ts`
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Page["apps/web/src/app/page.tsx"] --> PrismLayout["LookbookPrismLayout"]
+  PrismLayout --> StickyChips["ChipNavigation\n(Personal / Community / Sponsored)"]
+  PrismLayout --> BottomNav["StickyBottomNav\n(Mobile Viewport / Preview Fixed Anchor)"]
+  StickyChips --> FeedSync["Recommendation & Community Feed Sync"]
+  StickyChips --> PostHog["PostHog chip_changed"]
+  BottomNav --> PostHogNav["PostHog bottom_nav_clicked"]
 ```

@@ -1,0 +1,50 @@
+# Story 3.6: Mobile chip navigation and bottom navigation E2E verification
+appId: ${MAESTRO_APP_ID}
+name: 'Chip navigation & sticky bottom nav flow'
+tags:
+  - e2e
+  - navigation
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- openLink: ${APP_URL}
+
+# Dismiss Expo developer sheets if present
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu if it appears'
+
+# Verify chip selection is available on the mobile Home screen
+- assertVisible:
+    id: 'chip-personal'
+- assertVisible:
+    id: 'chip-community'
+- assertVisible:
+    id: 'chip-sponsored'
+
+- tapOn:
+    id: 'chip-community'
+
+- assertVisible:
+    id: 'chip-community'
+    selected: true
+
+- assertVisible:
+    id: 'tab-wardrobe'
+- assertVisible:
+    id: 'tab-community'
+- assertVisible:
+    id: 'tab-settings'
+
+- tapOn:
+    id: 'tab-community'
+- assertVisible:
+    id: 'community-screen'
+
+- takeScreenshot:
+    path: maestro/artifacts/chip-navigation-bottom-nav

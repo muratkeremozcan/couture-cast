@@ -36,9 +36,9 @@ vi.mock('@/src/lib/user', () => ({
 
 import i18n, { initI18n } from '../lib/i18n'
 import { getSavedSettings } from '../lib/settings-storage'
-import TabTwoScreen from '../../app/(tabs)/two'
+import SettingsScreen from '../../app/(tabs)/settings'
 
-describe('TabTwoScreen', () => {
+describe('SettingsScreen', () => {
   beforeAll(async () => {
     await initI18n()
   })
@@ -62,7 +62,7 @@ describe('TabTwoScreen', () => {
       status: 'ok',
     })
 
-    await render(<TabTwoScreen />)
+    await render(<SettingsScreen />)
 
     await screen.findByText('API health: ok')
   })
@@ -71,7 +71,7 @@ describe('TabTwoScreen', () => {
     vi.useFakeTimers()
     loadMobileApiHealthMock.mockImplementation(() => new Promise(() => undefined))
 
-    await render(<TabTwoScreen />)
+    await render(<SettingsScreen />)
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5_000)
@@ -81,7 +81,7 @@ describe('TabTwoScreen', () => {
   })
 
   it('persists, profiles, tracks, and renders a selected locale', async () => {
-    await render(<TabTwoScreen />)
+    await render(<SettingsScreen />)
 
     fireEvent.click(screen.getByTestId('locale-btn-tr-TR'))
 
@@ -111,7 +111,7 @@ describe('TabTwoScreen', () => {
       })
 
     try {
-      await render(<TabTwoScreen />)
+      await render(<SettingsScreen />)
 
       fireEvent.click(screen.getByTestId('locale-btn-tr-TR'))
 
@@ -144,7 +144,7 @@ describe('TabTwoScreen', () => {
         await i18n.changeLanguage(locale)
       })
 
-      const { container, unmount } = await render(<TabTwoScreen />)
+      const { container, unmount } = await render(<SettingsScreen />)
 
       const allElements = container.querySelectorAll('*')
       allElements.forEach((el) => {

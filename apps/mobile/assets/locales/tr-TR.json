@@ -1,7 +1,11 @@
 {
   "tabs": {
     "tab_one": "Ana Sayfa",
-    "tab_two": "Ayarlar"
+    "tab_two": "Ayarlar",
+    "home": "Ana Sayfa",
+    "wardrobe": "Gardırop",
+    "community": "Topluluk",
+    "settings": "Ayarlar"
   },
   "hero": {
     "scenarios": {

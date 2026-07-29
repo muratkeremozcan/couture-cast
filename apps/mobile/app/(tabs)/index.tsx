@@ -27,9 +27,22 @@ import { OutfitRecommendationCard } from '@/components/hero/outfit-recommendatio
 import { WeatherAlertBanner } from '@/components/hero/weather-alert-banner'
 import { parseGarmentId } from '@/components/hero/garment-item-tile'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
 type WidgetSize = 'small' | 'medium'
+
+const CHIP_SCENARIOS: Record<ChipCategory, ScenarioType> = {
+  Personal: 'morning',
+  Community: 'midday',
+  Sponsored: 'evening',
+}
+
+const SCENARIO_CHIPS: Record<ScenarioType, ChipCategory> = {
+  morning: 'Personal',
+  midday: 'Community',
+  evening: 'Sponsored',
+}
 
 const ritualRequestTimeoutMs = 15_000
 
@@ -74,6 +87,7 @@ export default function TabOneScreen() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeScenario, setActiveScenario] = useState<ScenarioType>('morning')
+  const [activeChipCategory, setActiveChipCategory] = useState<ChipCategory>('Personal')
   const [pendingWidgetSlot, setPendingWidgetSlot] = useState<WidgetSlot | null>(null)
   const [isStale, setIsStale] = useState(false)
   const [alertPreferences, setAlertPreferences] = useState<AlertPreferences | undefined>(
@@ -211,12 +225,15 @@ export default function TabOneScreen() {
       return
     }
 
-    setActiveScenario(resolveWidgetScenario(ritual, pendingWidgetSlot))
+    const scenario = resolveWidgetScenario(ritual, pendingWidgetSlot)
+    setActiveScenario(scenario)
+    setActiveChipCategory(SCENARIO_CHIPS[scenario])
     setPendingWidgetSlot(null)
   }, [ritual, pendingWidgetSlot])
 
   const handleScenarioChange = (scenario: ScenarioType) => {
     setActiveScenario(scenario)
+    setActiveChipCategory(SCENARIO_CHIPS[scenario])
     analytics.capture('hero_interaction', {
       interactionType: 'scenario_toggle',
       scenario,
@@ -283,6 +300,11 @@ export default function TabOneScreen() {
     void loadData(true)
   }
 
+  const handleChipCategoryChange = (category: ChipCategory) => {
+    setActiveChipCategory(category)
+    setActiveScenario(CHIP_SCENARIOS[category])
+  }
+
   // Determine swap category list
   const swapCategory = swappingGarmentId
     ? parseGarmentId(swappingGarmentId).category
@@ -294,8 +316,14 @@ export default function TabOneScreen() {
       <ScrollView
         style={[styles.container, { backgroundColor: palette.background }]}
         contentContainerStyle={styles.contentContainer}
+        stickyHeaderIndices={[0]}
         testID="hero-experience-scrollview"
       >
+        <MobileChipNavigation
+          activeCategory={activeChipCategory}
+          onCategoryChange={handleChipCategoryChange}
+        />
+
         {/* Stale Cache Banner */}
         {isStale && (
           <View style={styles.staleBanner} testID="stale-cache-banner">

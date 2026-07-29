@@ -1,7 +1,11 @@
 {
   "tabs": {
     "tab_one": "Scheda Uno",
-    "tab_two": "Impostazioni"
+    "tab_two": "Impostazioni",
+    "home": "Home",
+    "wardrobe": "Guardaroba",
+    "community": "Community",
+    "settings": "Impostazioni"
   },
   "hero": {
     "scenarios": {
