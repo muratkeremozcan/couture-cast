@@ -2,7 +2,6 @@
 'use client'
 
 import React, { useState } from 'react'
-import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import posthog from 'posthog-js'
@@ -49,7 +48,7 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
     }
   }
 
-  const navigation = (
+  return (
     <nav
       aria-label="Bottom Navigation"
       data-testid="sticky-bottom-nav"
@@ -100,10 +99,4 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
       </div>
     </nav>
   )
-
-  if (isMobilePreview) {
-    return navigation
-  }
-
-  return typeof document === 'undefined' ? null : createPortal(navigation, document.body)
 }

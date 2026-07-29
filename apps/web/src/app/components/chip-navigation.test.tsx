@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ChipNavigation } from './chip-navigation'
+import { CHIP_NAVIGATION_HEIGHT_PX, ChipNavigation } from './chip-navigation'
 import type { ChipCategory } from './chip-navigation'
 
 const posthogMocks = vi.hoisted(() => ({
@@ -56,6 +56,9 @@ describe('ChipNavigation Component (Story 3.6)', () => {
     const communityChip = screen.getByTestId('chip-community')
     const sponsoredChip = screen.getByTestId('chip-sponsored')
 
+    expect(screen.getByTestId('chip-navigation-bar')).toHaveStyle({
+      height: `${CHIP_NAVIGATION_HEIGHT_PX}px`,
+    })
     expect(personalChip).toHaveAttribute('aria-pressed', 'true')
     expect(communityChip).toHaveAttribute('aria-pressed', 'false')
     expect(sponsoredChip).toHaveAttribute('aria-pressed', 'false')

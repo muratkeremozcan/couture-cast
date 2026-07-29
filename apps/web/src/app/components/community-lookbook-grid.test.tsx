@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { CommunityLookbookGrid, LookbookFilterNav } from './community-lookbook-grid'
+import { CHIP_NAVIGATION_HEIGHT_PX } from './chip-navigation'
 import type { FilterCategory } from './community-lookbook-grid'
 
 const posthogMocks = vi.hoisted(() => ({
@@ -41,6 +42,9 @@ describe('CommunityLookbookGrid (3.5-UNIT-002)', () => {
     const newTab = screen.getByRole('button', { name: /new/i })
     const followingTab = screen.getByRole('button', { name: /following/i })
 
+    expect(screen.getByRole('navigation', { name: 'Lookbook Filters' })).toHaveStyle({
+      top: `${CHIP_NAVIGATION_HEIGHT_PX}px`,
+    })
     expect(newTab).toHaveAttribute('aria-pressed', 'true')
     expect(followingTab).toHaveAttribute('aria-pressed', 'false')
 

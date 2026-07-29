@@ -31,6 +31,10 @@ tags:
     id: 'chip-community'
 
 - assertVisible:
+    id: 'chip-community'
+    selected: true
+
+- assertVisible:
     id: 'tab-wardrobe'
 - assertVisible:
     id: 'tab-community'

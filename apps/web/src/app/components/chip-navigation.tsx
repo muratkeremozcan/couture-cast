@@ -6,6 +6,8 @@ import posthog from 'posthog-js'
 
 export type ChipCategory = 'Personal' | 'Community' | 'Sponsored'
 
+export const CHIP_NAVIGATION_HEIGHT_PX = 77
+
 const CHIP_CATEGORIES: ChipCategory[] = ['Personal', 'Community', 'Sponsored']
 
 export interface ChipNavigationProps {
@@ -82,6 +84,7 @@ export function ChipNavigation({
     <nav
       aria-label="Filter recommendations by category"
       data-testid="chip-navigation-bar"
+      style={{ height: CHIP_NAVIGATION_HEIGHT_PX }}
       className="sticky top-0 z-20 flex flex-col gap-2 border-b border-[#E6E6ED] bg-[#FFFFFF]/95 py-3 backdrop-blur"
     >
       <div

@@ -3,6 +3,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { Link, Tabs } from 'expo-router'
 import { Pressable, StyleSheet, useColorScheme, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useTranslation } from 'react-i18next'
 
 import Colors from '@/constants/colors'
 import { useClientOnlyValue } from '@/components/use-client-only-value'
@@ -32,7 +33,14 @@ export default function TabLayout() {
   const palette = colorScheme === 'dark' ? Colors.dark : Colors.light
   const insets = useSafeAreaInsets()
   const analytics = useMobileAnalytics()
+  const { t } = useTranslation()
   const inactiveTintColor = colorScheme === 'dark' ? '#B8B8C2' : '#5C5C66'
+  const tabLabels = {
+    home: t('tabs.home', { defaultValue: 'Home' }),
+    wardrobe: t('tabs.wardrobe', { defaultValue: 'Wardrobe' }),
+    community: t('tabs.community', { defaultValue: 'Community' }),
+    settings: t('tabs.settings', { defaultValue: 'Settings' }),
+  }
 
   const trackTabPress = (tabId: string, label: string, targetPath: string) => {
     try {
@@ -65,9 +73,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: tabLabels.home,
           tabBarButtonTestID: 'tab-home',
-          tabBarAccessibilityLabel: 'Home',
+          tabBarAccessibilityLabel: tabLabels.home,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <TabBarIcon name="home" color={color} focused={focused} tabId="home" />
           ),
@@ -87,15 +95,15 @@ export default function TabLayout() {
           ),
         }}
         listeners={{
-          tabPress: () => trackTabPress('home', 'Home', '/'),
+          tabPress: () => trackTabPress('home', tabLabels.home, '/'),
         }}
       />
       <Tabs.Screen
         name="wardrobe"
         options={{
-          title: 'Wardrobe',
+          title: tabLabels.wardrobe,
           tabBarButtonTestID: 'tab-wardrobe',
-          tabBarAccessibilityLabel: 'Wardrobe',
+          tabBarAccessibilityLabel: tabLabels.wardrobe,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <TabBarIcon
               name="shopping-bag"
@@ -106,35 +114,35 @@ export default function TabLayout() {
           ),
         }}
         listeners={{
-          tabPress: () => trackTabPress('wardrobe', 'Wardrobe', '/wardrobe'),
+          tabPress: () => trackTabPress('wardrobe', tabLabels.wardrobe, '/wardrobe'),
         }}
       />
       <Tabs.Screen
         name="community"
         options={{
-          title: 'Community',
+          title: tabLabels.community,
           tabBarButtonTestID: 'tab-community',
-          tabBarAccessibilityLabel: 'Community',
+          tabBarAccessibilityLabel: tabLabels.community,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <TabBarIcon name="users" color={color} focused={focused} tabId="community" />
           ),
         }}
         listeners={{
-          tabPress: () => trackTabPress('community', 'Community', '/community'),
+          tabPress: () => trackTabPress('community', tabLabels.community, '/community'),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
+          title: tabLabels.settings,
           tabBarButtonTestID: 'tab-settings',
-          tabBarAccessibilityLabel: 'Settings',
+          tabBarAccessibilityLabel: tabLabels.settings,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <TabBarIcon name="cog" color={color} focused={focused} tabId="settings" />
           ),
         }}
         listeners={{
-          tabPress: () => trackTabPress('settings', 'Settings', '/settings'),
+          tabPress: () => trackTabPress('settings', tabLabels.settings, '/settings'),
         }}
       />
       <Tabs.Screen

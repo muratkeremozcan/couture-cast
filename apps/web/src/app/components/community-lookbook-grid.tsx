@@ -3,6 +3,7 @@
 
 import Image from 'next/image'
 import posthog from 'posthog-js'
+import { CHIP_NAVIGATION_HEIGHT_PX } from './chip-navigation'
 import type { ChipCategory } from './chip-navigation'
 
 export type FilterCategory = 'New' | 'Following' | 'Near me' | 'Brands'
@@ -125,7 +126,8 @@ export function LookbookFilterNav({
   return (
     <nav
       aria-label="Lookbook Filters"
-      className="sticky top-[92px] z-10 flex flex-col gap-3 border-b border-[#E6E6ED] bg-[#FFFFFF]/95 py-3 backdrop-blur"
+      style={{ top: CHIP_NAVIGATION_HEIGHT_PX }}
+      className="sticky z-10 flex flex-col gap-3 border-b border-[#E6E6ED] bg-[#FFFFFF]/95 py-3 backdrop-blur"
     >
       <div className="flex items-center justify-between">
         <h2 className="lookbook-display text-2xl font-semibold text-[#111111]">
