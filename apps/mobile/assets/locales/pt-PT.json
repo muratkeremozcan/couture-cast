@@ -1,7 +1,11 @@
 {
   "tabs": {
     "tab_one": "Separador Um",
-    "tab_two": "Definições"
+    "tab_two": "Definições",
+    "home": "Início",
+    "wardrobe": "Guarda-roupa",
+    "community": "Comunidade",
+    "settings": "Definições"
   },
   "hero": {
     "scenarios": {

@@ -1,7 +1,11 @@
 {
   "tabs": {
     "tab_one": "Pestaña Uno",
-    "tab_two": "Configuración"
+    "tab_two": "Configuración",
+    "home": "Inicio",
+    "wardrobe": "Guardarropa",
+    "community": "Comunidad",
+    "settings": "Configuración"
   },
   "hero": {
     "scenarios": {

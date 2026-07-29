@@ -1,7 +1,11 @@
 {
   "tabs": {
     "tab_one": "Aba Um",
-    "tab_two": "Configurações"
+    "tab_two": "Configurações",
+    "home": "Início",
+    "wardrobe": "Guarda-roupa",
+    "community": "Comunidade",
+    "settings": "Configurações"
   },
   "hero": {
     "scenarios": {

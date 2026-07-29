@@ -1,7 +1,11 @@
 {
   "tabs": {
     "tab_one": "Onglet Un",
-    "tab_two": "Paramètres"
+    "tab_two": "Paramètres",
+    "home": "Accueil",
+    "wardrobe": "Garde-robe",
+    "community": "Communauté",
+    "settings": "Paramètres"
   },
   "hero": {
     "scenarios": {

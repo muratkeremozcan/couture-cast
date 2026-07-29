@@ -1,7 +1,11 @@
 {
   "tabs": {
     "tab_one": "Register Eins",
-    "tab_two": "Einstellungen"
+    "tab_two": "Einstellungen",
+    "home": "Startseite",
+    "wardrobe": "Garderobe",
+    "community": "Community",
+    "settings": "Einstellungen"
   },
   "hero": {
     "scenarios": {

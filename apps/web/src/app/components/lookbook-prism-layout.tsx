@@ -295,7 +295,7 @@ export function LookbookPrismLayout() {
         />
       </div>
 
-      <StickyBottomNav isMobilePreview={isMobilePreview} />
+      {isMobilePreview && <StickyBottomNav isMobilePreview />}
     </div>
   )
 }

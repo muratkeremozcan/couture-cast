@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { AnalyticsEventActions } from './components/analytics-event-actions'
 import { PostHogClickTracker } from './components/posthog-click-tracker'
 import { LookbookPrismLayout } from './components/lookbook-prism-layout'
+import { StickyBottomNav } from './components/sticky-bottom-nav'
 
 const navLinks = [
   { href: '#ritual', label: 'Daily ritual', testId: 'nav-ritual' },
@@ -49,6 +50,7 @@ export default function Home() {
         <div className="relative left-1/2 w-[100vw] max-w-[1440px] -translate-x-1/2">
           <LookbookPrismLayout />
         </div>
+        <StickyBottomNav />
 
         <section id="ritual" data-testid="hero-section" className="space-y-6">
           <p className="text-xs uppercase tracking-[0.4em] text-amber-300">

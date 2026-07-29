@@ -1,7 +1,11 @@
 {
   "tabs": {
     "tab_one": "Tab One",
-    "tab_two": "Tab Two"
+    "tab_two": "Tab Two",
+    "home": "Home",
+    "wardrobe": "Wardrobe",
+    "community": "Community",
+    "settings": "Settings"
   },
   "hero": {
     "scenarios": {
