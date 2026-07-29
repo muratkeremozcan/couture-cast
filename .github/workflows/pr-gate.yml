@@ -3,11 +3,14 @@
 # Uses the vendored pr-gate action (.github/actions/pr-gate, mode: watch),
 # replacing kachick/wait-other-jobs. Seconds per event instead of holding a
 # runner for the length of the slowest job.
+#
+# workflow_run is the only trigger on purpose. It always runs the default
+# branch's copy of this file and this action, so the checks: write token below
+# never executes code from the PR being gated. Six workflows here run on every
+# pull_request with no path filter, so the gate always gets an event to fire on.
 name: PR Gate
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   workflow_run:
     types: [completed]
     workflows: ['**'] # every workflow; an omitted list disables the trigger
@@ -15,7 +18,7 @@ on:
 # Serializes per commit so two events cannot race the same check run.
 # cancel-in-progress would drop a terminal verdict and leave the PR pending.
 concurrency:
-  group: pr-gate-${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
+  group: pr-gate-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: false
 
 jobs:
@@ -31,12 +34,12 @@ jobs:
       checks: write
       actions: read
     steps:
-      # The action runs with checks: write, so its code must come from the
-      # default branch, never from the PR being gated. On workflow_run,
-      # GITHUB_SHA already is the default-branch tip.
+      # On workflow_run, GITHUB_SHA is the default-branch tip, so the default
+      # checkout is the trusted copy. The action reads the PR's head SHA from
+      # the event payload rather than from the working tree.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'pull_request' && github.event.repository.default_branch || github.sha }}
+          persist-credentials: false
       - uses: ./.github/actions/pr-gate
         with:
           mode: watch
