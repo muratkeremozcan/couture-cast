@@ -832,6 +832,54 @@ describe('upsertCheckRun', () => {
       /422/
     );
   });
+
+  test('a lost create response does not produce a duplicate check run', async () => {
+    // The first POST may have created the run server-side while its response
+    // was lost. The retry must re-check ownership before POSTing again, and the
+    // lost POST already carried this verdict, so finding the run settles it.
+    let gets = 0;
+    let posts = 0;
+    global.fetch = async (url, init) => {
+      if (init.method === 'GET') {
+        gets += 1;
+        return res(200, { check_runs: gets === 1 ? [] : [ours(42)] });
+      }
+      posts += 1;
+      throw new Error('socket hang up');
+    };
+    const out = await gate.upsertCheckRun(ctx, { name: 'gate', status: 'completed', conclusion: 'success', title: 't', summary: 's' });
+
+    assert.strictEqual(posts, 1, 'the create was sent once and never blindly retried');
+    assert.strictEqual(out.id, 42);
+  });
+
+  test('the create is retried only while the follow-up lookup finds nothing', async () => {
+    let posts = 0;
+    global.fetch = async (url, init) => {
+      if (init.method === 'GET') return res(200, { check_runs: [] });
+      posts += 1;
+      throw new Error('socket hang up');
+    };
+    await assert.rejects(
+      () => gate.upsertCheckRun(ctx, { name: 'gate', status: 'in_progress', title: 't', summary: 's' }),
+      /network error/
+    );
+    assert.strictEqual(posts, ctx.retryLimit + 1, 'bounded by the same retry limit as any other call');
+  });
+});
+
+describe('parseIntOr', () => {
+  test('missing or non-numeric input falls back instead of producing NaN', () => {
+    assert.strictEqual(gate.parseIntOr('', 5), 5);
+    assert.strictEqual(gate.parseIntOr(undefined, 5), 5);
+    assert.strictEqual(gate.parseIntOr('abc', 5), 5);
+    assert.strictEqual(gate.parseIntOr('Infinity', 5), 5);
+  });
+
+  test('valid numbers pass through', () => {
+    assert.strictEqual(gate.parseIntOr('0', 5), 0);
+    assert.strictEqual(gate.parseIntOr('12', 5), 12);
+  });
 });
 
 describe('two-phase write: a stale verdict is invalidated before it is recomputed', () => {

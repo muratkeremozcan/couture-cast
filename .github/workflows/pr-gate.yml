@@ -31,7 +31,12 @@ jobs:
       checks: write
       actions: read
     steps:
+      # The action runs with checks: write, so its code must come from the
+      # default branch, never from the PR being gated. On workflow_run,
+      # GITHUB_SHA already is the default-branch tip.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.repository.default_branch || github.sha }}
       - uses: ./.github/actions/pr-gate
         with:
           mode: watch

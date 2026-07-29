@@ -2,8 +2,10 @@
 
 > Vendored 2026-07-29 from `seontechnologies/seon-gh-actions/pr-gate@d0bdf28`
 > (the event-driven `watch` mode branch). That repo is private, so this copy is
-> the source of truth here; the only local edits are the `user-agent` and
-> `external_id` strings in `main.js`. Re-copy from upstream when it changes.
+> the source of truth here. Local edits beyond the `user-agent` and
+> `external_id` strings: per-request timeout, integer-input fallback,
+> duplicate-create guard on retried check-run POSTs. These should be ported back
+> upstream, then this copy can return to byte-identity.
 
 Passes only if every other check run on the commit passed. This is the single
 required status check configured in the branch ruleset, so adding or renaming a

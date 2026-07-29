@@ -54,7 +54,7 @@ inputs:
     required: false
     default: 'gate'
   github-token:
-    description: 'Token used for the GraphQL query. Needs no more than read access to checks and actions.'
+    description: 'Token used for the GitHub API. Needs read access to checks and actions; watch mode also needs checks: write to publish the verdict.'
     required: false
     default: '${{ github.token }}'
   github-api-url:

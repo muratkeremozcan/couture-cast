@@ -11,6 +11,7 @@ _bmad
 .cursor
 .github/chatmodes
 .github/workflows
+.github/actions/pr-gate
 .vscode
 coverage
 dist

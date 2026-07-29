@@ -267,6 +267,11 @@ function verdictCheckRun(result, { name, totalWatched }) {
   };
 }
 
+// Bounds a single request. Without it a stalled connection parks until the job
+// timeout kills it, with no retry; the abort surfaces as a network error and is
+// retried like any other transient failure.
+const REQUEST_TIMEOUT_MS = 30_000;
+
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 const RETRYABLE_GRAPHQL_TYPES = new Set([
   'RATE_LIMITED',
@@ -409,6 +414,11 @@ const SUITE_RUNS_QUERY = /* GraphQL */ `
  * which is how GraphQL reports rate limiting. It shares this attempt counter on
  * purpose, so `api-retry-limit` bounds the total call count rather than being
  * spent twice over.
+ *
+ * `retryGuard` is for non-idempotent requests. It runs before each retry, and a
+ * non-null return settles the call without sending the request again. A create
+ * whose response was lost may have landed server-side, and blind retries would
+ * then duplicate it; the guard re-checks instead.
  */
 async function requestWithRetry({
   apiUrl,
@@ -419,8 +429,19 @@ async function requestWithRetry({
   retryLimit,
   baseDelayMs,
   retryBody,
+  retryGuard,
 }) {
   const endpoint = `${String(apiUrl || 'https://api.github.com').replace(/\/+$/, '')}${path}`;
+
+  // A failed guard must not eat the retry budget, so its errors read as "keep retrying".
+  const settledByGuard = async () => {
+    if (!retryGuard) return null;
+    try {
+      return (await retryGuard()) ?? null;
+    } catch {
+      return null;
+    }
+  };
 
   for (let attempt = 1; ; attempt += 1) {
     let res;
@@ -434,11 +455,14 @@ async function requestWithRetry({
           'user-agent': 'couture-cast/pr-gate',
         },
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (err) {
       if (attempt > retryLimit) {
         throw new Error(`network error contacting the GitHub API: ${err.message}`);
       }
+      const settled = await settledByGuard();
+      if (settled != null) return settled;
       const waitMs = backoffMs(attempt, baseDelayMs);
       warn(`Network error contacting the GitHub API (${err.message}), retrying in ${Math.round(waitMs / 1000)}s (${attempt}/${retryLimit})`);
       await sleep(waitMs);
@@ -448,6 +472,8 @@ async function requestWithRetry({
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       if (isRetryableStatus(res.status, res.headers) && attempt <= retryLimit) {
+        const settled = await settledByGuard();
+        if (settled != null) return settled;
         const waitMs = retryAfterMs(res.headers) ?? backoffMs(attempt, baseDelayMs);
         warn(`GitHub API returned ${res.status}, retrying in ${Math.round(waitMs / 1000)}s (${attempt}/${retryLimit})`);
         await sleep(waitMs);
@@ -459,6 +485,8 @@ async function requestWithRetry({
     const json = await res.json().catch(() => null);
     if (!json) {
       if (attempt <= retryLimit) {
+        const settled = await settledByGuard();
+        if (settled != null) return settled;
         const waitMs = backoffMs(attempt, baseDelayMs);
         warn(`GitHub API returned an unparseable body, retrying in ${Math.round(waitMs / 1000)}s (${attempt}/${retryLimit})`);
         await sleep(waitMs);
@@ -505,8 +533,8 @@ async function graphql({ apiUrl, token, query, variables, retryLimit, baseDelayM
 }
 
 /** REST counterpart, same retry rules. Used only by watch mode's check-run writes. */
-function rest({ apiUrl, token, retryLimit, baseDelayMs }, method, path, body) {
-  return requestWithRetry({ apiUrl, token, method, path, body, retryLimit, baseDelayMs });
+function rest({ apiUrl, token, retryLimit, baseDelayMs }, method, path, body, retryGuard) {
+  return requestWithRetry({ apiUrl, token, method, path, body, retryLimit, baseDelayMs, retryGuard });
 }
 
 async function fetchChecks(ctx) {
@@ -643,19 +671,37 @@ async function writeCheckRun(ctx, verdict, existing) {
     return { created: false, id: existing.id };
   }
 
-  const created = await rest(ctx, 'POST', `${base}/check-runs`, {
-    ...body,
-    name: verdict.name,
-    head_sha: ctx.sha,
-    external_id: externalIdFor(verdict.name),
-    started_at: new Date().toISOString(),
-  });
+  const created = await rest(
+    ctx,
+    'POST',
+    `${base}/check-runs`,
+    {
+      ...body,
+      name: verdict.name,
+      head_sha: ctx.sha,
+      external_id: externalIdFor(verdict.name),
+      started_at: new Date().toISOString(),
+    },
+    async () => findOwnedCheckRun(ctx, verdict.name)
+  );
   return { created: true, id: created?.id };
 }
 
 /** Kept as the simple composition, for callers that write once. */
 async function upsertCheckRun(ctx, verdict) {
   return writeCheckRun(ctx, verdict, await findOwnedCheckRun(ctx, verdict.name));
+}
+
+/**
+ * Missing or non-numeric input falls back instead of producing NaN, which
+ * comparisons silently swallow: `attempt > NaN` is always false, so a NaN
+ * retryLimit would retry forever and a NaN attemptLimits would never poll.
+ */
+function parseIntOr(raw, fallback) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (s === '') return fallback;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 /** Everything both modes need, read once from inputs and the environment. */
@@ -684,7 +730,7 @@ function buildOptions() {
     owner,
     repo,
     sha,
-    retryLimit: Math.max(0, Math.trunc(Number(getInput('api-retry-limit') || '5'))),
+    retryLimit: Math.max(0, Math.trunc(parseIntOr(getInput('api-retry-limit'), 5))),
     baseDelayMs: parseDurationSeconds(getInput('api-retry-base-delay'), 2) * 1000,
   };
 
@@ -695,7 +741,7 @@ function buildOptions() {
     retryMethod,
     warmupMs: parseDurationSeconds(getInput('warmup-delay'), 10) * 1000,
     minimumMs: parseDurationSeconds(getInput('minimum-interval'), 15) * 1000,
-    attemptLimits: Math.max(1, Math.trunc(Number(getInput('attempt-limits') || '180'))),
+    attemptLimits: Math.max(1, Math.trunc(parseIntOr(getInput('attempt-limits'), 180))),
     earlyExit: getBooleanInput('early-exit'),
     dryRun: getBooleanInput('dry-run'),
     skipOpts: {
@@ -900,6 +946,7 @@ module.exports = {
   backoffMs,
   retryAfterMs,
   pollIntervalMs,
+  parseIntOr,
   flattenCheckSuites,
   formatEntry,
   codeSpan,
