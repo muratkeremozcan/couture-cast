@@ -1,0 +1,43 @@
+# Story 3.7: Widget / Notification Deep Link Handling
+appId: ${MAESTRO_APP_ID}
+name: 'Widget & Notification Deep Link Handling'
+tags:
+  - e2e
+  - deep-link
+  - notification
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: false
+    stopApp: false
+
+- openLink: ${APP_URL}
+
+# Dismiss Expo developer sheets/menus if they appear
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu if it appears'
+- tapOn:
+    text: 'Open app'
+    optional: true
+    label: 'Dismiss Expo Go developer sheet if it appears'
+
+# Verify default state
+- assertVisible:
+    id: 'hero-experience-scrollview'
+
+# Test Severe Weather Notification Deep Link
+- openLink: '${APP_URL}?source=notification&type=severe_weather&alertId=alert-777'
+- assertVisible:
+    id: 'severe-weather-alert-focused'
+- takeScreenshot:
+    path: maestro/artifacts/deep-link-severe-weather
+
+# Test Invalid Deep Link Fallback & Info Banner
+- openLink: '${APP_URL}?source=invalid_src&slot=bad_slot'
+- assertVisible:
+    id: 'deep-link-info-banner'
+- takeScreenshot:
+    path: maestro/artifacts/deep-link-invalid-banner

@@ -98,6 +98,12 @@ const MOCK_LOOKBOOK_ITEMS: Record<FilterCategory, LookbookCardItem[]> = {
   ],
 }
 
+export function findLookbookFilterByCardId(cardId: string): FilterCategory | undefined {
+  return FILTER_TABS.find((filter) =>
+    MOCK_LOOKBOOK_ITEMS[filter].some((item) => item.id === cardId)
+  )
+}
+
 export interface LookbookFilterNavProps {
   activeTab: FilterCategory
   isMobilePreview: boolean
@@ -175,12 +181,14 @@ export interface CommunityLookbookGridProps {
   activeTab: FilterCategory
   isMobilePreview: boolean
   chipCategory?: ChipCategory
+  highlightedCardId?: string
 }
 
 export function CommunityLookbookGrid({
   activeTab,
   isMobilePreview,
   chipCategory = 'Personal',
+  highlightedCardId,
 }: CommunityLookbookGridProps) {
   const currentItems = MOCK_LOOKBOOK_ITEMS[activeTab]
 
@@ -193,65 +201,74 @@ export function CommunityLookbookGrid({
           isMobilePreview ? 'grid-cols-1' : 'grid-cols-1 min-[768px]:grid-cols-2'
         }`}
       >
-        {currentItems.map((item) => (
-          <article
-            key={item.id}
-            tabIndex={0}
-            className="flex flex-col overflow-hidden rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] shadow-sm motion-safe:transition-[border-color,box-shadow] motion-safe:duration-300 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
-          >
-            <div
-              role="img"
-              aria-label={`${item.title} editorial look`}
-              data-testid={`lookbook-image-${item.id}`}
-              className="relative flex h-64 w-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#E6E6ED] to-[#C9A14A]/40"
+        {currentItems.map((item) => {
+          const isHighlighted = item.id === highlightedCardId
+          return (
+            <article
+              key={item.id}
+              id={`lookbook-card-${item.id}`}
+              tabIndex={0}
+              data-highlighted={isHighlighted ? 'true' : 'false'}
+              className={`flex flex-col overflow-hidden rounded-[8px] border bg-[#F5F5F7] shadow-sm motion-safe:transition-[border-color,box-shadow] motion-safe:duration-300 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
+                isHighlighted
+                  ? 'border-[#C9A14A] outline outline-2 outline-[#111111] ring-2 ring-[#C9A14A] ring-offset-2 shadow-lg'
+                  : 'border-[#E6E6ED]'
+              }`}
             >
-              <span
-                aria-hidden="true"
-                className="lookbook-display text-4xl text-[#361F1F]/30"
+              <div
+                role="img"
+                aria-label={`${item.title} editorial look`}
+                data-testid={`lookbook-image-${item.id}`}
+                className="relative flex h-64 w-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#E6E6ED] to-[#C9A14A]/40"
               >
-                CC
-              </span>
-              <Image
-                src={item.imageUrl}
-                alt=""
-                fill
-                unoptimized
-                sizes="(min-width: 768px) 50vw, 100vw"
-                onError={(event) => {
-                  event.currentTarget.hidden = true
-                }}
-                className="object-cover motion-safe:transition-transform motion-safe:duration-300 motion-safe:hover:scale-[1.02] motion-reduce:transition-none"
-              />
-              <div className="absolute left-3 top-3 flex items-center gap-2">
-                <span className="lookbook-metrics rounded-md border border-[#E6E6ED] bg-[#FFFFFF]/95 px-2.5 py-1 text-[10px] uppercase text-[#111111]">
-                  {item.location}
+                <span
+                  aria-hidden="true"
+                  className="lookbook-display text-4xl text-[#361F1F]/30"
+                >
+                  CC
                 </span>
-                <span className="lookbook-metrics rounded-md bg-[#C9A14A] px-2.5 py-1 text-[10px] font-semibold uppercase text-[#111111]">
-                  {item.weatherTag}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-1 flex-col justify-between gap-3 p-6">
-              <div className="space-y-2">
-                <h3 className="lookbook-display text-lg font-semibold text-[#111111]">
-                  {item.title}
-                </h3>
-                <p className="text-xs leading-relaxed text-[#36363D]">
-                  {item.description}
-                </p>
-              </div>
-
-              <div className="lookbook-metrics flex items-center justify-between border-t border-[#E6E6ED] pt-3 text-xs text-[#5C5C66]">
-                <div className="flex items-center gap-4">
-                  <span>❤️ {item.saves} saves</span>
-                  <span>🔄 {item.imports} imports</span>
+                <Image
+                  src={item.imageUrl}
+                  alt=""
+                  fill
+                  unoptimized
+                  sizes="(min-width: 768px) 50vw, 100vw"
+                  onError={(event) => {
+                    event.currentTarget.hidden = true
+                  }}
+                  className="object-cover motion-safe:transition-transform motion-safe:duration-300 motion-safe:hover:scale-[1.02] motion-reduce:transition-none"
+                />
+                <div className="absolute left-3 top-3 flex items-center gap-2">
+                  <span className="lookbook-metrics rounded-md border border-[#E6E6ED] bg-[#FFFFFF]/95 px-2.5 py-1 text-[10px] uppercase text-[#111111]">
+                    {item.location}
+                  </span>
+                  <span className="lookbook-metrics rounded-md bg-[#C9A14A] px-2.5 py-1 text-[10px] font-semibold uppercase text-[#111111]">
+                    {item.weatherTag}
+                  </span>
                 </div>
-                <span className="text-[#8A691F]">👏 {item.applauds}</span>
               </div>
-            </div>
-          </article>
-        ))}
+
+              <div className="flex flex-1 flex-col justify-between gap-3 p-6">
+                <div className="space-y-2">
+                  <h3 className="lookbook-display text-lg font-semibold text-[#111111]">
+                    {item.title}
+                  </h3>
+                  <p className="text-xs leading-relaxed text-[#36363D]">
+                    {item.description}
+                  </p>
+                </div>
+
+                <div className="lookbook-metrics flex items-center justify-between border-t border-[#E6E6ED] pt-3 text-xs text-[#5C5C66]">
+                  <div className="flex items-center gap-4">
+                    <span>❤️ {item.saves} saves</span>
+                    <span>🔄 {item.imports} imports</span>
+                  </div>
+                  <span className="text-[#8A691F]">👏 {item.applauds}</span>
+                </div>
+              </div>
+            </article>
+          )
+        })}
       </div>
     </aside>
   )

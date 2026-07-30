@@ -4,7 +4,6 @@ import {
   authStorageInit,
   getStorageDir,
   getTokenFilePath,
-  saveStorageState,
   type AuthOptions,
   type AuthProvider,
   type PlaywrightStorageState,
@@ -150,7 +149,12 @@ function readCachedState(tokenPath: string) {
     return undefined
   }
 
-  const storageState = readStorageState(tokenPath)
+  let storageState: PlaywrightStorageState
+  try {
+    storageState = readStorageState(tokenPath)
+  } catch {
+    return undefined
+  }
   const authCookie = storageState.cookies.find(
     (cookie) => cookie.name === getAuthCookieName()
   )
@@ -161,6 +165,15 @@ function readCachedState(tokenPath: string) {
     authCookie.expires <= Math.floor(Date.now() / 1000) + 60
 
   return token && !cookieExpiresSoon && !isJwtExpired(token) ? storageState : undefined
+}
+
+function saveStorageStateAtomically(
+  tokenPath: string,
+  storageState: PlaywrightStorageState
+) {
+  const temporaryPath = `${tokenPath}.${process.pid}.${Date.now()}.tmp`
+  fs.writeFileSync(temporaryPath, JSON.stringify(storageState), 'utf8')
+  fs.renameSync(temporaryPath, tokenPath)
 }
 
 function authResult(storageState: PlaywrightStorageState) {
@@ -196,7 +209,7 @@ const coutureCastAuthProvider: AuthProvider = {
       userIdentifier,
     })
 
-    saveStorageState(tokenPath, storageState)
+    saveStorageStateAtomically(tokenPath, storageState)
     return authResult(storageState)
   },
 

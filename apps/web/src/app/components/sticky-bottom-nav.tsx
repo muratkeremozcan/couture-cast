@@ -2,7 +2,6 @@
 'use client'
 
 import React, { useState } from 'react'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import posthog from 'posthog-js'
 
@@ -61,7 +60,7 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
           const isActive = activeTab === tab.id
 
           return (
-            <Link
+            <a
               key={tab.id}
               href={tab.href}
               data-testid={`bottom-nav-${tab.id}`}
@@ -82,10 +81,10 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
               {isActive && (
                 <span
                   data-testid="gold-active-indicator"
-                  className="absolute bottom-0 h-1 w-full rounded-t-full bg-[#C9A14A]"
+                  className="absolute bottom-0 left-2 right-2 h-1 rounded-full bg-[#C9A14A]"
                 />
               )}
-            </Link>
+            </a>
           )
         })}
       </div>

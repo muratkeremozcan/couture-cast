@@ -147,7 +147,7 @@ describe('SettingsScreen', () => {
       const { container, unmount } = await render(<SettingsScreen />)
 
       const allElements = container.querySelectorAll('*')
-      allElements.forEach((el) => {
+      allElements.forEach((el: Element) => {
         if (el.children.length === 0 && el.textContent && el.textContent.trim()) {
           const scrollWidth = el.scrollWidth
           const clientWidth = el.clientWidth
