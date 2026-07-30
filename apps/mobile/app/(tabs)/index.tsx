@@ -99,7 +99,7 @@ export default function TabOneScreen() {
     undefined
   )
   const [isInvalidDeepLink, setIsInvalidDeepLink] = useState(false)
-  const invalidDeepLinkMessage = 'We refreshed your data after reconnecting'
+  const invalidDeepLinkMessage = 'This link is invalid, expired, or no longer available.'
   const [focusedWeatherAlert, setFocusedWeatherAlert] =
     useState<WeatherAlertDeepLinkTarget | null>(null)
 
@@ -210,25 +210,52 @@ export default function TabOneScreen() {
       return
     }
 
+    let active = true
     let routed = false
     void processMobileDeepLink({
       params: rawParams,
       locale: activeLocale,
-      analytics,
+      analytics: {
+        capture: (event, properties) => {
+          if (active) {
+            analytics.capture(event, properties)
+          }
+        },
+        screen: (...args) => analytics.screen(...args),
+        getDistinctId: () => analytics.getDistinctId(),
+      },
       setWidgetScenario: (scenario) => {
+        if (!active) {
+          return
+        }
         setPendingWidgetSlot(null)
         setActiveScenario(scenario)
         setActiveChipCategory(SCENARIO_CHIPS[scenario])
       },
-      setForecastSlot: setPendingWidgetSlot,
-      setFocusedWeatherAlert,
-      setIsInvalidDeepLink,
+      setForecastSlot: (forecastSlot) => {
+        if (active) {
+          setPendingWidgetSlot(forecastSlot)
+        }
+      },
+      setFocusedWeatherAlert: (alert) => {
+        if (active) {
+          setFocusedWeatherAlert(alert)
+        }
+      },
+      setIsInvalidDeepLink: (invalid) => {
+        if (active) {
+          setIsInvalidDeepLink(invalid)
+        }
+      },
       pushToCommunity: (communityParams) => {
+        if (!active) {
+          return
+        }
         routed = true
         router.push({ pathname: '/community', params: communityParams })
       },
     }).finally(() => {
-      if (!routed) {
+      if (active && !routed) {
         router.setParams({
           source: undefined,
           size: undefined,
@@ -240,6 +267,10 @@ export default function TabOneScreen() {
         })
       }
     })
+
+    return () => {
+      active = false
+    }
   }, [
     source,
     size,
@@ -258,19 +289,49 @@ export default function TabOneScreen() {
       return
     }
     requestAnimationFrame(() => {
-      scrollViewRef.current?.scrollTo({
-        y: Math.max(0, focusedAlertY.current - 16),
-        animated: true,
-      })
+      const focusAlert = () => {
+        if (Platform.OS === 'web') {
+          const webNode = focusedAlertRef.current as unknown as { focus?: () => void }
+          webNode?.focus?.()
+          return
+        }
+        const node = findNodeHandle(focusedAlertRef.current)
+        if (node) {
+          AccessibilityInfo.setAccessibilityFocus(node)
+        }
+      }
+      const scrollToAlert = (y: number) => {
+        scrollViewRef.current?.scrollTo({
+          y: Math.max(0, y - 16),
+          animated: true,
+        })
+        focusAlert()
+      }
+
       if (Platform.OS === 'web') {
-        const webNode = focusedAlertRef.current as unknown as { focus?: () => void }
-        webNode?.focus?.()
+        scrollToAlert(focusedAlertY.current)
         return
       }
-      const node = findNodeHandle(focusedAlertRef.current)
-      if (node) {
-        AccessibilityInfo.setAccessibilityFocus(node)
+
+      const focusedAlert = focusedAlertRef.current
+      const contentNode = scrollViewRef.current?.getInnerViewNode() as
+        | number
+        | NativeView
+        | null
+        | undefined
+      if (!focusedAlert || contentNode === undefined || contentNode === null) {
+        scrollToAlert(focusedAlertY.current)
+        return
       }
+
+      focusedAlert.measureLayout(
+        contentNode,
+        (_x, y) => {
+          focusedAlertY.current = y
+          scrollToAlert(y)
+        },
+        () => scrollToAlert(focusedAlertY.current)
+      )
     })
   }, [focusedWeatherAlert])
 

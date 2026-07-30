@@ -49,7 +49,7 @@ function invalidDeepLink(options: ApplyDeepLinkOptions, reason: string) {
   options.setFocusedWeatherAlert(null)
   options.setHighlightedCardId(undefined)
   options.setIsInvalidDeepLink(true)
-  options.setLiveAnnouncement('We refreshed your daily guidance.')
+  options.setLiveAnnouncement('This link is invalid, expired, or no longer available.')
   posthog.capture('deep_link_invalid', {
     rawUrl: typeof window !== 'undefined' ? window.location.href : '',
     reason,
@@ -61,6 +61,7 @@ function captureHandled(payload: DeepLinkPayload, resolvedAlertId?: string) {
   posthog.capture('deep_link_handled', {
     source: payload.source,
     slot: payload.slot,
+    ...(payload.size ? { widgetSize: payload.size } : {}),
     type: payload.type,
     alertId: resolvedAlertId ?? payload.alertId,
     cardId: payload.cardId,
@@ -125,6 +126,9 @@ export async function processWebDeepLink(options: ApplyDeepLinkOptions) {
     options.setChipCategory('Community')
     options.setActiveTab(filter)
     options.setHighlightedCardId(payload.cardId)
+  } else {
+    invalidDeepLink(options, 'Deep link target was not found')
+    return
   }
 
   captureHandled(payload)

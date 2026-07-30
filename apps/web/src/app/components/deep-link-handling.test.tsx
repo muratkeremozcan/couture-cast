@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
 import { http, HttpResponse } from 'msw'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -46,7 +46,7 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
   }
 
   it('3.7-UNIT-001: Hydrates Personal/Morning recommendation on widget tap deep-link', () => {
-    setLocationSearch('?source=widget&slot=am')
+    setLocationSearch('?source=widget&size=small&slot=am')
     render(<LookbookPrismLayout />)
 
     expect(screen.getByTestId('hero-recommendation-title')).toHaveTextContent(
@@ -55,6 +55,7 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
     expect(captureMock).toHaveBeenCalledWith('deep_link_handled', {
       source: 'widget',
       slot: 'am',
+      widgetSize: 'small',
       type: undefined,
       alertId: undefined,
       cardId: undefined,
@@ -111,9 +112,12 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
     setLocationSearch('?source=invalid_source&slot=bad_slot')
     render(<LookbookPrismLayout />)
 
-    expect(screen.getByTestId('deep-link-info-banner')).toBeInTheDocument()
+    const infoBanner = screen.getByTestId('deep-link-info-banner')
+    expect(infoBanner).toBeInTheDocument()
     expect(
-      screen.getByText('We refreshed your data after reconnecting')
+      within(infoBanner).getByText(
+        'This link is invalid, expired, or no longer available.'
+      )
     ).toBeInTheDocument()
     const expectedReason = expect.stringContaining('source') as unknown as string
     expect(captureMock).toHaveBeenCalledWith(
@@ -123,5 +127,20 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
         surface: 'web',
       })
     )
+  })
+
+  it('treats a valid payload without a supported target as invalid', () => {
+    setLocationSearch('?source=app')
+    render(<LookbookPrismLayout />)
+
+    expect(screen.getByTestId('deep-link-info-banner')).toBeInTheDocument()
+    expect(captureMock).toHaveBeenCalledWith(
+      'deep_link_invalid',
+      expect.objectContaining({
+        reason: 'Deep link target was not found',
+        surface: 'web',
+      })
+    )
+    expect(captureMock).not.toHaveBeenCalledWith('deep_link_handled', expect.anything())
   })
 })

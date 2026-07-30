@@ -9,7 +9,7 @@ tags:
 ---
 - launchApp:
     appId: ${MAESTRO_APP_ID}
-    clearState: false
+    clearState: true
     stopApp: false
 
 - openLink: ${APP_URL}

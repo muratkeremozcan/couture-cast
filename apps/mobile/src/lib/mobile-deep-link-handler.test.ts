@@ -33,6 +33,9 @@ function createMockOptions(
 const fakeWeatherAlert: WeatherAlertDeepLinkTarget = {
   id: 'alert-999',
   event: {
+    version: '1',
+    timestamp: '2026-07-30T12:00:00.000Z',
+    userId: 'test-user-id',
     data: {
       alertType: 'severe',
       location: 'Chicago',
@@ -184,6 +187,25 @@ describe('processMobileDeepLink', () => {
   })
 
   describe('severe weather notification deep links', () => {
+    it('does not resolve an alert for an unsupported target type', async () => {
+      const resolveWeatherAlert = vi.fn()
+      const { options, capture } = createMockOptions(
+        { source: 'app' },
+        { resolveWeatherAlert }
+      )
+
+      await processMobileDeepLink(options)
+
+      expect(resolveWeatherAlert).not.toHaveBeenCalled()
+      expect(capture).toHaveBeenCalledWith(
+        'deep_link_invalid',
+        expect.objectContaining({
+          reason: 'Weather alert notification type was not found',
+          surface: 'mobile',
+        })
+      )
+    })
+
     it('focuses weather alert when target resolves', async () => {
       const resolveWeatherAlert = vi.fn().mockResolvedValue(fakeWeatherAlert)
       const { options, capture } = createMockOptions(

@@ -71,10 +71,16 @@ function readStorageState(filePath: string): PlaywrightStorageState {
   const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as unknown
 
   if (!isStorageState(parsed)) {
-    throw new Error(`Auth-session storage state is invalid: ${filePath}`)
+    throw new InvalidStorageStateError(filePath)
   }
 
   return parsed
+}
+
+class InvalidStorageStateError extends Error {
+  constructor(filePath: string) {
+    super(`Auth-session storage state is invalid: ${filePath}`)
+  }
 }
 
 function getEnvironment(options: Partial<AuthOptions> = {}) {
@@ -152,8 +158,20 @@ function readCachedState(tokenPath: string) {
   let storageState: PlaywrightStorageState
   try {
     storageState = readStorageState(tokenPath)
-  } catch {
-    return undefined
+  } catch (error) {
+    const missingFile =
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    if (
+      missingFile ||
+      error instanceof SyntaxError ||
+      error instanceof InvalidStorageStateError
+    ) {
+      return undefined
+    }
+    throw error
   }
   const authCookie = storageState.cookies.find(
     (cookie) => cookie.name === getAuthCookieName()

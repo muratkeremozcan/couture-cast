@@ -58,7 +58,7 @@ export function LookbookPrismLayout() {
 
   // Deep Link & Notification States
   const [isInvalidDeepLink, setIsInvalidDeepLink] = useState(false)
-  const invalidDeepLinkMessage = 'We refreshed your data after reconnecting'
+  const invalidDeepLinkMessage = 'This link is invalid, expired, or no longer available.'
   const [focusedWeatherAlert, setFocusedWeatherAlert] =
     useState<WeatherAlertDeepLinkTarget | null>(null)
   const [highlightedCardId, setHighlightedCardId] = useState<string | undefined>(
@@ -109,9 +109,9 @@ export function LookbookPrismLayout() {
         setHighlightedCardId,
         setLiveAnnouncement,
         setIsInvalidDeepLink,
-      })
+      }).catch(() => setIsInvalidDeepLink(true))
     } catch {
-      // Deep link error fallback
+      setIsInvalidDeepLink(true)
     }
   }, [])
 

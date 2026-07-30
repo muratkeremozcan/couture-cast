@@ -44,6 +44,7 @@ export interface ProcessMobileDeepLinkOptions {
   setForecastSlot: (slot: 'now' | 'next') => void
   setFocusedWeatherAlert: (alert: WeatherAlertDeepLinkTarget | null) => void
   setIsInvalidDeepLink: (invalid: boolean) => void
+  resolveWeatherAlert?: typeof loadMobileWeatherAlertTarget
   pushToCommunity: (params: {
     source: 'notification'
     type: 'community'
@@ -93,19 +94,22 @@ async function handleWeatherDeepLink(
   options: ProcessMobileDeepLinkOptions,
   payload: DeepLinkPayload
 ) {
+  if (payload.type !== 'severe_weather' && payload.type !== 'weather_alert') {
+    invalidDeepLink(options, 'Weather alert notification type was not found')
+    return
+  }
+
   let alert: WeatherAlertDeepLinkTarget | undefined
   try {
-    alert = await loadMobileWeatherAlertTarget(payload.alertId)
+    alert = await (options.resolveWeatherAlert ?? loadMobileWeatherAlertTarget)(
+      payload.alertId
+    )
   } catch {
     invalidDeepLink(options, 'Weather alert target could not be loaded')
     return
   }
   if (!alert) {
     invalidDeepLink(options, 'Weather alert target was not found')
-    return
-  }
-  if (payload.type !== 'severe_weather' && payload.type !== 'weather_alert') {
-    invalidDeepLink(options, 'Weather alert notification type was not found')
     return
   }
   options.setFocusedWeatherAlert(alert)

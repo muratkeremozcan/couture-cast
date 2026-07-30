@@ -122,13 +122,15 @@ describe('Widget Deep Link Hydration', () => {
       ([event]) => event === 'hero_interaction'
     )
     expect(heroInteractionCalls).toEqual([['hero_interaction', expectedProperties]])
-    expect(mockSetParams).toHaveBeenCalledWith(
-      expect.objectContaining({
-        source: undefined,
-        size: undefined,
-        slot: undefined,
-      })
-    )
+    expect(mockSetParams).toHaveBeenCalledWith({
+      source: undefined,
+      size: undefined,
+      slot: undefined,
+      type: undefined,
+      alertId: undefined,
+      cardId: undefined,
+      expiresAt: undefined,
+    })
   })
 
   it('tracks a later widget link while the tab remains mounted', async () => {
