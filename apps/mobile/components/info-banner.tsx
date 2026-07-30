@@ -1,3 +1,4 @@
+// Story 3.7 Task 4 step 2 owner: implement mobile reusable info banner for invalid deep link notifications
 import React, { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 

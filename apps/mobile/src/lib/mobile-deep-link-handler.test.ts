@@ -1,3 +1,4 @@
+// Story 3.7 Task 5 step 3 owner: unit-test mobile deep-link handler orchestration logic across all branches
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import {
   processMobileDeepLink,

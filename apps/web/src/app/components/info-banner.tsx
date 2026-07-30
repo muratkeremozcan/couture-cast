@@ -1,5 +1,6 @@
 'use client'
 
+// Story 3.7 Task 4 step 1 owner: implement web reusable info banner for invalid deep link notifications
 import React, { useState } from 'react'
 
 export interface InfoBannerProps {

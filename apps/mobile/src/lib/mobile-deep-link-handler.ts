@@ -1,3 +1,4 @@
+// Story 3.7 Task 3 step 1 owner: implement mobile deep-link handler and Expo Router parameter processing
 import {
   resolveCommunityCardDeepLinkTarget,
   resolveWeatherAlertDeepLinkTarget,

@@ -1,3 +1,4 @@
+// Story 3.7 Task 1 step 1 owner: implement shared Zod deep-link parser, slot mapping, and expiry validation
 import { z } from 'zod'
 
 export const deepLinkSourceSchema = z.enum(['widget', 'notification', 'watch', 'app'])

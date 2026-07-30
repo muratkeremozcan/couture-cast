@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-07-29 - Step 25 captures the Lookbook Prism responsive layout, comparison mode, mobile preview, and community grid; Step 26 captures chip navigation (Personal/Community/Sponsored), sticky bottom nav on mobile, keyboard arrow traversal, safe-area insets, and cross-surface telemetry.
+Updated: 2026-07-30 - Step 25 captures the Lookbook Prism responsive layout, comparison mode, mobile preview, and community grid; Step 26 captures chip navigation (Personal/Community/Sponsored), sticky bottom nav on mobile, keyboard arrow traversal, safe-area insets, and cross-surface telemetry; Step 27 captures widget and notification deep-link handling, severe weather alert autoscroll, community card highlighting, invalid link info banners, and cross-surface telemetry.
 
 ## LLM collaborator prompt
 
@@ -2441,4 +2441,71 @@ flowchart TD
   StickyChips --> FeedSync["Recommendation & Community Feed Sync"]
   StickyChips --> PostHog["PostHog chip_changed"]
   BottomNav --> PostHogNav["PostHog bottom_nav_clicked"]
+```
+
+## Step 27 - Widget / notification deep-link handling
+
+User/business impact:
+
+Preserves user intent when launching Couture Cast from home-screen widgets, watch glanceables, severe weather alerts, or community pings. The business drives re-engagement, feature discovery, and retention by seamlessly hydrating hero recommendations, focusing weather alert banners, and highlighting target community lookbook cards across web and mobile surfaces without blank/error fallback states.
+
+Key takeaways:
+
+1. Shared Deep-Link Kernel: `packages/utils/src/deep-link.ts` exposes Zod schemas (`deepLinkSchema`), parser (`parseDeepLink`), and scenario resolver (`resolveDeepLinkScenario`) handling widget slots (`am`, `pm`, `evening`, `now`, `next`) and notification types (`severe_weather`, `community`).
+2. Web Deep-Link Hydration & Focus Management: `apps/web/src/app/lib/deep-link-handler.ts` parses query parameters on launch, hydrates hero recommendation cards, autoscrolls/focuses severe weather alerts, and highlights target community lookbook cards.
+3. Mobile Expo Router Handling: `apps/mobile/src/lib/mobile-deep-link-handler.ts` processes Expo Router search parameters, clears processed params via `router.setParams()`, focuses `WeatherAlertBanner`, and routes to `community.tsx` with card highlights.
+4. Resilient Fallbacks & Info Banners: Invalid or expired deep-link payloads gracefully fall back to default hero ritual view while rendering an accessible `<InfoBanner>` ("We refreshed your data after reconnecting") and firing PostHog `deep_link_invalid` telemetry.
+5. Cross-Surface Telemetry & ARIA Announcements: Fires `deep_link_handled` PostHog event on valid navigation and announces state transitions via ARIA live regions (`aria-live="polite"`, `role="status"`).
+
+Story/Task mapping:
+
+- Story 3.7
+- Task 1 (Shared Deep-Link Parsing & Validation Utility)
+- Task 2 (Web Deep-Link Hydration, Alert Focus & Community Card Highlighting)
+- Task 3 (Mobile Expo Router Deep-Link Hydration & Focus Management)
+- Task 4 (Invalid & Expired Info Banner Component)
+- Task 5 (Vitest & Component Unit Tests)
+- Task 6 (E2E Playwright & Maestro Automation)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/3-7-widget-notification-deep-link-handling.md`
+
+Cross-links:
+
+- Step 23 provides home/lock-screen widget configuration (`source=widget&size=small|medium&slot=now|next`).
+- Step 26 provides sticky chip navigation (`Personal`, `Community`, `Sponsored`) synchronized with deep-link scenario hydration.
+
+Sequence to follow:
+
+1. Read `packages/utils/src/deep-link.ts` to understand Zod deep link schemas, source/slot/type validation, parameter array normalization, expiry checks, and scenario resolution.
+2. Inspect `apps/web/src/app/lib/deep-link-handler.ts` and `apps/web/src/app/components/lookbook-prism-layout.tsx` for web search parameter parsing, alert autoscroll, and community card highlight borders.
+3. Inspect `apps/mobile/src/lib/mobile-deep-link-handler.ts`, `apps/mobile/app/(tabs)/index.tsx`, and `apps/mobile/app/(tabs)/community.tsx` for Expo Router deep-link processing and route handoffs.
+4. Read `apps/web/src/app/components/info-banner.tsx` and `apps/mobile/components/info-banner.tsx` for cross-platform invalid deep-link banner rendering.
+5. Review test suites in `packages/utils/src/deep-link.spec.ts`, `apps/web/src/app/components/deep-link-handling.test.tsx`, `apps/mobile/src/screens/deep-link-handling.test.tsx`, `apps/mobile/src/lib/mobile-deep-link-handler.test.ts`, and `playwright/tests/deep-link-handling.spec.ts`.
+
+Task owner map:
+
+- Story 3.7 Task 1 step 1 owner: implement shared Zod deep-link parser, slot mapping, and expiry validation in `packages/utils/src/deep-link.ts`
+- Story 3.7 Task 2 step 1 owner: implement web deep-link handler, alert autoscroll, and community card highlight in `apps/web/src/app/lib/deep-link-handler.ts`
+- Story 3.7 Task 3 step 1 owner: implement mobile deep-link handler and Expo Router parameter processing in `apps/mobile/src/lib/mobile-deep-link-handler.ts`
+- Story 3.7 Task 4 step 1 owner: implement web reusable info banner for invalid deep link notifications in `apps/web/src/app/components/info-banner.tsx`
+- Story 3.7 Task 4 step 2 owner: implement mobile reusable info banner for invalid deep link notifications in `apps/mobile/components/info-banner.tsx`
+- Story 3.7 Task 5 step 1 owner: unit-test web deep-link hydration, severe weather focus, and invalid banner in `apps/web/src/app/components/deep-link-handling.test.tsx`
+- Story 3.7 Task 5 step 2 owner: unit-test mobile deep-link hydration, severe weather alert focus, and community card highlight in `apps/mobile/src/screens/deep-link-handling.test.tsx`
+- Story 3.7 Task 5 step 3 owner: unit-test mobile deep-link handler orchestration logic across all branches in `apps/mobile/src/lib/mobile-deep-link-handler.test.ts`
+- Story 3.7 Task 6 step 1 owner: E2E Playwright test widget tap, severe weather alert focus, community lookbook highlight, and invalid deep link fallback in `playwright/tests/deep-link-handling.spec.ts`
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  URL["Deep Link URL\n(?source=widget|notification&slot=...|type=...)"] --> Parser["parseDeepLink\n(packages/utils/src/deep-link.ts)"]
+  Parser -->|Valid Widget| Hydrate["Hydrate Hero Canvas\n& Active Category Chip"]
+  Parser -->|Valid Weather Alert| FocusAlert["Focus WeatherAlertBanner\n& Autoscroll into View"]
+  Parser -->|Valid Community Ping| HighlightCard["Navigate to Community Grid\n& Highlight Target Card"]
+  Parser -->|Invalid / Expired| InfoBanner["Render InfoBanner\n& Capture deep_link_invalid"]
+  Hydrate --> Telemetry["Capture deep_link_handled"]
+  FocusAlert --> Telemetry
+  HighlightCard --> Telemetry
 ```

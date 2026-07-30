@@ -1,3 +1,4 @@
+// Story 3.7 Task 5 step 1 owner: unit-test web deep-link hydration, severe weather focus, and invalid banner
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
 import { http, HttpResponse } from 'msw'

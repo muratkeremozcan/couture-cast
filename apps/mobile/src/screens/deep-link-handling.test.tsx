@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/await-thenable */
+// Story 3.7 Task 5 step 2 owner: unit-test mobile deep-link hydration, severe weather alert focus, and community card highlight
 import React from 'react'
 import { screen, waitFor } from '@testing-library/react'
 import {

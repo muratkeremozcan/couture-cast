@@ -1,3 +1,4 @@
+// Story 3.7 Task 2 step 1 owner: implement web deep-link handler, alert autoscroll, and community card highlight
 import {
   resolveWeatherAlertDeepLinkTarget,
   type WeatherAlertDeepLinkTarget,
