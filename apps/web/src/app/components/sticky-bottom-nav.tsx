@@ -82,7 +82,7 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
               {isActive && (
                 <span
                   data-testid="gold-active-indicator"
-                  className="absolute bottom-0 h-1 w-full rounded-t-full bg-[#C9A14A]"
+                  className="absolute bottom-0 left-2 right-2 h-1 rounded-full bg-[#C9A14A]"
                 />
               )}
             </Link>

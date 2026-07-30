@@ -208,6 +208,10 @@ describe('AlertFanoutProcessor', () => {
       title: 'Critical weather alert for Chicago',
       body: 'A severe thunderstorm warning is active.',
       data: {
+        source: 'notification',
+        type: 'severe_weather',
+        alertId: 'event-1',
+        expiresAt: '2026-07-14T21:59:30.000Z',
         eventId: 'event-1',
         channel: 'alert:weather',
         alertType: 'severe',

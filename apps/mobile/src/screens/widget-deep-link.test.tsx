@@ -126,6 +126,10 @@ describe('Widget Deep Link Hydration', () => {
       source: undefined,
       size: undefined,
       slot: undefined,
+      type: undefined,
+      alertId: undefined,
+      cardId: undefined,
+      expiresAt: undefined,
     })
   })
 

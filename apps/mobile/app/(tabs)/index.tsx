@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Pressable, StyleSheet, ScrollView, Modal, Platform } from 'react-native'
+import {
+  AccessibilityInfo,
+  findNodeHandle,
+  Pressable,
+  StyleSheet,
+  ScrollView,
+  Modal,
+  Platform,
+  View as NativeView,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Text, View } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
@@ -16,10 +25,12 @@ import {
   type RitualResponse,
   type AlertPreferences,
 } from '@couture/api-client/contracts/http'
+import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
 import { trackMobileRitualCreated } from '@/src/analytics/track-events'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
-// Import components
+import { processMobileDeepLink } from '@/src/lib/mobile-deep-link-handler'
+import { InfoBanner } from '@/components/info-banner'
 import { WeatherHeader } from '@/components/hero/weather-header'
 import { HourlyForecastRibbon } from '@/components/hero/hourly-forecast-ribbon'
 import { ScenarioToggles } from '@/components/hero/scenario-toggles'
@@ -30,7 +41,6 @@ import { useHeroPalette } from '@/components/hero/hero-theme'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
-type WidgetSize = 'small' | 'medium'
 
 const CHIP_SCENARIOS: Record<ChipCategory, ScenarioType> = {
   Personal: 'morning',
@@ -45,14 +55,6 @@ const SCENARIO_CHIPS: Record<ScenarioType, ChipCategory> = {
 }
 
 const ritualRequestTimeoutMs = 15_000
-
-function isWidgetSlot(value: unknown): value is WidgetSlot {
-  return value === 'now' || value === 'next'
-}
-
-function isWidgetSize(value: unknown): value is WidgetSize {
-  return value === 'small' || value === 'medium'
-}
 
 const alternateGarments: Record<string, string[]> = {
   Outerwear: [
@@ -74,7 +76,7 @@ export default function TabOneScreen() {
   const router = useRouter()
   const { i18n, t } = useTranslation()
   const params = useLocalSearchParams()
-  const { source, size, slot } = params
+  const { source, size, slot, type, alertId, cardId, expiresAt } = params
   const analyticsUserId = analytics.getDistinctId() || 'mobile-anonymous-user'
   const activeLocale =
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
@@ -82,6 +84,9 @@ export default function TabOneScreen() {
   const palette = useHeroPalette()
   const latestLoadId = useRef(0)
   const hasTrackedTabView = useRef(false)
+  const scrollViewRef = useRef<ScrollView>(null)
+  const focusedAlertRef = useRef<NativeView>(null)
+  const focusedAlertY = useRef(0)
 
   const [ritual, setRitual] = useState<RitualResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -93,6 +98,10 @@ export default function TabOneScreen() {
   const [alertPreferences, setAlertPreferences] = useState<AlertPreferences | undefined>(
     undefined
   )
+  const [isInvalidDeepLink, setIsInvalidDeepLink] = useState(false)
+  const invalidDeepLinkMessage = 'This link is invalid, expired, or no longer available.'
+  const [focusedWeatherAlert, setFocusedWeatherAlert] =
+    useState<WeatherAlertDeepLinkTarget | null>(null)
 
   // Garment swap modal states
   const [isSwapModalVisible, setIsSwapModalVisible] = useState(false)
@@ -191,34 +200,140 @@ export default function TabOneScreen() {
     void loadData()
   }, [activeLocale, analyticsUserId])
 
-  // Story 3.3 Task 4 step 1 owner: validate each widget deep link before hydration or analytics.
   useEffect(() => {
-    if (source !== 'widget' && source !== 'watch') {
+    const rawParams = { source, size, slot, type, alertId, cardId, expiresAt }
+    if (
+      ![source, size, slot, type, alertId, cardId, expiresAt].some(
+        (value) => value !== undefined
+      )
+    ) {
       return
     }
 
-    const resolvedSlot = Array.isArray(slot) ? undefined : slot
-    if (source === 'watch' && isWidgetSlot(resolvedSlot)) {
-      setPendingWidgetSlot(resolvedSlot)
-      analytics.capture('hero_interaction', {
-        interactionType: 'watch_tap',
-        slot: resolvedSlot,
-        locale: activeLocale,
-      })
-    } else if (isWidgetSize(size) && isWidgetSlot(resolvedSlot)) {
-      setPendingWidgetSlot(resolvedSlot)
-      analytics.capture('hero_interaction', {
-        interactionType: 'widget_tap',
-        widgetSize: size,
-        slot: resolvedSlot,
-        locale: activeLocale,
-      })
-    }
+    let active = true
+    let routed = false
+    void processMobileDeepLink({
+      params: rawParams,
+      locale: activeLocale,
+      analytics: {
+        capture: (event, properties) => {
+          if (active) {
+            analytics.capture(event, properties)
+          }
+        },
+        screen: (...args) => analytics.screen(...args),
+        getDistinctId: () => analytics.getDistinctId(),
+      },
+      setWidgetScenario: (scenario) => {
+        if (!active) {
+          return
+        }
+        setPendingWidgetSlot(null)
+        setActiveScenario(scenario)
+        setActiveChipCategory(SCENARIO_CHIPS[scenario])
+      },
+      setForecastSlot: (forecastSlot) => {
+        if (active) {
+          setPendingWidgetSlot(forecastSlot)
+        }
+      },
+      setFocusedWeatherAlert: (alert) => {
+        if (active) {
+          setFocusedWeatherAlert(alert)
+        }
+      },
+      setIsInvalidDeepLink: (invalid) => {
+        if (active) {
+          setIsInvalidDeepLink(invalid)
+        }
+      },
+      pushToCommunity: (communityParams) => {
+        if (!active) {
+          return
+        }
+        routed = true
+        router.push({ pathname: '/community', params: communityParams })
+      },
+    }).finally(() => {
+      if (active && !routed) {
+        router.setParams({
+          source: undefined,
+          size: undefined,
+          slot: undefined,
+          type: undefined,
+          alertId: undefined,
+          cardId: undefined,
+          expiresAt: undefined,
+        })
+      }
+    })
 
-    // Consuming the parameters lets the same widget URL trigger again while this tab
-    // stays mounted.
-    router.setParams({ source: undefined, size: undefined, slot: undefined })
-  }, [source, size, slot, activeLocale, analytics, router])
+    return () => {
+      active = false
+    }
+  }, [
+    source,
+    size,
+    slot,
+    type,
+    alertId,
+    cardId,
+    expiresAt,
+    activeLocale,
+    analytics,
+    router,
+  ])
+
+  useEffect(() => {
+    if (!focusedWeatherAlert) {
+      return
+    }
+    requestAnimationFrame(() => {
+      const focusAlert = () => {
+        if (Platform.OS === 'web') {
+          const webNode = focusedAlertRef.current as unknown as { focus?: () => void }
+          webNode?.focus?.()
+          return
+        }
+        const node = findNodeHandle(focusedAlertRef.current)
+        if (node) {
+          AccessibilityInfo.setAccessibilityFocus(node)
+        }
+      }
+      const scrollToAlert = (y: number) => {
+        scrollViewRef.current?.scrollTo({
+          y: Math.max(0, y - 16),
+          animated: true,
+        })
+        focusAlert()
+      }
+
+      if (Platform.OS === 'web') {
+        scrollToAlert(focusedAlertY.current)
+        return
+      }
+
+      const focusedAlert = focusedAlertRef.current
+      const contentNode = scrollViewRef.current?.getInnerViewNode() as
+        | number
+        | NativeView
+        | null
+        | undefined
+      if (!focusedAlert || contentNode === undefined || contentNode === null) {
+        scrollToAlert(focusedAlertY.current)
+        return
+      }
+
+      focusedAlert.measureLayout(
+        contentNode,
+        (_x, y) => {
+          focusedAlertY.current = y
+          scrollToAlert(y)
+        },
+        () => scrollToAlert(focusedAlertY.current)
+      )
+    })
+  }, [focusedWeatherAlert])
 
   useEffect(() => {
     if (!ritual || !pendingWidgetSlot) {
@@ -314,6 +429,7 @@ export default function TabOneScreen() {
   return (
     <SafeAreaView style={[styles.safeContainer, { backgroundColor: palette.background }]}>
       <ScrollView
+        ref={scrollViewRef}
         style={[styles.container, { backgroundColor: palette.background }]}
         contentContainerStyle={styles.contentContainer}
         stickyHeaderIndices={[0]}
@@ -323,6 +439,38 @@ export default function TabOneScreen() {
           activeCategory={activeChipCategory}
           onCategoryChange={handleChipCategoryChange}
         />
+
+        {isInvalidDeepLink && (
+          <InfoBanner
+            message={invalidDeepLinkMessage}
+            onDismiss={() => setIsInvalidDeepLink(false)}
+          />
+        )}
+
+        {focusedWeatherAlert && (
+          <NativeView
+            ref={focusedAlertRef}
+            onLayout={(event) => {
+              focusedAlertY.current = event.nativeEvent.layout.y
+            }}
+            testID="severe-weather-alert-focused"
+            accessibilityLiveRegion="polite"
+            accessibilityRole="alert"
+            focusable
+            style={styles.focusedAlertCard}
+          >
+            <Text style={styles.focusedAlertBadge}>
+              ⚠️ {focusedWeatherAlert.event.data.severity} weather alert
+              {` (#${focusedWeatherAlert.id})`}
+            </Text>
+            <Text style={styles.focusedAlertTitle}>
+              {focusedWeatherAlert.event.data.location}
+            </Text>
+            <Text style={styles.focusedAlertText}>
+              {focusedWeatherAlert.event.data.message}
+            </Text>
+          </NativeView>
+        )}
 
         {/* Stale Cache Banner */}
         {isStale && (
@@ -582,5 +730,34 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  focusedAlertCard: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#361F1F',
+    borderWidth: 2,
+    borderColor: '#C9A14A',
+  },
+  focusedAlertBadge: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  focusedAlertTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  focusedAlertText: {
+    fontSize: 13,
+    color: '#E6E6ED',
   },
 })

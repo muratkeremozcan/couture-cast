@@ -39,14 +39,14 @@ describe('MobileChipNavigation Component (Story 3.6 - 3.6-UNIT-009)', () => {
     expect(personalChip).toBeDefined()
     expect(communityChip).toBeDefined()
     expect(sponsoredChip).toBeDefined()
-    expect(personalChip).toHaveAttribute('aria-selected', 'true')
-    expect(communityChip).toHaveAttribute('aria-selected', 'false')
+    expect(personalChip.getAttribute('aria-selected')).toBe('true')
+    expect(communityChip.getAttribute('aria-selected')).toBe('false')
 
     fireEvent.click(communityChip)
 
-    expect(personalChip).toHaveAttribute('aria-selected', 'false')
-    expect(communityChip).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByTestId('mobile-chip-status')).toHaveTextContent(
+    expect(personalChip.getAttribute('aria-selected')).toBe('false')
+    expect(communityChip.getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByTestId('mobile-chip-status').textContent).toContain(
       'Showing Community recommendations'
     )
     expect(analyticsMocks.capture).toHaveBeenCalledWith('chip_changed', {

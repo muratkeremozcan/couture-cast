@@ -67,12 +67,20 @@ function buildPushMessages(
   payload: AlertWeatherEvent,
   tokens: string[]
 ): ExpoPushMessage[] {
+  const expiresAt = new Date(
+    Date.parse(payload.timestamp) + 24 * 60 * 60 * 1000
+  ).toISOString()
+
   return tokens.map((token) => ({
     to: token,
     sound: 'default',
     title: pushTitle(payload),
     body: payload.data.message,
     data: {
+      source: 'notification',
+      type: 'severe_weather',
+      alertId: eventId,
+      expiresAt,
       eventId,
       channel: 'alert:weather',
       alertType: payload.data.alertType,

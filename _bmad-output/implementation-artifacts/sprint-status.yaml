@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-07-29
+last_updated: 2026-07-30
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -76,7 +76,7 @@ development_status:
   3-4-watchos-glance: done
   3-5-lookbook-prism-responsive-layout: done
   3-6-chip-navigation-sticky-bottom-nav: done
-  3-7-widget-notification-deep-link-handling: backlog
+  3-7-widget-notification-deep-link-handling: done
   3-8-accessibility-hardening: backlog
 
   # Epic 4: Wardrobe Capture & Closet Tools (Phase 2)

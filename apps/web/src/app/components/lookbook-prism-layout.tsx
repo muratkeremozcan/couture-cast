@@ -2,7 +2,9 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
+import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
 import posthog from 'posthog-js'
+import { processWebDeepLink } from '../lib/deep-link-handler'
 import { LayoutControls } from './layout-controls'
 import { CommunityLookbookGrid, LookbookFilterNav } from './community-lookbook-grid'
 import type { FilterCategory } from './community-lookbook-grid'
@@ -10,6 +12,7 @@ import { PlannerRail } from './planner-rail'
 import { ChipNavigation } from './chip-navigation'
 import type { ChipCategory } from './chip-navigation'
 import { StickyBottomNav } from './sticky-bottom-nav'
+import { InfoBanner } from './info-banner'
 
 const CHIP_DEFAULT_FILTER: Record<ChipCategory, FilterCategory> = {
   Personal: 'New',
@@ -46,11 +49,23 @@ const HERO_RECOMMENDATIONS: Record<
 
 export function LookbookPrismLayout() {
   const containerRef = useRef<HTMLDivElement>(null)
+  const alertRef = useRef<HTMLDivElement>(null)
   const [isComparisonMode, setIsComparisonMode] = useState(false)
   const [isMobilePreview, setIsMobilePreview] = useState(false)
   const [isPlannerRailOpen, setIsPlannerRailOpen] = useState(true)
   const [activeTab, setActiveTab] = useState<FilterCategory>('New')
   const [chipCategory, setChipCategory] = useState<ChipCategory>('Personal')
+
+  // Deep Link & Notification States
+  const [isInvalidDeepLink, setIsInvalidDeepLink] = useState(false)
+  const invalidDeepLinkMessage = 'This link is invalid, expired, or no longer available.'
+  const [focusedWeatherAlert, setFocusedWeatherAlert] =
+    useState<WeatherAlertDeepLinkTarget | null>(null)
+  const [highlightedCardId, setHighlightedCardId] = useState<string | undefined>(
+    undefined
+  )
+  const [liveAnnouncement, setLiveAnnouncement] = useState<string | null>(null)
+
   const heroRecommendation = HERO_RECOMMENDATIONS[chipCategory]
 
   const handleChipCategoryChange = (category: ChipCategory) => {
@@ -67,6 +82,59 @@ export function LookbookPrismLayout() {
       })
     }
   }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const searchParams = new URLSearchParams(window.location.search)
+      const rawParams: Record<string, string> = {}
+      searchParams.forEach((value, key) => {
+        rawParams[key] = value
+      })
+
+      const now = new Date()
+      void processWebDeepLink({
+        rawParams,
+        scenarioContext: {
+          now,
+          nextForecastAt: new Date(
+            Math.ceil(now.getTime() / (60 * 60 * 1000)) * 60 * 60 * 1000
+          ),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        },
+        setChipCategory,
+        setActiveTab,
+        setFocusedWeatherAlert,
+        setHighlightedCardId,
+        setLiveAnnouncement,
+        setIsInvalidDeepLink,
+      }).catch(() => setIsInvalidDeepLink(true))
+    } catch {
+      setIsInvalidDeepLink(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!focusedWeatherAlert) {
+      return
+    }
+    requestAnimationFrame(() => {
+      alertRef.current?.scrollIntoView?.({ block: 'center' })
+      alertRef.current?.focus()
+    })
+  }, [focusedWeatherAlert])
+
+  useEffect(() => {
+    if (!highlightedCardId) {
+      return
+    }
+    requestAnimationFrame(() => {
+      const card = document.getElementById(`lookbook-card-${highlightedCardId}`)
+      card?.scrollIntoView?.({ block: 'center' })
+      card?.focus()
+    })
+  }, [activeTab, highlightedCardId])
 
   useEffect(() => {
     try {
@@ -110,6 +178,62 @@ export function LookbookPrismLayout() {
           </h2>
         </div>
       </div>
+
+      {isInvalidDeepLink && (
+        <InfoBanner
+          message={invalidDeepLinkMessage}
+          onDismiss={() => setIsInvalidDeepLink(false)}
+        />
+      )}
+
+      {focusedWeatherAlert && (
+        <div
+          ref={alertRef}
+          role="region"
+          aria-label="Severe Weather Alert Details"
+          data-testid="severe-weather-alert-focused"
+          tabIndex={0}
+          className="my-4 rounded-xl border border-[#B91C1C] bg-[#361F1F] p-5 text-[#FFFFFF] ring-2 ring-[#C9A14A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#FFFFFF]"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#F87171]">
+              ⚠️ {focusedWeatherAlert.event.data.severity} weather alert
+              {` (#${focusedWeatherAlert.id})`}
+            </span>
+            <span className="text-xs text-[#E6E6ED]">
+              {focusedWeatherAlert.event.data.location}
+            </span>
+          </div>
+          <h3 className="mt-2 text-lg font-semibold">
+            {focusedWeatherAlert.event.data.alertType.replace('_', ' ')} advisory
+          </h3>
+          <p className="mt-1 text-sm text-[#E6E6ED]">
+            {focusedWeatherAlert.event.data.message}
+          </p>
+          <div className="mt-4 flex gap-3">
+            <button
+              type="button"
+              onClick={() => handleChipCategoryChange('Personal')}
+              className="rounded-lg bg-[#C9A14A] px-4 py-2 text-xs font-semibold text-[#111111] hover:bg-[#b58e3c]"
+            >
+              Adjust outfit
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPlannerRailOpen(true)}
+              className="rounded-lg border border-[#E6E6ED] bg-transparent px-4 py-2 text-xs font-semibold text-white hover:bg-white/10"
+            >
+              Plan week
+            </button>
+          </div>
+        </div>
+      )}
+
+      {liveAnnouncement && (
+        <div aria-live="polite" role="status" className="sr-only">
+          {liveAnnouncement}
+        </div>
+      )}
 
       <ChipNavigation
         activeCategory={chipCategory}
@@ -265,6 +389,7 @@ export function LookbookPrismLayout() {
             activeTab={activeTab}
             isMobilePreview={isMobilePreview}
             chipCategory={chipCategory}
+            highlightedCardId={highlightedCardId}
           />
         </section>
 

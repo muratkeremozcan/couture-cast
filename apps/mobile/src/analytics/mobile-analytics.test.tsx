@@ -102,7 +102,7 @@ describe('mobile analytics facade', () => {
 
   it('provides the PostHog client through the repo-local provider wrapper', async () => {
     await renderHook(() => null, {
-      wrapper: ({ children }) => (
+      wrapper: ({ children }: { children: React.ReactNode }) => (
         <MobileAnalyticsProvider>{children}</MobileAnalyticsProvider>
       ),
     })
