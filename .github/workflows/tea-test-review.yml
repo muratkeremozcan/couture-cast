@@ -1,0 +1,31 @@
+name: TEA Test Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Deny-all baseline for GITHUB_TOKEN. Not the same as omitting the key, which
+# falls back to the repository default; each job opts back in below.
+permissions: {}
+
+jobs:
+  review:
+    name: test review
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Forks receive no secrets, so the review cannot run for them.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      pull-requests: write # for the review comment
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the review diffs changed test files against the base ref
+          persist-credentials: false
+
+      - uses: muratkeremozcan/tea-test-review@main
+        with:
+          agent: codex
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
