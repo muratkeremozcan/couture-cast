@@ -40,3 +40,4 @@ jobs:
       - uses: muratkeremozcan/pr-gate@main
         with:
           mode: watch
+          publish: status
