@@ -3,7 +3,12 @@ import { TeenDashboardView } from './teen-dashboard-view'
 
 export default function TeenDashboardPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-neutral-950 via-black to-neutral-900 px-6 py-16 text-white">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      data-focus-surface="dark"
+      className="min-h-screen bg-gradient-to-b from-neutral-950 via-black to-neutral-900 px-6 py-16 text-white outline-none"
+    >
       <div className="mx-auto max-w-4xl space-y-8">
         <Link
           href="/"

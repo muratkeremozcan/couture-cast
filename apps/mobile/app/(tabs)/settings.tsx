@@ -21,6 +21,7 @@ import {
 import { loadMobileApiHealth } from '@/src/lib/api-health'
 import { getSavedSettings, saveSettings } from '@/src/lib/settings-storage'
 import { updatePreferredLocaleFromMobile } from '@/src/lib/user'
+import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 
 const API_HEALTH_TIMEOUT_MS = 5_000
 
@@ -39,6 +40,7 @@ const availableLocales = [
 
 export default function SettingsScreen() {
   const analytics = useMobileAnalytics()
+  const { announce } = useAccessibilityAnnouncer()
   const { t, i18n } = useTranslation()
   const [apiHealthMessage, setApiHealthMessage] = useState('Checking API health...')
   const [currentLocale, setCurrentLocale] = useState<SupportedLocale>(
@@ -48,6 +50,12 @@ export default function SettingsScreen() {
   const [isChangingLocale, setIsChangingLocale] = useState(false)
   const [localeError, setLocaleError] = useState<string | null>(null)
   const localeChangeInFlight = useRef(false)
+
+  useEffect(() => {
+    if (localeError) {
+      announce('error', localeError)
+    }
+  }, [announce, localeError])
 
   useEffect(() => {
     analytics.capture('tab_two_viewed')
@@ -225,7 +233,7 @@ export default function SettingsScreen() {
                     testID={`locale-btn-${locale.code}`}
                     accessibilityRole="button"
                     accessibilityState={{
-                      disabled: isChangingLocale,
+                      disabled: isChangingLocale || isSelected,
                       selected: isSelected,
                     }}
                   >
@@ -243,7 +251,11 @@ export default function SettingsScreen() {
           </View>
 
           {localeError ? (
-            <Text style={styles.errorText} accessibilityRole="alert">
+            <Text
+              style={styles.errorText}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
+            >
               {localeError}
             </Text>
           ) : null}
@@ -255,7 +267,14 @@ export default function SettingsScreen() {
             })}
           </Text>
           {isMobileAnalyticsDiagnosticsEnabled ? (
-            <Pressable style={styles.actionButton} onPress={recordDiagnosticAlert}>
+            <Pressable
+              style={styles.actionButton}
+              onPress={recordDiagnosticAlert}
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.diagnostic_alert_btn', {
+                defaultValue: 'Record weather alert analytics',
+              })}
+            >
               <Text style={styles.actionText}>
                 {t('settings.diagnostic_alert_btn', {
                   defaultValue: 'Record weather alert analytics',
@@ -307,6 +326,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   localeButton: {
+    minHeight: 44,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderWidth: 1,
@@ -320,10 +340,10 @@ const styles = StyleSheet.create({
   },
   localeText: {
     fontSize: 13,
-    color: '#888888',
+    color: '#5C5C66',
   },
   selectedLocaleText: {
-    color: '#C9A14A',
+    color: '#8A691F',
     fontWeight: 'bold',
   },
   errorText: {
@@ -342,6 +362,7 @@ const styles = StyleSheet.create({
     maxWidth: '80%',
   },
   actionButton: {
+    minHeight: 44,
     marginTop: 16,
     borderWidth: 1,
     borderColor: '#a3a3a3',

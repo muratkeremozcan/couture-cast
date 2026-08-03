@@ -1,29 +1,51 @@
-import React from 'react'
+import React, { useEffect, useMemo } from 'react'
 import { StyleSheet } from 'react-native'
 import { Text, View } from '@/components/themed'
 import type { WeatherAlert } from '@couture/api-client/contracts/http'
+import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 
 type WeatherAlertBannerProps = {
   alerts?: WeatherAlert[]
 }
 
 export function WeatherAlertBanner({ alerts }: WeatherAlertBannerProps) {
-  if (!alerts || alerts.length === 0) {
-    return null
-  }
+  const { announce } = useAccessibilityAnnouncer()
+  const alertKey = alerts
+    ?.map((a) => `${a.event}:${a.severity}:${a.description}:${a.start}:${a.end}`)
+    .join('|')
 
-  const severityRank = { high: 3, medium: 2, low: 1 }
-  const activeAlert = [...alerts].sort(
-    (left, right) =>
-      (severityRank[right.severity ?? 'low'] ?? 0) -
-      (severityRank[left.severity ?? 'low'] ?? 0)
-  )[0]
+  const severityRank: Record<string, number> = { high: 3, medium: 2, low: 1 }
+  const activeAlert = useMemo(
+    () =>
+      [...(alerts ?? [])].sort(
+        (left, right) =>
+          (severityRank[right.severity ?? 'low'] ?? 0) -
+          (severityRank[left.severity ?? 'low'] ?? 0)
+      )[0],
+    [alertKey]
+  )
+
+  useEffect(() => {
+    if (activeAlert) {
+      announce('alert', `${activeAlert.event}: ${activeAlert.description}`)
+    }
+  }, [activeAlert, announce])
+
   if (!activeAlert) return null
 
   return (
-    <View style={styles.bannerContainer} testID="weather-alert-banner">
+    <View
+      style={styles.bannerContainer}
+      testID="weather-alert-banner"
+      accessible
+      accessibilityRole="alert"
+      accessibilityLiveRegion="assertive"
+      accessibilityLabel={`${activeAlert.event}: ${activeAlert.description}`}
+    >
       <View style={styles.content}>
-        <Text style={styles.alertEmoji}>⚠️</Text>
+        <Text style={styles.alertEmoji} accessible={false} aria-hidden>
+          ⚠️
+        </Text>
         <View style={styles.textContainer}>
           <Text style={styles.eventText}>{activeAlert.event}</Text>
           <Text style={styles.descriptionText} numberOfLines={2}>

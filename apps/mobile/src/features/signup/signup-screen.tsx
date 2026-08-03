@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, TextInput } from 'react-native'
 import type {
   GuardianInvitationInput,
@@ -15,6 +15,7 @@ import {
 import { Text, View } from '@/components/themed'
 import { inviteGuardianFromMobile } from '@/src/lib/guardian'
 import { submitMobileSignup } from '@/src/lib/signup'
+import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 
 type SignupScreenProps = {
   submitSignup?: (input: SignupInput) => Promise<SignupResponse>
@@ -25,6 +26,7 @@ export function SignupScreen({
   submitSignup = submitMobileSignup,
   inviteGuardian = inviteGuardianFromMobile,
 }: SignupScreenProps) {
+  const { announce } = useAccessibilityAnnouncer()
   const [email, setEmail] = useState('')
   const [birthdate, setBirthdate] = useState('')
   const [guardianEmail, setGuardianEmail] = useState('')
@@ -39,6 +41,16 @@ export function SignupScreen({
 
   const birthdateEvaluation = evaluateBirthdateInput(birthdate)
   const inlineMessage = birthdateEvaluation.message
+
+  useEffect(() => {
+    if (errorMessage) {
+      announce('error', errorMessage)
+    } else if (successMessage) {
+      announce('feedback', successMessage)
+    } else if (inlineMessage) {
+      announce('feedback', inlineMessage)
+    }
+  }, [announce, errorMessage, successMessage, inlineMessage])
 
   async function handleSubmit() {
     setErrorMessage(null)
@@ -121,7 +133,9 @@ export function SignupScreen({
   return (
     <View style={styles.container}>
       <Text style={styles.eyebrow}>COPPA-ready signup</Text>
-      <Text style={styles.title}>Create your account with age verification first.</Text>
+      <Text style={styles.title} accessibilityRole="header">
+        Create your account with age verification first.
+      </Text>
       <Text style={styles.description}>
         Ages 13 to 15 require guardian consent before wardrobe access is enabled.
       </Text>
@@ -149,19 +163,32 @@ export function SignupScreen({
         />
 
         {inlineMessage ? (
-          <Text testID="signup-inline-message" style={styles.inlineMessage}>
+          <Text
+            testID="signup-inline-message"
+            style={styles.inlineMessage}
+            accessibilityLiveRegion="polite"
+          >
             {inlineMessage}
           </Text>
         ) : null}
 
         {errorMessage ? (
-          <Text testID="signup-error-message" style={styles.errorMessage}>
+          <Text
+            testID="signup-error-message"
+            style={styles.errorMessage}
+            accessibilityRole="alert"
+            accessibilityLiveRegion="assertive"
+          >
             {errorMessage}
           </Text>
         ) : null}
 
         {successMessage ? (
-          <Text testID="signup-success-message" style={styles.successMessage}>
+          <Text
+            testID="signup-success-message"
+            style={styles.successMessage}
+            accessibilityLiveRegion="polite"
+          >
             {successMessage}
           </Text>
         ) : null}
@@ -199,10 +226,11 @@ export function SignupScreen({
             />
 
             <Text style={styles.label}>Consent level</Text>
-            <View style={styles.segmentRow}>
+            <View style={styles.segmentRow} accessibilityRole="radiogroup">
               <Pressable
-                accessibilityRole="button"
+                accessibilityRole="radio"
                 accessibilityLabel="Read only consent"
+                accessibilityState={{ selected: consentLevel === 'read_only' }}
                 onPress={() => setConsentLevel('read_only')}
                 style={[
                   styles.segmentButton,
@@ -212,8 +240,9 @@ export function SignupScreen({
                 <Text style={styles.segmentButtonText}>Read only</Text>
               </Pressable>
               <Pressable
-                accessibilityRole="button"
+                accessibilityRole="radio"
                 accessibilityLabel="Full access consent"
+                accessibilityState={{ selected: consentLevel === 'full_access' }}
                 onPress={() => setConsentLevel('full_access')}
                 style={[
                   styles.segmentButton,
@@ -288,6 +317,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   input: {
+    minHeight: 44,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
     borderRadius: 14,
@@ -308,6 +338,7 @@ const styles = StyleSheet.create({
     color: '#bbf7d0',
   },
   button: {
+    minHeight: 44,
     marginTop: 8,
     borderRadius: 999,
     backgroundColor: '#fcd34d',
@@ -345,6 +376,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   segmentButton: {
+    minHeight: 44,
     flex: 1,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',

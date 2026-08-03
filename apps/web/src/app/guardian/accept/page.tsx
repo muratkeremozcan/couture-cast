@@ -14,5 +14,14 @@ export default async function GuardianAcceptPage({
     ? resolvedSearchParams.token[0]
     : resolvedSearchParams.token
 
-  return <GuardianAcceptView initialToken={token ?? null} />
+  return (
+    <main
+      id="main-content"
+      tabIndex={-1}
+      data-focus-surface="dark"
+      className="min-h-screen bg-neutral-950 outline-none"
+    >
+      <GuardianAcceptView initialToken={token ?? null} />
+    </main>
+  )
 }

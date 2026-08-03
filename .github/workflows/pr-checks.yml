@@ -52,6 +52,18 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Run Lighthouse accessibility gate
+        id: lighthouse
+        continue-on-error: true
+        run: npm run test:a11y:lighthouse
+
+      - name: Upload Lighthouse accessibility reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-accessibility-${{ github.event.pull_request.number || github.sha }}
+          path: playwright/artifacts/lighthouse/
+
       - name: Run tests with coverage
         id: tests
         continue-on-error: true
@@ -71,5 +83,5 @@ jobs:
           badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
 
       - name: Fail if tests failed
-        if: steps.tests.outcome == 'failure'
+        if: steps.tests.outcome == 'failure' || steps.lighthouse.outcome == 'failure'
         run: exit 1

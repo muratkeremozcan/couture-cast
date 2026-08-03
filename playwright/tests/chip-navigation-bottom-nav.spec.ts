@@ -119,7 +119,11 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
     await expect(communityChip).toHaveAttribute('aria-pressed', 'true')
     await expect(communityChip).toHaveAttribute('tabindex', '0')
     await expect(personalChip).toHaveAttribute('tabindex', '-1')
-    await expect(communityChip).toHaveCSS('outline-color', 'rgb(201, 161, 74)')
+    await expect(communityChip).toHaveCSS('outline-color', 'rgb(17, 17, 17)')
+    await expect(communityChip).toHaveCSS(
+      'box-shadow',
+      'rgb(201, 161, 74) 0px 0px 0px 4px'
+    )
 
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'New' })).toBeFocused()

@@ -71,7 +71,7 @@ describe('CommunityLookbookGrid (3.5-UNIT-002)', () => {
     })
   })
 
-  it('keeps cards focusable when a community image fails', () => {
+  it('keeps image-failure cards programmatically focusable without adding a Tab stop', () => {
     render(<LookbookHarness />)
 
     const imageSurface = screen.getByTestId('lookbook-image-look-1')
@@ -80,7 +80,7 @@ describe('CommunityLookbookGrid (3.5-UNIT-002)', () => {
 
     expect(image).toHaveProperty('hidden', true)
     expect(
-      screen.getByText(/milan autumn wool trench/i).closest('[tabindex="0"]')
+      screen.getByText(/milan autumn wool trench/i).closest('[tabindex="-1"]')
     ).toBeInTheDocument()
   })
 })

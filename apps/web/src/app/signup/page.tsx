@@ -3,7 +3,12 @@ import { SignupForm } from './signup-form'
 
 export default function SignupPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-neutral-950 via-black to-neutral-900 px-6 py-16 text-white">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      data-focus-surface="dark"
+      className="min-h-screen bg-gradient-to-b from-neutral-950 via-black to-neutral-900 px-6 py-16 text-white outline-none"
+    >
       <div className="mx-auto flex max-w-5xl flex-col gap-8 lg:flex-row lg:items-start">
         <section className="max-w-xl space-y-5">
           <p className="text-xs uppercase tracking-[0.4em] text-amber-300">

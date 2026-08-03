@@ -2,6 +2,8 @@
 import React from 'react'
 import { ScrollView, Pressable, Text, StyleSheet, View } from 'react-native'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
+import { useTranslation } from 'react-i18next'
+import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 
 export type ChipCategory = 'Personal' | 'Community' | 'Sponsored'
 
@@ -17,6 +19,8 @@ export function MobileChipNavigation({
   onCategoryChange,
 }: MobileChipNavigationProps) {
   const analytics = useMobileAnalytics()
+  const { t } = useTranslation()
+  const { announce } = useAccessibilityAnnouncer()
 
   const handleSelect = (category: ChipCategory) => {
     if (category === activeCategory) {
@@ -25,6 +29,10 @@ export function MobileChipNavigation({
 
     const previousCategory = activeCategory
     onCategoryChange(category)
+    announce(
+      'chip_change',
+      t(`accessibility.chip_${category.toLowerCase()}`, { defaultValue: category })
+    )
 
     try {
       analytics.capture('chip_changed', {
@@ -48,6 +56,9 @@ export function MobileChipNavigation({
       >
         {CHIP_CATEGORIES.map((category) => {
           const isActive = activeCategory === category
+          const localizedCategory = t(`accessibility.chip_${category.toLowerCase()}`, {
+            defaultValue: category,
+          })
 
           return (
             <Pressable
@@ -56,7 +67,9 @@ export function MobileChipNavigation({
               accessibilityRole="button"
               accessibilityState={{ selected: isActive }}
               aria-selected={isActive}
-              accessibilityLabel={`Filter by ${category} recommendations`}
+              accessibilityLabel={t('accessibility.chip_filter_label', {
+                chip: localizedCategory,
+              })}
               onPress={() => handleSelect(category)}
               style={({ pressed }) => [
                 styles.chip,
@@ -70,19 +83,12 @@ export function MobileChipNavigation({
                   isActive ? styles.chipTextActive : styles.chipTextInactive,
                 ]}
               >
-                {category}
+                {localizedCategory}
               </Text>
             </Pressable>
           )
         })}
       </ScrollView>
-      <Text
-        accessibilityLiveRegion="polite"
-        style={styles.visuallyHidden}
-        testID="mobile-chip-status"
-      >
-        Showing {activeCategory} recommendations
-      </Text>
     </View>
   )
 }
@@ -130,12 +136,5 @@ const styles = StyleSheet.create({
   },
   chipTextInactive: {
     color: '#5C5C66',
-  },
-  visuallyHidden: {
-    position: 'absolute',
-    width: 1,
-    height: 1,
-    overflow: 'hidden',
-    opacity: 0,
   },
 })

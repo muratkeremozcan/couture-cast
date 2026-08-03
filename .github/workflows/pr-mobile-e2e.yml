@@ -15,6 +15,7 @@ on:
         options:
           - sanity
           - analytics
+          - accessibility-hardening
 
 concurrency:
   group: mobile-e2e-${{ github.workflow }}-${{ github.ref }}
@@ -22,7 +23,7 @@ concurrency:
 
 env:
   MAESTRO_APP_ID: com.anonymous.mobile
-  MAESTRO_FLOW_PATH: ${{ inputs.flow == 'analytics' && 'maestro/analytics.yaml' || 'maestro/sanity.yaml' }}
+  MAESTRO_FLOW_PATH: ${{ inputs.flow == 'analytics' && 'maestro/analytics.yaml' || inputs.flow == 'accessibility-hardening' && 'maestro/accessibility-hardening.yaml' || 'maestro/sanity.yaml' }}
   MOBILE_ANALYTICS_DIAGNOSTICS: ${{ inputs.flow == 'analytics' && '1' || '0' }}
   EXPO_PUBLIC_MOBILE_ANALYTICS_DIAGNOSTICS: ${{ inputs.flow == 'analytics' && '1' || '0' }}
 
@@ -30,7 +31,7 @@ jobs:
   mobile-e2e-android:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    continue-on-error: true
+    continue-on-error: ${{ inputs.flow != 'accessibility-hardening' }}
     steps:
       - uses: actions/checkout@v4
 

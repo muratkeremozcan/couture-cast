@@ -1,0 +1,71 @@
+# Story 3.8: Deterministic navigation, state, modal, and target verification.
+# Maestro does not validate screen-reader speech or visual contrast.
+appId: ${MAESTRO_APP_ID}
+name: 'Accessibility interaction contract'
+tags:
+  - e2e
+  - accessibility
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu if it appears'
+
+- assertVisible:
+    id: 'tab-home'
+- assertVisible:
+    id: 'tab-wardrobe'
+- assertVisible:
+    id: 'tab-community'
+- assertVisible:
+    id: 'tab-settings'
+
+- assertVisible:
+    id: 'chip-personal'
+    selected: true
+- tapOn:
+    id: 'chip-community'
+- assertVisible:
+    id: 'chip-community'
+    selected: true
+
+- tapOn:
+    id: 'tab-community'
+- assertVisible:
+    id: 'community-screen'
+- tapOn:
+    id: 'tab-home'
+
+- assertVisible:
+    id: 'garment-tile-classic-trench-coat'
+- tapOn:
+    id: 'garment-tile-classic-trench-coat'
+- assertVisible:
+    id: 'garment-swap-modal'
+- assertVisible:
+    id: 'swap-option-classic-trench-coat'
+    selected: true
+- tapOn:
+    id: 'swap-option-leather-jacket'
+- assertVisible:
+    id: 'garment-tile-leather-jacket'
+
+- tapOn:
+    id: 'header-info-modal'
+- assertVisible:
+    id: 'information-modal'
+- tapOn:
+    id: 'information-modal-close'
+- assertVisible:
+    id: 'tab-home'
+
+- takeScreenshot:
+    path: maestro/artifacts/accessibility-hardening

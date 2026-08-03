@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { type ComponentRef, useState } from 'react'
 import { StyleSheet, Platform, Pressable } from 'react-native'
 import { Text, View } from '@/components/themed'
 import type { ScenarioOutfit } from '@couture/api-client/contracts/http'
@@ -8,13 +8,18 @@ import { useTranslation } from 'react-i18next'
 
 type OutfitRecommendationCardProps = {
   outfit?: ScenarioOutfit
-  onSwapGarment: (garmentId: string) => void
+  onSwapGarment: (garmentId: string, trigger?: number | { focus?: () => void }) => void
+  onGarmentRef?: (
+    garmentId: string,
+    element: ComponentRef<typeof Pressable> | null
+  ) => void
   isLoading?: boolean
 }
 
 export function OutfitRecommendationCard({
   outfit,
   onSwapGarment,
+  onGarmentRef,
   isLoading,
 }: OutfitRecommendationCardProps) {
   const [selectedBadgeKey, setSelectedBadgeKey] = useState<string | null>(null)
@@ -120,7 +125,12 @@ export function OutfitRecommendationCard({
       {/* Garments List */}
       <View style={styles.garmentsList}>
         {outfit.garmentIds.map((garmentId) => (
-          <GarmentItemTile key={garmentId} garmentId={garmentId} onSwap={onSwapGarment} />
+          <GarmentItemTile
+            key={garmentId}
+            garmentId={garmentId}
+            onSwap={onSwapGarment}
+            onRef={onGarmentRef}
+          />
         ))}
       </View>
     </View>
@@ -187,7 +197,7 @@ const styles = StyleSheet.create({
     }),
   },
   badgeLabelSelected: {
-    color: '#FFFFFF',
+    color: '#111111',
   },
   badgeDetails: {
     marginTop: 8,
@@ -215,7 +225,7 @@ const styles = StyleSheet.create({
   detailsTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#C9A14A',
+    color: '#8A691F',
     textTransform: 'uppercase',
     letterSpacing: 1.2,
     marginBottom: 4,

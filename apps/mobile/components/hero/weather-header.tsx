@@ -9,8 +9,12 @@ import {
 import { useHeroPalette } from './hero-theme'
 import { weatherConditionGlyphs } from './weather-glyphs'
 import { useTranslation } from 'react-i18next'
-import { formatTemperature as localizedFormatTemperature } from '@/src/lib/formatters'
+import {
+  formatTemperature as localizedFormatTemperature,
+  getTemperatureUnit,
+} from '@/src/lib/formatters'
 import i18n from '@/src/lib/i18n'
+import { formatWeatherAltText } from '@couture/utils'
 
 type WeatherHeaderProps = {
   current?: WeatherCurrent
@@ -62,19 +66,44 @@ export function WeatherHeader({ current, isLoading }: WeatherHeaderProps) {
   const text = t(`hero.conditions.${current.condition}`, {
     defaultValue: conditionNames[current.condition] || 'Unknown',
   })
+  const locale =
+    resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
+    defaultSupportedLocale
+  const unit = getTemperatureUnit(locale)
+  const temperature =
+    unit === 'F' ? (current.temperature * 9) / 5 + 32 : current.temperature
+  const accessibilityLabel = formatWeatherAltText({
+    conditionLabel: text,
+    temperature,
+    unit,
+    locale,
+  })
 
   return (
-    <View style={styles.container} testID="weather-header">
+    <View
+      style={styles.container}
+      testID="weather-header"
+      accessible
+      accessibilityLabel={accessibilityLabel}
+    >
       <View style={styles.row}>
         <Text
           style={[styles.temperature, { color: palette.text }]}
           testID="current-temperature"
+          accessible={false}
         >
           {formatTemperature(current.temperature)}
         </Text>
-        <Text style={styles.glyph}>{glyph}</Text>
+        <Text style={styles.glyph} accessible={false} aria-hidden>
+          {glyph}
+        </Text>
       </View>
-      <Text style={[styles.conditionText, { color: palette.mutedText }]}>{text}</Text>
+      <Text
+        style={[styles.conditionText, { color: palette.mutedText }]}
+        accessible={false}
+      >
+        {text}
+      </Text>
     </View>
   )
 }

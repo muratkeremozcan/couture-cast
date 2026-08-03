@@ -65,6 +65,11 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       expect(screen.getByTestId('weather-header')).toBeTruthy()
     })
 
+    expect(screen.getByTestId('weather-header')).toHaveAttribute(
+      'aria-label',
+      'Clear Sky and 70 degrees Fahrenheit'
+    )
+
     // Verify temperature display
     expect(screen.getByTestId('current-temperature').textContent).toBe('70°F')
     expect(screen.getByText('Clear Sky')).toBeTruthy()
@@ -82,6 +87,10 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     // Verify garment tiles are rendered
     expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     expect(screen.getByText('Navy Chinos')).toBeTruthy()
+    expect(screen.getByTestId('garment-tile-classic-trench-coat')).toHaveAttribute(
+      'aria-label',
+      'Classic Trench Coat: outerwear'
+    )
 
     // Verify reasoning badges are rendered
     expect(screen.getByText('Breeze Guard')).toBeTruthy()
@@ -172,11 +181,18 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
     // Click swap on trench coat
     const swapButton = screen.getByTestId('garment-tile-classic-trench-coat')
+    swapButton.focus()
     fireEvent.click(swapButton)
 
     // Verify modal is visible
     expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
-    expect(screen.getByText('Choose alternate Outerwear')).toBeTruthy()
+    expect(screen.getByTestId('garment-swap-modal')).toHaveAttribute('role', 'dialog')
+    expect(screen.getByTestId('garment-swap-modal')).toHaveAttribute('aria-modal', 'true')
+    expect(screen.getByText(/Choose alternate outerwear/i)).toBeTruthy()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('swap-option-classic-trench-coat')).toHaveFocus()
+    })
 
     // Choose 'Leather Jacket'
     const leatherJacketOption = screen.getByTestId('swap-option-leather-jacket')
@@ -185,6 +201,9 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     // Verify garment is updated in view
     expect(screen.queryByText('Classic Trench Coat')).toBeNull()
     expect(screen.getByText('Leather Jacket')).toBeTruthy()
+    await waitFor(() => {
+      expect(screen.getByTestId('garment-tile-leather-jacket')).toHaveFocus()
+    })
 
     // Verify telemetry
     expect(mockCapture).toHaveBeenLastCalledWith('hero_interaction', {
@@ -312,5 +331,10 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     })
     expect(screen.getByText('Severe Wind Advisory')).toBeTruthy()
     expect(screen.getByText('High winds expected up to 50mph.')).toBeTruthy()
+    expect(screen.getByTestId('weather-alert-banner')).toHaveAttribute('role', 'alert')
+    expect(screen.getByTestId('weather-alert-banner')).toHaveAttribute(
+      'aria-live',
+      'assertive'
+    )
   })
 })

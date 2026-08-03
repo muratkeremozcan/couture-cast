@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { type ComponentRef, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AccessibilityInfo,
@@ -39,8 +39,11 @@ import { WeatherAlertBanner } from '@/components/hero/weather-alert-banner'
 import { parseGarmentId } from '@/components/hero/garment-item-tile'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
+import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
+import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
+type SwapFocusTarget = number | { focus?: () => void }
 
 const CHIP_SCENARIOS: Record<ChipCategory, ScenarioType> = {
   Personal: 'morning',
@@ -55,6 +58,56 @@ const SCENARIO_CHIPS: Record<ScenarioType, ChipCategory> = {
 }
 
 const ritualRequestTimeoutMs = 15_000
+const modalFocusRestorationDelayMs = 400
+
+function focusAccessibilityTarget(
+  target: ComponentRef<typeof Pressable> | null,
+  testId: string
+) {
+  const browserTarget =
+    typeof document === 'undefined'
+      ? null
+      : document.querySelector<HTMLElement>(`[data-testid="${testId}"]`)
+  if (browserTarget) {
+    browserTarget.focus()
+    return
+  }
+
+  const focusableTarget = target as unknown as { focus?: () => void } | null
+  if (focusableTarget?.focus) {
+    focusableTarget.focus()
+    return
+  }
+
+  const node = findNodeHandle(target)
+  if (node) {
+    AccessibilityInfo.setAccessibilityFocus(node)
+  }
+}
+
+function restoreAccessibilityFocus(target: SwapFocusTarget | null) {
+  if (typeof target === 'object') {
+    requestAnimationFrame(() => target?.focus?.())
+  } else if (typeof target === 'number') {
+    requestAnimationFrame(() => AccessibilityInfo.setAccessibilityFocus(target))
+  }
+}
+
+function InvalidDeepLinkBanner({
+  visible,
+  message,
+  onDismiss,
+}: {
+  visible: boolean
+  message: string
+  onDismiss: () => void
+}) {
+  if (!visible) {
+    return null
+  }
+
+  return <InfoBanner message={message} onDismiss={onDismiss} />
+}
 
 const alternateGarments: Record<string, string[]> = {
   Outerwear: [
@@ -82,11 +135,16 @@ export default function TabOneScreen() {
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
     defaultSupportedLocale
   const palette = useHeroPalette()
+  const { announce } = useAccessibilityAnnouncer()
+  const reduceMotion = useReducedMotion()
   const latestLoadId = useRef(0)
   const hasTrackedTabView = useRef(false)
   const scrollViewRef = useRef<ScrollView>(null)
   const focusedAlertRef = useRef<NativeView>(null)
   const focusedAlertY = useRef(0)
+  const firstSwapOptionRef = useRef<ComponentRef<typeof Pressable>>(null)
+  const swapTriggerRef = useRef<SwapFocusTarget | null>(null)
+  const garmentRefs = useRef(new Map<string, ComponentRef<typeof Pressable> | null>())
 
   const [ritual, setRitual] = useState<RitualResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -99,13 +157,14 @@ export default function TabOneScreen() {
     undefined
   )
   const [isInvalidDeepLink, setIsInvalidDeepLink] = useState(false)
-  const invalidDeepLinkMessage = 'This link is invalid, expired, or no longer available.'
+  const invalidDeepLinkMessage = t('common.invalid_link')
   const [focusedWeatherAlert, setFocusedWeatherAlert] =
     useState<WeatherAlertDeepLinkTarget | null>(null)
 
   // Garment swap modal states
   const [isSwapModalVisible, setIsSwapModalVisible] = useState(false)
   const [swappingGarmentId, setSwappingGarmentId] = useState<string | null>(null)
+  const [garmentFocusTarget, setGarmentFocusTarget] = useState<string | null>(null)
 
   const fetchRitual = async () => {
     const client = createMobileApiClient({
@@ -167,6 +226,14 @@ export default function TabOneScreen() {
         ritualType: 'daily_outfit',
         weatherContext: data.data.weather.current.condition,
       })
+      if (forceRefresh) {
+        announce(
+          'refresh',
+          t(`hero.conditions.${data.data.weather.current.condition}`, {
+            defaultValue: data.data.weather.current.condition,
+          })
+        )
+      }
     } catch {
       if (loadId !== latestLoadId.current) {
         return
@@ -303,7 +370,7 @@ export default function TabOneScreen() {
       const scrollToAlert = (y: number) => {
         scrollViewRef.current?.scrollTo({
           y: Math.max(0, y - 16),
-          animated: true,
+          animated: !reduceMotion,
         })
         focusAlert()
       }
@@ -333,7 +400,7 @@ export default function TabOneScreen() {
         () => scrollToAlert(focusedAlertY.current)
       )
     })
-  }, [focusedWeatherAlert])
+  }, [focusedWeatherAlert, reduceMotion])
 
   useEffect(() => {
     if (!ritual || !pendingWidgetSlot) {
@@ -362,9 +429,55 @@ export default function TabOneScreen() {
     })
   }
 
-  const handleSwapGarment = (garmentId: string) => {
+  const handleSwapGarment = (garmentId: string, trigger?: SwapFocusTarget) => {
+    swapTriggerRef.current = trigger ?? null
     setSwappingGarmentId(garmentId)
     setIsSwapModalVisible(true)
+  }
+
+  const restoreSwapTriggerFocus = () => {
+    const trigger = swapTriggerRef.current
+    swapTriggerRef.current = null
+    restoreAccessibilityFocus(trigger)
+  }
+
+  const closeSwapModal = () => {
+    setIsSwapModalVisible(false)
+    setSwappingGarmentId(null)
+    restoreSwapTriggerFocus()
+  }
+
+  useEffect(() => {
+    if (!garmentFocusTarget || isSwapModalVisible) {
+      return
+    }
+
+    const focusTimer = setTimeout(
+      () => {
+        focusAccessibilityTarget(
+          garmentRefs.current.get(garmentFocusTarget) ?? null,
+          `garment-tile-${garmentFocusTarget}`
+        )
+        setGarmentFocusTarget(null)
+      },
+      reduceMotion ? 0 : modalFocusRestorationDelayMs
+    )
+
+    return () => clearTimeout(focusTimer)
+  }, [garmentFocusTarget, isSwapModalVisible, reduceMotion, ritual])
+
+  const focusFirstSwapOption = () => {
+    requestAnimationFrame(() => {
+      if (Platform.OS === 'web') {
+        const webNode = firstSwapOptionRef.current as unknown as { focus?: () => void }
+        webNode?.focus?.()
+        return
+      }
+      const node = findNodeHandle(firstSwapOptionRef.current)
+      if (node) {
+        AccessibilityInfo.setAccessibilityFocus(node)
+      }
+    })
   }
 
   const performSwap = (newGarmentId: string) => {
@@ -404,9 +517,11 @@ export default function TabOneScreen() {
       scenario: activeScenario,
       itemId: newGarmentId,
     })
-
+    announce('swap', parseGarmentId(newGarmentId).name)
     setIsSwapModalVisible(false)
     setSwappingGarmentId(null)
+    swapTriggerRef.current = null
+    setGarmentFocusTarget(newGarmentId)
   }
 
   const activeOutfit = ritual?.data.outfits.find((o) => o.scenario === activeScenario)
@@ -440,12 +555,11 @@ export default function TabOneScreen() {
           onCategoryChange={handleChipCategoryChange}
         />
 
-        {isInvalidDeepLink && (
-          <InfoBanner
-            message={invalidDeepLinkMessage}
-            onDismiss={() => setIsInvalidDeepLink(false)}
-          />
-        )}
+        <InvalidDeepLinkBanner
+          visible={isInvalidDeepLink}
+          message={invalidDeepLinkMessage}
+          onDismiss={() => setIsInvalidDeepLink(false)}
+        />
 
         {focusedWeatherAlert && (
           <NativeView
@@ -454,7 +568,7 @@ export default function TabOneScreen() {
               focusedAlertY.current = event.nativeEvent.layout.y
             }}
             testID="severe-weather-alert-focused"
-            accessibilityLiveRegion="polite"
+            accessibilityLiveRegion="assertive"
             accessibilityRole="alert"
             focusable
             style={styles.focusedAlertCard}
@@ -534,6 +648,9 @@ export default function TabOneScreen() {
             <OutfitRecommendationCard
               outfit={activeOutfit}
               onSwapGarment={handleSwapGarment}
+              onGarmentRef={(garmentId, element) => {
+                garmentRefs.current.set(garmentId, element)
+              }}
               isLoading={isLoading}
             />
           </>
@@ -544,50 +661,77 @@ export default function TabOneScreen() {
       <Modal
         visible={isSwapModalVisible}
         transparent={true}
-        animationType="slide"
-        onRequestClose={() => setIsSwapModalVisible(false)}
+        animationType={reduceMotion ? 'none' : 'slide'}
+        onShow={focusFirstSwapOption}
+        onRequestClose={closeSwapModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent} testID="garment-swap-modal">
-            <Text style={styles.modalTitle}>
-              {t('hero.garment_swap_title', {
-                category: swapCategory,
-                defaultValue: `Choose alternate ${swapCategory}`,
-              })}
-            </Text>
-            <ScrollView style={styles.modalScroll}>
-              {swapOptions.map((option) => {
-                const isCurrent = option === swappingGarmentId
-                const details = parseGarmentId(option)
-                return (
-                  <Pressable
-                    key={option}
-                    style={[styles.modalItem, isCurrent && styles.modalItemCurrent]}
-                    onPress={() => performSwap(option)}
-                    testID={`swap-option-${option}`}
-                  >
-                    <Text
-                      style={[
-                        styles.modalItemText,
-                        isCurrent && styles.modalItemTextCurrent,
-                      ]}
-                    >
-                      {details.name}
-                    </Text>
-                    {isCurrent && <Text style={styles.modalItemCheck}>✓</Text>}
-                  </Pressable>
-                )
-              })}
-            </ScrollView>
-            <Pressable
-              style={styles.closeButton}
-              onPress={() => setIsSwapModalVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>
-                {t('common.cancel', { defaultValue: 'Cancel' })}
-              </Text>
-            </Pressable>
-          </View>
+          {(() => {
+            const categoryKey = `accessibility.garment_category_${swapCategory.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
+            const localizedCategory = t(categoryKey, { defaultValue: swapCategory })
+            return (
+              <View
+                style={styles.modalContent}
+                testID="garment-swap-modal"
+                accessibilityViewIsModal
+                role="dialog"
+                accessibilityLabel={t('hero.garment_swap_title', {
+                  category: localizedCategory,
+                })}
+                aria-modal
+                aria-labelledby="garment-swap-title"
+              >
+                <Text
+                  nativeID="garment-swap-title"
+                  style={styles.modalTitle}
+                  accessibilityRole="header"
+                >
+                  {t('hero.garment_swap_title', {
+                    category: localizedCategory,
+                    defaultValue: `Choose alternate ${swapCategory}`,
+                  })}
+                </Text>
+                <ScrollView style={styles.modalScroll} accessibilityRole="radiogroup">
+                  {swapOptions.map((option, index) => {
+                    const isCurrent = option === swappingGarmentId
+                    const details = parseGarmentId(option)
+                    return (
+                      <Pressable
+                        ref={index === 0 ? firstSwapOptionRef : undefined}
+                        key={option}
+                        style={[styles.modalItem, isCurrent && styles.modalItemCurrent]}
+                        onPress={() => performSwap(option)}
+                        testID={`swap-option-${option}`}
+                        accessibilityRole="radio"
+                        accessibilityLabel={details.name}
+                        accessibilityState={{ selected: isCurrent }}
+                      >
+                        <Text
+                          style={[
+                            styles.modalItemText,
+                            isCurrent && styles.modalItemTextCurrent,
+                          ]}
+                        >
+                          {details.name}
+                        </Text>
+                        {isCurrent && <Text style={styles.modalItemCheck}>✓</Text>}
+                      </Pressable>
+                    )
+                  })}
+                </ScrollView>
+                <Pressable
+                  style={styles.closeButton}
+                  onPress={closeSwapModal}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.cancel')}
+                >
+                  <Text style={styles.closeButtonText}>
+                    {t('common.cancel', { defaultValue: 'Cancel' })}
+                  </Text>
+                </Pressable>
+              </View>
+            )
+          })()}
         </View>
       </Modal>
     </SafeAreaView>
@@ -615,7 +759,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   staleText: {
-    color: '#D97706',
+    color: '#92400E',
     fontSize: 12,
     fontWeight: '600',
     fontFamily: Platform.select({
@@ -713,10 +857,10 @@ const styles = StyleSheet.create({
   },
   modalItemTextCurrent: {
     fontWeight: '700',
-    color: '#C9A14A',
+    color: '#8A691F',
   },
   modalItemCheck: {
-    color: '#C9A14A',
+    color: '#8A691F',
     fontWeight: '700',
   },
   closeButton: {

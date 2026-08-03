@@ -71,6 +71,30 @@
     "diagnostic_info": "Das Tracking für alert_received ist mit den echten Push-Benachrichtigungsempfängern verknüpft."
   },
   "common": {
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "dismiss_banner": "Banner schließen",
+    "invalid_link": "Dieser Link ist ungültig, abgelaufen oder nicht mehr verfügbar.",
+    "about_couturecast": "Über CoutureCast",
+    "about_description": "CoutureCast verbindet Wetterdaten mit Garderobenempfehlungen."
+  },
+  "accessibility": {
+    "skip_to_content": "Zum Hauptinhalt springen",
+    "weather_glyph_alt": "Wetter-Icon für {{condition}}",
+    "garment_item_alt": "{{title}}",
+    "garment_swap_hint": "Öffnet alternative Kleidungsstücke",
+    "garment_category_outerwear": "Oberbekleidung",
+    "garment_category_bottoms": "Unterteile",
+    "garment_category_tops": "Oberteile",
+    "garment_category_footwear": "Schuhe",
+    "garment_category_accessories": "Accessoires",
+    "garment_category_garment": "Kleidungsstück",
+    "chip_personal": "Persönlich",
+    "chip_community": "Community",
+    "chip_sponsored": "Gesponsert",
+    "chip_filter_label": "{{chip}} Empfehlungen anzeigen",
+    "live_announcement_refresh": "Tagesempfehlung aktualisiert",
+    "live_announcement_swap": "Kleidungsstück ausgetauscht",
+    "live_announcement_chip_change": "Zeige {{chip}}-Empfehlungen",
+    "live_announcement_alert": "Unwetterwarnung: {{alert}}"
   }
 }

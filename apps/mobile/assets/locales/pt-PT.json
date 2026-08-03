@@ -71,6 +71,30 @@
     "diagnostic_info": "O rastreio de alert_received está ligado a recetores de notificações push reais."
   },
   "common": {
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "dismiss_banner": "Fechar aviso",
+    "invalid_link": "Esta ligação é inválida, expirou ou já não está disponível.",
+    "about_couturecast": "Sobre o CoutureCast",
+    "about_description": "O CoutureCast combina informação meteorológica com recomendações de vestuário."
+  },
+  "accessibility": {
+    "skip_to_content": "Ir para o conteúdo principal",
+    "weather_glyph_alt": "Ícone do tempo para {{condition}}",
+    "garment_item_alt": "{{title}}",
+    "garment_swap_hint": "Abre opções alternativas de roupa",
+    "garment_category_outerwear": "agasalhos",
+    "garment_category_bottoms": "partes de baixo",
+    "garment_category_tops": "partes de cima",
+    "garment_category_footwear": "calçado",
+    "garment_category_accessories": "acessórios",
+    "garment_category_garment": "peça",
+    "chip_personal": "Pessoal",
+    "chip_community": "Comunidade",
+    "chip_sponsored": "Patrocinado",
+    "chip_filter_label": "Mostrar recomendações de {{chip}}",
+    "live_announcement_refresh": "Guia diário atualizado",
+    "live_announcement_swap": "Peça trocada",
+    "live_announcement_chip_change": "A mostrar recomendações de {{chip}}",
+    "live_announcement_alert": "Alerta de tempo severo: {{alert}}"
   }
 }

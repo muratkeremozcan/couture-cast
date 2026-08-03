@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native'
 import type { UserProfileResponse } from '@couture/api-client/contracts/http'
 import { Text, View } from '@/components/themed'
 import { getUserProfileFromMobile } from '@/src/lib/user'
+import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 
 type TeenDashboardScreenProps = {
   loadProfile?: () => Promise<UserProfileResponse>
@@ -41,8 +42,15 @@ function getConsentStatus(profile: UserProfileResponse) {
 export function TeenDashboardScreen({
   loadProfile = getUserProfileFromMobile,
 }: TeenDashboardScreenProps) {
+  const { announce } = useAccessibilityAnnouncer()
   const [profile, setProfile] = useState<UserProfileResponse | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (errorMessage) {
+      announce('error', errorMessage)
+    }
+  }, [announce, errorMessage])
 
   useEffect(() => {
     let isMounted = true
@@ -70,8 +78,15 @@ export function TeenDashboardScreen({
   if (errorMessage) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Teen dashboard</Text>
-        <Text testID="teen-dashboard-error" style={styles.errorMessage}>
+        <Text style={styles.title} accessibilityRole="header">
+          Teen dashboard
+        </Text>
+        <Text
+          testID="teen-dashboard-error"
+          style={styles.errorMessage}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
           {errorMessage}
         </Text>
       </View>
@@ -89,7 +104,9 @@ export function TeenDashboardScreen({
   return (
     <View style={styles.container}>
       <Text style={styles.eyebrow}>Teen dashboard</Text>
-      <Text style={styles.title}>{profile.user.displayName ?? profile.user.email}</Text>
+      <Text style={styles.title} accessibilityRole="header">
+        {profile.user.displayName ?? profile.user.email}
+      </Text>
       <Text testID="teen-consent-status" style={styles.status}>
         {getConsentStatus(profile)}
       </Text>
