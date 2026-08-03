@@ -25,6 +25,7 @@ import {
 import { trackMobileAlertReceived } from '@/src/analytics/track-events'
 import { initI18n } from '@/src/lib/i18n'
 import { registerBackgroundFetchAsync } from '@/src/lib/background-fetch'
+import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -154,12 +155,14 @@ function RootLayoutNav() {
 
   return (
     <MobileAnalyticsProvider>
-      <ThemeProvider value={theme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-        </Stack>
-      </ThemeProvider>
+      <AccessibilityAnnouncerProvider>
+        <ThemeProvider value={theme}>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+          </Stack>
+        </ThemeProvider>
+      </AccessibilityAnnouncerProvider>
     </MobileAnalyticsProvider>
   )
   /* eslint-enable @typescript-eslint/no-unsafe-assignment */

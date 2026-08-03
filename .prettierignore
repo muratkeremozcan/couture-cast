@@ -1,6 +1,7 @@
 node_modules
 .next
 .turbo
+.lighthouseci
 .bmad
 _bmad
 .windsurf

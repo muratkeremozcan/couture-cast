@@ -1,0 +1,150 @@
+import { describe, expect, it } from 'vitest'
+import {
+  formatGarmentAltText,
+  formatWeatherAltText,
+  getAnnouncementUrgency,
+} from './accessibility'
+
+describe('accessibility utilities', () => {
+  const supportedLocales = [
+    'en-US',
+    'en-CA',
+    'es-419',
+    'fr-CA',
+    'fr-FR',
+    'tr-TR',
+    'de-DE',
+    'it-IT',
+    'pt-BR',
+    'pt-PT',
+  ] as const
+
+  describe('formatWeatherAltText', () => {
+    it.each([
+      ['en-US', 'Sunny, 22 degrees Celsius, and light breeze'],
+      ['fr-FR', 'Sunny, 22\u00a0degrés Celsius et light breeze'],
+      ['de-DE', 'Sunny, 22 Grad Celsius und light breeze'],
+      ['tr-TR', 'Sunny, 22 santigrat derece ve light breeze'],
+    ])('uses %s list and unit formatting', (locale, expected) => {
+      expect(
+        formatWeatherAltText({
+          conditionLabel: 'Sunny',
+          temperature: 22.4,
+          unit: 'C',
+          locale,
+          descriptor: 'light breeze',
+        })
+      ).toBe(expected)
+    })
+
+    it('formats Fahrenheit as a spoken unit', () => {
+      expect(
+        formatWeatherAltText({
+          conditionLabel: 'Heavy snow',
+          temperature: 28.7,
+          unit: 'F',
+          locale: 'en-US',
+        })
+      ).toBe('Heavy snow and 29 degrees Fahrenheit')
+    })
+
+    it.each(supportedLocales)('supports the configured %s locale', (locale) => {
+      const temperature = new Intl.NumberFormat(locale, {
+        style: 'unit',
+        unit: 'celsius',
+        unitDisplay: 'long',
+        maximumFractionDigits: 0,
+      }).format(0)
+      const expected = new Intl.ListFormat(locale, {
+        style: 'long',
+        type: 'conjunction',
+      }).format(['Clear', temperature])
+
+      expect(
+        formatWeatherAltText({
+          conditionLabel: 'Clear',
+          temperature: 0,
+          unit: 'C',
+          locale,
+        })
+      ).toBe(expected)
+    })
+
+    it('preserves zero and negative finite temperatures', () => {
+      expect(
+        formatWeatherAltText({
+          conditionLabel: 'Freezing rain',
+          temperature: 0,
+          unit: 'C',
+          locale: 'en-US',
+        })
+      ).toBe('Freezing rain and 0 degrees Celsius')
+      expect(
+        formatWeatherAltText({
+          conditionLabel: 'Deep freeze',
+          temperature: -12,
+          unit: 'F',
+          locale: 'en-US',
+        })
+      ).toBe('Deep freeze and -12 degrees Fahrenheit')
+    })
+
+    it('omits non-finite temperatures and duplicate descriptors', () => {
+      expect(
+        formatWeatherAltText({
+          conditionLabel: 'Rain',
+          temperature: Number.NaN,
+          unit: 'C',
+          locale: 'en-US',
+          descriptor: ' rain ',
+        })
+      ).toBe('Rain')
+    })
+
+    it('falls back safely for invalid locale and empty content', () => {
+      expect(
+        formatWeatherAltText({
+          conditionLabel: '',
+          temperature: Number.POSITIVE_INFINITY,
+          unit: 'C',
+          locale: 'not_a_locale',
+        })
+      ).toBe('')
+    })
+  })
+
+  describe('formatGarmentAltText', () => {
+    it('formats deduplicated descriptors using the requested locale', () => {
+      expect(
+        formatGarmentAltText(
+          'Pleated maxi skirt',
+          ['charcoal', 'wool', 'Charcoal'],
+          'en-US'
+        )
+      ).toBe('Pleated maxi skirt: charcoal and wool')
+
+      expect(formatGarmentAltText('Jupe plissée', ['anthracite', 'laine'], 'fr-FR')).toBe(
+        'Jupe plissée: anthracite et laine'
+      )
+    })
+
+    it('returns a clean title when descriptors are empty', () => {
+      expect(formatGarmentAltText('  Silk blouse  ', ['', '  '])).toBe('Silk blouse')
+    })
+
+    it('does not repeat a descriptor that equals the title', () => {
+      expect(formatGarmentAltText('Coat', ['coat', 'wool'])).toBe('Coat: wool')
+    })
+  })
+
+  describe('getAnnouncementUrgency', () => {
+    it('uses assertive urgency only for alerts', () => {
+      expect(getAnnouncementUrgency('alert')).toBe('assertive')
+      expect(getAnnouncementUrgency('refresh')).toBe('polite')
+      expect(getAnnouncementUrgency('swap')).toBe('polite')
+      expect(getAnnouncementUrgency('chip_change')).toBe('polite')
+      expect(getAnnouncementUrgency('feedback')).toBe('polite')
+      expect(getAnnouncementUrgency('error')).toBe('assertive')
+    })
+  })
+})

@@ -7,6 +7,12 @@ import { useHeroPalette } from './hero-theme'
 import { weatherConditionGlyphs } from './weather-glyphs'
 import { useTranslation } from 'react-i18next'
 import i18n from '@/src/lib/i18n'
+import { formatWeatherAltText } from '@couture/utils'
+import {
+  defaultSupportedLocale,
+  resolveSupportedLocale,
+} from '@couture/api-client/contracts/http'
+import { getTemperatureUnit } from '@/src/lib/formatters'
 
 type HourlyForecastRibbonProps = {
   hourly?: WeatherHourlyEntry[]
@@ -95,6 +101,22 @@ export function HourlyForecastRibbon({
         {visibleEntries.map((item, index) => {
           const glyph = weatherConditionGlyphs[item.condition] || '❓'
           const precipPercent = Math.round(item.precipitationProbability * 100)
+          const locale =
+            resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
+            defaultSupportedLocale
+          const condition = t(`hero.conditions.${item.condition}`, {
+            defaultValue: item.condition,
+          })
+          const unit = getTemperatureUnit(locale)
+          const temperature =
+            unit === 'F' ? (item.temperature * 9) / 5 + 32 : item.temperature
+          const description = formatWeatherAltText({
+            conditionLabel: condition,
+            temperature,
+            unit,
+            locale,
+            descriptor: `${formatHour(item.forecastAt)}, ${t('hero.precipitation')}: ${precipPercent}%`,
+          })
 
           return (
             <View
@@ -104,16 +126,25 @@ export function HourlyForecastRibbon({
                 { backgroundColor: palette.surface, borderColor: palette.divider },
               ]}
               testID="hourly-item"
+              accessible
+              accessibilityLabel={description}
             >
-              <Text style={[styles.hourText, { color: palette.mutedText }]}>
+              <Text
+                style={[styles.hourText, { color: palette.mutedText }]}
+                accessible={false}
+              >
                 {formatHour(item.forecastAt)}
               </Text>
-              <Text style={styles.glyph}>{glyph}</Text>
-              <Text style={[styles.tempText, { color: palette.text }]}>
+              <Text style={styles.glyph} accessible={false} aria-hidden>
+                {glyph}
+              </Text>
+              <Text style={[styles.tempText, { color: palette.text }]} accessible={false}>
                 {formatTemperature(item.temperature)}
               </Text>
               {precipPercent > 0 && (
-                <Text style={styles.precipText}>{precipPercent}%</Text>
+                <Text style={styles.precipText} accessible={false}>
+                  {precipPercent}%
+                </Text>
               )}
             </View>
           )
@@ -148,6 +179,7 @@ const styles = StyleSheet.create({
     color: '#111111',
   },
   toggleButton: {
+    minHeight: 44,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 4,
@@ -156,7 +188,7 @@ const styles = StyleSheet.create({
   toggleText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#C9A14A',
+    color: '#8A691F',
   },
   scrollContent: {
     paddingHorizontal: 16,

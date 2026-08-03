@@ -12,7 +12,10 @@ const navLinks = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-neutral-950 via-black to-neutral-900 text-white font-[family-name:var(--font-geist-sans)]">
+    <div
+      data-focus-surface="dark"
+      className="min-h-screen overflow-x-hidden bg-gradient-to-b from-neutral-950 via-black to-neutral-900 text-white font-[family-name:var(--font-geist-sans)]"
+    >
       <header className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-6 py-6 sm:flex-row sm:items-center">
         <div className="flex flex-col gap-2">
           <p
@@ -46,7 +49,11 @@ export default function Home() {
         </nav>
       </header>
 
-      <main className="max-w-6xl mx-auto space-y-16 px-6 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="max-w-6xl mx-auto space-y-16 px-6 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] outline-none"
+      >
         <div className="relative left-1/2 w-[100vw] max-w-[1440px] -translate-x-1/2">
           <LookbookPrismLayout />
         </div>

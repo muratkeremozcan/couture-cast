@@ -32,3 +32,10 @@ export type {
   DeepLinkScenario,
   DeepLinkScenarioContext,
 } from './deep-link'
+
+export {
+  formatWeatherAltText,
+  formatGarmentAltText,
+  getAnnouncementUrgency,
+} from './accessibility'
+export type { WeatherAltTextInput, AccessibilityAnnouncementEvent } from './accessibility'

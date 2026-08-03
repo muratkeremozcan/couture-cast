@@ -26,6 +26,7 @@ export function InfoBanner({ message, onDismiss }: InfoBannerProps) {
     <div
       aria-live="polite"
       role="status"
+      data-focus-surface="dark"
       data-testid="deep-link-info-banner"
       className="my-4 flex items-center justify-between rounded-xl border border-[#C9A14A]/40 bg-[#111111] p-4 text-sm text-[#FFFFFF] shadow-lg motion-safe:transition-all"
     >

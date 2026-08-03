@@ -71,6 +71,30 @@
     "diagnostic_info": "alert_received takibi, gerçek anlık bildirim alıcılarına bağlıdır."
   },
   "common": {
-    "cancel": "İptal"
+    "cancel": "İptal",
+    "dismiss_banner": "Bildirimi kapat",
+    "invalid_link": "Bu bağlantı geçersiz, süresi dolmuş veya artık kullanılamıyor.",
+    "about_couturecast": "CoutureCast hakkında",
+    "about_description": "CoutureCast hava durumu verilerini gardırop önerileriyle birleştirir."
+  },
+  "accessibility": {
+    "skip_to_content": "Ana içeriğe atla",
+    "weather_glyph_alt": "{{condition}} için hava durumu simgesi",
+    "garment_item_alt": "{{title}}",
+    "garment_swap_hint": "Alternatif giysi seçeneklerini açar",
+    "garment_category_outerwear": "dış giyim",
+    "garment_category_bottoms": "alt giyim",
+    "garment_category_tops": "üst giyim",
+    "garment_category_footwear": "ayakkabı",
+    "garment_category_accessories": "aksesuar",
+    "garment_category_garment": "giysi",
+    "chip_personal": "Kişisel",
+    "chip_community": "Topluluk",
+    "chip_sponsored": "Sponsorlu",
+    "chip_filter_label": "{{chip}} önerilerini göster",
+    "live_announcement_refresh": "Günlük rehber güncellendi",
+    "live_announcement_swap": "Kıyafet değiştirildi",
+    "live_announcement_chip_change": "{{chip}} önerileri gösteriliyor",
+    "live_announcement_alert": "Şiddetli hava uyarısı: {{alert}}"
   }
 }

@@ -30,6 +30,7 @@ playwright-logs/
 playwright/artifacts/
 playwright/playwright-report/
 playwright/.auth/
+.lighthouseci/
 .auth/
 blob-report/
 downloads/

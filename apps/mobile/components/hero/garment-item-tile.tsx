@@ -1,11 +1,14 @@
-import React from 'react'
+import React, { type ComponentRef } from 'react'
 import { StyleSheet, Pressable, Platform } from 'react-native'
 import { Text, View } from '@/components/themed'
 import { useHeroPalette } from './hero-theme'
+import { useTranslation } from 'react-i18next'
+import { formatGarmentAltText } from '@couture/utils'
 
 type GarmentItemTileProps = {
   garmentId: string
-  onSwap: (garmentId: string) => void
+  onSwap: (garmentId: string, trigger?: number | { focus?: () => void }) => void
+  onRef?: (garmentId: string, element: ComponentRef<typeof Pressable> | null) => void
 }
 
 export function parseGarmentId(id: string) {
@@ -36,20 +39,37 @@ export function parseGarmentId(id: string) {
   return { name, category }
 }
 
-export function GarmentItemTile({ garmentId, onSwap }: GarmentItemTileProps) {
+export function GarmentItemTile({ garmentId, onSwap, onRef }: GarmentItemTileProps) {
   const { name, category } = parseGarmentId(garmentId)
   const palette = useHeroPalette()
+  const { i18n, t } = useTranslation()
+  const localizedCategory = t(
+    `accessibility.garment_category_${category.toLowerCase()}`,
+    { defaultValue: category }
+  )
+  const label = formatGarmentAltText(
+    t('accessibility.garment_item_alt', { title: name }),
+    [localizedCategory],
+    i18n.resolvedLanguage ?? i18n.language
+  )
 
   return (
     <Pressable
+      ref={(element) => onRef?.(garmentId, element)}
       style={[
         styles.card,
         { backgroundColor: palette.surface, borderColor: palette.divider },
       ]}
-      onPress={() => onSwap(garmentId)}
+      onPress={(event) =>
+        onSwap(
+          garmentId,
+          event.currentTarget as unknown as number | { focus?: () => void }
+        )
+      }
       testID={`garment-tile-${garmentId}`}
       accessibilityRole="button"
-      accessibilityLabel={`Swap ${name}`}
+      accessibilityLabel={label}
+      accessibilityHint={t('accessibility.garment_swap_hint')}
     >
       <View style={styles.content}>
         <View style={styles.textColumn}>
@@ -141,7 +161,7 @@ const styles = StyleSheet.create({
   },
   swapIcon: {
     fontSize: 14,
-    color: '#C9A14A', // accent gold color
+    color: '#8A691F',
     fontWeight: 'bold',
   },
 })

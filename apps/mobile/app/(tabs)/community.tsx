@@ -96,7 +96,7 @@ export default function CommunityScreen() {
       </Text>
       {isInvalidDeepLink && (
         <InfoBanner
-          message="This link is invalid, expired, or no longer available."
+          message={t('common.invalid_link')}
           onDismiss={() => setIsInvalidDeepLink(false)}
         />
       )}

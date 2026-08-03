@@ -1,6 +1,8 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-07-30 - Step 25 captures the Lookbook Prism responsive layout, comparison mode, mobile preview, and community grid; Step 26 captures chip navigation (Personal/Community/Sponsored), sticky bottom nav on mobile, keyboard arrow traversal, safe-area insets, and cross-surface telemetry; Step 27 captures widget and notification deep-link handling, severe weather alert autoscroll, community card highlighting, invalid link info banners, and cross-surface telemetry.
+Updated: 2026-08-03. Step 28 records the evidence-backed accessibility hardening
+implementation, automated gates, and permanent Compliance exception for manual
+assistive-technology execution.
 
 ## LLM collaborator prompt
 
@@ -2508,4 +2510,84 @@ flowchart TD
   Hydrate --> Telemetry["Capture deep_link_handled"]
   FocusAlert --> Telemetry
   HighlightCard --> Telemetry
+```
+
+## Step 28 - Accessibility hardening
+
+User/business impact:
+
+Hardens Couture Cast against WCAG 2.1 Level A and AA requirements across mobile and web.
+Automated checks provide regression evidence. The release record states the limits of that
+evidence and the approved manual-testing exception, so it does not claim audited conformance.
+
+Key takeaways:
+
+1. Shared Localized Formatting Kernel: `packages/utils/src/accessibility.ts` provides `formatWeatherAltText`, `formatGarmentAltText`, and `getAnnouncementUrgency` for consistent accessible text generation across surfaces.
+2. Web Structure and Keyboard Traversal: Every route exposes the same skip target and one
+   main landmark. Ordinary cards remain outside routine Tab order. The baseline web route
+   inventory contains no production modal, so no generic focus trap exists.
+3. Contrast and Motion Tokens: `apps/web/src/app/globals.css` uses an Onyx essential outline
+   on light surfaces, a white outline on dark surfaces, and a decorative gold halo. Forced
+   colors remove the halo. Reduced motion disables nonessential movement.
+4. Native Mobile Accessibility Hooks: The rendered announcement provider localizes,
+   deduplicates, and coalesces updates. The reduced-motion hook defaults safely, handles
+   query failure and event races, and controls scrolling and modal animation.
+5. Verification and Evidence: Unit tests, the complete Playwright route and state matrix,
+   Lighthouse CI, the selectable Maestro flow, the QA protocol, and the release evidence
+   record form the verification package.
+
+Story/Task mapping:
+
+- Story 3.8
+- Task 1 (Shared localized accessibility formatting)
+- Task 2 (Web structure and keyboard flow)
+- Task 3 (Web focus appearance, contrast, and reduced motion)
+- Task 4 (Native mobile semantics, modal behavior, and reduced motion)
+- Task 5 (Browser component and interaction tests)
+- Task 6 (Lighthouse CI and workflow enforcement)
+- Task 7 (Mobile tests and executable Maestro flow)
+- Task 8 (Manual protocol and executed release evidence)
+- Task 9 (Workspace verification and completion gate)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/3-8-accessibility-hardening.md`
+
+Cross-links:
+
+- Step 22 provides localization infrastructure (`apps/mobile/assets/locales/`).
+- Step 25 provides Lookbook Prism responsive layout components.
+- Step 26 provides chip filter arrow key navigation and sticky bottom bar.
+- Step 27 provides deep-link focus management and alert banner scrolling.
+
+Sequence to follow:
+
+1. Read `packages/utils/src/accessibility.ts` for standardized weather/garment alt text generation and live announcement urgency helpers.
+2. Inspect `apps/web/src/app/components/skip-to-content.tsx`, route-level main landmarks,
+   and `apps/web/src/app/globals.css` for web structure and surface-aware focus styling.
+3. Inspect `apps/mobile/src/hooks/use-accessibility-announcer.ts` and `apps/mobile/src/hooks/use-reduced-motion.ts` for native screen reader and motion preference integration.
+4. Review test suites in `packages/utils/src/accessibility.spec.ts`, `apps/web/src/app/components/accessibility-hardening.test.tsx`, `apps/mobile/src/screens/accessibility-hardening.test.tsx`, and `playwright/tests/accessibility-hardening.spec.ts`.
+
+Task owner map:
+
+- Story 3.8 Task 1 step 1 owner: implement shared localized accessibility formatting, alt text, and live announcement urgency helpers in `packages/utils/src/accessibility.ts`
+- Story 3.8 Task 2 step 1 owner: implement SkipToContent link and main landmark focus target in `apps/web/src/app/components/skip-to-content.tsx`
+- Story 3.8 Task 3 step 1 owner: define focus ring contrast tokens, forced-colors mode, and prefers-reduced-motion overrides in `apps/web/src/app/globals.css`
+- Story 3.8 Task 4 step 1 owner: implement native mobile accessibility announcer hook in `apps/mobile/src/hooks/use-accessibility-announcer.ts`
+- Story 3.8 Task 4 step 2 owner: implement native mobile reduced motion listener hook in `apps/mobile/src/hooks/use-reduced-motion.ts`
+- Story 3.8 Task 5 step 1 owner: unit-test the web skip-link contract in `apps/web/src/app/components/accessibility-hardening.test.tsx`
+- Story 3.8 Task 7 step 1 owner: unit-test mobile accessibility announcer and reduced motion hook in `apps/mobile/src/screens/accessibility-hardening.test.tsx`
+- Story 3.8 Task 5 step 2 owner: E2E Playwright test skip-link activation, main landmark focus, and reduced-motion emulation in `playwright/tests/accessibility-hardening.spec.ts`
+- Story 3.8 Task 5 step 3 owner: implement reusable AxeBuilder accessibility scanning helper in `playwright/support/helpers/accessibility.ts`
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  User[User / Screen Reader / Keyboard] --> Web[apps/web / apps/mobile]
+  Web --> SkipLink["SkipToContent (#main-content)"]
+  Web --> FocusRing["Surface Contrast Outline\nDecorative Gold Halo"]
+  Web --> ReducedMotion["Prefers Reduced Motion Overrides"]
+  Web --> AltText["formatWeatherAltText & formatGarmentAltText\n(packages/utils/src/accessibility.ts)"]
+  Web --> Announcer["aria-live / AccessibilityInfo.announceForAccessibility"]
 ```

@@ -8,6 +8,7 @@ import type {
 import { Text, View } from '@/components/themed'
 import { revokeGuardianConsentFromMobile } from '@/src/lib/guardian'
 import { getUserProfileFromMobile } from '@/src/lib/user'
+import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 
 type GuardianDashboardScreenProps = {
   loadProfile?: () => Promise<UserProfileResponse>
@@ -31,10 +32,19 @@ export function GuardianDashboardScreen({
   loadProfile = getUserProfileFromMobile,
   revokeConsent = revokeGuardianConsentFromMobile,
 }: GuardianDashboardScreenProps) {
+  const { announce } = useAccessibilityAnnouncer()
   const [profile, setProfile] = useState<UserProfileResponse | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [pendingTeenId, setPendingTeenId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (errorMessage) {
+      announce('error', errorMessage)
+    } else if (message) {
+      announce('feedback', message)
+    }
+  }, [announce, errorMessage, message])
 
   useEffect(() => {
     let isMounted = true
@@ -98,8 +108,15 @@ export function GuardianDashboardScreen({
   if (errorMessage && !profile) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Guardian dashboard</Text>
-        <Text testID="guardian-dashboard-error" style={styles.errorMessage}>
+        <Text style={styles.title} accessibilityRole="header">
+          Guardian dashboard
+        </Text>
+        <Text
+          testID="guardian-dashboard-error"
+          style={styles.errorMessage}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
           {errorMessage}
         </Text>
       </View>
@@ -117,19 +134,30 @@ export function GuardianDashboardScreen({
   return (
     <View style={styles.container}>
       <Text style={styles.eyebrow}>Guardian dashboard</Text>
-      <Text style={styles.title}>{profile.user.displayName ?? profile.user.email}</Text>
+      <Text style={styles.title} accessibilityRole="header">
+        {profile.user.displayName ?? profile.user.email}
+      </Text>
       <Text style={styles.description}>
         Review linked teen accounts and revoke consent when access should stop.
       </Text>
 
       {message ? (
-        <Text testID="guardian-dashboard-message" style={styles.successMessage}>
+        <Text
+          testID="guardian-dashboard-message"
+          style={styles.successMessage}
+          accessibilityLiveRegion="polite"
+        >
           {message}
         </Text>
       ) : null}
 
       {errorMessage ? (
-        <Text testID="guardian-dashboard-error" style={styles.errorMessage}>
+        <Text
+          testID="guardian-dashboard-error"
+          style={styles.errorMessage}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
           {errorMessage}
         </Text>
       ) : null}
@@ -234,6 +262,7 @@ const styles = StyleSheet.create({
     color: '#a3a3a3',
   },
   revokeButton: {
+    minHeight: 44,
     marginTop: 6,
     borderWidth: 1,
     borderColor: '#fca5a5',

@@ -1,3 +1,4 @@
+/* Story 3.8 Task 3 step 1 owner: define focus ring contrast tokens, forced-colors mode, and prefers-reduced-motion overrides in apps/web/src/app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,19 +6,48 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --focus-essential: #111111;
+  --focus-halo: #c9a14a;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --focus-essential: #ffffff;
   }
+}
+
+[data-focus-surface='light'] {
+  --focus-essential: #111111;
+}
+
+[data-focus-surface='dark'] {
+  --focus-essential: #ffffff;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+:where(button, a[href], input, select, textarea) {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--focus-essential) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px var(--focus-halo) !important;
+}
+
+@media (forced-colors: active) {
+  *:focus-visible {
+    outline-color: CanvasText !important;
+    box-shadow: none !important;
+  }
 }
 
 .lookbook-body {
@@ -49,6 +79,17 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
   .planner-rail-enter {
     animation: none;
   }

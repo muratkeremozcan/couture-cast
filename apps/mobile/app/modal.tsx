@@ -1,31 +1,41 @@
 import { useEffect } from 'react'
+import { useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { Platform, StyleSheet } from 'react-native'
+import { Platform, Pressable, StyleSheet } from 'react-native'
+import { useTranslation } from 'react-i18next'
 
-import EditScreenInfo from '@/components/edit-screen-info'
 import { Text, View } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 
 export default function ModalScreen() {
   const analytics = useMobileAnalytics()
+  const router = useRouter()
+  const { t } = useTranslation()
 
-  // Track when user opens the modal
-  // @see https://posthog.com/docs/libraries/react-native#capturing-events
   useEffect(() => {
     analytics.capture('modal_opened')
   }, [analytics])
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Modal</Text>
-      <View
-        style={styles.separator}
-        lightColor="#eee"
-        darkColor="rgba(255,255,255,0.1)"
-      />
-      <EditScreenInfo path="app/modal.tsx" />
-
-      {/* Use a light status bar on iOS to account for the black space above the modal */}
+    <View
+      style={styles.container}
+      accessibilityViewIsModal
+      accessibilityLabel={t('common.about_couturecast')}
+      testID="information-modal"
+    >
+      <Text style={styles.title} accessibilityRole="header">
+        {t('common.about_couturecast')}
+      </Text>
+      <Text style={styles.description}>{t('common.about_description')}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('common.cancel')}
+        onPress={() => router.back()}
+        style={styles.closeButton}
+        testID="information-modal-close"
+      >
+        <Text style={styles.closeButtonText}>{t('common.cancel')}</Text>
+      </Pressable>
       <StatusBar style={Platform.OS === 'ios' ? 'light' : 'auto'} />
     </View>
   )
@@ -36,14 +46,31 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 20,
+    padding: 24,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '700',
   },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: '80%',
+  description: {
+    maxWidth: 420,
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  closeButton: {
+    minWidth: 120,
+    minHeight: 44,
+    borderRadius: 999,
+    backgroundColor: '#111111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  closeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 })

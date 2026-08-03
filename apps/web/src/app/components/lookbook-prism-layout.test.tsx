@@ -68,15 +68,13 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
     )
   })
 
-  it('3.5-INT-005: Keeps Hero, Chips, Garments, Community in DOM focus order', () => {
+  it('3.5-INT-005: Keeps semantic reading order and excludes static cards from Tab', () => {
     render(<LookbookPrismLayout />)
 
     const hero = screen.getByRole('region', { name: /hero ritual canvas/i })
     const filter = screen.getByRole('button', { name: /^new$/i })
-    const garment = screen.getByText(/double-breasted blazer/i).closest('[tabindex="0"]')
-    const community = screen
-      .getByText(/milan autumn wool trench/i)
-      .closest('[tabindex="0"]')
+    const garment = screen.getByText(/double-breasted blazer/i).closest('div.group')
+    const community = screen.getByText(/milan autumn wool trench/i).closest('article')
 
     if (!garment || !community) {
       throw new Error('Expected focus targets')
@@ -91,6 +89,8 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
     expect(
       garment.compareDocumentPosition(community) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
+    expect(garment).not.toHaveAttribute('tabindex')
+    expect(community).toHaveAttribute('tabindex', '-1')
   })
 
   it('restores the planner after it is closed', () => {

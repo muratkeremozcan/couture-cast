@@ -5,6 +5,7 @@ import Image from 'next/image'
 import posthog from 'posthog-js'
 import { CHIP_NAVIGATION_HEIGHT_PX } from './chip-navigation'
 import type { ChipCategory } from './chip-navigation'
+import { formatGarmentAltText } from '@couture/utils'
 
 export type FilterCategory = 'New' | 'Following' | 'Near me' | 'Brands'
 
@@ -207,7 +208,7 @@ export function CommunityLookbookGrid({
             <article
               key={item.id}
               id={`lookbook-card-${item.id}`}
-              tabIndex={0}
+              tabIndex={-1}
               data-highlighted={isHighlighted ? 'true' : 'false'}
               className={`flex flex-col overflow-hidden rounded-[8px] border bg-[#F5F5F7] shadow-sm motion-safe:transition-[border-color,box-shadow] motion-safe:duration-300 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
                 isHighlighted
@@ -216,8 +217,6 @@ export function CommunityLookbookGrid({
               }`}
             >
               <div
-                role="img"
-                aria-label={`${item.title} editorial look`}
                 data-testid={`lookbook-image-${item.id}`}
                 className="relative flex h-64 w-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#E6E6ED] to-[#C9A14A]/40"
               >
@@ -229,7 +228,11 @@ export function CommunityLookbookGrid({
                 </span>
                 <Image
                   src={item.imageUrl}
-                  alt=""
+                  alt={formatGarmentAltText(
+                    item.title,
+                    [item.description, item.location, item.weatherTag],
+                    'en-US'
+                  )}
                   fill
                   unoptimized
                   sizes="(min-width: 768px) 50vw, 100vw"

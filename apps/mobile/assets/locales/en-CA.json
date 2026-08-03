@@ -71,6 +71,30 @@
     "diagnostic_info": "alert_received tracking is wired to real push notification receipt listeners."
   },
   "common": {
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "dismiss_banner": "Dismiss banner",
+    "invalid_link": "This link is invalid, expired, or no longer available.",
+    "about_couturecast": "About CoutureCast",
+    "about_description": "CoutureCast combines weather intelligence with wardrobe recommendations."
+  },
+  "accessibility": {
+    "skip_to_content": "Skip to main content",
+    "weather_glyph_alt": "Weather icon for {{condition}}",
+    "garment_item_alt": "{{title}}",
+    "garment_swap_hint": "Opens alternate garment choices",
+    "garment_category_outerwear": "outerwear",
+    "garment_category_bottoms": "bottoms",
+    "garment_category_tops": "tops",
+    "garment_category_footwear": "footwear",
+    "garment_category_accessories": "accessories",
+    "garment_category_garment": "garment",
+    "chip_personal": "Personal",
+    "chip_community": "Community",
+    "chip_sponsored": "Sponsored",
+    "chip_filter_label": "Show {{chip}} recommendations",
+    "live_announcement_refresh": "Daily guidance updated",
+    "live_announcement_swap": "Garment swapped",
+    "live_announcement_chip_change": "Showing {{chip}} recommendations",
+    "live_announcement_alert": "Severe weather alert: {{alert}}"
   }
 }

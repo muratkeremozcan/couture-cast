@@ -7,6 +7,7 @@ import type { ChipCategory } from './chip-navigation'
 
 const analyticsMocks = vi.hoisted(() => ({
   capture: vi.fn(),
+  announce: vi.fn(),
 }))
 
 vi.mock('@/src/analytics/mobile-analytics', () => ({
@@ -14,6 +15,21 @@ vi.mock('@/src/analytics/mobile-analytics', () => ({
     capture: analyticsMocks.capture,
     getDistinctId: vi.fn(),
     screen: vi.fn(),
+  }),
+}))
+
+vi.mock('@/src/hooks/use-accessibility-announcer', () => ({
+  useAccessibilityAnnouncer: () => ({ announce: analyticsMocks.announce }),
+}))
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, values?: { defaultValue?: string; chip?: string }) => {
+      if (key === 'accessibility.chip_filter_label') {
+        return `Show ${values?.chip ?? ''} recommendations`
+      }
+      return values?.defaultValue ?? key
+    },
   }),
 }))
 
@@ -46,9 +62,7 @@ describe('MobileChipNavigation Component (Story 3.6 - 3.6-UNIT-009)', () => {
 
     expect(personalChip.getAttribute('aria-selected')).toBe('false')
     expect(communityChip.getAttribute('aria-selected')).toBe('true')
-    expect(screen.getByTestId('mobile-chip-status').textContent).toContain(
-      'Showing Community recommendations'
-    )
+    expect(analyticsMocks.announce).toHaveBeenCalledWith('chip_change', 'Community')
     expect(analyticsMocks.capture).toHaveBeenCalledWith('chip_changed', {
       chipCategory: 'Community',
       previousCategory: 'Personal',

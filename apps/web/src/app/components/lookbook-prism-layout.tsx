@@ -157,6 +157,7 @@ export function LookbookPrismLayout() {
   return (
     <div
       ref={containerRef}
+      data-focus-surface="light"
       data-testid="lookbook-prism-container"
       className={`lookbook-body relative w-full bg-[#FFFFFF] text-[#111111] motion-safe:transition-[max-width,box-shadow] motion-safe:duration-300 motion-reduce:transition-none ${
         isMobilePreview
@@ -189,10 +190,13 @@ export function LookbookPrismLayout() {
       {focusedWeatherAlert && (
         <div
           ref={alertRef}
-          role="region"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+          data-focus-surface="dark"
           aria-label="Severe Weather Alert Details"
           data-testid="severe-weather-alert-focused"
-          tabIndex={0}
+          tabIndex={-1}
           className="my-4 rounded-xl border border-[#B91C1C] bg-[#361F1F] p-5 text-[#FFFFFF] ring-2 ring-[#C9A14A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#FFFFFF]"
         >
           <div className="flex items-center justify-between">
@@ -213,6 +217,7 @@ export function LookbookPrismLayout() {
           <div className="mt-4 flex gap-3">
             <button
               type="button"
+              data-focus-surface="light"
               onClick={() => handleChipCategoryChange('Personal')}
               className="rounded-lg bg-[#C9A14A] px-4 py-2 text-xs font-semibold text-[#111111] hover:bg-[#b58e3c]"
             >
@@ -301,10 +306,7 @@ export function LookbookPrismLayout() {
             >
               {!isComparisonMode ? (
                 // Single Primary Card
-                <div
-                  tabIndex={0}
-                  className="group rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-6 motion-safe:transition-colors motion-safe:duration-300 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
-                >
+                <div className="group rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-6 motion-safe:transition-colors motion-safe:duration-300 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none">
                   <div className="mb-4 flex items-center justify-between">
                     <span className="lookbook-metrics text-xs uppercase text-[#8A691F]">
                       {heroRecommendation.eyebrow}
@@ -345,10 +347,7 @@ export function LookbookPrismLayout() {
                   }`}
                 >
                   {/* Look A */}
-                  <div
-                    tabIndex={0}
-                    className="space-y-3 rounded-[8px] border border-[#C9A14A] bg-[#FFFFFF] p-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
-                  >
+                  <div className="space-y-3 rounded-[8px] border border-[#C9A14A] bg-[#FFFFFF] p-5">
                     <div className="lookbook-metrics flex items-center justify-between text-xs text-[#8A691F]">
                       <span>LOOK A (Primary)</span>
                       <span>96%</span>
@@ -362,10 +361,7 @@ export function LookbookPrismLayout() {
                   </div>
 
                   {/* Look B */}
-                  <div
-                    tabIndex={0}
-                    className="space-y-3 rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
-                  >
+                  <div className="space-y-3 rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-5">
                     <div className="lookbook-metrics flex items-center justify-between text-xs text-[#5C5C66]">
                       <span>LOOK B (Alternative)</span>
                       <span>91%</span>

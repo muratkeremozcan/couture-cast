@@ -22,7 +22,10 @@ function TabBarIcon(props: {
     <View style={styles.iconContainer}>
       <FontAwesome size={28} style={styles.icon} {...iconProps} />
       {focused && (
-        <View style={styles.activeIndicator} testID={`tab-${tabId}-active-indicator`} />
+        <View
+          style={[styles.activeIndicator, { backgroundColor: props.color }]}
+          testID={`tab-${tabId}-active-indicator`}
+        />
       )}
     </View>
   )
@@ -57,7 +60,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#C9A14A',
+        tabBarActiveTintColor: palette.text,
         tabBarInactiveTintColor: inactiveTintColor,
         tabBarStyle: {
           borderTopColor: '#E6E6ED',
@@ -81,7 +84,12 @@ export default function TabLayout() {
           ),
           headerRight: () => (
             <Link href="/modal" asChild>
-              <Pressable>
+              <Pressable
+                testID="header-info-modal"
+                accessibilityRole="button"
+                accessibilityLabel={t('common.about_couturecast')}
+                style={styles.headerButton}
+              >
                 {({ pressed }) => (
                   <FontAwesome
                     name="info-circle"
@@ -156,6 +164,12 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
+  headerButton: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -170,6 +184,5 @@ const styles = StyleSheet.create({
     height: 4,
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
-    backgroundColor: '#C9A14A',
   },
 })

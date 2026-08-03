@@ -58,6 +58,7 @@
     "test:pw:burn-in": "npm run prepare:playwright && PW_BURN_IN=true npx playwright test --repeat-each=3 --retries=0",
     "test:pw:burn-in-changed-classic": "PW_BURN_IN=true npx playwright test --only-changed=main --repeat-each=3 --retries=0",
     "test:pw:burn-in-changed": "npm run prepare:playwright && tsx playwright/scripts/burn-in-changed.ts",
+    "test:a11y:lighthouse": "npm run prepare:playwright && start-server-and-test 'npm run start:web' http://127.0.0.1:3005 'lhci autorun --config=lighthouserc.cjs'",
     "prepare:k6": "npm run build --workspace @couture/k6-utils",
     "test:k6": "npm run test:k6:local",
     "test:k6:local": "npm run prepare:k6 && start-server-and-test 'cross-env TEST_ENV=local DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres ALLOW_DEV_GUARDIAN_SECRET=true GUARDIAN_INVITE_WEB_BASE_URL=http://127.0.0.1:3005 npm run start:api:e2e' http://127.0.0.1:4000/api/health 'k6/scripts/run-k6-env.sh local'",
@@ -83,8 +84,10 @@
     "supabase:stop": "supabase stop"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@couture/eslint-config": "workspace:*",
     "@faker-js/faker": "10.1.0",
+    "@lhci/cli": "0.15.1",
     "@openapitools/openapi-generator-cli": "2.31.0",
     "@pact-foundation/pact": "16.4.0",
     "@playwright/test": "1.58.2",

@@ -1,6 +1,8 @@
 // Story 3.7 Task 4 step 2 owner: implement mobile reusable info banner for invalid deep link notifications
-import React, { useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 
 export interface InfoBannerProps {
   message: string
@@ -8,7 +10,13 @@ export interface InfoBannerProps {
 }
 
 export function InfoBanner({ message, onDismiss }: InfoBannerProps) {
+  const { t } = useTranslation()
+  const { announce } = useAccessibilityAnnouncer()
   const [isVisible, setIsVisible] = useState(true)
+
+  useEffect(() => {
+    announce('feedback', message)
+  }, [announce, message])
 
   if (!isVisible) {
     return null
@@ -24,7 +32,7 @@ export function InfoBanner({ message, onDismiss }: InfoBannerProps) {
   return (
     <View
       accessibilityLiveRegion="polite"
-      accessibilityRole="alert"
+      accessibilityLabel={message}
       testID="deep-link-info-banner"
       style={styles.container}
     >
@@ -36,7 +44,7 @@ export function InfoBanner({ message, onDismiss }: InfoBannerProps) {
       </View>
       <Pressable
         onPress={handleDismiss}
-        accessibilityLabel="Dismiss banner"
+        accessibilityLabel={t('common.dismiss_banner')}
         accessibilityRole="button"
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         style={styles.closeButton}
@@ -59,11 +67,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+      android: { elevation: 5 },
+      web: { boxShadow: '0 2px 4px rgba(0, 0, 0, 0.25)' },
+    }),
   },
   content: {
     flexDirection: 'row',

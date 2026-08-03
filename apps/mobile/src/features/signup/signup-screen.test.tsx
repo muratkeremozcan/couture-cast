@@ -105,7 +105,7 @@ describe('SignupScreen', () => {
     fireEvent.change(screen.getByLabelText('Guardian email'), {
       target: { value: 'guardian@example.com' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Full access consent' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Full access consent' }))
     fireEvent.click(screen.getByRole('button', { name: 'Send guardian invite' }))
 
     await waitFor(() => {

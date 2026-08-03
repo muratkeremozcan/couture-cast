@@ -71,6 +71,30 @@
     "diagnostic_info": "Il tracciamento alert_received è collegato ai listener di ricezione delle notifiche push reali."
   },
   "common": {
-    "cancel": "Annulla"
+    "cancel": "Annulla",
+    "dismiss_banner": "Chiudi banner",
+    "invalid_link": "Questo link non è valido, è scaduto o non è più disponibile.",
+    "about_couturecast": "Informazioni su CoutureCast",
+    "about_description": "CoutureCast combina dati meteo e consigli per il guardaroba."
+  },
+  "accessibility": {
+    "skip_to_content": "Passa al contenuto principale",
+    "weather_glyph_alt": "Icona meteo per {{condition}}",
+    "garment_item_alt": "{{title}}",
+    "garment_swap_hint": "Apre le alternative per il capo",
+    "garment_category_outerwear": "capospalla",
+    "garment_category_bottoms": "pantaloni e gonne",
+    "garment_category_tops": "maglie",
+    "garment_category_footwear": "calzature",
+    "garment_category_accessories": "accessori",
+    "garment_category_garment": "capo",
+    "chip_personal": "Personale",
+    "chip_community": "Community",
+    "chip_sponsored": "Sponsorizzato",
+    "chip_filter_label": "Mostra i consigli {{chip}}",
+    "live_announcement_refresh": "Guida giornaliera aggiornata",
+    "live_announcement_swap": "Capo sostituito",
+    "live_announcement_chip_change": "Visualizzazione consigli {{chip}}",
+    "live_announcement_alert": "Allerta meteo grave: {{alert}}"
   }
 }
