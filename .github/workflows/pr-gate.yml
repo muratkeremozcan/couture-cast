@@ -1,7 +1,11 @@
 # Event-driven gate: recomputes the verdict on each CI completion event and
-# publishes it as the `gate` check run, the ONE required check in the ruleset.
+# publishes it as the `gate` commit status, the ONE required check in the ruleset.
 # Uses pr-gate in watch mode, replacing kachick/wait-other-jobs. Seconds per
 # event instead of holding a runner for the length of the slowest job.
+#
+# A status rather than a check run because an API-created check run cannot pick
+# its check suite, so the PR page labelled the gate with whichever unrelated
+# workflow opened the first suite on the commit.
 name: PR Gate
 
 on:
@@ -13,7 +17,7 @@ on:
   # workflow_run cannot fire for a file that is not yet on the default branch,
   # so pull_request exercises the gate on this branch before it is merged.
 
-# Serializes per commit so two events cannot race the same check run.
+# Serializes per commit so two events cannot race the same status context.
 # cancel-in-progress would drop a terminal verdict and leave the PR pending.
 concurrency:
   group: pr-gate-${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
@@ -29,7 +33,8 @@ jobs:
     if: github.event.workflow_run.path != '.github/workflows/pr-gate.yml'
     permissions:
       contents: read
-      checks: write
+      checks: read
+      statuses: write
       actions: read
     steps:
       - uses: muratkeremozcan/pr-gate@main
