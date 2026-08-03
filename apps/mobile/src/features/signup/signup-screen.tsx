@@ -47,8 +47,10 @@ export function SignupScreen({
       announce('error', errorMessage)
     } else if (successMessage) {
       announce('feedback', successMessage)
+    } else if (inlineMessage) {
+      announce('feedback', inlineMessage)
     }
-  }, [announce, errorMessage, successMessage])
+  }, [announce, errorMessage, successMessage, inlineMessage])
 
   async function handleSubmit() {
     setErrorMessage(null)

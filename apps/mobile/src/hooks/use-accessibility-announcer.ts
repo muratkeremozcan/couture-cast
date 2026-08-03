@@ -66,6 +66,11 @@ export function AccessibilityAnnouncerProvider({ children }: PropsWithChildren) 
           case 'feedback':
           case 'error':
             return cleanDetails
+          default: {
+            const _exhaustiveCheck: never = event
+            void _exhaustiveCheck
+            return cleanDetails
+          }
         }
       })()
       const next = { message: localized.trim(), urgency: getAnnouncementUrgency(event) }

@@ -208,6 +208,7 @@ export function CommunityLookbookGrid({
             <article
               key={item.id}
               id={`lookbook-card-${item.id}`}
+              aria-labelledby={`lookbook-card-title-${item.id}`}
               tabIndex={-1}
               data-highlighted={isHighlighted ? 'true' : 'false'}
               className={`flex flex-col overflow-hidden rounded-[8px] border bg-[#F5F5F7] shadow-sm motion-safe:transition-[border-color,box-shadow] motion-safe:duration-300 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
@@ -228,11 +229,7 @@ export function CommunityLookbookGrid({
                 </span>
                 <Image
                   src={item.imageUrl}
-                  alt={formatGarmentAltText(
-                    item.title,
-                    [item.description, item.location, item.weatherTag],
-                    'en-US'
-                  )}
+                  alt={formatGarmentAltText(item.title, [item.description], 'en-US')}
                   fill
                   unoptimized
                   sizes="(min-width: 768px) 50vw, 100vw"
@@ -253,7 +250,10 @@ export function CommunityLookbookGrid({
 
               <div className="flex flex-1 flex-col justify-between gap-3 p-6">
                 <div className="space-y-2">
-                  <h3 className="lookbook-display text-lg font-semibold text-[#111111]">
+                  <h3
+                    id={`lookbook-card-title-${item.id}`}
+                    className="lookbook-display text-lg font-semibold text-[#111111]"
+                  >
                     {item.title}
                   </h3>
                   <p className="text-xs leading-relaxed text-[#36363D]">

@@ -271,7 +271,9 @@ export default function SettingsScreen() {
               style={styles.actionButton}
               onPress={recordDiagnosticAlert}
               accessibilityRole="button"
-              accessibilityLabel={t('settings.diagnostic_alert_btn')}
+              accessibilityLabel={t('settings.diagnostic_alert_btn', {
+                defaultValue: 'Record weather alert analytics',
+              })}
             >
               <Text style={styles.actionText}>
                 {t('settings.diagnostic_alert_btn', {

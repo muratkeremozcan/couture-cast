@@ -1,8 +1,7 @@
 // Story 3.7 Task 4 step 2 owner: implement mobile reusable info banner for invalid deep link notifications
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 
 export interface InfoBannerProps {
   message: string
@@ -11,12 +10,7 @@ export interface InfoBannerProps {
 
 export function InfoBanner({ message, onDismiss }: InfoBannerProps) {
   const { t } = useTranslation()
-  const { announce } = useAccessibilityAnnouncer()
   const [isVisible, setIsVisible] = useState(true)
-
-  useEffect(() => {
-    announce('feedback', message)
-  }, [announce, message])
 
   if (!isVisible) {
     return null

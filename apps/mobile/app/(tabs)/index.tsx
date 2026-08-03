@@ -403,12 +403,6 @@ export default function TabOneScreen() {
   }, [focusedWeatherAlert, reduceMotion])
 
   useEffect(() => {
-    if (focusedWeatherAlert) {
-      announce('alert', focusedWeatherAlert.event.data.message)
-    }
-  }, [announce, focusedWeatherAlert])
-
-  useEffect(() => {
     if (!ritual || !pendingWidgetSlot) {
       return
     }
@@ -672,66 +666,72 @@ export default function TabOneScreen() {
         onRequestClose={closeSwapModal}
       >
         <View style={styles.modalOverlay}>
-          <View
-            style={styles.modalContent}
-            testID="garment-swap-modal"
-            accessibilityViewIsModal
-            role="dialog"
-            accessibilityLabel={t('hero.garment_swap_title', {
-              category: swapCategory,
-            })}
-            aria-modal
-            aria-labelledby="garment-swap-title"
-          >
-            <Text
-              nativeID="garment-swap-title"
-              style={styles.modalTitle}
-              accessibilityRole="header"
-            >
-              {t('hero.garment_swap_title', {
-                category: swapCategory,
-                defaultValue: `Choose alternate ${swapCategory}`,
-              })}
-            </Text>
-            <ScrollView style={styles.modalScroll} accessibilityRole="radiogroup">
-              {swapOptions.map((option, index) => {
-                const isCurrent = option === swappingGarmentId
-                const details = parseGarmentId(option)
-                return (
-                  <Pressable
-                    ref={index === 0 ? firstSwapOptionRef : undefined}
-                    key={option}
-                    style={[styles.modalItem, isCurrent && styles.modalItemCurrent]}
-                    onPress={() => performSwap(option)}
-                    testID={`swap-option-${option}`}
-                    accessibilityRole="radio"
-                    accessibilityLabel={details.name}
-                    accessibilityState={{ selected: isCurrent }}
-                  >
-                    <Text
-                      style={[
-                        styles.modalItemText,
-                        isCurrent && styles.modalItemTextCurrent,
-                      ]}
-                    >
-                      {details.name}
-                    </Text>
-                    {isCurrent && <Text style={styles.modalItemCheck}>✓</Text>}
-                  </Pressable>
-                )
-              })}
-            </ScrollView>
-            <Pressable
-              style={styles.closeButton}
-              onPress={closeSwapModal}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.cancel')}
-            >
-              <Text style={styles.closeButtonText}>
-                {t('common.cancel', { defaultValue: 'Cancel' })}
-              </Text>
-            </Pressable>
-          </View>
+          {(() => {
+            const categoryKey = `accessibility.garment_category_${swapCategory.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
+            const localizedCategory = t(categoryKey, { defaultValue: swapCategory })
+            return (
+              <View
+                style={styles.modalContent}
+                testID="garment-swap-modal"
+                accessibilityViewIsModal
+                role="dialog"
+                accessibilityLabel={t('hero.garment_swap_title', {
+                  category: localizedCategory,
+                })}
+                aria-modal
+                aria-labelledby="garment-swap-title"
+              >
+                <Text
+                  nativeID="garment-swap-title"
+                  style={styles.modalTitle}
+                  accessibilityRole="header"
+                >
+                  {t('hero.garment_swap_title', {
+                    category: localizedCategory,
+                    defaultValue: `Choose alternate ${swapCategory}`,
+                  })}
+                </Text>
+                <ScrollView style={styles.modalScroll} accessibilityRole="radiogroup">
+                  {swapOptions.map((option, index) => {
+                    const isCurrent = option === swappingGarmentId
+                    const details = parseGarmentId(option)
+                    return (
+                      <Pressable
+                        ref={index === 0 ? firstSwapOptionRef : undefined}
+                        key={option}
+                        style={[styles.modalItem, isCurrent && styles.modalItemCurrent]}
+                        onPress={() => performSwap(option)}
+                        testID={`swap-option-${option}`}
+                        accessibilityRole="radio"
+                        accessibilityLabel={details.name}
+                        accessibilityState={{ selected: isCurrent }}
+                      >
+                        <Text
+                          style={[
+                            styles.modalItemText,
+                            isCurrent && styles.modalItemTextCurrent,
+                          ]}
+                        >
+                          {details.name}
+                        </Text>
+                        {isCurrent && <Text style={styles.modalItemCheck}>✓</Text>}
+                      </Pressable>
+                    )
+                  })}
+                </ScrollView>
+                <Pressable
+                  style={styles.closeButton}
+                  onPress={closeSwapModal}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.cancel')}
+                >
+                  <Text style={styles.closeButtonText}>
+                    {t('common.cancel', { defaultValue: 'Cancel' })}
+                  </Text>
+                </Pressable>
+              </View>
+            )
+          })()}
         </View>
       </Modal>
     </SafeAreaView>

@@ -10,7 +10,11 @@ type WeatherAlertBannerProps = {
 
 export function WeatherAlertBanner({ alerts }: WeatherAlertBannerProps) {
   const { announce } = useAccessibilityAnnouncer()
-  const severityRank = { high: 3, medium: 2, low: 1 }
+  const alertKey = alerts
+    ?.map((a) => `${a.event}:${a.severity}:${a.description}:${a.start}:${a.end}`)
+    .join('|')
+
+  const severityRank: Record<string, number> = { high: 3, medium: 2, low: 1 }
   const activeAlert = useMemo(
     () =>
       [...(alerts ?? [])].sort(
@@ -18,7 +22,7 @@ export function WeatherAlertBanner({ alerts }: WeatherAlertBannerProps) {
           (severityRank[right.severity ?? 'low'] ?? 0) -
           (severityRank[left.severity ?? 'low'] ?? 0)
       )[0],
-    [alerts]
+    [alertKey]
   )
 
   useEffect(() => {

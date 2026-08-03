@@ -188,7 +188,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
     expect(screen.getByTestId('garment-swap-modal')).toHaveAttribute('role', 'dialog')
     expect(screen.getByTestId('garment-swap-modal')).toHaveAttribute('aria-modal', 'true')
-    expect(screen.getByText('Choose alternate Outerwear')).toBeTruthy()
+    expect(screen.getByText(/Choose alternate outerwear/i)).toBeTruthy()
 
     await waitFor(() => {
       expect(screen.getByTestId('swap-option-classic-trench-coat')).toHaveFocus()

@@ -233,13 +233,13 @@ test.describe('Story 3.8 interaction states', () => {
     await page.keyboard.press('Tab')
     await expect(page.locator(':focus')).not.toHaveAttribute('data-testid', /chip-/)
 
-    await expect(page.locator('article[id^="lookbook-card-"]')).toHaveAttribute(
+    await expect(page.locator('article[id^="lookbook-card-"]').first()).toHaveAttribute(
       'tabindex',
       '-1'
     )
-    await expect(page.locator('[data-testid="outfit-scroll"] > div')).not.toHaveAttribute(
-      'tabindex'
-    )
+    await expect(
+      page.locator('[data-testid="outfit-scroll"] > div').first()
+    ).not.toHaveAttribute('tabindex')
   })
 
   test('selected chips and an information banner pass axe', async ({ page }) => {
@@ -343,13 +343,16 @@ test.describe('Story 3.8 interaction states', () => {
 
     const dark = await focusColors(page.getByTestId('nav-ritual'))
     expect(contrastRatio(dark.outline, 'rgb(0, 0, 0)')).toBeGreaterThanOrEqual(3)
+    expect(dark.outlineStyle).toBe('solid')
 
     const lightChip = page.getByTestId('chip-community')
     const light = await focusColors(lightChip)
     expect(contrastRatio(light.outline, 'rgb(255, 255, 255)')).toBeGreaterThanOrEqual(3)
+    expect(light.outlineStyle).toBe('solid')
 
     const gold = await focusColors(page.getByTestId('chip-personal'))
     expect(contrastRatio(gold.outline, gold.background)).toBeGreaterThanOrEqual(3)
+    expect(gold.outlineStyle).toBe('solid')
 
     await installSevereAlert(page)
     await openStablePage(

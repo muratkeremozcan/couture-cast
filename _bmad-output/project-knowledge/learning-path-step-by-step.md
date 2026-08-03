@@ -2532,9 +2532,10 @@ Key takeaways:
 4. Native Mobile Accessibility Hooks: The rendered announcement provider localizes,
    deduplicates, and coalesces updates. The reduced-motion hook defaults safely, handles
    query failure and event races, and controls scrolling and modal animation.
-5. Verification and Evidence: Unit tests, the complete Playwright route and state matrix,
-   Lighthouse CI, the selectable Maestro flow, the QA protocol, and the release evidence
-   record form the verification package.
+5. Verification and Evidence: The Story 3.8 Playwright matrix passed 21 cases. Lighthouse
+   scored 1.00 on all four primary routes. The repository validation gate passed. The Maestro
+   flow is selectable and blocking. Native-device and human assistive-technology checks are
+   closed through permanent Compliance exception `A11Y-EX-001`.
 
 Story/Task mapping:
 
