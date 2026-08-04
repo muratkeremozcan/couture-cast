@@ -27,5 +27,14 @@ jobs:
       - uses: muratkeremozcan/tea-test-review@main
         with:
           agent: codex
+          model: gpt-5.6-luna
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          use-playwright-utils: 'true'
+          use-pactjs-utils: 'true'
+          # Keep TEA isolation. Codex also sandboxes itself, so grant its inner
+          # sandbox the TEA report and scratch root used by the outer sandbox.
+          extra-args: >-
+            --claude-arg=--add-dir=/tmp
+            --claude-arg=-c
+            --claude-arg=model_reasoning_effort=low
