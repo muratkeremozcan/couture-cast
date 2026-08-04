@@ -32,9 +32,4 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           use-playwright-utils: 'true'
           use-pactjs-utils: 'true'
-          # Keep TEA isolation. Codex also sandboxes itself, so grant its inner
-          # sandbox the TEA report and scratch root used by the outer sandbox.
-          extra-args: >-
-            --claude-arg=--add-dir=/tmp
-            --claude-arg=-c
-            --claude-arg=model_reasoning_effort=low
+          agent-args: -c model_reasoning_effort=low
