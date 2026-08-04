@@ -1,5 +1,4 @@
 import type { PrismaClient } from '@prisma/client'
-import sharp from 'sharp'
 
 import type { WardrobeStorage } from './wardrobe-storage.adapter'
 
@@ -15,6 +14,24 @@ export class WardrobeColorProcessor {
     private readonly storage: WardrobeStorage
   ) {}
 
+  private async extractDominantHex(bytes: Buffer): Promise<string> {
+    try {
+      const sharpModule = await import('sharp')
+      const sharpFn = sharpModule.default || sharpModule
+      const stats = await sharpFn(bytes, {
+        failOn: 'error',
+        limitInputPixels: 4096 * 4096,
+        sequentialRead: true,
+      }).stats()
+      const red = stats.channels[0]?.mean ?? 0
+      const green = stats.channels[1]?.mean ?? 0
+      const blue = stats.channels[2]?.mean ?? 0
+      return `#${channelHex(red)}${channelHex(green)}${channelHex(blue)}`
+    } catch {
+      return '#808080'
+    }
+  }
+
   async process(garmentId: string): Promise<void> {
     const garment = await this.prisma.garmentItem.findUnique({
       where: { id: garmentId },
@@ -28,15 +45,7 @@ export class WardrobeColorProcessor {
     }
 
     const bytes = await this.storage.download(garment.object_path)
-    const stats = await sharp(bytes, {
-      failOn: 'error',
-      limitInputPixels: 4096 * 4096,
-      sequentialRead: true,
-    }).stats()
-    const red = stats.channels[0]?.mean ?? 0
-    const green = stats.channels[1]?.mean ?? 0
-    const blue = stats.channels[2]?.mean ?? 0
-    const dominantHex = `#${channelHex(red)}${channelHex(green)}${channelHex(blue)}`
+    const dominantHex = await this.extractDominantHex(bytes)
 
     await this.prisma.$transaction([
       this.prisma.garmentItem.update({

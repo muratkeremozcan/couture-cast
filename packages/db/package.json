@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "db:migrate": "prisma migrate dev",
+    "predb:seed": "npm run build --workspace @couture/utils && npm run build --workspace @couture/testing",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force --skip-seed && prisma db seed",
     "db:studio": "prisma studio",

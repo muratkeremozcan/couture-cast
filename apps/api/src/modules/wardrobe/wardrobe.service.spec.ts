@@ -27,8 +27,8 @@ const USER_ID = 'user-123'
 const OTHER_USER_ID = 'other-user-456'
 const GARMENT_ID = 'garment-123'
 const SESSION_ID = 'session-123'
-const IDEMPOTENCY_KEY = '34eff0f2-39b2-454e-b6b1-44a9ebfdb8ec'
-const UPLOAD_SECRET = 'wardrobe-test-secret-at-least-32-bytes'
+const IDEMPOTENCY_KEY = '34eff0f2-39b2-454e-b6b1-44a9ebfdb8ec' // gitleaks:allow
+const UPLOAD_SECRET = 'wardrobe-test-secret-at-least-32-bytes' // gitleaks:allow
 const FIXTURE_NOW = new Date('2026-08-04T09:25:00.000Z')
 const FIXTURE_EXPIRY = new Date('2026-08-04T09:35:00.000Z')
 
