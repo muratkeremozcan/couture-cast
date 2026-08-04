@@ -25,13 +25,8 @@ export class SupabaseWardrobeStorageAdapter implements WardrobeStorage {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
 
     if (!url || !serviceRoleKey) {
-      if (process.env.NODE_ENV === 'test') {
-        this.client = null
-        return
-      }
-      throw new Error(
-        'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for wardrobe storage'
-      )
+      this.client = null
+      return
     }
 
     this.client = createClient(url, serviceRoleKey, {
