@@ -14,6 +14,7 @@ import {
   trackGarmentUploadCompleted,
   type AnalyticsEventName,
 } from '@couture/api-client'
+import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import { createBaseLogger } from '../../logger/pino.config'
 
 export interface TelemetryPropertiesMap {
@@ -99,7 +100,7 @@ function requireAnalyticsIdSecret(): string {
   if (configuredSecret && configuredSecret.length >= 32) {
     return configuredSecret
   }
-  if (process.env.NODE_ENV === 'test') {
+  if (allowsTestOnlySecrets()) {
     return 'test-only-analytics-id-secret-at-least-32-bytes'
   }
   throw new Error('ANALYTICS_ID_SECRET must contain at least 32 characters')

@@ -18,6 +18,7 @@ import type {
 } from '@couture/api-client/contracts/http'
 import { buildGarmentObjectPath } from '@couture/utils'
 
+import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import type { ApiRole } from '../auth/security.types'
 import { GuardianService } from '../guardian/guardian.service'
 import { TelemetryService } from '../telemetry/telemetry.service'
@@ -57,7 +58,7 @@ function requireUploadTokenSecret(): string {
   if (configuredSecret && configuredSecret.length >= 32) {
     return configuredSecret
   }
-  if (process.env.NODE_ENV === 'test') {
+  if (allowsTestOnlySecrets()) {
     return 'test-only-wardrobe-upload-token-secret'
   }
   throw new Error('WARDROBE_UPLOAD_TOKEN_SECRET must contain at least 32 characters')
