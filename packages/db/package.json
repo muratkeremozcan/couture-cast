@@ -8,7 +8,7 @@
     "db:migrate": "prisma migrate dev",
     "predb:seed": "npm run build --workspace @couture/utils && npm run build --workspace @couture/testing",
     "db:seed": "prisma db seed",
-    "db:reset": "prisma migrate reset --force --skip-seed && prisma db seed",
+    "db:reset": "prisma migrate reset --force --skip-seed && npm run build --workspace @couture/utils && npm run build --workspace @couture/testing && prisma db seed",
     "db:studio": "prisma studio",
     "db:generate": "npx prisma generate",
     "lint": "eslint --max-warnings=0 --ext .ts prisma/seeds test vitest.config.ts",
