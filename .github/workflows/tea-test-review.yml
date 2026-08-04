@@ -33,3 +33,4 @@ jobs:
           use-playwright-utils: 'true'
           use-pactjs-utils: 'true'
           agent-args: -c model_reasoning_effort=low
+          extra-args: --no-isolate
