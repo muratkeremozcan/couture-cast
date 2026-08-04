@@ -1,0 +1,43 @@
+name: TEA Test Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+# Deny-all baseline for GITHUB_TOKEN. Not the same as omitting the key, which
+# falls back to the repository default; each job opts back in below.
+permissions: {}
+
+jobs:
+  review:
+    name: test review
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The fork guard is only for the pull_request path; the mention path is
+    # gated inside the action (OWNER/MEMBER/COLLABORATOR, never a bot).
+    if: github.event_name == 'issue_comment' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      pull-requests: write # for the review comment
+    steps:
+      - uses: muratkeremozcan/tea-test-review@main
+        with:
+          # Auto on every PR with codex; a '@codex ...' or '@claude ...'
+          # comment re-runs on demand, the mention picks the agent, and text
+          # after it becomes the review's focus. Checkout and base-ref are
+          # the action's own job.
+          prompt: '@claude @codex'
+          agent: codex
+          model: gpt-5.6-luna
+          mode: 'manual'
+          agent-args: -c model_reasoning_effort=low
+          # Only the selected agent's credential is required. Without this, a
+          # '@claude' comment triggers and fails with the error naming this
+          # exact input; trim prompt to '@codex' to ignore '@claude' instead.
+          # anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          use-playwright-utils: 'true'
+          use-pactjs-utils: 'true'
