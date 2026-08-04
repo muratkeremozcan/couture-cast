@@ -1,8 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-08-03. Step 28 records the evidence-backed accessibility hardening
-implementation, automated gates, and permanent Compliance exception for manual
-assistive-technology execution.
+Updated: 2026-08-04. Step 29 records the consent-aware garment capture flow, binary upload relay, HMAC token verification, responsive web/mobile cropper & background cleanup modal, and telemetry integration.
 
 ## LLM collaborator prompt
 
@@ -2591,4 +2589,80 @@ flowchart TD
   Web --> ReducedMotion["Prefers Reduced Motion Overrides"]
   Web --> AltText["formatWeatherAltText & formatGarmentAltText\n(packages/utils/src/accessibility.ts)"]
   Web --> Announcer["aria-live / AccessibilityInfo.announceForAccessibility"]
+```
+
+## Step 29 - Garment capture flow
+
+User/business impact:
+
+Enables users to photograph or upload clothing items into their private digital wardrobe via camera or file picker with interactive aspect ratio cropping, auto background cleanup matting, real-time byte progress, and guardian consent enforcement. For the business, it unlocks personalized outfit matching and weather-driven recommendations while guaranteeing COPPA/GDPR teen compliance, strict private storage isolation, and zero privacy leaks in telemetry or server logs.
+
+Key takeaways:
+
+1. Consent-Aware Authorization & Guardian Verification: `GuardianService.assertWardrobeUploadAllowed` checks user age and active unrevoked guardian consent directly from Postgres before issuing upload sessions or committing garments for teen accounts (ages 13–15).
+2. Opaque HMAC Single-Use Upload Relay: Client apps request signed sessions (`POST /api/v1/wardrobe/upload-url`) and stream binary image bytes (`PUT /api/v1/wardrobe/uploads/{uploadSessionId}`) directly to NestJS server memory with single-use HMAC token validation, SHA-256 checksum verification, and 10MB payload bounds.
+3. Strict OpenAPI & Shared HTTP Contracts: `@couture/api-client/contracts/http` defines strict Zod schemas (`.strict()`) for session allocation, binary relay, and garment commit, rejecting unknown or client-controlled ownership parameters.
+4. Responsive Web & Mobile Capture UI: `GarmentCaptureModal` on web and native capture components on mobile provide live camera capture (`MediaDevices.getUserMedia`), image cropper (`1:1` & `4:3`), background matting preview toggle, accessibility status regions (`aria-live="polite"`), and retry error recovery.
+5. Privacy Telemetry & Redaction: `garment_upload_completed` event captures only pseudonymous subject ID, `garment_id`, `file_size_bytes`, `mime_type`, `has_cropping`, `has_bg_cleanup`, and `duration_ms` with PostHog IP capture disabled and Pino logger token redaction.
+
+Story/Task mapping:
+
+- Story 4.1
+- Task 1 (Database schema & lifecycle migration)
+- Task 2 (Private storage configuration & RLS policies)
+- Task 3 (Fresh wardrobe-consent authorization guard)
+- Task 4 (Canonical Wardrobe HTTP contracts & Zod schemas)
+- Task 5 (NestJS Wardrobe API controller, service & upload relay)
+- Task 6 (Processing lifecycle integration)
+- Task 7 (Strict telemetry & logger redaction)
+- Task 8 (Responsive web capture modal & page)
+- Task 9 (Native mobile capture experience)
+- Task 10 (Retention cleanup & deletion workflow)
+- Task 11 (Quality matrix & accessibility validation)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/4-1-garment-capture-flow.md`
+
+Cross-links:
+
+- Step 3 provides Prisma schema conventions (`GarmentItem`, `GarmentUploadStatus`, `GarmentRetentionStatus`).
+- Step 4 provides Supabase environment isolation and private RLS policies (`wardrobe-images` bucket).
+- Step 14 provides guardian consent state management and teen role verification.
+- Step 28 provides accessible modal structure, landmark focus targets, and `aria-live` status regions.
+
+Sequence to follow:
+
+1. Read `packages/db/prisma/schema.prisma` to understand `GarmentUploadStatus` enums and `GarmentItem` database fields (`object_path`, `upload_session_id`, `upload_status`, `retention_status`).
+2. Read `packages/api-client/src/contracts/http/wardrobe.ts` for strict Zod input/output schemas and `uploadGarmentBytes` transport helper.
+3. Inspect `apps/api/src/modules/guardian/guardian.service.ts` and `apps/api/src/modules/wardrobe/wardrobe.guard.ts` for teen guardian consent verification.
+4. Inspect `apps/api/src/modules/wardrobe/wardrobe.service.ts` and `wardrobe.controller.ts` for HMAC token generation, binary upload relay, checksum validation, and garment commit.
+5. Read `apps/web/src/app/components/garment-capture-modal.tsx` and `apps/web/src/app/wardrobe/page.tsx` for web capture UI, cropping, background matting preview, and progress feedback.
+6. Review test suites in `packages/api-client/testing/wardrobe-contract.spec.ts`, `apps/api/src/modules/wardrobe/wardrobe.service.spec.ts`, `apps/web/src/app/components/garment-capture-modal.test.tsx`, `playwright/tests/wardrobe-garment-capture.spec.ts`, and `maestro/garment-capture-flow.yaml`.
+
+Task owner map:
+
+- Story 4.1 Task 3 step 1 owner: assertWardrobeUploadAllowed for teen guardian consent verification in `apps/api/src/modules/guardian/guardian.service.ts`
+- Story 4.1 Task 4 step 1 owner: define Zod request and response envelope schemas and uploadGarmentBytes helper in `packages/api-client/src/contracts/http/wardrobe.ts`
+- Story 4.1 Task 5 step 1 owner: expose Wardrobe API endpoints for upload url allocation, binary upload relay, and garment commit in `apps/api/src/modules/wardrobe/wardrobe.controller.ts`
+- Story 4.1 Task 5 step 2 owner: implement HMAC upload tokens, checksum validation, and garment commit logic in `apps/api/src/modules/wardrobe/wardrobe.service.ts`
+- Story 4.1 Task 5 step 3 owner: implement WardrobeUploadGuard after auth guard in `apps/api/src/modules/wardrobe/wardrobe.guard.ts`
+- Story 4.1 Task 7 step 1 owner: define garment_upload_completed analytics event and track wrapper in `packages/api-client/src/types/analytics-events.ts`
+- Story 4.1 Task 8 step 1 owner: implement web garment capture modal component with camera, cropping, background cleanup preview, and ARIA live regions in `apps/web/src/app/components/garment-capture-modal.tsx`
+- Story 4.1 Task 8 step 2 owner: implement web wardrobe hub page in `apps/web/src/app/wardrobe/page.tsx`
+- Story 4.1 Task 8 step 3 owner: unit-test web garment capture modal dialog rendering and close interaction in `apps/web/src/app/components/garment-capture-modal.test.tsx`
+- Story 4.1 Task 8 step 4 owner: E2E Playwright test for wardrobe capture modal accessibility and landmark visibility in `playwright/tests/wardrobe-garment-capture.spec.ts`
+- Story 4.1 Task 9 step 1 owner: Maestro E2E test script for mobile garment capture flow in `maestro/garment-capture-flow.yaml`
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Client["Web / Mobile App\n(GarmentCaptureModal / Camera)"] --> Alloc["POST /api/v1/wardrobe/upload-url\n(WardrobeUploadGuard + GuardianService)"]
+  Alloc --> Session["GarmentItem (pending_upload)\n+ Opaque HMAC Token"]
+  Client --> Upload["PUT /api/v1/wardrobe/uploads/{sessionId}\n(Binary Upload Relay + SHA-256 Checksum)"]
+  Upload --> Storage["Write to Supabase Storage\nwardrobe-images/wardrobe/{userId}/{garmentId}.png"]
+  Upload --> BytesUploaded["GarmentItem (bytes_uploaded)"]
+  Client --> Commit["POST /api/v1/wardrobe/garments\n(Commit & Telemetry)"]
+  Commit --> Processing["GarmentItem (processing)\n+ garment_upload_completed Event"]
 ```

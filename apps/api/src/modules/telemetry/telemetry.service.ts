@@ -10,6 +10,7 @@ import {
   trackAlertSent,
   trackLocationSwitched,
   trackApiErrorOccurred,
+  trackGarmentUploadCompleted,
   type AnalyticsEventName,
 } from '@couture/api-client'
 import { createBaseLogger } from '../../logger/pino.config'
@@ -54,6 +55,20 @@ export interface TelemetryPropertiesMap {
     errorMessage?: string
     error_message?: string
   } & Record<string, unknown>
+  garment_upload_completed: {
+    garmentId?: string
+    garment_id?: string
+    fileSizeBytes?: number
+    file_size_bytes?: number
+    mimeType?: 'image/jpeg' | 'image/png' | 'image/webp'
+    mime_type?: 'image/jpeg' | 'image/png' | 'image/webp'
+    hasCropping?: boolean
+    has_cropping?: boolean
+    hasBgCleanup?: boolean
+    has_bg_cleanup?: boolean
+    durationMs?: number
+    duration_ms?: number
+  } & Record<string, unknown>
 }
 
 const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
@@ -71,6 +86,20 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   location_switched: z.object({}),
   api_error_occurred: z.object({
     method: z.string(),
+  }),
+  garment_upload_completed: z.object({
+    garment_id: z.string().min(1).max(64).optional(),
+    garmentId: z.string().min(1).max(64).optional(),
+    file_size_bytes: z.number().int().min(1).max(10_485_760).optional(),
+    fileSizeBytes: z.number().int().min(1).max(10_485_760).optional(),
+    mime_type: z.enum(['image/jpeg', 'image/png', 'image/webp']).optional(),
+    mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']).optional(),
+    has_cropping: z.boolean().optional(),
+    hasCropping: z.boolean().optional(),
+    has_bg_cleanup: z.boolean().optional(),
+    hasBgCleanup: z.boolean().optional(),
+    duration_ms: z.number().nonnegative().optional(),
+    durationMs: z.number().nonnegative().optional(),
   }),
 }
 
@@ -202,6 +231,30 @@ function buildApiErrorOccurred(
   })
 }
 
+function buildGarmentUploadCompleted(
+  userId: string | null,
+  props: Record<string, unknown>,
+  timestamp: string
+): PostHogPayload {
+  const mimeTypeRaw = getString(props['mimeType'] ?? props['mime_type'])
+  const validMimeType = (
+    ['image/jpeg', 'image/png', 'image/webp'].includes(mimeTypeRaw)
+      ? mimeTypeRaw
+      : 'image/png'
+  ) as 'image/jpeg' | 'image/png' | 'image/webp'
+
+  return trackGarmentUploadCompleted({
+    userId: getString(userId ?? props['userId'] ?? props['user_id']),
+    garmentId: getString(props['garmentId'] ?? props['garment_id']),
+    fileSizeBytes: getNumber(props['fileSizeBytes'] ?? props['file_size_bytes']),
+    mimeType: validMimeType,
+    hasCropping: getBool(props['hasCropping'] ?? props['has_cropping']),
+    hasBgCleanup: getBool(props['hasBgCleanup'] ?? props['has_bg_cleanup']),
+    durationMs: getNumber(props['durationMs'] ?? props['duration_ms']),
+    timestamp,
+  })
+}
+
 const eventBuilders: Partial<
   Record<
     AnalyticsEventName,
@@ -215,6 +268,7 @@ const eventBuilders: Partial<
   alert_sent: (uid, p, ts) => buildAlertSent(getString(uid ?? ''), p, ts),
   location_switched: (uid, p, ts) => buildLocationSwitched(getString(uid ?? ''), p, ts),
   api_error_occurred: (uid, p, ts) => buildApiErrorOccurred(uid, p, ts),
+  garment_upload_completed: (uid, p, ts) => buildGarmentUploadCompleted(uid, p, ts),
 }
 
 @Injectable()

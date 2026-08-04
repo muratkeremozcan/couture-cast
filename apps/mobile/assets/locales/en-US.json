@@ -96,5 +96,62 @@
     "live_announcement_swap": "Garment swapped",
     "live_announcement_chip_change": "Showing {{chip}} recommendations",
     "live_announcement_alert": "Severe weather alert: {{alert}}"
+  },
+  "wardrobe": {
+    "title": "Wardrobe Hub",
+    "add_garment": "Add Garment",
+    "empty_title": "No garments added yet",
+    "empty_desc": "Snap a photo of your favorite clothing item to get started.",
+    "capture": {
+      "title": "Garment Capture",
+      "camera": "Take Photo",
+      "library": "Photo Library",
+      "retake": "Retake",
+      "choose_another": "Choose Another"
+    },
+    "permission": {
+      "camera_denied": "Camera permission was denied.",
+      "camera_blocked": "Camera access is blocked in settings.",
+      "library_denied": "Photo library permission was denied.",
+      "open_settings": "Open Settings"
+    },
+    "error": {
+      "camera_unavailable": "Camera is unavailable on this device.",
+      "invalid_image": "Invalid image selected.",
+      "corrupt_image": "Selected image is corrupt.",
+      "image_too_large": "Image exceeds 10 MiB limit.",
+      "unsupported_type": "Unsupported image format.",
+      "network_timeout": "Upload timed out.",
+      "storage_forbidden": "Storage access forbidden.",
+      "consent_required": "Guardian consent required for wardrobe uploads.",
+      "upload_expired": "Upload session expired."
+    },
+    "crop": {
+      "title": "Crop & Position",
+      "aspect_square": "1:1 Square",
+      "aspect_four_three": "4:3 Portrait",
+      "rotate": "Rotate",
+      "reset": "Reset"
+    },
+    "cleanup": {
+      "title": "Auto Background Cleanup",
+      "toggle": "Background Matting",
+      "retry": "Retry Cleanup",
+      "unavailable": "Background cleanup unavailable for this image"
+    },
+    "confirm": {
+      "use_image": "Use This Image"
+    },
+    "upload": {
+      "preparing": "Preparing asset validation...",
+      "requesting": "Allocating upload session...",
+      "uploading": "Uploading image bytes...",
+      "verifying": "Verifying private storage payload...",
+      "processing": "Garment uploaded! Processing color analysis...",
+      "ready": "Garment ready",
+      "failed": "Garment upload failed",
+      "retry": "Retry Upload",
+      "cancel": "Cancel Upload"
+    }
   }
 }

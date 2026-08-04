@@ -1,0 +1,42 @@
+# Story 4.1 Task 9 step 1 owner: Maestro E2E test script for mobile garment capture flow
+appId: ${MAESTRO_APP_ID}
+name: 'Garment capture flow'
+tags:
+  - e2e
+  - wardrobe
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- openLink: ${APP_URL}
+
+- assertVisible:
+    id: 'tab-wardrobe'
+
+- tapOn:
+    id: 'tab-wardrobe'
+
+- assertVisible:
+    id: 'wardrobe-screen'
+
+- assertVisible:
+    id: 'garment-capture-open'
+
+- tapOn:
+    id: 'garment-capture-open'
+
+- assertVisible:
+    id: 'garment-source-camera'
+
+- assertVisible:
+    id: 'garment-source-library'
+
+- tapOn:
+    id: 'garment-e2e-fixture-source'
+    optional: true
+
+- takeScreenshot:
+    path: maestro/artifacts/garment-capture-flow

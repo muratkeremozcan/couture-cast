@@ -30,6 +30,7 @@ export type WardrobeComfortRange = (typeof WARDROBE_COMFORT_RANGES)[number]
 export interface WardrobeItemFixture {
   id: string
   userId: string
+  objectPath?: string
   imageUrl: string
   category: WardrobeCategory
   material: WardrobeMaterial
@@ -74,9 +75,12 @@ function buildDefaultColorPalette(): string[] {
 }
 
 function buildDefaultWardrobeItemFixture(): WardrobeItemFixture {
+  const id = faker.string.uuid()
+  const userId = faker.string.uuid()
   return {
-    id: faker.string.uuid(),
-    userId: faker.string.uuid(),
+    id,
+    userId,
+    objectPath: `wardrobe/${userId}/${id}.png`,
     imageUrl: faker.image.url(),
     category: faker.helpers.arrayElement(WARDROBE_CATEGORIES),
     material: faker.helpers.arrayElement(WARDROBE_MATERIALS),
@@ -98,11 +102,14 @@ export function buildWardrobeItemCreateInput(
 ): Prisma.GarmentItemCreateInput {
   return {
     id: fixture.id,
+    object_path: fixture.objectPath ?? `wardrobe/${fixture.userId}/${fixture.id}.png`,
     image_url: fixture.imageUrl,
     category: fixture.category,
     material: fixture.material,
     comfort_range: fixture.comfortRange,
     color_palette: fixture.colorPalette as Prisma.InputJsonArray,
+    upload_status: 'ready',
+    retention_status: 'active',
     user: {
       connect: {
         id: fixture.userId,

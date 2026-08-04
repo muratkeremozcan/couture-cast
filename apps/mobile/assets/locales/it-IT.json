@@ -43,15 +43,15 @@
     "now": "ORA",
     "next_hour": "PROSSIMA ORA",
     "stale": "Non aggiornato",
-    "unavailable": "Apri l’app per i consigli",
+    "unavailable": "Apri l\u2019app per i consigli",
     "precipitation": "Precipitazioni"
   },
   "settings": {
     "title": "Impostazioni",
     "language": "Lingua",
-    "locale_sync_error": "La lingua è stata cambiata su questo dispositivo. La sincronizzazione del profilo verrà ritentata più tardi.",
+    "locale_sync_error": "La lingua \u00e8 stata cambiata su questo dispositivo. La sincronizzazione del profilo verr\u00e0 ritentata pi\u00f9 tardi.",
     "locale_change_error": "Impossibile cambiare la lingua. Riprova.",
-    "region_units": "Regione e Unità",
+    "region_units": "Regione e Unit\u00e0",
     "languages": {
       "en-US": "Inglese (USA)",
       "en-CA": "Inglese (Canada)",
@@ -68,12 +68,12 @@
     "api_health_status": "Stato dell'API: {{status}}",
     "api_health_unavailable": "Stato dell'API non disponibile",
     "diagnostic_alert_btn": "Registra analisi allerta meteo",
-    "diagnostic_info": "Il tracciamento alert_received è collegato ai listener di ricezione delle notifiche push reali."
+    "diagnostic_info": "Il tracciamento alert_received \u00e8 collegato ai listener di ricezione delle notifiche push reali."
   },
   "common": {
     "cancel": "Annulla",
     "dismiss_banner": "Chiudi banner",
-    "invalid_link": "Questo link non è valido, è scaduto o non è più disponibile.",
+    "invalid_link": "Questo link non \u00e8 valido, \u00e8 scaduto o non \u00e8 pi\u00f9 disponibile.",
     "about_couturecast": "Informazioni su CoutureCast",
     "about_description": "CoutureCast combina dati meteo e consigli per il guardaroba."
   },
@@ -96,5 +96,62 @@
     "live_announcement_swap": "Capo sostituito",
     "live_announcement_chip_change": "Visualizzazione consigli {{chip}}",
     "live_announcement_alert": "Allerta meteo grave: {{alert}}"
+  },
+  "wardrobe": {
+    "title": "Wardrobe Hub",
+    "add_garment": "Add Garment",
+    "empty_title": "No garments added yet",
+    "empty_desc": "Snap a photo of your favorite clothing item to get started.",
+    "capture": {
+      "title": "Garment Capture",
+      "camera": "Take Photo",
+      "library": "Photo Library",
+      "retake": "Retake",
+      "choose_another": "Choose Another"
+    },
+    "permission": {
+      "camera_denied": "Camera permission was denied.",
+      "camera_blocked": "Camera access is blocked in settings.",
+      "library_denied": "Photo library permission was denied.",
+      "open_settings": "Open Settings"
+    },
+    "error": {
+      "camera_unavailable": "Camera is unavailable on this device.",
+      "invalid_image": "Invalid image selected.",
+      "corrupt_image": "Selected image is corrupt.",
+      "image_too_large": "Image exceeds 10 MiB limit.",
+      "unsupported_type": "Unsupported image format.",
+      "network_timeout": "Upload timed out.",
+      "storage_forbidden": "Storage access forbidden.",
+      "consent_required": "Guardian consent required for wardrobe uploads.",
+      "upload_expired": "Upload session expired."
+    },
+    "crop": {
+      "title": "Crop & Position",
+      "aspect_square": "1:1 Square",
+      "aspect_four_three": "4:3 Portrait",
+      "rotate": "Rotate",
+      "reset": "Reset"
+    },
+    "cleanup": {
+      "title": "Auto Background Cleanup",
+      "toggle": "Background Matting",
+      "retry": "Retry Cleanup",
+      "unavailable": "Background cleanup unavailable for this image"
+    },
+    "confirm": {
+      "use_image": "Use This Image"
+    },
+    "upload": {
+      "preparing": "Preparing asset validation...",
+      "requesting": "Allocating upload session...",
+      "uploading": "Uploading image bytes...",
+      "verifying": "Verifying private storage payload...",
+      "processing": "Garment uploaded! Processing color analysis...",
+      "ready": "Garment ready",
+      "failed": "Garment upload failed",
+      "retry": "Retry Upload",
+      "cancel": "Cancel Upload"
+    }
   }
 }

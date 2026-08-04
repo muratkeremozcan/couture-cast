@@ -1,100 +1,157 @@
 {
   "tabs": {
     "tab_one": "Separador Um",
-    "tab_two": "Definições",
-    "home": "Início",
+    "tab_two": "Defini\u00e7\u00f5es",
+    "home": "In\u00edcio",
     "wardrobe": "Guarda-roupa",
     "community": "Comunidade",
-    "settings": "Definições"
+    "settings": "Defini\u00e7\u00f5es"
   },
   "hero": {
     "scenarios": {
-      "morning": "Percurso da manhã",
+      "morning": "Percurso da manh\u00e3",
       "midday": "Meio-dia",
       "evening": "Planos para a noite"
     },
     "conditions": {
-      "clear": "Céu limpo",
+      "clear": "C\u00e9u limpo",
       "partly_cloudy": "Parcialmente nublado",
       "cloudy": "Nublado",
       "fog": "Nevoeiro",
       "drizzle": "Chuvisco",
       "rain": "Chuva",
-      "sleet": "Água-neve",
+      "sleet": "\u00c1gua-neve",
       "snow": "Neve",
       "thunderstorm": "Trovoada",
       "wind": "Ventoso",
       "unknown": "Desconhecido"
     },
-    "hourly_forecast": "Previsão horária",
+    "hourly_forecast": "Previs\u00e3o hor\u00e1ria",
     "expand_hours": "Expandir ({{hours}} h)",
     "collapse": "Recolher",
-    "load_error": "Não foi possível carregar as recomendações diárias",
+    "load_error": "N\u00e3o foi poss\u00edvel carregar as recomenda\u00e7\u00f5es di\u00e1rias",
     "retry": "Tentar novamente",
-    "badge_justification": "Justificação de {{label}}:",
+    "badge_justification": "Justifica\u00e7\u00e3o de {{label}}:",
     "alert_title": "Alerta de Mau Tempo",
-    "offline_toast": "A utilizar dados meteorológicos guardados recentemente",
-    "loading": "A carregar recomendações...",
+    "offline_toast": "A utilizar dados meteorol\u00f3gicos guardados recentemente",
+    "loading": "A carregar recomenda\u00e7\u00f5es...",
     "garment_swap_title": "Escolher alternativa para {{category}}",
-    "feels_like": "Sensação térmica",
-    "precipitation": "Precipitação"
+    "feels_like": "Sensa\u00e7\u00e3o t\u00e9rmica",
+    "precipitation": "Precipita\u00e7\u00e3o"
   },
   "widget": {
     "now": "AGORA",
-    "next_hour": "PRÓXIMA HORA",
+    "next_hour": "PR\u00d3XIMA HORA",
     "stale": "Desatualizado",
-    "unavailable": "Abra a aplicação para recomendações",
-    "precipitation": "Precipitação"
+    "unavailable": "Abra a aplica\u00e7\u00e3o para recomenda\u00e7\u00f5es",
+    "precipitation": "Precipita\u00e7\u00e3o"
   },
   "settings": {
-    "title": "Definições",
+    "title": "Defini\u00e7\u00f5es",
     "language": "Idioma",
-    "locale_sync_error": "O idioma foi alterado neste dispositivo. A sincronização do perfil será tentada novamente mais tarde.",
-    "locale_change_error": "Não foi possível alterar o idioma. Tente novamente.",
-    "region_units": "Região e Unidades",
+    "locale_sync_error": "O idioma foi alterado neste dispositivo. A sincroniza\u00e7\u00e3o do perfil ser\u00e1 tentada novamente mais tarde.",
+    "locale_change_error": "N\u00e3o foi poss\u00edvel alterar o idioma. Tente novamente.",
+    "region_units": "Regi\u00e3o e Unidades",
     "languages": {
-      "en-US": "Inglês (EUA)",
-      "en-CA": "Inglês (Canadá)",
+      "en-US": "Ingl\u00eas (EUA)",
+      "en-CA": "Ingl\u00eas (Canad\u00e1)",
       "es-419": "Espanhol (LatAm)",
-      "fr-CA": "Francês (Canadá)",
-      "fr-FR": "Francês (Europa)",
+      "fr-CA": "Franc\u00eas (Canad\u00e1)",
+      "fr-FR": "Franc\u00eas (Europa)",
       "tr-TR": "Turco",
-      "de-DE": "Alemão",
+      "de-DE": "Alem\u00e3o",
       "it-IT": "Italiano",
-      "pt-BR": "Português (Brasil)",
-      "pt-PT": "Português (Portugal)"
+      "pt-BR": "Portugu\u00eas (Brasil)",
+      "pt-PT": "Portugu\u00eas (Portugal)"
     },
-    "api_health": "A verificar estado do serviço da API...",
-    "api_health_status": "Estado do serviço da API: {{status}}",
-    "api_health_unavailable": "Serviço da API indisponível",
-    "diagnostic_alert_btn": "Registar analítica de alerta meteorológico",
-    "diagnostic_info": "O rastreio de alert_received está ligado a recetores de notificações push reais."
+    "api_health": "A verificar estado do servi\u00e7o da API...",
+    "api_health_status": "Estado do servi\u00e7o da API: {{status}}",
+    "api_health_unavailable": "Servi\u00e7o da API indispon\u00edvel",
+    "diagnostic_alert_btn": "Registar anal\u00edtica de alerta meteorol\u00f3gico",
+    "diagnostic_info": "O rastreio de alert_received est\u00e1 ligado a recetores de notifica\u00e7\u00f5es push reais."
   },
   "common": {
     "cancel": "Cancelar",
     "dismiss_banner": "Fechar aviso",
-    "invalid_link": "Esta ligação é inválida, expirou ou já não está disponível.",
+    "invalid_link": "Esta liga\u00e7\u00e3o \u00e9 inv\u00e1lida, expirou ou j\u00e1 n\u00e3o est\u00e1 dispon\u00edvel.",
     "about_couturecast": "Sobre o CoutureCast",
-    "about_description": "O CoutureCast combina informação meteorológica com recomendações de vestuário."
+    "about_description": "O CoutureCast combina informa\u00e7\u00e3o meteorol\u00f3gica com recomenda\u00e7\u00f5es de vestu\u00e1rio."
   },
   "accessibility": {
-    "skip_to_content": "Ir para o conteúdo principal",
-    "weather_glyph_alt": "Ícone do tempo para {{condition}}",
+    "skip_to_content": "Ir para o conte\u00fado principal",
+    "weather_glyph_alt": "\u00cdcone do tempo para {{condition}}",
     "garment_item_alt": "{{title}}",
-    "garment_swap_hint": "Abre opções alternativas de roupa",
+    "garment_swap_hint": "Abre op\u00e7\u00f5es alternativas de roupa",
     "garment_category_outerwear": "agasalhos",
     "garment_category_bottoms": "partes de baixo",
     "garment_category_tops": "partes de cima",
-    "garment_category_footwear": "calçado",
-    "garment_category_accessories": "acessórios",
-    "garment_category_garment": "peça",
+    "garment_category_footwear": "cal\u00e7ado",
+    "garment_category_accessories": "acess\u00f3rios",
+    "garment_category_garment": "pe\u00e7a",
     "chip_personal": "Pessoal",
     "chip_community": "Comunidade",
     "chip_sponsored": "Patrocinado",
-    "chip_filter_label": "Mostrar recomendações de {{chip}}",
-    "live_announcement_refresh": "Guia diário atualizado",
-    "live_announcement_swap": "Peça trocada",
-    "live_announcement_chip_change": "A mostrar recomendações de {{chip}}",
+    "chip_filter_label": "Mostrar recomenda\u00e7\u00f5es de {{chip}}",
+    "live_announcement_refresh": "Guia di\u00e1rio atualizado",
+    "live_announcement_swap": "Pe\u00e7a trocada",
+    "live_announcement_chip_change": "A mostrar recomenda\u00e7\u00f5es de {{chip}}",
     "live_announcement_alert": "Alerta de tempo severo: {{alert}}"
+  },
+  "wardrobe": {
+    "title": "Wardrobe Hub",
+    "add_garment": "Add Garment",
+    "empty_title": "No garments added yet",
+    "empty_desc": "Snap a photo of your favorite clothing item to get started.",
+    "capture": {
+      "title": "Garment Capture",
+      "camera": "Take Photo",
+      "library": "Photo Library",
+      "retake": "Retake",
+      "choose_another": "Choose Another"
+    },
+    "permission": {
+      "camera_denied": "Camera permission was denied.",
+      "camera_blocked": "Camera access is blocked in settings.",
+      "library_denied": "Photo library permission was denied.",
+      "open_settings": "Open Settings"
+    },
+    "error": {
+      "camera_unavailable": "Camera is unavailable on this device.",
+      "invalid_image": "Invalid image selected.",
+      "corrupt_image": "Selected image is corrupt.",
+      "image_too_large": "Image exceeds 10 MiB limit.",
+      "unsupported_type": "Unsupported image format.",
+      "network_timeout": "Upload timed out.",
+      "storage_forbidden": "Storage access forbidden.",
+      "consent_required": "Guardian consent required for wardrobe uploads.",
+      "upload_expired": "Upload session expired."
+    },
+    "crop": {
+      "title": "Crop & Position",
+      "aspect_square": "1:1 Square",
+      "aspect_four_three": "4:3 Portrait",
+      "rotate": "Rotate",
+      "reset": "Reset"
+    },
+    "cleanup": {
+      "title": "Auto Background Cleanup",
+      "toggle": "Background Matting",
+      "retry": "Retry Cleanup",
+      "unavailable": "Background cleanup unavailable for this image"
+    },
+    "confirm": {
+      "use_image": "Use This Image"
+    },
+    "upload": {
+      "preparing": "Preparing asset validation...",
+      "requesting": "Allocating upload session...",
+      "uploading": "Uploading image bytes...",
+      "verifying": "Verifying private storage payload...",
+      "processing": "Garment uploaded! Processing color analysis...",
+      "ready": "Garment ready",
+      "failed": "Garment upload failed",
+      "retry": "Retry Upload",
+      "cancel": "Cancel Upload"
+    }
   }
 }

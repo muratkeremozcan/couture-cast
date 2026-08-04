@@ -21,6 +21,7 @@ import { WeatherModule } from './modules/weather/weather.module'
 import { LocationPreferencesModule } from './modules/location-preferences/location-preferences.module'
 import { TelemetryModule } from './modules/telemetry/telemetry.module'
 import { PersonalizationModule } from './modules/personalization/personalization.module.js'
+import { WardrobeModule } from './modules/wardrobe/wardrobe.module'
 
 // Disable websockets by setting DISABLE_WEBSOCKETS=true (e.g., in specific tests)
 const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [GatewayModule]
@@ -42,6 +43,7 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     WeatherModule,
     TelemetryModule,
     PersonalizationModule,
+    WardrobeModule,
   ],
   controllers: [AppController, ApiHealthController, HealthController, AdminController],
   providers: [AppService, AdminService, AdminCron],

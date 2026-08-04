@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -1120,6 +1121,51 @@ export class GuardianService {
       teenIds,
       revokedConsentCount,
       notificationsQueued,
+    }
+  }
+
+  // Story 4.1 Task 3 step 1 owner: assertWardrobeUploadAllowed for teen guardian consent verification
+  async assertWardrobeUploadAllowed(userId: string, role?: string): Promise<void> {
+    if (role && role !== 'teen') {
+      return
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        profile: true,
+        teen_roles: {
+          where: { status: 'granted' },
+        },
+      },
+    })
+
+    if (!user || !user.profile) {
+      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+    }
+
+    if (hasGuardianConsentAgedOut(user.profile.preferences)) {
+      return
+    }
+
+    const prefs = (user.profile.preferences as Record<string, unknown> | null) ?? {}
+    const birthdate = typeof prefs.birthdate === 'string' ? prefs.birthdate : null
+
+    if (!birthdate) {
+      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+    }
+
+    const age = calculateAge(new Date(birthdate))
+    if (age >= 16) {
+      return
+    }
+
+    if (age < 13) {
+      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+    }
+
+    if (user.teen_roles.length === 0) {
+      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
     }
   }
 }
