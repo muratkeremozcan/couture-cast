@@ -43,15 +43,15 @@
     "now": "ORA",
     "next_hour": "PROSSIMA ORA",
     "stale": "Non aggiornato",
-    "unavailable": "Apri l’app per i consigli",
+    "unavailable": "Apri l\u2019app per i consigli",
     "precipitation": "Precipitazioni"
   },
   "settings": {
     "title": "Impostazioni",
     "language": "Lingua",
-    "locale_sync_error": "La lingua è stata cambiata su questo dispositivo. La sincronizzazione del profilo verrà ritentata più tardi.",
+    "locale_sync_error": "La lingua \u00e8 stata cambiata su questo dispositivo. La sincronizzazione del profilo verr\u00e0 ritentata pi\u00f9 tardi.",
     "locale_change_error": "Impossibile cambiare la lingua. Riprova.",
-    "region_units": "Regione e Unità",
+    "region_units": "Regione e Unit\u00e0",
     "languages": {
       "en-US": "Inglese (USA)",
       "en-CA": "Inglese (Canada)",
@@ -68,12 +68,12 @@
     "api_health_status": "Stato dell'API: {{status}}",
     "api_health_unavailable": "Stato dell'API non disponibile",
     "diagnostic_alert_btn": "Registra analisi allerta meteo",
-    "diagnostic_info": "Il tracciamento alert_received è collegato ai listener di ricezione delle notifiche push reali."
+    "diagnostic_info": "Il tracciamento alert_received \u00e8 collegato ai listener di ricezione delle notifiche push reali."
   },
   "common": {
     "cancel": "Annulla",
     "dismiss_banner": "Chiudi banner",
-    "invalid_link": "Questo link non è valido, è scaduto o non è più disponibile.",
+    "invalid_link": "Questo link non \u00e8 valido, \u00e8 scaduto o non \u00e8 pi\u00f9 disponibile.",
     "about_couturecast": "Informazioni su CoutureCast",
     "about_description": "CoutureCast combina dati meteo e consigli per il guardaroba."
   },
@@ -96,5 +96,62 @@
     "live_announcement_swap": "Capo sostituito",
     "live_announcement_chip_change": "Visualizzazione consigli {{chip}}",
     "live_announcement_alert": "Allerta meteo grave: {{alert}}"
+  },
+  "wardrobe": {
+    "title": "Guardaroba",
+    "add_garment": "Aggiungi capo",
+    "empty_title": "Non hai ancora aggiunto capi",
+    "empty_desc": "Scatta una foto del tuo capo preferito per iniziare.",
+    "capture": {
+      "title": "Acquisisci capo",
+      "camera": "Scatta foto",
+      "library": "Libreria foto",
+      "retake": "Scatta di nuovo",
+      "choose_another": "Scegline un'altra"
+    },
+    "permission": {
+      "camera_denied": "Il permesso per la fotocamera \u00e8 stato negato.",
+      "camera_blocked": "L'accesso alla fotocamera \u00e8 bloccato nelle impostazioni.",
+      "library_denied": "Il permesso per la libreria foto \u00e8 stato negato.",
+      "open_settings": "Apri impostazioni"
+    },
+    "error": {
+      "camera_unavailable": "La fotocamera non \u00e8 disponibile su questo dispositivo.",
+      "invalid_image": "L'immagine selezionata non \u00e8 valida.",
+      "corrupt_image": "L'immagine selezionata \u00e8 danneggiata.",
+      "image_too_large": "L'immagine supera il limite di 10 MiB.",
+      "unsupported_type": "Formato immagine non supportato.",
+      "network_timeout": "Il caricamento \u00e8 scaduto.",
+      "storage_forbidden": "Accesso allo spazio di archiviazione negato.",
+      "consent_required": "Per caricare capi serve il consenso di un tutore.",
+      "upload_expired": "La sessione di caricamento \u00e8 scaduta."
+    },
+    "crop": {
+      "title": "Ritaglia e posiziona",
+      "aspect_square": "1:1 Quadrato",
+      "aspect_four_three": "4:3 Ritratto",
+      "rotate": "Ruota",
+      "reset": "Ripristina"
+    },
+    "cleanup": {
+      "title": "Pulizia automatica dello sfondo",
+      "toggle": "Scontorno dello sfondo",
+      "retry": "Riprova pulizia",
+      "unavailable": "La pulizia dello sfondo non \u00e8 disponibile per questa immagine"
+    },
+    "confirm": {
+      "use_image": "Usa questa immagine"
+    },
+    "upload": {
+      "preparing": "Preparazione della convalida dell'immagine...",
+      "requesting": "Assegnazione della sessione di caricamento...",
+      "uploading": "Caricamento dei dati dell'immagine...",
+      "verifying": "Verifica dei dati nell'archivio privato...",
+      "processing": "Capo caricato. Analisi dei colori in corso...",
+      "ready": "Capo pronto",
+      "failed": "Caricamento del capo non riuscito",
+      "retry": "Riprova caricamento",
+      "cancel": "Annulla caricamento"
+    }
   }
 }

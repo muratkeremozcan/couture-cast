@@ -11,12 +11,12 @@
     "scenarios": {
       "morning": "Morgenpendeln",
       "midday": "Mittags",
-      "evening": "Abendpläne"
+      "evening": "Abendpl\u00e4ne"
     },
     "conditions": {
       "clear": "Klarer Himmel",
-      "partly_cloudy": "Teilweise bewölkt",
-      "cloudy": "Bewölkt",
+      "partly_cloudy": "Teilweise bew\u00f6lkt",
+      "cloudy": "Bew\u00f6lkt",
       "fog": "Neblig",
       "drizzle": "Nieselregen",
       "rain": "Regnerisch",
@@ -26,75 +26,132 @@
       "wind": "Windig",
       "unknown": "Unbekannt"
     },
-    "hourly_forecast": "Stündliche Vorhersage",
+    "hourly_forecast": "St\u00fcndliche Vorhersage",
     "expand_hours": "Erweitern ({{hours}} Std.)",
     "collapse": "Reduzieren",
-    "load_error": "Tägliche Empfehlungen konnten nicht geladen werden",
+    "load_error": "T\u00e4gliche Empfehlungen konnten nicht geladen werden",
     "retry": "Erneut versuchen",
-    "badge_justification": "Begründung für {{label}}:",
+    "badge_justification": "Begr\u00fcndung f\u00fcr {{label}}:",
     "alert_title": "Unwetterwarnung",
-    "offline_toast": "Kürzlich zwischengespeicherte Wetterdaten werden verwendet",
+    "offline_toast": "K\u00fcrzlich zwischengespeicherte Wetterdaten werden verwendet",
     "loading": "Empfehlungen werden geladen...",
-    "garment_swap_title": "Alternative für {{category}} wählen",
-    "feels_like": "Gefühlt wie",
+    "garment_swap_title": "Alternative f\u00fcr {{category}} w\u00e4hlen",
+    "feels_like": "Gef\u00fchlt wie",
     "precipitation": "Niederschlag"
   },
   "widget": {
     "now": "JETZT",
-    "next_hour": "NÄCHSTE STUNDE",
+    "next_hour": "N\u00c4CHSTE STUNDE",
     "stale": "Veraltet",
-    "unavailable": "App für Empfehlungen öffnen",
+    "unavailable": "App f\u00fcr Empfehlungen \u00f6ffnen",
     "precipitation": "Niederschlag"
   },
   "settings": {
     "title": "Einstellungen",
     "language": "Sprache",
-    "locale_sync_error": "Die Sprache wurde auf diesem Gerät geändert. Die Profilsynchronisierung wird später erneut versucht.",
-    "locale_change_error": "Die Sprache konnte nicht geändert werden. Bitte versuche es erneut.",
+    "locale_sync_error": "Die Sprache wurde auf diesem Ger\u00e4t ge\u00e4ndert. Die Profilsynchronisierung wird sp\u00e4ter erneut versucht.",
+    "locale_change_error": "Die Sprache konnte nicht ge\u00e4ndert werden. Bitte versuche es erneut.",
     "region_units": "Region & Einheiten",
     "languages": {
       "en-US": "Englisch (USA)",
       "en-CA": "Englisch (Kanada)",
       "es-419": "Spanisch (LatAm)",
-      "fr-CA": "Französisch (Kanada)",
-      "fr-FR": "Französisch (Europa)",
-      "tr-TR": "Türkisch",
+      "fr-CA": "Franz\u00f6sisch (Kanada)",
+      "fr-FR": "Franz\u00f6sisch (Europa)",
+      "tr-TR": "T\u00fcrkisch",
       "de-DE": "Deutsch",
       "it-IT": "Italienisch",
       "pt-BR": "Portugiesisch (Brasilien)",
       "pt-PT": "Portugiesisch (Portugal)"
     },
-    "api_health": "API-Status wird überprüft...",
+    "api_health": "API-Status wird \u00fcberpr\u00fcft...",
     "api_health_status": "API-Status: {{status}}",
-    "api_health_unavailable": "API-Status nicht verfügbar",
+    "api_health_unavailable": "API-Status nicht verf\u00fcgbar",
     "diagnostic_alert_btn": "Wetterwarnungsanalysen aufzeichnen",
-    "diagnostic_info": "Das Tracking für alert_received ist mit den echten Push-Benachrichtigungsempfängern verknüpft."
+    "diagnostic_info": "Das Tracking f\u00fcr alert_received ist mit den echten Push-Benachrichtigungsempf\u00e4ngern verkn\u00fcpft."
   },
   "common": {
     "cancel": "Abbrechen",
-    "dismiss_banner": "Banner schließen",
-    "invalid_link": "Dieser Link ist ungültig, abgelaufen oder nicht mehr verfügbar.",
-    "about_couturecast": "Über CoutureCast",
+    "dismiss_banner": "Banner schlie\u00dfen",
+    "invalid_link": "Dieser Link ist ung\u00fcltig, abgelaufen oder nicht mehr verf\u00fcgbar.",
+    "about_couturecast": "\u00dcber CoutureCast",
     "about_description": "CoutureCast verbindet Wetterdaten mit Garderobenempfehlungen."
   },
   "accessibility": {
     "skip_to_content": "Zum Hauptinhalt springen",
-    "weather_glyph_alt": "Wetter-Icon für {{condition}}",
+    "weather_glyph_alt": "Wetter-Icon f\u00fcr {{condition}}",
     "garment_item_alt": "{{title}}",
-    "garment_swap_hint": "Öffnet alternative Kleidungsstücke",
+    "garment_swap_hint": "\u00d6ffnet alternative Kleidungsst\u00fccke",
     "garment_category_outerwear": "Oberbekleidung",
     "garment_category_bottoms": "Unterteile",
     "garment_category_tops": "Oberteile",
     "garment_category_footwear": "Schuhe",
     "garment_category_accessories": "Accessoires",
-    "garment_category_garment": "Kleidungsstück",
-    "chip_personal": "Persönlich",
+    "garment_category_garment": "Kleidungsst\u00fcck",
+    "chip_personal": "Pers\u00f6nlich",
     "chip_community": "Community",
     "chip_sponsored": "Gesponsert",
     "chip_filter_label": "{{chip}} Empfehlungen anzeigen",
     "live_announcement_refresh": "Tagesempfehlung aktualisiert",
-    "live_announcement_swap": "Kleidungsstück ausgetauscht",
+    "live_announcement_swap": "Kleidungsst\u00fcck ausgetauscht",
     "live_announcement_chip_change": "Zeige {{chip}}-Empfehlungen",
     "live_announcement_alert": "Unwetterwarnung: {{alert}}"
+  },
+  "wardrobe": {
+    "title": "Kleiderschrank",
+    "add_garment": "Kleidungsst\u00fcck hinzuf\u00fcgen",
+    "empty_title": "Noch keine Kleidungsst\u00fccke hinzugef\u00fcgt",
+    "empty_desc": "Fotografiere dein Lieblingskleidungsst\u00fcck, um loszulegen.",
+    "capture": {
+      "title": "Kleidungsst\u00fcck erfassen",
+      "camera": "Foto aufnehmen",
+      "library": "Fotomediathek",
+      "retake": "Neu aufnehmen",
+      "choose_another": "Anderes ausw\u00e4hlen"
+    },
+    "permission": {
+      "camera_denied": "Die Kameraberechtigung wurde verweigert.",
+      "camera_blocked": "Der Kamerazugriff ist in den Einstellungen gesperrt.",
+      "library_denied": "Die Berechtigung f\u00fcr die Fotomediathek wurde verweigert.",
+      "open_settings": "Einstellungen \u00f6ffnen"
+    },
+    "error": {
+      "camera_unavailable": "Die Kamera ist auf diesem Ger\u00e4t nicht verf\u00fcgbar.",
+      "invalid_image": "Ung\u00fcltiges Bild ausgew\u00e4hlt.",
+      "corrupt_image": "Das ausgew\u00e4hlte Bild ist besch\u00e4digt.",
+      "image_too_large": "Das Bild \u00fcberschreitet die Grenze von 10 MiB.",
+      "unsupported_type": "Nicht unterst\u00fctztes Bildformat.",
+      "network_timeout": "Zeit\u00fcberschreitung beim Hochladen.",
+      "storage_forbidden": "Zugriff auf den Speicher verweigert.",
+      "consent_required": "F\u00fcr Uploads ist die Zustimmung einer erziehungsberechtigten Person erforderlich.",
+      "upload_expired": "Die Upload-Sitzung ist abgelaufen."
+    },
+    "crop": {
+      "title": "Zuschneiden und positionieren",
+      "aspect_square": "1:1 Quadrat",
+      "aspect_four_three": "4:3 Hochformat",
+      "rotate": "Drehen",
+      "reset": "Zur\u00fccksetzen"
+    },
+    "cleanup": {
+      "title": "Automatische Hintergrundbereinigung",
+      "toggle": "Hintergrund freistellen",
+      "retry": "Bereinigung wiederholen",
+      "unavailable": "Die Hintergrundbereinigung ist f\u00fcr dieses Bild nicht verf\u00fcgbar"
+    },
+    "confirm": {
+      "use_image": "Dieses Bild verwenden"
+    },
+    "upload": {
+      "preparing": "Bildpr\u00fcfung wird vorbereitet...",
+      "requesting": "Upload-Sitzung wird reserviert...",
+      "uploading": "Bilddaten werden hochgeladen...",
+      "verifying": "Private Speicherdaten werden gepr\u00fcft...",
+      "processing": "Kleidungsst\u00fcck hochgeladen. Farbanalyse l\u00e4uft...",
+      "ready": "Kleidungsst\u00fcck bereit",
+      "failed": "Upload des Kleidungsst\u00fccks fehlgeschlagen",
+      "retry": "Upload wiederholen",
+      "cancel": "Upload abbrechen"
+    }
   }
 }

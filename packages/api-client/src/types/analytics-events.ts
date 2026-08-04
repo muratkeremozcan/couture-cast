@@ -31,6 +31,7 @@ export const analyticsEventNameSchema = z.enum([
   'location_switched',
   'api_error_occurred',
   'locale_switched',
+  'garment_upload_completed',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -163,6 +164,22 @@ export const localeSwitchedEventSchema = z.object({
 
 export type LocaleSwitchedEvent = z.infer<typeof localeSwitchedEventSchema>
 
+export const garmentUploadCompletedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString.max(128),
+    garmentId: nonEmptyString,
+    fileSizeBytes: z.number().int().min(1).max(10_485_760),
+    mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    hasCropping: z.boolean(),
+    hasBgCleanup: z.boolean(),
+    durationMs: z.number().int().min(0).max(86_400_000),
+  })
+  .strict()
+
+export type GarmentUploadCompletedEvent = z.infer<
+  typeof garmentUploadCompletedEventSchema
+>
+
 export const analyticsEventSchemas = {
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
@@ -176,6 +193,7 @@ export const analyticsEventSchemas = {
   location_switched: locationSwitchedEventSchema,
   api_error_occurred: apiErrorOccurredEventSchema,
   locale_switched: localeSwitchedEventSchema,
+  garment_upload_completed: garmentUploadCompletedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -301,6 +319,21 @@ export const localeSwitchedPropertiesSchema = z.object({
 })
 
 export type LocaleSwitchedProperties = z.infer<typeof localeSwitchedPropertiesSchema>
+
+export const garmentUploadCompletedPropertiesSchema = z
+  .object({
+    garment_id: nonEmptyString.max(64),
+    file_size_bytes: z.number().int().min(1).max(10_485_760),
+    mime_type: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    has_cropping: z.boolean(),
+    has_bg_cleanup: z.boolean(),
+    duration_ms: z.number().int().min(0).max(86_400_000),
+  })
+  .strict()
+
+export type GarmentUploadCompletedProperties = z.infer<
+  typeof garmentUploadCompletedPropertiesSchema
+>
 
 // Flow ref S0.7/T2/2: normalize domain inputs to snake_case analytics
 // properties in the shared wrappers below.
@@ -516,6 +549,26 @@ export function trackLocaleSwitched(
       from_locale: parsed.fromLocale,
       to_locale: parsed.toLocale,
       timestamp: parsed.timestamp,
+    }),
+  }
+}
+
+// Story 4.1 Task 7 step 1 owner: define garment_upload_completed analytics event and track wrapper
+export function trackGarmentUploadCompleted(
+  event: GarmentUploadCompletedEvent
+): AnalyticsCapturePayload<'garment_upload_completed', GarmentUploadCompletedProperties> {
+  const parsed = garmentUploadCompletedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'garment_upload_completed',
+    properties: garmentUploadCompletedPropertiesSchema.parse({
+      garment_id: parsed.garmentId,
+      file_size_bytes: parsed.fileSizeBytes,
+      mime_type: parsed.mimeType,
+      has_cropping: parsed.hasCropping,
+      has_bg_cleanup: parsed.hasBgCleanup,
+      duration_ms: parsed.durationMs,
     }),
   }
 }

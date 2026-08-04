@@ -928,6 +928,7 @@ const run = async () => {
   const target = await ensureMaestroTarget()
   const apiHealthUrl = 'http://127.0.0.1:4000/api/health'
   const apiSetupBaseUrl = 'http://127.0.0.1:4000'
+  const mobileApiBaseUrl = getLocalApiUrl(target.platform)
   let apiProcess
 
   try {
@@ -948,6 +949,8 @@ const run = async () => {
               process.env.MOBILE_E2E_DATABASE_URL ||
               'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
             GUARDIAN_INVITE_WEB_BASE_URL: 'http://127.0.0.1:3005',
+            PUBLIC_API_URL:
+              process.env.MOBILE_E2E_PUBLIC_API_URL || mobileApiBaseUrl,
             TEST_ENV: 'local',
           },
         })
@@ -963,7 +966,7 @@ const run = async () => {
 
       process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN =
         await setupMobileE2EIdentity(apiSetupBaseUrl)
-      process.env.EXPO_PUBLIC_API_BASE_URL = getLocalApiUrl(target.platform)
+      process.env.EXPO_PUBLIC_API_BASE_URL = mobileApiBaseUrl
       log('Created authenticated mobile E2E fixture')
     } else if (!process.env.EXPO_PUBLIC_API_BASE_URL) {
       throw new Error(

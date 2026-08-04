@@ -21,11 +21,14 @@ describe('wardrobe item factory', () => {
     expect(item.colorPalette.length).toBeGreaterThan(0)
     expect(input).toEqual({
       id: item.id,
+      object_path: item.objectPath,
       image_url: item.imageUrl,
       category: item.category,
       material: item.material,
       comfort_range: item.comfortRange,
       color_palette: item.colorPalette,
+      upload_status: 'ready',
+      retention_status: 'active',
       user: {
         connect: {
           id: 'user-123',

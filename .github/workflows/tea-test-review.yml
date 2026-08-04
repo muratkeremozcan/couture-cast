@@ -22,7 +22,7 @@ jobs:
       contents: read
       pull-requests: write # for the review comment
     steps:
-      - uses: muratkeremozcan/tea-test-review@main
+      - uses: muratkeremozcan/tea-test-review@v1
         with:
           # Auto on every PR with codex; a '@codex ...' or '@claude ...'
           # comment re-runs on demand, the mention picks the agent, and text

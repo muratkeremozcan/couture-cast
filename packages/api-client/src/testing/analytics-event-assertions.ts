@@ -12,6 +12,7 @@ import {
   locationSwitchedPropertiesSchema,
   apiErrorOccurredPropertiesSchema,
   localeSwitchedPropertiesSchema,
+  garmentUploadCompletedPropertiesSchema,
   type AnalyticsEventName,
 } from '../types/analytics-events'
 import type { ExpectLike } from './expect-like'
@@ -40,6 +41,7 @@ const analyticsPropertySchemas = {
   location_switched: locationSwitchedPropertiesSchema,
   api_error_occurred: apiErrorOccurredPropertiesSchema,
   locale_switched: localeSwitchedPropertiesSchema,
+  garment_upload_completed: garmentUploadCompletedPropertiesSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

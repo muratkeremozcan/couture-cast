@@ -7,6 +7,7 @@ const {
   WARDROBE_CATEGORIES,
   WARDROBE_COMFORT_RANGES,
   WARDROBE_MATERIALS,
+  buildGarmentObjectPath,
   createWardrobeItem,
 } = unwrapCjsNamespace(wardrobeFactories)
 
@@ -51,25 +52,32 @@ export async function seedWardrobeItems(
         imageUrl: `https://picsum.photos/seed/${id}/640/640`,
       })
 
+      const objectPath = buildGarmentObjectPath(teen.id, id, 'png')
       garments.push({ id, userId: teen.id })
       garmentUpserts.push(
         prisma.garmentItem.upsert({
           where: { id },
           update: {
+            object_path: objectPath,
             category: fixture.category,
             material: fixture.material,
             comfort_range: fixture.comfortRange,
             color_palette: fixture.colorPalette,
             image_url: fixture.imageUrl,
+            upload_status: 'ready',
+            retention_status: 'active',
           },
           create: {
             id: fixture.id,
             user_id: fixture.userId,
+            object_path: objectPath,
             category: fixture.category,
             material: fixture.material,
             comfort_range: fixture.comfortRange,
             color_palette: fixture.colorPalette,
             image_url: fixture.imageUrl,
+            upload_status: 'ready',
+            retention_status: 'active',
           },
         })
       )

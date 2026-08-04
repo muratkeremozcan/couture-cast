@@ -11,6 +11,7 @@ import {
   ModerationApi,
   RitualApi,
   UserApi,
+  WardrobeApi,
   WeatherApi,
 } from './apis'
 
@@ -45,6 +46,7 @@ export interface DefaultApi
     PublicApi<ModerationApi>,
     PublicApi<RitualApi>,
     PublicApi<UserApi>,
+    PublicApi<WardrobeApi>,
     PublicApi<WeatherApi> {}
 
 export class DefaultApi extends BaseAPI {
@@ -64,5 +66,6 @@ applyApiMixins(DefaultApi, [
   ModerationApi,
   RitualApi,
   UserApi,
+  WardrobeApi,
   WeatherApi,
 ])

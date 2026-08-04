@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -786,6 +787,18 @@ export class GuardianService {
                   ),
                 },
               })
+
+              await tx.garmentItem.updateMany({
+                where: {
+                  user_id: teenId,
+                  retention_status: 'active',
+                },
+                data: {
+                  retention_status: 'deletion_pending',
+                  retention_trigger: 'guardian_consent_revoked',
+                  deletion_requested_at: revokedAt,
+                },
+              })
             }
 
             await tx.eventEnvelope.create({
@@ -1120,6 +1133,49 @@ export class GuardianService {
       teenIds,
       revokedConsentCount,
       notificationsQueued,
+    }
+  }
+
+  // Story 4.1 Task 3 step 1 owner: assertWardrobeUploadAllowed for teen guardian consent verification
+  async assertWardrobeUploadAllowed(userId: string, role?: string): Promise<void> {
+    if (role !== 'teen') {
+      return
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        profile: true,
+        teen_roles: {
+          where: { status: 'granted', revoked_at: null },
+        },
+      },
+    })
+
+    if (!user || !user.profile) {
+      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+    }
+
+    if (!user.profile.birthdate) {
+      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+    }
+
+    const compliance = extractComplianceState(user.profile.preferences)
+    if (compliance.accountStatus !== 'active') {
+      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+    }
+
+    const age = calculateAge(user.profile.birthdate)
+    if (age >= 16) {
+      return
+    }
+
+    if (age < 13) {
+      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+    }
+
+    if (user.teen_roles.length === 0) {
+      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
     }
   }
 }

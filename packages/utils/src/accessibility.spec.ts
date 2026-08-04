@@ -111,6 +111,31 @@ describe('accessibility utilities', () => {
         })
       ).toBe('')
     })
+
+    it('uses a locale-aware fallback when Intl.ListFormat is unavailable', () => {
+      const listFormat = Intl.ListFormat
+      Object.defineProperty(Intl, 'ListFormat', {
+        configurable: true,
+        value: undefined,
+      })
+
+      try {
+        expect(
+          formatWeatherAltText({
+            conditionLabel: 'Sunny',
+            temperature: 22,
+            unit: 'C',
+            locale: 'de-DE',
+            descriptor: 'light breeze',
+          })
+        ).toBe('Sunny, 22 Grad Celsius, und light breeze')
+      } finally {
+        Object.defineProperty(Intl, 'ListFormat', {
+          configurable: true,
+          value: listFormat,
+        })
+      }
+    })
   })
 
   describe('formatGarmentAltText', () => {

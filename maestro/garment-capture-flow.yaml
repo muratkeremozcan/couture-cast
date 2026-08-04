@@ -1,0 +1,87 @@
+# Story 4.1 Task 9 step 1 owner: Maestro E2E test script for mobile garment capture flow
+appId: ${MAESTRO_APP_ID}
+name: 'Garment capture flow'
+tags:
+  - e2e
+  - wardrobe
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go first-run sheet when present'
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu onboarding when present'
+
+- extendedWaitUntil:
+    visible:
+      id: 'tab-wardrobe'
+    timeout: 60000
+
+- tapOn:
+    point: '93%,35%'
+    label: 'Close the Expo Go developer panel when it appears late'
+
+- tapOn:
+    id: 'tab-wardrobe'
+    retryTapIfNoChange: true
+
+- assertVisible:
+    id: 'wardrobe-screen'
+
+- assertVisible:
+    id: 'garment-capture-open'
+
+- tapOn:
+    id: 'garment-capture-open'
+
+- assertVisible:
+    id: 'garment-source-camera'
+
+- assertVisible:
+    id: 'garment-source-library'
+
+- tapOn:
+    id: 'garment-e2e-fixture-source'
+
+- assertVisible:
+    id: 'garment-crop-preview'
+
+- assertVisible:
+    id: 'garment-aspect-square'
+
+- tapOn:
+    id: 'garment-aspect-portrait'
+
+- assertVisible:
+    id: 'garment-cleanup-toggle'
+
+- assertVisible:
+    id: 'garment-confirm-image'
+
+- tapOn:
+    id: 'garment-confirm-image'
+
+- assertVisible:
+    id: 'garment-capture-complete'
+
+- tapOn:
+    id: 'garment-capture-done'
+
+- assertVisible:
+    id: 'wardrobe-garment-list'
+
+- takeScreenshot:
+    path: maestro/artifacts/garment-capture-flow

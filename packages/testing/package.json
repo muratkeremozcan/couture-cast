@@ -37,6 +37,7 @@
   },
   "dependencies": {
     "@faker-js/faker": "10.1.0",
-    "@prisma/client": "6.19.0"
+    "@prisma/client": "6.19.0",
+    "@couture/utils": "file:../utils"
   }
 }

@@ -39,6 +39,14 @@ function extractDurationMs(value: unknown): number | undefined {
   return typeof responseTime === 'number' ? responseTime : undefined
 }
 
+export function normalizeRequestPath(path: string): string {
+  const pathname = path.split('?')[0] ?? path
+  return pathname.replace(
+    /\/api\/v1\/wardrobe\/uploads\/[^/]+/,
+    '/api/v1/wardrobe/uploads/:uploadSessionId'
+  )
+}
+
 export function createRequestLoggerMiddleware(
   options: CreateRequestLoggerOptions = {}
 ): HttpLogger<Request, Response> {
@@ -73,29 +81,32 @@ export function createRequestLoggerMiddleware(
     customReceivedObject(request) {
       // Flow ref S0.7/T5/2: shape request/response log payloads with feature,
       // path, status, and user context.
+      const path = normalizeRequestPath(request.originalUrl ?? request.url)
       return {
-        feature: inferFeatureFromPath(request.originalUrl ?? request.url),
+        feature: inferFeatureFromPath(path),
         method: request.method,
-        path: request.originalUrl ?? request.url,
+        path,
       }
     },
     customSuccessObject(request, response, value) {
+      const path = normalizeRequestPath(request.originalUrl ?? request.url)
       return {
         durationMs: extractDurationMs(value),
-        feature: inferFeatureFromPath(request.originalUrl ?? request.url),
+        feature: inferFeatureFromPath(path),
         method: request.method,
-        path: request.originalUrl ?? request.url,
+        path,
         statusCode: response.statusCode,
         userId: extractUserId(request),
       }
     },
     customErrorObject(request, response, error, value) {
+      const path = normalizeRequestPath(request.originalUrl ?? request.url)
       return {
         durationMs: extractDurationMs(value),
         error,
-        feature: inferFeatureFromPath(request.originalUrl ?? request.url),
+        feature: inferFeatureFromPath(path),
         method: request.method,
-        path: request.originalUrl ?? request.url,
+        path,
         statusCode: response.statusCode,
         userId: extractUserId(request),
       }

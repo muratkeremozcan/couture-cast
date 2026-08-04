@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createHmac } from 'node:crypto'
 import { TelemetryService } from './telemetry.service'
 import type { PrismaClient } from '@prisma/client'
 import { type AnalyticsClient } from '../../analytics/analytics.service'
@@ -12,6 +13,7 @@ describe('TelemetryService', () => {
   let analyticsCapture: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
+    process.env.ANALYTICS_ID_SECRET = 'telemetry-test-secret-at-least-32-bytes'
     telemetryCreate = vi.fn()
     telemetryDeleteMany = vi.fn()
     telemetryFindFirst = vi.fn().mockResolvedValue(null)
@@ -100,6 +102,60 @@ describe('TelemetryService', () => {
 
     expect(telemetryCreate).toHaveBeenCalled()
     expect(analyticsCapture).toHaveBeenCalled()
+  })
+
+  it('emits strict pseudonymous garment completion telemetry without IP capture', async () => {
+    telemetryCreate.mockResolvedValue({ id: 'event-1' })
+
+    await service.captureEvent('raw-user-1', 'garment_upload_completed', {
+      garmentId: 'garment-1',
+      fileSizeBytes: 2048,
+      mimeType: 'image/png',
+      hasCropping: true,
+      hasBgCleanup: false,
+      durationMs: 1200,
+    })
+
+    const subject = createHmac('sha256', 'telemetry-test-secret-at-least-32-bytes')
+      .update('raw-user-1')
+      .digest('base64url')
+    const productProperties = {
+      garment_id: 'garment-1',
+      file_size_bytes: 2048,
+      mime_type: 'image/png',
+      has_cropping: true,
+      has_bg_cleanup: false,
+      duration_ms: 1200,
+    }
+
+    expect(telemetryCreate).toHaveBeenCalledWith({
+      data: {
+        user_id: null,
+        event_type: 'garment_upload_completed',
+        properties: productProperties,
+      },
+    })
+    expect(analyticsCapture).toHaveBeenCalledWith({
+      distinctId: subject,
+      event: 'garment_upload_completed',
+      properties: { ...productProperties, $ip: null },
+    })
+  })
+
+  it('rejects incomplete or unknown garment completion properties', async () => {
+    await expect(
+      service.captureEvent('raw-user-1', 'garment_upload_completed', {
+        garmentId: 'garment-1',
+        fileSizeBytes: 2048,
+        mimeType: 'image/png',
+        hasCropping: true,
+        hasBgCleanup: false,
+        durationMs: 1200,
+        userId: 'raw-user-1',
+      } as never)
+    ).rejects.toThrow()
+    expect(telemetryCreate).not.toHaveBeenCalled()
+    expect(analyticsCapture).not.toHaveBeenCalled()
   })
 
   it('prunes old telemetry events older than 24 hours', async () => {

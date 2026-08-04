@@ -37,6 +37,9 @@ import { createBaseLogger } from '../logger/pino.config.js'
 import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 import { shutdownWorkerResources } from './shutdown-resources'
+import { WardrobeColorProcessor } from '../modules/wardrobe/wardrobe-color.processor'
+import { SupabaseWardrobeStorageAdapter } from '../modules/wardrobe/wardrobe-storage.adapter'
+import { garmentColorProcessingJobSchema } from '../modules/wardrobe/wardrobe-processing.queue'
 
 // Flow ref S0.4/T5: track worker/queue instances for coordinated shutdown.
 const logger = createBaseLogger().child({ feature: 'workers' })
@@ -53,10 +56,13 @@ async function startWorkers() {
     queues.push(...startedQueues)
     const weatherQueue = startedQueues.find((queue) => queue.name === 'weather-ingestion')
     const alertFanoutQueue = startedQueues.find((queue) => queue.name === 'alert-fanout')
+    const colorExtractionQueue = startedQueues.find(
+      (queue) => queue.name === 'color-extraction'
+    )
 
-    if (!weatherQueue || !alertFanoutQueue) {
+    if (!weatherQueue || !alertFanoutQueue || !colorExtractionQueue) {
       throw new Error(
-        'Required weather-ingestion and alert-fanout queues were not created'
+        'Required weather-ingestion, alert-fanout, and color-extraction queues were not created'
       )
     }
 
@@ -73,6 +79,10 @@ async function startWorkers() {
     redisClients.push(alertRelayRedis)
     posthogService = new PostHogService()
     const telemetryService = new TelemetryService(prisma, posthogService)
+    const wardrobeColorProcessor = new WardrobeColorProcessor(
+      prisma,
+      new SupabaseWardrobeStorageAdapter()
+    )
     const alertFanoutProcessor = new AlertFanoutProcessor(
       new PrismaAlertFanoutRepository(prisma),
       new RedisAlertRealtimePublisher(alertRelayRedis),
@@ -140,10 +150,25 @@ async function startWorkers() {
 
     workers.push(
       // Expensive extraction workload gets stricter queue-level throttling.
-      createWorker('color-extraction', async () => Promise.resolve(), {
-        ...defaultWorkerOptions(5),
-        limiter: { max: 5, duration: 1000 },
-      })
+      createWorker(
+        'color-extraction',
+        async (job) => {
+          const data = garmentColorProcessingJobSchema.parse(job.data)
+          try {
+            await wardrobeColorProcessor.process(data.garmentId)
+          } catch (error) {
+            const maxAttempts = job.opts.attempts ?? 1
+            if (job.attemptsMade + 1 >= maxAttempts) {
+              await wardrobeColorProcessor.markFailed(data.garmentId)
+            }
+            throw error
+          }
+        },
+        {
+          ...defaultWorkerOptions(5),
+          limiter: { max: 5, duration: 1000 },
+        }
+      )
     )
 
     workers.push(
