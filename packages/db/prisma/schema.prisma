@@ -247,39 +247,46 @@ model ComfortPreferences {
 
 /// RLS: wardrobe items must filter by user_id for tenant isolation
 model GarmentItem {
-  id                     String                 @id @default(cuid())
-  user                   User                   @relation(fields: [user_id], references: [id])
-  user_id                String
-  object_path            String?                @unique
-  image_url              String?
-  category               String?
-  material               String?
-  comfort_range          String?
-  color_palette          Json?
-  upload_session_id      String?                @unique
-  upload_idempotency_key String?
-  file_size_bytes        Int?
-  mime_type              String?
-  content_sha256         String?
-  width_px               Int?
-  height_px              Int?
-  upload_status          GarmentUploadStatus    @default(pending_upload)
-  retention_status       GarmentRetentionStatus @default(active)
-  upload_expires_at      DateTime?
-  committed_at           DateTime?
-  consent_checked_at     DateTime?
-  has_cropping           Boolean                @default(false)
-  has_bg_cleanup         Boolean                @default(false)
-  failure_code           String?
-  deletion_requested_at  DateTime?
-  created_at             DateTime               @default(now())
-  updated_at             DateTime               @updatedAt
-  palette                PaletteInsights?       @relation("GarmentPalette")
-  moderation_events      ModerationEvent[]
+  id                              String                 @id @default(cuid())
+  user                            User                   @relation(fields: [user_id], references: [id])
+  user_id                         String
+  object_path                     String?                @unique
+  image_url                       String?
+  category                        String?
+  material                        String?
+  comfort_range                   String?
+  color_palette                   Json?
+  upload_session_id               String?                @unique
+  upload_idempotency_key          String?
+  commit_idempotency_key          String?
+  commit_payload_hash             String?
+  file_size_bytes                 Int?
+  mime_type                       String?
+  content_sha256                  String?
+  width_px                        Int?
+  height_px                       Int?
+  upload_status                   GarmentUploadStatus    @default(pending_upload)
+  retention_status                GarmentRetentionStatus @default(active)
+  upload_expires_at               DateTime?
+  committed_at                    DateTime?
+  consent_checked_at              DateTime?
+  has_cropping                    Boolean                @default(false)
+  has_bg_cleanup                  Boolean                @default(false)
+  completion_telemetry_emitted_at DateTime?
+  processing_job_enqueued_at      DateTime?
+  failure_code                    String?
+  retention_trigger               String?
+  deletion_requested_at           DateTime?
+  created_at                      DateTime               @default(now())
+  updated_at                      DateTime               @updatedAt
+  palette                         PaletteInsights?       @relation("GarmentPalette")
+  moderation_events               ModerationEvent[]
 
+  @@unique([user_id, upload_idempotency_key])
+  @@unique([user_id, commit_idempotency_key])
   @@index([user_id])
   @@index([user_id, upload_status, upload_expires_at])
-  @@index([user_id, upload_idempotency_key])
+  @@index([retention_status, deletion_requested_at])
 }
 
 /// RLS: palette insights derived from garments, scoped to user_id
@@ -362,13 +369,13 @@ model PushToken {
 }
 
 model EventEnvelope {
-  id                    String                @id @default(cuid())
+  id                    String               @id @default(cuid())
   channel               String
   payload               Json
-  user                  User?                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user                  User?                @relation(fields: [user_id], references: [id], onDelete: Cascade)
   user_id               String?
-  created_at            DateTime              @default(now())
-  updated_at            DateTime              @updatedAt
+  created_at            DateTime             @default(now())
+  updated_at            DateTime             @updatedAt
   alert_delivery_outbox AlertDeliveryOutbox?
 
   @@index([channel])

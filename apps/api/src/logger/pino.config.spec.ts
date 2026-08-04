@@ -87,4 +87,32 @@ describe('pino.config', () => {
     })
     expect(parseLastLogLine(stream).timestamp).toEqual(expect.any(String))
   })
+
+  it('redacts garment upload credentials, paths, URLs, and image data', () => {
+    const stream = new MemoryStream()
+    const logger = createBaseLogger({ destination: stream, env: { LOG_LEVEL: 'info' } })
+
+    logger.info(
+      {
+        authorization: 'Bearer secret-jwt',
+        uploadToken: 'signed-upload-token',
+        upload: {
+          uploadUrl: 'https://api.test/upload?token=secret',
+          objectPath: 'wardrobe/user/garment.png',
+          imageData: 'data:image/png;base64,secret',
+        },
+      },
+      'garment_upload_failed'
+    )
+
+    expect(parseLastLogLine(stream)).toMatchObject({
+      authorization: '[REDACTED]',
+      uploadToken: '[REDACTED]',
+      upload: {
+        uploadUrl: '[REDACTED]',
+        objectPath: '[REDACTED]',
+        imageData: '[REDACTED]',
+      },
+    })
+  })
 })

@@ -98,60 +98,60 @@
     "live_announcement_alert": "Alerte m\u00e9t\u00e9o s\u00e9v\u00e8re : {{alert}}"
   },
   "wardrobe": {
-    "title": "Wardrobe Hub",
-    "add_garment": "Add Garment",
-    "empty_title": "No garments added yet",
-    "empty_desc": "Snap a photo of your favorite clothing item to get started.",
+    "title": "Garde-robe",
+    "add_garment": "Ajouter un v\u00eatement",
+    "empty_title": "Aucun v\u00eatement ajout\u00e9",
+    "empty_desc": "Prenez une photo de votre v\u00eatement pr\u00e9f\u00e9r\u00e9 pour commencer.",
     "capture": {
-      "title": "Garment Capture",
-      "camera": "Take Photo",
-      "library": "Photo Library",
-      "retake": "Retake",
-      "choose_another": "Choose Another"
+      "title": "Saisie du v\u00eatement",
+      "camera": "Prendre une photo",
+      "library": "Phototh\u00e8que",
+      "retake": "Reprendre la photo",
+      "choose_another": "En choisir une autre"
     },
     "permission": {
-      "camera_denied": "Camera permission was denied.",
-      "camera_blocked": "Camera access is blocked in settings.",
-      "library_denied": "Photo library permission was denied.",
-      "open_settings": "Open Settings"
+      "camera_denied": "L'autorisation d'acc\u00e8s \u00e0 la cam\u00e9ra a \u00e9t\u00e9 refus\u00e9e.",
+      "camera_blocked": "L'acc\u00e8s \u00e0 la cam\u00e9ra est bloqu\u00e9 dans les r\u00e9glages.",
+      "library_denied": "L'autorisation d'acc\u00e8s \u00e0 la phototh\u00e8que a \u00e9t\u00e9 refus\u00e9e.",
+      "open_settings": "Ouvrir les r\u00e9glages"
     },
     "error": {
-      "camera_unavailable": "Camera is unavailable on this device.",
-      "invalid_image": "Invalid image selected.",
-      "corrupt_image": "Selected image is corrupt.",
-      "image_too_large": "Image exceeds 10 MiB limit.",
-      "unsupported_type": "Unsupported image format.",
-      "network_timeout": "Upload timed out.",
-      "storage_forbidden": "Storage access forbidden.",
-      "consent_required": "Guardian consent required for wardrobe uploads.",
-      "upload_expired": "Upload session expired."
+      "camera_unavailable": "La cam\u00e9ra n'est pas disponible sur cet appareil.",
+      "invalid_image": "L'image s\u00e9lectionn\u00e9e est invalide.",
+      "corrupt_image": "L'image s\u00e9lectionn\u00e9e est corrompue.",
+      "image_too_large": "L'image d\u00e9passe la limite de 10 Mio.",
+      "unsupported_type": "Format d'image non pris en charge.",
+      "network_timeout": "Le t\u00e9l\u00e9versement a expir\u00e9.",
+      "storage_forbidden": "L'acc\u00e8s au stockage est interdit.",
+      "consent_required": "Le consentement d'un tuteur est requis pour t\u00e9l\u00e9verser des v\u00eatements.",
+      "upload_expired": "La session de t\u00e9l\u00e9versement a expir\u00e9."
     },
     "crop": {
-      "title": "Crop & Position",
-      "aspect_square": "1:1 Square",
+      "title": "Recadrer et positionner",
+      "aspect_square": "1:1 Carr\u00e9",
       "aspect_four_three": "4:3 Portrait",
-      "rotate": "Rotate",
-      "reset": "Reset"
+      "rotate": "Pivoter",
+      "reset": "R\u00e9initialiser"
     },
     "cleanup": {
-      "title": "Auto Background Cleanup",
-      "toggle": "Background Matting",
-      "retry": "Retry Cleanup",
-      "unavailable": "Background cleanup unavailable for this image"
+      "title": "Nettoyage automatique de l'arri\u00e8re-plan",
+      "toggle": "D\u00e9tourage de l'arri\u00e8re-plan",
+      "retry": "R\u00e9essayer le nettoyage",
+      "unavailable": "Le nettoyage de l'arri\u00e8re-plan n'est pas disponible pour cette image"
     },
     "confirm": {
-      "use_image": "Use This Image"
+      "use_image": "Utiliser cette image"
     },
     "upload": {
-      "preparing": "Preparing asset validation...",
-      "requesting": "Allocating upload session...",
-      "uploading": "Uploading image bytes...",
-      "verifying": "Verifying private storage payload...",
-      "processing": "Garment uploaded! Processing color analysis...",
-      "ready": "Garment ready",
-      "failed": "Garment upload failed",
-      "retry": "Retry Upload",
-      "cancel": "Cancel Upload"
+      "preparing": "Pr\u00e9paration de la validation de l'image...",
+      "requesting": "Attribution de la session de t\u00e9l\u00e9versement...",
+      "uploading": "T\u00e9l\u00e9versement des donn\u00e9es de l'image...",
+      "verifying": "V\u00e9rification des donn\u00e9es priv\u00e9es stock\u00e9es...",
+      "processing": "V\u00eatement t\u00e9l\u00e9vers\u00e9. Analyse des couleurs en cours...",
+      "ready": "V\u00eatement pr\u00eat",
+      "failed": "Le t\u00e9l\u00e9versement du v\u00eatement a \u00e9chou\u00e9",
+      "retry": "R\u00e9essayer le t\u00e9l\u00e9versement",
+      "cancel": "Annuler le t\u00e9l\u00e9versement"
     }
   }
 }

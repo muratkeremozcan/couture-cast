@@ -7,6 +7,7 @@ const {
   WARDROBE_CATEGORIES,
   WARDROBE_COMFORT_RANGES,
   WARDROBE_MATERIALS,
+  buildGarmentObjectPath,
   createWardrobeItem,
 } = unwrapCjsNamespace(wardrobeFactories)
 
@@ -51,7 +52,7 @@ export async function seedWardrobeItems(
         imageUrl: `https://picsum.photos/seed/${id}/640/640`,
       })
 
-      const objectPath = `wardrobe/${teen.id}/${id}.png`
+      const objectPath = buildGarmentObjectPath(teen.id, id, 'png')
       garments.push({ id, userId: teen.id })
       garmentUpserts.push(
         prisma.garmentItem.upsert({

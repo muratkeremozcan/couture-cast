@@ -4,7 +4,7 @@ baseline_commit: 53e9909d40384403ce8ae102ef5f1989601f2a19
 
 # Story 4.1: Garment capture flow
 
-Status: ready-for-dev
+Status: done
 
 Updated: 2026-08-04: security, privacy, lifecycle, cross-surface, and test contracts
 made implementation-ready after critical review
@@ -558,6 +558,39 @@ And no focused, skipped, or flaky garment-capture test remains.
   - [x] Inspect rendered web and mobile flows at supported viewport classes and device text sizes.
   - [x] Confirm no token, URL, path, filename, image, email, IP, or raw auth claim appears in
         captured logs, errors, traces, PostHog payloads, screenshots, or test artifacts.
+
+### Review Findings
+
+- [x] [Review][Patch] [High] Restore buildable and injectable Wardrobe API wiring
+      [apps/api/src/modules/wardrobe/wardrobe.controller.ts:87]
+- [x] [Review][Patch] [High] Add the required Garment lifecycle database migration
+      [packages/db/prisma/schema.prisma:44]
+- [x] [Review][Patch] [High] Add the private Storage bucket and operation-specific RLS policies
+      [packages/db/prisma/schema.prisma:253]
+- [x] [Review][Patch] [High] Receive, verify, and persist binary image bytes through the relay
+      [apps/api/src/modules/wardrobe/wardrobe.controller.ts:61]
+- [x] [Review][Patch] [High] Bind garment commit to the verified uploaded session
+      [apps/api/src/modules/wardrobe/wardrobe.service.ts:249]
+- [x] [Review][Patch] [High] Make allocation, upload, commit, and telemetry idempotent and atomic
+      [apps/api/src/modules/wardrobe/wardrobe.service.ts:136]
+- [x] [Review][Patch] [High] Enqueue ADR-014 processing and return a real private signed URL
+      [apps/api/src/modules/wardrobe/wardrobe.service.ts:293]
+- [x] [Review][Patch] [High] Authorize teens from canonical birthdate and fresh active consent
+      [apps/api/src/modules/guardian/guardian.service.ts:1133]
+- [x] [Review][Patch] [High] Fail closed when the upload-token secret is absent
+      [apps/api/src/modules/wardrobe/wardrobe.service.ts:23]
+- [x] [Review][Patch] [High] Enforce the strict pseudonymous completion telemetry contract
+      [packages/api-client/src/types/analytics-events.ts:322]
+- [x] [Review][Patch] [High] Replace the simulated web success path with the real upload workflow
+      [apps/web/src/app/components/garment-capture-modal.tsx:349]
+- [x] [Review][Patch] [High] Implement actual crop, cleanup, camera lifecycle, and cancellation
+      [apps/web/src/app/components/garment-capture-modal.tsx:143]
+- [x] [Review][Patch] [High] Implement the native capture flow and meaningful Maestro coverage
+      [apps/mobile/app/(tabs)/wardrobe.tsx:5]
+- [x] [Review][Patch] [High] Implement retention revocation, cleanup, and legal-hold enforcement
+      [apps/api/src/modules/wardrobe/wardrobe.service.ts:261]
+- [x] [Review][Patch] [Medium] Restore persistent mobile navigation on the web Wardrobe route
+      [apps/web/src/app/wardrobe/page.tsx:16]
 
 ## Required implementation contract
 

@@ -3667,7 +3667,7 @@
               },
               "uploadUrl": {
                 "type": "string",
-                "minLength": 1
+                "format": "uri"
               },
               "uploadToken": {
                 "type": "string",
@@ -3697,12 +3697,14 @@
               "uploadToken",
               "requiredHeaders",
               "expiresAt"
-            ]
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
           "data"
-        ]
+        ],
+        "additionalProperties": false
       },
       "CreateGarmentItemInput": {
         "type": "object",
@@ -3768,6 +3770,11 @@
                 "type": [
                   "string",
                   "null"
+                ],
+                "enum": [
+                  "image/jpeg",
+                  "image/png",
+                  "image/webp"
                 ]
               },
               "retentionStatus": {
@@ -3797,7 +3804,7 @@
                 "properties": {
                   "url": {
                     "type": "string",
-                    "minLength": 1
+                    "format": "uri"
                   },
                   "expiresAt": {
                     "type": "string",
@@ -3807,7 +3814,8 @@
                 "required": [
                   "url",
                   "expiresAt"
-                ]
+                ],
+                "additionalProperties": false
               }
             },
             "required": [
@@ -3820,12 +3828,122 @@
               "createdAt",
               "committedAt",
               "imageAccess"
-            ]
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
           "data"
-        ]
+        ],
+        "additionalProperties": false
+      },
+      "GarmentListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending_upload",
+                    "bytes_uploaded",
+                    "processing",
+                    "ready",
+                    "failed"
+                  ]
+                },
+                "category": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "fileSizeBytes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1,
+                  "maximum": 10485760
+                },
+                "mimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "image/jpeg",
+                    "image/png",
+                    "image/webp"
+                  ]
+                },
+                "retentionStatus": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "deletion_pending",
+                    "legal_hold"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "committedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "imageAccess": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "category",
+                "fileSizeBytes",
+                "mimeType",
+                "retentionStatus",
+                "createdAt",
+                "committedAt",
+                "imageAccess"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -5257,6 +5375,148 @@
         }
       }
     },
+    "/api/v1/wardrobe/garments": {
+      "get": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "List persisted garments for the authenticated wardrobe",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Persisted wardrobe garments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GarmentListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Commit uploaded garment bytes and initiate background processing",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "idempotency-key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGarmentItemInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent garment commit replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateGarmentItemResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Garment committed and moved to processing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateGarmentItemResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid garment commit payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Upload session not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency key reused, session expired, or upload claimed."
+          }
+        }
+      }
+    },
     "/api/v1/wardrobe/upload-url": {
       "post": {
         "tags": [
@@ -5339,6 +5599,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Idempotency key reused or upload session expired."
           }
         }
       }
@@ -5389,6 +5652,29 @@
             "in": "header"
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
         "responses": {
           "204": {
             "description": "Bytes uploaded and verified successfully."
@@ -5422,92 +5708,19 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/v1/wardrobe/garments": {
-      "post": {
-        "tags": [
-          "wardrobe"
-        ],
-        "summary": "Commit uploaded garment bytes and initiate background processing",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "idempotency-key",
-            "in": "header"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateGarmentItemInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Idempotent garment commit replay.",
+          },
+          "404": {
+            "description": "Upload session not found.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateGarmentItemResponse"
+                  "$ref": "#/components/schemas/NotFoundHttpError"
                 }
               }
             }
           },
-          "201": {
-            "description": "Garment committed and moved to processing.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateGarmentItemResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid garment commit payload.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequestHttpError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid authentication headers.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedHttpError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Guardian consent required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
-                }
-              }
-            }
+          "409": {
+            "description": "Upload session expired or token already consumed."
           }
         }
       }

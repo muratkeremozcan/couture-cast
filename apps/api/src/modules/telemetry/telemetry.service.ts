@@ -1,4 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common'
+import { createHmac } from 'node:crypto'
 import { PrismaClient, Prisma } from '@prisma/client'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { z } from 'zod'
@@ -56,19 +57,13 @@ export interface TelemetryPropertiesMap {
     error_message?: string
   } & Record<string, unknown>
   garment_upload_completed: {
-    garmentId?: string
-    garment_id?: string
-    fileSizeBytes?: number
-    file_size_bytes?: number
-    mimeType?: 'image/jpeg' | 'image/png' | 'image/webp'
-    mime_type?: 'image/jpeg' | 'image/png' | 'image/webp'
-    hasCropping?: boolean
-    has_cropping?: boolean
-    hasBgCleanup?: boolean
-    has_bg_cleanup?: boolean
-    durationMs?: number
-    duration_ms?: number
-  } & Record<string, unknown>
+    garmentId: string
+    fileSizeBytes: number
+    mimeType: 'image/jpeg' | 'image/png' | 'image/webp'
+    hasCropping: boolean
+    hasBgCleanup: boolean
+    durationMs: number
+  }
 }
 
 const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
@@ -87,20 +82,31 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   api_error_occurred: z.object({
     method: z.string(),
   }),
-  garment_upload_completed: z.object({
-    garment_id: z.string().min(1).max(64).optional(),
-    garmentId: z.string().min(1).max(64).optional(),
-    file_size_bytes: z.number().int().min(1).max(10_485_760).optional(),
-    fileSizeBytes: z.number().int().min(1).max(10_485_760).optional(),
-    mime_type: z.enum(['image/jpeg', 'image/png', 'image/webp']).optional(),
-    mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']).optional(),
-    has_cropping: z.boolean().optional(),
-    hasCropping: z.boolean().optional(),
-    has_bg_cleanup: z.boolean().optional(),
-    hasBgCleanup: z.boolean().optional(),
-    duration_ms: z.number().nonnegative().optional(),
-    durationMs: z.number().nonnegative().optional(),
-  }),
+  garment_upload_completed: z
+    .object({
+      garmentId: z.string().min(1).max(64),
+      fileSizeBytes: z.number().int().min(1).max(10_485_760),
+      mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+      hasCropping: z.boolean(),
+      hasBgCleanup: z.boolean(),
+      durationMs: z.number().int().min(0).max(86_400_000),
+    })
+    .strict(),
+}
+
+function requireAnalyticsIdSecret(): string {
+  const configuredSecret = process.env.ANALYTICS_ID_SECRET?.trim()
+  if (configuredSecret && configuredSecret.length >= 32) {
+    return configuredSecret
+  }
+  if (process.env.NODE_ENV === 'test') {
+    return 'test-only-analytics-id-secret-at-least-32-bytes'
+  }
+  throw new Error('ANALYTICS_ID_SECRET must contain at least 32 characters')
+}
+
+function buildAnalyticsSubjectId(userId: string, secret: string): string {
+  return createHmac('sha256', secret).update(userId).digest('base64url')
 }
 
 type PostHogPayload = {
@@ -234,24 +240,22 @@ function buildApiErrorOccurred(
 function buildGarmentUploadCompleted(
   userId: string | null,
   props: Record<string, unknown>,
-  timestamp: string
+  analyticsIdSecret: string
 ): PostHogPayload {
-  const mimeTypeRaw = getString(props['mimeType'] ?? props['mime_type'])
-  const validMimeType = (
-    ['image/jpeg', 'image/png', 'image/webp'].includes(mimeTypeRaw)
-      ? mimeTypeRaw
-      : 'image/png'
-  ) as 'image/jpeg' | 'image/png' | 'image/webp'
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Garment telemetry requires an authenticated user')
+  }
+  const mimeType = props['mimeType'] as 'image/jpeg' | 'image/png' | 'image/webp'
 
   return trackGarmentUploadCompleted({
-    userId: getString(userId ?? props['userId'] ?? props['user_id']),
-    garmentId: getString(props['garmentId'] ?? props['garment_id']),
-    fileSizeBytes: getNumber(props['fileSizeBytes'] ?? props['file_size_bytes']),
-    mimeType: validMimeType,
-    hasCropping: getBool(props['hasCropping'] ?? props['has_cropping']),
-    hasBgCleanup: getBool(props['hasBgCleanup'] ?? props['has_bg_cleanup']),
-    durationMs: getNumber(props['durationMs'] ?? props['duration_ms']),
-    timestamp,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+    garmentId: getString(props['garmentId']),
+    fileSizeBytes: getNumber(props['fileSizeBytes']),
+    mimeType,
+    hasCropping: getBool(props['hasCropping']),
+    hasBgCleanup: getBool(props['hasBgCleanup']),
+    durationMs: getNumber(props['durationMs']),
   })
 }
 
@@ -268,17 +272,19 @@ const eventBuilders: Partial<
   alert_sent: (uid, p, ts) => buildAlertSent(getString(uid ?? ''), p, ts),
   location_switched: (uid, p, ts) => buildLocationSwitched(getString(uid ?? ''), p, ts),
   api_error_occurred: (uid, p, ts) => buildApiErrorOccurred(uid, p, ts),
-  garment_upload_completed: (uid, p, ts) => buildGarmentUploadCompleted(uid, p, ts),
 }
 
 @Injectable()
 export class TelemetryService {
   private readonly logger = createBaseLogger().child({ feature: 'telemetry' })
+  private readonly analyticsIdSecret: string
 
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(ANALYTICS_CLIENT) private readonly analyticsClient: AnalyticsClient
-  ) {}
+  ) {
+    this.analyticsIdSecret = requireAnalyticsIdSecret()
+  }
 
   async captureEvent<T extends keyof TelemetryPropertiesMap>(
     userId: string | null,
@@ -291,44 +297,63 @@ export class TelemetryService {
       validator.parse(properties)
     }
 
+    const timestamp = new Date().toISOString()
+    const resolvedUserId =
+      userId ??
+      getStringOrNull(properties['userId']) ??
+      getStringOrNull(properties['user_id'])
+    const payload =
+      eventType === 'garment_upload_completed'
+        ? buildGarmentUploadCompleted(resolvedUserId, properties, this.analyticsIdSecret)
+        : (eventBuilders[eventType]?.(resolvedUserId, properties, timestamp) ?? null)
+    const persistedProperties =
+      eventType === 'garment_upload_completed' && payload
+        ? payload.properties
+        : properties
+
     // 1. Start database persistence asynchronously (without awaiting)
     const dbPromise = this.prisma.telemetryEvent
       .create({
         data: {
-          user_id: userId,
+          user_id: eventType === 'garment_upload_completed' ? null : userId,
           event_type: eventType,
-          properties: properties as Prisma.InputJsonValue,
+          properties: persistedProperties as Prisma.InputJsonValue,
         },
       })
       .catch((dbError: unknown) => {
         // Robustness: Database failures MUST NOT crash the application or prevent PostHog delivery.
         this.logger.error(
-          { dbError, eventType, userId },
+          {
+            dbError,
+            eventType,
+            subject:
+              eventType === 'garment_upload_completed' ? payload?.distinctId : userId,
+          },
           'Failed to persist telemetry event to database'
         )
       })
 
     // 2. Format payload via packages/api-client wrappers and call analyticsClient.capture(...)
     try {
-      const timestamp = new Date().toISOString()
-      const resolvedUserId =
-        userId ??
-        getStringOrNull(properties['userId']) ??
-        getStringOrNull(properties['user_id'])
-      const builder = eventBuilders[eventType]
-      const payload = builder ? builder(resolvedUserId, properties, timestamp) : null
-
       if (payload) {
         this.analyticsClient.capture({
           distinctId: payload.distinctId,
           event: payload.event,
-          properties: payload.properties,
+          properties:
+            eventType === 'garment_upload_completed'
+              ? { ...payload.properties, $ip: null }
+              : payload.properties,
         })
       }
     } catch (phError: unknown) {
       // Robustness: PostHog failures MUST NOT crash the application or prevent database persistence.
       this.logger.error(
-        { phError, eventType, userId },
+        {
+          phError,
+          eventType,
+          subject:
+            eventType === 'garment_upload_completed' ? payload?.distinctId : userId,
+        },
         'Failed to dispatch telemetry event to PostHog'
       )
     }

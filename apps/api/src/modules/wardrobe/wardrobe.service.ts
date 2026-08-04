@@ -1,4 +1,4 @@
-// Story 4.1 Task 5 step 2 owner: implement HMAC upload tokens, checksum validation, and garment commit logic
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import {
   BadRequestException,
   ConflictException,
@@ -6,46 +6,75 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
+  UnsupportedMediaTypeException,
   UnprocessableEntityException,
 } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
-import { createHmac, createHash, timingSafeEqual } from 'node:crypto'
-import {
+import { Prisma, PrismaClient, type GarmentItem } from '@prisma/client'
+import type {
   CreateGarmentItemInput,
   CreateGarmentUploadUrlInput,
   GarmentItemResponse,
 } from '@couture/api-client/contracts/http'
+import { buildGarmentObjectPath } from '@couture/utils'
+
+import type { ApiRole } from '../auth/security.types'
+import { GuardianService } from '../guardian/guardian.service'
 import { TelemetryService } from '../telemetry/telemetry.service'
+import {
+  GarmentImageValidationError,
+  type GarmentImageDeclaration,
+  type GarmentMimeType,
+  verifyGarmentImage,
+} from './wardrobe-image-validation'
+import { WardrobeProcessingQueue } from './wardrobe-processing.queue'
+import { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
 
 const UPLOAD_EXPIRY_SECONDS = 900
 const READ_URL_EXPIRY_SECONDS = 900
 
-function getUploadTokenSecret(): string {
-  return (
-    process.env.WARDROBE_UPLOAD_TOKEN_SECRET ||
-    'dev-wardrobe-upload-token-secret-32-chars'
-  )
+type UploadUrlResult = {
+  replayed: boolean
+  response: {
+    data: {
+      garmentId: string
+      uploadSessionId: string
+      uploadUrl: string
+      uploadToken: string
+      requiredHeaders: { 'content-type': GarmentMimeType }
+      expiresAt: string
+    }
+  }
 }
 
-function deriveObjectExtension(mimeType: string): string {
-  switch (mimeType) {
-    case 'image/jpeg':
-      return 'jpg'
-    case 'image/png':
-      return 'png'
-    case 'image/webp':
-      return 'webp'
-    default:
-      return 'png'
+type CommitResult = {
+  replayed: boolean
+  response: GarmentItemResponse
+}
+
+function requireUploadTokenSecret(): string {
+  const configuredSecret = process.env.WARDROBE_UPLOAD_TOKEN_SECRET?.trim()
+  if (configuredSecret && configuredSecret.length >= 32) {
+    return configuredSecret
   }
+  if (process.env.NODE_ENV === 'test') {
+    return 'test-only-wardrobe-upload-token-secret'
+  }
+  throw new Error('WARDROBE_UPLOAD_TOKEN_SECRET must contain at least 32 characters')
+}
+
+function deriveObjectExtension(mimeType: GarmentMimeType): 'jpg' | 'png' | 'webp' {
+  if (mimeType === 'image/jpeg') return 'jpg'
+  if (mimeType === 'image/png') return 'png'
+  return 'webp'
 }
 
 function generateUploadToken(
   uploadSessionId: string,
   userId: string,
-  expiresAtIso: string
+  expiresAtIso: string,
+  secret: string
 ): string {
-  const secret = getUploadTokenSecret()
   const data = `${uploadSessionId}.${userId}.${expiresAtIso}`
   return createHmac('sha256', secret).update(data).digest('base64url')
 }
@@ -54,170 +83,205 @@ function verifyUploadToken(
   token: string,
   uploadSessionId: string,
   userId: string,
-  expiresAtIso: string
+  expiresAtIso: string,
+  secret: string
 ): boolean {
-  const expected = generateUploadToken(uploadSessionId, userId, expiresAtIso)
+  const expected = generateUploadToken(uploadSessionId, userId, expiresAtIso, secret)
   if (token.length !== expected.length) {
     return false
   }
   return timingSafeEqual(Buffer.from(token), Buffer.from(expected))
 }
 
-function validateUploadState(
-  garment: {
-    user_id: string
-    upload_status: string
-    upload_expires_at: Date | null
-    mime_type: string | null
-    content_sha256: string | null
-  },
-  userId: string,
-  uploadToken: string,
-  uploadSessionId: string,
-  mimeType: string,
-  body: Buffer
-): void {
-  if (garment.user_id !== userId) {
-    throw new ForbiddenException('WARDROBE_UPLOAD_FORBIDDEN')
-  }
-
-  if (
-    garment.upload_status === 'bytes_uploaded' ||
-    garment.upload_status === 'processing' ||
-    garment.upload_status === 'ready'
-  ) {
-    throw new ConflictException('UPLOAD_TOKEN_CONSUMED')
-  }
-
-  if (garment.upload_expires_at && garment.upload_expires_at < new Date()) {
-    throw new ConflictException('UPLOAD_SESSION_EXPIRED')
-  }
-
-  const isValidToken = verifyUploadToken(
-    uploadToken,
-    uploadSessionId,
-    userId,
-    garment.upload_expires_at!.toISOString()
+function allocationMatches(
+  garment: GarmentItem,
+  input: CreateGarmentUploadUrlInput
+): boolean {
+  return (
+    garment.file_size_bytes === input.fileSizeBytes &&
+    garment.mime_type === input.mimeType &&
+    garment.content_sha256 === input.sha256 &&
+    garment.width_px === input.widthPx &&
+    garment.height_px === input.heightPx
   )
+}
 
-  if (!isValidToken) {
-    throw new BadRequestException('INVALID_UPLOAD_TOKEN')
-  }
+function commitPayloadHash(input: CreateGarmentItemInput): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        garmentId: input.garmentId,
+        uploadSessionId: input.uploadSessionId,
+        hasCropping: input.hasCropping,
+        hasBgCleanup: input.hasBgCleanup,
+      })
+    )
+    .digest('hex')
+}
 
+function declarationFromGarment(garment: GarmentItem): GarmentImageDeclaration {
   if (
-    !body ||
-    body.length === 0 ||
-    body.length > 10_485_760 ||
-    (garment.mime_type && mimeType !== garment.mime_type)
+    !garment.file_size_bytes ||
+    !garment.mime_type ||
+    !garment.content_sha256 ||
+    !garment.width_px ||
+    !garment.height_px
   ) {
-    throw new BadRequestException('INVALID_UPLOAD_BODY')
+    throw new BadRequestException('INVALID_UPLOAD_DECLARATION')
   }
+  return {
+    fileSizeBytes: garment.file_size_bytes,
+    mimeType: garment.mime_type as GarmentMimeType,
+    sha256: garment.content_sha256,
+    widthPx: garment.width_px,
+    heightPx: garment.height_px,
+  }
+}
 
-  if (garment.content_sha256) {
-    const computedSha256 = createHash('sha256').update(body).digest('hex')
-    if (computedSha256 !== garment.content_sha256) {
-      throw new UnprocessableEntityException('IMAGE_CHECKSUM_MISMATCH')
-    }
+function mapImageValidationError(error: GarmentImageValidationError): never {
+  if (error.code === 'IMAGE_CHECKSUM_MISMATCH') {
+    throw new UnprocessableEntityException(error.code)
   }
+  if (error.code === 'IMAGE_DIMENSIONS_INVALID') {
+    throw new UnprocessableEntityException(error.code)
+  }
+  if (error.code === 'UNSUPPORTED_IMAGE_TYPE') {
+    throw new UnsupportedMediaTypeException(error.code)
+  }
+  throw new UnprocessableEntityException('IMAGE_DECODE_FAILED')
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
 }
 
 @Injectable()
 export class WardrobeService {
+  private readonly uploadTokenSecret: string
+
   constructor(
-    @Inject('PRISMA_CLIENT') private readonly prisma: PrismaClient,
-    @Inject(TelemetryService) private readonly telemetryService: TelemetryService
-  ) {}
+    @Inject(PrismaClient) private readonly prisma: PrismaClient,
+    @Inject(TelemetryService) private readonly telemetryService: TelemetryService,
+    @Inject(GuardianService) private readonly guardianService: GuardianService,
+    @Inject(SupabaseWardrobeStorageAdapter)
+    private readonly storage: SupabaseWardrobeStorageAdapter,
+    @Inject(WardrobeProcessingQueue)
+    private readonly processingQueue: WardrobeProcessingQueue
+  ) {
+    this.uploadTokenSecret = requireUploadTokenSecret()
+  }
+
+  private uploadResponse(garment: GarmentItem): UploadUrlResult['response'] {
+    if (!garment.upload_session_id || !garment.upload_expires_at || !garment.mime_type) {
+      throw new ConflictException('UPLOAD_SESSION_EXPIRED')
+    }
+    const baseUrl = (process.env.PUBLIC_API_URL ?? 'http://localhost:3001').replace(
+      /\/+$/,
+      ''
+    )
+    return {
+      data: {
+        garmentId: garment.id,
+        uploadSessionId: garment.upload_session_id,
+        uploadUrl: `${baseUrl}/api/v1/wardrobe/uploads/${garment.upload_session_id}`,
+        uploadToken: generateUploadToken(
+          garment.upload_session_id,
+          garment.user_id,
+          garment.upload_expires_at.toISOString(),
+          this.uploadTokenSecret
+        ),
+        requiredHeaders: {
+          'content-type': garment.mime_type as GarmentMimeType,
+        },
+        expiresAt: garment.upload_expires_at.toISOString(),
+      },
+    }
+  }
 
   async createUploadUrl(
     userId: string,
+    role: ApiRole,
     input: CreateGarmentUploadUrlInput,
-    idempotencyKey?: string
-  ) {
-    if (idempotencyKey) {
-      const existingKeyMatch = await this.prisma.garmentItem.findFirst({
-        where: {
+    idempotencyKey: string
+  ): Promise<UploadUrlResult> {
+    await this.guardianService.assertWardrobeUploadAllowed(userId, role)
+
+    const existing = await this.prisma.garmentItem.findUnique({
+      where: {
+        user_id_upload_idempotency_key: {
           user_id: userId,
           upload_idempotency_key: idempotencyKey,
         },
-      })
-
-      if (existingKeyMatch) {
-        if (
-          existingKeyMatch.file_size_bytes === input.fileSizeBytes &&
-          existingKeyMatch.mime_type === input.mimeType &&
-          existingKeyMatch.content_sha256 === input.sha256
-        ) {
-          const expiresAt =
-            existingKeyMatch.upload_expires_at ??
-            new Date(Date.now() + UPLOAD_EXPIRY_SECONDS * 1000)
-          const uploadToken = generateUploadToken(
-            existingKeyMatch.upload_session_id!,
-            userId,
-            expiresAt.toISOString()
-          )
-          const baseUrl = process.env.PUBLIC_API_URL || 'http://localhost:3001'
-
-          return {
-            data: {
-              garmentId: existingKeyMatch.id,
-              uploadSessionId: existingKeyMatch.upload_session_id!,
-              uploadUrl: `${baseUrl}/api/v1/wardrobe/uploads/${existingKeyMatch.upload_session_id}`,
-              uploadToken,
-              requiredHeaders: {
-                'content-type': input.mimeType,
-              },
-              expiresAt: expiresAt.toISOString(),
-            },
-          }
-        } else {
-          throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
-        }
-      }
-    }
-
-    const garmentId = `garment_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-    const uploadSessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-    const ext = deriveObjectExtension(input.mimeType)
-    const objectPath = `wardrobe/${userId}/${garmentId}.${ext}`
-    const expiresAt = new Date(Date.now() + UPLOAD_EXPIRY_SECONDS * 1000)
-
-    const createdGarment = await this.prisma.garmentItem.create({
-      data: {
-        id: garmentId,
-        user_id: userId,
-        object_path: objectPath,
-        upload_session_id: uploadSessionId,
-        upload_idempotency_key: idempotencyKey ?? null,
-        file_size_bytes: input.fileSizeBytes,
-        mime_type: input.mimeType,
-        content_sha256: input.sha256,
-        width_px: input.widthPx,
-        height_px: input.heightPx,
-        upload_status: 'pending_upload',
-        retention_status: 'active',
-        upload_expires_at: expiresAt,
-        consent_checked_at: new Date(),
       },
     })
+    if (existing) {
+      if (!allocationMatches(existing, input)) {
+        throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
+      }
+      if (
+        existing.retention_status !== 'active' ||
+        existing.upload_status !== 'pending_upload' ||
+        !existing.upload_expires_at ||
+        existing.upload_expires_at <= new Date()
+      ) {
+        throw new ConflictException('UPLOAD_SESSION_EXPIRED')
+      }
+      return { replayed: true, response: this.uploadResponse(existing) }
+    }
 
-    const uploadToken = generateUploadToken(
-      uploadSessionId,
+    const garmentId = randomUUID()
+    const uploadSessionId = randomUUID()
+    const objectPath = buildGarmentObjectPath(
       userId,
-      expiresAt.toISOString()
+      garmentId,
+      deriveObjectExtension(input.mimeType)
     )
-    const baseUrl = process.env.PUBLIC_API_URL || 'http://localhost:3001'
+    const expiresAt = new Date(Date.now() + UPLOAD_EXPIRY_SECONDS * 1000)
 
-    return {
-      data: {
-        garmentId: createdGarment.id,
-        uploadSessionId,
-        uploadUrl: `${baseUrl}/api/v1/wardrobe/uploads/${uploadSessionId}`,
-        uploadToken,
-        requiredHeaders: {
-          'content-type': input.mimeType,
+    try {
+      const created = await this.prisma.garmentItem.create({
+        data: {
+          id: garmentId,
+          user_id: userId,
+          object_path: objectPath,
+          upload_session_id: uploadSessionId,
+          upload_idempotency_key: idempotencyKey,
+          file_size_bytes: input.fileSizeBytes,
+          mime_type: input.mimeType,
+          content_sha256: input.sha256,
+          width_px: input.widthPx,
+          height_px: input.heightPx,
+          upload_status: 'pending_upload',
+          retention_status: 'active',
+          upload_expires_at: expiresAt,
+          consent_checked_at: new Date(),
         },
-        expiresAt: expiresAt.toISOString(),
-      },
+      })
+      return { replayed: false, response: this.uploadResponse(created) }
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) {
+        throw error
+      }
+      const raced = await this.prisma.garmentItem.findUnique({
+        where: {
+          user_id_upload_idempotency_key: {
+            user_id: userId,
+            upload_idempotency_key: idempotencyKey,
+          },
+        },
+      })
+      if (!raced || !allocationMatches(raced, input)) {
+        throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
+      }
+      if (
+        raced.retention_status !== 'active' ||
+        raced.upload_status !== 'pending_upload' ||
+        !raced.upload_expires_at ||
+        raced.upload_expires_at <= new Date()
+      ) {
+        throw new ConflictException('UPLOAD_SESSION_EXPIRED')
+      }
+      return { replayed: true, response: this.uploadResponse(raced) }
     }
   }
 
@@ -225,110 +289,269 @@ export class WardrobeService {
     uploadSessionId: string,
     uploadToken: string,
     userId: string,
-    mimeType: string,
+    role: ApiRole,
+    mimeType: GarmentMimeType,
+    contentLength: number | undefined,
     body: Buffer
   ): Promise<void> {
     const garment = await this.prisma.garmentItem.findUnique({
       where: { upload_session_id: uploadSessionId },
     })
-
     if (!garment) {
       throw new NotFoundException('UPLOAD_SESSION_NOT_FOUND')
     }
+    if (garment.user_id !== userId) {
+      throw new ForbiddenException('WARDROBE_UPLOAD_FORBIDDEN')
+    }
+    if (garment.retention_status !== 'active') {
+      throw new ForbiddenException('WARDROBE_UPLOAD_FORBIDDEN')
+    }
+    if (garment.upload_status !== 'pending_upload') {
+      throw new ConflictException('UPLOAD_TOKEN_CONSUMED')
+    }
+    if (!garment.upload_expires_at || garment.upload_expires_at <= new Date()) {
+      throw new ConflictException('UPLOAD_SESSION_EXPIRED')
+    }
+    if (
+      !verifyUploadToken(
+        uploadToken,
+        uploadSessionId,
+        userId,
+        garment.upload_expires_at.toISOString(),
+        this.uploadTokenSecret
+      )
+    ) {
+      throw new ForbiddenException('INVALID_UPLOAD_TOKEN')
+    }
+    if (contentLength === undefined || contentLength !== body.length) {
+      throw new BadRequestException('INVALID_UPLOAD_BODY')
+    }
 
-    validateUploadState(garment, userId, uploadToken, uploadSessionId, mimeType, body)
+    const declaration = declarationFromGarment(garment)
+    if (mimeType !== declaration.mimeType) {
+      throw new BadRequestException('INVALID_UPLOAD_BODY')
+    }
+    try {
+      await verifyGarmentImage(body, declaration)
+    } catch (error) {
+      if (error instanceof GarmentImageValidationError) {
+        mapImageValidationError(error)
+      }
+      throw error
+    }
 
-    await this.prisma.garmentItem.update({
-      where: { id: garment.id },
+    await this.guardianService.assertWardrobeUploadAllowed(userId, role)
+    await this.storage.upload(garment.object_path!, body, declaration.mimeType)
+
+    const updated = await this.prisma.garmentItem.updateMany({
+      where: {
+        id: garment.id,
+        upload_status: 'pending_upload',
+        retention_status: 'active',
+      },
       data: {
         upload_status: 'bytes_uploaded',
+        consent_checked_at: new Date(),
       },
     })
+    if (updated.count !== 1) {
+      await this.storage.remove([garment.object_path!])
+      throw new ConflictException('UPLOAD_TOKEN_CONSUMED')
+    }
   }
 
-  async commitGarment(
-    userId: string,
-    input: CreateGarmentItemInput
-  ): Promise<GarmentItemResponse> {
-    const garment = await this.prisma.garmentItem.findUnique({
-      where: { id: input.garmentId },
-    })
-
-    if (!garment || garment.user_id !== userId) {
-      throw new NotFoundException('UPLOAD_SESSION_NOT_FOUND')
+  private async toResponse(garment: GarmentItem): Promise<GarmentItemResponse> {
+    if (!garment.object_path) {
+      throw new ServiceUnavailableException('STORAGE_UNAVAILABLE')
     }
-
-    if (garment.upload_status === 'processing' || garment.upload_status === 'ready') {
-      const readUrl = `https://supabase.example.com/storage/v1/object/sign/wardrobe-images/${garment.object_path}?token=sample`
-      return {
-        data: {
-          id: garment.id,
-          status: garment.upload_status,
-          category: garment.category,
-          fileSizeBytes: garment.file_size_bytes,
-          mimeType: garment.mime_type,
-          retentionStatus: garment.retention_status as
-            | 'active'
-            | 'deletion_pending'
-            | 'legal_hold',
-          createdAt: garment.created_at.toISOString(),
-          committedAt: garment.committed_at ? garment.committed_at.toISOString() : null,
-          imageAccess: {
-            url: readUrl,
-            expiresAt: new Date(
-              Date.now() + READ_URL_EXPIRY_SECONDS * 1000
-            ).toISOString(),
-          },
-        },
-      }
-    }
-
-    if (
-      garment.upload_status !== 'bytes_uploaded' &&
-      garment.upload_status !== 'pending_upload'
-    ) {
-      throw new BadRequestException('INVALID_GARMENT_COMMIT')
-    }
-
-    const updatedGarment = await this.prisma.garmentItem.update({
-      where: { id: garment.id },
-      data: {
-        upload_status: 'processing',
-        committed_at: new Date(),
-        has_cropping: input.hasCropping,
-        has_bg_cleanup: input.hasBgCleanup,
-      },
-    })
-
-    await this.telemetryService.captureEvent(userId, 'garment_upload_completed', {
-      garment_id: updatedGarment.id,
-      file_size_bytes: updatedGarment.file_size_bytes ?? 0,
-      mime_type: updatedGarment.mime_type as 'image/jpeg' | 'image/png' | 'image/webp',
-      has_cropping: updatedGarment.has_cropping,
-      has_bg_cleanup: updatedGarment.has_bg_cleanup,
-      duration_ms: 1200,
-    })
-
-    const readUrl = `https://supabase.example.com/storage/v1/object/sign/wardrobe-images/${updatedGarment.object_path}?token=sample`
-
+    const readUrl = await this.storage.signReadUrl(
+      garment.object_path,
+      READ_URL_EXPIRY_SECONDS
+    )
     return {
       data: {
-        id: updatedGarment.id,
-        status: 'processing',
-        category: updatedGarment.category,
-        fileSizeBytes: updatedGarment.file_size_bytes,
-        mimeType: updatedGarment.mime_type,
-        retentionStatus: updatedGarment.retention_status as
-          | 'active'
-          | 'deletion_pending'
-          | 'legal_hold',
-        createdAt: updatedGarment.created_at.toISOString(),
-        committedAt: updatedGarment.committed_at!.toISOString(),
+        id: garment.id,
+        status: garment.upload_status,
+        category: garment.category,
+        fileSizeBytes: garment.file_size_bytes,
+        mimeType: garment.mime_type as GarmentMimeType | null,
+        retentionStatus: garment.retention_status,
+        createdAt: garment.created_at.toISOString(),
+        committedAt: garment.committed_at?.toISOString() ?? null,
         imageAccess: {
           url: readUrl,
           expiresAt: new Date(Date.now() + READ_URL_EXPIRY_SECONDS * 1000).toISOString(),
         },
       },
     }
+  }
+
+  async listGarments(userId: string): Promise<{ data: GarmentItemResponse['data'][] }> {
+    const garments = await this.prisma.garmentItem.findMany({
+      where: {
+        user_id: userId,
+        object_path: { not: null },
+        retention_status: 'active',
+        upload_status: { in: ['processing', 'ready'] },
+      },
+      orderBy: { created_at: 'desc' },
+      take: 100,
+    })
+    const responses = await Promise.all(
+      garments.map((garment) => this.toResponse(garment))
+    )
+    return { data: responses.map((response) => response.data) }
+  }
+
+  async commitGarment(
+    userId: string,
+    role: ApiRole,
+    input: CreateGarmentItemInput,
+    idempotencyKey: string
+  ): Promise<CommitResult> {
+    const payloadHash = commitPayloadHash(input)
+    const initial = await this.prisma.garmentItem.findUnique({
+      where: { id: input.garmentId },
+    })
+    if (!initial || initial.user_id !== userId) {
+      throw new NotFoundException('UPLOAD_SESSION_NOT_FOUND')
+    }
+    if (initial.upload_session_id !== input.uploadSessionId) {
+      throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
+    }
+    if (initial.retention_status !== 'active') {
+      throw new ForbiddenException('WARDROBE_UPLOAD_FORBIDDEN')
+    }
+
+    if (initial.upload_status === 'processing' || initial.upload_status === 'ready') {
+      if (
+        initial.commit_idempotency_key !== idempotencyKey ||
+        initial.commit_payload_hash !== payloadHash
+      ) {
+        throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
+      }
+      await this.ensureProcessingHandoff(initial)
+      return { replayed: true, response: await this.toResponse(initial) }
+    }
+    if (initial.upload_status !== 'bytes_uploaded') {
+      throw new BadRequestException('INVALID_GARMENT_COMMIT')
+    }
+
+    await this.guardianService.assertWardrobeUploadAllowed(userId, role)
+    const storedBytes = await this.storage.download(initial.object_path!)
+    try {
+      await verifyGarmentImage(storedBytes, declarationFromGarment(initial))
+    } catch (error) {
+      if (error instanceof GarmentImageValidationError) {
+        await this.storage.remove([initial.object_path!]).catch(() => undefined)
+        mapImageValidationError(error)
+      }
+      throw error
+    }
+
+    let committed: GarmentItem
+    try {
+      committed = await this.prisma.$transaction(
+        async (tx) => {
+          const keyOwner = await tx.garmentItem.findUnique({
+            where: {
+              user_id_commit_idempotency_key: {
+                user_id: userId,
+                commit_idempotency_key: idempotencyKey,
+              },
+            },
+          })
+          if (keyOwner && keyOwner.id !== initial.id) {
+            throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
+          }
+
+          const changed = await tx.garmentItem.updateMany({
+            where: {
+              id: initial.id,
+              user_id: userId,
+              upload_session_id: input.uploadSessionId,
+              upload_status: 'bytes_uploaded',
+              retention_status: 'active',
+            },
+            data: {
+              upload_status: 'processing',
+              committed_at: new Date(),
+              commit_idempotency_key: idempotencyKey,
+              commit_payload_hash: payloadHash,
+              consent_checked_at: new Date(),
+              has_cropping: input.hasCropping,
+              has_bg_cleanup: input.hasBgCleanup,
+            },
+          })
+          if (changed.count !== 1) {
+            throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
+          }
+          return await tx.garmentItem.findUniqueOrThrow({ where: { id: initial.id } })
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      )
+    } catch (error) {
+      const replay = await this.reconcileConcurrentCommit(
+        initial.id,
+        idempotencyKey,
+        payloadHash
+      )
+      if (replay) return replay
+      throw error
+    }
+
+    await this.ensureProcessingHandoff(committed)
+
+    const telemetryClaim = await this.prisma.garmentItem.updateMany({
+      where: { id: committed.id, completion_telemetry_emitted_at: null },
+      data: { completion_telemetry_emitted_at: new Date() },
+    })
+    if (telemetryClaim.count === 1) {
+      await this.telemetryService.captureEvent(userId, 'garment_upload_completed', {
+        garmentId: committed.id,
+        fileSizeBytes: committed.file_size_bytes!,
+        mimeType: committed.mime_type as GarmentMimeType,
+        hasCropping: committed.has_cropping,
+        hasBgCleanup: committed.has_bg_cleanup,
+        durationMs: Math.max(0, Date.now() - committed.created_at.getTime()),
+      })
+    }
+
+    const refreshed = await this.prisma.garmentItem.findUniqueOrThrow({
+      where: { id: committed.id },
+    })
+    return { replayed: false, response: await this.toResponse(refreshed) }
+  }
+
+  private async reconcileConcurrentCommit(
+    garmentId: string,
+    idempotencyKey: string,
+    payloadHash: string
+  ): Promise<CommitResult | null> {
+    const raced = await this.prisma.garmentItem.findUnique({
+      where: { id: garmentId },
+    })
+    if (raced?.upload_status !== 'processing' && raced?.upload_status !== 'ready') {
+      return null
+    }
+    if (
+      raced.commit_idempotency_key !== idempotencyKey ||
+      raced.commit_payload_hash !== payloadHash
+    ) {
+      throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
+    }
+    await this.ensureProcessingHandoff(raced)
+    return { replayed: true, response: await this.toResponse(raced) }
+  }
+
+  private async ensureProcessingHandoff(garment: GarmentItem): Promise<void> {
+    if (garment.processing_job_enqueued_at) {
+      return
+    }
+    await this.processingQueue.enqueue(garment.id)
+    await this.prisma.garmentItem.updateMany({
+      where: { id: garment.id, processing_job_enqueued_at: null },
+      data: { processing_job_enqueued_at: new Date() },
+    })
   }
 }

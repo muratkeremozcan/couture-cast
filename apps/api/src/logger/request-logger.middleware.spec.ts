@@ -75,4 +75,24 @@ describe('request-logger middleware', () => {
     })
     expect(logs[1]?.durationMs).toEqual(expect.any(Number))
   })
+
+  it('normalizes upload session identifiers and strips query values from logs', async () => {
+    const stream = new MemoryStream()
+    const app = express()
+    const env = { LOG_LEVEL: 'info' }
+    const logger = createBaseLogger({ destination: stream, env })
+
+    app.use(createRequestLoggerMiddleware({ env, logger }))
+    app.put('/api/v1/wardrobe/uploads/:uploadSessionId', (_req, res) => {
+      res.status(204).end()
+    })
+
+    await request(app).put('/api/v1/wardrobe/uploads/private-session?token=secret')
+
+    for (const log of parseLogs(stream)) {
+      expect(log.path).toBe('/api/v1/wardrobe/uploads/:uploadSessionId')
+      expect(JSON.stringify(log)).not.toContain('private-session')
+      expect(JSON.stringify(log)).not.toContain('token=secret')
+    }
+  })
 })

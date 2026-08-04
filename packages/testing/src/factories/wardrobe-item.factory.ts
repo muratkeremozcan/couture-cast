@@ -1,4 +1,7 @@
 import type { GarmentItem, Prisma, PrismaClient } from '@prisma/client'
+import { buildGarmentObjectPath } from '@couture/utils'
+
+export { buildGarmentObjectPath } from '@couture/utils'
 
 import { createFactory, faker } from './factory.js'
 import { registerCreatedEntity } from './registry.js'
@@ -80,7 +83,7 @@ function buildDefaultWardrobeItemFixture(): WardrobeItemFixture {
   return {
     id,
     userId,
-    objectPath: `wardrobe/${userId}/${id}.png`,
+    objectPath: buildGarmentObjectPath(userId, id, 'png'),
     imageUrl: faker.image.url(),
     category: faker.helpers.arrayElement(WARDROBE_CATEGORIES),
     material: faker.helpers.arrayElement(WARDROBE_MATERIALS),
@@ -102,7 +105,8 @@ export function buildWardrobeItemCreateInput(
 ): Prisma.GarmentItemCreateInput {
   return {
     id: fixture.id,
-    object_path: fixture.objectPath ?? `wardrobe/${fixture.userId}/${fixture.id}.png`,
+    object_path:
+      fixture.objectPath ?? buildGarmentObjectPath(fixture.userId, fixture.id, 'png'),
     image_url: fixture.imageUrl,
     category: fixture.category,
     material: fixture.material,

@@ -5,6 +5,7 @@ import AxeBuilder from '@axe-core/playwright'
 
 export interface CheckA11yOptions {
   includeTags?: string[]
+  includedImpacts?: ('critical' | 'serious' | 'moderate' | 'minor')[]
   disableRules?: string[]
   excludeSelectors?: string[]
 }
@@ -40,8 +41,20 @@ export async function checkA11y(page: Page, options?: CheckA11yOptions): Promise
 
   const results = await builder.analyze()
 
+  const includedImpacts = options?.includedImpacts
+  const violations = includedImpacts
+    ? results.violations.filter((violation) => {
+        const impact = violation.impact
+        return (
+          impact !== null &&
+          impact !== undefined &&
+          includedImpacts.includes(impact) === true
+        )
+      })
+    : results.violations
+
   expect(
-    results.violations,
-    `Accessibility violations found:\n${JSON.stringify(results.violations, null, 2)}`
+    violations,
+    `Accessibility violations found:\n${JSON.stringify(violations, null, 2)}`
   ).toEqual([])
 }

@@ -468,6 +468,21 @@ class InMemoryGuardianPrisma {
     ),
   }
 
+  garmentItem = {
+    updateMany: vi
+      .fn<
+        (args: {
+          where: { user_id: string; retention_status: 'active' }
+          data: {
+            retention_status: 'deletion_pending'
+            retention_trigger: 'guardian_consent_revoked'
+            deletion_requested_at: Date
+          }
+        }) => Promise<{ count: number }>
+      >()
+      .mockResolvedValue({ count: 0 }),
+  }
+
   $transaction = vi.fn(
     async <T>(
       callback: (tx: InMemoryGuardianPrisma) => Promise<T>,
@@ -801,6 +816,19 @@ describe('GuardianService', () => {
     })
     expect(invalidateUserSessions).toHaveBeenCalledWith(teen.id)
     expect(markTeenAccessRevoked).toHaveBeenCalledWith(teen.id)
+    expect(prisma.garmentItem.updateMany).toHaveBeenCalledOnce()
+    const retentionUpdate = prisma.garmentItem.updateMany.mock.calls[0]?.[0]
+    expect(retentionUpdate).toMatchObject({
+      where: {
+        user_id: teen.id,
+        retention_status: 'active',
+      },
+      data: {
+        retention_status: 'deletion_pending',
+        retention_trigger: 'guardian_consent_revoked',
+      },
+    })
+    expect(retentionUpdate?.data.deletion_requested_at).toBeInstanceOf(Date)
     expect(capture).toHaveBeenCalledOnce()
     const analyticsEvent = capture.mock.calls[0]?.[0]
     expect(analyticsEvent).toMatchObject({

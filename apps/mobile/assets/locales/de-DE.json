@@ -98,60 +98,60 @@
     "live_announcement_alert": "Unwetterwarnung: {{alert}}"
   },
   "wardrobe": {
-    "title": "Wardrobe Hub",
-    "add_garment": "Add Garment",
-    "empty_title": "No garments added yet",
-    "empty_desc": "Snap a photo of your favorite clothing item to get started.",
+    "title": "Kleiderschrank",
+    "add_garment": "Kleidungsst\u00fcck hinzuf\u00fcgen",
+    "empty_title": "Noch keine Kleidungsst\u00fccke hinzugef\u00fcgt",
+    "empty_desc": "Fotografiere dein Lieblingskleidungsst\u00fcck, um loszulegen.",
     "capture": {
-      "title": "Garment Capture",
-      "camera": "Take Photo",
-      "library": "Photo Library",
-      "retake": "Retake",
-      "choose_another": "Choose Another"
+      "title": "Kleidungsst\u00fcck erfassen",
+      "camera": "Foto aufnehmen",
+      "library": "Fotomediathek",
+      "retake": "Neu aufnehmen",
+      "choose_another": "Anderes ausw\u00e4hlen"
     },
     "permission": {
-      "camera_denied": "Camera permission was denied.",
-      "camera_blocked": "Camera access is blocked in settings.",
-      "library_denied": "Photo library permission was denied.",
-      "open_settings": "Open Settings"
+      "camera_denied": "Die Kameraberechtigung wurde verweigert.",
+      "camera_blocked": "Der Kamerazugriff ist in den Einstellungen gesperrt.",
+      "library_denied": "Die Berechtigung f\u00fcr die Fotomediathek wurde verweigert.",
+      "open_settings": "Einstellungen \u00f6ffnen"
     },
     "error": {
-      "camera_unavailable": "Camera is unavailable on this device.",
-      "invalid_image": "Invalid image selected.",
-      "corrupt_image": "Selected image is corrupt.",
-      "image_too_large": "Image exceeds 10 MiB limit.",
-      "unsupported_type": "Unsupported image format.",
-      "network_timeout": "Upload timed out.",
-      "storage_forbidden": "Storage access forbidden.",
-      "consent_required": "Guardian consent required for wardrobe uploads.",
-      "upload_expired": "Upload session expired."
+      "camera_unavailable": "Die Kamera ist auf diesem Ger\u00e4t nicht verf\u00fcgbar.",
+      "invalid_image": "Ung\u00fcltiges Bild ausgew\u00e4hlt.",
+      "corrupt_image": "Das ausgew\u00e4hlte Bild ist besch\u00e4digt.",
+      "image_too_large": "Das Bild \u00fcberschreitet die Grenze von 10 MiB.",
+      "unsupported_type": "Nicht unterst\u00fctztes Bildformat.",
+      "network_timeout": "Zeit\u00fcberschreitung beim Hochladen.",
+      "storage_forbidden": "Zugriff auf den Speicher verweigert.",
+      "consent_required": "F\u00fcr Uploads ist die Zustimmung einer erziehungsberechtigten Person erforderlich.",
+      "upload_expired": "Die Upload-Sitzung ist abgelaufen."
     },
     "crop": {
-      "title": "Crop & Position",
-      "aspect_square": "1:1 Square",
-      "aspect_four_three": "4:3 Portrait",
-      "rotate": "Rotate",
-      "reset": "Reset"
+      "title": "Zuschneiden und positionieren",
+      "aspect_square": "1:1 Quadrat",
+      "aspect_four_three": "4:3 Hochformat",
+      "rotate": "Drehen",
+      "reset": "Zur\u00fccksetzen"
     },
     "cleanup": {
-      "title": "Auto Background Cleanup",
-      "toggle": "Background Matting",
-      "retry": "Retry Cleanup",
-      "unavailable": "Background cleanup unavailable for this image"
+      "title": "Automatische Hintergrundbereinigung",
+      "toggle": "Hintergrund freistellen",
+      "retry": "Bereinigung wiederholen",
+      "unavailable": "Die Hintergrundbereinigung ist f\u00fcr dieses Bild nicht verf\u00fcgbar"
     },
     "confirm": {
-      "use_image": "Use This Image"
+      "use_image": "Dieses Bild verwenden"
     },
     "upload": {
-      "preparing": "Preparing asset validation...",
-      "requesting": "Allocating upload session...",
-      "uploading": "Uploading image bytes...",
-      "verifying": "Verifying private storage payload...",
-      "processing": "Garment uploaded! Processing color analysis...",
-      "ready": "Garment ready",
-      "failed": "Garment upload failed",
-      "retry": "Retry Upload",
-      "cancel": "Cancel Upload"
+      "preparing": "Bildpr\u00fcfung wird vorbereitet...",
+      "requesting": "Upload-Sitzung wird reserviert...",
+      "uploading": "Bilddaten werden hochgeladen...",
+      "verifying": "Private Speicherdaten werden gepr\u00fcft...",
+      "processing": "Kleidungsst\u00fcck hochgeladen. Farbanalyse l\u00e4uft...",
+      "ready": "Kleidungsst\u00fcck bereit",
+      "failed": "Upload des Kleidungsst\u00fccks fehlgeschlagen",
+      "retry": "Upload wiederholen",
+      "cancel": "Upload abbrechen"
     }
   }
 }

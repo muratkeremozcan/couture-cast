@@ -98,60 +98,60 @@
     "live_announcement_alert": "Alerta meteorol\u00f3gica severa: {{alert}}"
   },
   "wardrobe": {
-    "title": "Wardrobe Hub",
-    "add_garment": "Add Garment",
-    "empty_title": "No garments added yet",
-    "empty_desc": "Snap a photo of your favorite clothing item to get started.",
+    "title": "Armario",
+    "add_garment": "Agregar prenda",
+    "empty_title": "A\u00fan no agregaste prendas",
+    "empty_desc": "Toma una foto de tu prenda favorita para comenzar.",
     "capture": {
-      "title": "Garment Capture",
-      "camera": "Take Photo",
-      "library": "Photo Library",
-      "retake": "Retake",
-      "choose_another": "Choose Another"
+      "title": "Capturar prenda",
+      "camera": "Tomar foto",
+      "library": "Galer\u00eda de fotos",
+      "retake": "Tomar otra foto",
+      "choose_another": "Elegir otra"
     },
     "permission": {
-      "camera_denied": "Camera permission was denied.",
-      "camera_blocked": "Camera access is blocked in settings.",
-      "library_denied": "Photo library permission was denied.",
-      "open_settings": "Open Settings"
+      "camera_denied": "Se rechaz\u00f3 el permiso de la c\u00e1mara.",
+      "camera_blocked": "El acceso a la c\u00e1mara est\u00e1 bloqueado en la configuraci\u00f3n.",
+      "library_denied": "Se rechaz\u00f3 el permiso de la galer\u00eda de fotos.",
+      "open_settings": "Abrir configuraci\u00f3n"
     },
     "error": {
-      "camera_unavailable": "Camera is unavailable on this device.",
-      "invalid_image": "Invalid image selected.",
-      "corrupt_image": "Selected image is corrupt.",
-      "image_too_large": "Image exceeds 10 MiB limit.",
-      "unsupported_type": "Unsupported image format.",
-      "network_timeout": "Upload timed out.",
-      "storage_forbidden": "Storage access forbidden.",
-      "consent_required": "Guardian consent required for wardrobe uploads.",
-      "upload_expired": "Upload session expired."
+      "camera_unavailable": "La c\u00e1mara no est\u00e1 disponible en este dispositivo.",
+      "invalid_image": "Seleccionaste una imagen no v\u00e1lida.",
+      "corrupt_image": "La imagen seleccionada est\u00e1 da\u00f1ada.",
+      "image_too_large": "La imagen supera el l\u00edmite de 10 MiB.",
+      "unsupported_type": "Formato de imagen no compatible.",
+      "network_timeout": "Se agot\u00f3 el tiempo para subir la imagen.",
+      "storage_forbidden": "No tienes acceso al almacenamiento.",
+      "consent_required": "Se requiere el consentimiento de un tutor para subir prendas.",
+      "upload_expired": "La sesi\u00f3n de carga venci\u00f3."
     },
     "crop": {
-      "title": "Crop & Position",
-      "aspect_square": "1:1 Square",
-      "aspect_four_three": "4:3 Portrait",
-      "rotate": "Rotate",
-      "reset": "Reset"
+      "title": "Recortar y posicionar",
+      "aspect_square": "1:1 Cuadrada",
+      "aspect_four_three": "4:3 Vertical",
+      "rotate": "Girar",
+      "reset": "Restablecer"
     },
     "cleanup": {
-      "title": "Auto Background Cleanup",
-      "toggle": "Background Matting",
-      "retry": "Retry Cleanup",
-      "unavailable": "Background cleanup unavailable for this image"
+      "title": "Limpieza autom\u00e1tica del fondo",
+      "toggle": "Recorte del fondo",
+      "retry": "Reintentar limpieza",
+      "unavailable": "La limpieza del fondo no est\u00e1 disponible para esta imagen"
     },
     "confirm": {
-      "use_image": "Use This Image"
+      "use_image": "Usar esta imagen"
     },
     "upload": {
-      "preparing": "Preparing asset validation...",
-      "requesting": "Allocating upload session...",
-      "uploading": "Uploading image bytes...",
-      "verifying": "Verifying private storage payload...",
-      "processing": "Garment uploaded! Processing color analysis...",
-      "ready": "Garment ready",
-      "failed": "Garment upload failed",
-      "retry": "Retry Upload",
-      "cancel": "Cancel Upload"
+      "preparing": "Preparando la validaci\u00f3n de la imagen...",
+      "requesting": "Asignando la sesi\u00f3n de carga...",
+      "uploading": "Subiendo los datos de la imagen...",
+      "verifying": "Verificando los datos privados almacenados...",
+      "processing": "Prenda cargada. Procesando el an\u00e1lisis de color...",
+      "ready": "Prenda lista",
+      "failed": "No se pudo subir la prenda",
+      "retry": "Reintentar carga",
+      "cancel": "Cancelar carga"
     }
   }
 }

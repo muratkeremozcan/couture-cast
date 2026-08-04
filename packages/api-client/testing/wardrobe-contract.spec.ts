@@ -1,4 +1,5 @@
-import { expect, test } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { z } from 'zod'
 import {
   createGarmentItemInputSchema,
   createGarmentItemResponseSchema,
@@ -6,143 +7,276 @@ import {
   createGarmentUploadUrlResponseSchema,
   garmentItemSchema,
   generateHttpOpenApiDocument,
+  uploadGarmentBytes,
 } from '../src/contracts/http'
 
-const validSha256 = 'b6d81b360a5672d80c27430f39153e2c3f359dd3a214b61213cfa1447d2d73e5'
+const VALID_SHA256 = 'b6d81b360a5672d80c27430f39153e2c3f359dd3a214b61213cfa1447d2d73e5'
 
-const sampleGarmentItem = {
-  id: 'clx123456789',
-  status: 'processing',
-  category: null,
-  fileSizeBytes: 2048576,
-  mimeType: 'image/png',
-  retentionStatus: 'active',
-  createdAt: '2026-08-04T09:25:00.000Z',
-  committedAt: '2026-08-04T09:26:22.000Z',
-  imageAccess: {
-    url: 'https://example.supabase.co/storage/v1/object/sign/wardrobe-images/wardrobe/user_123/clx123456789.png',
-    expiresAt: '2026-08-04T09:41:22.000Z',
-  },
+function buildUploadInput(overrides: Record<string, unknown> = {}) {
+  return {
+    fileSizeBytes: 2048576,
+    mimeType: 'image/png',
+    sha256: VALID_SHA256,
+    widthPx: 1024,
+    heightPx: 1024,
+    ...overrides,
+  }
 }
 
-test('validates wardrobe upload-url and garment commit schemas', () => {
-  const uploadUrlInput = createGarmentUploadUrlInputSchema.parse({
+function buildGarmentItem(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'clx123456789',
+    status: 'processing',
+    category: null,
     fileSizeBytes: 2048576,
     mimeType: 'image/png',
-    sha256: validSha256,
-    widthPx: 1024,
-    heightPx: 1024,
-  })
-  expect(uploadUrlInput).toEqual({
-    fileSizeBytes: 2048576,
-    mimeType: 'image/png',
-    sha256: validSha256,
-    widthPx: 1024,
-    heightPx: 1024,
-  })
-
-  const uploadSession = createGarmentUploadUrlResponseSchema.parse({
-    data: {
-      garmentId: 'clx123456789',
-      uploadSessionId: 'b0e9bf1d-2a18-4d59-bef8-fb559cbb3272',
-      uploadUrl:
-        'https://api.example/wardrobe/uploads/b0e9bf1d-2a18-4d59-bef8-fb559cbb3272',
-      uploadToken: 'token_123',
-      requiredHeaders: {
-        'content-type': 'image/png',
-      },
-      expiresAt: '2026-08-04T09:40:00.000Z',
+    retentionStatus: 'active',
+    createdAt: '2026-08-04T09:25:00.000Z',
+    committedAt: '2026-08-04T09:26:22.000Z',
+    imageAccess: {
+      url: 'https://example.supabase.co/storage/v1/object/sign/wardrobe-images/wardrobe/user_123/clx123456789.png',
+      expiresAt: '2026-08-04T09:41:22.000Z',
     },
+    ...overrides,
+  }
+}
+
+function expectIssuePath(schema: z.ZodType, input: unknown, expectedPath: string): void {
+  const result = schema.safeParse(input)
+  expect(result.success).toBe(false)
+  if (!result.success) {
+    expect(result.error.issues.map((issue) => issue.path.join('.'))).toContain(
+      expectedPath
+    )
+  }
+}
+
+describe('Wardrobe HTTP Contracts', () => {
+  describe('Schema Validation', () => {
+    it('validates garment upload-url input schema', () => {
+      const input = buildUploadInput()
+      const parsed = createGarmentUploadUrlInputSchema.parse(input)
+      expect(parsed).toEqual(input)
+    })
+
+    it('validates garment upload-url response schema', () => {
+      const responsePayload = {
+        data: {
+          garmentId: 'clx123456789',
+          uploadSessionId: 'b0e9bf1d-2a18-4d59-bef8-fb559cbb3272',
+          uploadUrl:
+            'https://api.example/wardrobe/uploads/b0e9bf1d-2a18-4d59-bef8-fb559cbb3272',
+          uploadToken: 'token_123',
+          requiredHeaders: {
+            'content-type': 'image/png',
+          },
+          expiresAt: '2026-08-04T09:40:00.000Z',
+        },
+      }
+      const parsed = createGarmentUploadUrlResponseSchema.parse(responsePayload)
+      expect(parsed.data.garmentId).toBe('clx123456789')
+    })
+
+    it('validates garment item commit input schema', () => {
+      const commitInput = {
+        garmentId: 'clx123456789',
+        uploadSessionId: 'b0e9bf1d-2a18-4d59-bef8-fb559cbb3272',
+        hasCropping: true,
+        hasBgCleanup: true,
+      }
+      const parsed = createGarmentItemInputSchema.parse(commitInput)
+      expect(parsed.garmentId).toBe('clx123456789')
+    })
+
+    it('validates garment item and commit response schemas', () => {
+      const sampleItem = buildGarmentItem()
+      const garmentItem = garmentItemSchema.parse(sampleItem)
+      expect(garmentItem.id).toBe('clx123456789')
+      expect(garmentItem.status).toBe('processing')
+
+      const commitResponse = createGarmentItemResponseSchema.parse({
+        data: sampleItem,
+      })
+      expect(commitResponse.data.id).toBe('clx123456789')
+    })
   })
-  expect(uploadSession.data.garmentId).toBe('clx123456789')
 
-  const garmentInput = createGarmentItemInputSchema.parse({
-    garmentId: 'clx123456789',
-    uploadSessionId: 'b0e9bf1d-2a18-4d59-bef8-fb559cbb3272',
-    hasCropping: true,
-    hasBgCleanup: true,
+  describe('Security & Boundary Rejection', () => {
+    it('rejects client-injected userId in allocation schema', () => {
+      const unknownAllocationField = createGarmentUploadUrlInputSchema.safeParse(
+        buildUploadInput({ userId: 'client-injected-user-id' })
+      )
+      expect(unknownAllocationField.success).toBe(false)
+      if (!unknownAllocationField.success) {
+        expect(unknownAllocationField.error.issues).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ code: 'unrecognized_keys', keys: ['userId'] }),
+          ])
+        )
+      }
+    })
+
+    it('rejects invalid sha256 checksum strings', () => {
+      expectIssuePath(
+        createGarmentUploadUrlInputSchema,
+        buildUploadInput({ sha256: 'invalid-sha-256' }),
+        'sha256'
+      )
+      expectIssuePath(
+        createGarmentUploadUrlInputSchema,
+        buildUploadInput({ sha256: VALID_SHA256.toUpperCase() }),
+        'sha256'
+      )
+    })
+
+    it('rejects file size outside allowed bounds', () => {
+      expectIssuePath(
+        createGarmentUploadUrlInputSchema,
+        buildUploadInput({ fileSizeBytes: 0 }),
+        'fileSizeBytes'
+      )
+      expectIssuePath(
+        createGarmentUploadUrlInputSchema,
+        buildUploadInput({ fileSizeBytes: 20_000_000 }),
+        'fileSizeBytes'
+      )
+    })
+
+    it('rejects image dimensions outside valid ranges', () => {
+      expectIssuePath(
+        createGarmentUploadUrlInputSchema,
+        buildUploadInput({ widthPx: 255 }),
+        'widthPx'
+      )
+      expectIssuePath(
+        createGarmentUploadUrlInputSchema,
+        buildUploadInput({ heightPx: 4097 }),
+        'heightPx'
+      )
+    })
+
+    it('rejects unsupported image MIME types', () => {
+      expectIssuePath(
+        createGarmentUploadUrlInputSchema,
+        buildUploadInput({ mimeType: 'image/gif' }),
+        'mimeType'
+      )
+    })
+
+    it('rejects client-injected userId in garment commit schema', () => {
+      const unknownCommitField = createGarmentItemInputSchema.safeParse({
+        garmentId: 'clx123456789',
+        uploadSessionId: 'b0e9bf1d-2a18-4d59-bef8-fb559cbb3272',
+        hasCropping: true,
+        hasBgCleanup: true,
+        userId: 'hacker-user',
+      })
+      expect(unknownCommitField.success).toBe(false)
+      if (!unknownCommitField.success) {
+        expect(unknownCommitField.error.issues).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ code: 'unrecognized_keys', keys: ['userId'] }),
+          ])
+        )
+      }
+    })
   })
-  expect(garmentInput.garmentId).toBe('clx123456789')
 
-  const garmentItem = garmentItemSchema.parse(sampleGarmentItem)
-  expect(garmentItem.id).toBe('clx123456789')
-  expect(garmentItem.status).toBe('processing')
+  describe('OpenAPI Registration', () => {
+    it('registers authenticated wardrobe routes in OpenAPI specification', () => {
+      const spec = generateHttpOpenApiDocument()
 
-  const commitResponse = createGarmentItemResponseSchema.parse({
-    data: sampleGarmentItem,
+      const uploadUrlPath = spec.paths?.['/api/v1/wardrobe/upload-url']
+      const uploadRelayPath = spec.paths?.['/api/v1/wardrobe/uploads/{uploadSessionId}']
+      const garmentsPath = spec.paths?.['/api/v1/wardrobe/garments']
+
+      expect(uploadUrlPath?.post?.security).toEqual([{ bearerAuth: [] }])
+      expect(uploadUrlPath?.post?.responses?.['201']).toBeDefined()
+      expect(Object.keys(uploadUrlPath?.post?.responses ?? {}).sort()).toEqual([
+        '200',
+        '201',
+        '400',
+        '401',
+        '403',
+        '409',
+      ])
+      expect(uploadRelayPath?.put?.security).toEqual([{ bearerAuth: [] }])
+      expect(uploadRelayPath?.put?.responses?.['204']).toBeDefined()
+      expect(Object.keys(uploadRelayPath?.put?.responses ?? {}).sort()).toEqual([
+        '204',
+        '400',
+        '401',
+        '403',
+        '404',
+        '409',
+      ])
+      expect(uploadRelayPath?.put?.requestBody).toMatchObject({
+        required: true,
+        content: {
+          'image/jpeg': { schema: { type: 'string', format: 'binary' } },
+          'image/png': { schema: { type: 'string', format: 'binary' } },
+          'image/webp': { schema: { type: 'string', format: 'binary' } },
+        },
+      })
+      expect(garmentsPath?.post?.security).toEqual([{ bearerAuth: [] }])
+      expect(garmentsPath?.post?.responses?.['201']).toBeDefined()
+      expect(garmentsPath?.post?.requestBody).toBeDefined()
+      expect(Object.keys(garmentsPath?.post?.responses ?? {}).sort()).toEqual([
+        '200',
+        '201',
+        '400',
+        '401',
+        '403',
+        '404',
+        '409',
+      ])
+    })
   })
-  expect(commitResponse.data.id).toBe('clx123456789')
-})
 
-test('rejects client-controlled ownership fields and invalid upload inputs', () => {
-  // Reject extra/unknown fields (.strict())
-  expect(() =>
-    createGarmentUploadUrlInputSchema.parse({
-      fileSizeBytes: 2048576,
-      mimeType: 'image/png',
-      sha256: validSha256,
-      widthPx: 1024,
-      heightPx: 1024,
-      userId: 'client-injected-user-id',
+  describe('uploadGarmentBytes Transport Helper', () => {
+    it('reports completion once for Blob upload bodies', async () => {
+      const blobProgress = vi.fn()
+      const successfulFetch = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(null, { status: 204 }))
+      const blob = new Blob(['fixture-body'], { type: 'image/png' })
+
+      await uploadGarmentBytes({
+        uploadUrl: 'https://api.example.test/upload',
+        uploadToken: 'upload-token',
+        bearerToken: 'access-token',
+        mimeType: 'image/png',
+        body: blob,
+        onProgress: blobProgress,
+        timeoutMs: 1000,
+        fetchFn: successfulFetch,
+      })
+
+      expect(blobProgress).toHaveBeenCalledOnce()
+      expect(blobProgress).toHaveBeenCalledWith(blob.size, blob.size)
+      expect(successfulFetch.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal)
     })
-  ).toThrow()
 
-  // Reject invalid sha256
-  expect(() =>
-    createGarmentUploadUrlInputSchema.parse({
-      fileSizeBytes: 2048576,
-      mimeType: 'image/png',
-      sha256: 'invalid-sha-256',
-      widthPx: 1024,
-      heightPx: 1024,
+    it('reports completion once for ArrayBuffer upload bodies and handles HTTP failures', async () => {
+      const bufferProgress = vi.fn()
+      const failedFetch = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(null, { status: 500 }))
+      const buffer = new Uint8Array([1, 2, 3, 4]).buffer
+
+      await expect(
+        uploadGarmentBytes({
+          uploadUrl: 'https://api.example.test/upload',
+          uploadToken: 'upload-token',
+          bearerToken: 'access-token',
+          mimeType: 'image/png',
+          body: buffer,
+          onProgress: bufferProgress,
+          fetchFn: failedFetch,
+        })
+      ).rejects.toThrow('Upload failed with HTTP 500')
+      expect(bufferProgress).toHaveBeenCalledOnce()
+      expect(bufferProgress).toHaveBeenCalledWith(buffer.byteLength, buffer.byteLength)
     })
-  ).toThrow()
-
-  // Reject oversized file (>10MB)
-  expect(() =>
-    createGarmentUploadUrlInputSchema.parse({
-      fileSizeBytes: 20_000_000,
-      mimeType: 'image/png',
-      sha256: validSha256,
-      widthPx: 1024,
-      heightPx: 1024,
-    })
-  ).toThrow()
-
-  // Reject unsupported mime type
-  expect(() =>
-    createGarmentUploadUrlInputSchema.parse({
-      fileSizeBytes: 2048576,
-      mimeType: 'image/gif',
-      sha256: validSha256,
-      widthPx: 1024,
-      heightPx: 1024,
-    })
-  ).toThrow()
-
-  // Reject client-injected userId in commit input
-  expect(() =>
-    createGarmentItemInputSchema.parse({
-      garmentId: 'clx123456789',
-      uploadSessionId: 'b0e9bf1d-2a18-4d59-bef8-fb559cbb3272',
-      hasCropping: true,
-      hasBgCleanup: true,
-      userId: 'hacker-user',
-    })
-  ).toThrow()
-})
-
-test('registers authenticated wardrobe routes in OpenAPI', () => {
-  const spec = generateHttpOpenApiDocument()
-
-  const uploadUrlPath = spec.paths?.['/api/v1/wardrobe/upload-url']
-  const uploadRelayPath = spec.paths?.['/api/v1/wardrobe/uploads/{uploadSessionId}']
-  const garmentsPath = spec.paths?.['/api/v1/wardrobe/garments']
-
-  expect(uploadUrlPath?.post?.security).toEqual([{ bearerAuth: [] }])
-  expect(uploadUrlPath?.post?.responses?.['201']).toBeDefined()
-  expect(uploadRelayPath?.put?.security).toEqual([{ bearerAuth: [] }])
-  expect(uploadRelayPath?.put?.responses?.['204']).toBeDefined()
-  expect(garmentsPath?.post?.security).toEqual([{ bearerAuth: [] }])
-  expect(garmentsPath?.post?.responses?.['201']).toBeDefined()
+  })
 })

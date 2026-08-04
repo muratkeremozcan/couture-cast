@@ -1,12 +1,18 @@
 // Story 4.1 Task 8 step 1 owner: implement web garment capture modal component with camera, cropping, background cleanup preview, and ARIA live regions
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
+import type { GarmentItemContract } from '@couture/api-client/contracts/http'
+import {
+  uploadGarmentImageFromWeb,
+  type UploadGarmentImageInput,
+} from '../../lib/wardrobe'
 
 export interface GarmentCaptureModalProps {
   isOpen: boolean
   onClose: () => void
-  onGarmentCommitted?: (garmentId: string) => void
+  onGarmentCommitted?: (garment: GarmentItemContract) => void
+  uploadGarment?: (input: UploadGarmentImageInput) => Promise<GarmentItemContract>
 }
 
 export type CaptureStep = 'source' | 'camera' | 'crop' | 'uploading' | 'complete'
@@ -32,7 +38,9 @@ function SourceStep({
           }}
           className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 p-6 font-semibold text-zinc-800 transition hover:border-gold-500 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
         >
-          <span className="text-2xl">📷</span>
+          <span aria-hidden="true" className="text-2xl">
+            📷
+          </span>
           <span className="mt-2">Take Photo</span>
         </button>
 
@@ -40,12 +48,15 @@ function SourceStep({
           onClick={() => fileInputRef.current?.click()}
           className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 p-6 font-semibold text-zinc-800 transition hover:border-gold-500 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
         >
-          <span className="text-2xl">📁</span>
+          <span aria-hidden="true" className="text-2xl">
+            📁
+          </span>
           <span className="mt-2">Choose File</span>
         </button>
         <input
           ref={fileInputRef}
           type="file"
+          aria-label="Garment image file"
           accept="image/jpeg,image/png,image/webp"
           className="hidden"
           onChange={onFileSelect}
@@ -142,7 +153,7 @@ function CropStep({
 
       <div
         className={`relative mx-auto overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800 ${
-          aspectRatio === '1:1' ? 'aspect-square w-64' : 'aspect-[4/3] w-64'
+          aspectRatio === '1:1' ? 'aspect-square w-64' : 'aspect-[3/4] w-64'
         }`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -167,6 +178,7 @@ function CropStep({
         <button
           type="button"
           role="switch"
+          aria-label="Auto Background Cleanup"
           aria-checked={useBgCleanup}
           onClick={() => setUseBgCleanup(!useBgCleanup)}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
@@ -254,6 +266,7 @@ export function GarmentCaptureModal({
   isOpen,
   onClose,
   onGarmentCommitted,
+  uploadGarment = uploadGarmentImageFromWeb,
 }: GarmentCaptureModalProps) {
   const [step, setStep] = useState<CaptureStep>('source')
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -265,15 +278,45 @@ export function GarmentCaptureModal({
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const dialogRef = useRef<HTMLDivElement | null>(null)
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const uploadAbortRef = useRef<AbortController | null>(null)
+  const isOpenRef = useRef(isOpen)
+
+  isOpenRef.current = isOpen
+
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+    const trigger =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    requestAnimationFrame(() => closeButtonRef.current?.focus())
+    return () => {
+      trigger?.focus()
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (step === 'camera' && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+    }
+  }, [step])
 
   useEffect(() => {
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop())
-        streamRef.current = null
-      }
+      stopCamera()
+      uploadAbortRef.current?.abort()
     }
-  }, [step, isOpen])
+  }, [stopCamera])
 
   if (!isOpen) {
     return null
@@ -289,13 +332,12 @@ export function GarmentCaptureModal({
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       })
+      if (!isOpenRef.current) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
       streamRef.current = stream
       setStep('camera')
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-        }
-      }, 50)
     } catch {
       setErrorMessage(
         'Camera permission denied or camera unavailable. Please select a photo file.'
@@ -315,10 +357,7 @@ export function GarmentCaptureModal({
       setImagePreview(dataUrl)
       setStep('crop')
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop())
-      streamRef.current = null
-    }
+    stopCamera()
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -347,40 +386,46 @@ export function GarmentCaptureModal({
   }
 
   const handleConfirmAndUpload = async () => {
+    if (!imagePreview) {
+      setErrorMessage('Choose an image before uploading.')
+      return
+    }
     setStep('uploading')
     setUploadState('preparing')
     setUploadProgress(10)
     setErrorMessage(null)
+    const abortController = new AbortController()
+    uploadAbortRef.current = abortController
 
     try {
-      await new Promise((r) => setTimeout(r, 200))
-      setUploadState('requesting_upload')
-      setUploadProgress(30)
-
-      await new Promise((r) => setTimeout(r, 300))
-      setUploadState('uploading')
-      setUploadProgress(70)
-
-      await new Promise((r) => setTimeout(r, 300))
-      setUploadState('verifying')
-      setUploadProgress(90)
-
-      await new Promise((r) => setTimeout(r, 200))
-      setUploadState('processing')
-      setUploadProgress(100)
-
-      const fakeGarmentId = `garment_${Date.now()}`
-      if (onGarmentCommitted) {
-        onGarmentCommitted(fakeGarmentId)
-      }
+      const garment = await uploadGarment({
+        imagePreview,
+        aspectRatio,
+        useBgCleanup,
+        signal: abortController.signal,
+        onStateChange: setUploadState,
+        onProgress: setUploadProgress,
+      })
+      onGarmentCommitted?.(garment)
       setStep('complete')
-    } catch {
-      setErrorMessage('Upload failed. Please try again.')
-      setStep('crop')
+    } catch (error) {
+      if (!abortController.signal.aborted && isOpenRef.current) {
+        setErrorMessage(
+          error instanceof Error ? error.message : 'Upload failed. Please try again.'
+        )
+        setStep('crop')
+      }
+    } finally {
+      if (uploadAbortRef.current === abortController) {
+        uploadAbortRef.current = null
+      }
     }
   }
 
   const handleResetModal = () => {
+    uploadAbortRef.current?.abort()
+    uploadAbortRef.current = null
+    stopCamera()
     setStep('source')
     setImagePreview(null)
     setErrorMessage(null)
@@ -388,14 +433,59 @@ export function GarmentCaptureModal({
     setUploadState('')
   }
 
+  const handleClose = () => {
+    handleResetModal()
+    onClose()
+  }
+
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      handleClose()
+      return
+    }
+    if (event.key !== 'Tab') {
+      return
+    }
+
+    const focusable = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+      ) ?? []
+    ).filter(
+      (element) =>
+        element.getAttribute('aria-hidden') !== 'true' &&
+        !element.classList.contains('hidden')
+    )
+    const first = focusable[0]
+    const last = focusable.at(-1)
+    if (!first || !last) {
+      event.preventDefault()
+      dialogRef.current?.focus()
+      return
+    }
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="garment-capture-title"
+      onKeyDown={handleDialogKeyDown}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
     >
-      <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900 dark:text-zinc-100">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900 dark:text-zinc-100"
+      >
         <div className="flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
           <h2
             id="garment-capture-title"
@@ -404,10 +494,8 @@ export function GarmentCaptureModal({
             Garment Capture Flow
           </h2>
           <button
-            onClick={() => {
-              handleResetModal()
-              onClose()
-            }}
+            ref={closeButtonRef}
+            onClick={handleClose}
             className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
             aria-label="Close capture modal"
           >
@@ -441,7 +529,10 @@ export function GarmentCaptureModal({
         {step === 'camera' && (
           <CameraStep
             videoRef={videoRef}
-            onCancel={() => setStep('source')}
+            onCancel={() => {
+              stopCamera()
+              setStep('source')
+            }}
             onCapture={handleCapturePhoto}
           />
         )}
@@ -467,8 +558,7 @@ export function GarmentCaptureModal({
         {step === 'complete' && (
           <CompleteStep
             onDone={() => {
-              handleResetModal()
-              onClose()
+              handleClose()
             }}
           />
         )}

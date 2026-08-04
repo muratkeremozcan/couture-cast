@@ -13,11 +13,30 @@ tags:
 
 - openLink: ${APP_URL}
 
-- assertVisible:
-    id: 'tab-wardrobe'
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go first-run sheet when present'
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu onboarding when present'
+
+- extendedWaitUntil:
+    visible:
+      id: 'tab-wardrobe'
+    timeout: 60000
+
+- tapOn:
+    point: '93%,35%'
+    label: 'Close the Expo Go developer panel when it appears late'
 
 - tapOn:
     id: 'tab-wardrobe'
+    retryTapIfNoChange: true
 
 - assertVisible:
     id: 'wardrobe-screen'
@@ -36,7 +55,33 @@ tags:
 
 - tapOn:
     id: 'garment-e2e-fixture-source'
-    optional: true
+
+- assertVisible:
+    id: 'garment-crop-preview'
+
+- assertVisible:
+    id: 'garment-aspect-square'
+
+- tapOn:
+    id: 'garment-aspect-portrait'
+
+- assertVisible:
+    id: 'garment-cleanup-toggle'
+
+- assertVisible:
+    id: 'garment-confirm-image'
+
+- tapOn:
+    id: 'garment-confirm-image'
+
+- assertVisible:
+    id: 'garment-capture-complete'
+
+- tapOn:
+    id: 'garment-capture-done'
+
+- assertVisible:
+    id: 'wardrobe-garment-list'
 
 - takeScreenshot:
     path: maestro/artifacts/garment-capture-flow

@@ -580,6 +580,284 @@ export type ComfortRun = (typeof ComfortRun)[keyof typeof ComfortRun]
 /**
  *
  * @export
+ * @interface CreateGarmentItemInput
+ */
+export interface CreateGarmentItemInput {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentItemInput
+   */
+  garmentId: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentItemInput
+   */
+  uploadSessionId: string
+  /**
+   *
+   * @type {boolean}
+   * @memberof CreateGarmentItemInput
+   */
+  hasCropping: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof CreateGarmentItemInput
+   */
+  hasBgCleanup: boolean
+}
+/**
+ *
+ * @export
+ * @interface CreateGarmentItemResponse
+ */
+export interface CreateGarmentItemResponse {
+  /**
+   *
+   * @type {CreateGarmentItemResponseData}
+   * @memberof CreateGarmentItemResponse
+   */
+  data: CreateGarmentItemResponseData
+}
+/**
+ *
+ * @export
+ * @interface CreateGarmentItemResponseData
+ */
+export interface CreateGarmentItemResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentItemResponseData
+   */
+  id: string
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataStatusEnum}
+   * @memberof CreateGarmentItemResponseData
+   */
+  status: CreateGarmentItemResponseDataStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentItemResponseData
+   */
+  category: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof CreateGarmentItemResponseData
+   */
+  fileSizeBytes: number | null
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataMimeTypeEnum}
+   * @memberof CreateGarmentItemResponseData
+   */
+  mimeType: CreateGarmentItemResponseDataMimeTypeEnum | null
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataRetentionStatusEnum}
+   * @memberof CreateGarmentItemResponseData
+   */
+  retentionStatus: CreateGarmentItemResponseDataRetentionStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentItemResponseData
+   */
+  createdAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentItemResponseData
+   */
+  committedAt: string | null
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @memberof CreateGarmentItemResponseData
+   */
+  imageAccess: CreateGarmentItemResponseDataImageAccess
+}
+
+/**
+ * @export
+ */
+export const CreateGarmentItemResponseDataStatusEnum = {
+  pending_upload: 'pending_upload',
+  bytes_uploaded: 'bytes_uploaded',
+  processing: 'processing',
+  ready: 'ready',
+  failed: 'failed',
+} as const
+export type CreateGarmentItemResponseDataStatusEnum =
+  (typeof CreateGarmentItemResponseDataStatusEnum)[keyof typeof CreateGarmentItemResponseDataStatusEnum]
+
+/**
+ * @export
+ */
+export const CreateGarmentItemResponseDataMimeTypeEnum = {
+  image_jpeg: 'image/jpeg',
+  image_png: 'image/png',
+  image_webp: 'image/webp',
+} as const
+export type CreateGarmentItemResponseDataMimeTypeEnum =
+  (typeof CreateGarmentItemResponseDataMimeTypeEnum)[keyof typeof CreateGarmentItemResponseDataMimeTypeEnum]
+
+/**
+ * @export
+ */
+export const CreateGarmentItemResponseDataRetentionStatusEnum = {
+  active: 'active',
+  deletion_pending: 'deletion_pending',
+  legal_hold: 'legal_hold',
+} as const
+export type CreateGarmentItemResponseDataRetentionStatusEnum =
+  (typeof CreateGarmentItemResponseDataRetentionStatusEnum)[keyof typeof CreateGarmentItemResponseDataRetentionStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface CreateGarmentItemResponseDataImageAccess
+ */
+export interface CreateGarmentItemResponseDataImageAccess {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentItemResponseDataImageAccess
+   */
+  url: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentItemResponseDataImageAccess
+   */
+  expiresAt: string
+}
+/**
+ *
+ * @export
+ * @interface CreateGarmentUploadUrlInput
+ */
+export interface CreateGarmentUploadUrlInput {
+  /**
+   *
+   * @type {number}
+   * @memberof CreateGarmentUploadUrlInput
+   */
+  fileSizeBytes: number
+  /**
+   *
+   * @type {CreateGarmentUploadUrlInputMimeTypeEnum}
+   * @memberof CreateGarmentUploadUrlInput
+   */
+  mimeType: CreateGarmentUploadUrlInputMimeTypeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentUploadUrlInput
+   */
+  sha256: string
+  /**
+   *
+   * @type {number}
+   * @memberof CreateGarmentUploadUrlInput
+   */
+  widthPx: number
+  /**
+   *
+   * @type {number}
+   * @memberof CreateGarmentUploadUrlInput
+   */
+  heightPx: number
+}
+
+/**
+ * @export
+ */
+export const CreateGarmentUploadUrlInputMimeTypeEnum = {
+  image_jpeg: 'image/jpeg',
+  image_png: 'image/png',
+  image_webp: 'image/webp',
+} as const
+export type CreateGarmentUploadUrlInputMimeTypeEnum =
+  (typeof CreateGarmentUploadUrlInputMimeTypeEnum)[keyof typeof CreateGarmentUploadUrlInputMimeTypeEnum]
+
+/**
+ *
+ * @export
+ * @interface CreateGarmentUploadUrlResponse
+ */
+export interface CreateGarmentUploadUrlResponse {
+  /**
+   *
+   * @type {CreateGarmentUploadUrlResponseData}
+   * @memberof CreateGarmentUploadUrlResponse
+   */
+  data: CreateGarmentUploadUrlResponseData
+}
+/**
+ *
+ * @export
+ * @interface CreateGarmentUploadUrlResponseData
+ */
+export interface CreateGarmentUploadUrlResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentUploadUrlResponseData
+   */
+  garmentId: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentUploadUrlResponseData
+   */
+  uploadSessionId: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentUploadUrlResponseData
+   */
+  uploadUrl: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentUploadUrlResponseData
+   */
+  uploadToken: string
+  /**
+   *
+   * @type {CreateGarmentUploadUrlResponseDataRequiredHeaders}
+   * @memberof CreateGarmentUploadUrlResponseData
+   */
+  requiredHeaders: CreateGarmentUploadUrlResponseDataRequiredHeaders
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentUploadUrlResponseData
+   */
+  expiresAt: string
+}
+/**
+ *
+ * @export
+ * @interface CreateGarmentUploadUrlResponseDataRequiredHeaders
+ */
+export interface CreateGarmentUploadUrlResponseDataRequiredHeaders {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateGarmentUploadUrlResponseDataRequiredHeaders
+   */
+  contentType: string
+}
+/**
+ *
+ * @export
  * @interface CreateSavedLocationInput
  */
 export interface CreateSavedLocationInput {
@@ -807,6 +1085,19 @@ export const ForbiddenHttpErrorErrorEnum = {
 export type ForbiddenHttpErrorErrorEnum =
   (typeof ForbiddenHttpErrorErrorEnum)[keyof typeof ForbiddenHttpErrorErrorEnum]
 
+/**
+ *
+ * @export
+ * @interface GarmentListResponse
+ */
+export interface GarmentListResponse {
+  /**
+   *
+   * @type {Array<CreateGarmentItemResponseData>}
+   * @memberof GarmentListResponse
+   */
+  data: Array<CreateGarmentItemResponseData>
+}
 /**
  *
  * @export

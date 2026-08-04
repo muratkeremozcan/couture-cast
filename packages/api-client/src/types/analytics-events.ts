@@ -164,16 +164,17 @@ export const localeSwitchedEventSchema = z.object({
 
 export type LocaleSwitchedEvent = z.infer<typeof localeSwitchedEventSchema>
 
-export const garmentUploadCompletedEventSchema = z.object({
-  userId: nonEmptyString,
-  garmentId: nonEmptyString,
-  fileSizeBytes: z.number().int().positive(),
-  mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
-  hasCropping: z.boolean(),
-  hasBgCleanup: z.boolean(),
-  durationMs: z.number().int().nonnegative(),
-  timestamp: isoTimestamp,
-})
+export const garmentUploadCompletedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString.max(128),
+    garmentId: nonEmptyString,
+    fileSizeBytes: z.number().int().min(1).max(10_485_760),
+    mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    hasCropping: z.boolean(),
+    hasBgCleanup: z.boolean(),
+    durationMs: z.number().int().min(0).max(86_400_000),
+  })
+  .strict()
 
 export type GarmentUploadCompletedEvent = z.infer<
   typeof garmentUploadCompletedEventSchema
@@ -319,16 +320,16 @@ export const localeSwitchedPropertiesSchema = z.object({
 
 export type LocaleSwitchedProperties = z.infer<typeof localeSwitchedPropertiesSchema>
 
-export const garmentUploadCompletedPropertiesSchema = z.object({
-  user_id: nonEmptyString,
-  garment_id: nonEmptyString,
-  file_size_bytes: z.number().int().positive(),
-  mime_type: z.enum(['image/jpeg', 'image/png', 'image/webp']),
-  has_cropping: z.boolean(),
-  has_bg_cleanup: z.boolean(),
-  duration_ms: z.number().int().nonnegative(),
-  timestamp: isoTimestamp,
-})
+export const garmentUploadCompletedPropertiesSchema = z
+  .object({
+    garment_id: nonEmptyString.max(64),
+    file_size_bytes: z.number().int().min(1).max(10_485_760),
+    mime_type: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    has_cropping: z.boolean(),
+    has_bg_cleanup: z.boolean(),
+    duration_ms: z.number().int().min(0).max(86_400_000),
+  })
+  .strict()
 
 export type GarmentUploadCompletedProperties = z.infer<
   typeof garmentUploadCompletedPropertiesSchema
@@ -559,17 +560,15 @@ export function trackGarmentUploadCompleted(
   const parsed = garmentUploadCompletedEventSchema.parse(event)
 
   return {
-    distinctId: parsed.userId,
+    distinctId: parsed.analyticsSubjectId,
     event: 'garment_upload_completed',
     properties: garmentUploadCompletedPropertiesSchema.parse({
-      user_id: parsed.userId,
       garment_id: parsed.garmentId,
       file_size_bytes: parsed.fileSizeBytes,
       mime_type: parsed.mimeType,
       has_cropping: parsed.hasCropping,
       has_bg_cleanup: parsed.hasBgCleanup,
       duration_ms: parsed.durationMs,
-      timestamp: parsed.timestamp,
     }),
   }
 }

@@ -21,6 +21,9 @@ module.exports = {
           './apps/mobile/tsconfig.eslint.json',
           './apps/web/tsconfig.eslint.json',
           './apps/api/tsconfig.eslint.json',
+          './packages/db/tsconfig.json',
+          './packages/testing/tsconfig.typecheck.json',
+          './packages/utils/tsconfig.typecheck.json',
           './playwright/tsconfig.eslint.json',
           './pact/tsconfig.json',
         ],
@@ -70,6 +73,27 @@ module.exports = {
       files: ['apps/mobile/**/*.{ts,tsx}'],
       parserOptions: {
         project: ['./apps/mobile/tsconfig.eslint.json'],
+        tsconfigRootDir: __dirname,
+      },
+    },
+    {
+      files: ['packages/db/**/*.{ts,tsx}'],
+      parserOptions: {
+        project: ['./packages/db/tsconfig.json'],
+        tsconfigRootDir: __dirname,
+      },
+    },
+    {
+      files: ['packages/testing/**/*.{ts,tsx}'],
+      parserOptions: {
+        project: ['./packages/testing/tsconfig.typecheck.json'],
+        tsconfigRootDir: __dirname,
+      },
+    },
+    {
+      files: ['packages/utils/**/*.{ts,tsx}'],
+      parserOptions: {
+        project: ['./packages/utils/tsconfig.typecheck.json'],
         tsconfigRootDir: __dirname,
       },
     },

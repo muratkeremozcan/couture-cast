@@ -98,60 +98,60 @@
     "live_announcement_alert": "Alerta de tempo severo: {{alert}}"
   },
   "wardrobe": {
-    "title": "Wardrobe Hub",
-    "add_garment": "Add Garment",
-    "empty_title": "No garments added yet",
-    "empty_desc": "Snap a photo of your favorite clothing item to get started.",
+    "title": "Guarda-roupa",
+    "add_garment": "Adicionar pe\u00e7a",
+    "empty_title": "Ainda n\u00e3o adicionou pe\u00e7as",
+    "empty_desc": "Tire uma fotografia da sua pe\u00e7a favorita para come\u00e7ar.",
     "capture": {
-      "title": "Garment Capture",
-      "camera": "Take Photo",
-      "library": "Photo Library",
-      "retake": "Retake",
-      "choose_another": "Choose Another"
+      "title": "Capturar pe\u00e7a",
+      "camera": "Tirar fotografia",
+      "library": "Fototeca",
+      "retake": "Tirar novamente",
+      "choose_another": "Escolher outra"
     },
     "permission": {
-      "camera_denied": "Camera permission was denied.",
-      "camera_blocked": "Camera access is blocked in settings.",
-      "library_denied": "Photo library permission was denied.",
-      "open_settings": "Open Settings"
+      "camera_denied": "A permiss\u00e3o da c\u00e2mara foi recusada.",
+      "camera_blocked": "O acesso \u00e0 c\u00e2mara est\u00e1 bloqueado nas defini\u00e7\u00f5es.",
+      "library_denied": "A permiss\u00e3o da fototeca foi recusada.",
+      "open_settings": "Abrir defini\u00e7\u00f5es"
     },
     "error": {
-      "camera_unavailable": "Camera is unavailable on this device.",
-      "invalid_image": "Invalid image selected.",
-      "corrupt_image": "Selected image is corrupt.",
-      "image_too_large": "Image exceeds 10 MiB limit.",
-      "unsupported_type": "Unsupported image format.",
-      "network_timeout": "Upload timed out.",
-      "storage_forbidden": "Storage access forbidden.",
-      "consent_required": "Guardian consent required for wardrobe uploads.",
-      "upload_expired": "Upload session expired."
+      "camera_unavailable": "A c\u00e2mara n\u00e3o est\u00e1 dispon\u00edvel neste dispositivo.",
+      "invalid_image": "A imagem selecionada \u00e9 inv\u00e1lida.",
+      "corrupt_image": "A imagem selecionada est\u00e1 danificada.",
+      "image_too_large": "A imagem excede o limite de 10 MiB.",
+      "unsupported_type": "Formato de imagem n\u00e3o suportado.",
+      "network_timeout": "O envio excedeu o tempo limite.",
+      "storage_forbidden": "Acesso ao armazenamento recusado.",
+      "consent_required": "\u00c9 necess\u00e1rio o consentimento de um respons\u00e1vel para enviar pe\u00e7as.",
+      "upload_expired": "A sess\u00e3o de envio expirou."
     },
     "crop": {
-      "title": "Crop & Position",
-      "aspect_square": "1:1 Square",
-      "aspect_four_three": "4:3 Portrait",
-      "rotate": "Rotate",
-      "reset": "Reset"
+      "title": "Recortar e posicionar",
+      "aspect_square": "1:1 Quadrado",
+      "aspect_four_three": "4:3 Retrato",
+      "rotate": "Rodar",
+      "reset": "Repor"
     },
     "cleanup": {
-      "title": "Auto Background Cleanup",
-      "toggle": "Background Matting",
-      "retry": "Retry Cleanup",
-      "unavailable": "Background cleanup unavailable for this image"
+      "title": "Limpeza autom\u00e1tica do fundo",
+      "toggle": "Recorte do fundo",
+      "retry": "Tentar limpeza novamente",
+      "unavailable": "A limpeza do fundo n\u00e3o est\u00e1 dispon\u00edvel para esta imagem"
     },
     "confirm": {
-      "use_image": "Use This Image"
+      "use_image": "Usar esta imagem"
     },
     "upload": {
-      "preparing": "Preparing asset validation...",
-      "requesting": "Allocating upload session...",
-      "uploading": "Uploading image bytes...",
-      "verifying": "Verifying private storage payload...",
-      "processing": "Garment uploaded! Processing color analysis...",
-      "ready": "Garment ready",
-      "failed": "Garment upload failed",
-      "retry": "Retry Upload",
-      "cancel": "Cancel Upload"
+      "preparing": "A preparar a valida\u00e7\u00e3o da imagem...",
+      "requesting": "A reservar a sess\u00e3o de envio...",
+      "uploading": "A enviar os dados da imagem...",
+      "verifying": "A verificar os dados no armazenamento privado...",
+      "processing": "Pe\u00e7a enviada. A processar a an\u00e1lise de cores...",
+      "ready": "Pe\u00e7a pronta",
+      "failed": "Falha ao enviar a pe\u00e7a",
+      "retry": "Tentar envio novamente",
+      "cancel": "Cancelar envio"
     }
   }
 }

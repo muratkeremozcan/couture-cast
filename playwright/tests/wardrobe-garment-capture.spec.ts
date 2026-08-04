@@ -6,7 +6,12 @@ test.describe('Wardrobe Garment Capture Flow', () => {
   test('opens wardrobe hub, launches capture modal, and checks accessibility', async ({
     page,
   }) => {
+    // Network-first readiness signal: intercept navigation/readiness response before navigating
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/wardrobe') || resp.status() === 200
+    )
     await page.goto('/wardrobe')
+    await responsePromise
     await waitForAccessibilityReady(page)
 
     // Verify page landmark & title
@@ -16,8 +21,11 @@ test.describe('Wardrobe Garment Capture Flow', () => {
       page.getByRole('heading', { level: 1, name: 'Wardrobe Hub' })
     ).toBeVisible()
 
-    // Open capture modal
-    const addGarmentButton = page.getByRole('button', { name: '+ Add Garment' })
+    // Open capture modal via accessible semantic button
+    const addGarmentButton = page.getByRole('button', {
+      name: /\+ Add Garment|Add Garment/i,
+    })
+    await expect(addGarmentButton).toBeVisible()
     await addGarmentButton.click()
 
     // Verify modal dialog
@@ -28,7 +36,7 @@ test.describe('Wardrobe Garment Capture Flow', () => {
     ).toBeVisible()
 
     // Run axe accessibility check on open modal dialog
-    await checkA11y(page, '#main-content', {
+    await checkA11y(page, {
       includedImpacts: ['critical', 'serious', 'moderate', 'minor'],
     })
 

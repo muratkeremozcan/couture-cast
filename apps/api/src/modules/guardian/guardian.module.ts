@@ -11,5 +11,6 @@ import { GuardianService } from './guardian.service'
   imports: [AnalyticsModule, PrismaModule, AuthStateModule],
   controllers: [GuardianController],
   providers: [GuardianService, GuardianCron, RequestAuthGuard, RolesGuard],
+  exports: [GuardianService],
 })
 export class GuardianModule {}

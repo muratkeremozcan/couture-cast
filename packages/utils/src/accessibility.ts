@@ -50,10 +50,33 @@ function formatList(parts: readonly string[], locale: string): string {
     return parts[0] ?? ''
   }
 
-  return new Intl.ListFormat(locale, {
-    style: 'long',
-    type: 'conjunction',
-  }).format(parts)
+  const listFormat = (
+    Intl as typeof Intl & {
+      ListFormat?: typeof Intl.ListFormat
+    }
+  ).ListFormat
+  if (listFormat) {
+    return new listFormat(locale, {
+      style: 'long',
+      type: 'conjunction',
+    }).format(parts)
+  }
+
+  const language = locale.split('-')[0]?.toLowerCase() ?? 'en'
+  const conjunction =
+    {
+      de: 'und',
+      es: 'y',
+      fr: 'et',
+      it: 'e',
+      pt: 'e',
+      tr: 've',
+    }[language] ?? 'and'
+  const head = parts.slice(0, -1)
+  const tail = parts.at(-1) ?? ''
+  return head.length === 1
+    ? `${head[0]} ${conjunction} ${tail}`
+    : `${head.join(', ')}, ${conjunction} ${tail}`
 }
 
 /**

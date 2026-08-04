@@ -28,6 +28,47 @@ const defaultTraceRuntime: TraceRuntime = {
   getActiveSpan: () => trace.getSpan(context.active()),
 }
 
+const SENSITIVE_LOG_PATHS = [
+  'authorization',
+  '*.authorization',
+  '*.*.authorization',
+  'headers.authorization',
+  'request.headers.authorization',
+  'token',
+  '*.token',
+  '*.*.token',
+  'uploadToken',
+  '*.uploadToken',
+  '*.*.uploadToken',
+  'uploadUrl',
+  '*.uploadUrl',
+  '*.*.uploadUrl',
+  'signedUrl',
+  '*.signedUrl',
+  '*.*.signedUrl',
+  'objectPath',
+  '*.objectPath',
+  '*.*.objectPath',
+  'filename',
+  '*.filename',
+  '*.*.filename',
+  'bytes',
+  '*.bytes',
+  '*.*.bytes',
+  'base64',
+  '*.base64',
+  '*.*.base64',
+  'imageData',
+  '*.imageData',
+  '*.*.imageData',
+  'imagePreview',
+  '*.imagePreview',
+  '*.*.imagePreview',
+  'storageError',
+  '*.storageError',
+  '*.*.storageError',
+]
+
 function removeUndefined<T extends Record<string, unknown>>(value: T) {
   return Object.fromEntries(
     Object.entries(value).filter(([, entry]) => entry !== undefined)
@@ -108,6 +149,10 @@ export function createBaseLogger(options: CreateBaseLoggerOptions = {}) {
       },
       base: {
         service: 'couturecast-api',
+      },
+      redact: {
+        paths: SENSITIVE_LOG_PATHS,
+        censor: '[REDACTED]',
       },
       timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
       transport: shouldUsePrettyTransport(env, options.destination)

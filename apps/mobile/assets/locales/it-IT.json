@@ -98,60 +98,60 @@
     "live_announcement_alert": "Allerta meteo grave: {{alert}}"
   },
   "wardrobe": {
-    "title": "Wardrobe Hub",
-    "add_garment": "Add Garment",
-    "empty_title": "No garments added yet",
-    "empty_desc": "Snap a photo of your favorite clothing item to get started.",
+    "title": "Guardaroba",
+    "add_garment": "Aggiungi capo",
+    "empty_title": "Non hai ancora aggiunto capi",
+    "empty_desc": "Scatta una foto del tuo capo preferito per iniziare.",
     "capture": {
-      "title": "Garment Capture",
-      "camera": "Take Photo",
-      "library": "Photo Library",
-      "retake": "Retake",
-      "choose_another": "Choose Another"
+      "title": "Acquisisci capo",
+      "camera": "Scatta foto",
+      "library": "Libreria foto",
+      "retake": "Scatta di nuovo",
+      "choose_another": "Scegline un'altra"
     },
     "permission": {
-      "camera_denied": "Camera permission was denied.",
-      "camera_blocked": "Camera access is blocked in settings.",
-      "library_denied": "Photo library permission was denied.",
-      "open_settings": "Open Settings"
+      "camera_denied": "Il permesso per la fotocamera \u00e8 stato negato.",
+      "camera_blocked": "L'accesso alla fotocamera \u00e8 bloccato nelle impostazioni.",
+      "library_denied": "Il permesso per la libreria foto \u00e8 stato negato.",
+      "open_settings": "Apri impostazioni"
     },
     "error": {
-      "camera_unavailable": "Camera is unavailable on this device.",
-      "invalid_image": "Invalid image selected.",
-      "corrupt_image": "Selected image is corrupt.",
-      "image_too_large": "Image exceeds 10 MiB limit.",
-      "unsupported_type": "Unsupported image format.",
-      "network_timeout": "Upload timed out.",
-      "storage_forbidden": "Storage access forbidden.",
-      "consent_required": "Guardian consent required for wardrobe uploads.",
-      "upload_expired": "Upload session expired."
+      "camera_unavailable": "La fotocamera non \u00e8 disponibile su questo dispositivo.",
+      "invalid_image": "L'immagine selezionata non \u00e8 valida.",
+      "corrupt_image": "L'immagine selezionata \u00e8 danneggiata.",
+      "image_too_large": "L'immagine supera il limite di 10 MiB.",
+      "unsupported_type": "Formato immagine non supportato.",
+      "network_timeout": "Il caricamento \u00e8 scaduto.",
+      "storage_forbidden": "Accesso allo spazio di archiviazione negato.",
+      "consent_required": "Per caricare capi serve il consenso di un tutore.",
+      "upload_expired": "La sessione di caricamento \u00e8 scaduta."
     },
     "crop": {
-      "title": "Crop & Position",
-      "aspect_square": "1:1 Square",
-      "aspect_four_three": "4:3 Portrait",
-      "rotate": "Rotate",
-      "reset": "Reset"
+      "title": "Ritaglia e posiziona",
+      "aspect_square": "1:1 Quadrato",
+      "aspect_four_three": "4:3 Ritratto",
+      "rotate": "Ruota",
+      "reset": "Ripristina"
     },
     "cleanup": {
-      "title": "Auto Background Cleanup",
-      "toggle": "Background Matting",
-      "retry": "Retry Cleanup",
-      "unavailable": "Background cleanup unavailable for this image"
+      "title": "Pulizia automatica dello sfondo",
+      "toggle": "Scontorno dello sfondo",
+      "retry": "Riprova pulizia",
+      "unavailable": "La pulizia dello sfondo non \u00e8 disponibile per questa immagine"
     },
     "confirm": {
-      "use_image": "Use This Image"
+      "use_image": "Usa questa immagine"
     },
     "upload": {
-      "preparing": "Preparing asset validation...",
-      "requesting": "Allocating upload session...",
-      "uploading": "Uploading image bytes...",
-      "verifying": "Verifying private storage payload...",
-      "processing": "Garment uploaded! Processing color analysis...",
-      "ready": "Garment ready",
-      "failed": "Garment upload failed",
-      "retry": "Retry Upload",
-      "cancel": "Cancel Upload"
+      "preparing": "Preparazione della convalida dell'immagine...",
+      "requesting": "Assegnazione della sessione di caricamento...",
+      "uploading": "Caricamento dei dati dell'immagine...",
+      "verifying": "Verifica dei dati nell'archivio privato...",
+      "processing": "Capo caricato. Analisi dei colori in corso...",
+      "ready": "Capo pronto",
+      "failed": "Caricamento del capo non riuscito",
+      "retry": "Riprova caricamento",
+      "cancel": "Annulla caricamento"
     }
   }
 }

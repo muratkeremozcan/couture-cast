@@ -787,6 +787,18 @@ export class GuardianService {
                   ),
                 },
               })
+
+              await tx.garmentItem.updateMany({
+                where: {
+                  user_id: teenId,
+                  retention_status: 'active',
+                },
+                data: {
+                  retention_status: 'deletion_pending',
+                  retention_trigger: 'guardian_consent_revoked',
+                  deletion_requested_at: revokedAt,
+                },
+              })
             }
 
             await tx.eventEnvelope.create({
@@ -1126,7 +1138,7 @@ export class GuardianService {
 
   // Story 4.1 Task 3 step 1 owner: assertWardrobeUploadAllowed for teen guardian consent verification
   async assertWardrobeUploadAllowed(userId: string, role?: string): Promise<void> {
-    if (role && role !== 'teen') {
+    if (role !== 'teen') {
       return
     }
 
@@ -1135,7 +1147,7 @@ export class GuardianService {
       include: {
         profile: true,
         teen_roles: {
-          where: { status: 'granted' },
+          where: { status: 'granted', revoked_at: null },
         },
       },
     })
@@ -1144,18 +1156,16 @@ export class GuardianService {
       throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
     }
 
-    if (hasGuardianConsentAgedOut(user.profile.preferences)) {
-      return
-    }
-
-    const prefs = (user.profile.preferences as Record<string, unknown> | null) ?? {}
-    const birthdate = typeof prefs.birthdate === 'string' ? prefs.birthdate : null
-
-    if (!birthdate) {
+    if (!user.profile.birthdate) {
       throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
     }
 
-    const age = calculateAge(new Date(birthdate))
+    const compliance = extractComplianceState(user.profile.preferences)
+    if (compliance.accountStatus !== 'active') {
+      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+    }
+
+    const age = calculateAge(user.profile.birthdate)
     if (age >= 16) {
       return
     }

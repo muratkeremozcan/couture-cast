@@ -98,60 +98,60 @@
     "live_announcement_alert": "\u015eiddetli hava uyar\u0131s\u0131: {{alert}}"
   },
   "wardrobe": {
-    "title": "Wardrobe Hub",
-    "add_garment": "Add Garment",
-    "empty_title": "No garments added yet",
-    "empty_desc": "Snap a photo of your favorite clothing item to get started.",
+    "title": "Gard\u0131rop",
+    "add_garment": "Giysi ekle",
+    "empty_title": "Hen\u00fcz giysi eklenmedi",
+    "empty_desc": "Ba\u015flamak i\u00e7in en sevdi\u011finiz giysinin foto\u011fraf\u0131n\u0131 \u00e7ekin.",
     "capture": {
-      "title": "Garment Capture",
-      "camera": "Take Photo",
-      "library": "Photo Library",
-      "retake": "Retake",
-      "choose_another": "Choose Another"
+      "title": "Giysi foto\u011fraf\u0131",
+      "camera": "Foto\u011fraf \u00e7ek",
+      "library": "Foto\u011fraf ar\u015fivi",
+      "retake": "Yeniden \u00e7ek",
+      "choose_another": "Ba\u015fka bir tane se\u00e7"
     },
     "permission": {
-      "camera_denied": "Camera permission was denied.",
-      "camera_blocked": "Camera access is blocked in settings.",
-      "library_denied": "Photo library permission was denied.",
-      "open_settings": "Open Settings"
+      "camera_denied": "Kamera izni reddedildi.",
+      "camera_blocked": "Kamera eri\u015fimi ayarlarda engellenmi\u015f.",
+      "library_denied": "Foto\u011fraf ar\u015fivi izni reddedildi.",
+      "open_settings": "Ayarlar\u0131 a\u00e7"
     },
     "error": {
-      "camera_unavailable": "Camera is unavailable on this device.",
-      "invalid_image": "Invalid image selected.",
-      "corrupt_image": "Selected image is corrupt.",
-      "image_too_large": "Image exceeds 10 MiB limit.",
-      "unsupported_type": "Unsupported image format.",
-      "network_timeout": "Upload timed out.",
-      "storage_forbidden": "Storage access forbidden.",
-      "consent_required": "Guardian consent required for wardrobe uploads.",
-      "upload_expired": "Upload session expired."
+      "camera_unavailable": "Kamera bu cihazda kullan\u0131lam\u0131yor.",
+      "invalid_image": "Ge\u00e7ersiz bir g\u00f6rsel se\u00e7ildi.",
+      "corrupt_image": "Se\u00e7ilen g\u00f6rsel bozuk.",
+      "image_too_large": "G\u00f6rsel 10 MiB s\u0131n\u0131r\u0131n\u0131 a\u015f\u0131yor.",
+      "unsupported_type": "Desteklenmeyen g\u00f6rsel bi\u00e7imi.",
+      "network_timeout": "Y\u00fckleme zaman a\u015f\u0131m\u0131na u\u011frad\u0131.",
+      "storage_forbidden": "Depolama eri\u015fimi reddedildi.",
+      "consent_required": "Giysi y\u00fcklemek i\u00e7in vasi onay\u0131 gerekiyor.",
+      "upload_expired": "Y\u00fckleme oturumunun s\u00fcresi doldu."
     },
     "crop": {
-      "title": "Crop & Position",
-      "aspect_square": "1:1 Square",
-      "aspect_four_three": "4:3 Portrait",
-      "rotate": "Rotate",
-      "reset": "Reset"
+      "title": "K\u0131rp ve konumland\u0131r",
+      "aspect_square": "1:1 Kare",
+      "aspect_four_three": "4:3 Dikey",
+      "rotate": "D\u00f6nd\u00fcr",
+      "reset": "S\u0131f\u0131rla"
     },
     "cleanup": {
-      "title": "Auto Background Cleanup",
-      "toggle": "Background Matting",
-      "retry": "Retry Cleanup",
-      "unavailable": "Background cleanup unavailable for this image"
+      "title": "Otomatik arka plan temizleme",
+      "toggle": "Arka plan\u0131 ay\u0131r",
+      "retry": "Temizlemeyi yeniden dene",
+      "unavailable": "Bu g\u00f6rsel i\u00e7in arka plan temizleme kullan\u0131lam\u0131yor"
     },
     "confirm": {
-      "use_image": "Use This Image"
+      "use_image": "Bu g\u00f6rseli kullan"
     },
     "upload": {
-      "preparing": "Preparing asset validation...",
-      "requesting": "Allocating upload session...",
-      "uploading": "Uploading image bytes...",
-      "verifying": "Verifying private storage payload...",
-      "processing": "Garment uploaded! Processing color analysis...",
-      "ready": "Garment ready",
-      "failed": "Garment upload failed",
-      "retry": "Retry Upload",
-      "cancel": "Cancel Upload"
+      "preparing": "G\u00f6rsel do\u011frulamas\u0131 haz\u0131rlan\u0131yor...",
+      "requesting": "Y\u00fckleme oturumu ayr\u0131l\u0131yor...",
+      "uploading": "G\u00f6rsel verileri y\u00fckleniyor...",
+      "verifying": "\u00d6zel depolama verileri do\u011frulan\u0131yor...",
+      "processing": "Giysi y\u00fcklendi. Renk analizi i\u015fleniyor...",
+      "ready": "Giysi haz\u0131r",
+      "failed": "Giysi y\u00fcklenemedi",
+      "retry": "Y\u00fcklemeyi yeniden dene",
+      "cancel": "Y\u00fcklemeyi iptal et"
     }
   }
 }
