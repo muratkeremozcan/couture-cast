@@ -24,6 +24,7 @@
     "lint": "cd ../.. && eslint --max-warnings=0 --ext .ts,.tsx apps/web"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.4",
     "@couture/api-client": "file:../../packages/api-client",
     "@couture/utils": "file:../../packages/utils",
     "next": "15.5.9",

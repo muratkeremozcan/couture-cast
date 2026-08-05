@@ -116,14 +116,16 @@ export const garmentImageAccessSchema = z
 export const garmentItemSchema = z
   .object({
     id: nonEmptyStringSchema,
-    status: z.enum([
-      'pending_upload',
-      'bytes_uploaded',
-      'processing',
-      'awaiting_tags',
-      'ready',
-      'failed',
-    ]),
+    status: z
+      .enum([
+        'pending_upload',
+        'bytes_uploaded',
+        'processing',
+        'awaiting_tags',
+        'ready',
+        'failed',
+      ])
+      .openapi({ 'x-optic-exemptions': 'request and response property enums' }),
     category: garmentCategoryEnum.nullable(),
     material: garmentMaterialEnum.nullable(),
     comfortRange: garmentComfortRangeEnum.nullable(),

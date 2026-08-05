@@ -3812,7 +3812,8 @@
                   "awaiting_tags",
                   "ready",
                   "failed"
-                ]
+                ],
+                "x-optic-exemptions": "request and response property enums"
               },
               "category": {
                 "type": [
@@ -3968,7 +3969,8 @@
                     "awaiting_tags",
                     "ready",
                     "failed"
-                  ]
+                  ],
+                  "x-optic-exemptions": "request and response property enums"
                 },
                 "category": {
                   "type": [
@@ -4305,7 +4307,8 @@
                   "awaiting_tags",
                   "ready",
                   "failed"
-                ]
+                ],
+                "x-optic-exemptions": "request and response property enums"
               },
               "category": {
                 "type": [
