@@ -16,6 +16,18 @@ export default defineConfig({
         projectRoot,
         'packages/api-client/src/index.ts'
       ),
+      '@couture/utils': path.resolve(
+        projectRoot,
+        'packages/utils/src/index.ts'
+      ),
+      '@couture/config': path.resolve(
+        projectRoot,
+        'packages/config/src/index.ts'
+      ),
+      '@couture/testing': path.resolve(
+        projectRoot,
+        'packages/testing/src/index.ts'
+      ),
     },
   },
   test: {
