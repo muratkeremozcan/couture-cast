@@ -17,43 +17,65 @@ export const isoTimestampSchema = z.string().datetime()
 export const nonEmptyStringSchema = z.string().min(1)
 export const okStatusSchema = z.literal('ok')
 export const unknownObjectSchema = z.record(z.string(), z.unknown())
-export const trackedResponseSchema = z.object({
-  tracked: z.literal(true),
-})
+export const trackedResponseSchema = z.object({ tracked: z.literal(true) }).strict()
 
-export const apiErrorSchema = z.object({
-  error: nonEmptyStringSchema,
-})
+export const apiErrorSchema = z.object({ error: nonEmptyStringSchema }).strict()
 
-export const badRequestHttpErrorSchema = z.object({
-  statusCode: z.literal(400),
-  message: nonEmptyStringSchema,
-  error: z.literal('Bad Request'),
-})
+export const badRequestHttpErrorSchema = z
+  .object({
+    statusCode: z.literal(400),
+    message: nonEmptyStringSchema,
+    error: z.literal('Bad Request'),
+  })
+  .strict()
 
-export const unauthorizedHttpErrorSchema = z.object({
-  statusCode: z.literal(401),
-  message: nonEmptyStringSchema,
-  error: z.literal('Unauthorized'),
-})
+export const unauthorizedHttpErrorSchema = z
+  .object({
+    statusCode: z.literal(401),
+    message: nonEmptyStringSchema,
+    error: z.literal('Unauthorized'),
+  })
+  .strict()
 
-export const forbiddenHttpErrorSchema = z.object({
-  statusCode: z.literal(403),
-  message: nonEmptyStringSchema,
-  error: z.literal('Forbidden'),
-})
+export const forbiddenHttpErrorSchema = z
+  .object({
+    statusCode: z.literal(403),
+    message: nonEmptyStringSchema,
+    error: z.literal('Forbidden'),
+  })
+  .strict()
 
-export const notFoundHttpErrorSchema = z.object({
-  statusCode: z.literal(404),
-  message: nonEmptyStringSchema,
-  error: z.literal('Not Found'),
-})
+export const notFoundHttpErrorSchema = z
+  .object({
+    statusCode: z.literal(404),
+    message: nonEmptyStringSchema,
+    error: z.literal('Not Found'),
+  })
+  .strict()
 
-export const internalServerErrorHttpErrorSchema = z.object({
-  statusCode: z.literal(500),
-  message: nonEmptyStringSchema,
-  error: z.literal('Internal Server Error'),
-})
+export const conflictHttpErrorSchema = z
+  .object({
+    statusCode: z.literal(409),
+    message: nonEmptyStringSchema,
+    error: z.literal('Conflict'),
+  })
+  .strict()
+
+export const internalServerErrorHttpErrorSchema = z
+  .object({
+    statusCode: z.literal(500),
+    message: nonEmptyStringSchema,
+    error: z.literal('Internal Server Error'),
+  })
+  .strict()
+
+export const serviceUnavailableHttpErrorSchema = z
+  .object({
+    statusCode: z.literal(503),
+    message: nonEmptyStringSchema,
+    error: z.literal('Service Unavailable'),
+  })
+  .strict()
 
 export type RegisteredCommonHttpSchemas = {
   apiErrorSchema: typeof apiErrorSchema
@@ -62,7 +84,9 @@ export type RegisteredCommonHttpSchemas = {
   unauthorizedHttpErrorSchema: typeof unauthorizedHttpErrorSchema
   forbiddenHttpErrorSchema: typeof forbiddenHttpErrorSchema
   notFoundHttpErrorSchema: typeof notFoundHttpErrorSchema
+  conflictHttpErrorSchema: typeof conflictHttpErrorSchema
   internalServerErrorHttpErrorSchema: typeof internalServerErrorHttpErrorSchema
+  serviceUnavailableHttpErrorSchema: typeof serviceUnavailableHttpErrorSchema
 }
 
 export function registerCommonHttpSchemas(registry: OpenAPIRegistry) {
@@ -85,9 +109,17 @@ export function registerCommonHttpSchemas(registry: OpenAPIRegistry) {
       'NotFoundHttpError',
       notFoundHttpErrorSchema
     ),
+    conflictHttpErrorSchema: registry.register(
+      'ConflictHttpError',
+      conflictHttpErrorSchema
+    ),
     internalServerErrorHttpErrorSchema: registry.register(
       'InternalServerErrorHttpError',
       internalServerErrorHttpErrorSchema
+    ),
+    serviceUnavailableHttpErrorSchema: registry.register(
+      'ServiceUnavailableHttpError',
+      serviceUnavailableHttpErrorSchema
     ),
   } satisfies RegisteredCommonHttpSchemas
 }

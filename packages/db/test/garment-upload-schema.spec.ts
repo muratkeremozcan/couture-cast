@@ -35,4 +35,28 @@ describe('garment upload lifecycle migration', () => {
     expect(migration).toContain('private.can_read_shared_user_row')
     expect(migration).not.toMatch(/FOR\s+(INSERT|UPDATE|DELETE)/)
   })
+
+  it('includes smart tagging enums, metadata columns, legacy data normalization, and check constraints', () => {
+    const smartTaggingMigration = readFileSync(
+      new URL(
+        '../prisma/migrations/20260805120000_add_garment_smart_tags/migration.sql',
+        import.meta.url
+      ),
+      'utf8'
+    )
+    expect(schema).toContain('enum GarmentCategory')
+    expect(schema).toContain('enum GarmentMaterial')
+    expect(schema).toContain('enum GarmentComfortRange')
+    expect(schema).toContain('awaiting_tags')
+    expect(smartTaggingMigration).toContain('CREATE TYPE "GarmentCategory"')
+    expect(smartTaggingMigration).toContain('CREATE TYPE "GarmentMaterial"')
+    expect(smartTaggingMigration).toContain('CREATE TYPE "GarmentComfortRange"')
+    expect(smartTaggingMigration).toContain('awaiting_tags')
+    expect(smartTaggingMigration).toContain('GarmentItem_ready_tags_check')
+    expect(smartTaggingMigration).toContain('LEGACY_TAGS_REQUIRED')
+    expect(smartTaggingMigration).toContain('IRREVERSIBLE CHECKPOINT')
+    expect(smartTaggingMigration).toContain('DATA-LOSS CHECKPOINT')
+    expect(smartTaggingMigration).toContain('back up GarmentItem')
+    expect(smartTaggingMigration).toContain('no automatic down migration')
+  })
 })

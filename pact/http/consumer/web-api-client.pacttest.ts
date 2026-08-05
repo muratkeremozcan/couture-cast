@@ -10,6 +10,8 @@ import {
   verifyRitualInteraction,
   verifyGetComfortPreferencesInteraction,
   verifyUpdateComfortPreferencesInteraction,
+  verifySuggestGarmentTagsInteraction,
+  verifyUpdateGarmentTagsInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -47,5 +49,13 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   it('updates user comfort preferences', async () => {
     await verifyUpdateComfortPreferencesInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('suggests garment smart tags', async () => {
+    await verifySuggestGarmentTagsInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('updates garment smart tags', async () => {
+    await verifyUpdateGarmentTagsInteraction(pact, createWebClientForMockServer)
   })
 })

@@ -11,6 +11,9 @@ const mockCommittedGarment: GarmentItemContract = {
   id: 'garment-committed-1',
   status: 'processing',
   category: null,
+  material: null,
+  comfortRange: null,
+  tagsConfirmedAt: null,
   fileSizeBytes: 1024,
   mimeType: 'image/png',
   retentionStatus: 'active',
@@ -22,9 +25,31 @@ const mockCommittedGarment: GarmentItemContract = {
   },
 }
 
+const globalRestorers: (() => void)[] = []
+
 afterEach(() => {
+  for (const restore of globalRestorers.splice(0).reverse()) {
+    restore()
+  }
   cleanup()
+  vi.restoreAllMocks()
 })
+
+function installCameraMock(getUserMedia: ReturnType<typeof vi.fn>) {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices')
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia },
+  })
+
+  globalRestorers.push(() => {
+    if (originalDescriptor) {
+      Object.defineProperty(navigator, 'mediaDevices', originalDescriptor)
+    } else {
+      Reflect.deleteProperty(navigator, 'mediaDevices')
+    }
+  })
+}
 
 describe('GarmentCaptureModal Component', () => {
   it('renders modal dialog when open', () => {
@@ -54,10 +79,7 @@ describe('GarmentCaptureModal Component', () => {
     const stop = vi.fn()
     const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream
     const getUserMedia = vi.fn().mockResolvedValue(stream)
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: { getUserMedia },
-    })
+    installCameraMock(getUserMedia)
 
     render(<GarmentCaptureModal isOpen={true} onClose={vi.fn()} />)
     await user.click(screen.getByRole('button', { name: 'Take Photo' }))
@@ -75,12 +97,12 @@ describe('GarmentCaptureModal Component', () => {
     const onGarmentCommitted = vi.fn()
     const uploadGarment = vi.fn().mockResolvedValue(mockCommittedGarment)
 
-    HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
       drawImage: vi.fn(),
-    }) as unknown as typeof HTMLCanvasElement.prototype.getContext
-    HTMLCanvasElement.prototype.toDataURL = vi
-      .fn()
-      .mockReturnValue('data:image/png;base64,sample')
+    } as unknown as CanvasRenderingContext2D)
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(
+      'data:image/png;base64,sample'
+    )
 
     render(
       <GarmentCaptureModal
@@ -95,10 +117,7 @@ describe('GarmentCaptureModal Component', () => {
 
     const stop = vi.fn()
     const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: { getUserMedia: vi.fn().mockResolvedValue(stream) },
-    })
+    installCameraMock(vi.fn().mockResolvedValue(stream))
 
     await user.click(screen.getByRole('button', { name: 'Take Photo' }))
     await screen.findByRole('button', { name: 'Snap Photo' })

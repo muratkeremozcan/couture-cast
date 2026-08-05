@@ -885,7 +885,7 @@ export class RitualService implements OnModuleDestroy {
               latitude: selectedLocation.latitude ?? 0.0,
               longitude: selectedLocation.longitude ?? 0.0,
               timezone,
-              provider: 'mock-provider',
+              provider: 'openweather',
               provider_updated_at: providerUpdatedAt,
               temperature: 68.0,
               condition: 'clear',
@@ -936,8 +936,14 @@ export class RitualService implements OnModuleDestroy {
     let latestGarment: GarmentItem | null = null
     if (this.prisma.garmentItem.findFirst) {
       latestGarment = await this.prisma.garmentItem.findFirst({
-        where: { user_id: userId },
-        orderBy: { updated_at: 'desc' },
+        where: {
+          user_id: userId,
+          retention_status: 'active',
+          upload_status: 'ready',
+          category: { not: null },
+          comfort_range: { not: null },
+        },
+        orderBy: [{ updated_at: 'desc' }, { id: 'asc' }],
       })
     }
     const wardrobeUpdatedAt = latestGarment?.updated_at ?? new Date(0)
@@ -1069,7 +1075,14 @@ export class RitualService implements OnModuleDestroy {
 
     // 5. Query user garments
     const userGarments = await this.prisma.garmentItem.findMany({
-      where: { user_id: userId },
+      where: {
+        user_id: userId,
+        retention_status: 'active',
+        upload_status: 'ready',
+        category: { not: null },
+        comfort_range: { not: null },
+      },
+      orderBy: [{ updated_at: 'desc' }, { id: 'asc' }],
     })
 
     // 6. Build or retrieve outfit recommendations

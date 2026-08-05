@@ -8,6 +8,7 @@ import { z } from 'zod'
  * Alternatives: direct untyped posthog.capture calls, ingest-only JSON Schema validation, or Protobuf/Avro contracts.
  * Ownership anchors:
  * - Story 0.7 Task 2 step 1 owner: define canonical event names and input/property schemas.
+ * - Story 4.2 Task 6 step 1 owner: define garment_tagging_completed analytics event schema in packages/api-client/src/types/analytics-events.ts
  * - Story 0.7 Task 2 step 2 owner: normalize domain inputs to snake_case analytics properties in track* wrappers.
  * - Story 0.7 Task 3 step 1 owner: publish shared track* wrappers for app-layer reuse and integration assertions.
  * Flow refs:
@@ -32,6 +33,7 @@ export const analyticsEventNameSchema = z.enum([
   'api_error_occurred',
   'locale_switched',
   'garment_upload_completed',
+  'garment_tagging_completed',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -180,6 +182,60 @@ export type GarmentUploadCompletedEvent = z.infer<
   typeof garmentUploadCompletedEventSchema
 >
 
+export const garmentTaggingCompletedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString.max(128),
+    garmentId: nonEmptyString.max(128),
+    suggestedCategory: z
+      .enum(['top', 'bottom', 'outerwear', 'dress', 'shoes', 'accessory'])
+      .nullable(),
+    confirmedCategory: z.enum([
+      'top',
+      'bottom',
+      'outerwear',
+      'dress',
+      'shoes',
+      'accessory',
+    ]),
+    suggestedMaterial: z
+      .enum([
+        'cotton',
+        'wool',
+        'linen',
+        'leather',
+        'denim',
+        'fleece',
+        'synthetic',
+        'down',
+        'silk',
+      ])
+      .nullable(),
+    confirmedMaterial: z
+      .enum([
+        'cotton',
+        'wool',
+        'linen',
+        'leather',
+        'denim',
+        'fleece',
+        'synthetic',
+        'down',
+        'silk',
+      ])
+      .nullable(),
+    suggestedComfortRange: z.enum(['cold', 'cool', 'mild', 'warm', 'hot']).nullable(),
+    confirmedComfortRange: z.enum(['cold', 'cool', 'mild', 'warm', 'hot']),
+    suggestionAvailable: z.boolean(),
+    analysisVersion: z.string().nullable(),
+    wasOverridden: z.boolean(),
+    overrideFields: z.array(z.enum(['category', 'material', 'comfort_range'])),
+  })
+  .strict()
+
+export type GarmentTaggingCompletedEvent = z.infer<
+  typeof garmentTaggingCompletedEventSchema
+>
+
 export const analyticsEventSchemas = {
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
@@ -194,6 +250,7 @@ export const analyticsEventSchemas = {
   api_error_occurred: apiErrorOccurredEventSchema,
   locale_switched: localeSwitchedEventSchema,
   garment_upload_completed: garmentUploadCompletedEventSchema,
+  garment_tagging_completed: garmentTaggingCompletedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -333,6 +390,59 @@ export const garmentUploadCompletedPropertiesSchema = z
 
 export type GarmentUploadCompletedProperties = z.infer<
   typeof garmentUploadCompletedPropertiesSchema
+>
+
+export const garmentTaggingCompletedPropertiesSchema = z
+  .object({
+    garment_id: nonEmptyString.max(128),
+    suggested_category: z
+      .enum(['top', 'bottom', 'outerwear', 'dress', 'shoes', 'accessory'])
+      .nullable(),
+    confirmed_category: z.enum([
+      'top',
+      'bottom',
+      'outerwear',
+      'dress',
+      'shoes',
+      'accessory',
+    ]),
+    suggested_material: z
+      .enum([
+        'cotton',
+        'wool',
+        'linen',
+        'leather',
+        'denim',
+        'fleece',
+        'synthetic',
+        'down',
+        'silk',
+      ])
+      .nullable(),
+    confirmed_material: z
+      .enum([
+        'cotton',
+        'wool',
+        'linen',
+        'leather',
+        'denim',
+        'fleece',
+        'synthetic',
+        'down',
+        'silk',
+      ])
+      .nullable(),
+    suggested_comfort_range: z.enum(['cold', 'cool', 'mild', 'warm', 'hot']).nullable(),
+    confirmed_comfort_range: z.enum(['cold', 'cool', 'mild', 'warm', 'hot']),
+    suggestion_available: z.boolean(),
+    analysis_version: z.string().nullable(),
+    was_overridden: z.boolean(),
+    override_fields: z.array(z.enum(['category', 'material', 'comfort_range'])),
+  })
+  .strict()
+
+export type GarmentTaggingCompletedProperties = z.infer<
+  typeof garmentTaggingCompletedPropertiesSchema
 >
 
 // Flow ref S0.7/T2/2: normalize domain inputs to snake_case analytics
@@ -569,6 +679,33 @@ export function trackGarmentUploadCompleted(
       has_cropping: parsed.hasCropping,
       has_bg_cleanup: parsed.hasBgCleanup,
       duration_ms: parsed.durationMs,
+    }),
+  }
+}
+
+export function trackGarmentTaggingCompleted(
+  event: GarmentTaggingCompletedEvent
+): AnalyticsCapturePayload<
+  'garment_tagging_completed',
+  GarmentTaggingCompletedProperties
+> {
+  const parsed = garmentTaggingCompletedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'garment_tagging_completed',
+    properties: garmentTaggingCompletedPropertiesSchema.parse({
+      garment_id: parsed.garmentId,
+      suggested_category: parsed.suggestedCategory,
+      confirmed_category: parsed.confirmedCategory,
+      suggested_material: parsed.suggestedMaterial,
+      confirmed_material: parsed.confirmedMaterial,
+      suggested_comfort_range: parsed.suggestedComfortRange,
+      confirmed_comfort_range: parsed.confirmedComfortRange,
+      suggestion_available: parsed.suggestionAvailable,
+      analysis_version: parsed.analysisVersion,
+      was_overridden: parsed.wasOverridden,
+      override_fields: parsed.overrideFields,
     }),
   }
 }

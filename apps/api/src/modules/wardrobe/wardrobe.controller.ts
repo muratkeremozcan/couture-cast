@@ -1,4 +1,5 @@
 // Story 4.1 Task 5 step 1 owner: expose Wardrobe API endpoints for upload url allocation, binary upload relay, and garment commit
+// Story 4.2 Task 5 step 2 owner: expose suggestGarmentTags and updateGarmentTags API endpoints in apps/api/src/modules/wardrobe/wardrobe.controller.ts
 import {
   BadRequestException,
   Body,
@@ -10,6 +11,7 @@ import {
   Get,
   Inject,
   Param,
+  Patch,
   PayloadTooLargeException,
   Post,
   Put,
@@ -23,6 +25,10 @@ import { z } from 'zod'
 import {
   createGarmentItemInputSchema,
   createGarmentUploadUrlInputSchema,
+  garmentIdPathParamsSchema,
+  suggestGarmentTagsResponseSchema,
+  updateGarmentTagsInputSchema,
+  updateGarmentTagsResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { AuthContext } from '../auth/security.decorators'
 import { RequestAuthGuard } from '../auth/security.guards'
@@ -164,5 +170,60 @@ export class WardrobeController {
     @Param('garmentId') garmentId: string
   ): Promise<void> {
     await this.wardrobeRetentionService.requestDeletion(auth.userId, garmentId)
+  }
+
+  @Post('garments/:garmentId/suggest-tags')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  async suggestGarmentTags(
+    @AuthContext() auth: RequestAuthContext,
+    @Param('garmentId') garmentId: string
+  ) {
+    const parsedPath = garmentIdPathParamsSchema.safeParse({ garmentId })
+    if (!parsedPath.success) {
+      throw new BadRequestException(
+        validationMessage('Invalid garment id', parsedPath.error)
+      )
+    }
+
+    return suggestGarmentTagsResponseSchema.parse(
+      await this.wardrobeService.suggestGarmentTags(
+        auth.userId,
+        auth.role,
+        parsedPath.data.garmentId
+      )
+    )
+  }
+
+  @Patch('garments/:garmentId/tags')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  async updateGarmentTags(
+    @AuthContext() auth: RequestAuthContext,
+    @Param('garmentId') garmentId: string,
+    @Body() payload: unknown
+  ) {
+    const parsedPath = garmentIdPathParamsSchema.safeParse({ garmentId })
+    if (!parsedPath.success) {
+      throw new BadRequestException(
+        validationMessage('Invalid garment id', parsedPath.error)
+      )
+    }
+
+    const parsedBody = updateGarmentTagsInputSchema.safeParse(payload)
+    if (!parsedBody.success) {
+      throw new BadRequestException(
+        validationMessage('Invalid garment tags', parsedBody.error)
+      )
+    }
+
+    return updateGarmentTagsResponseSchema.parse(
+      await this.wardrobeService.updateGarmentTags(
+        auth.userId,
+        auth.role,
+        parsedPath.data.garmentId,
+        parsedBody.data
+      )
+    )
   }
 }

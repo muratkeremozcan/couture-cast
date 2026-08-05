@@ -22,4 +22,12 @@ export const stateHandlers: StateHandlers = {
   'Comfort preferences exist for user': () => {
     return Promise.resolve({ description: 'Configured mock comfort preferences' })
   },
+  'A garment in awaiting_tags status with tag suggestions exists for user': () => {
+    return Promise.resolve({
+      description: 'Configured garment awaiting tags with suggestions',
+    })
+  },
+  'A garment in awaiting_tags status exists for user': () => {
+    return Promise.resolve({ description: 'Configured garment awaiting tags' })
+  },
 }

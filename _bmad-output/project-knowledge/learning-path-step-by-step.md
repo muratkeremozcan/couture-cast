@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-08-04. Step 29 records the consent-aware garment capture flow, binary upload relay, HMAC token verification, responsive web/mobile cropper & background cleanup modal, and telemetry integration.
+Updated: 2026-08-05. Step 30 records the smart tagging and comfort metadata flow, FashionCLIP ONNX inference engine, awaiting_tags upload status, Zod HTTP contracts, responsive web/mobile modal confirmation, and telemetry/ritual integration.
 
 ## LLM collaborator prompt
 
@@ -2665,4 +2665,83 @@ flowchart TD
   Upload --> BytesUploaded["GarmentItem (bytes_uploaded)"]
   Client --> Commit["POST /api/v1/wardrobe/garments\n(Commit & Telemetry)"]
   Commit --> Processing["GarmentItem (processing)\n+ garment_upload_completed Event"]
+```
+
+## Step 30 - Smart tagging and comfort metadata
+
+User/business impact:
+
+Automatically analyzes uploaded garment images to suggest clothing category (`top`, `bottom`, `outerwear`, `dress`, `shoes`, `accessory`), fabric material (`cotton`, `wool`, `linen`, `denim`, etc.), and target comfort temperature range (`cold`, `cool`, `mild`, `warm`, `hot`) using a local FashionCLIP ONNX machine learning model running on background worker threads. Gives users instant 1-click confirmation or quick override with multi-language support (10 locales), empowering personalized thermal comfort outfit recommendations while keeping processing privacy-first, local, and resilient with graceful fallback to manual tagging if inference fails.
+
+Key takeaways:
+
+1. Schema & Lifecycle Integration: `GarmentItem` is extended with `tag_suggestions` (JSON snapshot with confidence scores, values, and model version), `tags_confirmed_at`, `tagging_model_version`, `tagging_failure_code`, and `awaiting_tags` status in `GarmentUploadStatus`.
+2. Pluggable Inference Engine Architecture: `GarmentTaggingEngine` interface with `FashionClipTaggingEngine` (FashionCLIP ONNX model with worker thread isolation) and `FixtureGarmentTaggingEngine` (deterministic test/dev fallback).
+3. Resilient Background Processing: `WardrobeColorProcessor` runs inference asynchronously outside request threads. On inference success, sets `upload_status = awaiting_tags` and attaches suggestions; on inference error, sets `tagging_failure_code = TAGGING_INFERENCE_FAILED` and `awaiting_tags` status so users can still manually tag garments without data loss.
+4. Strict OpenAPI & Shared HTTP Contracts: `@couture/api-client/contracts/http/wardrobe.ts` defines `suggestGarmentTags` (`GET /api/v1/wardrobe/garments/{id}/tag-suggestions`) and `updateGarmentTags` (`PUT /api/v1/wardrobe/garments/{id}/tags`).
+5. Responsive Web & Native Mobile UI: `GarmentTaggingModal` on web and mobile pre-fills confident AI suggestions (confidence >= 70% category, >= 65% material/comfort), supports 1-click confirm or manual overrides, localized in 10 languages, with accessible radio groups and screen reader feedback.
+6. Telemetry & Personalization Integration: Tag confirmation emits `garment_tagging_completed` with `wasOverridden` calculation and `overrideFields` list, and invalidates user ritual cache so personalized thermal outfit matching updates immediately.
+
+Story/Task mapping:
+
+- Story 4.2
+- Task 1 (Database schema & lifecycle migration)
+- Task 2 (ONNX tagging engine & worker thread isolation)
+- Task 3 (BullMQ queue processing & failure recovery)
+- Task 4 (Canonical Wardrobe HTTP contracts & Zod schemas)
+- Task 5 (NestJS Wardrobe API controller & service methods)
+- Task 6 (Telemetry & ritual cache invalidation integration)
+- Task 7 (Responsive web tagging modal & hub page)
+- Task 8 (Native mobile tagging experience & 10 locale translations)
+- Task 9 (Quality matrix & accessibility validation)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/4-2-smart-tagging-comfort-metadata.md`
+
+Cross-links:
+
+- Step 3 provides Prisma schema conventions (`GarmentItem`, `GarmentCategory`, `GarmentMaterial`, `GarmentComfortRange`).
+- Step 5 provides BullMQ worker concurrency and DLQ-style failure capture patterns.
+- Step 22 provides mobile multi-locale translation infrastructure (`apps/mobile/assets/locales/`).
+- Step 29 provides the garment upload relay and `processing` state that triggers color extraction and AI tagging.
+
+Sequence to follow:
+
+1. Read `packages/db/prisma/schema.prisma` to understand `GarmentCategory`, `GarmentMaterial`, `GarmentComfortRange` enums and `GarmentItem` smart tagging fields.
+2. Inspect `apps/api/src/modules/wardrobe/garment-tagging.engine.ts` and `apps/api/src/modules/wardrobe/fashion-clip-tagging.engine.ts` for pluggable inference engine architecture and worker thread execution.
+3. Inspect `apps/api/src/modules/wardrobe/wardrobe-color.processor.ts` for BullMQ job handling, AI tag inference, and recoverable failure fallback (`TAGGING_INFERENCE_FAILED`).
+4. Read `packages/api-client/src/contracts/http/wardrobe.ts` for `suggestGarmentTags` and `updateGarmentTags` contracts.
+5. Inspect `apps/api/src/modules/wardrobe/wardrobe.service.ts` and `wardrobe.controller.ts` for tag suggestion fetching, user override calculation (`wasOverridden`), telemetry emission, and ritual cache invalidation.
+6. Read `apps/web/src/app/components/garment-tagging-modal.tsx` and `apps/mobile/components/wardrobe/garment-tagging-modal.tsx` for web and mobile UI modal flows.
+7. Review test suites in `apps/api/src/modules/wardrobe/fashion-clip-tagging.engine.spec.ts`, `apps/api/src/modules/wardrobe/wardrobe-color.processor.spec.ts`, `apps/api/src/modules/wardrobe/wardrobe.service.spec.ts`, `packages/api-client/testing/wardrobe-contract.spec.ts`, `apps/web/src/app/components/garment-tagging-modal.test.tsx`, `apps/mobile/components/wardrobe/garment-tagging-modal.test.tsx`, and `playwright/tests/wardrobe-smart-tagging.spec.ts`.
+
+Task owner map:
+
+- Story 4.2 Task 1 step 1 owner: add garment smart tagging metadata fields and awaiting_tags upload status to Prisma schema in packages/db/prisma/schema.prisma
+- Story 4.2 Task 2 step 1 owner: implement pluggable GarmentTaggingEngine interface and confidence scoring in apps/api/src/modules/wardrobe/garment-tagging.engine.ts
+- Story 4.2 Task 2 step 2 owner: implement FashionClipTaggingEngine ONNX inference engine in apps/api/src/modules/wardrobe/fashion-clip-tagging.engine.ts
+- Story 4.2 Task 2 step 3 owner: implement FixtureGarmentTaggingEngine fallback engine in apps/api/src/modules/wardrobe/fixture-garment-tagging.engine.ts
+- Story 4.2 Task 3 step 1 owner: integrate smart tagging inference into BullMQ wardrobe color processor in apps/api/src/modules/wardrobe/wardrobe-color.processor.ts
+- Story 4.2 Task 4 step 1 owner: define suggestGarmentTags and updateGarmentTags HTTP contracts and Zod schemas in packages/api-client/src/contracts/http/wardrobe.ts
+- Story 4.2 Task 5 step 1 owner: implement suggestGarmentTags and updateGarmentTags service methods in apps/api/src/modules/wardrobe/wardrobe.service.ts
+- Story 4.2 Task 5 step 2 owner: expose suggestGarmentTags and updateGarmentTags API endpoints in apps/api/src/modules/wardrobe/wardrobe.controller.ts
+- Story 4.2 Task 6 step 1 owner: define garment_tagging_completed analytics event schema in packages/api-client/src/types/analytics-events.ts
+- Story 4.2 Task 7 step 1 owner: implement web garment tagging modal dialog component in apps/web/src/app/components/garment-tagging-modal.tsx
+- Story 4.2 Task 8 step 1 owner: implement native mobile garment tagging modal component in apps/mobile/components/wardrobe/garment-tagging-modal.tsx
+- Story 4.2 Task 9 step 1 owner: E2E Playwright test for smart tagging modal accessibility and flow in playwright/tests/wardrobe-smart-tagging.spec.ts
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Upload[Garment Item Uploaded] --> Processing["GarmentItem (processing)"]
+  Processing --> Worker["BullMQ WardrobeColorProcessor\n(Worker Thread)"]
+  Worker --> Engine["FashionClipTaggingEngine\n(FashionCLIP ONNX Model)"]
+  Engine -->|Success| Suggestions["GarmentItem (awaiting_tags)\n+ tag_suggestions JSON"]
+  Engine -->|Inference Error| Fallback["GarmentItem (awaiting_tags)\n+ TAGGING_INFERENCE_FAILED"]
+  Suggestions --> UI["GarmentTaggingModal (Web & Mobile)\nPre-fills confident AI tags"]
+  Fallback --> UI
+  UI --> Confirm["PUT /api/v1/wardrobe/garments/{id}/tags\n(Confirm / Override)"]
+  Confirm --> Ready["GarmentItem (ready)\n+ garment_tagging_completed Event\n+ Invalidate Ritual Cache"]
 ```

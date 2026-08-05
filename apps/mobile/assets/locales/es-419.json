@@ -1,16 +1,16 @@
 {
   "tabs": {
-    "tab_one": "Pesta\u00f1a Uno",
-    "tab_two": "Configuraci\u00f3n",
+    "tab_one": "Pestaña Uno",
+    "tab_two": "Configuración",
     "home": "Inicio",
     "wardrobe": "Guardarropa",
     "community": "Comunidad",
-    "settings": "Configuraci\u00f3n"
+    "settings": "Configuración"
   },
   "hero": {
     "scenarios": {
       "morning": "Viaje matutino",
-      "midday": "Mediod\u00eda",
+      "midday": "Mediodía",
       "evening": "Planes nocturnos"
     },
     "conditions": {
@@ -22,60 +22,60 @@
       "rain": "Lluvia",
       "sleet": "Aguanieve",
       "snow": "Nieve",
-      "thunderstorm": "Tormenta el\u00e9ctrica",
+      "thunderstorm": "Tormenta eléctrica",
       "wind": "Ventoso",
       "unknown": "Desconocido"
     },
-    "hourly_forecast": "Pron\u00f3stico por hora",
+    "hourly_forecast": "Pronóstico por hora",
     "expand_hours": "Ampliar ({{hours}} h)",
     "collapse": "Contraer",
     "load_error": "No se pudieron cargar las recomendaciones diarias",
     "retry": "Reintentar",
-    "badge_justification": "Justificaci\u00f3n de {{label}}:",
+    "badge_justification": "Justificación de {{label}}:",
     "alert_title": "Advertencia de Clima Severo",
-    "offline_toast": "Usando datos clim\u00e1ticos recientemente guardados",
+    "offline_toast": "Usando datos climáticos recientemente guardados",
     "loading": "Cargando recomendaciones...",
     "garment_swap_title": "Elegir alternativa para {{category}}",
-    "feels_like": "Sensaci\u00f3n t\u00e9rmica",
-    "precipitation": "Precipitaci\u00f3n"
+    "feels_like": "Sensación térmica",
+    "precipitation": "Precipitación"
   },
   "widget": {
     "now": "AHORA",
-    "next_hour": "PR\u00d3XIMA HORA",
+    "next_hour": "PRÓXIMA HORA",
     "stale": "Desactualizado",
     "unavailable": "Abre la app para ver recomendaciones",
-    "precipitation": "Precipitaci\u00f3n"
+    "precipitation": "Precipitación"
   },
   "settings": {
     "title": "Ajustes",
     "language": "Idioma",
-    "locale_sync_error": "El idioma cambi\u00f3 en este dispositivo. La sincronizaci\u00f3n del perfil se reintentar\u00e1 m\u00e1s tarde.",
-    "locale_change_error": "No se pudo cambiar el idioma. Int\u00e9ntalo de nuevo.",
-    "region_units": "Regi\u00f3n y Unidades",
+    "locale_sync_error": "El idioma cambió en este dispositivo. La sincronización del perfil se reintentará más tarde.",
+    "locale_change_error": "No se pudo cambiar el idioma. Inténtalo de nuevo.",
+    "region_units": "Región y Unidades",
     "languages": {
-      "en-US": "Ingl\u00e9s (EE. UU.)",
-      "en-CA": "Ingl\u00e9s (Canad\u00e1)",
-      "es-419": "Espa\u00f1ol (LatAm)",
-      "fr-CA": "Franc\u00e9s (Canad\u00e1)",
-      "fr-FR": "Franc\u00e9s (Europa)",
+      "en-US": "Inglés (EE. UU.)",
+      "en-CA": "Inglés (Canadá)",
+      "es-419": "Español (LatAm)",
+      "fr-CA": "Francés (Canadá)",
+      "fr-FR": "Francés (Europa)",
       "tr-TR": "Turco",
-      "de-DE": "Alem\u00e1n",
+      "de-DE": "Alemán",
       "it-IT": "Italiano",
-      "pt-BR": "Portugu\u00eas (Brasil)",
-      "pt-PT": "Portugu\u00eas (Portugal)"
+      "pt-BR": "Português (Brasil)",
+      "pt-PT": "Português (Portugal)"
     },
     "api_health": "Comprobando estado de API...",
     "api_health_status": "Estado de API: {{status}}",
     "api_health_unavailable": "API no disponible",
-    "diagnostic_alert_btn": "Registrar an\u00e1lisis de alertas clim\u00e1ticas",
-    "diagnostic_info": "El seguimiento de alert_received est\u00e1 conectado a receptores reales de notificaciones push."
+    "diagnostic_alert_btn": "Registrar análisis de alertas climáticas",
+    "diagnostic_info": "El seguimiento de alert_received está conectado a receptores reales de notificaciones push."
   },
   "common": {
     "cancel": "Cancelar",
     "dismiss_banner": "Cerrar aviso",
-    "invalid_link": "Este enlace no es v\u00e1lido, venci\u00f3 o ya no est\u00e1 disponible.",
+    "invalid_link": "Este enlace no es válido, venció o ya no está disponible.",
     "about_couturecast": "Acerca de CoutureCast",
-    "about_description": "CoutureCast combina informaci\u00f3n meteorol\u00f3gica con recomendaciones de vestuario."
+    "about_description": "CoutureCast combina información meteorológica con recomendaciones de vestuario."
   },
   "accessibility": {
     "skip_to_content": "Saltar al contenido principal",
@@ -92,39 +92,39 @@
     "chip_community": "Comunidad",
     "chip_sponsored": "Patrocinado",
     "chip_filter_label": "Mostrar recomendaciones de {{chip}}",
-    "live_announcement_refresh": "Orientaci\u00f3n diaria actualizada",
+    "live_announcement_refresh": "Orientación diaria actualizada",
     "live_announcement_swap": "Prenda cambiada",
     "live_announcement_chip_change": "Mostrando recomendaciones de {{chip}}",
-    "live_announcement_alert": "Alerta meteorol\u00f3gica severa: {{alert}}"
+    "live_announcement_alert": "Alerta meteorológica severa: {{alert}}"
   },
   "wardrobe": {
     "title": "Armario",
     "add_garment": "Agregar prenda",
-    "empty_title": "A\u00fan no agregaste prendas",
+    "empty_title": "Aún no agregaste prendas",
     "empty_desc": "Toma una foto de tu prenda favorita para comenzar.",
     "capture": {
       "title": "Capturar prenda",
       "camera": "Tomar foto",
-      "library": "Galer\u00eda de fotos",
+      "library": "Galería de fotos",
       "retake": "Tomar otra foto",
       "choose_another": "Elegir otra"
     },
     "permission": {
-      "camera_denied": "Se rechaz\u00f3 el permiso de la c\u00e1mara.",
-      "camera_blocked": "El acceso a la c\u00e1mara est\u00e1 bloqueado en la configuraci\u00f3n.",
-      "library_denied": "Se rechaz\u00f3 el permiso de la galer\u00eda de fotos.",
-      "open_settings": "Abrir configuraci\u00f3n"
+      "camera_denied": "Se rechazó el permiso de la cámara.",
+      "camera_blocked": "El acceso a la cámara está bloqueado en la configuración.",
+      "library_denied": "Se rechazó el permiso de la galería de fotos.",
+      "open_settings": "Abrir configuración"
     },
     "error": {
-      "camera_unavailable": "La c\u00e1mara no est\u00e1 disponible en este dispositivo.",
-      "invalid_image": "Seleccionaste una imagen no v\u00e1lida.",
-      "corrupt_image": "La imagen seleccionada est\u00e1 da\u00f1ada.",
-      "image_too_large": "La imagen supera el l\u00edmite de 10 MiB.",
+      "camera_unavailable": "La cámara no está disponible en este dispositivo.",
+      "invalid_image": "Seleccionaste una imagen no válida.",
+      "corrupt_image": "La imagen seleccionada está dañada.",
+      "image_too_large": "La imagen supera el límite de 10 MiB.",
       "unsupported_type": "Formato de imagen no compatible.",
-      "network_timeout": "Se agot\u00f3 el tiempo para subir la imagen.",
+      "network_timeout": "Se agotó el tiempo para subir la imagen.",
       "storage_forbidden": "No tienes acceso al almacenamiento.",
       "consent_required": "Se requiere el consentimiento de un tutor para subir prendas.",
-      "upload_expired": "La sesi\u00f3n de carga venci\u00f3."
+      "upload_expired": "La sesión de carga venció."
     },
     "crop": {
       "title": "Recortar y posicionar",
@@ -134,24 +134,77 @@
       "reset": "Restablecer"
     },
     "cleanup": {
-      "title": "Limpieza autom\u00e1tica del fondo",
+      "title": "Limpieza automática del fondo",
       "toggle": "Recorte del fondo",
       "retry": "Reintentar limpieza",
-      "unavailable": "La limpieza del fondo no est\u00e1 disponible para esta imagen"
+      "unavailable": "La limpieza del fondo no está disponible para esta imagen"
     },
     "confirm": {
       "use_image": "Usar esta imagen"
     },
     "upload": {
-      "preparing": "Preparando la validaci\u00f3n de la imagen...",
-      "requesting": "Asignando la sesi\u00f3n de carga...",
+      "preparing": "Preparando la validación de la imagen...",
+      "requesting": "Asignando la sesión de carga...",
       "uploading": "Subiendo los datos de la imagen...",
       "verifying": "Verificando los datos privados almacenados...",
-      "processing": "Prenda cargada. Procesando el an\u00e1lisis de color...",
+      "processing": "Prenda cargada. Procesando el análisis de color...",
       "ready": "Prenda lista",
       "failed": "No se pudo subir la prenda",
       "retry": "Reintentar carga",
       "cancel": "Cancelar carga"
+    },
+    "tagging": {
+      "title": "Etiquetas inteligentes",
+      "desc": "Revisa las sugerencias de IA para personalizar tus atuendos.",
+      "needs_tags": "Requiere etiquetas",
+      "category": "Categoría",
+      "material": "Material",
+      "comfort_range": "Rango de confort",
+      "not_sure": "No estoy seguro / Limpiar",
+      "save": "Confirmar y guardar etiquetas",
+      "saving": "Guardando...",
+      "ai_suggested": "Sugerido por IA: {{value}}",
+      "loading_suggestions": "Cargando sugerencias...",
+      "pending_analysis": "El análisis está pendiente. Puedes seleccionar etiquetas manualmente.",
+      "inference_unavailable": "Sugerencias no disponibles. Selecciona etiquetas manualmente.",
+      "required": "*",
+      "optional": "(Opcional)",
+      "close": "Cerrar etiquetas inteligentes",
+      "low_confidence_suggested": "Sugerencia de baja confianza: {{value}}",
+      "retry": "Reintentar sugerencias",
+      "load_failed": "No se pudieron cargar las sugerencias.",
+      "selection_required": "Selecciona una categoría y un rango de confort.",
+      "save_failed": "No se pudieron guardar las etiquetas. Inténtalo de nuevo.",
+      "saved": "Etiquetas de la prenda guardadas.",
+      "poll_timeout": "El etiquetado está tardando más de lo esperado. La prenda seguirá disponible durante el procesamiento.",
+      "options": {
+        "category": {
+          "top": "Prenda superior",
+          "bottom": "Prenda inferior",
+          "outerwear": "Abrigo",
+          "dress": "Vestido",
+          "shoes": "Calzado",
+          "accessory": "Accesorio"
+        },
+        "material": {
+          "cotton": "Algodón",
+          "wool": "Lana",
+          "linen": "Lino",
+          "leather": "Cuero",
+          "denim": "Mezclilla",
+          "fleece": "Forro polar",
+          "synthetic": "Sintético",
+          "down": "Plumón",
+          "silk": "Seda"
+        },
+        "comfort": {
+          "cold": "Frío (< 10 °C / 50 °F)",
+          "cool": "Fresco (10–16 °C / 50–60 °F)",
+          "mild": "Templado (16–22 °C / 60–72 °F)",
+          "warm": "Cálido (22–28 °C / 72–82 °F)",
+          "hot": "Caluroso (> 28 °C / 82 °F)"
+        }
+      }
     }
   }
 }

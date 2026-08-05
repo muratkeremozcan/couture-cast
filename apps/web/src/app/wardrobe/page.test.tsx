@@ -6,10 +6,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
 import type { UploadGarmentImageInput } from '../../lib/wardrobe'
 
-const { listGarmentsFromWeb, uploadGarmentImageFromWeb } = vi.hoisted(() => ({
+const {
+  listGarmentsFromWeb,
+  uploadGarmentImageFromWeb,
+  suggestGarmentTagsFromWeb,
+  updateGarmentTagsFromWeb,
+} = vi.hoisted(() => ({
   listGarmentsFromWeb: vi.fn<(signal?: AbortSignal) => Promise<GarmentItemContract[]>>(),
   uploadGarmentImageFromWeb:
     vi.fn<(input: UploadGarmentImageInput) => Promise<GarmentItemContract>>(),
+  suggestGarmentTagsFromWeb: vi.fn(),
+  updateGarmentTagsFromWeb: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -19,6 +26,8 @@ vi.mock('next/navigation', () => ({
 vi.mock('../../lib/wardrobe', () => ({
   listGarmentsFromWeb,
   uploadGarmentImageFromWeb,
+  suggestGarmentTagsFromWeb,
+  updateGarmentTagsFromWeb,
 }))
 
 import WardrobePage from './page'
@@ -27,6 +36,9 @@ const persistedGarment: GarmentItemContract = {
   id: 'persisted-garment-1',
   status: 'processing',
   category: null,
+  material: null,
+  comfortRange: null,
+  tagsConfirmedAt: null,
   fileSizeBytes: 1024,
   mimeType: 'image/png',
   retentionStatus: 'active',

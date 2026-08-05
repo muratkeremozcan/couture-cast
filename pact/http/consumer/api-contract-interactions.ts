@@ -9,6 +9,9 @@ import {
   comfortPreferencesResponseSchema,
   updateComfortPreferencesResponseSchema,
   userPreferencesResponseSchema,
+  GARMENT_TAGGING_ANALYSIS_VERSION,
+  suggestGarmentTagsResponseSchema,
+  updateGarmentTagsResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { expect } from 'vitest'
 
@@ -32,6 +35,8 @@ type ContractApiClient = Pick<
   | 'apiV1PersonalizationComfortGet'
   | 'apiV1PersonalizationComfortPut'
   | 'apiV1UserPreferencesPut'
+  | 'apiV1WardrobeGarmentsGarmentIdSuggestTagsPost'
+  | 'apiV1WardrobeGarmentsGarmentIdTagsPatch'
 >
 type CreateClient = (mockServer: V3MockServer) => ContractApiClient
 
@@ -525,5 +530,128 @@ export async function verifyRitualLocalizationInteraction(
 
       expect(response).toBeDefined()
       expect(response.data?.outfits?.[0]?.comfortNotes).toContain('serin sabah')
+    })
+}
+
+export async function verifySuggestGarmentTagsInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  const garmentId = '00000000-0000-4000-8000-000000000001'
+
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A garment in awaiting_tags status with tag suggestions exists for user',
+        params: { garmentId, userId: 'guardian-1' },
+      })
+    )
+    .uponReceiving('a request to suggest garment smart tags')
+    .withRequest(
+      'POST',
+      `/api/v1/wardrobe/garments/${garmentId}/suggest-tags`,
+      setJsonContent({ headers: pactEventHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: {
+            garmentId: string(garmentId),
+            analysisVersion: string(GARMENT_TAGGING_ANALYSIS_VERSION),
+            suggestions: {
+              category: {
+                value: string('top'),
+                confidence: like(0.85),
+                isConfident: like(true),
+              },
+              material: {
+                value: string('cotton'),
+                confidence: like(0.72),
+                isConfident: like(true),
+              },
+              comfortRange: {
+                value: string('mild'),
+                confidence: like(0.72),
+                isConfident: like(true),
+              },
+            },
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(
+        mockServer
+      ).apiV1WardrobeGarmentsGarmentIdSuggestTagsPost({
+        garmentId,
+      })
+
+      expect(suggestGarmentTagsResponseSchema.parse(response)).toBeDefined()
+    })
+}
+
+export async function verifyUpdateGarmentTagsInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  const garmentId = '00000000-0000-4000-8000-000000000001'
+  const input = {
+    category: 'top' as const,
+    material: 'cotton' as const,
+    comfortRange: 'mild' as const,
+  }
+
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A garment in awaiting_tags status exists for user',
+        params: { garmentId, userId: 'guardian-1' },
+      })
+    )
+    .uponReceiving('a request to update and confirm garment tags')
+    .withRequest(
+      'PATCH',
+      `/api/v1/wardrobe/garments/${garmentId}/tags`,
+      setJsonContent({
+        headers: pactEventHeaders,
+        body: input,
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: {
+            id: string(garmentId),
+            status: string('ready'),
+            category: string('top'),
+            material: string('cotton'),
+            comfortRange: string('mild'),
+            tagsConfirmedAt: isoTimestamp('2026-08-05T12:00:00.000Z'),
+            fileSizeBytes: like(1024),
+            mimeType: string('image/png'),
+            retentionStatus: string('active'),
+            createdAt: isoTimestamp('2026-08-05T10:00:00.000Z'),
+            committedAt: isoTimestamp('2026-08-05T10:01:00.000Z'),
+            imageAccess: {
+              url: string('https://example.com/read.png'),
+              expiresAt: isoTimestamp('2026-08-05T12:15:00.000Z'),
+            },
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(
+        mockServer
+      ).apiV1WardrobeGarmentsGarmentIdTagsPatch({
+        garmentId,
+        updateGarmentTagsInput: input,
+      })
+
+      expect(updateGarmentTagsResponseSchema.parse(response)).toBeDefined()
     })
 }

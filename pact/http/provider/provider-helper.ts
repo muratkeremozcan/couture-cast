@@ -8,6 +8,7 @@ import { ApiHealthController } from '../../../apps/api/src/controllers/api-healt
 import { HealthController } from '../../../apps/api/src/controllers/health.controller'
 import { AccessTokenIdentityService } from '../../../apps/api/src/modules/auth/access-token-identity.service'
 import { GuardianConsentStateService } from '../../../apps/api/src/modules/auth/guardian-consent-state.service'
+import { GuardianService } from '../../../apps/api/src/modules/guardian/guardian.service'
 import { RequestAuthGuard } from '../../../apps/api/src/modules/auth/security.guards'
 import { EventsController } from '../../../apps/api/src/modules/events/events.controller'
 import { EventsRepository } from '../../../apps/api/src/modules/events/events.repository'
@@ -18,6 +19,16 @@ import { ComfortController } from '../../../apps/api/src/modules/personalization
 import { ComfortService } from '../../../apps/api/src/modules/personalization/comfort.service'
 import { UserController } from '../../../apps/api/src/modules/user/user.controller'
 import { UserService } from '../../../apps/api/src/modules/user/user.service'
+import { WardrobeController } from '../../../apps/api/src/modules/wardrobe/wardrobe.controller'
+import { WardrobeService } from '../../../apps/api/src/modules/wardrobe/wardrobe.service'
+import { WardrobeRetentionService } from '../../../apps/api/src/modules/wardrobe/wardrobe-retention.service'
+import { WardrobeUploadGuard } from '../../../apps/api/src/modules/wardrobe/wardrobe.guard'
+import {
+  GARMENT_TAGGING_ANALYSIS_VERSION,
+  type GarmentCategory,
+  type GarmentMaterial,
+  type GarmentComfortRange,
+} from '@couture/api-client'
 
 export type PactEvent = {
   id: string
@@ -273,6 +284,63 @@ export async function startLocalPactProvider({
       Promise.resolve({ success: true }),
   } as unknown as UserService
 
+  const mockWardrobeService = {
+    suggestGarmentTags: (userId: string, role: string, garmentId: string) => {
+      return Promise.resolve({
+        data: {
+          garmentId,
+          analysisVersion: GARMENT_TAGGING_ANALYSIS_VERSION,
+          suggestions: {
+            category: { value: 'top', confidence: 0.85, isConfident: true },
+            material: { value: 'cotton', confidence: 0.72, isConfident: true },
+            comfortRange: { value: 'mild', confidence: 0.72, isConfident: true },
+          },
+        },
+      })
+    },
+    updateGarmentTags: (
+      userId: string,
+      role: string,
+      garmentId: string,
+      input: {
+        category: GarmentCategory
+        material?: GarmentMaterial | null
+        comfortRange: GarmentComfortRange
+      }
+    ) => {
+      const categoryValue = input.category
+      const materialValue = input.material ?? null
+      const comfortValue = input.comfortRange
+      return Promise.resolve({
+        data: {
+          id: garmentId,
+          status: 'ready',
+          category: categoryValue,
+          material: materialValue,
+          comfortRange: comfortValue,
+          tagsConfirmedAt: '2026-08-05T12:00:00.000Z',
+          fileSizeBytes: 1024,
+          mimeType: 'image/png',
+          retentionStatus: 'active',
+          createdAt: '2026-08-05T10:00:00.000Z',
+          committedAt: '2026-08-05T10:01:00.000Z',
+          imageAccess: {
+            url: 'https://example.com/read.png',
+            expiresAt: '2026-08-05T12:15:00.000Z',
+          },
+        },
+      })
+    },
+  } as unknown as WardrobeService
+
+  const mockWardrobeRetentionService = {} as unknown as WardrobeRetentionService
+  const mockWardrobeUploadGuard = {
+    canActivate: () => true,
+  } as unknown as WardrobeUploadGuard
+  const mockGuardianService = {
+    assertWardrobeUploadAllowed: () => Promise.resolve(),
+  } as unknown as GuardianService
+
   const moduleFixture = await Test.createTestingModule({
     controllers: [
       ApiHealthController,
@@ -281,6 +349,7 @@ export async function startLocalPactProvider({
       RitualController,
       ComfortController,
       UserController,
+      WardrobeController,
     ],
     providers: [
       EventsService,
@@ -291,6 +360,10 @@ export async function startLocalPactProvider({
       {
         provide: GuardianConsentStateService,
         useValue: guardianConsentStateService,
+      },
+      {
+        provide: GuardianService,
+        useValue: mockGuardianService,
       },
       {
         provide: AccessTokenIdentityService,
@@ -307,6 +380,18 @@ export async function startLocalPactProvider({
       {
         provide: UserService,
         useValue: mockUserService,
+      },
+      {
+        provide: WardrobeService,
+        useValue: mockWardrobeService,
+      },
+      {
+        provide: WardrobeRetentionService,
+        useValue: mockWardrobeRetentionService,
+      },
+      {
+        provide: WardrobeUploadGuard,
+        useValue: mockWardrobeUploadGuard,
       },
     ],
   })

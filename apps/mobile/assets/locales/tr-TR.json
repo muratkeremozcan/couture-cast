@@ -3,155 +3,208 @@
     "tab_one": "Ana Sayfa",
     "tab_two": "Ayarlar",
     "home": "Ana Sayfa",
-    "wardrobe": "Gard\u0131rop",
+    "wardrobe": "Gardırop",
     "community": "Topluluk",
     "settings": "Ayarlar"
   },
   "hero": {
     "scenarios": {
       "morning": "Sabah gezisi",
-      "midday": "\u00d6\u011fle vakti",
-      "evening": "Ak\u015fam planlar\u0131"
+      "midday": "Öğle vakti",
+      "evening": "Akşam planları"
     },
     "conditions": {
-      "clear": "A\u00e7\u0131k",
-      "partly_cloudy": "Par\u00e7al\u0131 bulutlu",
+      "clear": "Açık",
+      "partly_cloudy": "Parçalı bulutlu",
       "cloudy": "Bulutlu",
       "fog": "Sisli",
-      "drizzle": "\u00c7isenti",
-      "rain": "Ya\u011fmurlu",
-      "sleet": "Karla kar\u0131\u015f\u0131k ya\u011fmur",
-      "snow": "Karl\u0131",
-      "thunderstorm": "G\u00f6k g\u00fcr\u00fclt\u00fcl\u00fc f\u0131rt\u0131na",
-      "wind": "R\u00fczgarl\u0131",
+      "drizzle": "Çisenti",
+      "rain": "Yağmurlu",
+      "sleet": "Karla karışık yağmur",
+      "snow": "Karlı",
+      "thunderstorm": "Gök gürültülü fırtına",
+      "wind": "Rüzgarlı",
       "unknown": "Bilinmiyor"
     },
     "hourly_forecast": "Saatlik tahmin",
-    "expand_hours": "Geni\u015flet ({{hours}} sa)",
+    "expand_hours": "Genişlet ({{hours}} sa)",
     "collapse": "Daralt",
-    "load_error": "G\u00fcnl\u00fck \u00f6neriler y\u00fcklenemedi",
+    "load_error": "Günlük öneriler yüklenemedi",
     "retry": "Tekrar dene",
-    "badge_justification": "{{label}} gerek\u00e7esi:",
-    "alert_title": "\u015eiddetli Hava Uyar\u0131s\u0131",
-    "offline_toast": "Yak\u0131n zamanda \u00f6nbelle\u011fe al\u0131nm\u0131\u015f hava durumu verileri kullan\u0131l\u0131yor",
-    "loading": "\u00d6neriler y\u00fckleniyor...",
-    "garment_swap_title": "{{category}} i\u00e7in alternatif se\u00e7in",
-    "feels_like": "Hissedilen s\u0131cakl\u0131k",
-    "precipitation": "Ya\u011f\u0131\u015f oran\u0131"
+    "badge_justification": "{{label}} gerekçesi:",
+    "alert_title": "Şiddetli Hava Uyarısı",
+    "offline_toast": "Yakın zamanda önbelleğe alınmış hava durumu verileri kullanılıyor",
+    "loading": "Öneriler yükleniyor...",
+    "garment_swap_title": "{{category}} için alternatif seçin",
+    "feels_like": "Hissedilen sıcaklık",
+    "precipitation": "Yağış oranı"
   },
   "widget": {
-    "now": "\u015e\u0130MD\u0130",
-    "next_hour": "SONRAK\u0130 SAAT",
-    "stale": "G\u00fcncel de\u011fil",
-    "unavailable": "\u00d6neriler i\u00e7in uygulamay\u0131 a\u00e7\u0131n",
-    "precipitation": "Ya\u011f\u0131\u015f"
+    "now": "ŞİMDİ",
+    "next_hour": "SONRAKİ SAAT",
+    "stale": "Güncel değil",
+    "unavailable": "Öneriler için uygulamayı açın",
+    "precipitation": "Yağış"
   },
   "settings": {
     "title": "Ayarlar",
     "language": "Dil",
-    "locale_sync_error": "Dil bu cihazda de\u011fi\u015ftirildi. Profil e\u015fitlemesi daha sonra yeniden denenecek.",
-    "locale_change_error": "Dil de\u011fi\u015ftirilemedi. L\u00fctfen tekrar deneyin.",
-    "region_units": "B\u00f6lge ve Birimler",
+    "locale_sync_error": "Dil bu cihazda değiştirildi. Profil eşitlemesi daha sonra yeniden denenecek.",
+    "locale_change_error": "Dil değiştirilemedi. Lütfen tekrar deneyin.",
+    "region_units": "Bölge ve Birimler",
     "languages": {
-      "en-US": "\u0130ngilizce (ABD)",
-      "en-CA": "\u0130ngilizce (Kanada)",
-      "es-419": "\u0130spanyolca (LatAm)",
-      "fr-CA": "Frans\u0131zca (Kanada)",
-      "fr-FR": "Frans\u0131zca (Avrupa)",
-      "tr-TR": "T\u00fcrk\u00e7e",
+      "en-US": "İngilizce (ABD)",
+      "en-CA": "İngilizce (Kanada)",
+      "es-419": "İspanyolca (LatAm)",
+      "fr-CA": "Fransızca (Kanada)",
+      "fr-FR": "Fransızca (Avrupa)",
+      "tr-TR": "Türkçe",
       "de-DE": "Almanca",
-      "it-IT": "\u0130talyanca",
+      "it-IT": "İtalyanca",
       "pt-BR": "Portekizce (Brezilya)",
       "pt-PT": "Portekizce (Portekiz)"
     },
     "api_health": "API durumu kontrol ediliyor...",
     "api_health_status": "API durumu: {{status}}",
-    "api_health_unavailable": "API kullan\u0131labilir de\u011fil",
-    "diagnostic_alert_btn": "Hava uyar\u0131s\u0131 analiti\u011fini kaydet",
-    "diagnostic_info": "alert_received takibi, ger\u00e7ek anl\u0131k bildirim al\u0131c\u0131lar\u0131na ba\u011fl\u0131d\u0131r."
+    "api_health_unavailable": "API kullanılabilir değil",
+    "diagnostic_alert_btn": "Hava uyarısı analitiğini kaydet",
+    "diagnostic_info": "alert_received takibi, gerçek anlık bildirim alıcılarına bağlıdır."
   },
   "common": {
-    "cancel": "\u0130ptal",
+    "cancel": "İptal",
     "dismiss_banner": "Bildirimi kapat",
-    "invalid_link": "Bu ba\u011flant\u0131 ge\u00e7ersiz, s\u00fcresi dolmu\u015f veya art\u0131k kullan\u0131lam\u0131yor.",
-    "about_couturecast": "CoutureCast hakk\u0131nda",
-    "about_description": "CoutureCast hava durumu verilerini gard\u0131rop \u00f6nerileriyle birle\u015ftirir."
+    "invalid_link": "Bu bağlantı geçersiz, süresi dolmuş veya artık kullanılamıyor.",
+    "about_couturecast": "CoutureCast hakkında",
+    "about_description": "CoutureCast hava durumu verilerini gardırop önerileriyle birleştirir."
   },
   "accessibility": {
-    "skip_to_content": "Ana i\u00e7eri\u011fe atla",
-    "weather_glyph_alt": "{{condition}} i\u00e7in hava durumu simgesi",
+    "skip_to_content": "Ana içeriğe atla",
+    "weather_glyph_alt": "{{condition}} için hava durumu simgesi",
     "garment_item_alt": "{{title}}",
-    "garment_swap_hint": "Alternatif giysi se\u00e7eneklerini a\u00e7ar",
-    "garment_category_outerwear": "d\u0131\u015f giyim",
+    "garment_swap_hint": "Alternatif giysi seçeneklerini açar",
+    "garment_category_outerwear": "dış giyim",
     "garment_category_bottoms": "alt giyim",
-    "garment_category_tops": "\u00fcst giyim",
-    "garment_category_footwear": "ayakkab\u0131",
+    "garment_category_tops": "üst giyim",
+    "garment_category_footwear": "ayakkabı",
     "garment_category_accessories": "aksesuar",
     "garment_category_garment": "giysi",
-    "chip_personal": "Ki\u015fisel",
+    "chip_personal": "Kişisel",
     "chip_community": "Topluluk",
     "chip_sponsored": "Sponsorlu",
-    "chip_filter_label": "{{chip}} \u00f6nerilerini g\u00f6ster",
-    "live_announcement_refresh": "G\u00fcnl\u00fck rehber g\u00fcncellendi",
-    "live_announcement_swap": "K\u0131yafet de\u011fi\u015ftirildi",
-    "live_announcement_chip_change": "{{chip}} \u00f6nerileri g\u00f6steriliyor",
-    "live_announcement_alert": "\u015eiddetli hava uyar\u0131s\u0131: {{alert}}"
+    "chip_filter_label": "{{chip}} önerilerini göster",
+    "live_announcement_refresh": "Günlük rehber güncellendi",
+    "live_announcement_swap": "Kıyafet değiştirildi",
+    "live_announcement_chip_change": "{{chip}} önerileri gösteriliyor",
+    "live_announcement_alert": "Şiddetli hava uyarısı: {{alert}}"
   },
   "wardrobe": {
-    "title": "Gard\u0131rop",
+    "title": "Gardırop",
     "add_garment": "Giysi ekle",
-    "empty_title": "Hen\u00fcz giysi eklenmedi",
-    "empty_desc": "Ba\u015flamak i\u00e7in en sevdi\u011finiz giysinin foto\u011fraf\u0131n\u0131 \u00e7ekin.",
+    "empty_title": "Henüz giysi eklenmedi",
+    "empty_desc": "Başlamak için en sevdiğiniz giysinin fotoğrafını çekin.",
     "capture": {
-      "title": "Giysi foto\u011fraf\u0131",
-      "camera": "Foto\u011fraf \u00e7ek",
-      "library": "Foto\u011fraf ar\u015fivi",
-      "retake": "Yeniden \u00e7ek",
-      "choose_another": "Ba\u015fka bir tane se\u00e7"
+      "title": "Giysi fotoğrafı",
+      "camera": "Fotoğraf çek",
+      "library": "Fotoğraf arşivi",
+      "retake": "Yeniden çek",
+      "choose_another": "Başka bir tane seç"
     },
     "permission": {
       "camera_denied": "Kamera izni reddedildi.",
-      "camera_blocked": "Kamera eri\u015fimi ayarlarda engellenmi\u015f.",
-      "library_denied": "Foto\u011fraf ar\u015fivi izni reddedildi.",
-      "open_settings": "Ayarlar\u0131 a\u00e7"
+      "camera_blocked": "Kamera erişimi ayarlarda engellenmiş.",
+      "library_denied": "Fotoğraf arşivi izni reddedildi.",
+      "open_settings": "Ayarları aç"
     },
     "error": {
-      "camera_unavailable": "Kamera bu cihazda kullan\u0131lam\u0131yor.",
-      "invalid_image": "Ge\u00e7ersiz bir g\u00f6rsel se\u00e7ildi.",
-      "corrupt_image": "Se\u00e7ilen g\u00f6rsel bozuk.",
-      "image_too_large": "G\u00f6rsel 10 MiB s\u0131n\u0131r\u0131n\u0131 a\u015f\u0131yor.",
-      "unsupported_type": "Desteklenmeyen g\u00f6rsel bi\u00e7imi.",
-      "network_timeout": "Y\u00fckleme zaman a\u015f\u0131m\u0131na u\u011frad\u0131.",
-      "storage_forbidden": "Depolama eri\u015fimi reddedildi.",
-      "consent_required": "Giysi y\u00fcklemek i\u00e7in vasi onay\u0131 gerekiyor.",
-      "upload_expired": "Y\u00fckleme oturumunun s\u00fcresi doldu."
+      "camera_unavailable": "Kamera bu cihazda kullanılamıyor.",
+      "invalid_image": "Geçersiz bir görsel seçildi.",
+      "corrupt_image": "Seçilen görsel bozuk.",
+      "image_too_large": "Görsel 10 MiB sınırını aşıyor.",
+      "unsupported_type": "Desteklenmeyen görsel biçimi.",
+      "network_timeout": "Yükleme zaman aşımına uğradı.",
+      "storage_forbidden": "Depolama erişimi reddedildi.",
+      "consent_required": "Giysi yüklemek için vasi onayı gerekiyor.",
+      "upload_expired": "Yükleme oturumunun süresi doldu."
     },
     "crop": {
-      "title": "K\u0131rp ve konumland\u0131r",
+      "title": "Kırp ve konumlandır",
       "aspect_square": "1:1 Kare",
       "aspect_four_three": "4:3 Dikey",
-      "rotate": "D\u00f6nd\u00fcr",
-      "reset": "S\u0131f\u0131rla"
+      "rotate": "Döndür",
+      "reset": "Sıfırla"
     },
     "cleanup": {
       "title": "Otomatik arka plan temizleme",
-      "toggle": "Arka plan\u0131 ay\u0131r",
+      "toggle": "Arka planı ayır",
       "retry": "Temizlemeyi yeniden dene",
-      "unavailable": "Bu g\u00f6rsel i\u00e7in arka plan temizleme kullan\u0131lam\u0131yor"
+      "unavailable": "Bu görsel için arka plan temizleme kullanılamıyor"
     },
     "confirm": {
-      "use_image": "Bu g\u00f6rseli kullan"
+      "use_image": "Bu görseli kullan"
     },
     "upload": {
-      "preparing": "G\u00f6rsel do\u011frulamas\u0131 haz\u0131rlan\u0131yor...",
-      "requesting": "Y\u00fckleme oturumu ayr\u0131l\u0131yor...",
-      "uploading": "G\u00f6rsel verileri y\u00fckleniyor...",
-      "verifying": "\u00d6zel depolama verileri do\u011frulan\u0131yor...",
-      "processing": "Giysi y\u00fcklendi. Renk analizi i\u015fleniyor...",
-      "ready": "Giysi haz\u0131r",
-      "failed": "Giysi y\u00fcklenemedi",
-      "retry": "Y\u00fcklemeyi yeniden dene",
-      "cancel": "Y\u00fcklemeyi iptal et"
+      "preparing": "Görsel doğrulaması hazırlanıyor...",
+      "requesting": "Yükleme oturumu ayrılıyor...",
+      "uploading": "Görsel verileri yükleniyor...",
+      "verifying": "Özel depolama verileri doğrulanıyor...",
+      "processing": "Giysi yüklendi. Renk analizi işleniyor...",
+      "ready": "Giysi hazır",
+      "failed": "Giysi yüklenemedi",
+      "retry": "Yüklemeyi Tekrar Dene",
+      "cancel": "Yüklemeyi İptal Et"
+    },
+    "tagging": {
+      "title": "Akıllı Etiketler",
+      "desc": "Kombin önerilerini kişiselleştirmek için YZ önerilerini inceleyin.",
+      "needs_tags": "Etiket gerekli",
+      "category": "Kategori",
+      "material": "Kumaş/Materyal",
+      "comfort_range": "Konfor Aralığı",
+      "not_sure": "Emin değilim / Temizle",
+      "save": "Onayla ve Kaydet",
+      "saving": "Kaydediliyor...",
+      "ai_suggested": "YZ Önerisi: {{value}}",
+      "loading_suggestions": "Akıllı öneriler yükleniyor...",
+      "pending_analysis": "Analiz henüz tamamlanmadı. Etiketleri manuel seçebilirsiniz.",
+      "inference_unavailable": "Akıllı öneri çıkarımı kullanılamıyor. Etiketleri manuel seçin.",
+      "required": "*",
+      "optional": "(İsteğe bağlı)",
+      "close": "Akıllı etiketleri kapat",
+      "low_confidence_suggested": "Düşük güvenli öneri: {{value}}",
+      "retry": "Önerileri yeniden dene",
+      "load_failed": "Akıllı öneriler yüklenemedi.",
+      "selection_required": "Bir kategori ve konfor aralığı seçin.",
+      "save_failed": "Etiketler kaydedilemedi. Tekrar deneyin.",
+      "saved": "Giysi etiketleri kaydedildi.",
+      "poll_timeout": "Etiketleme beklenenden uzun sürüyor. İşlem devam ederken giysi kullanılabilir kalacaktır.",
+      "options": {
+        "category": {
+          "top": "Üst",
+          "bottom": "Alt",
+          "outerwear": "Dış giyim",
+          "dress": "Elbise",
+          "shoes": "Ayakkabı",
+          "accessory": "Aksesuar"
+        },
+        "material": {
+          "cotton": "Pamuk",
+          "wool": "Yün",
+          "linen": "Keten",
+          "leather": "Deri",
+          "denim": "Denim",
+          "fleece": "Polar",
+          "synthetic": "Sentetik",
+          "down": "Kaz tüyü",
+          "silk": "İpek"
+        },
+        "comfort": {
+          "cold": "Soğuk (< 10 °C / 50 °F)",
+          "cool": "Serin (10–16 °C / 50–60 °F)",
+          "mild": "Ilık (16–22 °C / 60–72 °F)",
+          "warm": "Sıcak (22–28 °C / 72–82 °F)",
+          "hot": "Çok sıcak (> 28 °C / 82 °F)"
+        }
+      }
     }
   }
 }

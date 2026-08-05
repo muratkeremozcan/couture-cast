@@ -8,6 +8,7 @@ import { raw } from 'express'
 import { RequestAuthGuard } from '../auth/security.guards'
 import { AuthStateModule } from '../auth/auth-state.module'
 import { GuardianModule } from '../guardian/guardian.module'
+import { PersonalizationModule } from '../personalization/personalization.module'
 import { TelemetryModule } from '../telemetry/telemetry.module'
 import { WardrobeController } from './wardrobe.controller'
 import { WardrobeUploadGuard } from './wardrobe.guard'
@@ -18,7 +19,7 @@ import { WardrobeRetentionService } from './wardrobe-retention.service'
 import { MAX_GARMENT_IMAGE_BYTES } from './wardrobe-image-validation'
 
 @Module({
-  imports: [AuthStateModule, GuardianModule, TelemetryModule],
+  imports: [AuthStateModule, GuardianModule, PersonalizationModule, TelemetryModule],
   controllers: [WardrobeController],
   providers: [
     WardrobeService,

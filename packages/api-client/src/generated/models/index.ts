@@ -580,6 +580,50 @@ export type ComfortRun = (typeof ComfortRun)[keyof typeof ComfortRun]
 /**
  *
  * @export
+ * @interface ConflictHttpError
+ */
+export interface ConflictHttpError {
+  /**
+   *
+   * @type {ConflictHttpErrorStatusCodeEnum}
+   * @memberof ConflictHttpError
+   */
+  statusCode: ConflictHttpErrorStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ConflictHttpError
+   */
+  message: string
+  /**
+   *
+   * @type {ConflictHttpErrorErrorEnum}
+   * @memberof ConflictHttpError
+   */
+  error: ConflictHttpErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const ConflictHttpErrorStatusCodeEnum = {
+  NUMBER_409: 409,
+} as const
+export type ConflictHttpErrorStatusCodeEnum =
+  (typeof ConflictHttpErrorStatusCodeEnum)[keyof typeof ConflictHttpErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const ConflictHttpErrorErrorEnum = {
+  Conflict: 'Conflict',
+} as const
+export type ConflictHttpErrorErrorEnum =
+  (typeof ConflictHttpErrorErrorEnum)[keyof typeof ConflictHttpErrorErrorEnum]
+
+/**
+ *
+ * @export
  * @interface CreateGarmentItemInput
  */
 export interface CreateGarmentItemInput {
@@ -641,10 +685,28 @@ export interface CreateGarmentItemResponseData {
   status: CreateGarmentItemResponseDataStatusEnum
   /**
    *
+   * @type {CreateGarmentItemResponseDataCategoryEnum}
+   * @memberof CreateGarmentItemResponseData
+   */
+  category: CreateGarmentItemResponseDataCategoryEnum | null
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataMaterialEnum}
+   * @memberof CreateGarmentItemResponseData
+   */
+  material: CreateGarmentItemResponseDataMaterialEnum | null
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataComfortRangeEnum}
+   * @memberof CreateGarmentItemResponseData
+   */
+  comfortRange: CreateGarmentItemResponseDataComfortRangeEnum | null
+  /**
+   *
    * @type {string}
    * @memberof CreateGarmentItemResponseData
    */
-  category: string | null
+  tagsConfirmedAt: string | null
   /**
    *
    * @type {number}
@@ -690,11 +752,56 @@ export const CreateGarmentItemResponseDataStatusEnum = {
   pending_upload: 'pending_upload',
   bytes_uploaded: 'bytes_uploaded',
   processing: 'processing',
+  awaiting_tags: 'awaiting_tags',
   ready: 'ready',
   failed: 'failed',
 } as const
 export type CreateGarmentItemResponseDataStatusEnum =
   (typeof CreateGarmentItemResponseDataStatusEnum)[keyof typeof CreateGarmentItemResponseDataStatusEnum]
+
+/**
+ * @export
+ */
+export const CreateGarmentItemResponseDataCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type CreateGarmentItemResponseDataCategoryEnum =
+  (typeof CreateGarmentItemResponseDataCategoryEnum)[keyof typeof CreateGarmentItemResponseDataCategoryEnum]
+
+/**
+ * @export
+ */
+export const CreateGarmentItemResponseDataMaterialEnum = {
+  cotton: 'cotton',
+  wool: 'wool',
+  linen: 'linen',
+  leather: 'leather',
+  denim: 'denim',
+  fleece: 'fleece',
+  synthetic: 'synthetic',
+  down: 'down',
+  silk: 'silk',
+} as const
+export type CreateGarmentItemResponseDataMaterialEnum =
+  (typeof CreateGarmentItemResponseDataMaterialEnum)[keyof typeof CreateGarmentItemResponseDataMaterialEnum]
+
+/**
+ * @export
+ */
+export const CreateGarmentItemResponseDataComfortRangeEnum = {
+  cold: 'cold',
+  cool: 'cool',
+  mild: 'mild',
+  warm: 'warm',
+  hot: 'hot',
+} as const
+export type CreateGarmentItemResponseDataComfortRangeEnum =
+  (typeof CreateGarmentItemResponseDataComfortRangeEnum)[keyof typeof CreateGarmentItemResponseDataComfortRangeEnum]
 
 /**
  * @export
@@ -2442,6 +2549,50 @@ export interface ScenarioOutfitReasoningBadgesInner {
 /**
  *
  * @export
+ * @interface ServiceUnavailableHttpError
+ */
+export interface ServiceUnavailableHttpError {
+  /**
+   *
+   * @type {ServiceUnavailableHttpErrorStatusCodeEnum}
+   * @memberof ServiceUnavailableHttpError
+   */
+  statusCode: ServiceUnavailableHttpErrorStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ServiceUnavailableHttpError
+   */
+  message: string
+  /**
+   *
+   * @type {ServiceUnavailableHttpErrorErrorEnum}
+   * @memberof ServiceUnavailableHttpError
+   */
+  error: ServiceUnavailableHttpErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const ServiceUnavailableHttpErrorStatusCodeEnum = {
+  NUMBER_503: 503,
+} as const
+export type ServiceUnavailableHttpErrorStatusCodeEnum =
+  (typeof ServiceUnavailableHttpErrorStatusCodeEnum)[keyof typeof ServiceUnavailableHttpErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const ServiceUnavailableHttpErrorErrorEnum = {
+  Service_Unavailable: 'Service Unavailable',
+} as const
+export type ServiceUnavailableHttpErrorErrorEnum =
+  (typeof ServiceUnavailableHttpErrorErrorEnum)[keyof typeof ServiceUnavailableHttpErrorErrorEnum]
+
+/**
+ *
+ * @export
  * @interface SetPrimarySavedLocationResponse
  */
 export interface SetPrimarySavedLocationResponse {
@@ -2512,6 +2663,202 @@ export const SignupResponseAccountStatusEnum = {
 } as const
 export type SignupResponseAccountStatusEnum =
   (typeof SignupResponseAccountStatusEnum)[keyof typeof SignupResponseAccountStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface SuggestGarmentTagsResponse
+ */
+export interface SuggestGarmentTagsResponse {
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseData}
+   * @memberof SuggestGarmentTagsResponse
+   */
+  data: SuggestGarmentTagsResponseData
+}
+/**
+ *
+ * @export
+ * @interface SuggestGarmentTagsResponseData
+ */
+export interface SuggestGarmentTagsResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof SuggestGarmentTagsResponseData
+   */
+  garmentId: string
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseDataAnalysisVersionEnum}
+   * @memberof SuggestGarmentTagsResponseData
+   */
+  analysisVersion: SuggestGarmentTagsResponseDataAnalysisVersionEnum
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseDataSuggestions}
+   * @memberof SuggestGarmentTagsResponseData
+   */
+  suggestions: SuggestGarmentTagsResponseDataSuggestions
+}
+
+/**
+ * @export
+ */
+export const SuggestGarmentTagsResponseDataAnalysisVersionEnum = {
+  fashion_clip_7e3ba62ce16b379a1ab479346b66f192e76f51b7_prompts_v1:
+    'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1',
+} as const
+export type SuggestGarmentTagsResponseDataAnalysisVersionEnum =
+  (typeof SuggestGarmentTagsResponseDataAnalysisVersionEnum)[keyof typeof SuggestGarmentTagsResponseDataAnalysisVersionEnum]
+
+/**
+ *
+ * @export
+ * @interface SuggestGarmentTagsResponseDataSuggestions
+ */
+export interface SuggestGarmentTagsResponseDataSuggestions {
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseDataSuggestionsCategory}
+   * @memberof SuggestGarmentTagsResponseDataSuggestions
+   */
+  category: SuggestGarmentTagsResponseDataSuggestionsCategory
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseDataSuggestionsMaterial}
+   * @memberof SuggestGarmentTagsResponseDataSuggestions
+   */
+  material: SuggestGarmentTagsResponseDataSuggestionsMaterial
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseDataSuggestionsComfortRange}
+   * @memberof SuggestGarmentTagsResponseDataSuggestions
+   */
+  comfortRange: SuggestGarmentTagsResponseDataSuggestionsComfortRange
+}
+/**
+ *
+ * @export
+ * @interface SuggestGarmentTagsResponseDataSuggestionsCategory
+ */
+export interface SuggestGarmentTagsResponseDataSuggestionsCategory {
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseDataSuggestionsCategoryValueEnum}
+   * @memberof SuggestGarmentTagsResponseDataSuggestionsCategory
+   */
+  value: SuggestGarmentTagsResponseDataSuggestionsCategoryValueEnum
+  /**
+   *
+   * @type {number}
+   * @memberof SuggestGarmentTagsResponseDataSuggestionsCategory
+   */
+  confidence: number
+  /**
+   *
+   * @type {boolean}
+   * @memberof SuggestGarmentTagsResponseDataSuggestionsCategory
+   */
+  isConfident: boolean
+}
+
+/**
+ * @export
+ */
+export const SuggestGarmentTagsResponseDataSuggestionsCategoryValueEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type SuggestGarmentTagsResponseDataSuggestionsCategoryValueEnum =
+  (typeof SuggestGarmentTagsResponseDataSuggestionsCategoryValueEnum)[keyof typeof SuggestGarmentTagsResponseDataSuggestionsCategoryValueEnum]
+
+/**
+ *
+ * @export
+ * @interface SuggestGarmentTagsResponseDataSuggestionsComfortRange
+ */
+export interface SuggestGarmentTagsResponseDataSuggestionsComfortRange {
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseDataSuggestionsComfortRangeValueEnum}
+   * @memberof SuggestGarmentTagsResponseDataSuggestionsComfortRange
+   */
+  value: SuggestGarmentTagsResponseDataSuggestionsComfortRangeValueEnum
+  /**
+   *
+   * @type {number}
+   * @memberof SuggestGarmentTagsResponseDataSuggestionsComfortRange
+   */
+  confidence: number
+  /**
+   *
+   * @type {boolean}
+   * @memberof SuggestGarmentTagsResponseDataSuggestionsComfortRange
+   */
+  isConfident: boolean
+}
+
+/**
+ * @export
+ */
+export const SuggestGarmentTagsResponseDataSuggestionsComfortRangeValueEnum = {
+  cold: 'cold',
+  cool: 'cool',
+  mild: 'mild',
+  warm: 'warm',
+  hot: 'hot',
+} as const
+export type SuggestGarmentTagsResponseDataSuggestionsComfortRangeValueEnum =
+  (typeof SuggestGarmentTagsResponseDataSuggestionsComfortRangeValueEnum)[keyof typeof SuggestGarmentTagsResponseDataSuggestionsComfortRangeValueEnum]
+
+/**
+ *
+ * @export
+ * @interface SuggestGarmentTagsResponseDataSuggestionsMaterial
+ */
+export interface SuggestGarmentTagsResponseDataSuggestionsMaterial {
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseDataSuggestionsMaterialValueEnum}
+   * @memberof SuggestGarmentTagsResponseDataSuggestionsMaterial
+   */
+  value: SuggestGarmentTagsResponseDataSuggestionsMaterialValueEnum
+  /**
+   *
+   * @type {number}
+   * @memberof SuggestGarmentTagsResponseDataSuggestionsMaterial
+   */
+  confidence: number
+  /**
+   *
+   * @type {boolean}
+   * @memberof SuggestGarmentTagsResponseDataSuggestionsMaterial
+   */
+  isConfident: boolean
+}
+
+/**
+ * @export
+ */
+export const SuggestGarmentTagsResponseDataSuggestionsMaterialValueEnum = {
+  cotton: 'cotton',
+  wool: 'wool',
+  linen: 'linen',
+  leather: 'leather',
+  denim: 'denim',
+  fleece: 'fleece',
+  synthetic: 'synthetic',
+  down: 'down',
+  silk: 'silk',
+} as const
+export type SuggestGarmentTagsResponseDataSuggestionsMaterialValueEnum =
+  (typeof SuggestGarmentTagsResponseDataSuggestionsMaterialValueEnum)[keyof typeof SuggestGarmentTagsResponseDataSuggestionsMaterialValueEnum]
 
 /**
  *
@@ -2599,44 +2946,9 @@ export interface UpdateAlertRulesInput {
  * @export
  */
 export type UpdateAlertRulesInputRulesInner =
+  | AlertRuleOneOf
   | AlertRuleOneOf1
   | AlertRuleOneOf2
-  | UpdateAlertRulesInputRulesInnerOneOf
-/**
- *
- * @export
- * @interface UpdateAlertRulesInputRulesInnerOneOf
- */
-export interface UpdateAlertRulesInputRulesInnerOneOf {
-  /**
-   *
-   * @type {UpdateAlertRulesInputRulesInnerOneOfRuleTypeEnum}
-   * @memberof UpdateAlertRulesInputRulesInnerOneOf
-   */
-  ruleType: UpdateAlertRulesInputRulesInnerOneOfRuleTypeEnum
-  /**
-   *
-   * @type {number}
-   * @memberof UpdateAlertRulesInputRulesInnerOneOf
-   */
-  threshold: number
-  /**
-   *
-   * @type {boolean}
-   * @memberof UpdateAlertRulesInputRulesInnerOneOf
-   */
-  enabled: boolean
-}
-
-/**
- * @export
- */
-export const UpdateAlertRulesInputRulesInnerOneOfRuleTypeEnum = {
-  temperature: 'temperature',
-} as const
-export type UpdateAlertRulesInputRulesInnerOneOfRuleTypeEnum =
-  (typeof UpdateAlertRulesInputRulesInnerOneOfRuleTypeEnum)[keyof typeof UpdateAlertRulesInputRulesInnerOneOfRuleTypeEnum]
-
 /**
  *
  * @export
@@ -2734,6 +3046,89 @@ export interface UpdateComfortPreferencesResponse {
    * @memberof UpdateComfortPreferencesResponse
    */
   data: ComfortPreferencesResponseData
+}
+/**
+ *
+ * @export
+ * @interface UpdateGarmentTagsInput
+ */
+export interface UpdateGarmentTagsInput {
+  /**
+   *
+   * @type {UpdateGarmentTagsInputCategoryEnum}
+   * @memberof UpdateGarmentTagsInput
+   */
+  category: UpdateGarmentTagsInputCategoryEnum
+  /**
+   *
+   * @type {UpdateGarmentTagsInputMaterialEnum}
+   * @memberof UpdateGarmentTagsInput
+   */
+  material?: UpdateGarmentTagsInputMaterialEnum | null
+  /**
+   *
+   * @type {UpdateGarmentTagsInputComfortRangeEnum}
+   * @memberof UpdateGarmentTagsInput
+   */
+  comfortRange: UpdateGarmentTagsInputComfortRangeEnum
+}
+
+/**
+ * @export
+ */
+export const UpdateGarmentTagsInputCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type UpdateGarmentTagsInputCategoryEnum =
+  (typeof UpdateGarmentTagsInputCategoryEnum)[keyof typeof UpdateGarmentTagsInputCategoryEnum]
+
+/**
+ * @export
+ */
+export const UpdateGarmentTagsInputMaterialEnum = {
+  cotton: 'cotton',
+  wool: 'wool',
+  linen: 'linen',
+  leather: 'leather',
+  denim: 'denim',
+  fleece: 'fleece',
+  synthetic: 'synthetic',
+  down: 'down',
+  silk: 'silk',
+} as const
+export type UpdateGarmentTagsInputMaterialEnum =
+  (typeof UpdateGarmentTagsInputMaterialEnum)[keyof typeof UpdateGarmentTagsInputMaterialEnum]
+
+/**
+ * @export
+ */
+export const UpdateGarmentTagsInputComfortRangeEnum = {
+  cold: 'cold',
+  cool: 'cool',
+  mild: 'mild',
+  warm: 'warm',
+  hot: 'hot',
+} as const
+export type UpdateGarmentTagsInputComfortRangeEnum =
+  (typeof UpdateGarmentTagsInputComfortRangeEnum)[keyof typeof UpdateGarmentTagsInputComfortRangeEnum]
+
+/**
+ *
+ * @export
+ * @interface UpdateGarmentTagsResponse
+ */
+export interface UpdateGarmentTagsResponse {
+  /**
+   *
+   * @type {CreateGarmentItemResponseData}
+   * @memberof UpdateGarmentTagsResponse
+   */
+  data: CreateGarmentItemResponseData
 }
 /**
  *

@@ -30,7 +30,8 @@
         },
         "required": [
           "error"
-        ]
+        ],
+        "additionalProperties": false
       },
       "TrackedResponse": {
         "type": "object",
@@ -44,7 +45,8 @@
         },
         "required": [
           "tracked"
-        ]
+        ],
+        "additionalProperties": false
       },
       "BadRequestHttpError": {
         "type": "object",
@@ -70,7 +72,8 @@
           "statusCode",
           "message",
           "error"
-        ]
+        ],
+        "additionalProperties": false
       },
       "UnauthorizedHttpError": {
         "type": "object",
@@ -96,7 +99,8 @@
           "statusCode",
           "message",
           "error"
-        ]
+        ],
+        "additionalProperties": false
       },
       "ForbiddenHttpError": {
         "type": "object",
@@ -122,7 +126,8 @@
           "statusCode",
           "message",
           "error"
-        ]
+        ],
+        "additionalProperties": false
       },
       "NotFoundHttpError": {
         "type": "object",
@@ -148,7 +153,35 @@
           "statusCode",
           "message",
           "error"
-        ]
+        ],
+        "additionalProperties": false
+      },
+      "ConflictHttpError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              409
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Conflict"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
       },
       "InternalServerErrorHttpError": {
         "type": "object",
@@ -174,7 +207,35 @@
           "statusCode",
           "message",
           "error"
-        ]
+        ],
+        "additionalProperties": false
+      },
+      "ServiceUnavailableHttpError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              503
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Service Unavailable"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
       },
       "AlertRuleType": {
         "type": "string",
@@ -3748,6 +3809,7 @@
                   "pending_upload",
                   "bytes_uploaded",
                   "processing",
+                  "awaiting_tags",
                   "ready",
                   "failed"
                 ]
@@ -3756,7 +3818,52 @@
                 "type": [
                   "string",
                   "null"
+                ],
+                "enum": [
+                  "top",
+                  "bottom",
+                  "outerwear",
+                  "dress",
+                  "shoes",
+                  "accessory"
                 ]
+              },
+              "material": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "cotton",
+                  "wool",
+                  "linen",
+                  "leather",
+                  "denim",
+                  "fleece",
+                  "synthetic",
+                  "down",
+                  "silk"
+                ]
+              },
+              "comfortRange": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "cold",
+                  "cool",
+                  "mild",
+                  "warm",
+                  "hot"
+                ]
+              },
+              "tagsConfirmedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
               },
               "fileSizeBytes": {
                 "type": [
@@ -3822,6 +3929,9 @@
               "id",
               "status",
               "category",
+              "material",
+              "comfortRange",
+              "tagsConfirmedAt",
               "fileSizeBytes",
               "mimeType",
               "retentionStatus",
@@ -3855,6 +3965,7 @@
                     "pending_upload",
                     "bytes_uploaded",
                     "processing",
+                    "awaiting_tags",
                     "ready",
                     "failed"
                   ]
@@ -3863,7 +3974,52 @@
                   "type": [
                     "string",
                     "null"
+                  ],
+                  "enum": [
+                    "top",
+                    "bottom",
+                    "outerwear",
+                    "dress",
+                    "shoes",
+                    "accessory"
                   ]
+                },
+                "material": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "cotton",
+                    "wool",
+                    "linen",
+                    "leather",
+                    "denim",
+                    "fleece",
+                    "synthetic",
+                    "down",
+                    "silk"
+                  ]
+                },
+                "comfortRange": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "cold",
+                    "cool",
+                    "mild",
+                    "warm",
+                    "hot"
+                  ]
+                },
+                "tagsConfirmedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
                 },
                 "fileSizeBytes": {
                   "type": [
@@ -3929,6 +4085,9 @@
                 "id",
                 "status",
                 "category",
+                "material",
+                "comfortRange",
+                "tagsConfirmedAt",
                 "fileSizeBytes",
                 "mimeType",
                 "retentionStatus",
@@ -3938,6 +4097,342 @@
               ],
               "additionalProperties": false
             }
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "SuggestGarmentTagsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "garmentId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "analysisVersion": {
+                "type": "string",
+                "enum": [
+                  "fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1"
+                ]
+              },
+              "suggestions": {
+                "type": "object",
+                "properties": {
+                  "category": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "enum": [
+                          "top",
+                          "bottom",
+                          "outerwear",
+                          "dress",
+                          "shoes",
+                          "accessory"
+                        ]
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "isConfident": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "confidence",
+                      "isConfident"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "material": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "enum": [
+                          "cotton",
+                          "wool",
+                          "linen",
+                          "leather",
+                          "denim",
+                          "fleece",
+                          "synthetic",
+                          "down",
+                          "silk"
+                        ]
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "isConfident": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "confidence",
+                      "isConfident"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "comfortRange": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "enum": [
+                          "cold",
+                          "cool",
+                          "mild",
+                          "warm",
+                          "hot"
+                        ]
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "isConfident": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "confidence",
+                      "isConfident"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "category",
+                  "material",
+                  "comfortRange"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "garmentId",
+              "analysisVersion",
+              "suggestions"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateGarmentTagsInput": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "top",
+              "bottom",
+              "outerwear",
+              "dress",
+              "shoes",
+              "accessory"
+            ]
+          },
+          "material": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "cotton",
+              "wool",
+              "linen",
+              "leather",
+              "denim",
+              "fleece",
+              "synthetic",
+              "down",
+              "silk"
+            ]
+          },
+          "comfortRange": {
+            "type": "string",
+            "enum": [
+              "cold",
+              "cool",
+              "mild",
+              "warm",
+              "hot"
+            ]
+          }
+        },
+        "required": [
+          "category",
+          "comfortRange"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateGarmentTagsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending_upload",
+                  "bytes_uploaded",
+                  "processing",
+                  "awaiting_tags",
+                  "ready",
+                  "failed"
+                ]
+              },
+              "category": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "top",
+                  "bottom",
+                  "outerwear",
+                  "dress",
+                  "shoes",
+                  "accessory"
+                ]
+              },
+              "material": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "cotton",
+                  "wool",
+                  "linen",
+                  "leather",
+                  "denim",
+                  "fleece",
+                  "synthetic",
+                  "down",
+                  "silk"
+                ]
+              },
+              "comfortRange": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "cold",
+                  "cool",
+                  "mild",
+                  "warm",
+                  "hot"
+                ]
+              },
+              "tagsConfirmedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "fileSizeBytes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1,
+                "maximum": 10485760
+              },
+              "mimeType": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "image/jpeg",
+                  "image/png",
+                  "image/webp"
+                ]
+              },
+              "retentionStatus": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "deletion_pending",
+                  "legal_hold"
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "committedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "imageAccess": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "url",
+                  "expiresAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "category",
+              "material",
+              "comfortRange",
+              "tagsConfirmedAt",
+              "fileSizeBytes",
+              "mimeType",
+              "retentionStatus",
+              "createdAt",
+              "committedAt",
+              "imageAccess"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -5512,7 +6007,212 @@
             }
           },
           "409": {
-            "description": "Idempotency key reused, session expired, or upload claimed."
+            "description": "Idempotency key reused, session expired, or upload claimed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/garments/{garmentId}/suggest-tags": {
+      "post": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Retrieve algorithmically inferred tag suggestions for an awaiting-tags garment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique garment item ID."
+            },
+            "required": true,
+            "description": "Unique garment item ID.",
+            "name": "garmentId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tag suggestions retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestGarmentTagsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid garment ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent required or access forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Garment not found or owned by another user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Garment analysis pending or not taggable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Tagging inference unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/garments/{garmentId}/tags": {
+      "patch": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Confirm or edit garment category, material, and comfort tags",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique garment item ID."
+            },
+            "required": true,
+            "description": "Unique garment item ID.",
+            "name": "garmentId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGarmentTagsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Garment tags updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateGarmentTagsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid garment tags input.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent required or access forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Garment not found or owned by another user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Garment analysis pending or not taggable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
           }
         }
       }
@@ -5601,7 +6301,14 @@
             }
           },
           "409": {
-            "description": "Idempotency key reused or upload session expired."
+            "description": "Idempotency key reused or upload session expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
           }
         }
       }
@@ -5720,7 +6427,14 @@
             }
           },
           "409": {
-            "description": "Upload session expired or token already consumed."
+            "description": "Upload session expired or token already consumed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
           }
         }
       }

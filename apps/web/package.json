@@ -19,6 +19,7 @@
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "dev": "node ../../node_modules/next/dist/bin/next dev",
     "build": "node ../../node_modules/next/dist/bin/next build",
+    "build:e2e": "node ../../node_modules/next/dist/bin/next build",
     "start": "node ../../node_modules/next/dist/bin/next start",
     "lint": "cd ../.. && eslint --max-warnings=0 --ext .ts,.tsx apps/web"
   },

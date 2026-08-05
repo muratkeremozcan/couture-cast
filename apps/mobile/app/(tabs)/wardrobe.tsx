@@ -13,11 +13,11 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
+  findNodeHandle,
 } from 'react-native'
 import {
   createGarmentItemResponseSchema,
   createGarmentUploadUrlResponseSchema,
-  garmentListResponseSchema,
   uploadGarmentBytes,
   type GarmentItemContract,
 } from '@couture/api-client/contracts/http'
@@ -25,6 +25,9 @@ import {
 import { Text, View } from '@/components/themed'
 import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
+
+import { MobileGarmentTaggingModal } from '@/components/wardrobe/garment-tagging-modal'
+import { listGarmentsFromMobile } from '@/src/lib/wardrobe'
 
 type CaptureStep = 'source' | 'crop' | 'uploading' | 'complete'
 type AspectRatio = '1:1' | '4:3'
@@ -70,27 +73,30 @@ export default function WardrobeScreen() {
   const [step, setStep] = useState<CaptureStep>('source')
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null)
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1')
+  const [taggingGarmentId, setTaggingGarmentId] = useState<string | null>(null)
+  const [accessToken, setAccessToken] = useState<string>('')
+  const [taggingInvokerNodeHandle, setTaggingInvokerNodeHandle] = useState<number | null>(
+    null
+  )
   const [useBgCleanup, setUseBgCleanup] = useState(true)
   const [uploadStatus, setUploadStatus] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const uploadAbortRef = useRef<AbortController | null>(null)
+  const pollingAbortRef = useRef<AbortController | null>(null)
+  const pendingTaggingGarmentIdRef = useRef<string | null>(null)
+  const isCaptureOpenRef = useRef(false)
+
+  useEffect(() => {
+    isCaptureOpenRef.current = isCaptureOpen
+  }, [isCaptureOpen])
 
   const loadGarments = useCallback(async (signal?: AbortSignal) => {
-    const accessToken = await resolveMobileAccessToken()
-    if (!accessToken) {
+    const token = await resolveMobileAccessToken()
+    if (!token) {
       throw new Error('AUTHENTICATION_REQUIRED')
     }
-    const response = await fetch(
-      `${resolveMobileApiBaseUrl()}/api/v1/wardrobe/garments`,
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        signal,
-      }
-    )
-    if (!response.ok) {
-      throw await responseError(response)
-    }
-    setGarments(garmentListResponseSchema.parse(await response.json()).data)
+    setAccessToken(token)
+    setGarments(await listGarmentsFromMobile(token, signal))
   }, [])
 
   useEffect(() => {
@@ -101,6 +107,7 @@ export default function WardrobeScreen() {
     return () => {
       controller.abort()
       uploadAbortRef.current?.abort()
+      pollingAbortRef.current?.abort()
     }
   }, [loadGarments])
 
@@ -116,6 +123,56 @@ export default function WardrobeScreen() {
   const closeCapture = () => {
     resetCapture()
     setIsCaptureOpen(false)
+    const pendingGarmentId = pendingTaggingGarmentIdRef.current
+    pendingTaggingGarmentIdRef.current = null
+    if (pendingGarmentId) {
+      setTimeout(() => setTaggingGarmentId(pendingGarmentId), 0)
+    }
+  }
+
+  const waitForPoll = (delayMs: number, signal: AbortSignal) =>
+    new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(resolve, delayMs)
+      signal.addEventListener(
+        'abort',
+        () => {
+          clearTimeout(timer)
+          reject(new Error('POLL_ABORTED'))
+        },
+        { once: true }
+      )
+    })
+
+  const pollCommittedGarment = (garmentId: string, token: string) => {
+    pollingAbortRef.current?.abort()
+    const controller = new AbortController()
+    pollingAbortRef.current = controller
+    void (async () => {
+      try {
+        for (const delayMs of [1_000, 2_000, 4_000, 8_000]) {
+          await waitForPoll(delayMs, controller.signal)
+          const persisted = await listGarmentsFromMobile(token, controller.signal)
+          setGarments(persisted)
+          const current = persisted.find((garment) => garment.id === garmentId)
+          if (!current || current.status === 'processing') continue
+          if (current.status === 'awaiting_tags') {
+            if (isCaptureOpenRef.current) {
+              pendingTaggingGarmentIdRef.current = current.id
+            } else {
+              setTaggingGarmentId(current.id)
+            }
+          }
+          return
+        }
+        setErrorMessage(t('wardrobe.tagging.poll_timeout'))
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setErrorMessage(
+            error instanceof Error ? error.message : t('wardrobe.tagging.load_failed')
+          )
+        }
+      }
+    })()
   }
 
   const selectAsset = (asset: ImagePicker.ImagePickerAsset) => {
@@ -287,6 +344,11 @@ export default function WardrobeScreen() {
         garment,
         ...current.filter((item) => item.id !== garment.id),
       ])
+      if (garment.status === 'awaiting_tags') {
+        pendingTaggingGarmentIdRef.current = garment.id
+      } else if (garment.status === 'processing') {
+        pollCommittedGarment(garment.id, accessToken)
+      }
       setUploadStatus(t('wardrobe.upload.processing'))
       setStep('complete')
     } catch (error) {
@@ -304,201 +366,261 @@ export default function WardrobeScreen() {
   }
 
   return (
-    <View style={styles.screen} testID="wardrobe-screen">
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>{t('wardrobe.title')}</Text>
-            <Text style={styles.subtitle}>{t('wardrobe.empty_desc')}</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            testID="garment-capture-open"
-            style={styles.primaryButton}
-            onPress={() => setIsCaptureOpen(true)}
-          >
-            <Text style={styles.primaryButtonText}>{t('wardrobe.add_garment')}</Text>
-          </Pressable>
-        </View>
-
-        {isLoading ? (
-          <ActivityIndicator accessibilityLabel="Loading wardrobe" />
-        ) : garments.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>{t('wardrobe.empty_title')}</Text>
-          </View>
-        ) : (
-          <View style={styles.grid} testID="wardrobe-garment-list">
-            {garments.map((garment) => (
-              <View key={garment.id} style={styles.garmentCard}>
-                {garment.imageAccess ? (
-                  <Image
-                    source={{ uri: garment.imageAccess.url }}
-                    accessibilityLabel={t('wardrobe.capture.title')}
-                    style={styles.garmentImage}
-                  />
-                ) : null}
-                <Text numberOfLines={1} style={styles.garmentId}>
-                  {garment.id}
-                </Text>
-                <Text>{garment.status}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-
-      <Modal animationType="slide" visible={isCaptureOpen} onRequestClose={closeCapture}>
-        <View style={styles.modal} testID="garment-capture-modal">
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t('wardrobe.capture.title')}</Text>
+    <>
+      <View
+        style={styles.screen}
+        testID="wardrobe-screen"
+        importantForAccessibility={taggingGarmentId ? 'no-hide-descendants' : 'auto'}
+      >
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.title}>{t('wardrobe.title')}</Text>
+              <Text style={styles.subtitle}>{t('wardrobe.empty_desc')}</Text>
+            </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t('common.close', { defaultValue: 'Close' })}
-              testID="garment-capture-close"
-              onPress={closeCapture}
+              testID="garment-capture-open"
+              style={styles.primaryButton}
+              onPress={() => setIsCaptureOpen(true)}
             >
-              <Text style={styles.closeButton}>✕</Text>
+              <Text style={styles.primaryButtonText}>{t('wardrobe.add_garment')}</Text>
             </Pressable>
           </View>
 
-          {errorMessage ? (
-            <View accessibilityRole="alert" style={styles.errorBox}>
-              <Text>{errorMessage}</Text>
-              {errorMessage === t('wardrobe.permission.camera_blocked') ? (
-                <Pressable onPress={() => void Linking.openSettings()}>
-                  <Text style={styles.link}>
-                    {t('wardrobe.permission.open_settings')}
+          {isLoading ? (
+            <ActivityIndicator accessibilityLabel="Loading wardrobe" />
+          ) : garments.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>{t('wardrobe.empty_title')}</Text>
+            </View>
+          ) : (
+            <View style={styles.grid} testID="wardrobe-garment-list">
+              {garments.map((garment) => (
+                <View key={garment.id} style={styles.garmentCard}>
+                  {garment.imageAccess ? (
+                    <Image
+                      source={{ uri: garment.imageAccess.url }}
+                      accessibilityLabel={t('wardrobe.capture.title')}
+                      style={styles.garmentImage}
+                    />
+                  ) : null}
+                  <Text numberOfLines={1} style={styles.garmentId}>
+                    {garment.id}
                   </Text>
-                </Pressable>
-              ) : null}
+                  <Text>{garment.status}</Text>
+                  {garment.status === 'awaiting_tags' && (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('wardrobe.tagging.needs_tags', {
+                        defaultValue: 'Needs tags',
+                      })}
+                      style={styles.needsTagsBtn}
+                      onPress={(event) => {
+                        setTaggingInvokerNodeHandle(
+                          findNodeHandle(event.currentTarget as never)
+                        )
+                        setTaggingGarmentId(garment.id)
+                      }}
+                    >
+                      <Text style={styles.needsTagsText}>
+                        {t('wardrobe.tagging.needs_tags', { defaultValue: 'Needs tags' })}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              ))}
             </View>
-          ) : null}
+          )}
+        </ScrollView>
 
-          {step === 'source' ? (
-            <View style={styles.sourceActions}>
+        <Modal
+          animationType="slide"
+          visible={isCaptureOpen}
+          onRequestClose={closeCapture}
+        >
+          <View style={styles.modal} testID="garment-capture-modal">
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t('wardrobe.capture.title')}</Text>
               <Pressable
                 accessibilityRole="button"
-                testID="garment-source-camera"
-                style={styles.sourceButton}
-                onPress={() => void openCamera()}
-              >
-                <Text style={styles.sourceButtonText}>
-                  {t('wardrobe.capture.camera')}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                testID="garment-source-library"
-                style={styles.sourceButton}
-                onPress={() => void openLibrary()}
-              >
-                <Text style={styles.sourceButtonText}>
-                  {t('wardrobe.capture.library')}
-                </Text>
-              </Pressable>
-              {__DEV__ ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Use deterministic garment fixture"
-                  testID="garment-e2e-fixture-source"
-                  style={styles.fixtureButton}
-                  onPress={() => void selectFixture()}
-                >
-                  <Text>Use deterministic garment fixture</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-
-          {step === 'crop' && selectedImage ? (
-            <ScrollView contentContainerStyle={styles.cropContent}>
-              <Text style={styles.sectionTitle}>{t('wardrobe.crop.title')}</Text>
-              <Image
-                source={{ uri: selectedImage.uri }}
-                resizeMode="cover"
-                testID="garment-crop-preview"
-                style={
-                  aspectRatio === '1:1' ? styles.squarePreview : styles.portraitPreview
-                }
-              />
-              <View style={styles.row}>
-                <Pressable
-                  testID="garment-aspect-square"
-                  style={styles.optionButton}
-                  onPress={() => setAspectRatio('1:1')}
-                >
-                  <Text>{t('wardrobe.crop.aspect_square')}</Text>
-                </Pressable>
-                <Pressable
-                  testID="garment-aspect-portrait"
-                  style={styles.optionButton}
-                  onPress={() => setAspectRatio('4:3')}
-                >
-                  <Text>{t('wardrobe.crop.aspect_four_three')}</Text>
-                </Pressable>
-              </View>
-              <View style={styles.cleanupRow}>
-                <Text>{t('wardrobe.cleanup.title')}</Text>
-                <Switch
-                  accessibilityLabel={t('wardrobe.cleanup.title')}
-                  testID="garment-cleanup-toggle"
-                  value={useBgCleanup}
-                  onValueChange={setUseBgCleanup}
-                />
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                testID="garment-confirm-image"
-                style={styles.primaryButton}
-                onPress={() => void uploadSelectedImage()}
-              >
-                <Text style={styles.primaryButtonText}>
-                  {t('wardrobe.confirm.use_image')}
-                </Text>
-              </Pressable>
-            </ScrollView>
-          ) : null}
-
-          {step === 'uploading' ? (
-            <View style={styles.uploadState} testID="garment-upload-progress">
-              <ActivityIndicator />
-              <Text>{uploadStatus}</Text>
-              <Pressable
-                testID="garment-upload-cancel"
-                onPress={() => {
-                  uploadAbortRef.current?.abort()
-                  setStep('crop')
-                }}
-              >
-                <Text style={styles.link}>{t('wardrobe.upload.cancel')}</Text>
-              </Pressable>
-            </View>
-          ) : null}
-
-          {step === 'complete' ? (
-            <View style={styles.completeState} testID="garment-capture-complete">
-              <Text style={styles.completeIcon}>✓</Text>
-              <Text style={styles.sectionTitle}>{t('wardrobe.upload.processing')}</Text>
-              <Pressable
-                testID="garment-capture-done"
-                style={styles.primaryButton}
+                accessibilityLabel={t('common.close', { defaultValue: 'Close' })}
+                testID="garment-capture-close"
                 onPress={closeCapture}
               >
-                <Text style={styles.primaryButtonText}>
-                  {t('common.done', { defaultValue: 'Done' })}
-                </Text>
+                <Text style={styles.closeButton}>✕</Text>
               </Pressable>
             </View>
-          ) : null}
-        </View>
-      </Modal>
-    </View>
+
+            {errorMessage ? (
+              <View accessibilityRole="alert" style={styles.errorBox}>
+                <Text>{errorMessage}</Text>
+                {errorMessage === t('wardrobe.permission.camera_blocked') ? (
+                  <Pressable onPress={() => void Linking.openSettings()}>
+                    <Text style={styles.link}>
+                      {t('wardrobe.permission.open_settings')}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+
+            {step === 'source' ? (
+              <View style={styles.sourceActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  testID="garment-source-camera"
+                  style={styles.sourceButton}
+                  onPress={() => void openCamera()}
+                >
+                  <Text style={styles.sourceButtonText}>
+                    {t('wardrobe.capture.camera')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  testID="garment-source-library"
+                  style={styles.sourceButton}
+                  onPress={() => void openLibrary()}
+                >
+                  <Text style={styles.sourceButtonText}>
+                    {t('wardrobe.capture.library')}
+                  </Text>
+                </Pressable>
+                {__DEV__ ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Use deterministic garment fixture"
+                    testID="garment-e2e-fixture-source"
+                    style={styles.fixtureButton}
+                    onPress={() => void selectFixture()}
+                  >
+                    <Text>Use deterministic garment fixture</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+
+            {step === 'crop' && selectedImage ? (
+              <ScrollView contentContainerStyle={styles.cropContent}>
+                <Text style={styles.sectionTitle}>{t('wardrobe.crop.title')}</Text>
+                <Image
+                  source={{ uri: selectedImage.uri }}
+                  resizeMode="cover"
+                  testID="garment-crop-preview"
+                  style={
+                    aspectRatio === '1:1' ? styles.squarePreview : styles.portraitPreview
+                  }
+                />
+                <View style={styles.row}>
+                  <Pressable
+                    testID="garment-aspect-square"
+                    style={styles.optionButton}
+                    onPress={() => setAspectRatio('1:1')}
+                  >
+                    <Text>{t('wardrobe.crop.aspect_square')}</Text>
+                  </Pressable>
+                  <Pressable
+                    testID="garment-aspect-portrait"
+                    style={styles.optionButton}
+                    onPress={() => setAspectRatio('4:3')}
+                  >
+                    <Text>{t('wardrobe.crop.aspect_four_three')}</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.cleanupRow}>
+                  <Text>{t('wardrobe.cleanup.title')}</Text>
+                  <Switch
+                    accessibilityLabel={t('wardrobe.cleanup.title')}
+                    testID="garment-cleanup-toggle"
+                    value={useBgCleanup}
+                    onValueChange={setUseBgCleanup}
+                  />
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  testID="garment-confirm-image"
+                  style={styles.primaryButton}
+                  onPress={() => void uploadSelectedImage()}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    {t('wardrobe.confirm.use_image')}
+                  </Text>
+                </Pressable>
+              </ScrollView>
+            ) : null}
+
+            {step === 'uploading' ? (
+              <View style={styles.uploadState} testID="garment-upload-progress">
+                <ActivityIndicator />
+                <Text>{uploadStatus}</Text>
+                <Pressable
+                  testID="garment-upload-cancel"
+                  onPress={() => {
+                    uploadAbortRef.current?.abort()
+                    setStep('crop')
+                  }}
+                >
+                  <Text style={styles.link}>{t('wardrobe.upload.cancel')}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {step === 'complete' ? (
+              <View style={styles.completeState} testID="garment-capture-complete">
+                <Text style={styles.completeIcon}>✓</Text>
+                <Text style={styles.sectionTitle}>{t('wardrobe.upload.processing')}</Text>
+                <Pressable
+                  testID="garment-capture-done"
+                  style={styles.primaryButton}
+                  onPress={closeCapture}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    {t('common.done', { defaultValue: 'Done' })}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        </Modal>
+      </View>
+
+      <MobileGarmentTaggingModal
+        visible={Boolean(taggingGarmentId)}
+        onClose={() => setTaggingGarmentId(null)}
+        garmentId={taggingGarmentId}
+        accessToken={accessToken}
+        invokingNodeHandle={taggingInvokerNodeHandle}
+        onTagsConfirmed={(updatedGarment) => {
+          setGarments((current) =>
+            current.map((item) => (item.id === updatedGarment.id ? updatedGarment : item))
+          )
+          setTaggingGarmentId(null)
+        }}
+      />
+    </>
   )
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  needsTagsBtn: {
+    minHeight: 44,
+    minWidth: 44,
+    backgroundColor: '#FEF9EF',
+    borderColor: '#C5A059',
+    borderWidth: 1,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingHorizontal: 8,
+  },
+  needsTagsText: {
+    color: '#8A5A00',
+    fontWeight: '700',
+    fontSize: 12,
+  },
   content: { padding: 20, gap: 24 },
   header: { gap: 16 },
   title: { fontSize: 28, fontWeight: '700' },

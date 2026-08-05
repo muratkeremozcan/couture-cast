@@ -1,13 +1,15 @@
 'use client'
 
 import {
-  createGarmentItemResponseSchema,
-  createGarmentUploadUrlResponseSchema,
-  garmentListResponseSchema,
   uploadGarmentBytes,
+  type GarmentCategory,
+  type GarmentMaterial,
+  type GarmentComfortRange,
   type GarmentItemContract,
+  type SuggestGarmentTagsData,
 } from '@couture/api-client/contracts/http'
-import { resolveWebApiBaseUrl } from './api-client'
+import { ResponseError } from '@couture/api-client'
+import { createWebApiClient } from './api-client'
 
 export const WEB_ACCESS_TOKEN_STORAGE_KEY = 'couturecast.access-token'
 
@@ -186,8 +188,11 @@ async function readError(response: Response): Promise<Error> {
   }
 }
 
-function authHeaders(accessToken: string): Record<string, string> {
-  return { Authorization: `Bearer ${accessToken}` }
+async function actionableWardrobeError(error: unknown, fallback: string): Promise<Error> {
+  if (error instanceof ResponseError) {
+    return readError(error.response)
+  }
+  return error instanceof Error ? error : new Error(fallback)
 }
 
 export async function uploadGarmentImageFromWeb({
@@ -205,32 +210,27 @@ export async function uploadGarmentImageFromWeb({
 
   onStateChange?.('requesting_upload')
   onProgress?.(25)
-  const allocationResponse = await fetch(
-    `${resolveWebApiBaseUrl()}/api/v1/wardrobe/upload-url`,
-    {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        ...authHeaders(accessToken),
-        'Content-Type': 'application/json',
-        'Idempotency-Key': crypto.randomUUID(),
-      },
-      body: JSON.stringify({
-        fileSizeBytes: image.blob.size,
-        mimeType: image.mimeType,
-        sha256: image.sha256,
-        widthPx: image.widthPx,
-        heightPx: image.heightPx,
-      }),
-      signal,
-    }
-  )
-  if (!allocationResponse.ok) {
-    throw await readError(allocationResponse)
+  const api = createWebApiClient({ accessToken })
+  let allocation
+  try {
+    allocation = (
+      await api.apiV1WardrobeUploadUrlPost(
+        {
+          idempotencyKey: crypto.randomUUID(),
+          createGarmentUploadUrlInput: {
+            fileSizeBytes: image.blob.size,
+            mimeType: image.mimeType,
+            sha256: image.sha256,
+            widthPx: image.widthPx,
+            heightPx: image.heightPx,
+          },
+        },
+        { signal }
+      )
+    ).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to allocate garment upload.')
   }
-  const allocation = createGarmentUploadUrlResponseSchema.parse(
-    await allocationResponse.json()
-  ).data
 
   onStateChange?.('uploading')
   onProgress?.(35)
@@ -247,29 +247,25 @@ export async function uploadGarmentImageFromWeb({
 
   onStateChange?.('verifying')
   onProgress?.(90)
-  const commitResponse = await fetch(
-    `${resolveWebApiBaseUrl()}/api/v1/wardrobe/garments`,
-    {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        ...authHeaders(accessToken),
-        'Content-Type': 'application/json',
-        'Idempotency-Key': crypto.randomUUID(),
-      },
-      body: JSON.stringify({
-        garmentId: allocation.garmentId,
-        uploadSessionId: allocation.uploadSessionId,
-        hasCropping: true,
-        hasBgCleanup: useBgCleanup,
-      }),
-      signal,
-    }
-  )
-  if (!commitResponse.ok) {
-    throw await readError(commitResponse)
+  let garment
+  try {
+    garment = (
+      await api.apiV1WardrobeGarmentsPost(
+        {
+          idempotencyKey: crypto.randomUUID(),
+          createGarmentItemInput: {
+            garmentId: allocation.garmentId,
+            uploadSessionId: allocation.uploadSessionId,
+            hasCropping: true,
+            hasBgCleanup: useBgCleanup,
+          },
+        },
+        { signal }
+      )
+    ).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to commit garment upload.')
   }
-  const garment = createGarmentItemResponseSchema.parse(await commitResponse.json()).data
   onStateChange?.('processing')
   onProgress?.(100)
   return garment
@@ -279,13 +275,49 @@ export async function listGarmentsFromWeb(
   signal?: AbortSignal
 ): Promise<GarmentItemContract[]> {
   const accessToken = readAccessToken()
-  const response = await fetch(`${resolveWebApiBaseUrl()}/api/v1/wardrobe/garments`, {
-    credentials: 'include',
-    headers: authHeaders(accessToken),
-    signal,
-  })
-  if (!response.ok) {
-    throw await readError(response)
+  try {
+    return (
+      await createWebApiClient({ accessToken }).apiV1WardrobeGarmentsGet({ signal })
+    ).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to load your wardrobe.')
   }
-  return garmentListResponseSchema.parse(await response.json()).data
+}
+
+export async function suggestGarmentTagsFromWeb(
+  garmentId: string,
+  signal?: AbortSignal
+): Promise<SuggestGarmentTagsData> {
+  const accessToken = readAccessToken()
+  try {
+    return (
+      await createWebApiClient({
+        accessToken,
+      }).apiV1WardrobeGarmentsGarmentIdSuggestTagsPost({ garmentId }, { signal })
+    ).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to load smart suggestions.')
+  }
+}
+
+export async function updateGarmentTagsFromWeb(
+  garmentId: string,
+  tags: {
+    category: GarmentCategory
+    material?: GarmentMaterial | null
+    comfortRange: GarmentComfortRange
+  },
+  signal?: AbortSignal
+): Promise<GarmentItemContract> {
+  const accessToken = readAccessToken()
+  try {
+    return (
+      await createWebApiClient({ accessToken }).apiV1WardrobeGarmentsGarmentIdTagsPatch(
+        { garmentId, updateGarmentTagsInput: tags },
+        { signal }
+      )
+    ).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to save garment tags.')
+  }
 }

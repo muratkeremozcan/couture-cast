@@ -43,15 +43,15 @@
     "now": "ORA",
     "next_hour": "PROSSIMA ORA",
     "stale": "Non aggiornato",
-    "unavailable": "Apri l\u2019app per i consigli",
+    "unavailable": "Apri l’app per i consigli",
     "precipitation": "Precipitazioni"
   },
   "settings": {
     "title": "Impostazioni",
     "language": "Lingua",
-    "locale_sync_error": "La lingua \u00e8 stata cambiata su questo dispositivo. La sincronizzazione del profilo verr\u00e0 ritentata pi\u00f9 tardi.",
+    "locale_sync_error": "La lingua è stata cambiata su questo dispositivo. La sincronizzazione del profilo verrà ritentata più tardi.",
     "locale_change_error": "Impossibile cambiare la lingua. Riprova.",
-    "region_units": "Regione e Unit\u00e0",
+    "region_units": "Regione e Unità",
     "languages": {
       "en-US": "Inglese (USA)",
       "en-CA": "Inglese (Canada)",
@@ -68,12 +68,12 @@
     "api_health_status": "Stato dell'API: {{status}}",
     "api_health_unavailable": "Stato dell'API non disponibile",
     "diagnostic_alert_btn": "Registra analisi allerta meteo",
-    "diagnostic_info": "Il tracciamento alert_received \u00e8 collegato ai listener di ricezione delle notifiche push reali."
+    "diagnostic_info": "Il tracciamento alert_received è collegato ai listener di ricezione delle notifiche push reali."
   },
   "common": {
     "cancel": "Annulla",
     "dismiss_banner": "Chiudi banner",
-    "invalid_link": "Questo link non \u00e8 valido, \u00e8 scaduto o non \u00e8 pi\u00f9 disponibile.",
+    "invalid_link": "Questo link non è valido, è scaduto o non è più disponibile.",
     "about_couturecast": "Informazioni su CoutureCast",
     "about_description": "CoutureCast combina dati meteo e consigli per il guardaroba."
   },
@@ -110,21 +110,21 @@
       "choose_another": "Scegline un'altra"
     },
     "permission": {
-      "camera_denied": "Il permesso per la fotocamera \u00e8 stato negato.",
-      "camera_blocked": "L'accesso alla fotocamera \u00e8 bloccato nelle impostazioni.",
-      "library_denied": "Il permesso per la libreria foto \u00e8 stato negato.",
+      "camera_denied": "Il permesso per la fotocamera è stato negato.",
+      "camera_blocked": "L'accesso alla fotocamera è bloccato nelle impostazioni.",
+      "library_denied": "Il permesso per la libreria foto è stato negato.",
       "open_settings": "Apri impostazioni"
     },
     "error": {
-      "camera_unavailable": "La fotocamera non \u00e8 disponibile su questo dispositivo.",
-      "invalid_image": "L'immagine selezionata non \u00e8 valida.",
-      "corrupt_image": "L'immagine selezionata \u00e8 danneggiata.",
+      "camera_unavailable": "La fotocamera non è disponibile su questo dispositivo.",
+      "invalid_image": "L'immagine selezionata non è valida.",
+      "corrupt_image": "L'immagine selezionata è danneggiata.",
       "image_too_large": "L'immagine supera il limite di 10 MiB.",
       "unsupported_type": "Formato immagine non supportato.",
-      "network_timeout": "Il caricamento \u00e8 scaduto.",
+      "network_timeout": "Il caricamento è scaduto.",
       "storage_forbidden": "Accesso allo spazio di archiviazione negato.",
       "consent_required": "Per caricare capi serve il consenso di un tutore.",
-      "upload_expired": "La sessione di caricamento \u00e8 scaduta."
+      "upload_expired": "La sessione di caricamento è scaduta."
     },
     "crop": {
       "title": "Ritaglia e posiziona",
@@ -137,7 +137,7 @@
       "title": "Pulizia automatica dello sfondo",
       "toggle": "Scontorno dello sfondo",
       "retry": "Riprova pulizia",
-      "unavailable": "La pulizia dello sfondo non \u00e8 disponibile per questa immagine"
+      "unavailable": "La pulizia dello sfondo non è disponibile per questa immagine"
     },
     "confirm": {
       "use_image": "Usa questa immagine"
@@ -152,6 +152,59 @@
       "failed": "Caricamento del capo non riuscito",
       "retry": "Riprova caricamento",
       "cancel": "Annulla caricamento"
+    },
+    "tagging": {
+      "title": "Tag intelligenti",
+      "desc": "Rivedi i suggerimenti IA per personalizzare i consigli sugli outfit.",
+      "needs_tags": "Tag richiesti",
+      "category": "Categoria",
+      "material": "Materiale",
+      "comfort_range": "Gamma di comfort",
+      "not_sure": "Non sicuro / Cancella",
+      "save": "Conferma e salva",
+      "saving": "Salvataggio...",
+      "ai_suggested": "Suggerito da IA: {{value}}",
+      "loading_suggestions": "Caricamento suggerimenti...",
+      "pending_analysis": "Analisi in corso. Seleziona i tag manualmente.",
+      "inference_unavailable": "Inferenza non disponibile. Seleziona i tag manualmente.",
+      "required": "*",
+      "optional": "(Facoltativo)",
+      "close": "Chiudi tag intelligenti",
+      "low_confidence_suggested": "Suggerimento con bassa affidabilità: {{value}}",
+      "retry": "Riprova i suggerimenti",
+      "load_failed": "Impossibile caricare i suggerimenti.",
+      "selection_required": "Seleziona una categoria e una gamma di comfort.",
+      "save_failed": "Impossibile salvare i tag. Riprova.",
+      "saved": "Tag del capo salvati.",
+      "poll_timeout": "L’etichettatura richiede più tempo del previsto. Il capo resta disponibile durante l’elaborazione.",
+      "options": {
+        "category": {
+          "top": "Parte superiore",
+          "bottom": "Parte inferiore",
+          "outerwear": "Capospalla",
+          "dress": "Abito",
+          "shoes": "Scarpe",
+          "accessory": "Accessorio"
+        },
+        "material": {
+          "cotton": "Cotone",
+          "wool": "Lana",
+          "linen": "Lino",
+          "leather": "Pelle",
+          "denim": "Denim",
+          "fleece": "Pile",
+          "synthetic": "Sintetico",
+          "down": "Piumino",
+          "silk": "Seta"
+        },
+        "comfort": {
+          "cold": "Freddo (< 10 °C / 50 °F)",
+          "cool": "Fresco (10–16 °C / 50–60 °F)",
+          "mild": "Mite (16–22 °C / 60–72 °F)",
+          "warm": "Caldo (22–28 °C / 72–82 °F)",
+          "hot": "Molto caldo (> 28 °C / 82 °F)"
+        }
+      }
     }
   }
 }

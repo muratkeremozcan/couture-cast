@@ -1,11 +1,65 @@
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 // Story 4.1 Task 4 step 1 owner: define Zod request and response envelope schemas and uploadGarmentBytes helper
+// Story 4.2 Task 4 step 1 owner: define suggestGarmentTags and updateGarmentTags HTTP contracts and Zod schemas in packages/api-client/src/contracts/http/wardrobe.ts
 import { z } from 'zod'
 import {
   isoTimestampSchema,
   nonEmptyStringSchema,
   type RegisteredCommonHttpSchemas,
 } from './common'
+
+export const garmentCategoryEnum = z.enum([
+  'top',
+  'bottom',
+  'outerwear',
+  'dress',
+  'shoes',
+  'accessory',
+])
+
+export const garmentMaterialEnum = z.enum([
+  'cotton',
+  'wool',
+  'linen',
+  'leather',
+  'denim',
+  'fleece',
+  'synthetic',
+  'down',
+  'silk',
+])
+
+export const garmentComfortRangeEnum = z.enum(['cold', 'cool', 'mild', 'warm', 'hot'])
+
+export const GARMENT_TAGGING_ANALYSIS_VERSION =
+  'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1' as const
+
+export const garmentTagSuggestionSnapshotSchema = z
+  .object({
+    analysisVersion: z.literal(GARMENT_TAGGING_ANALYSIS_VERSION),
+    category: z
+      .object({
+        value: garmentCategoryEnum,
+        confidence: z.number().min(0).max(1),
+        isConfident: z.boolean(),
+      })
+      .strict(),
+    material: z
+      .object({
+        value: garmentMaterialEnum,
+        confidence: z.number().min(0).max(1),
+        isConfident: z.boolean(),
+      })
+      .strict(),
+    comfortRange: z
+      .object({
+        value: garmentComfortRangeEnum,
+        confidence: z.number().min(0).max(1),
+        isConfident: z.boolean(),
+      })
+      .strict(),
+  })
+  .strict()
 
 export const createGarmentUploadUrlInputSchema = z
   .object({
@@ -62,8 +116,18 @@ export const garmentImageAccessSchema = z
 export const garmentItemSchema = z
   .object({
     id: nonEmptyStringSchema,
-    status: z.enum(['pending_upload', 'bytes_uploaded', 'processing', 'ready', 'failed']),
-    category: z.string().nullable(),
+    status: z.enum([
+      'pending_upload',
+      'bytes_uploaded',
+      'processing',
+      'awaiting_tags',
+      'ready',
+      'failed',
+    ]),
+    category: garmentCategoryEnum.nullable(),
+    material: garmentMaterialEnum.nullable(),
+    comfortRange: garmentComfortRangeEnum.nullable(),
+    tagsConfirmedAt: isoTimestampSchema.nullable(),
     fileSizeBytes: z.number().int().min(1).max(10_485_760).nullable(),
     mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']).nullable(),
     retentionStatus: z.enum(['active', 'deletion_pending', 'legal_hold']),
@@ -89,6 +153,68 @@ export const uploadSessionPathParamsSchema = z.object({
   uploadSessionId: nonEmptyStringSchema.describe('Opaque upload session ID.'),
 })
 
+export const garmentIdPathParamsSchema = z.object({
+  garmentId: nonEmptyStringSchema.max(128).describe('Unique garment item ID.'),
+})
+
+export const suggestGarmentTagsDataSchema = z
+  .object({
+    garmentId: nonEmptyStringSchema.max(128),
+    analysisVersion: z.literal(GARMENT_TAGGING_ANALYSIS_VERSION),
+    suggestions: z
+      .object({
+        category: z
+          .object({
+            value: garmentCategoryEnum,
+            confidence: z.number().min(0).max(1),
+            isConfident: z.boolean(),
+          })
+          .strict(),
+        material: z
+          .object({
+            value: garmentMaterialEnum,
+            confidence: z.number().min(0).max(1),
+            isConfident: z.boolean(),
+          })
+          .strict(),
+        comfortRange: z
+          .object({
+            value: garmentComfortRangeEnum,
+            confidence: z.number().min(0).max(1),
+            isConfident: z.boolean(),
+          })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict()
+
+export const suggestGarmentTagsResponseSchema = z
+  .object({
+    data: suggestGarmentTagsDataSchema,
+  })
+  .strict()
+
+export const updateGarmentTagsInputSchema = z
+  .object({
+    category: garmentCategoryEnum,
+    material: garmentMaterialEnum.nullable().optional(),
+    comfortRange: garmentComfortRangeEnum,
+  })
+  .strict()
+
+export const updateGarmentTagsResponseSchema = z
+  .object({
+    data: garmentItemSchema,
+  })
+  .strict()
+
+export type GarmentCategory = z.infer<typeof garmentCategoryEnum>
+export type GarmentMaterial = z.infer<typeof garmentMaterialEnum>
+export type GarmentComfortRange = z.infer<typeof garmentComfortRangeEnum>
+export type GarmentTagSuggestionSnapshot = z.infer<
+  typeof garmentTagSuggestionSnapshotSchema
+>
 export type CreateGarmentUploadUrlInput = z.infer<
   typeof createGarmentUploadUrlInputSchema
 >
@@ -99,6 +225,10 @@ export type CreateGarmentItemInput = z.infer<typeof createGarmentItemInputSchema
 export type GarmentItemResponse = z.infer<typeof createGarmentItemResponseSchema>
 export type GarmentItemContract = z.infer<typeof garmentItemSchema>
 export type GarmentListResponse = z.infer<typeof garmentListResponseSchema>
+export type SuggestGarmentTagsData = z.infer<typeof suggestGarmentTagsDataSchema>
+export type SuggestGarmentTagsResponse = z.infer<typeof suggestGarmentTagsResponseSchema>
+export type UpdateGarmentTagsInput = z.infer<typeof updateGarmentTagsInputSchema>
+export type UpdateGarmentTagsResponse = z.infer<typeof updateGarmentTagsResponseSchema>
 
 export function registerWardrobeContracts(
   registry: OpenAPIRegistry,
@@ -123,6 +253,18 @@ export function registerWardrobeContracts(
   const registeredGarmentListResponse = registry.register(
     'GarmentListResponse',
     garmentListResponseSchema
+  )
+  const registeredSuggestGarmentTagsResponse = registry.register(
+    'SuggestGarmentTagsResponse',
+    suggestGarmentTagsResponseSchema
+  )
+  const registeredUpdateGarmentTagsInput = registry.register(
+    'UpdateGarmentTagsInput',
+    updateGarmentTagsInputSchema
+  )
+  const registeredUpdateGarmentTagsResponse = registry.register(
+    'UpdateGarmentTagsResponse',
+    updateGarmentTagsResponseSchema
   )
 
   registry.registerPath({
@@ -154,6 +296,141 @@ export function registerWardrobeContracts(
           'application/json': {
             schema: commonSchemas.forbiddenHttpErrorSchema,
           },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/wardrobe/garments/{garmentId}/suggest-tags',
+    tags: ['wardrobe'],
+    summary:
+      'Retrieve algorithmically inferred tag suggestions for an awaiting-tags garment',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: garmentIdPathParamsSchema,
+    },
+    responses: {
+      200: {
+        description: 'Tag suggestions retrieved successfully.',
+        content: {
+          'application/json': {
+            schema: registeredSuggestGarmentTagsResponse,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid garment ID.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.badRequestHttpErrorSchema,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian consent required or access forbidden.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.forbiddenHttpErrorSchema,
+          },
+        },
+      },
+      404: {
+        description: 'Garment not found or owned by another user.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.notFoundHttpErrorSchema,
+          },
+        },
+      },
+      409: {
+        description: 'Garment analysis pending or not taggable.',
+        content: {
+          'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
+        },
+      },
+      503: {
+        description: 'Tagging inference unavailable.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.serviceUnavailableHttpErrorSchema,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/v1/wardrobe/garments/{garmentId}/tags',
+    tags: ['wardrobe'],
+    summary: 'Confirm or edit garment category, material, and comfort tags',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: garmentIdPathParamsSchema,
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: registeredUpdateGarmentTagsInput,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Garment tags updated successfully.',
+        content: {
+          'application/json': {
+            schema: registeredUpdateGarmentTagsResponse,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid garment tags input.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.badRequestHttpErrorSchema,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian consent required or access forbidden.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.forbiddenHttpErrorSchema,
+          },
+        },
+      },
+      404: {
+        description: 'Garment not found or owned by another user.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.notFoundHttpErrorSchema,
+          },
+        },
+      },
+      409: {
+        description: 'Garment analysis pending or not taggable.',
+        content: {
+          'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
         },
       },
     },
@@ -221,6 +498,9 @@ export function registerWardrobeContracts(
       },
       409: {
         description: 'Idempotency key reused or upload session expired.',
+        content: {
+          'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
+        },
       },
     },
   })
@@ -290,6 +570,9 @@ export function registerWardrobeContracts(
       },
       409: {
         description: 'Upload session expired or token already consumed.',
+        content: {
+          'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
+        },
       },
     },
   })
@@ -364,6 +647,9 @@ export function registerWardrobeContracts(
       },
       409: {
         description: 'Idempotency key reused, session expired, or upload claimed.',
+        content: {
+          'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
+        },
       },
     },
   })
