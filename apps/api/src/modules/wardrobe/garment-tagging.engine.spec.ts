@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  ANALYSIS_VERSION,
   CATEGORY_KEYS,
   CATEGORY_PROMPTS,
   MATERIAL_KEYS,
@@ -127,5 +128,22 @@ describe('GarmentTaggingEngine Core Logic', () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('GARMENT_TAGGING_ENGINE', 'fixture')
     expect(() => new FixtureGarmentTaggingEngine()).toThrow('strictly forbidden')
+  })
+
+  it('returns deterministic suggestions when the fixture engine is allowed', async () => {
+    vi.stubEnv('NODE_ENV', 'test')
+    vi.stubEnv('GARMENT_TAGGING_ENGINE', 'fixture')
+
+    const suggestions = await new FixtureGarmentTaggingEngine().inferTags(
+      Buffer.from('synthetic-garment-image')
+    )
+
+    expect(suggestions.analysisVersion).toBe(ANALYSIS_VERSION)
+    expect(suggestions.category).toMatchObject({ value: 'top', isConfident: true })
+    expect(suggestions.material).toMatchObject({ value: 'cotton', isConfident: true })
+    expect(suggestions.comfortRange).toMatchObject({
+      value: 'mild',
+      isConfident: true,
+    })
   })
 })

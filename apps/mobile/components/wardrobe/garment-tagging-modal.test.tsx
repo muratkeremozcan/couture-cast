@@ -1,7 +1,8 @@
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
+import { AccessibilityInfo, findNodeHandle, Platform } from 'react-native'
 import { MobileGarmentTaggingModal } from './garment-tagging-modal'
 import {
   createReadyGarmentFixture,
@@ -16,11 +17,17 @@ vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactNativeModule>()
   return {
     ...actual,
+    AccessibilityInfo: {
+      ...actual.AccessibilityInfo,
+      setAccessibilityFocus: vi.fn(),
+    },
     BackHandler: {
       addEventListener: vi.fn(() => ({ remove: vi.fn() })),
     },
+    findNodeHandle: vi.fn(),
     Modal: ({ children, visible }: { children: React.ReactNode; visible: boolean }) =>
       visible ? children : null,
+    Platform: { ...actual.Platform, OS: 'web' },
   }
 })
 
@@ -57,7 +64,50 @@ describe('MobileGarmentTaggingModal Component', () => {
   })
 
   afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    vi.useRealTimers()
     vi.restoreAllMocks()
+  })
+
+  it('does not schedule native accessibility focus in the web renderer', () => {
+    vi.useFakeTimers()
+
+    render(
+      <MobileGarmentTaggingModal
+        visible={true}
+        onClose={vi.fn()}
+        garmentId={null}
+        accessToken="test_token"
+      />
+    )
+
+    act(() => {
+      vi.advanceTimersByTime(150)
+    })
+
+    expect(findNodeHandle).not.toHaveBeenCalled()
+  })
+
+  it('focuses the modal title after the native accessibility delay', () => {
+    vi.useFakeTimers()
+    Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
+    vi.mocked(findNodeHandle).mockReturnValue(42)
+
+    render(
+      <MobileGarmentTaggingModal
+        visible={true}
+        onClose={vi.fn()}
+        garmentId={null}
+        accessToken="test_token"
+      />
+    )
+
+    act(() => {
+      vi.advanceTimersByTime(150)
+    })
+
+    expect(findNodeHandle).toHaveBeenCalledOnce()
+    expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledWith(42)
   })
 
   it('fetches suggestions and pre-fills confident values when opened', async () => {

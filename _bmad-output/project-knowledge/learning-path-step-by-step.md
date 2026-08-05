@@ -1,23 +1,142 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-08-05. Step 30 records the smart tagging and comfort metadata flow, FashionCLIP ONNX inference engine, awaiting_tags upload status, Zod HTTP contracts, responsive web/mobile modal confirmation, and telemetry/ritual integration.
+Updated: 2026-08-05. Added a plain-English project map and a standalone AI garment tagging
+explanation. Corrected the Story 4.2 flow and strengthened the LLM writing-style guidance.
+
+## How to use this
+
+1. Read the project map below.
+2. Jump to the step you need. You do not need to read the file from top to bottom.
+3. Read the story, then open the files in `Sequence to follow`.
+4. Use `Task owner map` when you need the exact code location.
+
+## The whole project in plain English
+
+| Step | Caveman version                                                  |
+| ---: | ---------------------------------------------------------------- |
+|    1 | Decide what to build and why.                                    |
+|    2 | Know which app or package owns each job.                         |
+|    3 | Define data once. Seed predictable examples.                     |
+|    4 | Keep local, test, and production settings separate and safe.     |
+|    5 | Put slow or retryable work in queues.                            |
+|    6 | Send live updates. Poll when live updates fail.                  |
+|    7 | Make CI catch broken code before release.                        |
+|    8 | Track the same analytics events everywhere.                      |
+|    9 | Start tracing before the API starts.                             |
+|   10 | Send useful telemetry to Grafana. Build dashboards from it.      |
+|   11 | Log API requests without leaking secrets.                        |
+|   12 | Test real user flows across the API, Web, and Mobile.            |
+|   13 | Serve one OpenAPI contract from the API.                         |
+|   14 | Write public API rules once in Zod.                              |
+|   15 | Validate the contract. Generate clients. Use those clients.      |
+|   16 | Fetch weather, store it, and survive provider failures.          |
+|   17 | Match weather to alert rules and deliver notifications.          |
+|   18 | Record telemetry and audit events without blocking users.        |
+|   19 | Build and cache daily outfit recommendations.                    |
+|   20 | Let users say they run hot or cold.                              |
+|   21 | Explain why an outfit was recommended.                           |
+|   22 | Keep translations complete and consistent.                       |
+|   23 | Send small, ready-to-display data to phone widgets.              |
+|   24 | Send glanceable weather and outfit data to Apple Watch.          |
+|   25 | Make the wardrobe and community grid fit every screen.           |
+|   26 | Keep navigation simple on desktop and mobile.                    |
+|   27 | Open the correct screen from widgets and notifications.          |
+|   28 | Make the product usable with keyboards and assistive technology. |
+|   29 | Upload a garment safely and process it in the background.        |
+|   30 | Use AI to suggest garment tags. Let the user decide.             |
+
+## Special feature: AI garment tagging
+
+### Caveman version
+
+1. User uploads clothing photo.
+2. Backend AI compares photo with fixed clothing labels.
+3. AI guesses category and material.
+4. Normal TypeScript rules turn those guesses into a comfort range.
+5. User confirms or fixes the tags. User has final say.
+
+### What "AI" means here
+
+- FashionCLIP is a pretrained image classifier. It runs through ONNX and Transformers.js.
+- It compares the image with fixed text prompts such as `a photo of a coat` and `a garment made
+from wool`. It returns scores rather than free-form text.
+- It is not an LLM. It does not call OpenAI, generate content, learn from wardrobe photos, or
+  fine-tune itself.
+- "Local" means local to the backend wardrobe worker. The model does not run on the phone or in the
+  browser.
+- Model preparation downloads one pinned FashionCLIP snapshot from Hugging Face and verifies its
+  SHA-256 hashes. Runtime inference loads those local files with remote model access disabled.
+
+### How the app uses it
+
+1. Garment commit adds a BullMQ `color-extraction` job.
+2. A dedicated wardrobe worker process downloads the stored image.
+3. `FashionClipTaggingEngine` sends the image to a separate Node worker thread. The thread runs one
+   inference request at a time so model work does not block API requests or overlap in memory.
+4. FashionCLIP scores six category prompts and nine material prompts. The API converts the scores
+   into probabilities and confidence flags.
+5. Category is confident at score `0.55` with a `0.15` lead. Material is confident at score `0.45`
+   with a `0.10` lead. Low-confidence values require user review.
+6. TypeScript rules derive `cold`, `cool`, `mild`, `warm`, or `hot`. For example, wool maps to
+   `cold` and linen maps to `hot`. FashionCLIP does not predict this field directly.
+7. The worker stores the suggestions and changes the garment to `awaiting_tags`.
+8. Web or Mobile asks the user to confirm or correct the tags. Both clients support ten locales,
+   accessible radio choices, and screen reader status. Confirmation uses
+   `PATCH /api/v1/wardrobe/garments/{garmentId}/tags` and changes the garment to `ready`.
+9. Confirmation records telemetry and clears the Ritual cache so future outfits use the new tags.
+10. If inference fails, the garment still moves to `awaiting_tags`. The user can enter tags
+    manually. If the dedicated wardrobe worker is not running, queued garments remain in
+    `processing`, so production must deploy the worker and verified model snapshot with the API.
+
+### Stored data
+
+- `tag_suggestions`: values, confidence scores, confidence flags, and model version.
+- `tagging_failure_code`: why inference failed, when applicable.
+- `tags_confirmed_at`: when the user accepted or corrected the tags.
+- `awaiting_tags`: processing finished and user confirmation is required.
+
+```mermaid
+flowchart TD
+  Upload[Garment uploaded] --> Queue[BullMQ job]
+  Queue --> Worker[Wardrobe worker process]
+  Worker --> Thread[Node worker thread]
+  Thread --> Model[Local FashionCLIP ONNX model]
+  Model --> Guess[Category and material guesses]
+  Guess --> Rules[TypeScript comfort rules]
+  Rules --> Review[User confirms or fixes tags]
+  Review --> Ready[Garment ready]
+```
 
 ## LLM collaborator prompt
 
-Use this prompt when asking an LLM to improve this document and apply the same in-code comment
-style:
+Use this prompt when asking an LLM to improve this document or its matching code comments:
 
 ```text
 You are improving Couture Cast learning docs and code commentary.
 
 Primary goals:
 1) Keep `_bmad-output/project-knowledge/learning-path-step-by-step.md` clear, lean, and teachable.
-2) Preserve one standardized section template across all steps.
-3) Make the `Task owner map` the primary search surface for finding source code.
-4) Keep implementation-anchor comments aligned with the same owner IDs used in this doc.
+2) Preserve one standardized section template across numbered steps.
+3) Keep the plain-English project map and special feature sections accurate.
+4) Make `Task owner map` the main search surface for finding source code.
+5) Keep implementation-anchor comments aligned with owner IDs in this document.
+
+"Caveman but professional" style:
+- Write for a smart engineer who is new to this repository.
+- Explain the idea as if drawing it on a whiteboard.
+- State the outcome first. Add implementation detail after it.
+- Prefer short subject-verb-object sentences.
+- Put one main idea in each sentence.
+- Use common words. Define necessary jargon once.
+- Use concrete examples when a rule is abstract.
+- Keep paragraphs short. Prefer lists for sequences and choices.
+- Preserve exact paths, contracts, thresholds, failure states, and security rules.
+- Keep technical depth in the detailed step. Keep the opening summary simple.
+- Do not use childish fragments, slang, marketing language, or vague claims.
+- Do not remove a useful explanation only because the same topic has a short summary elsewhere.
 
 Step template rules:
-- Every step must use this exact section order:
+- Every numbered step uses this order:
   `User/business impact`
   `Key takeaways`
   `Story/Task mapping`
@@ -27,63 +146,35 @@ Step template rules:
   `Task owner map`
   optional `Current repo note`
   optional `Architecture diagram`
-- Do not invent alternate section headings for the same idea.
-- Do not add `Searchable strings:` sections.
-- Do not add `Pattern summary:` sections.
-- Do not add one-off headings that duplicate the owner map.
-- If a section does not earn its keep, remove it instead of adding another section.
+- Special feature sections may appear before the numbered steps.
+- Do not add `Searchable strings:` or `Pattern summary:` sections.
+- Remove a section only when it adds no useful information.
 
-Mermaid diagram rules:
-- Use exactly three backticks for every Mermaid fence: open with three backticks plus `mermaid`,
-  and close with three backticks alone.
-- Close each diagram before the next Markdown heading; never let a Mermaid block span across steps.
-- After editing diagrams, verify the number of Mermaid openings matches the number of closings and
-  render or parse every diagram before finishing.
+Mermaid rules:
+- Open with exactly three backticks plus `mermaid` and close with three backticks.
+- Close each diagram before the next heading.
+- Parse or render every diagram after editing it.
 
 Task owner map rules:
-- Use the section heading `Task owner map:` in every step.
-- Treat the owner ID as the search key.
-- Reuse the exact `Story X Task Y step Z owner` label already used at the implementation anchor whenever one exists.
-- Prefer `Story X Task Y step Z owner` over `Step N step M owner` whenever the implementation already has a story/task anchor comment.
-- Format owner-map bullets as:
-  `- Story X Task Y step Z owner: <action> in \`path\``
-  or
-  `- Step N step M owner: <action> in \`path\``
-- Keep each owner-map bullet on one physical line in the markdown source. Never wrap it.
-- Keep every file path as one full contiguous searchable string on that same line.
-- If multiple files matter, prefer separate owner bullets over hiding paths in wrapped prose.
-- Aim for the exact owner ID to be discoverable in two places:
-  1) this learning doc
-  2) the implementation anchor
-- Validate this with repo search before finishing. For real numbered owner IDs, the expected result is exactly 2 hits:
-  1) this learning doc
-  2) the implementation anchor
-- If the primary target is non-commentable or unstable (for example `package.json`, `openapitools.json`, `package-lock.json`, generated files, or env files), add the second hit in `_bmad-output/project-knowledge/owner-anchor-exceptions.md`.
-- Do not leave a real numbered owner ID with only one searchable hit.
+- Use the heading `Task owner map:` in every numbered step.
+- Reuse the exact `Story X Task Y step Z owner` or `Step N step M owner` implementation anchor.
+- Keep each owner bullet and full file path on one physical line.
+- Prefer separate bullets when multiple files matter.
+- Each numbered owner ID should appear exactly twice: here and at its implementation anchor.
+- Use `_bmad-output/project-knowledge/owner-anchor-exceptions.md` when the target cannot hold a
+  stable comment.
 
 Code comment rules:
-- Keep behavior unchanged unless asked.
+- Keep behavior unchanged unless the task asks for a behavior change.
 - Keep comments concise and ASCII.
-- Preserve existing Story/Task mapping in docs and code.
-- Add or adjust educational comments only where they improve understanding.
-- Preferred comment style:
-  - brief "what it is / problem solved / alternatives"
-  - numbered setup steps `1) 2) 3) ...` when useful
-  - "where we did this" anchor comments near actual implementation
-  - searchable owner text that matches the learning doc
+- Preserve Story/Task mapping and exact owner IDs.
+- Explain what the code owns, the problem it solves, and any important alternative or failure path.
 
 Working style:
-- Minimize fluff and duplication.
-- Prefer sharpening existing teaching prose over adding new explanatory sections.
-- Preserve the current standardized format going forward.
-- After edits, run formatting/lint checks and report changed files.
+- Make small edits. Preserve facts and working explanations.
+- Remove fluff and true duplication.
+- Run formatting, Markdown, owner-anchor, and Mermaid checks after editing.
 ```
-
-## How to use this
-
-1. Follow steps in order.
-2. For each step, read the story first, then open the evidence files.
-3. Complete the exercise before moving on.
 
 ## Step 1 - Understand product-to-engineering traceability
 
@@ -2671,16 +2762,50 @@ flowchart TD
 
 User/business impact:
 
-Automatically analyzes uploaded garment images to suggest clothing category (`top`, `bottom`, `outerwear`, `dress`, `shoes`, `accessory`), fabric material (`cotton`, `wool`, `linen`, `denim`, etc.), and target comfort temperature range (`cold`, `cool`, `mild`, `warm`, `hot`) using a local FashionCLIP ONNX machine learning model running on background worker threads. Gives users instant 1-click confirmation or quick override with multi-language support (10 locales), empowering personalized thermal comfort outfit recommendations while keeping processing privacy-first, local, and resilient with graceful fallback to manual tagging if inference fails.
+1. User uploads clothing photo.
+2. Backend AI compares photo with fixed clothing labels.
+3. AI guesses category and material.
+4. Normal TypeScript rules turn those guesses into a comfort range.
+5. User confirms or fixes the tags. User has final say.
 
-Key takeaways:
+What "AI" means here:
 
-1. Schema & Lifecycle Integration: `GarmentItem` is extended with `tag_suggestions` (JSON snapshot with confidence scores, values, and model version), `tags_confirmed_at`, `tagging_model_version`, `tagging_failure_code`, and `awaiting_tags` status in `GarmentUploadStatus`.
-2. Pluggable Inference Engine Architecture: `GarmentTaggingEngine` interface with `FashionClipTaggingEngine` (FashionCLIP ONNX model with worker thread isolation) and `FixtureGarmentTaggingEngine` (deterministic test/dev fallback).
-3. Resilient Background Processing: `WardrobeColorProcessor` runs inference asynchronously outside request threads. On inference success, sets `upload_status = awaiting_tags` and attaches suggestions; on inference error, sets `tagging_failure_code = TAGGING_INFERENCE_FAILED` and `awaiting_tags` status so users can still manually tag garments without data loss.
-4. Strict OpenAPI & Shared HTTP Contracts: `@couture/api-client/contracts/http/wardrobe.ts` defines `suggestGarmentTags` (`POST /api/v1/wardrobe/garments/{garmentId}/suggest-tags`) and `updateGarmentTags` (`PATCH /api/v1/wardrobe/garments/{garmentId}/tags`).
-5. Responsive Web & Native Mobile UI: `GarmentTaggingModal` on web and mobile pre-fills category suggestions at confidence `0.55` with a `0.15` top-score margin, and material suggestions at confidence `0.45` with a `0.10` margin. Low-confidence values remain unselected for review. The flow supports one-click confirmation or manual overrides, ten locales, accessible radio groups, and screen reader feedback.
-6. Telemetry & Personalization Integration: Tag confirmation emits `garment_tagging_completed` with `wasOverridden` calculation and `overrideFields` list, and invalidates user ritual cache so personalized thermal outfit matching updates immediately.
+- FashionCLIP is a pretrained image classifier. It runs through ONNX and Transformers.js.
+- It compares the image with fixed text prompts such as `a photo of a coat` and `a garment made
+from wool`. It returns scores rather than free-form text.
+- It is not an LLM. It does not generate content, learn from wardrobe photos, or fine-tune itself.
+- “Local” means local to the backend wardrobe worker. The model does not run on the phone or in the
+  browser.
+- Model preparation downloads one pinned FashionCLIP snapshot from Hugging Face and verifies its
+  SHA-256 hashes. Runtime inference loads those local files with remote model access disabled.
+
+How the app uses it:
+
+1. Garment commit adds a BullMQ `color-extraction` job.
+2. A dedicated wardrobe worker process downloads the stored image.
+3. `FashionClipTaggingEngine` sends the image to a separate Node worker thread. The thread runs one
+   inference request at a time so model work does not block API requests or overlap in memory.
+4. FashionCLIP scores six category prompts and nine material prompts. The API converts the scores
+   into probabilities and confidence flags.
+5. Category is confident at score `0.55` with a `0.15` lead. Material is confident at score `0.45`
+   with a `0.10` lead. Low-confidence values require user review.
+6. TypeScript rules derive `cold`, `cool`, `mild`, `warm`, or `hot`. For example, wool maps to
+   `cold` and linen maps to `hot`. FashionCLIP does not predict this field directly.
+7. The worker stores the suggestions and changes the garment to `awaiting_tags`.
+8. Web or Mobile asks the user to confirm or correct the tags. Both clients support ten locales,
+   accessible radio choices, and screen reader status. Confirmation uses
+   `PATCH /api/v1/wardrobe/garments/{garmentId}/tags` and changes the garment to `ready`.
+9. Confirmation records telemetry and clears the Ritual cache so future outfits use the new tags.
+10. If inference fails, the garment still moves to `awaiting_tags`. The user can enter tags
+    manually. If the dedicated wardrobe worker is not running, queued garments remain in
+    `processing`, so production must deploy the worker and verified model snapshot with the API.
+
+Stored data:
+
+- `tag_suggestions`: values, confidence scores, confidence flags, and model version.
+- `tagging_failure_code`: why inference failed, when applicable.
+- `tags_confirmed_at`: when the user accepted or corrected the tags.
+- `awaiting_tags`: processing finished and user confirmation is required.
 
 Story/Task mapping:
 
@@ -2731,17 +2856,7 @@ Task owner map:
 - Story 4.2 Task 8 step 1 owner: implement native mobile garment tagging modal component in apps/mobile/components/wardrobe/garment-tagging-modal.tsx
 - Story 4.2 Task 9 step 1 owner: E2E Playwright test for smart tagging modal accessibility and flow in playwright/tests/wardrobe-smart-tagging.spec.ts
 
-Architecture diagram:
+Current repo note:
 
-```mermaid
-flowchart TD
-  Upload[Garment Item Uploaded] --> Processing["GarmentItem (processing)"]
-  Processing --> Worker["BullMQ WardrobeColorProcessor\n(Worker Thread)"]
-  Worker --> Engine["FashionClipTaggingEngine\n(FashionCLIP ONNX Model)"]
-  Engine -->|Success| Suggestions["GarmentItem (awaiting_tags)\n+ tag_suggestions JSON"]
-  Engine -->|Inference Error| Fallback["GarmentItem (awaiting_tags)\n+ TAGGING_INFERENCE_FAILED"]
-  Suggestions --> UI["GarmentTaggingModal (Web & Mobile)\nPre-fills confident AI tags"]
-  Fallback --> UI
-  UI --> Confirm["PUT /api/v1/wardrobe/garments/{id}/tags\n(Confirm / Override)"]
-  Confirm --> Ready["GarmentItem (ready)\n+ garment_tagging_completed Event\n+ Invalidate Ritual Cache"]
-```
+The standalone AI section near the top owns the plain-English explanation and architecture diagram.
+This numbered step remains the traceability and code-reading reference for Story 4.2.

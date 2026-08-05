@@ -3887,7 +3887,8 @@
                   "image/png",
                   "image/webp",
                   null
-                ]
+                ],
+                "x-optic-exemptions": "request and response property enums"
               },
               "retentionStatus": {
                 "type": "string",
@@ -4048,7 +4049,8 @@
                     "image/png",
                     "image/webp",
                     null
-                  ]
+                  ],
+                  "x-optic-exemptions": "request and response property enums"
                 },
                 "retentionStatus": {
                   "type": "string",
@@ -4396,7 +4398,8 @@
                   "image/png",
                   "image/webp",
                   null
-                ]
+                ],
+                "x-optic-exemptions": "request and response property enums"
               },
               "retentionStatus": {
                 "type": "string",

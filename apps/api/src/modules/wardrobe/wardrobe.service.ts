@@ -46,6 +46,7 @@ import { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
 
 const UPLOAD_EXPIRY_SECONDS = 900
 const READ_URL_EXPIRY_SECONDS = 900
+const MAX_SERIALIZABLE_TRANSACTION_ATTEMPTS = 5
 
 type UploadUrlResult = {
   replayed: boolean
@@ -289,10 +290,11 @@ function buildTaggingTelemetryProperties(
 }
 
 function isRetriableTagUpdateError(error: unknown): boolean {
-  return (
-    error instanceof ConcurrentTagUpdateError ||
-    (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034')
-  )
+  return error instanceof ConcurrentTagUpdateError || isPrismaSerializationFailure(error)
+}
+
+function isPrismaSerializationFailure(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
 }
 
 function assertCommitCandidate(
@@ -845,45 +847,62 @@ export class WardrobeService {
     idempotencyKey: string,
     payloadHash: string
   ): Promise<GarmentItem> {
-    return this.prisma.$transaction(
-      async (tx) => {
-        const keyOwner = await tx.garmentItem.findUnique({
-          where: {
-            user_id_commit_idempotency_key: {
-              user_id: userId,
-              commit_idempotency_key: idempotencyKey,
-            },
-          },
-        })
-        if (keyOwner && keyOwner.id !== initial.id) {
-          throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
-        }
+    for (
+      let attempt = 1;
+      attempt <= MAX_SERIALIZABLE_TRANSACTION_ATTEMPTS;
+      attempt += 1
+    ) {
+      try {
+        return await this.prisma.$transaction(
+          async (tx) => {
+            const keyOwner = await tx.garmentItem.findUnique({
+              where: {
+                user_id_commit_idempotency_key: {
+                  user_id: userId,
+                  commit_idempotency_key: idempotencyKey,
+                },
+              },
+            })
+            if (keyOwner && keyOwner.id !== initial.id) {
+              throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
+            }
 
-        const changed = await tx.garmentItem.updateMany({
-          where: {
-            id: initial.id,
-            user_id: userId,
-            upload_session_id: input.uploadSessionId,
-            upload_status: 'bytes_uploaded',
-            retention_status: 'active',
+            const changed = await tx.garmentItem.updateMany({
+              where: {
+                id: initial.id,
+                user_id: userId,
+                upload_session_id: input.uploadSessionId,
+                upload_status: 'bytes_uploaded',
+                retention_status: 'active',
+              },
+              data: {
+                upload_status: 'processing',
+                committed_at: new Date(),
+                commit_idempotency_key: idempotencyKey,
+                commit_payload_hash: payloadHash,
+                consent_checked_at: new Date(),
+                has_cropping: input.hasCropping,
+                has_bg_cleanup: input.hasBgCleanup,
+              },
+            })
+            if (changed.count !== 1) {
+              throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
+            }
+            return tx.garmentItem.findUniqueOrThrow({ where: { id: initial.id } })
           },
-          data: {
-            upload_status: 'processing',
-            committed_at: new Date(),
-            commit_idempotency_key: idempotencyKey,
-            commit_payload_hash: payloadHash,
-            consent_checked_at: new Date(),
-            has_cropping: input.hasCropping,
-            has_bg_cleanup: input.hasBgCleanup,
-          },
-        })
-        if (changed.count !== 1) {
-          throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+        )
+      } catch (error) {
+        if (
+          attempt < MAX_SERIALIZABLE_TRANSACTION_ATTEMPTS &&
+          isPrismaSerializationFailure(error)
+        ) {
+          continue
         }
-        return tx.garmentItem.findUniqueOrThrow({ where: { id: initial.id } })
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
-    )
+        throw error
+      }
+    }
+    throw new Error('Failed to commit garment after retrying the transaction')
   }
 
   private async emitUploadCompletionTelemetry(

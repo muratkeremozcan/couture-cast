@@ -131,7 +131,10 @@ export const garmentItemSchema = z
     comfortRange: garmentComfortRangeEnum.nullable(),
     tagsConfirmedAt: isoTimestampSchema.nullable(),
     fileSizeBytes: z.number().int().min(1).max(10_485_760).nullable(),
-    mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']).nullable(),
+    mimeType: z
+      .enum(['image/jpeg', 'image/png', 'image/webp'])
+      .nullable()
+      .openapi({ 'x-optic-exemptions': 'request and response property enums' }),
     retentionStatus: z.enum(['active', 'deletion_pending', 'legal_hold']),
     createdAt: isoTimestampSchema,
     committedAt: isoTimestampSchema.nullable(),

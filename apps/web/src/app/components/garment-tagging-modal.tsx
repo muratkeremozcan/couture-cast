@@ -133,25 +133,32 @@ export function GarmentTaggingModal({
   const comfortOptionRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const saveAbortRef = useRef<AbortController | null>(null)
   const saveRequestIdRef = useRef(0)
+  const touchedFieldsRef = useRef({
+    category: false,
+    material: false,
+    comfort: false,
+  })
 
   useEffect(() => {
-    if (!isOpen || !garmentId) {
-      setSelectedCategory(null)
-      setSelectedMaterial(null)
-      setSelectedComfort(null)
-      setSuggestions(null)
-      setSuggestionError(null)
-      setSaveError(null)
-      setIsAnalysisPending(false)
-      return
+    touchedFieldsRef.current = {
+      category: false,
+      material: false,
+      comfort: false,
     }
-
-    const controller = new AbortController()
-    let isMounted = true
     setSelectedCategory(null)
     setSelectedMaterial(null)
     setSelectedComfort(null)
     setSuggestions(null)
+    setSuggestionError(null)
+    setSaveError(null)
+    setIsAnalysisPending(false)
+  }, [isOpen, garmentId])
+
+  useEffect(() => {
+    if (!isOpen || !garmentId) return
+
+    const controller = new AbortController()
+    let isMounted = true
     setIsLoadingSuggestions(true)
     setSuggestionError(null)
     setSaveError(null)
@@ -161,13 +168,16 @@ export function GarmentTaggingModal({
       .then((data) => {
         if (!isMounted) return
         setSuggestions(data)
-        if (data.suggestions.category.isConfident) {
+        if (data.suggestions.category.isConfident && !touchedFieldsRef.current.category) {
           setSelectedCategory(data.suggestions.category.value)
         }
-        if (data.suggestions.material.isConfident) {
+        if (data.suggestions.material.isConfident && !touchedFieldsRef.current.material) {
           setSelectedMaterial(data.suggestions.material.value)
         }
-        if (data.suggestions.comfortRange.isConfident) {
+        if (
+          data.suggestions.comfortRange.isConfident &&
+          !touchedFieldsRef.current.comfort
+        ) {
           setSelectedComfort(data.suggestions.comfortRange.value)
         }
       })
@@ -228,6 +238,21 @@ export function GarmentTaggingModal({
     const nextValue = options[nextIndex]!
     select(nextValue)
     refs.current[nextValue]?.focus()
+  }
+
+  const selectCategory = (value: GarmentCategory) => {
+    touchedFieldsRef.current.category = true
+    setSelectedCategory(value)
+  }
+
+  const selectMaterial = (value: GarmentMaterial | null) => {
+    touchedFieldsRef.current.material = true
+    setSelectedMaterial(value)
+  }
+
+  const selectComfort = (value: GarmentComfortRange) => {
+    touchedFieldsRef.current.comfort = true
+    setSelectedComfort(value)
   }
 
   const handleSave = async () => {
@@ -342,14 +367,14 @@ export function GarmentTaggingModal({
                       tabIndex={
                         isSelected || (!selectedCategory && opt.value === 'top') ? 0 : -1
                       }
-                      onClick={() => setSelectedCategory(opt.value)}
+                      onClick={() => selectCategory(opt.value)}
                       onKeyDown={(event) =>
                         moveSelection(
                           event,
                           CATEGORY_OPTIONS.map((option) => option.value),
                           selectedCategory,
                           categoryOptionRefs,
-                          setSelectedCategory
+                          selectCategory
                         )
                       }
                       className={`flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-lg border p-2 text-sm font-medium transition ${
@@ -397,7 +422,7 @@ export function GarmentTaggingModal({
                   aria-checked={selectedMaterial === null}
                   disabled={isSaving}
                   tabIndex={selectedMaterial === null ? 0 : -1}
-                  onClick={() => setSelectedMaterial(null)}
+                  onClick={() => selectMaterial(null)}
                   onKeyDown={(event) => {
                     const values = [
                       'clear',
@@ -409,7 +434,7 @@ export function GarmentTaggingModal({
                       selectedMaterial ?? 'clear',
                       materialOptionRefs,
                       (value) =>
-                        setSelectedMaterial(
+                        selectMaterial(
                           value === 'clear' ? null : (value as GarmentMaterial)
                         )
                     )
@@ -435,7 +460,7 @@ export function GarmentTaggingModal({
                       aria-checked={isSelected}
                       disabled={isSaving}
                       tabIndex={isSelected ? 0 : -1}
-                      onClick={() => setSelectedMaterial(opt.value)}
+                      onClick={() => selectMaterial(opt.value)}
                       onKeyDown={(event) => {
                         const values = [
                           'clear',
@@ -447,7 +472,7 @@ export function GarmentTaggingModal({
                           selectedMaterial ?? 'clear',
                           materialOptionRefs,
                           (value) =>
-                            setSelectedMaterial(
+                            selectMaterial(
                               value === 'clear' ? null : (value as GarmentMaterial)
                             )
                         )
@@ -503,14 +528,14 @@ export function GarmentTaggingModal({
                       tabIndex={
                         isSelected || (!selectedComfort && opt.value === 'cold') ? 0 : -1
                       }
-                      onClick={() => setSelectedComfort(opt.value)}
+                      onClick={() => selectComfort(opt.value)}
                       onKeyDown={(event) =>
                         moveSelection(
                           event,
                           COMFORT_OPTIONS.map((option) => option.value),
                           selectedComfort,
                           comfortOptionRefs,
-                          setSelectedComfort
+                          selectComfort
                         )
                       }
                       className={`flex min-h-[44px] w-full flex-col items-start justify-center rounded-lg border p-3 text-left transition ${

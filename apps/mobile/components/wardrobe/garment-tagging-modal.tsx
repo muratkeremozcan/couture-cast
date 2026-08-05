@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   findNodeHandle,
+  Platform,
 } from 'react-native'
 import type {
   GarmentCategory,
@@ -134,19 +135,22 @@ export function MobileGarmentTaggingModal({
 
   useEffect(() => {
     if (!visible) return
-    const focusTimer = setTimeout(() => {
-      const node = findNodeHandle(titleRef.current)
-      if (node) AccessibilityInfo.setAccessibilityFocus(node)
-    }, 150)
+    const focusTimer =
+      Platform.OS === 'web'
+        ? null
+        : setTimeout(() => {
+            const node = findNodeHandle(titleRef.current)
+            if (node) AccessibilityInfo.setAccessibilityFocus(node)
+          }, 150)
     const backSubscription = BackHandler.addEventListener('hardwareBackPress', () => {
       onCloseRef.current()
       return true
     })
     return () => {
-      clearTimeout(focusTimer)
+      if (focusTimer !== null) clearTimeout(focusTimer)
       backSubscription.remove()
       const invoker = invokingNodeHandleRef.current
-      if (invoker) {
+      if (Platform.OS !== 'web' && invoker) {
         AccessibilityInfo.setAccessibilityFocus(invoker)
       }
     }

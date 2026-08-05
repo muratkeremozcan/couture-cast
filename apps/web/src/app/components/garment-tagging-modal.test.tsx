@@ -84,4 +84,43 @@ describe('GarmentTaggingModal Component', () => {
       expect(onTagsConfirmed).toHaveBeenCalledWith(mockUpdatedGarment)
     })
   })
+
+  it('preserves fields touched while smart suggestions are loading', async () => {
+    const user = userEvent.setup()
+    let resolveSuggestions: (suggestions: typeof mockSuggestions) => void = () =>
+      undefined
+    const suggestTagsFn = vi.fn().mockReturnValue(
+      new Promise<typeof mockSuggestions>((resolve) => {
+        resolveSuggestions = resolve
+      })
+    )
+
+    render(
+      <GarmentTaggingModal
+        isOpen={true}
+        onClose={vi.fn()}
+        garmentId="garment-1"
+        suggestTagsFn={suggestTagsFn}
+      />
+    )
+
+    const bottom = screen.getByRole('radio', { name: /Bottom/ })
+    const cotton = screen.getByRole('radio', { name: 'Cotton' })
+    const clearMaterial = screen.getByRole('radio', { name: 'Not sure / Clear' })
+    const hot = screen.getByRole('radio', { name: /Hot/ })
+
+    await user.click(bottom)
+    await user.click(cotton)
+    await user.click(clearMaterial)
+    await user.click(hot)
+
+    resolveSuggestions(mockSuggestions)
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading smart suggestions...')).toBeNull()
+    })
+    expect(bottom).toHaveAttribute('aria-checked', 'true')
+    expect(clearMaterial).toHaveAttribute('aria-checked', 'true')
+    expect(hot).toHaveAttribute('aria-checked', 'true')
+  })
 })

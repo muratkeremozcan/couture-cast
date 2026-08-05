@@ -289,6 +289,10 @@ describe('Wardrobe HTTP Contracts', () => {
           null
         )
       }
+      expect(garmentResponse?.properties?.data?.properties?.mimeType).toMatchObject({
+        enum: ['image/jpeg', 'image/png', 'image/webp', null],
+        'x-optic-exemptions': 'request and response property enums',
+      })
     })
   })
 

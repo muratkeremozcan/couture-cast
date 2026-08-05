@@ -5,7 +5,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common'
-import type { GarmentItem, PrismaClient } from '@prisma/client'
+import { Prisma, type GarmentItem, type PrismaClient } from '@prisma/client'
 import sharp from 'sharp'
 import {
   afterEach,
@@ -557,6 +557,33 @@ describe('WardrobeService', () => {
           durationMs: expect.any(Number),
         })
       )
+    })
+
+    it('retries a serializable commit transaction after a Prisma write conflict', async () => {
+      const initial = uploadedGarment()
+      const committed = uploadedGarment({
+        upload_status: 'processing',
+        committed_at: new Date('2026-08-04T09:26:22.000Z'),
+        commit_idempotency_key: IDEMPOTENCY_KEY,
+      })
+      mockPrisma.garmentItem.findUnique.mockResolvedValue(initial)
+      mockPrisma.garmentItem.findUniqueOrThrow.mockResolvedValue(committed)
+      mockPrisma.$transaction.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Serializable write conflict', {
+          code: 'P2034',
+          clientVersion: '6.19.0',
+        })
+      )
+
+      await expect(
+        service.commitGarment(USER_ID, 'guardian', commitInput, IDEMPOTENCY_KEY)
+      ).resolves.toMatchObject({
+        replayed: false,
+        response: { data: { status: 'processing' } },
+      })
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2)
+      expect(enqueue).toHaveBeenCalledWith(GARMENT_ID)
     })
 
     it('replays the committed garment when a concurrent matching commit wins', async () => {

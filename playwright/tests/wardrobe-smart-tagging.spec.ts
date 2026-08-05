@@ -8,7 +8,7 @@ import {
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { resolveEnvironmentConfig } from '../config/environments'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
-import { buildUniqueId } from '../support/helpers/api-test'
+import { buildUniqueId, isNonLocalEnvironment } from '../support/helpers/api-test'
 import { cleanupWardrobeUserTestData } from '../support/helpers/user-test-data'
 
 const environment = resolveEnvironmentConfig('local')
@@ -41,6 +41,13 @@ const wardrobeTest = test.extend<{ cleanupState: WardrobeCleanupState }>({
 wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
   // This journey authenticates as its API-created user instead of the default persisted session.
   wardrobeTest.use({ authSessionEnabled: false })
+
+  wardrobeTest.beforeEach(({}, testInfo) => {
+    test.skip(
+      isNonLocalEnvironment(testInfo),
+      'The smart-tagging system journey requires the supervised local API and fixture wardrobe worker.'
+    )
+  })
 
   wardrobeTest(
     '[P0] [4.2-E2E-001] uploads, resumes, confirms, reloads, and uses the garment in a Ritual',
@@ -147,6 +154,12 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
       })
 
       await test.step('Override the suggestion with the keyboard and save', async () => {
+        await expect(
+          page
+            .getByRole('radiogroup', { name: 'Target Comfort Range' })
+            .getByRole('radio', { checked: true })
+        ).toBeVisible()
+
         const categoryGroup = page.getByRole('radiogroup', {
           name: 'Garment Category',
         })
