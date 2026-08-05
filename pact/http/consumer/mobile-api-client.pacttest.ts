@@ -13,6 +13,8 @@ import {
   verifyGetComfortPreferencesInteraction,
   verifyUpdateComfortPreferencesInteraction,
   verifyUpdateUserPreferencesInteraction,
+  verifySuggestGarmentTagsInteraction,
+  verifyUpdateGarmentTagsInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -60,5 +62,13 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
 
   it('persists the selected mobile locale', async () => {
     await verifyUpdateUserPreferencesInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('suggests garment smart tags', async () => {
+    await verifySuggestGarmentTagsInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('updates garment smart tags', async () => {
+    await verifyUpdateGarmentTagsInteraction(pact, createMobileClientForMockServer)
   })
 })

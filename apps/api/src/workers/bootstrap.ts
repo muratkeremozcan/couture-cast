@@ -37,9 +37,6 @@ import { createBaseLogger } from '../logger/pino.config.js'
 import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 import { shutdownWorkerResources } from './shutdown-resources'
-import { WardrobeColorProcessor } from '../modules/wardrobe/wardrobe-color.processor'
-import { SupabaseWardrobeStorageAdapter } from '../modules/wardrobe/wardrobe-storage.adapter'
-import { garmentColorProcessingJobSchema } from '../modules/wardrobe/wardrobe-processing.queue'
 
 // Flow ref S0.4/T5: track worker/queue instances for coordinated shutdown.
 const logger = createBaseLogger().child({ feature: 'workers' })
@@ -79,10 +76,6 @@ async function startWorkers() {
     redisClients.push(alertRelayRedis)
     posthogService = new PostHogService()
     const telemetryService = new TelemetryService(prisma, posthogService)
-    const wardrobeColorProcessor = new WardrobeColorProcessor(
-      prisma,
-      new SupabaseWardrobeStorageAdapter()
-    )
     const alertFanoutProcessor = new AlertFanoutProcessor(
       new PrismaAlertFanoutRepository(prisma),
       new RedisAlertRealtimePublisher(alertRelayRedis),
@@ -144,29 +137,6 @@ async function startWorkers() {
         },
         {
           ...defaultWorkerOptions(20),
-        }
-      )
-    )
-
-    workers.push(
-      // Expensive extraction workload gets stricter queue-level throttling.
-      createWorker(
-        'color-extraction',
-        async (job) => {
-          const data = garmentColorProcessingJobSchema.parse(job.data)
-          try {
-            await wardrobeColorProcessor.process(data.garmentId)
-          } catch (error) {
-            const maxAttempts = job.opts.attempts ?? 1
-            if (job.attemptsMade + 1 >= maxAttempts) {
-              await wardrobeColorProcessor.markFailed(data.garmentId)
-            }
-            throw error
-          }
-        },
-        {
-          ...defaultWorkerOptions(5),
-          limiter: { max: 5, duration: 1000 },
         }
       )
     )

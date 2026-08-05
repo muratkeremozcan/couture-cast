@@ -12,7 +12,10 @@ import {
   trackLocationSwitched,
   trackApiErrorOccurred,
   trackGarmentUploadCompleted,
+  trackGarmentTaggingCompleted,
+  garmentTaggingCompletedEventSchema,
   type AnalyticsEventName,
+  type GarmentTaggingCompletedProperties,
 } from '@couture/api-client'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import { createBaseLogger } from '../../logger/pino.config'
@@ -65,6 +68,47 @@ export interface TelemetryPropertiesMap {
     hasBgCleanup: boolean
     durationMs: number
   }
+  garment_tagging_completed: {
+    analyticsSubjectId: string
+    garmentId: string
+    suggestedCategory:
+      | 'top'
+      | 'bottom'
+      | 'outerwear'
+      | 'dress'
+      | 'shoes'
+      | 'accessory'
+      | null
+    confirmedCategory: 'top' | 'bottom' | 'outerwear' | 'dress' | 'shoes' | 'accessory'
+    suggestedMaterial:
+      | 'cotton'
+      | 'wool'
+      | 'linen'
+      | 'leather'
+      | 'denim'
+      | 'fleece'
+      | 'synthetic'
+      | 'down'
+      | 'silk'
+      | null
+    confirmedMaterial:
+      | 'cotton'
+      | 'wool'
+      | 'linen'
+      | 'leather'
+      | 'denim'
+      | 'fleece'
+      | 'synthetic'
+      | 'down'
+      | 'silk'
+      | null
+    suggestedComfortRange: 'cold' | 'cool' | 'mild' | 'warm' | 'hot' | null
+    confirmedComfortRange: 'cold' | 'cool' | 'mild' | 'warm' | 'hot'
+    suggestionAvailable: boolean
+    analysisVersion: string | null
+    wasOverridden: boolean
+    overrideFields: ('category' | 'material' | 'comfort_range')[]
+  }
 }
 
 const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
@@ -93,6 +137,7 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
       durationMs: z.number().int().min(0).max(86_400_000),
     })
     .strict(),
+  garment_tagging_completed: garmentTaggingCompletedEventSchema,
 }
 
 function requireAnalyticsIdSecret(): string {
@@ -260,6 +305,50 @@ function buildGarmentUploadCompleted(
   })
 }
 
+function buildGarmentTaggingCompleted(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Garment telemetry requires an authenticated user')
+  }
+
+  return trackGarmentTaggingCompleted({
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+    garmentId: getString(props['garmentId']),
+    suggestedCategory:
+      (props[
+        'suggestedCategory'
+      ] as GarmentTaggingCompletedProperties['suggested_category']) ?? null,
+    confirmedCategory: props[
+      'confirmedCategory'
+    ] as GarmentTaggingCompletedProperties['confirmed_category'],
+    suggestedMaterial:
+      (props[
+        'suggestedMaterial'
+      ] as GarmentTaggingCompletedProperties['suggested_material']) ?? null,
+    confirmedMaterial:
+      (props[
+        'confirmedMaterial'
+      ] as GarmentTaggingCompletedProperties['confirmed_material']) ?? null,
+    suggestedComfortRange:
+      (props[
+        'suggestedComfortRange'
+      ] as GarmentTaggingCompletedProperties['suggested_comfort_range']) ?? null,
+    confirmedComfortRange: props[
+      'confirmedComfortRange'
+    ] as GarmentTaggingCompletedProperties['confirmed_comfort_range'],
+    suggestionAvailable: getBool(props['suggestionAvailable']),
+    analysisVersion: getStringOrNull(props['analysisVersion']),
+    wasOverridden: getBool(props['wasOverridden']),
+    overrideFields:
+      (props['overrideFields'] as GarmentTaggingCompletedProperties['override_fields']) ??
+      [],
+  })
+}
+
 const eventBuilders: Partial<
   Record<
     AnalyticsEventName,
@@ -306,17 +395,24 @@ export class TelemetryService {
     const payload =
       eventType === 'garment_upload_completed'
         ? buildGarmentUploadCompleted(resolvedUserId, properties, this.analyticsIdSecret)
-        : (eventBuilders[eventType]?.(resolvedUserId, properties, timestamp) ?? null)
+        : eventType === 'garment_tagging_completed'
+          ? buildGarmentTaggingCompleted(
+              resolvedUserId,
+              properties,
+              this.analyticsIdSecret
+            )
+          : (eventBuilders[eventType]?.(resolvedUserId, properties, timestamp) ?? null)
+    const isPseudonymousGarmentEvent =
+      eventType === 'garment_upload_completed' ||
+      eventType === 'garment_tagging_completed'
     const persistedProperties =
-      eventType === 'garment_upload_completed' && payload
-        ? payload.properties
-        : properties
+      isPseudonymousGarmentEvent && payload ? payload.properties : properties
 
     // 1. Start database persistence asynchronously (without awaiting)
     const dbPromise = this.prisma.telemetryEvent
       .create({
         data: {
-          user_id: eventType === 'garment_upload_completed' ? null : userId,
+          user_id: isPseudonymousGarmentEvent ? null : userId,
           event_type: eventType,
           properties: persistedProperties as Prisma.InputJsonValue,
         },
@@ -327,8 +423,7 @@ export class TelemetryService {
           {
             dbError,
             eventType,
-            subject:
-              eventType === 'garment_upload_completed' ? payload?.distinctId : userId,
+            subject: isPseudonymousGarmentEvent ? payload?.distinctId : userId,
           },
           'Failed to persist telemetry event to database'
         )
@@ -340,10 +435,9 @@ export class TelemetryService {
         this.analyticsClient.capture({
           distinctId: payload.distinctId,
           event: payload.event,
-          properties:
-            eventType === 'garment_upload_completed'
-              ? { ...payload.properties, $ip: null }
-              : payload.properties,
+          properties: isPseudonymousGarmentEvent
+            ? { ...payload.properties, $ip: null }
+            : payload.properties,
         })
       }
     } catch (phError: unknown) {
@@ -352,8 +446,7 @@ export class TelemetryService {
         {
           phError,
           eventType,
-          subject:
-            eventType === 'garment_upload_completed' ? payload?.distinctId : userId,
+          subject: isPseudonymousGarmentEvent ? payload?.distinctId : userId,
         },
         'Failed to dispatch telemetry event to PostHog'
       )

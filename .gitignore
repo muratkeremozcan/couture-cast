@@ -9,6 +9,8 @@ dist/
 build/
 .turbo
 .next
+.cache/
+**/garment-tagging-model/
 coverage/
 apps/**/dist
 apps/**/build
@@ -52,3 +54,4 @@ _bmad/custom/*
 !_bmad/custom/config.toml
 perf-test-plan.md
 .bmad-loop/
+.playwright-cli

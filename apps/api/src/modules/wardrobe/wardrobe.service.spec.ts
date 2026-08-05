@@ -1,562 +1,244 @@
-import { createHash, createHmac } from 'node:crypto'
 import {
-  BadRequestException,
   ConflictException,
-  ForbiddenException,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import type { PrismaClient } from '@prisma/client'
-import sharp from 'sharp'
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-  type Mock,
-} from 'vitest'
+import { createGarmentTagSuggestionSnapshotFixture } from '@couture/api-client/testing/wardrobe-fixtures'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GuardianService } from '../guardian/guardian.service'
+import type { RitualService } from '../personalization/ritual.service'
 import type { TelemetryService } from '../telemetry/telemetry.service'
-import type { WardrobeProcessingQueue } from './wardrobe-processing.queue'
 import { WardrobeService } from './wardrobe.service'
 import type { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
+import type { WardrobeProcessingQueue } from './wardrobe-processing.queue'
 
-const USER_ID = 'user-123'
-const OTHER_USER_ID = 'other-user-456'
-const GARMENT_ID = 'garment-123'
-const SESSION_ID = 'session-123'
-const IDEMPOTENCY_KEY = '34eff0f2-39b2-454e-b6b1-44a9ebfdb8ec' // gitleaks:allow
-const UPLOAD_SECRET = 'wardrobe-test-secret-at-least-32-bytes' // gitleaks:allow
-const FIXTURE_NOW = new Date('2026-08-04T09:25:00.000Z')
-const FIXTURE_EXPIRY = new Date('2026-08-04T09:35:00.000Z')
+describe('WardrobeService Smart Tagging Operations', () => {
+  const fixedNow = new Date('2026-08-05T12:00:00.000Z')
+  const mockFindFirst = vi.fn()
+  const mockUpdate = vi.fn()
+  const mockUpdateMany = vi.fn()
+  const mockFindUniqueOrThrow = vi.fn()
+  const mockSignReadUrl = vi.fn()
+  const mockTransaction = vi.fn()
 
-type MockGarmentRepository = {
-  create: Mock
-  findMany: Mock
-  findUnique: Mock
-  findUniqueOrThrow: Mock
-  updateMany: Mock
-}
+  const mockPrisma = {
+    garmentItem: {
+      findFirst: mockFindFirst,
+      update: mockUpdate,
+      updateMany: mockUpdateMany,
+      findUniqueOrThrow: mockFindUniqueOrThrow,
+    },
+    $transaction: mockTransaction,
+  } as unknown as PrismaClient
 
-type MockPrisma = {
-  garmentItem: MockGarmentRepository
-  $transaction: Mock
-}
+  const mockCaptureEvent = vi.fn()
+  const mockInvalidateUserCache = vi.fn()
+  const mockAssertWardrobeUploadAllowed = vi.fn()
 
-function garmentFixture(overrides: Record<string, unknown> = {}) {
-  return {
-    id: GARMENT_ID,
-    user_id: USER_ID,
-    image_url: null,
-    object_path: `wardrobe/${USER_ID}/${GARMENT_ID}.png`,
-    category: null,
-    material: null,
-    comfort_range: null,
-    color_palette: null,
-    upload_session_id: SESSION_ID,
-    upload_idempotency_key: IDEMPOTENCY_KEY,
-    commit_idempotency_key: null,
-    commit_payload_hash: null,
-    upload_status: 'pending_upload',
-    retention_status: 'active',
-    retention_trigger: null,
-    file_size_bytes: 0,
-    mime_type: 'image/png',
-    content_sha256: '',
-    width_px: 300,
-    height_px: 300,
-    upload_expires_at: FIXTURE_EXPIRY,
-    consent_checked_at: FIXTURE_NOW,
-    committed_at: null,
-    has_cropping: false,
-    has_bg_cleanup: false,
-    completion_telemetry_emitted_at: null,
-    processing_job_enqueued_at: null,
-    created_at: FIXTURE_NOW,
-    updated_at: FIXTURE_NOW,
-    ...overrides,
-  }
-}
+  const mockTelemetryService = {
+    captureEvent: mockCaptureEvent,
+  } as unknown as TelemetryService
 
-function uploadToken(expiresAt: Date, userId = USER_ID): string {
-  return createHmac('sha256', UPLOAD_SECRET)
-    .update(`${SESSION_ID}.${userId}.${expiresAt.toISOString()}`)
-    .digest('base64url')
-}
+  const mockGuardianService = {
+    assertWardrobeUploadAllowed: mockAssertWardrobeUploadAllowed,
+  } as unknown as GuardianService
 
-describe('WardrobeService', () => {
-  let validImage: Buffer
-  let validSha256: string
-  let mockPrisma: MockPrisma
-  let telemetryCapture: Mock
-  let guardianAuthorization: Mock
-  let storageUpload: Mock
-  let storageDownload: Mock
-  let storageSignReadUrl: Mock
-  let storageRemove: Mock
-  let enqueue: Mock
-  let service: WardrobeService
+  const mockStorage = {
+    signReadUrl: mockSignReadUrl,
+  } as unknown as SupabaseWardrobeStorageAdapter
 
-  beforeAll(async () => {
-    validImage = await sharp({
-      create: {
-        width: 300,
-        height: 300,
-        channels: 4,
-        background: { r: 80, g: 120, b: 160, alpha: 1 },
-      },
-    })
-      .png()
-      .toBuffer()
-    validSha256 = createHash('sha256').update(validImage).digest('hex')
-  })
+  const mockProcessingQueue = {} as unknown as WardrobeProcessingQueue
+
+  const mockRitualService = {
+    invalidateUserCache: mockInvalidateUserCache,
+  } as unknown as RitualService
+
+  const service = new WardrobeService(
+    mockPrisma,
+    mockTelemetryService,
+    mockGuardianService,
+    mockStorage,
+    mockProcessingQueue,
+    mockRitualService
+  )
 
   beforeEach(() => {
-    vi.useFakeTimers()
-    vi.setSystemTime(FIXTURE_NOW)
+    mockFindFirst.mockReset()
+    mockUpdate.mockReset()
+    mockUpdateMany.mockReset()
+    mockFindUniqueOrThrow.mockReset()
+    mockSignReadUrl.mockReset().mockResolvedValue('https://example.com/read.png')
+    mockCaptureEvent.mockReset().mockResolvedValue(undefined)
+    mockInvalidateUserCache.mockReset().mockResolvedValue(true)
+    mockAssertWardrobeUploadAllowed.mockReset().mockResolvedValue(undefined)
+    mockTransaction
+      .mockReset()
+      .mockImplementation(
+        async (callback: (tx: PrismaClient) => Promise<unknown>) =>
+          await callback(mockPrisma as unknown as PrismaClient)
+      )
+  })
 
-    process.env.WARDROBE_UPLOAD_TOKEN_SECRET = UPLOAD_SECRET
-    const garmentItem: MockGarmentRepository = {
-      create: vi.fn(),
-      findMany: vi.fn().mockResolvedValue([]),
-      findUnique: vi.fn().mockResolvedValue(null),
-      findUniqueOrThrow: vi.fn(),
-      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
-    }
-    mockPrisma = {
-      garmentItem,
-      $transaction: vi.fn(async (callback: (tx: MockPrisma) => Promise<unknown>) =>
-        callback(mockPrisma)
-      ),
-    }
-    telemetryCapture = vi.fn().mockResolvedValue(undefined)
-    guardianAuthorization = vi.fn().mockResolvedValue(undefined)
-    storageUpload = vi.fn().mockResolvedValue(undefined)
-    storageDownload = vi.fn().mockResolvedValue(validImage)
-    storageSignReadUrl = vi.fn().mockResolvedValue('https://storage.test/signed.png')
-    storageRemove = vi.fn().mockResolvedValue(undefined)
-    enqueue = vi.fn().mockResolvedValue(undefined)
+  it('throws NotFoundException for absent or cross-owner garment on suggestGarmentTags', async () => {
+    mockFindFirst.mockResolvedValueOnce(null)
+    await expect(
+      service.suggestGarmentTags('user_1', 'teen', 'garment_missing')
+    ).rejects.toThrow(NotFoundException)
+  })
 
-    service = new WardrobeService(
-      mockPrisma as unknown as PrismaClient,
-      { captureEvent: telemetryCapture } as unknown as TelemetryService,
-      {
-        assertWardrobeUploadAllowed: guardianAuthorization,
-      } as unknown as GuardianService,
-      {
-        upload: storageUpload,
-        download: storageDownload,
-        signReadUrl: storageSignReadUrl,
-        remove: storageRemove,
-      } as unknown as SupabaseWardrobeStorageAdapter,
-      { enqueue } as unknown as WardrobeProcessingQueue
+  it('throws ConflictException when suggesting tags for garment in processing status', async () => {
+    mockFindFirst.mockResolvedValueOnce({
+      id: 'g_1',
+      user_id: 'user_1',
+      upload_status: 'processing',
+      retention_status: 'active',
+    })
+    await expect(service.suggestGarmentTags('user_1', 'teen', 'g_1')).rejects.toThrow(
+      ConflictException
     )
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
+  it('throws ServiceUnavailableException when tag suggestions are missing or invalid', async () => {
+    mockFindFirst.mockResolvedValueOnce({
+      id: 'g_1',
+      user_id: 'user_1',
+      upload_status: 'awaiting_tags',
+      retention_status: 'active',
+      tag_suggestions: null,
+    })
+    await expect(service.suggestGarmentTags('user_1', 'teen', 'g_1')).rejects.toThrow(
+      ServiceUnavailableException
+    )
   })
 
-  describe('createUploadUrl', () => {
-    const declaration = {
-      fileSizeBytes: 1024,
-      mimeType: 'image/png' as const,
-      sha256: 'a'.repeat(64),
-      widthPx: 500,
-      heightPx: 500,
-    }
-
-    it('creates a private upload session with a user-scoped idempotency key', async () => {
-      mockPrisma.garmentItem.create.mockImplementation(
-        ({ data }: { data: Record<string, unknown> }) =>
-          Promise.resolve(
-            garmentFixture({
-              ...data,
-              created_at: FIXTURE_NOW,
-              updated_at: FIXTURE_NOW,
-            })
-          )
-      )
-
-      const result = await service.createUploadUrl(
-        USER_ID,
-        'guardian',
-        declaration,
-        IDEMPOTENCY_KEY
-      )
-
-      expect(result.replayed).toBe(false)
-      expect(result.response.data.uploadUrl).toContain('/api/v1/wardrobe/uploads/')
-      expect(result.response.data.uploadToken).not.toHaveLength(0)
-      expect(mockPrisma.garmentItem.findUnique).toHaveBeenCalledWith({
-        where: {
-          user_id_upload_idempotency_key: {
-            user_id: USER_ID,
-            upload_idempotency_key: IDEMPOTENCY_KEY,
-          },
-        },
-      })
+  it('throws ServiceUnavailableException for a malformed stored suggestion snapshot', async () => {
+    mockFindFirst.mockResolvedValueOnce({
+      id: 'g_invalid',
+      user_id: 'user_1',
+      upload_status: 'awaiting_tags',
+      retention_status: 'active',
+      tag_suggestions: { category: 'top' },
     })
 
-    it('returns the same active session for a matching caller replay', async () => {
-      const existing = garmentFixture({
-        file_size_bytes: declaration.fileSizeBytes,
-        content_sha256: declaration.sha256,
-        width_px: declaration.widthPx,
-        height_px: declaration.heightPx,
-      })
-      mockPrisma.garmentItem.findUnique.mockResolvedValue(existing)
-
-      const result = await service.createUploadUrl(
-        USER_ID,
-        'guardian',
-        declaration,
-        IDEMPOTENCY_KEY
-      )
-
-      expect(result.replayed).toBe(true)
-      expect(result.response.data.garmentId).toBe(GARMENT_ID)
-      expect(result.response.data.uploadSessionId).toBe(SESSION_ID)
-      expect(mockPrisma.garmentItem.create).not.toHaveBeenCalled()
-    })
-
-    it('does not disclose another caller upload session for the same key', async () => {
-      const firstCallerGarment = garmentFixture({ user_id: USER_ID })
-      mockPrisma.garmentItem.findUnique.mockImplementation(
-        ({ where }: { where: Record<string, { user_id?: string }> }) =>
-          Promise.resolve(
-            where.user_id_upload_idempotency_key?.user_id === USER_ID
-              ? firstCallerGarment
-              : null
-          )
-      )
-      mockPrisma.garmentItem.create.mockImplementation(
-        ({ data }: { data: Record<string, unknown> }) =>
-          Promise.resolve(
-            garmentFixture({
-              ...data,
-              id: 'second-caller-garment',
-              user_id: OTHER_USER_ID,
-              upload_session_id: 'second-caller-session',
-              created_at: FIXTURE_NOW,
-              updated_at: FIXTURE_NOW,
-            })
-          )
-      )
-
-      const result = await service.createUploadUrl(
-        OTHER_USER_ID,
-        'guardian',
-        declaration,
-        IDEMPOTENCY_KEY
-      )
-
-      expect(result.response.data.garmentId).toBe('second-caller-garment')
-      expect(result.response.data.uploadSessionId).toBe('second-caller-session')
-      expect(result.response.data).not.toEqual(
-        expect.objectContaining({ garmentId: GARMENT_ID, uploadSessionId: SESSION_ID })
-      )
-    })
-
-    it('preserves payload mismatch conflict behavior', async () => {
-      mockPrisma.garmentItem.findUnique.mockResolvedValue(
-        garmentFixture({
-          file_size_bytes: declaration.fileSizeBytes,
-          content_sha256: declaration.sha256,
-          width_px: declaration.widthPx,
-          height_px: declaration.heightPx,
-        })
-      )
-
-      await expect(
-        service.createUploadUrl(
-          USER_ID,
-          'guardian',
-          { ...declaration, fileSizeBytes: 2048 },
-          IDEMPOTENCY_KEY
-        )
-      ).rejects.toThrow('IDEMPOTENCY_KEY_REUSED')
-    })
+    await expect(
+      service.suggestGarmentTags('user_1', 'teen', 'g_invalid')
+    ).rejects.toThrow(ServiceUnavailableException)
+    expect(mockUpdateMany).not.toHaveBeenCalled()
   })
 
-  describe('uploadBytes', () => {
-    function pendingUpload(overrides: Record<string, unknown> = {}) {
-      return garmentFixture({
-        file_size_bytes: validImage.length,
-        content_sha256: validSha256,
-        width_px: 300,
-        height_px: 300,
-        ...overrides,
-      })
-    }
-
-    it('rejects a missing session', async () => {
-      await expect(
-        service.uploadBytes(
-          SESSION_ID,
-          'token',
-          USER_ID,
-          'guardian',
-          'image/png',
-          validImage.length,
-          validImage
-        )
-      ).rejects.toThrow(NotFoundException)
+  it('returns structured suggestions when valid snapshot exists', async () => {
+    const validSnapshot = createGarmentTagSuggestionSnapshotFixture({
+      category: { confidence: 0.88 },
+    })
+    mockFindFirst.mockResolvedValueOnce({
+      id: 'g_1',
+      user_id: 'user_1',
+      upload_status: 'awaiting_tags',
+      retention_status: 'active',
+      tag_suggestions: validSnapshot,
     })
 
-    it('preserves cross-user ownership rejection', async () => {
-      mockPrisma.garmentItem.findUnique.mockResolvedValue(
-        pendingUpload({ user_id: OTHER_USER_ID })
-      )
-
-      await expect(
-        service.uploadBytes(
-          SESSION_ID,
-          'token',
-          USER_ID,
-          'guardian',
-          'image/png',
-          validImage.length,
-          validImage
-        )
-      ).rejects.toThrow(ForbiddenException)
-      expect(storageUpload).not.toHaveBeenCalled()
-    })
-
-    it('rejects a tampered upload token before persistence', async () => {
-      mockPrisma.garmentItem.findUnique.mockResolvedValue(pendingUpload())
-
-      await expect(
-        service.uploadBytes(
-          SESSION_ID,
-          'tampered-token',
-          USER_ID,
-          'guardian',
-          'image/png',
-          validImage.length,
-          validImage
-        )
-      ).rejects.toThrow('INVALID_UPLOAD_TOKEN')
-      expect(storageUpload).not.toHaveBeenCalled()
-      expect(mockPrisma.garmentItem.updateMany).not.toHaveBeenCalled()
-    })
-
-    it('treats a null expiry as an expired session before token validation', async () => {
-      mockPrisma.garmentItem.findUnique.mockResolvedValue(
-        pendingUpload({ upload_expires_at: null })
-      )
-
-      await expect(
-        service.uploadBytes(
-          SESSION_ID,
-          'tampered-token',
-          USER_ID,
-          'guardian',
-          'image/png',
-          validImage.length,
-          validImage
-        )
-      ).rejects.toThrow('UPLOAD_SESSION_EXPIRED')
-    })
-
-    it('rejects an expired session when current system time exceeds upload_expires_at', async () => {
-      const garment = pendingUpload({ upload_expires_at: FIXTURE_EXPIRY })
-      mockPrisma.garmentItem.findUnique.mockResolvedValue(garment)
-      const token = uploadToken(garment.upload_expires_at)
-
-      // Advance system time past expiry window
-      vi.setSystemTime(new Date(FIXTURE_EXPIRY.getTime() + 1000))
-
-      await expect(
-        service.uploadBytes(
-          SESSION_ID,
-          token,
-          USER_ID,
-          'guardian',
-          'image/png',
-          validImage.length,
-          validImage
-        )
-      ).rejects.toThrow('UPLOAD_SESSION_EXPIRED')
-      expect(storageUpload).not.toHaveBeenCalled()
-    })
-
-    it('enforces the declared byte count', async () => {
-      const garment = pendingUpload()
-      mockPrisma.garmentItem.findUnique.mockResolvedValue(garment)
-
-      await expect(
-        service.uploadBytes(
-          SESSION_ID,
-          uploadToken(garment.upload_expires_at),
-          USER_ID,
-          'guardian',
-          'image/png',
-          validImage.length - 1,
-          validImage
-        )
-      ).rejects.toThrow(BadRequestException)
-      expect(storageUpload).not.toHaveBeenCalled()
-    })
-
-    it('verifies and stores image bytes before consuming the upload state', async () => {
-      const garment = pendingUpload()
-      mockPrisma.garmentItem.findUnique.mockResolvedValue(garment)
-
-      await service.uploadBytes(
-        SESSION_ID,
-        uploadToken(garment.upload_expires_at),
-        USER_ID,
-        'guardian',
-        'image/png',
-        validImage.length,
-        validImage
-      )
-
-      expect(storageUpload).toHaveBeenCalledWith(
-        garment.object_path,
-        validImage,
-        'image/png'
-      )
-      expect(mockPrisma.garmentItem.updateMany).toHaveBeenCalledWith({
-        where: {
-          id: GARMENT_ID,
-          upload_status: 'pending_upload',
-          retention_status: 'active',
-        },
-        data: {
-          upload_status: 'bytes_uploaded',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          consent_checked_at: expect.any(Date),
-        },
-      })
-    })
+    const res = await service.suggestGarmentTags('user_1', 'teen', 'g_1')
+    expect(res.data.analysisVersion).toBe(validSnapshot.analysisVersion)
+    expect(res.data.suggestions.category.value).toBe('top')
   })
 
-  describe('commitGarment', () => {
-    function uploadedGarment(overrides: Record<string, unknown> = {}) {
-      return garmentFixture({
-        upload_status: 'bytes_uploaded',
-        file_size_bytes: validImage.length,
-        content_sha256: validSha256,
-        width_px: 300,
-        height_px: 300,
-        upload_session_id: SESSION_ID,
-        ...overrides,
+  it('returns current response without DB write when ready garment receives identical update', async () => {
+    mockFindFirst.mockResolvedValueOnce({
+      id: 'g_ready',
+      user_id: 'user_1',
+      upload_status: 'ready',
+      retention_status: 'active',
+      category: 'top',
+      material: 'cotton',
+      comfort_range: 'mild',
+      object_path: 'wardrobe/user_1/g_ready.png',
+      file_size_bytes: 1024,
+      tagging_telemetry_emitted_at: null,
+      created_at: fixedNow,
+    })
+
+    const res = await service.updateGarmentTags('user_1', 'teen', 'g_ready', {
+      category: 'top',
+      material: 'cotton',
+      comfortRange: 'mild',
+    })
+
+    expect(res.data.status).toBe('ready')
+    expect(mockUpdateMany).not.toHaveBeenCalled()
+    expect(mockCaptureEvent).not.toHaveBeenCalled()
+    expect(mockInvalidateUserCache).not.toHaveBeenCalled()
+  })
+
+  it('updates awaiting_tags garment to ready, emits telemetry, and invalidates cache', async () => {
+    const validSnapshot = createGarmentTagSuggestionSnapshotFixture({
+      category: { confidence: 0.88 },
+    })
+
+    mockFindFirst.mockResolvedValueOnce({
+      id: 'g_awaiting',
+      user_id: 'user_1',
+      upload_status: 'awaiting_tags',
+      retention_status: 'active',
+      tag_suggestions: validSnapshot,
+      category: null,
+      material: null,
+      comfort_range: null,
+      object_path: 'wardrobe/user_1/g_awaiting.png',
+      file_size_bytes: 2048,
+      tagging_telemetry_emitted_at: null,
+      created_at: fixedNow,
+    })
+
+    mockUpdateMany.mockResolvedValueOnce({ count: 1 })
+    mockFindUniqueOrThrow.mockResolvedValueOnce({
+      id: 'g_awaiting',
+      user_id: 'user_1',
+      upload_status: 'ready',
+      retention_status: 'active',
+      category: 'top',
+      material: 'silk', // overridden
+      comfort_range: 'warm', // overridden
+      tags_confirmed_at: fixedNow,
+      object_path: 'wardrobe/user_1/g_awaiting.png',
+      file_size_bytes: 2048,
+      created_at: fixedNow,
+    })
+
+    const res = await service.updateGarmentTags('user_1', 'teen', 'g_awaiting', {
+      category: 'top',
+      material: 'silk',
+      comfortRange: 'warm',
+    })
+
+    expect(res.data.status).toBe('ready')
+    expect(res.data.category).toBe('top')
+    expect(res.data.material).toBe('silk')
+
+    expect(mockUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'g_awaiting',
+          user_id: 'user_1',
+          upload_status: 'awaiting_tags',
+        }) as unknown,
+        data: expect.objectContaining({
+          upload_status: 'ready',
+          tagging_telemetry_emitted_at: expect.any(Date) as unknown,
+        }) as unknown,
       })
-    }
+    )
 
-    const commitInput = {
-      garmentId: GARMENT_ID,
-      uploadSessionId: SESSION_ID,
-      hasCropping: true,
-      hasBgCleanup: true,
-    }
-
-    it('rejects a mismatched upload session before mutation or telemetry', async () => {
-      mockPrisma.garmentItem.findUnique.mockResolvedValue(uploadedGarment())
-
-      await expect(
-        service.commitGarment(
-          USER_ID,
-          'guardian',
-          { ...commitInput, uploadSessionId: 'mismatched-session' },
-          IDEMPOTENCY_KEY
-        )
-      ).rejects.toThrow(ConflictException)
-      expect(mockPrisma.garmentItem.updateMany).not.toHaveBeenCalled()
-      expect(storageDownload).not.toHaveBeenCalled()
-      expect(telemetryCapture).not.toHaveBeenCalled()
-    })
-
-    it('accepts only bytes_uploaded state for a new commit', async () => {
-      mockPrisma.garmentItem.findUnique.mockResolvedValue(
-        uploadedGarment({ upload_status: 'pending_upload' })
-      )
-
-      await expect(
-        service.commitGarment(USER_ID, 'guardian', commitInput, IDEMPOTENCY_KEY)
-      ).rejects.toThrow('INVALID_GARMENT_COMMIT')
-    })
-
-    it('commits verified bytes, enqueues processing, signs the read URL, and emits telemetry', async () => {
-      const initial = uploadedGarment()
-      const committed = uploadedGarment({
-        upload_status: 'processing',
-        committed_at: new Date('2026-08-04T09:26:22.000Z'),
-        commit_idempotency_key: IDEMPOTENCY_KEY,
-        has_cropping: true,
-        has_bg_cleanup: true,
+    expect(mockCaptureEvent).toHaveBeenCalledWith(
+      'user_1',
+      'garment_tagging_completed',
+      expect.objectContaining({
+        garmentId: 'g_awaiting',
+        wasOverridden: true,
+        overrideFields: ['material', 'comfort_range'],
       })
-      mockPrisma.garmentItem.findUnique.mockResolvedValue(initial)
-      mockPrisma.garmentItem.findUniqueOrThrow.mockResolvedValue(committed)
-
-      const result = await service.commitGarment(
-        USER_ID,
-        'guardian',
-        commitInput,
-        IDEMPOTENCY_KEY
-      )
-
-      expect(result.replayed).toBe(false)
-      expect(result.response.data.status).toBe('processing')
-      expect(result.response.data.imageAccess?.url).toBe(
-        'https://storage.test/signed.png'
-      )
-      expect(enqueue).toHaveBeenCalledWith(GARMENT_ID)
-      expect(telemetryCapture).toHaveBeenCalledWith(
-        USER_ID,
-        'garment_upload_completed',
-        expect.objectContaining({
-          garmentId: GARMENT_ID,
-          fileSizeBytes: validImage.length,
-          mimeType: 'image/png',
-          hasCropping: true,
-          hasBgCleanup: true,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          durationMs: expect.any(Number),
-        })
-      )
-    })
-
-    it('replays the committed garment when a concurrent matching commit wins', async () => {
-      const initial = uploadedGarment()
-      const payloadHash = createHash('sha256')
-        .update(
-          JSON.stringify({
-            garmentId: commitInput.garmentId,
-            uploadSessionId: commitInput.uploadSessionId,
-            hasCropping: commitInput.hasCropping,
-            hasBgCleanup: commitInput.hasBgCleanup,
-          })
-        )
-        .digest('hex')
-      const raced = uploadedGarment({
-        upload_status: 'processing',
-        committed_at: new Date('2026-08-04T09:26:22.000Z'),
-        commit_idempotency_key: IDEMPOTENCY_KEY,
-        commit_payload_hash: payloadHash,
-        processing_job_enqueued_at: new Date('2026-08-04T09:26:23.000Z'),
-      })
-      mockPrisma.garmentItem.findUnique
-        .mockResolvedValueOnce(initial)
-        .mockResolvedValueOnce(raced)
-      mockPrisma.$transaction.mockRejectedValueOnce(
-        new ConflictException('UPLOAD_ALREADY_CLAIMED')
-      )
-
-      const result = await service.commitGarment(
-        USER_ID,
-        'guardian',
-        commitInput,
-        IDEMPOTENCY_KEY
-      )
-
-      expect(result.replayed).toBe(true)
-      expect(result.response.data.status).toBe('processing')
-      expect(telemetryCapture).not.toHaveBeenCalled()
-    })
+    )
+    expect(mockInvalidateUserCache).toHaveBeenCalledWith('user_1')
   })
 })

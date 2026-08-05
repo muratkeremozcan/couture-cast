@@ -5,8 +5,6 @@ import {
   eventsPollResponseSchema,
 } from '@couture/api-client/contracts/http'
 
-process.env.API_E2E_UI_MODE = 'true'
-
 const POLL_PATH = '/api/v1/events/poll'
 
 type TypedResponse = {
@@ -29,6 +27,7 @@ test.describe('Realtime poll API', () => {
       path: POLL_PATH,
       baseUrl,
       headers: authHeaders('poll-test-user', 'admin'),
+      uiMode: true,
     })) as TypedResponse
     expect(status).toBe(200)
 
@@ -53,6 +52,7 @@ test.describe('Realtime poll API', () => {
       path: pollUrl,
       baseUrl,
       headers: authHeaders('poll-test-user', 'admin'),
+      uiMode: true,
     })) as TypedResponse
     expect(status).toBe(200)
 

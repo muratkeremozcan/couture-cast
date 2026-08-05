@@ -55,10 +55,10 @@
     "languages": {
       "en-US": "English (US)",
       "en-CA": "English (Canada)",
-      "es-419": "Espa\u00f1ol (LatAm)",
-      "fr-CA": "Fran\u00e7ais (Canada)",
-      "fr-FR": "Fran\u00e7ais (Europe)",
-      "tr-TR": "T\u00fcrk\u00e7e",
+      "es-419": "Español (LatAm)",
+      "fr-CA": "Français (Canada)",
+      "fr-FR": "Français (Europe)",
+      "tr-TR": "Türkçe",
       "de-DE": "German",
       "it-IT": "Italian",
       "pt-BR": "Portuguese (Brazil)",
@@ -152,6 +152,59 @@
       "failed": "Garment upload failed",
       "retry": "Retry Upload",
       "cancel": "Cancel Upload"
+    },
+    "tagging": {
+      "title": "Garment Smart Tags",
+      "desc": "Review AI suggestions to personalize outfit recommendations.",
+      "needs_tags": "Needs tags",
+      "category": "Category",
+      "material": "Material",
+      "comfort_range": "Comfort Range",
+      "not_sure": "Not sure / Clear",
+      "save": "Confirm & Save Tags",
+      "saving": "Saving...",
+      "ai_suggested": "AI suggested: {{value}}",
+      "loading_suggestions": "Loading smart suggestions...",
+      "pending_analysis": "Garment analysis is still pending. You can select tags manually.",
+      "inference_unavailable": "Smart suggestion inference is unavailable. Please select tags manually.",
+      "required": "*",
+      "optional": "(Optional)",
+      "close": "Close smart tags",
+      "low_confidence_suggested": "Low confidence suggestion: {{value}}",
+      "retry": "Retry suggestions",
+      "load_failed": "Unable to load smart suggestions.",
+      "selection_required": "Select a category and comfort range.",
+      "save_failed": "Unable to save tags. Try again.",
+      "saved": "Garment tags saved.",
+      "poll_timeout": "Smart tagging is taking longer than expected. The garment remains available while processing continues.",
+      "options": {
+        "category": {
+          "top": "Top",
+          "bottom": "Bottom",
+          "outerwear": "Outerwear",
+          "dress": "Dress",
+          "shoes": "Shoes",
+          "accessory": "Accessory"
+        },
+        "material": {
+          "cotton": "Cotton",
+          "wool": "Wool",
+          "linen": "Linen",
+          "leather": "Leather",
+          "denim": "Denim",
+          "fleece": "Fleece",
+          "synthetic": "Synthetic",
+          "down": "Down",
+          "silk": "Silk"
+        },
+        "comfort": {
+          "cold": "Cold (< 10°C / 50°F)",
+          "cool": "Cool (10–16°C / 50–60°F)",
+          "mild": "Mild (16–22°C / 60–72°F)",
+          "warm": "Warm (22–28°C / 72–82°F)",
+          "hot": "Hot (> 28°C / 82°F)"
+        }
+      }
     }
   }
 }

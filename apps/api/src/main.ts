@@ -53,6 +53,18 @@ async function bootstrap() {
 
   // 2) NestFactory.create(AppModule) builds the route graph from that metadata.
   const app = await NestFactory.create(AppModule)
+  const httpCorsOrigins = (
+    process.env.HTTP_CORS_ORIGIN ??
+    process.env.GUARDIAN_INVITE_WEB_BASE_URL ??
+    'http://localhost:3000'
+  )
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+  app.enableCors({
+    credentials: true,
+    origin: httpCorsOrigins,
+  })
   app.use(bindRequestContext)
   app.use(createRequestLoggerMiddleware())
 

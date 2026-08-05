@@ -6,7 +6,9 @@ import {
   createGarmentUploadUrlInputSchema,
   createGarmentUploadUrlResponseSchema,
   garmentItemSchema,
+  GARMENT_TAGGING_ANALYSIS_VERSION,
   generateHttpOpenApiDocument,
+  suggestGarmentTagsResponseSchema,
   uploadGarmentBytes,
 } from '../src/contracts/http'
 
@@ -28,6 +30,9 @@ function buildGarmentItem(overrides: Record<string, unknown> = {}) {
     id: 'clx123456789',
     status: 'processing',
     category: null,
+    material: null,
+    comfortRange: null,
+    tagsConfirmedAt: null,
     fileSizeBytes: 2048576,
     mimeType: 'image/png',
     retentionStatus: 'active',
@@ -98,6 +103,26 @@ describe('Wardrobe HTTP Contracts', () => {
         data: sampleItem,
       })
       expect(commitResponse.data.id).toBe('clx123456789')
+    })
+
+    it('requires nullable tag fields and the exact pinned analysis version', () => {
+      expect(
+        garmentItemSchema.safeParse(buildGarmentItem({ material: undefined })).success
+      ).toBe(false)
+      expect(
+        suggestGarmentTagsResponseSchema.safeParse({
+          data: {
+            garmentId: 'garment-1',
+            analysisVersion: 'fashion-clip:untrusted',
+            suggestions: {
+              category: { value: 'top', confidence: 0.9, isConfident: true },
+              material: { value: 'cotton', confidence: 0.8, isConfident: true },
+              comfortRange: { value: 'mild', confidence: 0.8, isConfident: true },
+            },
+          },
+        }).success
+      ).toBe(false)
+      expect(GARMENT_TAGGING_ANALYSIS_VERSION).toContain('prompts-v1')
     })
   })
 
@@ -186,31 +211,45 @@ describe('Wardrobe HTTP Contracts', () => {
     it('registers authenticated wardrobe routes in OpenAPI specification', () => {
       const spec = generateHttpOpenApiDocument()
 
-      const uploadUrlPath = spec.paths?.['/api/v1/wardrobe/upload-url']
-      const uploadRelayPath = spec.paths?.['/api/v1/wardrobe/uploads/{uploadSessionId}']
-      const garmentsPath = spec.paths?.['/api/v1/wardrobe/garments']
+      const authenticatedRoutes = [
+        {
+          method: 'post',
+          path: '/api/v1/wardrobe/upload-url',
+          statuses: ['200', '201', '400', '401', '403', '409'],
+        },
+        {
+          method: 'put',
+          path: '/api/v1/wardrobe/uploads/{uploadSessionId}',
+          statuses: ['204', '400', '401', '403', '404', '409'],
+        },
+        {
+          method: 'post',
+          path: '/api/v1/wardrobe/garments',
+          statuses: ['200', '201', '400', '401', '403', '404', '409'],
+        },
+        {
+          method: 'post',
+          path: '/api/v1/wardrobe/garments/{garmentId}/suggest-tags',
+          statuses: ['200', '400', '401', '403', '404', '409', '503'],
+        },
+        {
+          method: 'patch',
+          path: '/api/v1/wardrobe/garments/{garmentId}/tags',
+          statuses: ['200', '400', '401', '403', '404', '409'],
+        },
+      ] as const
 
-      expect(uploadUrlPath?.post?.security).toEqual([{ bearerAuth: [] }])
-      expect(uploadUrlPath?.post?.responses?.['201']).toBeDefined()
-      expect(Object.keys(uploadUrlPath?.post?.responses ?? {}).sort()).toEqual([
-        '200',
-        '201',
-        '400',
-        '401',
-        '403',
-        '409',
-      ])
-      expect(uploadRelayPath?.put?.security).toEqual([{ bearerAuth: [] }])
-      expect(uploadRelayPath?.put?.responses?.['204']).toBeDefined()
-      expect(Object.keys(uploadRelayPath?.put?.responses ?? {}).sort()).toEqual([
-        '204',
-        '400',
-        '401',
-        '403',
-        '404',
-        '409',
-      ])
-      expect(uploadRelayPath?.put?.requestBody).toMatchObject({
+      for (const route of authenticatedRoutes) {
+        const operation = spec.paths?.[route.path]?.[route.method]
+        expect(
+          operation?.security,
+          `${route.method.toUpperCase()} ${route.path}`
+        ).toEqual([{ bearerAuth: [] }])
+        expect(Object.keys(operation?.responses ?? {}).sort()).toEqual(route.statuses)
+      }
+
+      const uploadRelay = spec.paths?.['/api/v1/wardrobe/uploads/{uploadSessionId}']?.put
+      expect(uploadRelay?.requestBody).toMatchObject({
         required: true,
         content: {
           'image/jpeg': { schema: { type: 'string', format: 'binary' } },
@@ -218,18 +257,42 @@ describe('Wardrobe HTTP Contracts', () => {
           'image/webp': { schema: { type: 'string', format: 'binary' } },
         },
       })
-      expect(garmentsPath?.post?.security).toEqual([{ bearerAuth: [] }])
-      expect(garmentsPath?.post?.responses?.['201']).toBeDefined()
-      expect(garmentsPath?.post?.requestBody).toBeDefined()
-      expect(Object.keys(garmentsPath?.post?.responses ?? {}).sort()).toEqual([
-        '200',
-        '201',
-        '400',
-        '401',
-        '403',
-        '404',
-        '409',
-      ])
+
+      expect(spec.paths?.['/api/v1/wardrobe/garments']?.post?.requestBody).toBeDefined()
+      const suggestions =
+        spec.paths?.['/api/v1/wardrobe/garments/{garmentId}/suggest-tags']?.post
+      expect(suggestions?.responses?.['409']).toHaveProperty(
+        'content.application/json.schema'
+      )
+      expect(suggestions?.responses?.['503']).toHaveProperty(
+        'content.application/json.schema'
+      )
+      const tagUpdate = spec.paths?.['/api/v1/wardrobe/garments/{garmentId}/tags']?.patch
+      expect(tagUpdate?.requestBody).toMatchObject({
+        required: true,
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/UpdateGarmentTagsInput' },
+          },
+        },
+      })
+
+      const garmentResponse = spec.components?.schemas?.CreateGarmentItemResponse as
+        | {
+            properties?: {
+              data?: { properties?: Record<string, { enum?: unknown[] }> }
+            }
+          }
+        | undefined
+      for (const field of ['category', 'material', 'comfortRange']) {
+        expect(garmentResponse?.properties?.data?.properties?.[field]?.enum).toContain(
+          null
+        )
+      }
+      expect(garmentResponse?.properties?.data?.properties?.mimeType).toMatchObject({
+        enum: ['image/jpeg', 'image/png', 'image/webp', null],
+        'x-optic-exemptions': 'request and response property enums',
+      })
     })
   })
 

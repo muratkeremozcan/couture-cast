@@ -3,13 +3,32 @@ import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GarmentItemContract } from '@couture/api-client/contracts/http'
+import type {
+  GarmentItemContract,
+  SuggestGarmentTagsData,
+  UpdateGarmentTagsInput,
+} from '@couture/api-client/contracts/http'
 import type { UploadGarmentImageInput } from '../../lib/wardrobe'
 
-const { listGarmentsFromWeb, uploadGarmentImageFromWeb } = vi.hoisted(() => ({
+const {
+  listGarmentsFromWeb,
+  uploadGarmentImageFromWeb,
+  suggestGarmentTagsFromWeb,
+  updateGarmentTagsFromWeb,
+} = vi.hoisted(() => ({
   listGarmentsFromWeb: vi.fn<(signal?: AbortSignal) => Promise<GarmentItemContract[]>>(),
   uploadGarmentImageFromWeb:
     vi.fn<(input: UploadGarmentImageInput) => Promise<GarmentItemContract>>(),
+  suggestGarmentTagsFromWeb:
+    vi.fn<(garmentId: string, signal?: AbortSignal) => Promise<SuggestGarmentTagsData>>(),
+  updateGarmentTagsFromWeb:
+    vi.fn<
+      (
+        garmentId: string,
+        tags: UpdateGarmentTagsInput,
+        signal?: AbortSignal
+      ) => Promise<GarmentItemContract>
+    >(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -19,6 +38,8 @@ vi.mock('next/navigation', () => ({
 vi.mock('../../lib/wardrobe', () => ({
   listGarmentsFromWeb,
   uploadGarmentImageFromWeb,
+  suggestGarmentTagsFromWeb,
+  updateGarmentTagsFromWeb,
 }))
 
 import WardrobePage from './page'
@@ -27,6 +48,9 @@ const persistedGarment: GarmentItemContract = {
   id: 'persisted-garment-1',
   status: 'processing',
   category: null,
+  material: null,
+  comfortRange: null,
+  tagsConfirmedAt: null,
   fileSizeBytes: 1024,
   mimeType: 'image/png',
   retentionStatus: 'active',
@@ -42,6 +66,8 @@ describe('WardrobePage persistence', () => {
   beforeEach(() => {
     listGarmentsFromWeb.mockReset()
     uploadGarmentImageFromWeb.mockReset()
+    suggestGarmentTagsFromWeb.mockReset()
+    updateGarmentTagsFromWeb.mockReset()
   })
 
   it('reconciles a committed garment and hydrates it again after reload', async () => {

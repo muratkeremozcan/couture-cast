@@ -12,7 +12,7 @@
     "db:studio": "prisma studio",
     "db:generate": "npx prisma generate",
     "lint": "eslint --max-warnings=0 --ext .ts prisma/seeds test vitest.config.ts",
-    "typecheck": "npm run db:generate && tsc --noEmit -p tsconfig.json",
+    "typecheck": "npm run build --workspace @couture/utils && npm run db:generate && tsc --noEmit -p tsconfig.json",
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {

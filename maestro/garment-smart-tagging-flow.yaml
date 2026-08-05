@@ -1,0 +1,154 @@
+# Story 4.2 mobile E2E: worker-backed smart tagging and persisted confirmation
+appId: ${MAESTRO_APP_ID}
+name: 'Garment smart tagging flow'
+tags:
+  - e2e
+  - wardrobe
+  - smart-tagging
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+# iOS can preserve an Authentication Services sheet across Expo Go app-data
+# resets. Dismiss the QR panel and its parent browser before opening the test
+# deep link so a prior interactive sign-in cannot mask the app under test.
+- runFlow:
+    when:
+      visible: 'Sign in with Google'
+    commands:
+      - tapOn:
+          text: 'close'
+          optional: true
+      - tapOn:
+          point: '9%,29%'
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: 'tab-wardrobe'
+    timeout: 60000
+
+- runFlow:
+    file: subflows/open-wardrobe.yaml
+    label: 'Open the Wardrobe tab'
+
+# Expo Go exposes the React Native test ID in the native hierarchy, while
+# accessibility activation can fail to dispatch this outer Pressable's onPress.
+- tapOn:
+    text: 'Add Garment'
+    label: 'Tap the visible Add Garment label'
+
+- waitForAnimationToEnd
+
+- runFlow:
+    when:
+      platform: iOS
+      notVisible:
+        id: 'garment-capture-modal'
+    commands:
+      - tapOn:
+          point: '50%,27%'
+          retryTapIfNoChange: true
+          label: 'Physically tap Add Garment on iOS if accessibility activation was ignored'
+
+- runFlow:
+    when:
+      platform: Android
+      notVisible:
+        id: 'garment-capture-modal'
+    commands:
+      - tapOn:
+          point: '50%,24%'
+          retryTapIfNoChange: true
+          label: 'Physically tap Add Garment on Android if accessibility activation was ignored'
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-capture-modal'
+    timeout: 15000
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-e2e-fixture-source'
+    timeout: 15000
+
+- tapOn:
+    id: 'garment-e2e-fixture-source'
+
+- tapOn:
+    id: 'garment-confirm-image'
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-capture-complete'
+    timeout: 30000
+
+- tapOn:
+    id: 'garment-capture-done'
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-tagging-modal'
+    timeout: 30000
+
+- tapOn:
+    id: 'garment-tagging-close'
+
+- tapOn: 'Needs tags'
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-tagging-modal'
+    timeout: 15000
+
+- tapOn:
+    id: 'garment-tag-category-bottom'
+
+- tapOn:
+    id: 'garment-tag-comfort-mild'
+
+- tapOn:
+    id: 'garment-tagging-save'
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-status-ready'
+    timeout: 15000
+
+- stopApp:
+    appId: ${MAESTRO_APP_ID}
+
+# Android requires an explicit relaunch after stopApp. openLink resumes either platform.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - launchApp:
+          appId: ${MAESTRO_APP_ID}
+          clearState: false
+
+- openLink: ${APP_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'tab-wardrobe'
+    timeout: 60000
+
+- runFlow:
+    file: subflows/open-wardrobe.yaml
+    label: 'Reopen the Wardrobe tab after restart'
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-status-ready'
+    timeout: 30000
+
+- takeScreenshot:
+    path: maestro/artifacts/garment-smart-tagging-flow

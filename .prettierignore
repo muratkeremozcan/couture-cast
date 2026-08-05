@@ -30,5 +30,8 @@ apps/web/public/mockServiceWorker.js
 packages/**/dist
 AGENTS.md
 docs
+apps/api/.cache
+.cache
 k6/*.json
 k6/summary*.json
+.playwright-cli

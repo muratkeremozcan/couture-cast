@@ -18,7 +18,19 @@ import type {
   CreateGarmentUploadUrlInput,
   CreateGarmentUploadUrlResponse,
   GarmentListResponse,
+  SuggestGarmentTagsResponse,
+  UpdateGarmentTagsInput,
+  UpdateGarmentTagsResponse,
 } from '../models/index'
+
+export interface ApiV1WardrobeGarmentsGarmentIdSuggestTagsPostRequest {
+  garmentId: string
+}
+
+export interface ApiV1WardrobeGarmentsGarmentIdTagsPatchRequest {
+  garmentId: string
+  updateGarmentTagsInput: UpdateGarmentTagsInput
+}
 
 export interface ApiV1WardrobeGarmentsPostRequest {
   idempotencyKey: string
@@ -41,6 +53,154 @@ export interface ApiV1WardrobeUploadsUploadSessionIdPutRequest {
  *
  */
 export class WardrobeApi extends runtime.BaseAPI {
+  /**
+   * Creates request options for apiV1WardrobeGarmentsGarmentIdSuggestTagsPost without sending the request
+   */
+  async apiV1WardrobeGarmentsGarmentIdSuggestTagsPostRequestOpts(
+    requestParameters: ApiV1WardrobeGarmentsGarmentIdSuggestTagsPostRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['garmentId'] == null) {
+      throw new runtime.RequiredError(
+        'garmentId',
+        'Required parameter "garmentId" was null or undefined when calling apiV1WardrobeGarmentsGarmentIdSuggestTagsPost().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/garments/{garmentId}/suggest-tags`
+    urlPath = urlPath.replace(
+      `{${'garmentId'}}`,
+      encodeURIComponent(String(requestParameters['garmentId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Retrieve algorithmically inferred tag suggestions for an awaiting-tags garment
+   */
+  async apiV1WardrobeGarmentsGarmentIdSuggestTagsPostRaw(
+    requestParameters: ApiV1WardrobeGarmentsGarmentIdSuggestTagsPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<SuggestGarmentTagsResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeGarmentsGarmentIdSuggestTagsPostRequestOpts(
+        requestParameters
+      )
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Retrieve algorithmically inferred tag suggestions for an awaiting-tags garment
+   */
+  async apiV1WardrobeGarmentsGarmentIdSuggestTagsPost(
+    requestParameters: ApiV1WardrobeGarmentsGarmentIdSuggestTagsPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<SuggestGarmentTagsResponse> {
+    const response = await this.apiV1WardrobeGarmentsGarmentIdSuggestTagsPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeGarmentsGarmentIdTagsPatch without sending the request
+   */
+  async apiV1WardrobeGarmentsGarmentIdTagsPatchRequestOpts(
+    requestParameters: ApiV1WardrobeGarmentsGarmentIdTagsPatchRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['garmentId'] == null) {
+      throw new runtime.RequiredError(
+        'garmentId',
+        'Required parameter "garmentId" was null or undefined when calling apiV1WardrobeGarmentsGarmentIdTagsPatch().'
+      )
+    }
+
+    if (requestParameters['updateGarmentTagsInput'] == null) {
+      throw new runtime.RequiredError(
+        'updateGarmentTagsInput',
+        'Required parameter "updateGarmentTagsInput" was null or undefined when calling apiV1WardrobeGarmentsGarmentIdTagsPatch().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/garments/{garmentId}/tags`
+    urlPath = urlPath.replace(
+      `{${'garmentId'}}`,
+      encodeURIComponent(String(requestParameters['garmentId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'PATCH',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['updateGarmentTagsInput'],
+    }
+  }
+
+  /**
+   * Confirm or edit garment category, material, and comfort tags
+   */
+  async apiV1WardrobeGarmentsGarmentIdTagsPatchRaw(
+    requestParameters: ApiV1WardrobeGarmentsGarmentIdTagsPatchRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<UpdateGarmentTagsResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeGarmentsGarmentIdTagsPatchRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Confirm or edit garment category, material, and comfort tags
+   */
+  async apiV1WardrobeGarmentsGarmentIdTagsPatch(
+    requestParameters: ApiV1WardrobeGarmentsGarmentIdTagsPatchRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<UpdateGarmentTagsResponse> {
+    const response = await this.apiV1WardrobeGarmentsGarmentIdTagsPatchRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
   /**
    * Creates request options for apiV1WardrobeGarmentsGet without sending the request
    */

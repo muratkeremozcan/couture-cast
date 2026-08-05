@@ -1,0 +1,32 @@
+{
+  "modelId": "patrickjohncyh/fashion-clip",
+  "revision": "7e3ba62ce16b379a1ab479346b66f192e76f51b7",
+  "analysisVersion": "fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1",
+  "files": [
+    {
+      "path": "config.json",
+      "sha256": "79595b5c6be8867e3ba42c34b1e6b9a0f957e549c1e7f43b5c6945f4f6f59471",
+      "required": true
+    },
+    {
+      "path": "tokenizer.json",
+      "sha256": "b556ac8c99757ffb677208af34bc8c6721572114111a6e0aaf5fa69ff0b8d842",
+      "required": true
+    },
+    {
+      "path": "tokenizer_config.json",
+      "sha256": "cbcdcf14cede6b5c3a6841f37961364357d82bef3079beb115e95f27252526a0",
+      "required": true
+    },
+    {
+      "path": "preprocessor_config.json",
+      "sha256": "910e70b3956ac9879ebc90b22fb3bc8a75b6a0677814500101a4c072bd7857bd",
+      "required": true
+    },
+    {
+      "path": "onnx/model.onnx",
+      "sha256": "dc4c724479e49d1da9598969125353113a341bd4fd5a1dbc7d528d3f1545bba9",
+      "required": true
+    }
+  ]
+}

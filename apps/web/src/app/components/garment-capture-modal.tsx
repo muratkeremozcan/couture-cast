@@ -7,12 +7,14 @@ import {
   uploadGarmentImageFromWeb,
   type UploadGarmentImageInput,
 } from '../../lib/wardrobe'
+import { AccessibleModal } from './accessible-modal'
 
 export interface GarmentCaptureModalProps {
   isOpen: boolean
   onClose: () => void
   onGarmentCommitted?: (garment: GarmentItemContract) => void
   uploadGarment?: (input: UploadGarmentImageInput) => Promise<GarmentItemContract>
+  invokingElementRef?: React.RefObject<HTMLElement | null>
 }
 
 export type CaptureStep = 'source' | 'camera' | 'crop' | 'uploading' | 'complete'
@@ -254,7 +256,7 @@ function CompleteStep({ onDone }: { onDone: () => void }) {
       </p>
       <button
         onClick={onDone}
-        className="mt-2 rounded-lg bg-zinc-900 px-6 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+        className="mt-2 min-h-[44px] rounded-lg bg-zinc-900 px-6 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
       >
         Done
       </button>
@@ -267,6 +269,7 @@ export function GarmentCaptureModal({
   onClose,
   onGarmentCommitted,
   uploadGarment = uploadGarmentImageFromWeb,
+  invokingElementRef,
 }: GarmentCaptureModalProps) {
   const [step, setStep] = useState<CaptureStep>('source')
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -278,8 +281,6 @@ export function GarmentCaptureModal({
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const dialogRef = useRef<HTMLDivElement | null>(null)
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const uploadAbortRef = useRef<AbortController | null>(null)
   const isOpenRef = useRef(isOpen)
 
@@ -292,18 +293,6 @@ export function GarmentCaptureModal({
       videoRef.current.srcObject = null
     }
   }, [])
-
-  useEffect(() => {
-    if (!isOpen) {
-      return
-    }
-    const trigger =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
-    requestAnimationFrame(() => closeButtonRef.current?.focus())
-    return () => {
-      trigger?.focus()
-    }
-  }, [isOpen])
 
   useEffect(() => {
     if (step === 'camera' && videoRef.current && streamRef.current) {
@@ -438,131 +427,62 @@ export function GarmentCaptureModal({
     onClose()
   }
 
-  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      handleClose()
-      return
-    }
-    if (event.key !== 'Tab') {
-      return
-    }
-
-    const focusable = Array.from(
-      dialogRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
-      ) ?? []
-    ).filter(
-      (element) =>
-        element.getAttribute('aria-hidden') !== 'true' &&
-        !element.classList.contains('hidden')
-    )
-    const first = focusable[0]
-    const last = focusable.at(-1)
-    if (!first || !last) {
-      event.preventDefault()
-      dialogRef.current?.focus()
-      return
-    }
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
-    }
-  }
-
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="garment-capture-title"
-      onKeyDown={handleDialogKeyDown}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+    <AccessibleModal
+      isOpen={isOpen}
+      onClose={handleClose}
+      titleId="garment-capture-title"
+      title="Garment Capture Flow"
+      invokingElementRef={invokingElementRef}
+      closeLabel="Close capture modal"
+      ariaLiveMessage={uploadState ? `Upload status: ${uploadState}` : null}
+      errorMessage={errorMessage}
     >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900 dark:text-zinc-100"
-      >
-        <div className="flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
-          <h2
-            id="garment-capture-title"
-            className="text-xl font-bold text-zinc-900 dark:text-zinc-50"
-          >
-            Garment Capture Flow
-          </h2>
-          <button
-            ref={closeButtonRef}
-            onClick={handleClose}
-            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            aria-label="Close capture modal"
-          >
-            ✕
-          </button>
-        </div>
+      {step === 'source' && (
+        <SourceStep
+          onStartCamera={() => {
+            void handleStartCamera()
+          }}
+          onFileSelect={handleFileSelect}
+        />
+      )}
 
-        <div role="status" aria-live="polite" className="sr-only">
-          {uploadState ? `Upload status: ${uploadState}` : ''}
-        </div>
+      {step === 'camera' && (
+        <CameraStep
+          videoRef={videoRef}
+          onCancel={() => {
+            stopCamera()
+            setStep('source')
+          }}
+          onCapture={handleCapturePhoto}
+        />
+      )}
 
-        {errorMessage && (
-          <div
-            role="alert"
-            aria-live="assertive"
-            className="mt-4 rounded-md bg-red-50 p-3 text-sm font-medium text-red-800 dark:bg-red-950 dark:text-red-200"
-          >
-            {errorMessage}
-          </div>
-        )}
+      {step === 'crop' && imagePreview && (
+        <CropStep
+          imagePreview={imagePreview}
+          aspectRatio={aspectRatio}
+          setAspectRatio={setAspectRatio}
+          useBgCleanup={useBgCleanup}
+          setUseBgCleanup={setUseBgCleanup}
+          onReset={handleResetModal}
+          onConfirm={() => {
+            void handleConfirmAndUpload()
+          }}
+        />
+      )}
 
-        {step === 'source' && (
-          <SourceStep
-            onStartCamera={() => {
-              void handleStartCamera()
-            }}
-            onFileSelect={handleFileSelect}
-          />
-        )}
+      {step === 'uploading' && (
+        <UploadingStep uploadState={uploadState} uploadProgress={uploadProgress} />
+      )}
 
-        {step === 'camera' && (
-          <CameraStep
-            videoRef={videoRef}
-            onCancel={() => {
-              stopCamera()
-              setStep('source')
-            }}
-            onCapture={handleCapturePhoto}
-          />
-        )}
-
-        {step === 'crop' && imagePreview && (
-          <CropStep
-            imagePreview={imagePreview}
-            aspectRatio={aspectRatio}
-            setAspectRatio={setAspectRatio}
-            useBgCleanup={useBgCleanup}
-            setUseBgCleanup={setUseBgCleanup}
-            onReset={handleResetModal}
-            onConfirm={() => {
-              void handleConfirmAndUpload()
-            }}
-          />
-        )}
-
-        {step === 'uploading' && (
-          <UploadingStep uploadState={uploadState} uploadProgress={uploadProgress} />
-        )}
-
-        {step === 'complete' && (
-          <CompleteStep
-            onDone={() => {
-              handleClose()
-            }}
-          />
-        )}
-      </div>
-    </div>
+      {step === 'complete' && (
+        <CompleteStep
+          onDone={() => {
+            handleClose()
+          }}
+        />
+      )}
+    </AccessibleModal>
   )
 }

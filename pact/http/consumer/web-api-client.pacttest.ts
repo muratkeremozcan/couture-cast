@@ -10,6 +10,11 @@ import {
   verifyRitualInteraction,
   verifyGetComfortPreferencesInteraction,
   verifyUpdateComfortPreferencesInteraction,
+  verifySuggestGarmentTagsInteraction,
+  verifySuggestGarmentTagsErrorInteractions,
+  verifyUpdateGarmentTagsInteraction,
+  verifyUpdateGarmentTagsErrorInteractions,
+  verifyUpdateGarmentTagsNullMaterialInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -47,5 +52,25 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   it('updates user comfort preferences', async () => {
     await verifyUpdateComfortPreferencesInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('suggests garment smart tags', async () => {
+    await verifySuggestGarmentTagsInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('updates garment smart tags', async () => {
+    await verifyUpdateGarmentTagsInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('preserves documented smart-tagging error envelopes', async () => {
+    await verifySuggestGarmentTagsErrorInteractions(pact)
+    await verifyUpdateGarmentTagsErrorInteractions(pact)
+  })
+
+  it('clears nullable garment material', async () => {
+    await verifyUpdateGarmentTagsNullMaterialInteraction(
+      pact,
+      createWebClientForMockServer
+    )
   })
 })

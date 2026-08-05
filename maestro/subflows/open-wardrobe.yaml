@@ -1,0 +1,14 @@
+appId: ${MAESTRO_APP_ID}
+---
+- openLink: ${WARDROBE_URL}
+
+- extendedWaitUntil:
+    visible:
+      id: 'wardrobe-screen'
+    timeout: 15000
+
+- extendedWaitUntil:
+    notVisible: 'Loading wardrobe'
+    timeout: 15000
+
+- waitForAnimationToEnd

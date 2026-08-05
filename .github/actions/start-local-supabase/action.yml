@@ -33,12 +33,21 @@ runs:
           echo "::endgroup::"
         }
 
+        export_supabase_environment() {
+          npx supabase status -o json | jq -r '
+            "SUPABASE_URL=\(.API_URL)",
+            "SUPABASE_ANON_KEY=\(.ANON_KEY)",
+            "SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"
+          ' >> "$GITHUB_ENV"
+        }
+
         while [ "$attempt" -le "$max_attempts" ]; do
           echo "::group::Start local Supabase (attempt ${attempt}/${max_attempts})"
 
           if npx supabase start; then
             echo "Supabase services started successfully."
             npx supabase status || true
+            export_supabase_environment
             echo "::endgroup::"
             exit 0
           else

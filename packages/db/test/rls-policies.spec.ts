@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Pool, type PoolClient } from 'pg'
 
 const databaseUrl =
@@ -28,7 +28,7 @@ const ownerOrGlobalReadTables = ['EventEnvelope'] as const
 
 const adminPool = new Pool({
   connectionString: databaseUrl,
-  max: 4,
+  max: 8,
 })
 
 type SeededScenario = {
@@ -66,8 +66,6 @@ type SeededScenario = {
   consentReadOnlyId: string
   consentFullId: string
 }
-
-let scenario: SeededScenario | undefined
 
 const buildClaims = (email: string, role: string) => ({
   sub: randomUUID(),
@@ -459,7 +457,18 @@ const cleanupScenario = async (seeded: SeededScenario | undefined) => {
   }
 }
 
-describe.sequential('guardian-aware RLS policies', () => {
+const scenarioTest = it.extend<{ scenario: SeededScenario }>({
+  scenario: async ({}, use) => {
+    const seeded = await seedScenario()
+    try {
+      await use(seeded)
+    } finally {
+      await cleanupScenario(seeded)
+    }
+  },
+})
+
+describe.concurrent('guardian-aware RLS policies', () => {
   beforeAll(async () => {
     let client: PoolClient | undefined
 
@@ -473,14 +482,6 @@ describe.sequential('guardian-aware RLS policies', () => {
       )
     } finally {
       client?.release()
-    }
-  })
-
-  afterEach(async () => {
-    try {
-      await cleanupScenario(scenario)
-    } finally {
-      scenario = undefined
     }
   })
 
@@ -618,890 +619,940 @@ describe.sequential('guardian-aware RLS policies', () => {
     }
   })
 
-  it('allows teens to read and update their own wardrobe-scoped rows', async () => {
-    const seeded = (scenario = await seedScenario())
+  scenarioTest(
+    'allows teens to read and update their own wardrobe-scoped rows',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          const garmentRows = await client.query<{
+            id: string
+            category: string
+          }>('SELECT "id", "category" FROM public."GarmentItem" WHERE "user_id" = $1', [
+            seeded.teenId,
+          ])
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (client) => {
-        const garmentRows = await client.query<{
-          id: string
-          category: string
-        }>('SELECT "id", "category" FROM public."GarmentItem" WHERE "user_id" = $1', [
-          seeded.teenId,
-        ])
+          expect(garmentRows.rows).toEqual([
+            {
+              id: seeded.garmentId,
+              category: 'top',
+            },
+          ])
 
-        expect(garmentRows.rows).toEqual([
-          {
-            id: seeded.garmentId,
-            category: 'top',
-          },
-        ])
+          await client.query(
+            'UPDATE public."GarmentItem" SET "category" = $1, "updated_at" = NOW() WHERE "id" = $2',
+            ['outerwear', seeded.garmentId]
+          )
 
-        await client.query(
-          'UPDATE public."GarmentItem" SET "category" = $1, "updated_at" = NOW() WHERE "id" = $2',
-          ['outerwear', seeded.garmentId]
-        )
+          const updatedProfile = await client.query<{
+            display_name: string
+          }>('SELECT "display_name" FROM public."UserProfile" WHERE "user_id" = $1', [
+            seeded.teenId,
+          ])
 
-        const updatedProfile = await client.query<{
-          display_name: string
-        }>('SELECT "display_name" FROM public."UserProfile" WHERE "user_id" = $1', [
-          seeded.teenId,
-        ])
+          expect(updatedProfile.rows[0]?.display_name).toBe('Teen Wardrobe Owner')
 
-        expect(updatedProfile.rows[0]?.display_name).toBe('Teen Wardrobe Owner')
+          const savedLocationRows = await client.query<{
+            id: string
+            label: string
+          }>('SELECT "id", "label" FROM public."SavedLocation" WHERE "user_id" = $1', [
+            seeded.teenId,
+          ])
 
-        const savedLocationRows = await client.query<{
-          id: string
-          label: string
-        }>('SELECT "id", "label" FROM public."SavedLocation" WHERE "user_id" = $1', [
-          seeded.teenId,
-        ])
+          expect(savedLocationRows.rows).toEqual([
+            {
+              id: seeded.savedLocationId,
+              label: 'Home',
+            },
+          ])
 
-        expect(savedLocationRows.rows).toEqual([
-          {
-            id: seeded.savedLocationId,
-            label: 'Home',
-          },
-        ])
-
-        const updateLocationResult = await client.query(
-          `UPDATE public."SavedLocation"
+          const updateLocationResult = await client.query(
+            `UPDATE public."SavedLocation"
            SET "label" = $1, "updated_at" = NOW()
            WHERE "id" = $2
            RETURNING "label"`,
-          ['Office', seeded.savedLocationId]
-        )
+            ['Office', seeded.savedLocationId]
+          )
 
-        expect(updateLocationResult.rows).toEqual([{ label: 'Office' }])
-      }
-    )
-  })
+          expect(updateLocationResult.rows).toEqual([{ label: 'Office' }])
+        }
+      )
+    }
+  )
 
-  it('lets linked guardians read teen wardrobe data but blocks read-only mutations', async () => {
-    const seeded = (scenario = await seedScenario())
+  scenarioTest(
+    'lets linked guardians read teen wardrobe data but blocks read-only mutations',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
+        async (client) => {
+          const garmentRows = await client.query<{
+            id: string
+          }>('SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1', [
+            seeded.teenId,
+          ])
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
-      async (client) => {
-        const garmentRows = await client.query<{
-          id: string
-        }>('SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1', [seeded.teenId])
+          expect(garmentRows.rows).toHaveLength(1)
 
-        expect(garmentRows.rows).toHaveLength(1)
+          const consentRows = await client.query<{
+            teen_id: string
+          }>('SELECT "teen_id" FROM public."GuardianConsent" WHERE "guardian_id" = $1', [
+            seeded.guardianReadOnlyId,
+          ])
 
-        const consentRows = await client.query<{
-          teen_id: string
-        }>('SELECT "teen_id" FROM public."GuardianConsent" WHERE "guardian_id" = $1', [
-          seeded.guardianReadOnlyId,
-        ])
+          expect(consentRows.rows).toEqual([{ teen_id: seeded.teenId }])
 
-        expect(consentRows.rows).toEqual([{ teen_id: seeded.teenId }])
-
-        const updateResult = await client.query(
-          `UPDATE public."GarmentItem"
+          const updateResult = await client.query(
+            `UPDATE public."GarmentItem"
            SET "category" = $1, "updated_at" = NOW()
            WHERE "id" = $2
            RETURNING "id"`,
-          ['coat', seeded.garmentId]
-        )
+            ['outerwear', seeded.garmentId]
+          )
 
-        expect(updateResult.rowCount).toBe(0)
-      }
-    )
-  })
-
-  it('grants wardrobe access from a single active guardian consent row', async () => {
-    const seeded = (scenario = await seedScenario())
-
-    const client = await adminPool.connect()
-
-    try {
-      await client.query('DELETE FROM public."GuardianConsent" WHERE "id" = $1', [
-        seeded.consentFullId,
-      ])
-    } finally {
-      client.release()
+          expect(updateResult.rowCount).toBe(0)
+        }
+      )
     }
+  )
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (client) => {
-        const teenGarments = await client.query(
-          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [seeded.teenId]
-        )
+  scenarioTest(
+    'grants wardrobe access from a single active guardian consent row',
+    async ({ scenario: seeded }) => {
+      const client = await adminPool.connect()
 
-        expect(teenGarments.rows).toEqual([{ id: seeded.garmentId }])
+      try {
+        await client.query('DELETE FROM public."GuardianConsent" WHERE "id" = $1', [
+          seeded.consentFullId,
+        ])
+      } finally {
+        client.release()
       }
-    )
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
-      async (client) => {
-        const guardianGarments = await client.query(
-          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [seeded.teenId]
-        )
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          const teenGarments = await client.query(
+            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
 
-        expect(guardianGarments.rows).toEqual([{ id: seeded.garmentId }])
-      }
-    )
-  })
+          expect(teenGarments.rows).toEqual([{ id: seeded.garmentId }])
+        }
+      )
 
-  it('lets full-access guardians mutate linked teen wardrobe rows', async () => {
-    const seeded = (scenario = await seedScenario())
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
+        async (client) => {
+          const guardianGarments = await client.query(
+            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
-      async (client) => {
-        const updateResult = await client.query<{
-          category: string
-        }>(
-          `UPDATE public."GarmentItem"
+          expect(guardianGarments.rows).toEqual([{ id: seeded.garmentId }])
+        }
+      )
+    }
+  )
+
+  scenarioTest(
+    'lets full-access guardians mutate linked teen wardrobe rows',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
+        async (client) => {
+          const updateResult = await client.query<{
+            category: string
+          }>(
+            `UPDATE public."GarmentItem"
            SET "category" = $1, "updated_at" = NOW()
            WHERE "id" = $2
            RETURNING "category"`,
-          ['jacket', seeded.garmentId]
-        )
+            ['outerwear', seeded.garmentId]
+          )
 
-        expect(updateResult.rows).toEqual([{ category: 'jacket' }])
+          expect(updateResult.rows).toEqual([{ category: 'outerwear' }])
 
-        const insertResult = await client.query<{
-          id: string
-        }>(
-          `INSERT INTO public."OutfitRecommendation"
+          const insertResult = await client.query<{
+            id: string
+          }>(
+            `INSERT INTO public."OutfitRecommendation"
             ("id", "user_id", "scenario", "updated_at")
            VALUES ($1, $2, $3, NOW())
            RETURNING "id"`,
-          [`guardian-created-outfit-${randomUUID()}`, seeded.teenId, 'school-run']
-        )
+            [`guardian-created-outfit-${randomUUID()}`, seeded.teenId, 'school-run']
+          )
 
-        expect(insertResult.rows).toHaveLength(1)
-      }
-    )
-  })
+          expect(insertResult.rows).toHaveLength(1)
+        }
+      )
+    }
+  )
 
-  it('keeps remaining guardian wardrobe access after one guardian revokes consent', async () => {
-    const seeded = (scenario = await seedScenario())
+  scenarioTest(
+    'keeps remaining guardian wardrobe access after one guardian revokes consent',
+    async ({ scenario: seeded }) => {
+      const adminClient = await adminPool.connect()
 
-    const adminClient = await adminPool.connect()
-
-    try {
-      await adminClient.query(
-        `UPDATE public."GuardianConsent"
+      try {
+        await adminClient.query(
+          `UPDATE public."GuardianConsent"
          SET "revoked_at" = NOW(), "status" = 'revoked'
          WHERE "id" = $1`,
-        [seeded.consentReadOnlyId]
-      )
-    } finally {
-      adminClient.release()
-    }
-
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
-      async (client) => {
-        const revokedGuardianRows = await client.query(
-          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [seeded.teenId]
+          [seeded.consentReadOnlyId]
         )
-
-        expect(revokedGuardianRows.rows).toHaveLength(0)
+      } finally {
+        adminClient.release()
       }
-    )
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
-      async (client) => {
-        const remainingGuardianRows = await client.query(
-          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [seeded.teenId]
-        )
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
+        async (client) => {
+          const revokedGuardianRows = await client.query(
+            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
 
-        expect(remainingGuardianRows.rows).toEqual([{ id: seeded.garmentId }])
+          expect(revokedGuardianRows.rows).toHaveLength(0)
+        }
+      )
 
-        const updateResult = await client.query(
-          `UPDATE public."GarmentItem"
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
+        async (client) => {
+          const remainingGuardianRows = await client.query(
+            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
+
+          expect(remainingGuardianRows.rows).toEqual([{ id: seeded.garmentId }])
+
+          const updateResult = await client.query(
+            `UPDATE public."GarmentItem"
            SET "category" = $1, "updated_at" = NOW()
            WHERE "id" = $2
            RETURNING "category"`,
-          ['remaining-guardian-reviewed', seeded.garmentId]
-        )
+            ['bottom', seeded.garmentId]
+          )
 
-        expect(updateResult.rows).toEqual([{ category: 'remaining-guardian-reviewed' }])
-      }
-    )
-  })
+          expect(updateResult.rows).toEqual([{ category: 'bottom' }])
+        }
+      )
+    }
+  )
 
-  it('keeps social tables self-scoped until community sharing semantics exist', async () => {
-    const seeded = (scenario = await seedScenario())
+  scenarioTest(
+    'keeps social tables self-scoped until community sharing semantics exist',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          const ownPosts = await client.query(
+            'SELECT "id" FROM public."LookbookPost" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (client) => {
-        const ownPosts = await client.query(
-          'SELECT "id" FROM public."LookbookPost" WHERE "user_id" = $1',
-          [seeded.teenId]
-        )
+          expect(ownPosts.rows).toHaveLength(1)
+        }
+      )
 
-        expect(ownPosts.rows).toHaveLength(1)
-      }
-    )
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
+        async (client) => {
+          const teenPosts = await client.query(
+            'SELECT "id" FROM public."LookbookPost" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
-      async (client) => {
-        const teenPosts = await client.query(
-          'SELECT "id" FROM public."LookbookPost" WHERE "user_id" = $1',
-          [seeded.teenId]
-        )
+          expect(teenPosts.rows).toHaveLength(0)
+        }
+      )
+    }
+  )
 
-        expect(teenPosts.rows).toHaveLength(0)
-      }
-    )
-  })
+  scenarioTest(
+    'keeps saved locations self-scoped for guardians while allowing admin access',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
+        async (client) => {
+          const teenLocations = await client.query(
+            'SELECT "id" FROM public."SavedLocation" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
 
-  it('keeps saved locations self-scoped for guardians while allowing admin access', async () => {
-    const seeded = (scenario = await seedScenario())
+          expect(teenLocations.rows).toHaveLength(0)
+        }
+      )
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
-      async (client) => {
-        const teenLocations = await client.query(
-          'SELECT "id" FROM public."SavedLocation" WHERE "user_id" = $1',
-          [seeded.teenId]
-        )
+      await withRole(
+        'authenticated',
+        buildClaims(`admin-${randomUUID()}@example.com`, 'admin'),
+        async (client) => {
+          const teenLocations = await client.query(
+            'SELECT "id" FROM public."SavedLocation" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
 
-        expect(teenLocations.rows).toHaveLength(0)
-      }
-    )
+          expect(teenLocations.rows).toEqual([{ id: seeded.savedLocationId }])
+        }
+      )
+    }
+  )
 
-    await withRole(
-      'authenticated',
-      buildClaims(`admin-${randomUUID()}@example.com`, 'admin'),
-      async (client) => {
-        const teenLocations = await client.query(
-          'SELECT "id" FROM public."SavedLocation" WHERE "user_id" = $1',
-          [seeded.teenId]
-        )
-
-        expect(teenLocations.rows).toEqual([{ id: seeded.savedLocationId }])
-      }
-    )
-  })
-
-  it('allows owners to perform CRUD on alert settings and push tokens', async () => {
-    const seeded = (scenario = await seedScenario())
-
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (client) => {
-        const alertRules = await client.query<{
-          id: string
-          threshold: number
-        }>(
-          `SELECT "id", "threshold"
+  scenarioTest(
+    'allows owners to perform CRUD on alert rules',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          const alertRules = await client.query<{
+            id: string
+            threshold: number
+          }>(
+            `SELECT "id", "threshold"
            FROM public."AlertRule"
            WHERE "id" = ANY($1::text[])`,
-          [[seeded.alertRuleId, seeded.otherAlertRuleId]]
-        )
+            [[seeded.alertRuleId, seeded.otherAlertRuleId]]
+          )
 
-        expect(alertRules.rows).toEqual([{ id: seeded.alertRuleId, threshold: 8 }])
+          expect(alertRules.rows).toEqual([{ id: seeded.alertRuleId, threshold: 8 }])
 
-        const notificationPreferences = await client.query<{
-          id: string
-          push_enabled: boolean
-        }>(
-          `SELECT "id", "push_enabled"
-           FROM public."NotificationPreference"
-           WHERE "id" = ANY($1::text[])`,
-          [[seeded.notificationPreferenceId, seeded.otherNotificationPreferenceId]]
-        )
-
-        expect(notificationPreferences.rows).toEqual([
-          { id: seeded.notificationPreferenceId, push_enabled: true },
-        ])
-
-        const pushTokens = await client.query<{
-          id: string
-          platform: string
-        }>(
-          `SELECT "id", "platform"
-           FROM public."PushToken"
-           WHERE "id" = ANY($1::text[])`,
-          [[seeded.pushTokenId, seeded.otherPushTokenId]]
-        )
-
-        expect(pushTokens.rows).toEqual([{ id: seeded.pushTokenId, platform: 'ios' }])
-
-        const updatedRule = await client.query(
-          `UPDATE public."AlertRule"
+          const updatedRule = await client.query(
+            `UPDATE public."AlertRule"
            SET "threshold" = 10, "updated_at" = NOW()
            WHERE "id" = $1
            RETURNING "threshold"`,
-          [seeded.alertRuleId]
-        )
-        expect(updatedRule.rows).toEqual([{ threshold: 10 }])
-
-        const updatedPreference = await client.query(
-          `UPDATE public."NotificationPreference"
-           SET "push_enabled" = FALSE, "updated_at" = NOW()
-           WHERE "id" = $1
-           RETURNING "push_enabled"`,
-          [seeded.notificationPreferenceId]
-        )
-        expect(updatedPreference.rows).toEqual([{ push_enabled: false }])
-
-        const updatedToken = await client.query(
-          `UPDATE public."PushToken"
-           SET "platform" = 'android', "updated_at" = NOW()
-           WHERE "id" = $1
-           RETURNING "platform"`,
-          [seeded.pushTokenId]
-        )
-        expect(updatedToken.rows).toEqual([{ platform: 'android' }])
-
-        for (const [tableName, id] of [
-          ['AlertRule', seeded.alertRuleId],
-          ['NotificationPreference', seeded.notificationPreferenceId],
-          ['PushToken', seeded.pushTokenId],
-        ] as const) {
-          const deleted = await client.query(
-            `DELETE FROM public."${tableName}" WHERE "id" = $1 RETURNING "id"`,
-            [id]
+            [seeded.alertRuleId]
           )
-          expect(deleted.rows).toEqual([{ id }])
-        }
+          expect(updatedRule.rows).toEqual([{ threshold: 10 }])
 
-        const insertedRule = await client.query(
-          `INSERT INTO public."AlertRule"
+          const deleted = await client.query(
+            'DELETE FROM public."AlertRule" WHERE "id" = $1 RETURNING "id"',
+            [seeded.alertRuleId]
+          )
+          expect(deleted.rows).toEqual([{ id: seeded.alertRuleId }])
+
+          const insertedRule = await client.query(
+            `INSERT INTO public."AlertRule"
             ("id", "user_id", "rule_type", "threshold", "updated_at")
            VALUES ($1, $2, 'precipitation', 0.5, NOW())
            RETURNING "id"`,
-          [seeded.alertRuleId, seeded.teenId]
-        )
-        expect(insertedRule.rows).toEqual([{ id: seeded.alertRuleId }])
+            [seeded.alertRuleId, seeded.teenId]
+          )
+          expect(insertedRule.rows).toEqual([{ id: seeded.alertRuleId }])
+        }
+      )
+    }
+  )
 
-        const insertedPreference = await client.query(
-          `INSERT INTO public."NotificationPreference"
+  scenarioTest(
+    'allows owners to perform CRUD on notification preferences',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          const preferences = await client.query<{
+            id: string
+            push_enabled: boolean
+          }>(
+            `SELECT "id", "push_enabled"
+             FROM public."NotificationPreference"
+             WHERE "id" = ANY($1::text[])`,
+            [[seeded.notificationPreferenceId, seeded.otherNotificationPreferenceId]]
+          )
+          expect(preferences.rows).toEqual([
+            { id: seeded.notificationPreferenceId, push_enabled: true },
+          ])
+
+          const updated = await client.query(
+            `UPDATE public."NotificationPreference"
+             SET "push_enabled" = FALSE, "updated_at" = NOW()
+             WHERE "id" = $1
+             RETURNING "push_enabled"`,
+            [seeded.notificationPreferenceId]
+          )
+          expect(updated.rows).toEqual([{ push_enabled: false }])
+
+          const deleted = await client.query(
+            'DELETE FROM public."NotificationPreference" WHERE "id" = $1 RETURNING "id"',
+            [seeded.notificationPreferenceId]
+          )
+          expect(deleted.rows).toEqual([{ id: seeded.notificationPreferenceId }])
+
+          const insertedPreference = await client.query(
+            `INSERT INTO public."NotificationPreference"
             ("id", "user_id", "push_enabled", "updated_at")
            VALUES ($1, $2, TRUE, NOW())
            RETURNING "id"`,
-          [seeded.notificationPreferenceId, seeded.teenId]
-        )
-        expect(insertedPreference.rows).toEqual([{ id: seeded.notificationPreferenceId }])
+            [seeded.notificationPreferenceId, seeded.teenId]
+          )
+          expect(insertedPreference.rows).toEqual([
+            { id: seeded.notificationPreferenceId },
+          ])
+        }
+      )
+    }
+  )
 
-        const insertedToken = await client.query(
-          `INSERT INTO public."PushToken"
+  scenarioTest(
+    'allows owners to perform CRUD on push tokens',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          const tokens = await client.query<{ id: string; platform: string }>(
+            `SELECT "id", "platform"
+             FROM public."PushToken"
+             WHERE "id" = ANY($1::text[])`,
+            [[seeded.pushTokenId, seeded.otherPushTokenId]]
+          )
+          expect(tokens.rows).toEqual([{ id: seeded.pushTokenId, platform: 'ios' }])
+
+          const updated = await client.query(
+            `UPDATE public."PushToken"
+             SET "platform" = 'android', "updated_at" = NOW()
+             WHERE "id" = $1
+             RETURNING "platform"`,
+            [seeded.pushTokenId]
+          )
+          expect(updated.rows).toEqual([{ platform: 'android' }])
+
+          const deleted = await client.query(
+            'DELETE FROM public."PushToken" WHERE "id" = $1 RETURNING "id"',
+            [seeded.pushTokenId]
+          )
+          expect(deleted.rows).toEqual([{ id: seeded.pushTokenId }])
+
+          const insertedToken = await client.query(
+            `INSERT INTO public."PushToken"
             ("id", "user_id", "token", "platform", "updated_at")
            VALUES ($1, $2, $3, 'ios', NOW())
            RETURNING "id"`,
-          [seeded.pushTokenId, seeded.teenId, seeded.pushToken]
-        )
-        expect(insertedToken.rows).toEqual([{ id: seeded.pushTokenId }])
-      }
-    )
-  })
+            [seeded.pushTokenId, seeded.teenId, seeded.pushToken]
+          )
+          expect(insertedToken.rows).toEqual([{ id: seeded.pushTokenId }])
+        }
+      )
+    }
+  )
 
-  it('exposes only owned and global event envelopes to authenticated users', async () => {
-    const seeded = (scenario = await seedScenario())
-
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (client) => {
-        const events = await client.query<{ id: string }>(
-          `SELECT "id"
+  scenarioTest(
+    'exposes only owned and global event envelopes to authenticated users',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          const events = await client.query<{ id: string }>(
+            `SELECT "id"
            FROM public."EventEnvelope"
            WHERE "id" = ANY($1::text[])`,
-          [
             [
-              seeded.eventEnvelopeId,
-              seeded.otherEventEnvelopeId,
-              seeded.globalEventEnvelopeId,
-            ],
-          ]
-        )
+              [
+                seeded.eventEnvelopeId,
+                seeded.otherEventEnvelopeId,
+                seeded.globalEventEnvelopeId,
+              ],
+            ]
+          )
 
-        expect(new Set(events.rows.map((row) => row.id))).toEqual(
-          new Set([seeded.eventEnvelopeId, seeded.globalEventEnvelopeId])
-        )
-      }
-    )
-  })
+          expect(new Set(events.rows.map((row) => row.id))).toEqual(
+            new Set([seeded.eventEnvelopeId, seeded.globalEventEnvelopeId])
+          )
+        }
+      )
+    }
+  )
 
-  it('keeps alert settings, push tokens, and user events hidden from other users', async () => {
-    const seeded = (scenario = await seedScenario())
+  scenarioTest(
+    'keeps alert settings, push tokens, and user events hidden from other users',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          const otherRules = await client.query(
+            'SELECT "id" FROM public."AlertRule" WHERE "user_id" = $1',
+            [seeded.otherTeenId]
+          )
+          expect(otherRules.rows).toHaveLength(0)
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (client) => {
-        const otherRules = await client.query(
-          'SELECT "id" FROM public."AlertRule" WHERE "user_id" = $1',
-          [seeded.otherTeenId]
-        )
-        expect(otherRules.rows).toHaveLength(0)
+          const otherPreferences = await client.query(
+            'SELECT "id" FROM public."NotificationPreference" WHERE "user_id" = $1',
+            [seeded.otherTeenId]
+          )
+          expect(otherPreferences.rows).toHaveLength(0)
 
-        const otherPreferences = await client.query(
-          'SELECT "id" FROM public."NotificationPreference" WHERE "user_id" = $1',
-          [seeded.otherTeenId]
-        )
-        expect(otherPreferences.rows).toHaveLength(0)
+          const otherTokens = await client.query(
+            'SELECT "id" FROM public."PushToken" WHERE "user_id" = $1',
+            [seeded.otherTeenId]
+          )
+          expect(otherTokens.rows).toHaveLength(0)
 
-        const otherTokens = await client.query(
-          'SELECT "id" FROM public."PushToken" WHERE "user_id" = $1',
-          [seeded.otherTeenId]
-        )
-        expect(otherTokens.rows).toHaveLength(0)
+          const otherEvents = await client.query(
+            'SELECT "id" FROM public."EventEnvelope" WHERE "user_id" = $1',
+            [seeded.otherTeenId]
+          )
+          expect(otherEvents.rows).toHaveLength(0)
 
-        const otherEvents = await client.query(
-          'SELECT "id" FROM public."EventEnvelope" WHERE "user_id" = $1',
-          [seeded.otherTeenId]
-        )
-        expect(otherEvents.rows).toHaveLength(0)
-
-        const updatedRule = await client.query(
-          `UPDATE public."AlertRule"
+          const updatedRule = await client.query(
+            `UPDATE public."AlertRule"
            SET "threshold" = 99, "updated_at" = NOW()
            WHERE "id" = $1
            RETURNING "id"`,
-          [seeded.otherAlertRuleId]
-        )
-        expect(updatedRule.rows).toHaveLength(0)
+            [seeded.otherAlertRuleId]
+          )
+          expect(updatedRule.rows).toHaveLength(0)
 
-        const deletedToken = await client.query(
-          'DELETE FROM public."PushToken" WHERE "id" = $1 RETURNING "id"',
-          [seeded.otherPushTokenId]
-        )
-        expect(deletedToken.rows).toHaveLength(0)
-      }
-    )
-  })
+          const deletedToken = await client.query(
+            'DELETE FROM public."PushToken" WHERE "id" = $1 RETURNING "id"',
+            [seeded.otherPushTokenId]
+          )
+          expect(deletedToken.rows).toHaveLength(0)
+        }
+      )
+    }
+  )
 
-  it('rejects cross-account alert rule inserts', async () => {
-    const seeded = (scenario = await seedScenario())
-
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (client) => {
-        await expect(
-          client.query(
-            `INSERT INTO public."AlertRule"
+  scenarioTest(
+    'rejects cross-account alert rule inserts',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          await expect(
+            client.query(
+              `INSERT INTO public."AlertRule"
               ("id", "user_id", "rule_type", "threshold", "updated_at")
              VALUES ($1, $2, 'precipitation', 0.5, NOW())`,
-            [`cross-alert-rule-${randomUUID()}`, seeded.otherTeenId]
-          )
-        ).rejects.toMatchObject({ code: '42501' })
-      }
-    )
-  })
+              [`cross-alert-rule-${randomUUID()}`, seeded.otherTeenId]
+            )
+          ).rejects.toMatchObject({ code: '42501' })
+        }
+      )
+    }
+  )
 
-  it('rejects cross-account notification preference inserts', async () => {
-    const seeded = (scenario = await seedScenario())
-
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (client) => {
-        await expect(
-          client.query(
-            `INSERT INTO public."NotificationPreference"
+  scenarioTest(
+    'rejects cross-account notification preference inserts',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          await expect(
+            client.query(
+              `INSERT INTO public."NotificationPreference"
               ("id", "user_id", "push_enabled", "updated_at")
              VALUES ($1, $2, TRUE, NOW())`,
-            [`cross-notification-preference-${randomUUID()}`, seeded.guardianReadOnlyId]
-          )
-        ).rejects.toMatchObject({ code: '42501' })
-      }
-    )
-  })
+              [`cross-notification-preference-${randomUUID()}`, seeded.guardianReadOnlyId]
+            )
+          ).rejects.toMatchObject({ code: '42501' })
+        }
+      )
+    }
+  )
 
-  it('rejects cross-account push token inserts', async () => {
-    const seeded = (scenario = await seedScenario())
-
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (client) => {
-        await expect(
-          client.query(
-            `INSERT INTO public."PushToken"
+  scenarioTest(
+    'rejects cross-account push token inserts',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          await expect(
+            client.query(
+              `INSERT INTO public."PushToken"
               ("id", "user_id", "token", "platform", "updated_at")
              VALUES ($1, $2, $3, 'ios', NOW())`,
-            [
-              `cross-push-token-${randomUUID()}`,
-              seeded.otherTeenId,
-              `ExponentPushToken[cross-${randomUUID()}]`,
-            ]
-          )
-        ).rejects.toMatchObject({ code: '42501' })
-      }
-    )
-  })
+              [
+                `cross-push-token-${randomUUID()}`,
+                seeded.otherTeenId,
+                `ExponentPushToken[cross-${randomUUID()}]`,
+              ]
+            )
+          ).rejects.toMatchObject({ code: '42501' })
+        }
+      )
+    }
+  )
 
-  it('does not extend full guardian access to private alert delivery records', async () => {
-    const seeded = (scenario = await seedScenario())
+  scenarioTest(
+    'does not extend full guardian access to private alert delivery records',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
+        async (client) => {
+          for (const tableName of [
+            'AlertRule',
+            'NotificationPreference',
+            'PushToken',
+          ] as const) {
+            const rows = await client.query(
+              `SELECT "id" FROM public."${tableName}" WHERE "user_id" = $1`,
+              [seeded.teenId]
+            )
+            expect(rows.rows).toHaveLength(0)
+          }
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
-      async (client) => {
-        for (const tableName of [
-          'AlertRule',
-          'NotificationPreference',
-          'PushToken',
-        ] as const) {
-          const rows = await client.query(
-            `SELECT "id" FROM public."${tableName}" WHERE "user_id" = $1`,
+          const privateEvents = await client.query(
+            'SELECT "id" FROM public."EventEnvelope" WHERE "user_id" = $1',
             [seeded.teenId]
           )
-          expect(rows.rows).toHaveLength(0)
-        }
+          expect(privateEvents.rows).toHaveLength(0)
 
-        const privateEvents = await client.query(
-          'SELECT "id" FROM public."EventEnvelope" WHERE "user_id" = $1',
-          [seeded.teenId]
-        )
-        expect(privateEvents.rows).toHaveLength(0)
-
-        const globalEvents = await client.query(
-          'SELECT "id" FROM public."EventEnvelope" WHERE "id" = $1',
-          [seeded.globalEventEnvelopeId]
-        )
-        expect(globalEvents.rows).toEqual([{ id: seeded.globalEventEnvelopeId }])
-      }
-    )
-  })
-
-  it('allows administrators to inspect alert settings and delivery records', async () => {
-    const seeded = (scenario = await seedScenario())
-
-    await withRole(
-      'authenticated',
-      buildClaims(`admin-${randomUUID()}@example.com`, 'admin'),
-      async (client) => {
-        for (const tableName of [
-          'AlertRule',
-          'NotificationPreference',
-          'PushToken',
-        ] as const) {
-          const rows = await client.query(
-            `SELECT "id" FROM public."${tableName}"
-             WHERE "user_id" = ANY($1::text[])`,
-            [[seeded.teenId, seeded.otherTeenId]]
+          const globalEvents = await client.query(
+            'SELECT "id" FROM public."EventEnvelope" WHERE "id" = $1',
+            [seeded.globalEventEnvelopeId]
           )
-          expect(rows.rows).toHaveLength(2)
+          expect(globalEvents.rows).toEqual([{ id: seeded.globalEventEnvelopeId }])
         }
+      )
+    }
+  )
 
-        const events = await client.query(
-          `SELECT "id" FROM public."EventEnvelope"
+  scenarioTest(
+    'allows administrators to inspect alert settings and delivery records',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(`admin-${randomUUID()}@example.com`, 'admin'),
+        async (client) => {
+          for (const tableName of [
+            'AlertRule',
+            'NotificationPreference',
+            'PushToken',
+          ] as const) {
+            const rows = await client.query(
+              `SELECT "id" FROM public."${tableName}"
+             WHERE "user_id" = ANY($1::text[])`,
+              [[seeded.teenId, seeded.otherTeenId]]
+            )
+            expect(rows.rows).toHaveLength(2)
+          }
+
+          const events = await client.query(
+            `SELECT "id" FROM public."EventEnvelope"
            WHERE "id" = ANY($1::text[])`,
-          [
             [
-              seeded.eventEnvelopeId,
-              seeded.otherEventEnvelopeId,
-              seeded.globalEventEnvelopeId,
-            ],
-          ]
-        )
-        expect(events.rows).toHaveLength(3)
+              [
+                seeded.eventEnvelopeId,
+                seeded.otherEventEnvelopeId,
+                seeded.globalEventEnvelopeId,
+              ],
+            ]
+          )
+          expect(events.rows).toHaveLength(3)
 
-        const updatedRule = await client.query(
-          `UPDATE public."AlertRule"
+          const updatedRule = await client.query(
+            `UPDATE public."AlertRule"
            SET "enabled" = FALSE, "updated_at" = NOW()
            WHERE "id" = $1
            RETURNING "enabled"`,
-          [seeded.otherAlertRuleId]
-        )
-        expect(updatedRule.rows).toEqual([{ enabled: false }])
-      }
-    )
-  })
+            [seeded.otherAlertRuleId]
+          )
+          expect(updatedRule.rows).toEqual([{ enabled: false }])
+        }
+      )
+    }
+  )
 
-  it('denies teens from reading another teen wardrobe', async () => {
-    const seeded = (scenario = await seedScenario())
+  scenarioTest(
+    'denies teens from reading another teen wardrobe',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (guardedClient) => {
+          const otherTeenRows = await guardedClient.query(
+            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+            [seeded.otherTeenId]
+          )
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (guardedClient) => {
-        const otherTeenRows = await guardedClient.query(
-          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [seeded.otherTeenId]
-        )
+          expect(otherTeenRows.rows).toHaveLength(0)
 
-        expect(otherTeenRows.rows).toHaveLength(0)
+          const otherSavedLocationRows = await guardedClient.query(
+            'SELECT "id" FROM public."SavedLocation" WHERE "user_id" = $1',
+            [seeded.otherTeenId]
+          )
 
-        const otherSavedLocationRows = await guardedClient.query(
-          'SELECT "id" FROM public."SavedLocation" WHERE "user_id" = $1',
-          [seeded.otherTeenId]
-        )
+          expect(otherSavedLocationRows.rows).toHaveLength(0)
 
-        expect(otherSavedLocationRows.rows).toHaveLength(0)
-
-        const otherSavedLocationUpdate = await guardedClient.query(
-          `UPDATE public."SavedLocation"
+          const otherSavedLocationUpdate = await guardedClient.query(
+            `UPDATE public."SavedLocation"
            SET "label" = $1, "updated_at" = NOW()
            WHERE "id" = $2
            RETURNING "id"`,
-          ['Blocked update', seeded.otherSavedLocationId]
-        )
+            ['Blocked update', seeded.otherSavedLocationId]
+          )
 
-        expect(otherSavedLocationUpdate.rows).toHaveLength(0)
+          expect(otherSavedLocationUpdate.rows).toHaveLength(0)
 
-        const otherSavedLocationDelete = await guardedClient.query(
-          'DELETE FROM public."SavedLocation" WHERE "id" = $1 RETURNING "id"',
-          [seeded.otherSavedLocationId]
-        )
+          const otherSavedLocationDelete = await guardedClient.query(
+            'DELETE FROM public."SavedLocation" WHERE "id" = $1 RETURNING "id"',
+            [seeded.otherSavedLocationId]
+          )
 
-        expect(otherSavedLocationDelete.rows).toHaveLength(0)
-      }
-    )
-  })
-
-  it('does not trust unverified email claims for cross-account access', async () => {
-    const seeded = (scenario = await seedScenario())
-
-    await withRole(
-      'authenticated',
-      {
-        sub: randomUUID(),
-        email: seeded.teenEmail,
-        email_verified: false,
-        role: 'authenticated',
-        app_metadata: {
-          role: 'guardian',
-        },
-      },
-      async (client) => {
-        const garmentRows = await client.query(
-          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [seeded.teenId]
-        )
-
-        expect(garmentRows.rows).toHaveLength(0)
-      }
-    )
-  })
-
-  it('denies unrelated guardians and anonymous actors from teen wardrobe data', async () => {
-    const seeded = (scenario = await seedScenario())
-
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.outsiderGuardianEmail, 'guardian'),
-      async (client) => {
-        const garmentRows = await client.query(
-          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [seeded.teenId]
-        )
-
-        expect(garmentRows.rows).toHaveLength(0)
-      }
-    )
-
-    await withRole('anon', null, async (client) => {
-      await expect(
-        client.query('SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1', [
-          seeded.teenId,
-        ])
-      ).rejects.toMatchObject({
-        code: '42501',
-      })
-    })
-  })
-
-  it('does not grant access from user_metadata identity or role claims', async () => {
-    const seeded = (scenario = await seedScenario())
-
-    await withRole(
-      'authenticated',
-      {
-        sub: randomUUID(),
-        email: seeded.outsiderGuardianEmail,
-        email_verified: true,
-        role: 'authenticated',
-        app_metadata: {
-          role: 'guardian',
-        },
-        user_metadata: {
-          app_user_id: seeded.teenId,
-          app_role: 'admin',
-          role: 'admin',
-        },
-      },
-      async (client) => {
-        const garmentRows = await client.query(
-          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [seeded.teenId]
-        )
-
-        expect(garmentRows.rows).toHaveLength(0)
-      }
-    )
-  })
-
-  it('blocks teen self access after the last guardian consent is revoked', async () => {
-    const seeded = (scenario = await seedScenario())
-
-    const client = await adminPool.connect()
-
-    try {
-      await client.query('BEGIN')
-      await client.query(
-        `UPDATE public."GuardianConsent"
-         SET "revoked_at" = NOW(), "status" = 'revoked'
-         WHERE "teen_id" = $1`,
-        [seeded.teenId]
+          expect(otherSavedLocationDelete.rows).toHaveLength(0)
+        }
       )
-      await client.query(
-        `UPDATE public."UserProfile"
-         SET "preferences" = $2::jsonb, "updated_at" = NOW()
-         WHERE "user_id" = $1`,
-        [
-          seeded.teenId,
-          JSON.stringify({
-            compliance: {
-              accountStatus: 'pending_guardian_consent',
-              guardianConsentRequired: true,
-            },
-          }),
-        ]
-      )
-      await client.query('COMMIT')
-    } catch (error) {
-      await client.query('ROLLBACK')
-      throw error
-    } finally {
-      client.release()
     }
+  )
 
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (guardedClient) => {
-        const garmentRows = await guardedClient.query(
-          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-          [seeded.teenId]
-        )
+  scenarioTest(
+    'does not trust unverified email claims for cross-account access',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        {
+          sub: randomUUID(),
+          email: seeded.teenEmail,
+          email_verified: false,
+          role: 'authenticated',
+          app_metadata: {
+            role: 'guardian',
+          },
+        },
+        async (client) => {
+          const garmentRows = await client.query(
+            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
 
-        expect(garmentRows.rows).toHaveLength(0)
+          expect(garmentRows.rows).toHaveLength(0)
+        }
+      )
+    }
+  )
 
-        const updateResult = await guardedClient.query(
-          `UPDATE public."GarmentItem"
-           SET "category" = $1, "updated_at" = NOW()
-           WHERE "id" = $2
-           RETURNING "id"`,
-          ['restored-without-consent', seeded.garmentId]
-        )
+  scenarioTest(
+    'denies unrelated guardians and anonymous actors from teen wardrobe data',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.outsiderGuardianEmail, 'guardian'),
+        async (client) => {
+          const garmentRows = await client.query(
+            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
 
-        expect(updateResult.rowCount).toBe(0)
-      }
-    )
-  })
+          expect(garmentRows.rows).toHaveLength(0)
+        }
+      )
 
-  it('does not allow authenticated callers to execute the guardian-consent helper directly', async () => {
-    const seeded = (scenario = await seedScenario())
-
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (client) => {
+      await withRole('anon', null, async (client) => {
         await expect(
-          client.query('SELECT private.user_requires_guardian_consent($1)', [
+          client.query('SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1', [
             seeded.teenId,
           ])
         ).rejects.toMatchObject({
           code: '42501',
         })
-      }
-    )
-  })
+      })
+    }
+  )
 
-  it('allows admin claims to inspect and update teen wardrobe rows without service role bypass', async () => {
-    const seeded = (scenario = await seedScenario())
+  scenarioTest(
+    'does not grant access from user_metadata identity or role claims',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        {
+          sub: randomUUID(),
+          email: seeded.outsiderGuardianEmail,
+          email_verified: true,
+          role: 'authenticated',
+          app_metadata: {
+            role: 'guardian',
+          },
+          user_metadata: {
+            app_user_id: seeded.teenId,
+            app_role: 'admin',
+            role: 'admin',
+          },
+        },
+        async (client) => {
+          const garmentRows = await client.query(
+            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
 
-    await withRole(
-      'authenticated',
-      buildClaims(`admin-${randomUUID()}@example.com`, 'admin'),
-      async (client) => {
-        const garmentRows = await client.query(
-          'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+          expect(garmentRows.rows).toHaveLength(0)
+        }
+      )
+    }
+  )
+
+  scenarioTest(
+    'blocks teen self access after the last guardian consent is revoked',
+    async ({ scenario: seeded }) => {
+      const client = await adminPool.connect()
+
+      try {
+        await client.query('BEGIN')
+        await client.query(
+          `UPDATE public."GuardianConsent"
+         SET "revoked_at" = NOW(), "status" = 'revoked'
+         WHERE "teen_id" = $1`,
           [seeded.teenId]
         )
+        await client.query(
+          `UPDATE public."UserProfile"
+         SET "preferences" = $2::jsonb, "updated_at" = NOW()
+         WHERE "user_id" = $1`,
+          [
+            seeded.teenId,
+            JSON.stringify({
+              compliance: {
+                accountStatus: 'pending_guardian_consent',
+                guardianConsentRequired: true,
+              },
+            }),
+          ]
+        )
+        await client.query('COMMIT')
+      } catch (error) {
+        await client.query('ROLLBACK')
+        throw error
+      } finally {
+        client.release()
+      }
 
-        expect(garmentRows.rows).toHaveLength(1)
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (guardedClient) => {
+          const garmentRows = await guardedClient.query(
+            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
 
-        const updateResult = await client.query(
-          `UPDATE public."GarmentItem"
+          expect(garmentRows.rows).toHaveLength(0)
+
+          const updateResult = await guardedClient.query(
+            `UPDATE public."GarmentItem"
+           SET "category" = $1, "updated_at" = NOW()
+           WHERE "id" = $2
+           RETURNING "id"`,
+            ['accessory', seeded.garmentId]
+          )
+
+          expect(updateResult.rowCount).toBe(0)
+        }
+      )
+    }
+  )
+
+  scenarioTest(
+    'does not allow authenticated callers to execute the guardian-consent helper directly',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          await expect(
+            client.query('SELECT private.user_requires_guardian_consent($1)', [
+              seeded.teenId,
+            ])
+          ).rejects.toMatchObject({
+            code: '42501',
+          })
+        }
+      )
+    }
+  )
+
+  scenarioTest(
+    'allows admin claims to inspect and update teen wardrobe rows without service role bypass',
+    async ({ scenario: seeded }) => {
+      await withRole(
+        'authenticated',
+        buildClaims(`admin-${randomUUID()}@example.com`, 'admin'),
+        async (client) => {
+          const garmentRows = await client.query(
+            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
+
+          expect(garmentRows.rows).toHaveLength(1)
+
+          const updateResult = await client.query(
+            `UPDATE public."GarmentItem"
            SET "category" = $1, "updated_at" = NOW()
            WHERE "id" = $2
            RETURNING "category"`,
-          ['admin-reviewed', seeded.garmentId]
-        )
+            ['accessory', seeded.garmentId]
+          )
 
-        expect(updateResult.rows).toEqual([{ category: 'admin-reviewed' }])
-      }
-    )
-  })
+          expect(updateResult.rows).toEqual([{ category: 'accessory' }])
+        }
+      )
+    }
+  )
 
-  it('enforces telemetry RLS policies for authenticated users and the service role', async () => {
-    const seeded = (scenario = await seedScenario())
+  scenarioTest(
+    'enforces telemetry RLS policies for authenticated users and the service role',
+    async ({ scenario: seeded }) => {
+      // 1. Authenticated user CAN insert their own telemetry
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          const id = randomUUID()
+          const result = await client.query(
+            `INSERT INTO public."telemetry_events" ("id", "user_id", "event_type", "properties")
+           VALUES ($1, $2, 'profile_completed', '{"age": 16}'::jsonb)
+           RETURNING "id"`,
+            [id, seeded.teenId]
+          )
+          expect(result.rowCount).toBe(1)
+        }
+      )
 
-    // 1. Authenticated user CAN insert their own telemetry
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (client) => {
+      // 2. Authenticated user CANNOT insert telemetry with null user_id (anonymous/system record)
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          const id = randomUUID()
+          await expect(
+            client.query(
+              `INSERT INTO public."telemetry_events" ("id", "user_id", "event_type", "properties")
+             VALUES ($1, NULL, 'forecast_viewed', '{"status": "success"}'::jsonb)`,
+              [id]
+            )
+          ).rejects.toThrow()
+        }
+      )
+
+      // 3. Service role CAN insert anonymous telemetry (null user_id)
+      await withRole('service_role', {}, async (client) => {
         const id = randomUUID()
         const result = await client.query(
           `INSERT INTO public."telemetry_events" ("id", "user_id", "event_type", "properties")
-           VALUES ($1, $2, 'profile_completed', '{"age": 16}'::jsonb)
-           RETURNING "id"`,
-          [id, seeded.teenId]
-        )
-        expect(result.rowCount).toBe(1)
-      }
-    )
-
-    // 2. Authenticated user CANNOT insert telemetry with null user_id (anonymous/system record)
-    await withRole(
-      'authenticated',
-      buildClaims(seeded.teenEmail, 'teen'),
-      async (client) => {
-        const id = randomUUID()
-        await expect(
-          client.query(
-            `INSERT INTO public."telemetry_events" ("id", "user_id", "event_type", "properties")
-             VALUES ($1, NULL, 'forecast_viewed', '{"status": "success"}'::jsonb)`,
-            [id]
-          )
-        ).rejects.toThrow()
-      }
-    )
-
-    // 3. Service role CAN insert anonymous telemetry (null user_id)
-    await withRole('service_role', {}, async (client) => {
-      const id = randomUUID()
-      const result = await client.query(
-        `INSERT INTO public."telemetry_events" ("id", "user_id", "event_type", "properties")
            VALUES ($1, NULL, 'forecast_viewed', '{"status": "success"}'::jsonb)
            RETURNING "id"`,
-        [id]
-      )
-      expect(result.rowCount).toBe(1)
-    })
-  })
+          [id]
+        )
+        expect(result.rowCount).toBe(1)
+      })
+    }
+  )
 })

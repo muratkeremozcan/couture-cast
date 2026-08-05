@@ -16,6 +16,7 @@ import {
 import Redis from 'ioredis'
 
 export const RITUAL_REDIS_CLIENT = Symbol('RITUAL_REDIS_CLIENT')
+const RITUAL_GARMENT_CANDIDATE_LIMIT = 1_000
 
 import { WeatherQueryService } from '../weather/weather-query.service.js'
 import { LocationPreferencesService } from '../location-preferences/location-preferences.service.js'
@@ -885,7 +886,7 @@ export class RitualService implements OnModuleDestroy {
               latitude: selectedLocation.latitude ?? 0.0,
               longitude: selectedLocation.longitude ?? 0.0,
               timezone,
-              provider: 'mock-provider',
+              provider: 'openweather',
               provider_updated_at: providerUpdatedAt,
               temperature: 68.0,
               condition: 'clear',
@@ -936,8 +937,14 @@ export class RitualService implements OnModuleDestroy {
     let latestGarment: GarmentItem | null = null
     if (this.prisma.garmentItem.findFirst) {
       latestGarment = await this.prisma.garmentItem.findFirst({
-        where: { user_id: userId },
-        orderBy: { updated_at: 'desc' },
+        where: {
+          user_id: userId,
+          retention_status: 'active',
+          upload_status: 'ready',
+          category: { not: null },
+          comfort_range: { not: null },
+        },
+        orderBy: [{ updated_at: 'desc' }, { id: 'asc' }],
       })
     }
     const wardrobeUpdatedAt = latestGarment?.updated_at ?? new Date(0)
@@ -1069,7 +1076,15 @@ export class RitualService implements OnModuleDestroy {
 
     // 5. Query user garments
     const userGarments = await this.prisma.garmentItem.findMany({
-      where: { user_id: userId },
+      where: {
+        user_id: userId,
+        retention_status: 'active',
+        upload_status: 'ready',
+        category: { not: null },
+        comfort_range: { not: null },
+      },
+      orderBy: [{ updated_at: 'desc' }, { id: 'asc' }],
+      take: RITUAL_GARMENT_CANDIDATE_LIMIT,
     })
 
     // 6. Build or retrieve outfit recommendations
@@ -1436,7 +1451,7 @@ export class RitualService implements OnModuleDestroy {
   }
 
   // Story 2.2 Task 2 step 3 owner: implement chunk-based Redis key invalidation
-  async invalidateUserCache(userId: string): Promise<void> {
+  async invalidateUserCache(userId: string): Promise<boolean> {
     try {
       const matchPattern = `ritual:${userId}:*`
       let cursor = '0'
@@ -1453,10 +1468,12 @@ export class RitualService implements OnModuleDestroy {
           await this.redis.del(keys)
         }
       } while (cursor !== '0')
+      return true
     } catch (err) {
       this.logger.warn(
         `Redis cache invalidation failed: ${err instanceof Error ? err.message : String(err)}`
       )
+      return false
     }
   }
 

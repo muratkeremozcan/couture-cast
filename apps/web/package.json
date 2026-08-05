@@ -19,10 +19,12 @@
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "dev": "node ../../node_modules/next/dist/bin/next dev",
     "build": "node ../../node_modules/next/dist/bin/next build",
+    "build:e2e": "next build",
     "start": "node ../../node_modules/next/dist/bin/next start",
     "lint": "cd ../.. && eslint --max-warnings=0 --ext .ts,.tsx apps/web"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.4",
     "@couture/api-client": "file:../../packages/api-client",
     "@couture/utils": "file:../../packages/utils",
     "next": "15.5.9",

@@ -1,5 +1,5 @@
 import { BadRequestException, UnsupportedMediaTypeException } from '@nestjs/common'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RequestAuthContext } from '../auth/security.types'
 import { WardrobeController } from './wardrobe.controller'
 import type { WardrobeRetentionService } from './wardrobe-retention.service'
@@ -16,12 +16,16 @@ const mockCreateUploadUrl = vi.fn()
 const mockUploadBytes = vi.fn()
 const mockCommitGarment = vi.fn()
 const mockRequestDeletion = vi.fn()
+const mockSuggestGarmentTags = vi.fn()
+const mockUpdateGarmentTags = vi.fn()
 
 const mockWardrobeService = {
   listGarments: mockListGarments,
   createUploadUrl: mockCreateUploadUrl,
   uploadBytes: mockUploadBytes,
   commitGarment: mockCommitGarment,
+  suggestGarmentTags: mockSuggestGarmentTags,
+  updateGarmentTags: mockUpdateGarmentTags,
 } as unknown as WardrobeService
 
 const mockRetentionService = {
@@ -30,6 +34,10 @@ const mockRetentionService = {
 
 describe('WardrobeController', () => {
   const controller = new WardrobeController(mockWardrobeService, mockRetentionService)
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
 
   it('delegates listGarments to WardrobeService', async () => {
     mockListGarments.mockResolvedValue({ data: [] })
@@ -85,5 +93,19 @@ describe('WardrobeController', () => {
   it('delegates deletion to retention service', async () => {
     await controller.deleteGarment(mockAuth, 'garment_99')
     expect(mockRequestDeletion).toHaveBeenCalledWith('user_123', 'garment_99')
+  })
+
+  it('rejects a service response that violates the public smart-tagging contract', async () => {
+    mockSuggestGarmentTags.mockResolvedValueOnce({
+      data: {
+        garmentId: 'garment_99',
+        analysisVersion: 'untrusted-version',
+        suggestions: {},
+      },
+    })
+
+    await expect(controller.suggestGarmentTags(mockAuth, 'garment_99')).rejects.toThrow(
+      'Invalid literal value'
+    )
   })
 })

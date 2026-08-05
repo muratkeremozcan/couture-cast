@@ -2,8 +2,6 @@ import { test, expect } from '../support/fixtures/merged-fixtures'
 import { createFallbackController } from '../../apps/web/src/app/lib/fallback'
 import type { BaseEvent } from '@couture/api-client'
 
-process.env.API_E2E_UI_MODE = 'true'
-
 class FakeSocket {
   private listeners: Record<string, (() => void)[]> = {}
 

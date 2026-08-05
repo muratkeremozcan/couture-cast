@@ -252,18 +252,51 @@ fails the API build/start command. There is no separate migration workflow, appr
 post-migration database probe, backup command, down migration, or automated schema rollback in the
 repository. Reverting application code does not revert a migration that has already been applied.
 
+The smart-tagging migration replaces a PostgreSQL enum and clears legacy tag values outside the
+canonical sets. Before Preview or production deployment:
+
+1. Export `GarmentItem` and record total rows plus rows with non-canonical category, material, or
+   comfort values.
+2. Verify the backup can be restored into an isolated database.
+3. Pause API writes and every wardrobe worker.
+4. Apply the migration, validate the recorded counts, then deploy the compatible API and worker.
+5. If validation fails, keep writers paused and restore the backup. An application rollback alone
+   cannot reverse this migration.
+
 ## Worker deployment and operations
 
 The dedicated BullMQ process starts through `npm run start:workers` or
-`npm run start:workers:prod` in [the API package](../../apps/api/package.json). Its
-[bootstrap](../../apps/api/src/workers/bootstrap.ts):
+`npm run start:workers:prod` in [the API package](../../apps/api/package.json).
+
+### Dedicated wardrobe worker deployment sequence
+
+Wardrobe color extraction and FashionCLIP tagging run in their own required process. The general
+worker does not consume the wardrobe queue. Deploy the wardrobe process in this order:
+
+1. Set `GARMENT_TAGGING_ENGINE=fashion-clip` and an absolute
+   `GARMENT_TAGGING_MODEL_DIR` on the wardrobe worker.
+2. Run `npm run prepare:tagging-model --workspace api` in the deploy image.
+3. Run `npm run verify:tagging-model --workspace api` after the image is mounted on the target.
+4. Complete the migration backup checkpoint above, then run
+   `npx prisma migrate deploy --schema packages/db/prisma/schema.prisma`.
+5. Start the general workers with `npm run start:workers:prod --workspace api`.
+6. Start the separate wardrobe consumer with
+   `npm run start:workers:wardrobe:prod --workspace api`.
+7. Require structured `Garment tagging engine is ready` and
+   `Dedicated wardrobe worker started` logs before enabling API writes.
+
+The general [bootstrap](../../apps/api/src/workers/bootstrap.ts):
 
 - loads root environment files;
 - creates the configured queues and Redis clients;
 - registers the weather refresh scheduler;
-- starts weather, alert fan-out, color extraction, and moderation workers;
+- starts weather, alert fan-out, and moderation workers;
 - logs startup failure and exits nonzero; and
 - handles `SIGTERM` and `SIGINT` by closing workers, queues, Redis, PostHog, and Prisma.
+
+The dedicated [wardrobe bootstrap](../../apps/api/src/workers/wardrobe.bootstrap.ts) verifies the
+engine selection, rejects fixture mode outside test environments, loads the pinned model, and
+consumes `color-extraction` at concurrency one.
 
 No Docker image, Vercel function, GitHub deployment workflow, process manifest, or other hosted
 worker target starts this command. The Vercel API function does not start the dedicated workers.

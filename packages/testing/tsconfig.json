@@ -6,7 +6,11 @@
     "declaration": true,
     "outDir": "dist",
     "rootDir": "src",
-    "composite": true
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@couture/utils": ["../utils/dist/index.d.ts"]
+    }
   },
   "include": ["src/**/*.ts"]
 }

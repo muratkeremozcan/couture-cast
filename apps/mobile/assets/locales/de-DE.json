@@ -11,12 +11,12 @@
     "scenarios": {
       "morning": "Morgenpendeln",
       "midday": "Mittags",
-      "evening": "Abendpl\u00e4ne"
+      "evening": "Abendpläne"
     },
     "conditions": {
       "clear": "Klarer Himmel",
-      "partly_cloudy": "Teilweise bew\u00f6lkt",
-      "cloudy": "Bew\u00f6lkt",
+      "partly_cloudy": "Teilweise bewölkt",
+      "cloudy": "Bewölkt",
       "fog": "Neblig",
       "drizzle": "Nieselregen",
       "rain": "Regnerisch",
@@ -26,104 +26,104 @@
       "wind": "Windig",
       "unknown": "Unbekannt"
     },
-    "hourly_forecast": "St\u00fcndliche Vorhersage",
+    "hourly_forecast": "Stündliche Vorhersage",
     "expand_hours": "Erweitern ({{hours}} Std.)",
     "collapse": "Reduzieren",
-    "load_error": "T\u00e4gliche Empfehlungen konnten nicht geladen werden",
+    "load_error": "Tägliche Empfehlungen konnten nicht geladen werden",
     "retry": "Erneut versuchen",
-    "badge_justification": "Begr\u00fcndung f\u00fcr {{label}}:",
+    "badge_justification": "Begründung für {{label}}:",
     "alert_title": "Unwetterwarnung",
-    "offline_toast": "K\u00fcrzlich zwischengespeicherte Wetterdaten werden verwendet",
+    "offline_toast": "Kürzlich zwischengespeicherte Wetterdaten werden verwendet",
     "loading": "Empfehlungen werden geladen...",
-    "garment_swap_title": "Alternative f\u00fcr {{category}} w\u00e4hlen",
-    "feels_like": "Gef\u00fchlt wie",
+    "garment_swap_title": "Alternative für {{category}} wählen",
+    "feels_like": "Gefühlt wie",
     "precipitation": "Niederschlag"
   },
   "widget": {
     "now": "JETZT",
-    "next_hour": "N\u00c4CHSTE STUNDE",
+    "next_hour": "NÄCHSTE STUNDE",
     "stale": "Veraltet",
-    "unavailable": "App f\u00fcr Empfehlungen \u00f6ffnen",
+    "unavailable": "App für Empfehlungen öffnen",
     "precipitation": "Niederschlag"
   },
   "settings": {
     "title": "Einstellungen",
     "language": "Sprache",
-    "locale_sync_error": "Die Sprache wurde auf diesem Ger\u00e4t ge\u00e4ndert. Die Profilsynchronisierung wird sp\u00e4ter erneut versucht.",
-    "locale_change_error": "Die Sprache konnte nicht ge\u00e4ndert werden. Bitte versuche es erneut.",
+    "locale_sync_error": "Die Sprache wurde auf diesem Gerät geändert. Die Profilsynchronisierung wird später erneut versucht.",
+    "locale_change_error": "Die Sprache konnte nicht geändert werden. Bitte versuche es erneut.",
     "region_units": "Region & Einheiten",
     "languages": {
       "en-US": "Englisch (USA)",
       "en-CA": "Englisch (Kanada)",
       "es-419": "Spanisch (LatAm)",
-      "fr-CA": "Franz\u00f6sisch (Kanada)",
-      "fr-FR": "Franz\u00f6sisch (Europa)",
-      "tr-TR": "T\u00fcrkisch",
+      "fr-CA": "Französisch (Kanada)",
+      "fr-FR": "Französisch (Europa)",
+      "tr-TR": "Türkisch",
       "de-DE": "Deutsch",
       "it-IT": "Italienisch",
       "pt-BR": "Portugiesisch (Brasilien)",
       "pt-PT": "Portugiesisch (Portugal)"
     },
-    "api_health": "API-Status wird \u00fcberpr\u00fcft...",
+    "api_health": "API-Status wird überprüft...",
     "api_health_status": "API-Status: {{status}}",
-    "api_health_unavailable": "API-Status nicht verf\u00fcgbar",
+    "api_health_unavailable": "API-Status nicht verfügbar",
     "diagnostic_alert_btn": "Wetterwarnungsanalysen aufzeichnen",
-    "diagnostic_info": "Das Tracking f\u00fcr alert_received ist mit den echten Push-Benachrichtigungsempf\u00e4ngern verkn\u00fcpft."
+    "diagnostic_info": "Das Tracking für alert_received ist mit den echten Push-Benachrichtigungsempfängern verknüpft."
   },
   "common": {
     "cancel": "Abbrechen",
-    "dismiss_banner": "Banner schlie\u00dfen",
-    "invalid_link": "Dieser Link ist ung\u00fcltig, abgelaufen oder nicht mehr verf\u00fcgbar.",
-    "about_couturecast": "\u00dcber CoutureCast",
+    "dismiss_banner": "Banner schließen",
+    "invalid_link": "Dieser Link ist ungültig, abgelaufen oder nicht mehr verfügbar.",
+    "about_couturecast": "Über CoutureCast",
     "about_description": "CoutureCast verbindet Wetterdaten mit Garderobenempfehlungen."
   },
   "accessibility": {
     "skip_to_content": "Zum Hauptinhalt springen",
-    "weather_glyph_alt": "Wetter-Icon f\u00fcr {{condition}}",
+    "weather_glyph_alt": "Wetter-Icon für {{condition}}",
     "garment_item_alt": "{{title}}",
-    "garment_swap_hint": "\u00d6ffnet alternative Kleidungsst\u00fccke",
+    "garment_swap_hint": "Öffnet alternative Kleidungsstücke",
     "garment_category_outerwear": "Oberbekleidung",
     "garment_category_bottoms": "Unterteile",
     "garment_category_tops": "Oberteile",
     "garment_category_footwear": "Schuhe",
     "garment_category_accessories": "Accessoires",
-    "garment_category_garment": "Kleidungsst\u00fcck",
-    "chip_personal": "Pers\u00f6nlich",
+    "garment_category_garment": "Kleidungsstück",
+    "chip_personal": "Persönlich",
     "chip_community": "Community",
     "chip_sponsored": "Gesponsert",
     "chip_filter_label": "{{chip}} Empfehlungen anzeigen",
     "live_announcement_refresh": "Tagesempfehlung aktualisiert",
-    "live_announcement_swap": "Kleidungsst\u00fcck ausgetauscht",
+    "live_announcement_swap": "Kleidungsstück ausgetauscht",
     "live_announcement_chip_change": "Zeige {{chip}}-Empfehlungen",
     "live_announcement_alert": "Unwetterwarnung: {{alert}}"
   },
   "wardrobe": {
     "title": "Kleiderschrank",
-    "add_garment": "Kleidungsst\u00fcck hinzuf\u00fcgen",
-    "empty_title": "Noch keine Kleidungsst\u00fccke hinzugef\u00fcgt",
-    "empty_desc": "Fotografiere dein Lieblingskleidungsst\u00fcck, um loszulegen.",
+    "add_garment": "Kleidungsstück hinzufügen",
+    "empty_title": "Noch keine Kleidungsstücke hinzugefügt",
+    "empty_desc": "Fotografiere dein Lieblingskleidungsstück, um loszulegen.",
     "capture": {
-      "title": "Kleidungsst\u00fcck erfassen",
+      "title": "Kleidungsstück erfassen",
       "camera": "Foto aufnehmen",
       "library": "Fotomediathek",
       "retake": "Neu aufnehmen",
-      "choose_another": "Anderes ausw\u00e4hlen"
+      "choose_another": "Anderes auswählen"
     },
     "permission": {
       "camera_denied": "Die Kameraberechtigung wurde verweigert.",
       "camera_blocked": "Der Kamerazugriff ist in den Einstellungen gesperrt.",
-      "library_denied": "Die Berechtigung f\u00fcr die Fotomediathek wurde verweigert.",
-      "open_settings": "Einstellungen \u00f6ffnen"
+      "library_denied": "Die Berechtigung für die Fotomediathek wurde verweigert.",
+      "open_settings": "Einstellungen öffnen"
     },
     "error": {
-      "camera_unavailable": "Die Kamera ist auf diesem Ger\u00e4t nicht verf\u00fcgbar.",
-      "invalid_image": "Ung\u00fcltiges Bild ausgew\u00e4hlt.",
-      "corrupt_image": "Das ausgew\u00e4hlte Bild ist besch\u00e4digt.",
-      "image_too_large": "Das Bild \u00fcberschreitet die Grenze von 10 MiB.",
-      "unsupported_type": "Nicht unterst\u00fctztes Bildformat.",
-      "network_timeout": "Zeit\u00fcberschreitung beim Hochladen.",
+      "camera_unavailable": "Die Kamera ist auf diesem Gerät nicht verfügbar.",
+      "invalid_image": "Ungültiges Bild ausgewählt.",
+      "corrupt_image": "Das ausgewählte Bild ist beschädigt.",
+      "image_too_large": "Das Bild überschreitet die Grenze von 10 MiB.",
+      "unsupported_type": "Nicht unterstütztes Bildformat.",
+      "network_timeout": "Zeitüberschreitung beim Hochladen.",
       "storage_forbidden": "Zugriff auf den Speicher verweigert.",
-      "consent_required": "F\u00fcr Uploads ist die Zustimmung einer erziehungsberechtigten Person erforderlich.",
+      "consent_required": "Für Uploads ist die Zustimmung einer erziehungsberechtigten Person erforderlich.",
       "upload_expired": "Die Upload-Sitzung ist abgelaufen."
     },
     "crop": {
@@ -131,27 +131,80 @@
       "aspect_square": "1:1 Quadrat",
       "aspect_four_three": "4:3 Hochformat",
       "rotate": "Drehen",
-      "reset": "Zur\u00fccksetzen"
+      "reset": "Zurücksetzen"
     },
     "cleanup": {
       "title": "Automatische Hintergrundbereinigung",
       "toggle": "Hintergrund freistellen",
       "retry": "Bereinigung wiederholen",
-      "unavailable": "Die Hintergrundbereinigung ist f\u00fcr dieses Bild nicht verf\u00fcgbar"
+      "unavailable": "Die Hintergrundbereinigung ist für dieses Bild nicht verfügbar"
     },
     "confirm": {
       "use_image": "Dieses Bild verwenden"
     },
     "upload": {
-      "preparing": "Bildpr\u00fcfung wird vorbereitet...",
+      "preparing": "Bildprüfung wird vorbereitet...",
       "requesting": "Upload-Sitzung wird reserviert...",
       "uploading": "Bilddaten werden hochgeladen...",
-      "verifying": "Private Speicherdaten werden gepr\u00fcft...",
-      "processing": "Kleidungsst\u00fcck hochgeladen. Farbanalyse l\u00e4uft...",
-      "ready": "Kleidungsst\u00fcck bereit",
-      "failed": "Upload des Kleidungsst\u00fccks fehlgeschlagen",
+      "verifying": "Private Speicherdaten werden geprüft...",
+      "processing": "Kleidungsstück hochgeladen. Farbanalyse läuft...",
+      "ready": "Kleidungsstück bereit",
+      "failed": "Upload des Kleidungsstücks fehlgeschlagen",
       "retry": "Upload wiederholen",
       "cancel": "Upload abbrechen"
+    },
+    "tagging": {
+      "title": "Smarte Tags",
+      "desc": "Überprüfe KI-Vorschläge für personalisierte Outfit-Empfehlungen.",
+      "needs_tags": "Tags erforderlich",
+      "category": "Kategorie",
+      "material": "Material",
+      "comfort_range": "Komfortbereich",
+      "not_sure": "Nicht sicher / Löschen",
+      "save": "Bestätigen & Speichern",
+      "saving": "Speichern...",
+      "ai_suggested": "KI-Vorschlag: {{value}}",
+      "loading_suggestions": "Vorschläge werden geladen...",
+      "pending_analysis": "Analyse ausstehend. Tags manuell auswählen.",
+      "inference_unavailable": "Inferenz nicht verfügbar. Tags manuell auswählen.",
+      "required": "*",
+      "optional": "(Optional)",
+      "close": "Smarte Tags schließen",
+      "low_confidence_suggested": "Vorschlag mit geringer Sicherheit: {{value}}",
+      "retry": "Vorschläge erneut laden",
+      "load_failed": "Smarte Vorschläge konnten nicht geladen werden.",
+      "selection_required": "Wähle eine Kategorie und einen Komfortbereich.",
+      "save_failed": "Tags konnten nicht gespeichert werden. Versuche es erneut.",
+      "saved": "Kleidungs-Tags gespeichert.",
+      "poll_timeout": "Das Tagging dauert länger als erwartet. Das Kleidungsstück bleibt während der Verarbeitung verfügbar.",
+      "options": {
+        "category": {
+          "top": "Oberteil",
+          "bottom": "Unterteil",
+          "outerwear": "Oberbekleidung",
+          "dress": "Kleid",
+          "shoes": "Schuhe",
+          "accessory": "Accessoire"
+        },
+        "material": {
+          "cotton": "Baumwolle",
+          "wool": "Wolle",
+          "linen": "Leinen",
+          "leather": "Leder",
+          "denim": "Denim",
+          "fleece": "Fleece",
+          "synthetic": "Synthetik",
+          "down": "Daunen",
+          "silk": "Seide"
+        },
+        "comfort": {
+          "cold": "Kalt (< 10 °C / 50 °F)",
+          "cool": "Kühl (10–16 °C / 50–60 °F)",
+          "mild": "Mild (16–22 °C / 60–72 °F)",
+          "warm": "Warm (22–28 °C / 72–82 °F)",
+          "hot": "Heiß (> 28 °C / 82 °F)"
+        }
+      }
     }
   }
 }

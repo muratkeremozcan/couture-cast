@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import { Prisma, PrismaClient, type GarmentItem } from '@prisma/client'
 
 import { createBaseLogger } from '../../logger/pino.config'
+import { RitualService } from '../personalization/ritual.service'
 import { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
 
 const ABANDONED_UPLOAD_RETENTION_MS = 24 * 60 * 60 * 1000
@@ -15,7 +16,8 @@ export class WardrobeRetentionService {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(SupabaseWardrobeStorageAdapter)
-    private readonly storage: SupabaseWardrobeStorageAdapter
+    private readonly storage: SupabaseWardrobeStorageAdapter,
+    private readonly ritualService: RitualService
   ) {}
 
   async requestDeletion(
@@ -43,6 +45,7 @@ export class WardrobeRetentionService {
       },
     })
     if (claimed.count === 1) {
+      await this.invalidateRitualCache(userId, garment.id)
       await this.purgeGarment({
         ...garment,
         retention_status: 'deletion_pending',
@@ -72,7 +75,7 @@ export class WardrobeRetentionService {
     })
 
     for (const garment of candidates) {
-      await this.prisma.garmentItem.updateMany({
+      const claimed = await this.prisma.garmentItem.updateMany({
         where: { id: garment.id, retention_status: { not: 'legal_hold' } },
         data: {
           retention_status: 'deletion_pending',
@@ -80,6 +83,9 @@ export class WardrobeRetentionService {
           deletion_requested_at: garment.deletion_requested_at ?? now,
         },
       })
+      if (claimed.count === 1) {
+        await this.invalidateRitualCache(garment.user_id, garment.id)
+      }
 
       await this.purgeGarment(garment).catch((error: unknown) => {
         this.logger.error(
@@ -87,6 +93,16 @@ export class WardrobeRetentionService {
           'wardrobe_retention_purge_failed'
         )
       })
+    }
+  }
+
+  private async invalidateRitualCache(userId: string, garmentId: string): Promise<void> {
+    const invalidated = await this.ritualService.invalidateUserCache(userId)
+    if (!invalidated) {
+      this.logger.warn(
+        { garmentId, userId },
+        'wardrobe_retention_cache_invalidation_failed'
+      )
     }
   }
 
