@@ -1,7 +1,5 @@
 import { test, expect } from '../../support/fixtures/merged-fixtures'
 
-process.env.API_E2E_UI_MODE = 'true'
-
 test.describe('API smoke', () => {
   test('root endpoint responds with hello message', async ({ apiRequest }, testInfo) => {
     const metadata = (testInfo.project.metadata ?? {}) as Record<string, string>
@@ -11,6 +9,7 @@ test.describe('API smoke', () => {
       method: 'GET',
       path: '/',
       baseUrl: apiBaseUrl,
+      uiMode: true,
     })
 
     if (!rawResponse || typeof rawResponse !== 'object') {

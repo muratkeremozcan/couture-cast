@@ -1,7 +1,5 @@
 import { test, expect } from '../support/fixtures/merged-fixtures'
 
-process.env.API_E2E_UI_MODE = 'true'
-
 const getExpectedSha = () =>
   process.env.EXPECTED_SHA ?? process.env.GITHUB_SHA ?? process.env.CI_COMMIT_SHA
 
@@ -26,6 +24,7 @@ test.describe('Web health metadata', () => {
       baseUrl: healthUrl.origin,
       path: healthUrl.pathname + healthUrl.search,
       headers: vercelBypassHeaders,
+      uiMode: true,
     })
 
     if (!response || typeof response !== 'object') {
