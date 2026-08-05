@@ -5,7 +5,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common'
-import type { PrismaClient } from '@prisma/client'
+import type { GarmentItem, PrismaClient } from '@prisma/client'
 import sharp from 'sharp'
 import {
   afterEach,
@@ -46,7 +46,20 @@ type MockPrisma = {
   $transaction: Mock
 }
 
-function garmentFixture(overrides: Record<string, unknown> = {}) {
+type GarmentFixture = GarmentItem & {
+  object_path: string
+  file_size_bytes: number
+  mime_type: string
+  content_sha256: string
+  width_px: number
+  height_px: number
+  upload_expires_at: Date
+  consent_checked_at: Date
+}
+
+function garmentFixture<T extends Partial<GarmentItem> = Record<never, never>>(
+  overrides = {} as T
+): Omit<GarmentFixture, keyof T> & T {
   return {
     id: GARMENT_ID,
     user_id: USER_ID,
@@ -56,6 +69,12 @@ function garmentFixture(overrides: Record<string, unknown> = {}) {
     material: null,
     comfort_range: null,
     color_palette: null,
+    tag_suggestions: null,
+    tagging_model_version: null,
+    tag_suggested_at: null,
+    tags_confirmed_at: null,
+    tagging_failure_code: null,
+    tagging_telemetry_emitted_at: null,
     upload_session_id: SESSION_ID,
     upload_idempotency_key: IDEMPOTENCY_KEY,
     commit_idempotency_key: null,
@@ -63,6 +82,7 @@ function garmentFixture(overrides: Record<string, unknown> = {}) {
     upload_status: 'pending_upload',
     retention_status: 'active',
     retention_trigger: null,
+    deletion_requested_at: null,
     file_size_bytes: 0,
     mime_type: 'image/png',
     content_sha256: '',
@@ -75,10 +95,11 @@ function garmentFixture(overrides: Record<string, unknown> = {}) {
     has_bg_cleanup: false,
     completion_telemetry_emitted_at: null,
     processing_job_enqueued_at: null,
+    failure_code: null,
     created_at: FIXTURE_NOW,
     updated_at: FIXTURE_NOW,
     ...overrides,
-  }
+  } as Omit<GarmentFixture, keyof T> & T
 }
 
 function uploadToken(expiresAt: Date, userId = USER_ID): string {
@@ -108,7 +129,7 @@ function createWardrobeServiceHarness(validImage: Buffer) {
   const storageSignReadUrl = vi.fn().mockResolvedValue('https://storage.test/signed.png')
   const storageRemove = vi.fn().mockResolvedValue(undefined)
   const enqueue = vi.fn().mockResolvedValue(undefined)
-  const invalidateUserCache = vi.fn().mockResolvedValue(undefined)
+  const invalidateUserCache = vi.fn().mockResolvedValue(true)
 
   const service = new WardrobeService(
     mockPrisma as unknown as PrismaClient,
@@ -295,7 +316,9 @@ describe('WardrobeService', () => {
   })
 
   describe('uploadBytes', () => {
-    function pendingUpload(overrides: Record<string, unknown> = {}) {
+    function pendingUpload<T extends Partial<GarmentItem> = Record<never, never>>(
+      overrides = {} as T
+    ) {
       return garmentFixture({
         file_size_bytes: validImage.length,
         content_sha256: validSha256,
@@ -449,7 +472,9 @@ describe('WardrobeService', () => {
   })
 
   describe('commitGarment', () => {
-    function uploadedGarment(overrides: Record<string, unknown> = {}) {
+    function uploadedGarment<T extends Partial<GarmentItem> = Record<never, never>>(
+      overrides = {} as T
+    ) {
       return garmentFixture({
         upload_status: 'bytes_uploaded',
         file_size_bytes: validImage.length,
@@ -570,6 +595,27 @@ describe('WardrobeService', () => {
       expect(result.replayed).toBe(true)
       expect(result.response.data.status).toBe('processing')
       expect(telemetryCapture).not.toHaveBeenCalled()
+    })
+
+    it('keeps a successful commit response when upload telemetry delivery fails', async () => {
+      const initial = uploadedGarment()
+      const committed = uploadedGarment({
+        upload_status: 'processing',
+        committed_at: new Date('2026-08-04T09:26:22.000Z'),
+        commit_idempotency_key: IDEMPOTENCY_KEY,
+        has_cropping: true,
+        has_bg_cleanup: true,
+      })
+      mockPrisma.garmentItem.findUnique.mockResolvedValue(initial)
+      mockPrisma.garmentItem.findUniqueOrThrow.mockResolvedValue(committed)
+      telemetryCapture.mockRejectedValueOnce(new Error('telemetry unavailable'))
+
+      await expect(
+        service.commitGarment(USER_ID, 'guardian', commitInput, IDEMPOTENCY_KEY)
+      ).resolves.toMatchObject({
+        replayed: false,
+        response: { data: { status: 'processing' } },
+      })
     })
   })
 })

@@ -3826,7 +3826,8 @@
                   "outerwear",
                   "dress",
                   "shoes",
-                  "accessory"
+                  "accessory",
+                  null
                 ]
               },
               "material": {
@@ -3843,7 +3844,8 @@
                   "fleece",
                   "synthetic",
                   "down",
-                  "silk"
+                  "silk",
+                  null
                 ]
               },
               "comfortRange": {
@@ -3856,7 +3858,8 @@
                   "cool",
                   "mild",
                   "warm",
-                  "hot"
+                  "hot",
+                  null
                 ]
               },
               "tagsConfirmedAt": {
@@ -3882,7 +3885,8 @@
                 "enum": [
                   "image/jpeg",
                   "image/png",
-                  "image/webp"
+                  "image/webp",
+                  null
                 ]
               },
               "retentionStatus": {
@@ -3983,7 +3987,8 @@
                     "outerwear",
                     "dress",
                     "shoes",
-                    "accessory"
+                    "accessory",
+                    null
                   ]
                 },
                 "material": {
@@ -4000,7 +4005,8 @@
                     "fleece",
                     "synthetic",
                     "down",
-                    "silk"
+                    "silk",
+                    null
                   ]
                 },
                 "comfortRange": {
@@ -4013,7 +4019,8 @@
                     "cool",
                     "mild",
                     "warm",
-                    "hot"
+                    "hot",
+                    null
                   ]
                 },
                 "tagsConfirmedAt": {
@@ -4039,7 +4046,8 @@
                   "enum": [
                     "image/jpeg",
                     "image/png",
-                    "image/webp"
+                    "image/webp",
+                    null
                   ]
                 },
                 "retentionStatus": {
@@ -4137,7 +4145,8 @@
                           "outerwear",
                           "dress",
                           "shoes",
-                          "accessory"
+                          "accessory",
+                          null
                         ]
                       },
                       "confidence": {
@@ -4170,7 +4179,8 @@
                           "fleece",
                           "synthetic",
                           "down",
-                          "silk"
+                          "silk",
+                          null
                         ]
                       },
                       "confidence": {
@@ -4199,7 +4209,8 @@
                           "cool",
                           "mild",
                           "warm",
-                          "hot"
+                          "hot",
+                          null
                         ]
                       },
                       "confidence": {
@@ -4251,7 +4262,8 @@
               "outerwear",
               "dress",
               "shoes",
-              "accessory"
+              "accessory",
+              null
             ]
           },
           "material": {
@@ -4268,7 +4280,8 @@
               "fleece",
               "synthetic",
               "down",
-              "silk"
+              "silk",
+              null
             ]
           },
           "comfortRange": {
@@ -4278,7 +4291,8 @@
               "cool",
               "mild",
               "warm",
-              "hot"
+              "hot",
+              null
             ]
           }
         },
@@ -4321,7 +4335,8 @@
                   "outerwear",
                   "dress",
                   "shoes",
-                  "accessory"
+                  "accessory",
+                  null
                 ]
               },
               "material": {
@@ -4338,7 +4353,8 @@
                   "fleece",
                   "synthetic",
                   "down",
-                  "silk"
+                  "silk",
+                  null
                 ]
               },
               "comfortRange": {
@@ -4351,7 +4367,8 @@
                   "cool",
                   "mild",
                   "warm",
-                  "hot"
+                  "hot",
+                  null
                 ]
               },
               "tagsConfirmedAt": {
@@ -4377,7 +4394,8 @@
                 "enum": [
                   "image/jpeg",
                   "image/png",
-                  "image/webp"
+                  "image/webp",
+                  null
                 ]
               },
               "retentionStatus": {
@@ -4440,6 +4458,244 @@
         },
         "required": [
           "data"
+        ],
+        "additionalProperties": false
+      },
+      "GarmentIdBadRequestError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              400
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Bad Request"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "GarmentTagsBadRequestError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              400
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Bad Request"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "GarmentTaggingUnauthorizedError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              401
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "Missing or invalid bearer token",
+              "Invalid access token"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Unauthorized"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "GarmentTaggingForbiddenError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              403
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "Guardian consent required before continuing",
+              "GUARDIAN_CONSENT_REQUIRED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Forbidden"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "GarmentTaggingNotFoundError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              404
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "GARMENT_NOT_FOUND"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Not Found"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "GarmentSuggestionConflictError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              409
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "GARMENT_ANALYSIS_PENDING",
+              "GARMENT_NOT_TAGGABLE"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Conflict"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "GarmentUpdateConflictError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              409
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "GARMENT_ANALYSIS_PENDING",
+              "GARMENT_NOT_TAGGABLE",
+              "CONCURRENT_TAG_UPDATE"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Conflict"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "GarmentTaggingUnavailableError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              503
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "TAGGING_INFERENCE_UNAVAILABLE"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Service Unavailable"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
         ],
         "additionalProperties": false
       }
@@ -6063,7 +6319,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BadRequestHttpError"
+                  "$ref": "#/components/schemas/GarmentIdBadRequestError"
                 }
               }
             }
@@ -6073,7 +6329,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                  "$ref": "#/components/schemas/GarmentTaggingUnauthorizedError"
                 }
               }
             }
@@ -6083,7 +6339,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "$ref": "#/components/schemas/GarmentTaggingForbiddenError"
                 }
               }
             }
@@ -6093,7 +6349,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotFoundHttpError"
+                  "$ref": "#/components/schemas/GarmentTaggingNotFoundError"
                 }
               }
             }
@@ -6103,7 +6359,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConflictHttpError"
+                  "$ref": "#/components/schemas/GarmentSuggestionConflictError"
                 }
               }
             }
@@ -6113,7 +6369,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                  "$ref": "#/components/schemas/GarmentTaggingUnavailableError"
                 }
               }
             }
@@ -6172,7 +6428,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BadRequestHttpError"
+                  "$ref": "#/components/schemas/GarmentTagsBadRequestError"
                 }
               }
             }
@@ -6182,7 +6438,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                  "$ref": "#/components/schemas/GarmentTaggingUnauthorizedError"
                 }
               }
             }
@@ -6192,7 +6448,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "$ref": "#/components/schemas/GarmentTaggingForbiddenError"
                 }
               }
             }
@@ -6202,7 +6458,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotFoundHttpError"
+                  "$ref": "#/components/schemas/GarmentTaggingNotFoundError"
                 }
               }
             }
@@ -6212,7 +6468,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConflictHttpError"
+                  "$ref": "#/components/schemas/GarmentUpdateConflictError"
                 }
               }
             }

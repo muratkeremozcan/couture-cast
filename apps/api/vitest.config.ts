@@ -2,6 +2,13 @@ import { resolve } from 'node:path'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@couture/utils': resolve(__dirname, '../../packages/utils/src/index.ts'),
+      '@couture/config': resolve(__dirname, '../../packages/config/src/index.ts'),
+      '@couture/api-client': resolve(__dirname, '../../packages/api-client/src/index.ts'),
+    },
+  },
   test: {
     globals: true,
     environment: 'node',

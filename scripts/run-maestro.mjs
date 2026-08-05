@@ -324,6 +324,35 @@ const waitForHealth = (url, timeoutMs = 120000, intervalMs = 2000) =>
     attempt()
   })
 
+const waitForProcessOutput = (child, expectedText, timeoutMs = 180000) =>
+  new Promise((resolve, reject) => {
+    let output = ''
+    const timer = setTimeout(
+      () => reject(new Error(`Process did not report readiness: ${expectedText}`)),
+      timeoutMs
+    )
+    const inspect = (chunk, destination) => {
+      destination.write(chunk)
+      output = `${output}${chunk.toString()}`.slice(-4096)
+      if (output.includes(expectedText)) {
+        clearTimeout(timer)
+        resolve()
+      }
+    }
+    child.stdout?.on('data', (chunk) => inspect(chunk, process.stdout))
+    child.stderr?.on('data', (chunk) => inspect(chunk, process.stderr))
+    child.once('error', (error) => {
+      clearTimeout(timer)
+      reject(error)
+    })
+    child.once('exit', (code) => {
+      if (!output.includes(expectedText)) {
+        clearTimeout(timer)
+        reject(new Error(`Process exited before readiness with code ${code}`))
+      }
+    })
+  })
+
 const requestJson = async (url, init) => {
   const response = await fetch(url, init)
   const body = await response.json().catch(() => undefined)
@@ -381,7 +410,12 @@ const setupMobileE2EIdentity = async (apiBaseUrl) => {
 
     return identity
   } catch (error) {
-    await cleanupMobileE2EIdentity(apiBaseUrl, identity)
+    try {
+      await cleanupMobileE2EIdentity(apiBaseUrl, identity)
+    } catch (cleanupError) {
+      console.error('[maestro:runner] Failed to clean partial mobile E2E identity')
+      console.error(cleanupError)
+    }
     throw error
   }
 }
@@ -418,7 +452,6 @@ const cleanupMobileE2EIdentity = async (apiBaseUrl, identity) => {
 
   try {
     await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SET LOCAL session_replication_role = 'replica'`
       const garments = await tx.garmentItem.findMany({
         where: { user_id: identity.userId },
         select: { id: true },
@@ -441,10 +474,18 @@ const cleanupMobileE2EIdentity = async (apiBaseUrl, identity) => {
         },
       })
       await tx.eventEnvelope.deleteMany({ where: { user_id: identity.userId } })
-      await tx.telemetryEvent.deleteMany({ where: { user_id: identity.userId } })
+      await tx.telemetryEvent.deleteMany({
+        where: {
+          OR: [
+            { user_id: identity.userId },
+            ...garmentIds.map((garmentId) => ({
+              properties: { path: ['garment_id'], equals: garmentId },
+            })),
+          ],
+        },
+      })
       await tx.engagementEvent.deleteMany({ where: { user_id: identity.userId } })
       await tx.lookbookPost.deleteMany({ where: { user_id: identity.userId } })
-      await tx.auditLog.deleteMany({ where: { user_id: identity.userId } })
       await tx.pushToken.deleteMany({ where: { user_id: identity.userId } })
       await tx.alertRule.deleteMany({ where: { user_id: identity.userId } })
       await tx.notificationPreference.deleteMany({
@@ -456,7 +497,24 @@ const cleanupMobileE2EIdentity = async (apiBaseUrl, identity) => {
       await tx.garmentItem.deleteMany({ where: { user_id: identity.userId } })
       await tx.comfortPreferences.deleteMany({ where: { user_id: identity.userId } })
       await tx.userProfile.deleteMany({ where: { user_id: identity.userId } })
-      await tx.user.deleteMany({ where: { id: identity.userId } })
+
+      await tx.$executeRawUnsafe('SAVEPOINT maestro_audit_cleanup')
+      let canDeleteImmutableAuditRows = false
+      try {
+        await tx.$executeRaw`SET LOCAL session_replication_role = 'replica'`
+        await tx.$executeRawUnsafe('RELEASE SAVEPOINT maestro_audit_cleanup')
+        canDeleteImmutableAuditRows = true
+      } catch {
+        await tx.$executeRawUnsafe('ROLLBACK TO SAVEPOINT maestro_audit_cleanup')
+        await tx.$executeRawUnsafe('RELEASE SAVEPOINT maestro_audit_cleanup')
+        console.warn(
+          '[maestro:runner] Database role cannot disable audit triggers; immutable audit rows and the linked user were retained'
+        )
+      }
+      if (canDeleteImmutableAuditRows) {
+        await tx.auditLog.deleteMany({ where: { user_id: identity.userId } })
+        await tx.user.deleteMany({ where: { id: identity.userId } })
+      }
     })
   } finally {
     await prisma.$disconnect()
@@ -1016,6 +1074,7 @@ const run = async () => {
   const apiSetupBaseUrl = 'http://127.0.0.1:4000'
   const mobileApiBaseUrl = getLocalApiUrl(target.platform)
   let apiProcess
+  let workerProcess
   let mobileIdentity
 
   try {
@@ -1023,6 +1082,25 @@ const run = async () => {
       try {
         await waitForHealth(apiHealthUrl, 2_000, 250)
         log(`Detected existing local API at ${apiHealthUrl}, reusing it`)
+        workerProcess = spawn(
+          'npm',
+          ['run', 'start:workers:wardrobe', '--workspace', 'api'],
+          {
+            cwd: projectRoot,
+            detached: process.platform !== 'win32',
+            stdio: ['inherit', 'pipe', 'pipe'],
+            env: {
+              ...process.env,
+              DATABASE_URL:
+                process.env.MOBILE_E2E_DATABASE_URL ||
+                'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+              GARMENT_TAGGING_ENGINE: 'fixture',
+              TEST_ENV: 'local',
+            },
+          }
+        )
+        managedProcesses.set(workerProcess, 'Wardrobe worker')
+        await waitForProcessOutput(workerProcess, 'Dedicated wardrobe worker started')
       } catch {
         log('Starting local API for mobile E2E')
         apiProcess = spawn('npm', ['run', 'start:api:e2e-with-workers'], {
@@ -1061,6 +1139,7 @@ const run = async () => {
       )
     }
   } catch (error) {
+    await stopManagedProcess(workerProcess, 'Wardrobe worker')
     await stopManagedProcess(apiProcess, 'Local API')
     throw error
   }
@@ -1246,15 +1325,29 @@ const run = async () => {
   } finally {
     if (mobileIdentity) {
       log('Cleaning authenticated mobile E2E fixture')
-      await cleanupMobileE2EIdentity(apiSetupBaseUrl, mobileIdentity)
+      try {
+        await cleanupMobileE2EIdentity(apiSetupBaseUrl, mobileIdentity)
+      } catch (cleanupError) {
+        console.error('[maestro:runner] Failed to clean mobile E2E fixture')
+        console.error(cleanupError)
+      }
     }
-    if (serverProcess) {
-      log('Stopping Expo dev server')
-      await stopManagedProcess(serverProcess, 'Expo dev server')
-    }
-    if (apiProcess) {
-      log('Stopping local API')
-      await stopManagedProcess(apiProcess, 'Local API')
+    const processCleanup = [
+      [serverProcess, 'Expo dev server'],
+      [workerProcess, 'Wardrobe worker'],
+      [apiProcess, 'Local API'],
+    ].filter(([child]) => Boolean(child))
+    const processCleanupResults = await Promise.allSettled(
+      processCleanup.map(([child, label]) => {
+        log(`Stopping ${label}`)
+        return stopManagedProcess(child, label)
+      })
+    )
+    for (const result of processCleanupResults) {
+      if (result.status === 'rejected') {
+        console.error('[maestro:runner] Failed to stop managed process')
+        console.error(result.reason)
+      }
     }
   }
 }

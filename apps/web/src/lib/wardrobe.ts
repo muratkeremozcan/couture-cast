@@ -2,6 +2,9 @@
 
 import {
   uploadGarmentBytes,
+  garmentListResponseSchema,
+  suggestGarmentTagsResponseSchema,
+  updateGarmentTagsResponseSchema,
   type GarmentCategory,
   type GarmentMaterial,
   type GarmentComfortRange,
@@ -35,6 +38,16 @@ type PreparedImage = {
   mimeType: 'image/jpeg' | 'image/png' | 'image/webp'
   sha256: string
   widthPx: number
+}
+
+export class WardrobeRequestError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string
+  ) {
+    super(message)
+    this.name = 'WardrobeRequestError'
+  }
 }
 
 function readAccessToken(): string {
@@ -175,16 +188,54 @@ async function prepareGarmentImage(
 async function readError(response: Response): Promise<Error> {
   try {
     const payload = (await response.json()) as {
-      error?: { message?: string }
+      error?: string | { code?: string; message?: string }
+      code?: string
       message?: string
     }
-    return new Error(
-      payload.error?.message ??
-        payload.message ??
-        `Wardrobe request failed with status ${response.status}`
+    const message =
+      (typeof payload.error === 'object' ? payload.error.message : undefined) ??
+      payload.message ??
+      `Wardrobe request failed with status ${response.status}`
+    const knownCode = [
+      'GARMENT_ANALYSIS_PENDING',
+      'TAGGING_INFERENCE_UNAVAILABLE',
+    ].includes(message)
+      ? message
+      : undefined
+    return new WardrobeRequestError(
+      message,
+      (typeof payload.error === 'object' ? payload.error.code : undefined) ??
+        payload.code ??
+        knownCode
     )
   } catch {
     return new Error(`Wardrobe request failed with status ${response.status}`)
+  }
+}
+
+async function withRequestTimeout<T>(
+  signal: AbortSignal | undefined,
+  request: (requestSignal: AbortSignal) => Promise<T>,
+  timeoutMs = 15_000
+): Promise<T> {
+  const controller = new AbortController()
+  let timedOut = false
+  const abortFromCaller = () => controller.abort(signal?.reason)
+  if (signal?.aborted) abortFromCaller()
+  else signal?.addEventListener('abort', abortFromCaller, { once: true })
+
+  const timeout = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMs)
+  try {
+    return await request(controller.signal)
+  } catch (error) {
+    if (timedOut) throw new Error('Wardrobe request timed out. Please try again.')
+    throw error
+  } finally {
+    clearTimeout(timeout)
+    signal?.removeEventListener('abort', abortFromCaller)
   }
 }
 
@@ -276,9 +327,10 @@ export async function listGarmentsFromWeb(
 ): Promise<GarmentItemContract[]> {
   const accessToken = readAccessToken()
   try {
-    return (
-      await createWebApiClient({ accessToken }).apiV1WardrobeGarmentsGet({ signal })
-    ).data
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1WardrobeGarmentsGet({ signal })
+    return garmentListResponseSchema.parse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to load your wardrobe.')
   }
@@ -290,11 +342,15 @@ export async function suggestGarmentTagsFromWeb(
 ): Promise<SuggestGarmentTagsData> {
   const accessToken = readAccessToken()
   try {
-    return (
-      await createWebApiClient({
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createWebApiClient({
         accessToken,
-      }).apiV1WardrobeGarmentsGarmentIdSuggestTagsPost({ garmentId }, { signal })
-    ).data
+      }).apiV1WardrobeGarmentsGarmentIdSuggestTagsPost(
+        { garmentId },
+        { signal: requestSignal }
+      )
+    )
+    return suggestGarmentTagsResponseSchema.parse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to load smart suggestions.')
   }
@@ -311,12 +367,13 @@ export async function updateGarmentTagsFromWeb(
 ): Promise<GarmentItemContract> {
   const accessToken = readAccessToken()
   try {
-    return (
-      await createWebApiClient({ accessToken }).apiV1WardrobeGarmentsGarmentIdTagsPatch(
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createWebApiClient({ accessToken }).apiV1WardrobeGarmentsGarmentIdTagsPatch(
         { garmentId, updateGarmentTagsInput: tags },
-        { signal }
+        { signal: requestSignal }
       )
-    ).data
+    )
+    return updateGarmentTagsResponseSchema.parse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to save garment tags.')
   }

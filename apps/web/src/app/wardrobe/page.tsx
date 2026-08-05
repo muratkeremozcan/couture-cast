@@ -15,6 +15,9 @@ export default function WardrobePage() {
   const [garments, setGarments] = useState<GarmentItemContract[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [timedOutGarmentIds, setTimedOutGarmentIds] = useState<Set<string>>(
+    () => new Set()
+  )
   const addGarmentButtonRef = useRef<HTMLButtonElement | null>(null)
   const captureInvokerRef = useRef<HTMLElement | null>(null)
   const taggingInvokerRef = useRef<HTMLElement | null>(null)
@@ -59,7 +62,10 @@ export default function WardrobePage() {
 
   const openTagging = (garmentId: string, invoker?: HTMLElement | null) => {
     taggingInvokerRef.current =
-      invoker ?? taggingButtonRefs.current.get(garmentId) ?? captureInvokerRef.current
+      invoker ??
+      taggingButtonRefs.current.get(garmentId) ??
+      (captureInvokerRef.current?.isConnected ? captureInvokerRef.current : null) ??
+      addGarmentButtonRef.current
     setTaggingGarmentId(garmentId)
   }
 
@@ -83,12 +89,21 @@ export default function WardrobePage() {
 
     void (async () => {
       try {
-        for (const delayMs of [1_000, 2_000, 4_000, 8_000]) {
-          await waitForPoll(delayMs, controller.signal)
+        const startedAt = Date.now()
+        for (const offsetMs of [1_000, 2_000, 4_000, 8_000]) {
+          await waitForPoll(
+            Math.max(0, startedAt + offsetMs - Date.now()),
+            controller.signal
+          )
           const persisted = await listGarmentsFromWeb(controller.signal)
           setGarments(persisted)
           const current = persisted.find((garment) => garment.id === garmentId)
           if (!current || current.status === 'processing') continue
+          setTimedOutGarmentIds((ids) => {
+            const next = new Set(ids)
+            next.delete(garmentId)
+            return next
+          })
           if (current.status === 'awaiting_tags') {
             if (isCaptureOpenRef.current) {
               pendingTaggingGarmentIdRef.current = current.id
@@ -98,6 +113,7 @@ export default function WardrobePage() {
           }
           return
         }
+        setTimedOutGarmentIds((ids) => new Set(ids).add(garmentId))
         setLoadError(
           'Smart tagging is taking longer than expected. The garment will remain visible while processing continues.'
         )
@@ -133,10 +149,24 @@ export default function WardrobePage() {
   }
 
   const handleTagsConfirmed = (updatedGarment: GarmentItemContract) => {
+    const recordedButton = taggingButtonRefs.current.get(updatedGarment.id)
+    if (
+      !taggingInvokerRef.current?.isConnected ||
+      taggingInvokerRef.current === recordedButton
+    ) {
+      taggingInvokerRef.current = addGarmentButtonRef.current
+    }
     setGarments((current) =>
       current.map((item) => (item.id === updatedGarment.id ? updatedGarment : item))
     )
     setTaggingGarmentId(null)
+    void listGarmentsFromWeb()
+      .then((persisted) => setGarments(persisted))
+      .catch((error: unknown) => {
+        setLoadError(
+          error instanceof Error ? error.message : 'Unable to refresh your wardrobe.'
+        )
+      })
   }
 
   return (
@@ -209,6 +239,7 @@ export default function WardrobePage() {
                 {garments.map((garment) => (
                   <div
                     key={garment.id}
+                    data-testid={`garment-card-${garment.id}`}
                     className="flex flex-col justify-between overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800"
                   >
                     {garment.imageAccess ? (
@@ -228,10 +259,14 @@ export default function WardrobePage() {
                         {garment.id}
                       </span>
                       <div className="flex items-center justify-between">
-                        <span className="inline-block rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold capitalize text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                        <span
+                          data-testid={`garment-status-${garment.status}`}
+                          className="inline-block rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold capitalize text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+                        >
                           {garment.status.replace('_', ' ')}
                         </span>
-                        {garment.status === 'awaiting_tags' && (
+                        {(garment.status === 'awaiting_tags' ||
+                          timedOutGarmentIds.has(garment.id)) && (
                           <button
                             ref={(element) => {
                               if (element)

@@ -155,9 +155,11 @@ export const uploadSessionPathParamsSchema = z.object({
   uploadSessionId: nonEmptyStringSchema.describe('Opaque upload session ID.'),
 })
 
-export const garmentIdPathParamsSchema = z.object({
-  garmentId: nonEmptyStringSchema.max(128).describe('Unique garment item ID.'),
-})
+export const garmentIdPathParamsSchema = z
+  .object({
+    garmentId: nonEmptyStringSchema.max(128).describe('Unique garment item ID.'),
+  })
+  .strict()
 
 export const suggestGarmentTagsDataSchema = z
   .object({
@@ -208,6 +210,80 @@ export const updateGarmentTagsInputSchema = z
 export const updateGarmentTagsResponseSchema = z
   .object({
     data: garmentItemSchema,
+  })
+  .strict()
+
+const garmentIdBadRequestErrorSchema = z
+  .object({
+    statusCode: z.literal(400),
+    message: z.string().startsWith('Invalid garment id'),
+    error: z.literal('Bad Request'),
+  })
+  .strict()
+
+const garmentTagsBadRequestErrorSchema = z
+  .object({
+    statusCode: z.literal(400),
+    message: z.union([
+      z.string().startsWith('Invalid garment id'),
+      z.string().startsWith('Invalid garment tags'),
+    ]),
+    error: z.literal('Bad Request'),
+  })
+  .strict()
+
+const garmentTaggingUnauthorizedErrorSchema = z
+  .object({
+    statusCode: z.literal(401),
+    message: z.enum(['Missing or invalid bearer token', 'Invalid access token']),
+    error: z.literal('Unauthorized'),
+  })
+  .strict()
+
+const garmentTaggingForbiddenErrorSchema = z
+  .object({
+    statusCode: z.literal(403),
+    message: z.enum([
+      'Guardian consent required before continuing',
+      'GUARDIAN_CONSENT_REQUIRED',
+    ]),
+    error: z.literal('Forbidden'),
+  })
+  .strict()
+
+const garmentTaggingNotFoundErrorSchema = z
+  .object({
+    statusCode: z.literal(404),
+    message: z.literal('GARMENT_NOT_FOUND'),
+    error: z.literal('Not Found'),
+  })
+  .strict()
+
+const garmentSuggestionConflictErrorSchema = z
+  .object({
+    statusCode: z.literal(409),
+    message: z.enum(['GARMENT_ANALYSIS_PENDING', 'GARMENT_NOT_TAGGABLE']),
+    error: z.literal('Conflict'),
+  })
+  .strict()
+
+const garmentUpdateConflictErrorSchema = z
+  .object({
+    statusCode: z.literal(409),
+    message: z.enum([
+      'GARMENT_ANALYSIS_PENDING',
+      'GARMENT_NOT_TAGGABLE',
+      'CONCURRENT_TAG_UPDATE',
+    ]),
+    error: z.literal('Conflict'),
+  })
+  .strict()
+
+const garmentTaggingUnavailableErrorSchema = z
+  .object({
+    statusCode: z.literal(503),
+    message: z.literal('TAGGING_INFERENCE_UNAVAILABLE'),
+    error: z.literal('Service Unavailable'),
   })
   .strict()
 
@@ -268,6 +344,38 @@ export function registerWardrobeContracts(
     'UpdateGarmentTagsResponse',
     updateGarmentTagsResponseSchema
   )
+  const registeredGarmentIdBadRequestError = registry.register(
+    'GarmentIdBadRequestError',
+    garmentIdBadRequestErrorSchema
+  )
+  const registeredGarmentTagsBadRequestError = registry.register(
+    'GarmentTagsBadRequestError',
+    garmentTagsBadRequestErrorSchema
+  )
+  const registeredGarmentTaggingUnauthorizedError = registry.register(
+    'GarmentTaggingUnauthorizedError',
+    garmentTaggingUnauthorizedErrorSchema
+  )
+  const registeredGarmentTaggingForbiddenError = registry.register(
+    'GarmentTaggingForbiddenError',
+    garmentTaggingForbiddenErrorSchema
+  )
+  const registeredGarmentTaggingNotFoundError = registry.register(
+    'GarmentTaggingNotFoundError',
+    garmentTaggingNotFoundErrorSchema
+  )
+  const registeredGarmentSuggestionConflictError = registry.register(
+    'GarmentSuggestionConflictError',
+    garmentSuggestionConflictErrorSchema
+  )
+  const registeredGarmentUpdateConflictError = registry.register(
+    'GarmentUpdateConflictError',
+    garmentUpdateConflictErrorSchema
+  )
+  const registeredGarmentTaggingUnavailableError = registry.register(
+    'GarmentTaggingUnavailableError',
+    garmentTaggingUnavailableErrorSchema
+  )
 
   registry.registerPath({
     method: 'get',
@@ -326,7 +434,7 @@ export function registerWardrobeContracts(
         description: 'Invalid garment ID.',
         content: {
           'application/json': {
-            schema: commonSchemas.badRequestHttpErrorSchema,
+            schema: registeredGarmentIdBadRequestError,
           },
         },
       },
@@ -334,7 +442,7 @@ export function registerWardrobeContracts(
         description: 'Missing or invalid authentication headers.',
         content: {
           'application/json': {
-            schema: commonSchemas.unauthorizedHttpErrorSchema,
+            schema: registeredGarmentTaggingUnauthorizedError,
           },
         },
       },
@@ -342,7 +450,7 @@ export function registerWardrobeContracts(
         description: 'Guardian consent required or access forbidden.',
         content: {
           'application/json': {
-            schema: commonSchemas.forbiddenHttpErrorSchema,
+            schema: registeredGarmentTaggingForbiddenError,
           },
         },
       },
@@ -350,21 +458,21 @@ export function registerWardrobeContracts(
         description: 'Garment not found or owned by another user.',
         content: {
           'application/json': {
-            schema: commonSchemas.notFoundHttpErrorSchema,
+            schema: registeredGarmentTaggingNotFoundError,
           },
         },
       },
       409: {
         description: 'Garment analysis pending or not taggable.',
         content: {
-          'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
+          'application/json': { schema: registeredGarmentSuggestionConflictError },
         },
       },
       503: {
         description: 'Tagging inference unavailable.',
         content: {
           'application/json': {
-            schema: commonSchemas.serviceUnavailableHttpErrorSchema,
+            schema: registeredGarmentTaggingUnavailableError,
           },
         },
       },
@@ -401,7 +509,7 @@ export function registerWardrobeContracts(
         description: 'Invalid garment tags input.',
         content: {
           'application/json': {
-            schema: commonSchemas.badRequestHttpErrorSchema,
+            schema: registeredGarmentTagsBadRequestError,
           },
         },
       },
@@ -409,7 +517,7 @@ export function registerWardrobeContracts(
         description: 'Missing or invalid authentication headers.',
         content: {
           'application/json': {
-            schema: commonSchemas.unauthorizedHttpErrorSchema,
+            schema: registeredGarmentTaggingUnauthorizedError,
           },
         },
       },
@@ -417,7 +525,7 @@ export function registerWardrobeContracts(
         description: 'Guardian consent required or access forbidden.',
         content: {
           'application/json': {
-            schema: commonSchemas.forbiddenHttpErrorSchema,
+            schema: registeredGarmentTaggingForbiddenError,
           },
         },
       },
@@ -425,14 +533,14 @@ export function registerWardrobeContracts(
         description: 'Garment not found or owned by another user.',
         content: {
           'application/json': {
-            schema: commonSchemas.notFoundHttpErrorSchema,
+            schema: registeredGarmentTaggingNotFoundError,
           },
         },
       },
       409: {
         description: 'Garment analysis pending or not taggable.',
         content: {
-          'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
+          'application/json': { schema: registeredGarmentUpdateConflictError },
         },
       },
     },

@@ -6,6 +6,7 @@ export {
   garmentComfortRangeEnum,
   GARMENT_TAGGING_ANALYSIS_VERSION,
   garmentTagSuggestionSnapshotSchema,
+  garmentListResponseSchema,
   suggestGarmentTagsDataSchema,
   suggestGarmentTagsResponseSchema,
   updateGarmentTagsInputSchema,

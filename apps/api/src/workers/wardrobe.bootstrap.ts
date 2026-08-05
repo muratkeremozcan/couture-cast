@@ -97,13 +97,13 @@ async function startWardrobeWorker() {
     logger.info('Dedicated wardrobe worker started for color-extraction at concurrency 1')
   } catch (err) {
     logger.error(err, 'Failed to start dedicated wardrobe worker')
-    process.exit(1)
+    await shutdown(1)
   }
 }
 
-async function performShutdown() {
+async function performShutdown(requestedExitCode = 0) {
   logger.info('Shutting down dedicated wardrobe worker...')
-  let exitCode = 0
+  let exitCode = requestedExitCode
   try {
     await shutdownWorkerResources({
       workers,
@@ -121,8 +121,8 @@ async function performShutdown() {
 
 let shutdownPromise: Promise<void> | undefined
 
-function shutdown(): Promise<void> {
-  shutdownPromise ??= performShutdown()
+function shutdown(exitCode = 0): Promise<void> {
+  shutdownPromise ??= performShutdown(exitCode)
   return shutdownPromise
 }
 

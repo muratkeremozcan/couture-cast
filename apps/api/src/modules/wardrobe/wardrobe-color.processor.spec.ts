@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client'
+import { GARMENT_TAGGING_ANALYSIS_VERSION } from '@couture/api-client'
 import { createGarmentTagSuggestionSnapshotFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { WardrobeColorProcessor } from './wardrobe-color.processor'
@@ -84,12 +85,11 @@ describe('WardrobeColorProcessor', () => {
     expect(mockUpdateMany).toHaveBeenCalledWith({
       where: expect.objectContaining({
         id: 'g_processing',
-        upload_status: { in: ['processing', 'failed'] },
+        upload_status: 'processing',
       }) as unknown as Record<string, unknown>,
       data: expect.objectContaining({
         upload_status: 'awaiting_tags',
-        tagging_model_version:
-          'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1',
+        tagging_model_version: GARMENT_TAGGING_ANALYSIS_VERSION,
       }) as unknown as Record<string, unknown>,
     })
   })
@@ -121,6 +121,42 @@ describe('WardrobeColorProcessor', () => {
       data: expect.objectContaining({
         upload_status: 'awaiting_tags',
         tagging_failure_code: 'TAGGING_INFERENCE_FAILED',
+      }) as unknown as Record<string, unknown>,
+    })
+  })
+
+  it('reuses a persisted inference checkpoint after a queue retry', async () => {
+    const tagSnapshot = createGarmentTagSuggestionSnapshotFixture()
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'g_retry',
+      user_id: 'user_1',
+      object_path: 'wardrobe/user_1/g_retry.png',
+      retention_status: 'active',
+      upload_status: 'processing',
+      tag_suggestions: tagSnapshot,
+      tagging_failure_code: null,
+    })
+    const mockTaggingEngine = {
+      inferTags: vi.fn(),
+    }
+    const processorWithTagging = new WardrobeColorProcessor(
+      mockPrisma,
+      mockStorage,
+      mockTaggingEngine as unknown as GarmentTaggingEngine
+    )
+
+    await processorWithTagging.process('g_retry')
+
+    expect(mockTaggingEngine.inferTags).not.toHaveBeenCalled()
+    expect(mockUpdateMany).toHaveBeenCalledOnce()
+    expect(mockUpdateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: 'g_retry',
+        upload_status: 'processing',
+      }) as unknown as Record<string, unknown>,
+      data: expect.objectContaining({
+        upload_status: 'awaiting_tags',
+        tagging_model_version: GARMENT_TAGGING_ANALYSIS_VERSION,
       }) as unknown as Record<string, unknown>,
     })
   })

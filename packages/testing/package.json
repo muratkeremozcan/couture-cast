@@ -30,8 +30,9 @@
   "scripts": {
     "build": "rm -rf dist tsconfig.build.tsbuildinfo && npm exec --yes --package=typescript@5.9.3 -- tsc -p tsconfig.build.json",
     "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "prelint": "npm run build --workspace @couture/utils",
     "lint": "eslint --max-warnings=0 --ext .ts src templates test",
-    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "typecheck": "npm run build --workspace @couture/utils && tsc --noEmit -p tsconfig.typecheck.json",
     "test": "vitest run --config vitest.config.ts",
     "test:coverage": "vitest run --config vitest.config.ts --coverage"
   },

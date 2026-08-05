@@ -174,6 +174,7 @@ class ConcurrentTagUpdateError extends Error {}
 type TagConfirmationResult = {
   updated: GarmentItem
   telemetryProperties: TelemetryPropertiesMap['garment_tagging_completed'] | null
+  cacheInvalidationRequired: boolean
 }
 
 type ParsedTagSuggestion = {
@@ -588,23 +589,7 @@ export class WardrobeService {
       where: { id: garmentId, user_id: userId },
     })
 
-    if (!garment) {
-      throw new NotFoundException('GARMENT_NOT_FOUND')
-    }
-
-    if (garment.retention_status !== 'active') {
-      throw new ConflictException('GARMENT_NOT_TAGGABLE')
-    }
-
-    if (
-      ['pending_upload', 'bytes_uploaded', 'processing'].includes(garment.upload_status)
-    ) {
-      throw new ConflictException('GARMENT_ANALYSIS_PENDING')
-    }
-
-    if (garment.upload_status === 'failed') {
-      throw new ConflictException('GARMENT_NOT_TAGGABLE')
-    }
+    assertTaggableGarment(garment)
 
     if (!garment.tag_suggestions) {
       throw new ServiceUnavailableException('TAGGING_INFERENCE_UNAVAILABLE')
@@ -612,15 +597,14 @@ export class WardrobeService {
 
     const parsed = garmentTagSuggestionSnapshotSchema.safeParse(garment.tag_suggestions)
     if (!parsed.success) {
-      await this.prisma.garmentItem.updateMany({
-        where: { id: garment.id, user_id: userId },
-        data: {
-          tag_suggestions: Prisma.DbNull,
-          tagging_model_version: null,
-          tag_suggested_at: null,
-          tagging_failure_code: 'TAGGING_OUTPUT_INVALID',
+      this.logger.error(
+        {
+          garmentId: garment.id,
+          issueCount: parsed.error.issues.length,
+          userId,
         },
-      })
+        'Stored garment tag suggestion snapshot is invalid'
+      )
       throw new ServiceUnavailableException('TAGGING_INFERENCE_UNAVAILABLE')
     }
 
@@ -661,14 +645,26 @@ export class WardrobeService {
       }
     }
 
-    try {
-      await this.ritualService.invalidateUserCache(userId)
-      this.logger.info({ garmentId, userId }, 'Invalidated Ritual cache after tag update')
-    } catch (error) {
-      this.logger.error(
-        { error, garmentId, userId },
-        'Failed to invalidate Ritual cache after tag update'
-      )
+    if (result.cacheInvalidationRequired) {
+      try {
+        const invalidated = await this.ritualService.invalidateUserCache(userId)
+        if (invalidated) {
+          this.logger.info(
+            { garmentId, userId },
+            'Invalidated Ritual cache after tag update'
+          )
+        } else {
+          this.logger.error(
+            { garmentId, userId },
+            'Ritual cache invalidation failed after tag update'
+          )
+        }
+      } catch (error) {
+        this.logger.error(
+          { error, garmentId, userId },
+          'Ritual cache invalidation failed after tag update'
+        )
+      }
     }
 
     return this.toResponse(result.updated)
@@ -686,8 +682,11 @@ export class WardrobeService {
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
         )
       } catch (error) {
-        if (isRetriableTagUpdateError(error) && attempt < 3) {
-          continue
+        if (isRetriableTagUpdateError(error)) {
+          if (attempt < 3) {
+            continue
+          }
+          throw new ConflictException('CONCURRENT_TAG_UPDATE')
         }
         throw error
       }
@@ -708,7 +707,11 @@ export class WardrobeService {
 
     const targetMaterial = resolveTargetMaterial(garment, input)
     if (isUnchangedTagConfirmation(garment, input, targetMaterial)) {
-      return { updated: garment, telemetryProperties: null }
+      return {
+        updated: garment,
+        telemetryProperties: null,
+        cacheInvalidationRequired: false,
+      }
     }
 
     const { suggestion, hasMalformedSuggestion } = parseTagSuggestion(garment)
@@ -747,6 +750,7 @@ export class WardrobeService {
     })
     return {
       updated,
+      cacheInvalidationRequired: true,
       telemetryProperties: shouldEmitTelemetry
         ? buildTaggingTelemetryProperties(
             userId,
@@ -893,14 +897,21 @@ export class WardrobeService {
     if (telemetryClaim.count !== 1) {
       return
     }
-    await this.telemetryService.captureEvent(userId, 'garment_upload_completed', {
-      garmentId: garment.id,
-      fileSizeBytes: garment.file_size_bytes!,
-      mimeType: garment.mime_type as GarmentMimeType,
-      hasCropping: garment.has_cropping,
-      hasBgCleanup: garment.has_bg_cleanup,
-      durationMs: Math.max(0, Date.now() - garment.created_at.getTime()),
-    })
+    try {
+      await this.telemetryService.captureEvent(userId, 'garment_upload_completed', {
+        garmentId: garment.id,
+        fileSizeBytes: garment.file_size_bytes!,
+        mimeType: garment.mime_type as GarmentMimeType,
+        hasCropping: garment.has_cropping,
+        hasBgCleanup: garment.has_bg_cleanup,
+        durationMs: Math.max(0, Date.now() - garment.created_at.getTime()),
+      })
+    } catch (error) {
+      this.logger.error(
+        { error, garmentId: garment.id, userId },
+        'Failed to emit garment upload completion telemetry'
+      )
+    }
   }
 
   private async reconcileConcurrentCommit(

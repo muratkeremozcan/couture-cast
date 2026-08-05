@@ -16,6 +16,13 @@ import { z } from 'zod'
  */
 const isoTimestamp = z.string().datetime()
 const nonEmptyString = z.string().min(1)
+const garmentOverrideFieldSchema = z.enum(['category', 'material', 'comfort_range'])
+const garmentOverrideFieldsSchema = z
+  .array(garmentOverrideFieldSchema)
+  .max(3)
+  .refine((fields) => new Set(fields).size === fields.length, {
+    message: 'override fields must be unique',
+  })
 
 // Flow ref S0.7/T2/1: define canonical event names and input/property schemas
 // in one shared place before any app calls capture().
@@ -226,11 +233,20 @@ export const garmentTaggingCompletedEventSchema = z
     suggestedComfortRange: z.enum(['cold', 'cool', 'mild', 'warm', 'hot']).nullable(),
     confirmedComfortRange: z.enum(['cold', 'cool', 'mild', 'warm', 'hot']),
     suggestionAvailable: z.boolean(),
-    analysisVersion: z.string().nullable(),
+    analysisVersion: nonEmptyString.max(128).nullable(),
     wasOverridden: z.boolean(),
-    overrideFields: z.array(z.enum(['category', 'material', 'comfort_range'])),
+    overrideFields: garmentOverrideFieldsSchema,
   })
   .strict()
+  .superRefine((event, context) => {
+    if (event.wasOverridden && event.overrideFields.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['overrideFields'],
+        message: 'overrideFields must contain a value when wasOverridden is true',
+      })
+    }
+  })
 
 export type GarmentTaggingCompletedEvent = z.infer<
   typeof garmentTaggingCompletedEventSchema
@@ -435,11 +451,20 @@ export const garmentTaggingCompletedPropertiesSchema = z
     suggested_comfort_range: z.enum(['cold', 'cool', 'mild', 'warm', 'hot']).nullable(),
     confirmed_comfort_range: z.enum(['cold', 'cool', 'mild', 'warm', 'hot']),
     suggestion_available: z.boolean(),
-    analysis_version: z.string().nullable(),
+    analysis_version: nonEmptyString.max(128).nullable(),
     was_overridden: z.boolean(),
-    override_fields: z.array(z.enum(['category', 'material', 'comfort_range'])),
+    override_fields: garmentOverrideFieldsSchema,
   })
   .strict()
+  .superRefine((properties, context) => {
+    if (properties.was_overridden && properties.override_fields.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['override_fields'],
+        message: 'override_fields must contain a value when was_overridden is true',
+      })
+    }
+  })
 
 export type GarmentTaggingCompletedProperties = z.infer<
   typeof garmentTaggingCompletedPropertiesSchema

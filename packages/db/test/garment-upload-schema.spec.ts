@@ -51,6 +51,21 @@ describe('garment upload lifecycle migration', () => {
     expect(smartTaggingMigration).toContain('CREATE TYPE "GarmentCategory"')
     expect(smartTaggingMigration).toContain('CREATE TYPE "GarmentMaterial"')
     expect(smartTaggingMigration).toContain('CREATE TYPE "GarmentComfortRange"')
+    for (const column of [
+      'tag_suggestions',
+      'tagging_model_version',
+      'tag_suggested_at',
+      'tags_confirmed_at',
+      'tagging_failure_code',
+      'tagging_telemetry_emitted_at',
+    ]) {
+      expect(schema).toContain(column)
+      expect(smartTaggingMigration).toContain(`"${column}"`)
+    }
+    for (const value of ['top', 'cotton', 'mild']) {
+      expect(schema).toContain(value)
+      expect(smartTaggingMigration).toContain(`'${value}'`)
+    }
     expect(smartTaggingMigration).toContain('awaiting_tags')
     expect(smartTaggingMigration).toContain('GarmentItem_ready_tags_check')
     expect(smartTaggingMigration).toContain('LEGACY_TAGS_REQUIRED')
@@ -58,5 +73,11 @@ describe('garment upload lifecycle migration', () => {
     expect(smartTaggingMigration).toContain('DATA-LOSS CHECKPOINT')
     expect(smartTaggingMigration).toContain('back up GarmentItem')
     expect(smartTaggingMigration).toContain('no automatic down migration')
+    expect(smartTaggingMigration).toContain('NOT VALID')
+    expect(smartTaggingMigration).toContain(
+      'VALIDATE CONSTRAINT "GarmentItem_ready_tags_check"'
+    )
+    expect(schema).toContain('GarmentItem_ritual_candidates_idx')
+    expect(smartTaggingMigration).toContain('GarmentItem_ritual_candidates_idx')
   })
 })

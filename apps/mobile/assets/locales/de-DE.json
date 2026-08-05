@@ -155,7 +155,7 @@
     },
     "tagging": {
       "title": "Smarte Tags",
-      "desc": "Überprüfen Sie KI-Vorschläge für personalisierte Outfit-Empfehlungen.",
+      "desc": "Überprüfe KI-Vorschläge für personalisierte Outfit-Empfehlungen.",
       "needs_tags": "Tags erforderlich",
       "category": "Kategorie",
       "material": "Material",
@@ -173,8 +173,8 @@
       "low_confidence_suggested": "Vorschlag mit geringer Sicherheit: {{value}}",
       "retry": "Vorschläge erneut laden",
       "load_failed": "Smarte Vorschläge konnten nicht geladen werden.",
-      "selection_required": "Wählen Sie eine Kategorie und einen Komfortbereich.",
-      "save_failed": "Tags konnten nicht gespeichert werden. Versuchen Sie es erneut.",
+      "selection_required": "Wähle eine Kategorie und einen Komfortbereich.",
+      "save_failed": "Tags konnten nicht gespeichert werden. Versuche es erneut.",
       "saved": "Kleidungs-Tags gespeichert.",
       "poll_timeout": "Das Tagging dauert länger als erwartet. Das Kleidungsstück bleibt während der Verarbeitung verfügbar.",
       "options": {

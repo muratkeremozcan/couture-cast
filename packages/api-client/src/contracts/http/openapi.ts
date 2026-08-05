@@ -21,6 +21,25 @@ import { registerWardrobeContracts } from './wardrobe'
 
 export const HTTP_OPENAPI_OUTPUT_FILENAME = 'http.openapi.json'
 
+function preserveNullableEnumValues(value: unknown): void {
+  if (Array.isArray(value)) {
+    for (const item of value) preserveNullableEnumValues(item)
+    return
+  }
+  if (!value || typeof value !== 'object') return
+
+  const schema = value as Record<string, unknown>
+  if (
+    Array.isArray(schema.type) &&
+    schema.type.includes('null') &&
+    Array.isArray(schema.enum) &&
+    !schema.enum.includes(null)
+  ) {
+    schema.enum.push(null)
+  }
+  for (const child of Object.values(schema)) preserveNullableEnumValues(child)
+}
+
 // Story 0.9 Task 2 step 4 owner:
 // compose every contract slice into one canonical OpenAPI registry and document here.
 //
@@ -53,7 +72,7 @@ export function generateHttpOpenApiDocument() {
   const registry = createHttpOpenApiRegistry()
   const generator = new OpenApiGeneratorV31(registry.definitions)
 
-  return generator.generateDocument({
+  const document = generator.generateDocument({
     openapi: '3.1.0',
     info: {
       title: 'CoutureCast HTTP API',
@@ -67,4 +86,6 @@ export function generateHttpOpenApiDocument() {
       },
     ],
   })
+  preserveNullableEnumValues(document)
+  return document
 }

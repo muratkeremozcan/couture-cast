@@ -21,11 +21,24 @@ function flattenKeys(value: unknown, prefix = ''): string[] {
 
 describe('wardrobe smart-tagging locale parity', () => {
   it('keeps every smart-tagging key present in every supported locale', () => {
-    const locales = [deDE, enCA, es419, frCA, frFR, itIT, ptBR, ptPT, trTR]
+    const locales = [
+      ['de-DE', deDE],
+      ['en-CA', enCA],
+      ['es-419', es419],
+      ['fr-CA', frCA],
+      ['fr-FR', frFR],
+      ['it-IT', itIT],
+      ['pt-BR', ptBR],
+      ['pt-PT', ptPT],
+      ['tr-TR', trTR],
+    ] as const
     const canonicalKeys = flattenKeys(enUS.wardrobe.tagging).sort()
 
-    for (const locale of locales) {
-      expect(flattenKeys(locale.wardrobe.tagging).sort()).toEqual(canonicalKeys)
+    for (const [localeId, locale] of locales) {
+      expect(
+        flattenKeys(locale.wardrobe.tagging).sort(),
+        `tagging keys for ${localeId}`
+      ).toEqual(canonicalKeys)
     }
   })
 })

@@ -72,11 +72,15 @@ describe('GarmentTaggingModal Component', () => {
     await user.click(confirmBtn)
 
     await waitFor(() => {
-      expect(updateTagsFn).toHaveBeenCalledWith('garment-1', {
-        category: 'top',
-        material: 'cotton',
-        comfortRange: 'mild',
-      })
+      expect(updateTagsFn).toHaveBeenCalledWith(
+        'garment-1',
+        {
+          category: 'top',
+          material: 'cotton',
+          comfortRange: 'mild',
+        },
+        expect.anything()
+      )
       expect(onTagsConfirmed).toHaveBeenCalledWith(mockUpdatedGarment)
     })
   })

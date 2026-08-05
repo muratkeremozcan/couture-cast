@@ -783,7 +783,7 @@ describe('RitualService', () => {
       const scanSpy = vi.spyOn(redis, 'scan')
       const delSpy = vi.spyOn(redis, 'del')
 
-      await customService.invalidateUserCache('user-1')
+      await expect(customService.invalidateUserCache('user-1')).resolves.toBe(true)
 
       expect(scanSpy).toHaveBeenCalledWith('0', 'MATCH', 'ritual:user-1:*', 'COUNT', 100)
       expect(delSpy).toHaveBeenCalledWith([

@@ -17,7 +17,7 @@ describe('Garment Tagging Model Smoke Test', () => {
   it('processes a neutral garment fixture and returns valid finite schema output', async () => {
     const fixturePath = path.resolve(
       __dirname,
-      '../../../../mobile/assets/images/icon.png'
+      '../../../test/fixtures/garment-tagging/neutral-top.png'
     )
     const modelDir = path.resolve(__dirname, '../../../.cache/garment-tagging-model')
     expect(fs.existsSync(fixturePath)).toBe(true)

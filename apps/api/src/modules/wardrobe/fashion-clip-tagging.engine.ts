@@ -2,7 +2,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { Worker } from 'node:worker_threads'
-import type { GarmentTagSuggestionSnapshot } from '@couture/api-client/contracts/http'
+import {
+  garmentTagSuggestionSnapshotSchema,
+  type GarmentTagSuggestionSnapshot,
+} from '@couture/api-client/contracts/http'
 import {
   ANALYSIS_VERSION,
   classifyCategory,
@@ -14,6 +17,8 @@ import {
 import type { InferenceRequest, InferenceResponse } from './fashion-clip-inference.worker'
 
 export class FashionClipTaggingEngine implements GarmentTaggingEngine {
+  private static readonly INITIALIZATION_TIMEOUT_MS = 30_000
+  private static readonly FAILURE_COOLDOWN_MS = 5_000
   private worker: Worker | null = null
   private isReady = false
   private readyPromise: Promise<void> | null = null
@@ -21,6 +26,7 @@ export class FashionClipTaggingEngine implements GarmentTaggingEngine {
   private requestIdCounter = 0
   private restartPromise: Promise<void> | null = null
   private closing = false
+  private initializationFailure: { error: Error; failedAt: number } | null = null
 
   constructor(modelDir?: string) {
     this.modelDir = path.resolve(
@@ -36,7 +42,18 @@ export class FashionClipTaggingEngine implements GarmentTaggingEngine {
     const workerScript = path.join(__dirname, 'fashion-clip-inference.worker.js')
     const fallbackScript = path.join(__dirname, 'fashion-clip-inference.worker.ts')
 
-    const workerPath = fs.existsSync(workerScript) ? workerScript : fallbackScript
+    let workerPath: string
+    if (fs.existsSync(workerScript)) {
+      workerPath = workerScript
+    } else if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        `FashionCLIP inference worker build artifact is missing: ${workerScript}`
+      )
+    } else if (fs.existsSync(fallbackScript)) {
+      workerPath = fallbackScript
+    } else {
+      throw new Error(`FashionCLIP inference worker source is missing: ${fallbackScript}`)
+    }
 
     this.isReady = false
     this.worker = new Worker(workerPath, {
@@ -45,23 +62,40 @@ export class FashionClipTaggingEngine implements GarmentTaggingEngine {
     })
     const worker = this.worker
 
-    this.readyPromise = new Promise<void>((resolve, reject) => {
+    const readyPromise = new Promise<void>((resolve, reject) => {
       let settled = false
+      const initializationTimer = setTimeout(() => {
+        const error = new Error(
+          `FashionCLIP inference worker initialization timed out after ${FashionClipTaggingEngine.INITIALIZATION_TIMEOUT_MS.toLocaleString()} ms`
+        )
+        rejectInitialization(error)
+        void worker.terminate()
+      }, FashionClipTaggingEngine.INITIALIZATION_TIMEOUT_MS)
+      initializationTimer.unref()
       const cleanupInitializationListeners = () => {
+        clearTimeout(initializationTimer)
         worker.off('message', onMessage)
         worker.off('error', onError)
       }
       const rejectInitialization = (error: Error) => {
         if (settled) return
         settled = true
+        this.initializationFailure = { error, failedAt: Date.now() }
         cleanupInitializationListeners()
         reject(error)
+      }
+      const onRuntimeError = (error: Error) => {
+        if (this.closing || this.worker !== worker) return
+        this.initializationFailure = { error, failedAt: Date.now() }
+        void this.restartWorker(worker)
       }
       const onMessage = (msg: InferenceResponse) => {
         if (msg && msg.type === 'ready') {
           settled = true
           this.isReady = true
+          this.initializationFailure = null
           cleanupInitializationListeners()
+          worker.on('error', onRuntimeError)
           resolve()
         } else if (msg && msg.type === 'initialization_error') {
           rejectInitialization(new Error(msg.error))
@@ -75,6 +109,7 @@ export class FashionClipTaggingEngine implements GarmentTaggingEngine {
       worker.on('message', onMessage)
       worker.on('error', onError)
       worker.on('exit', (code) => {
+        worker.off('error', onRuntimeError)
         if (this.worker === worker) {
           this.worker = null
           this.isReady = false
@@ -89,6 +124,8 @@ export class FashionClipTaggingEngine implements GarmentTaggingEngine {
         }
       })
     })
+    void readyPromise.catch(() => undefined)
+    this.readyPromise = readyPromise
   }
 
   private async restartWorker(failedWorker: Worker): Promise<void> {
@@ -118,11 +155,25 @@ export class FashionClipTaggingEngine implements GarmentTaggingEngine {
 
   public async ensureReady(): Promise<void> {
     if (this.isReady) return
+    if (
+      this.initializationFailure &&
+      Date.now() - this.initializationFailure.failedAt <
+        FashionClipTaggingEngine.FAILURE_COOLDOWN_MS
+    ) {
+      throw this.initializationFailure.error
+    }
     if (this.restartPromise) {
       await this.restartPromise
     }
     if (!this.worker) {
-      this.spawnWorker()
+      try {
+        this.spawnWorker()
+      } catch (error) {
+        const normalized =
+          error instanceof Error ? error : new Error('Failed to spawn inference worker')
+        this.initializationFailure = { error: normalized, failedAt: Date.now() }
+        throw normalized
+      }
     }
     if (this.readyPromise) {
       await this.readyPromise
@@ -158,12 +209,14 @@ export class FashionClipTaggingEngine implements GarmentTaggingEngine {
               const material = classifyMaterial(msg.materialLogits)
               const comfortRange = deriveComfort(category, material)
 
-              resolve({
-                analysisVersion: ANALYSIS_VERSION,
-                category,
-                material,
-                comfortRange,
-              })
+              resolve(
+                garmentTagSuggestionSnapshotSchema.parse({
+                  analysisVersion: ANALYSIS_VERSION,
+                  category,
+                  material,
+                  comfortRange,
+                })
+              )
             } catch (err) {
               reject(
                 new GarmentTaggingOutputError(

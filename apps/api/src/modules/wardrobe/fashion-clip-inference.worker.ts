@@ -44,6 +44,7 @@ let tokenizer:
     ) => Promise<Record<string, unknown>>)
   | null = null
 let model: ((input: unknown) => Promise<unknown>) | null = null
+let promptTextInputs: Record<string, unknown> | null = null
 let initialized = false
 const logger = createBaseLogger().child({ feature: 'fashion-clip-inference-worker' })
 
@@ -76,14 +77,16 @@ function calculateEmbeddingLogits(
   promptCount: number
 ): number[] {
   const embedDimension = imageEmbeds.length
+  if (embedDimension === 0 || textEmbeds.length !== promptCount * embedDimension) {
+    throw new InvalidInferenceOutputError('Inference embedding dimensions are invalid')
+  }
   const logits = new Array<number>(promptCount).fill(0)
 
   for (let promptIndex = 0; promptIndex < promptCount; promptIndex++) {
     let dotProduct = 0
     for (let dimension = 0; dimension < embedDimension; dimension++) {
       dotProduct +=
-        (imageEmbeds[dimension] ?? 0) *
-        (textEmbeds[promptIndex * embedDimension + dimension] ?? 0)
+        imageEmbeds[dimension]! * textEmbeds[promptIndex * embedDimension + dimension]!
     }
     logits[promptIndex] = dotProduct
   }
@@ -111,7 +114,7 @@ export function extractLogits(
 }
 
 export function assertValidLogits(logits: number[], expectedCount: number): void {
-  if (logits.length < expectedCount) {
+  if (logits.length !== expectedCount) {
     throw new InvalidInferenceOutputError('Inference output logits count invalid')
   }
   if (logits.some((score) => !Number.isFinite(score))) {
@@ -119,14 +122,18 @@ export function assertValidLogits(logits: number[], expectedCount: number): void
   }
 }
 
-function computeSha256(filePath: string): string {
+// Keep this streamed digest implementation aligned with
+// scripts/prepare-garment-tagging-model.mjs.
+async function computeSha256(filePath: string): Promise<string> {
   const hash = crypto.createHash('sha256')
-  const fileBuffer = fs.readFileSync(filePath)
-  hash.update(fileBuffer)
+  for await (const chunk of fs.createReadStream(filePath)) {
+    hash.update(chunk as Buffer)
+  }
   return hash.digest('hex')
 }
 
-export function verifyModelSnapshot(modelDir: string): void {
+// eslint-disable-next-line complexity
+export async function verifyModelSnapshot(modelDir: string): Promise<void> {
   const absoluteModelDir = path.resolve(modelDir)
   const manifestCandidates = [
     path.resolve(__dirname, '../../../model-manifests/fashion-clip-7e3ba62.json'),
@@ -148,7 +155,8 @@ export function verifyModelSnapshot(modelDir: string): void {
     manifest.revision !== '7e3ba62ce16b379a1ab479346b66f192e76f51b7' ||
     manifest.analysisVersion !==
       'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1' ||
-    !Array.isArray(manifest.files)
+    !Array.isArray(manifest.files) ||
+    manifest.files.length === 0
   ) {
     throw new Error('Model manifest identity or file list is invalid')
   }
@@ -172,7 +180,14 @@ export function verifyModelSnapshot(modelDir: string): void {
     if (!fs.existsSync(fullPath)) {
       throw new Error(`Model snapshot missing required file: ${fullPath}`)
     }
-    const actualHash = computeSha256(fullPath)
+    const canonicalModelDir = fs.realpathSync(absoluteModelDir)
+    const canonicalFilePath = fs.realpathSync(fullPath)
+    if (!canonicalFilePath.startsWith(`${canonicalModelDir}${path.sep}`)) {
+      throw new Error(
+        `Model manifest path escapes the snapshot directory: ${fileSpec.path}`
+      )
+    }
+    const actualHash = await computeSha256(fullPath)
     if (actualHash.toLowerCase() !== expectedSha256.toLowerCase()) {
       throw new Error(
         `Model file checksum mismatch for ${fileSpec.path}: expected ${expectedSha256}, got ${actualHash}`
@@ -182,24 +197,25 @@ export function verifyModelSnapshot(modelDir: string): void {
 }
 
 export async function initializeInferenceWorker(modelDir: string): Promise<void> {
-  verifyModelSnapshot(modelDir)
+  const resolvedModelDir = path.resolve(modelDir)
+  await verifyModelSnapshot(resolvedModelDir)
 
   const transformers = await import('@huggingface/transformers')
   transformers.env.allowRemoteModels = false
-  transformers.env.localModelPath = modelDir
+  transformers.env.localModelPath = resolvedModelDir
 
   const { AutoProcessor, AutoTokenizer, AutoModel, RawImage } = transformers
 
-  processor = (await AutoProcessor.from_pretrained(modelDir, {
+  processor = (await AutoProcessor.from_pretrained(resolvedModelDir, {
     local_files_only: true,
   })) as unknown as (input: unknown) => Promise<Record<string, unknown>>
-  tokenizer = (await AutoTokenizer.from_pretrained(modelDir, {
+  tokenizer = (await AutoTokenizer.from_pretrained(resolvedModelDir, {
     local_files_only: true,
   })) as unknown as (
     input: string[],
     options: { padding: boolean; truncation: boolean }
   ) => Promise<Record<string, unknown>>
-  model = (await AutoModel.from_pretrained(modelDir, {
+  model = (await AutoModel.from_pretrained(resolvedModelDir, {
     local_files_only: true,
   })) as unknown as (input: unknown) => Promise<unknown>
 
@@ -210,9 +226,12 @@ export async function initializeInferenceWorker(modelDir: string): Promise<void>
   const materialTexts = MATERIAL_KEYS.map((k) => MATERIAL_PROMPTS[k])
   const allPrompts = [...categoryTexts, ...materialTexts]
 
-  const textInputs = await tokenizer(allPrompts, { padding: true, truncation: true })
+  promptTextInputs = await tokenizer(allPrompts, {
+    padding: true,
+    truncation: true,
+  })
   const imageInputs = await processor(dummyRawImage)
-  await model({ ...textInputs, ...imageInputs })
+  await model({ ...promptTextInputs, ...imageInputs })
 
   initialized = true
 }
@@ -220,7 +239,7 @@ export async function initializeInferenceWorker(modelDir: string): Promise<void>
 export async function runInferenceOnImage(
   imageBuffer: Buffer
 ): Promise<{ categoryLogits: number[]; materialLogits: number[] }> {
-  if (!initialized || !processor || !tokenizer || !model) {
+  if (!initialized || !processor || !model || !promptTextInputs) {
     throw new Error('Inference worker is not initialized')
   }
 
@@ -229,19 +248,14 @@ export async function runInferenceOnImage(
 
   const imageBytes = Uint8Array.from(imageBuffer)
   const rawImage = await RawImage.fromBlob(new Blob([imageBytes]))
-  const categoryTexts = CATEGORY_KEYS.map((k) => CATEGORY_PROMPTS[k])
-  const materialTexts = MATERIAL_KEYS.map((k) => MATERIAL_PROMPTS[k])
-  const allPrompts = [...categoryTexts, ...materialTexts]
-
-  const textInputs = await tokenizer(allPrompts, { padding: true, truncation: true })
   const imageInputs = await processor(rawImage)
 
   const output = (await model({
-    ...textInputs,
+    ...promptTextInputs,
     ...imageInputs,
   })) as InferenceModelOutput
   const expectedLogitCount = CATEGORY_KEYS.length + MATERIAL_KEYS.length
-  const logits = extractLogits(output, allPrompts.length)
+  const logits = extractLogits(output, expectedLogitCount)
   assertValidLogits(logits, expectedLogitCount)
 
   const categoryLogits = logits.slice(0, CATEGORY_KEYS.length)
@@ -288,9 +302,10 @@ if (!isMainThread && parentPort) {
       process.exit(1)
     })
 
+  let requestQueue = Promise.resolve()
   parentPort.on('message', (msg: InferenceRequest) => {
-    void (async () => {
-      if (!msg || !msg.id || !msg.imageBuffer) return
+    if (!msg || !msg.id || !msg.imageBuffer) return
+    requestQueue = requestQueue.then(async () => {
       try {
         const { categoryLogits, materialLogits } = await runInferenceOnImage(
           msg.imageBuffer
@@ -323,6 +338,7 @@ if (!isMainThread && parentPort) {
           code,
         } as InferenceResponse)
       }
-    })()
+    })
+    void requestQueue
   })
 }

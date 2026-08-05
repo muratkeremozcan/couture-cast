@@ -40,6 +40,14 @@ describe('MobileGarmentTaggingModal Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSuggestTagsFn.mockResolvedValue(
+      createSuggestGarmentTagsDataFixture({
+        garmentId: 'g_123',
+        category: { confidence: 0.88 },
+        material: { confidence: 0.75 },
+      })
+    )
+    mockUpdateTagsFn.mockResolvedValue(createReadyGarmentFixture({ id: 'g_123' }))
     vi.spyOn(console, 'warn').mockImplementation((message) => {
       if (message === 'props.pointerEvents is deprecated. Use style.pointerEvents') {
         return

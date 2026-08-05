@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type React from 'react'
 import { useTranslation } from 'react-i18next'
 import * as Crypto from 'expo-crypto'
 import { File, Paths } from 'expo-file-system'
@@ -81,10 +82,14 @@ export default function WardrobeScreen() {
   const [useBgCleanup, setUseBgCleanup] = useState(true)
   const [uploadStatus, setUploadStatus] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [timedOutGarmentIds, setTimedOutGarmentIds] = useState<Set<string>>(
+    () => new Set()
+  )
   const uploadAbortRef = useRef<AbortController | null>(null)
   const pollingAbortRef = useRef<AbortController | null>(null)
   const pendingTaggingGarmentIdRef = useRef<string | null>(null)
   const isCaptureOpenRef = useRef(false)
+  const addGarmentButtonRef = useRef<React.ElementRef<typeof Pressable> | null>(null)
 
   useEffect(() => {
     isCaptureOpenRef.current = isCaptureOpen
@@ -126,6 +131,7 @@ export default function WardrobeScreen() {
     const pendingGarmentId = pendingTaggingGarmentIdRef.current
     pendingTaggingGarmentIdRef.current = null
     if (pendingGarmentId) {
+      setTaggingInvokerNodeHandle(findNodeHandle(addGarmentButtonRef.current))
       setTimeout(() => setTaggingGarmentId(pendingGarmentId), 0)
     }
   }
@@ -149,21 +155,32 @@ export default function WardrobeScreen() {
     pollingAbortRef.current = controller
     void (async () => {
       try {
-        for (const delayMs of [1_000, 2_000, 4_000, 8_000]) {
-          await waitForPoll(delayMs, controller.signal)
+        const startedAt = Date.now()
+        for (const offsetMs of [1_000, 2_000, 4_000, 8_000]) {
+          await waitForPoll(
+            Math.max(0, startedAt + offsetMs - Date.now()),
+            controller.signal
+          )
           const persisted = await listGarmentsFromMobile(token, controller.signal)
           setGarments(persisted)
           const current = persisted.find((garment) => garment.id === garmentId)
           if (!current || current.status === 'processing') continue
+          setTimedOutGarmentIds((ids) => {
+            const next = new Set(ids)
+            next.delete(garmentId)
+            return next
+          })
           if (current.status === 'awaiting_tags') {
             if (isCaptureOpenRef.current) {
               pendingTaggingGarmentIdRef.current = current.id
             } else {
+              setTaggingInvokerNodeHandle(findNodeHandle(addGarmentButtonRef.current))
               setTaggingGarmentId(current.id)
             }
           }
           return
         }
+        setTimedOutGarmentIds((ids) => new Set(ids).add(garmentId))
         setErrorMessage(t('wardrobe.tagging.poll_timeout'))
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -173,6 +190,22 @@ export default function WardrobeScreen() {
         }
       }
     })()
+  }
+
+  const openTaggingGarment = async (
+    garmentId: string,
+    invokingNodeHandle?: number | null
+  ) => {
+    const freshToken = await resolveMobileAccessToken()
+    if (!freshToken) {
+      setErrorMessage('AUTHENTICATION_REQUIRED')
+      return
+    }
+    setAccessToken(freshToken)
+    setTaggingInvokerNodeHandle(
+      invokingNodeHandle ?? findNodeHandle(addGarmentButtonRef.current)
+    )
+    setTaggingGarmentId(garmentId)
   }
 
   const selectAsset = (asset: ImagePicker.ImagePickerAsset) => {
@@ -277,6 +310,7 @@ export default function WardrobeScreen() {
       if (!accessToken) {
         throw new Error('AUTHENTICATION_REQUIRED')
       }
+      setAccessToken(accessToken)
 
       setUploadStatus(t('wardrobe.upload.requesting'))
       const allocationResponse = await fetch(
@@ -379,6 +413,7 @@ export default function WardrobeScreen() {
               <Text style={styles.subtitle}>{t('wardrobe.empty_desc')}</Text>
             </View>
             <Pressable
+              ref={addGarmentButtonRef}
               accessibilityRole="button"
               testID="garment-capture-open"
               style={styles.primaryButton}
@@ -408,8 +443,11 @@ export default function WardrobeScreen() {
                   <Text numberOfLines={1} style={styles.garmentId}>
                     {garment.id}
                   </Text>
-                  <Text>{garment.status}</Text>
-                  {garment.status === 'awaiting_tags' && (
+                  <Text testID={`garment-status-${garment.status}`}>
+                    {garment.status}
+                  </Text>
+                  {(garment.status === 'awaiting_tags' ||
+                    timedOutGarmentIds.has(garment.id)) && (
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={t('wardrobe.tagging.needs_tags', {
@@ -417,10 +455,10 @@ export default function WardrobeScreen() {
                       })}
                       style={styles.needsTagsBtn}
                       onPress={(event) => {
-                        setTaggingInvokerNodeHandle(
+                        void openTaggingGarment(
+                          garment.id,
                           findNodeHandle(event.currentTarget as never)
                         )
-                        setTaggingGarmentId(garment.id)
                       }}
                     >
                       <Text style={styles.needsTagsText}>
@@ -596,6 +634,12 @@ export default function WardrobeScreen() {
             current.map((item) => (item.id === updatedGarment.id ? updatedGarment : item))
           )
           setTaggingGarmentId(null)
+          void (async () => {
+            const freshToken = await resolveMobileAccessToken()
+            if (!freshToken) return
+            setAccessToken(freshToken)
+            setGarments(await listGarmentsFromMobile(freshToken))
+          })().catch(() => undefined)
         }}
       />
     </>

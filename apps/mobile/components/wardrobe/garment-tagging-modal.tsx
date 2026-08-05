@@ -101,6 +101,7 @@ function TaggingError({ message, isLoading, retryLabel, onRetry }: TaggingErrorP
   )
 }
 
+// eslint-disable-next-line complexity
 export function MobileGarmentTaggingModal({
   visible,
   onClose,
@@ -118,31 +119,49 @@ export function MobileGarmentTaggingModal({
   const [selectedComfort, setSelectedComfort] = useState<GarmentComfortRange | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [isSaving, setIsSaving] = useState<boolean>(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [suggestionError, setSuggestionError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [isAnalysisPending, setIsAnalysisPending] = useState(false)
   const [suggestions, setSuggestions] = useState<SuggestGarmentTagsData | null>(null)
   const [loadAttempt, setLoadAttempt] = useState(0)
-  const closeButtonRef = useRef<React.ElementRef<typeof TouchableOpacity> | null>(null)
+  const titleRef = useRef<React.ElementRef<typeof Text> | null>(null)
   const saveAbortRef = useRef<AbortController | null>(null)
+  const onCloseRef = useRef(onClose)
+  const invokingNodeHandleRef = useRef(invokingNodeHandle)
+  const modalSessionRef = useRef(0)
+  onCloseRef.current = onClose
+  invokingNodeHandleRef.current = invokingNodeHandle
 
   useEffect(() => {
     if (!visible) return
     const focusTimer = setTimeout(() => {
-      const node = findNodeHandle(closeButtonRef.current)
+      const node = findNodeHandle(titleRef.current)
       if (node) AccessibilityInfo.setAccessibilityFocus(node)
     }, 150)
     const backSubscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      onClose()
+      onCloseRef.current()
       return true
     })
     return () => {
       clearTimeout(focusTimer)
       backSubscription.remove()
-      saveAbortRef.current?.abort()
-      if (invokingNodeHandle) {
-        AccessibilityInfo.setAccessibilityFocus(invokingNodeHandle)
+      const invoker = invokingNodeHandleRef.current
+      if (invoker) {
+        AccessibilityInfo.setAccessibilityFocus(invoker)
       }
     }
-  }, [invokingNodeHandle, onClose, visible])
+  }, [visible])
+
+  useEffect(() => {
+    modalSessionRef.current += 1
+  }, [garmentId, visible])
+
+  useEffect(
+    () => () => {
+      saveAbortRef.current?.abort()
+    },
+    []
+  )
 
   useEffect(() => {
     if (!visible || !garmentId) {
@@ -150,14 +169,22 @@ export function MobileGarmentTaggingModal({
       setSelectedMaterial(null)
       setSelectedComfort(null)
       setSuggestions(null)
-      setErrorMessage(null)
+      setSuggestionError(null)
+      setSaveError(null)
+      setIsAnalysisPending(false)
       return
     }
 
     const controller = new AbortController()
     let isMounted = true
+    setSelectedCategory(null)
+    setSelectedMaterial(null)
+    setSelectedComfort(null)
+    setSuggestions(null)
     setIsLoading(true)
-    setErrorMessage(null)
+    setSuggestionError(null)
+    setSaveError(null)
+    setIsAnalysisPending(false)
 
     announce('feedback', t('wardrobe.tagging.loading_suggestions'))
     suggestTagsFn(accessToken, garmentId, controller.signal)
@@ -177,12 +204,21 @@ export function MobileGarmentTaggingModal({
       .catch((err: unknown) => {
         if (!isMounted) return
         const msg = err instanceof Error ? err.message : ''
-        const localized = msg.includes('GARMENT_ANALYSIS_PENDING')
-          ? t('wardrobe.tagging.pending_analysis')
-          : msg.includes('TAGGING_INFERENCE_UNAVAILABLE')
-            ? t('wardrobe.tagging.inference_unavailable')
-            : msg || t('wardrobe.tagging.load_failed')
-        setErrorMessage(localized)
+        const code =
+          err &&
+          typeof err === 'object' &&
+          'code' in err &&
+          typeof (err as { code?: unknown }).code === 'string'
+            ? (err as { code: string }).code
+            : ''
+        const localized =
+          code === 'GARMENT_ANALYSIS_PENDING'
+            ? t('wardrobe.tagging.pending_analysis')
+            : code === 'TAGGING_INFERENCE_UNAVAILABLE'
+              ? t('wardrobe.tagging.inference_unavailable')
+              : msg || t('wardrobe.tagging.load_failed')
+        setIsAnalysisPending(code === 'GARMENT_ANALYSIS_PENDING')
+        setSuggestionError(localized)
         announce('error', localized)
       })
       .finally(() => {
@@ -198,15 +234,16 @@ export function MobileGarmentTaggingModal({
   const handleSave = async () => {
     if (!garmentId || !selectedCategory || !selectedComfort) {
       const message = t('wardrobe.tagging.selection_required')
-      setErrorMessage(message)
+      setSaveError(message)
       announce('error', message)
       return
     }
 
     setIsSaving(true)
-    setErrorMessage(null)
+    setSaveError(null)
     const controller = new AbortController()
     saveAbortRef.current = controller
+    const modalSession = modalSessionRef.current
 
     try {
       const updated = await updateTagsFn(
@@ -219,21 +256,25 @@ export function MobileGarmentTaggingModal({
         },
         controller.signal
       )
+      if (modalSessionRef.current !== modalSession || controller.signal.aborted) return
       announce('feedback', t('wardrobe.tagging.saved'))
       onTagsConfirmed?.(updated)
       onClose()
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : t('wardrobe.tagging.save_failed')
-      setErrorMessage(message)
-      announce('error', message)
+      if (!controller.signal.aborted && modalSessionRef.current === modalSession) {
+        setSaveError(message)
+        announce('error', message)
+      }
     } finally {
-      setIsSaving(false)
+      if (modalSessionRef.current === modalSession) setIsSaving(false)
       if (saveAbortRef.current === controller) saveAbortRef.current = null
     }
   }
 
-  const isSaveDisabled = !selectedCategory || !selectedComfort || isSaving
+  const isSaveDisabled =
+    !selectedCategory || !selectedComfort || isSaving || isAnalysisPending
 
   return (
     <Modal
@@ -247,11 +288,18 @@ export function MobileGarmentTaggingModal({
           testID="garment-tagging-modal"
           style={styles.container}
           accessibilityViewIsModal={true}
+          onAccessibilityEscape={() => onCloseRef.current()}
         >
           <View style={styles.header}>
-            <Text style={styles.title}>{t('wardrobe.tagging.title')}</Text>
+            <Text
+              ref={titleRef}
+              style={styles.title}
+              accessible={true}
+              accessibilityRole="header"
+            >
+              {t('wardrobe.tagging.title')}
+            </Text>
             <TouchableOpacity
-              ref={closeButtonRef}
               onPress={onClose}
               style={styles.closeBtn}
               accessibilityLabel={t('wardrobe.tagging.close')}
@@ -263,11 +311,17 @@ export function MobileGarmentTaggingModal({
           </View>
 
           <TaggingError
-            message={errorMessage}
+            message={suggestionError}
             isLoading={isLoading}
             retryLabel={t('wardrobe.tagging.retry')}
             onRetry={() => setLoadAttempt((current) => current + 1)}
           />
+
+          {saveError && (
+            <Text style={styles.errorText} accessibilityRole="alert">
+              {saveError}
+            </Text>
+          )}
 
           {isLoading ? (
             <ActivityIndicator
@@ -276,7 +330,7 @@ export function MobileGarmentTaggingModal({
               color="#000"
               style={{ marginVertical: 20 }}
             />
-          ) : (
+          ) : !isAnalysisPending ? (
             <ScrollView keyboardShouldPersistTaps="handled" style={styles.content}>
               {/* Category */}
               <Text style={styles.sectionTitle}>
@@ -296,7 +350,12 @@ export function MobileGarmentTaggingModal({
                   )}
                 </Text>
               )}
-              <View accessibilityRole="radiogroup" style={styles.chipGrid}>
+              <View
+                accessibilityRole="radiogroup"
+                accessibilityLabel={t('wardrobe.tagging.category')}
+                accessibilityHint={t('wardrobe.tagging.desc')}
+                style={styles.chipGrid}
+              >
                 {CATEGORY_OPTIONS.map((opt) => {
                   const isSelected = selectedCategory === opt
                   const label = t(`wardrobe.tagging.options.category.${opt}`)
@@ -305,8 +364,9 @@ export function MobileGarmentTaggingModal({
                       key={opt}
                       testID={`garment-tag-category-${opt}`}
                       accessibilityRole="radio"
-                      accessibilityState={{ selected: isSelected }}
+                      accessibilityState={{ selected: isSelected, disabled: isSaving }}
                       accessibilityLabel={label}
+                      disabled={isSaving}
                       onPress={() => {
                         setSelectedCategory(opt)
                         announce('feedback', label)
@@ -341,11 +401,20 @@ export function MobileGarmentTaggingModal({
                   )}
                 </Text>
               )}
-              <View accessibilityRole="radiogroup" style={styles.chipGrid}>
+              <View
+                accessibilityRole="radiogroup"
+                accessibilityLabel={t('wardrobe.tagging.material')}
+                accessibilityHint={t('wardrobe.tagging.desc')}
+                style={styles.chipGrid}
+              >
                 <TouchableOpacity
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: selectedMaterial === null }}
+                  accessibilityState={{
+                    selected: selectedMaterial === null,
+                    disabled: isSaving,
+                  }}
                   accessibilityLabel={t('wardrobe.tagging.not_sure')}
+                  disabled={isSaving}
                   onPress={() => {
                     setSelectedMaterial(null)
                     announce('feedback', t('wardrobe.tagging.not_sure'))
@@ -369,8 +438,9 @@ export function MobileGarmentTaggingModal({
                       key={opt}
                       testID={`garment-tag-material-${opt}`}
                       accessibilityRole="radio"
-                      accessibilityState={{ selected: isSelected }}
+                      accessibilityState={{ selected: isSelected, disabled: isSaving }}
                       accessibilityLabel={label}
+                      disabled={isSaving}
                       onPress={() => {
                         setSelectedMaterial(opt)
                         announce('feedback', label)
@@ -405,7 +475,12 @@ export function MobileGarmentTaggingModal({
                   )}
                 </Text>
               )}
-              <View accessibilityRole="radiogroup" style={styles.comfortList}>
+              <View
+                accessibilityRole="radiogroup"
+                accessibilityLabel={t('wardrobe.tagging.comfort_range')}
+                accessibilityHint={t('wardrobe.tagging.desc')}
+                style={styles.comfortList}
+              >
                 {COMFORT_OPTIONS.map((opt) => {
                   const isSelected = selectedComfort === opt
                   const label = t(`wardrobe.tagging.options.comfort.${opt}`)
@@ -414,8 +489,9 @@ export function MobileGarmentTaggingModal({
                       key={opt}
                       testID={`garment-tag-comfort-${opt}`}
                       accessibilityRole="radio"
-                      accessibilityState={{ selected: isSelected }}
+                      accessibilityState={{ selected: isSelected, disabled: isSaving }}
                       accessibilityLabel={label}
+                      disabled={isSaving}
                       onPress={() => {
                         setSelectedComfort(opt)
                         announce('feedback', label)
@@ -438,7 +514,7 @@ export function MobileGarmentTaggingModal({
                 })}
               </View>
             </ScrollView>
-          )}
+          ) : null}
 
           <View style={styles.footer}>
             <TouchableOpacity
@@ -449,18 +525,20 @@ export function MobileGarmentTaggingModal({
               <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => void handleSave()}
-              disabled={isSaveDisabled}
-              style={[styles.saveBtn, isSaveDisabled && styles.saveBtnDisabled]}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: isSaveDisabled }}
-              testID="garment-tagging-save"
-            >
-              <Text style={styles.saveText}>
-                {isSaving ? t('wardrobe.tagging.saving') : t('wardrobe.tagging.save')}
-              </Text>
-            </TouchableOpacity>
+            {!isAnalysisPending && (
+              <TouchableOpacity
+                onPress={() => void handleSave()}
+                disabled={isSaveDisabled}
+                style={[styles.saveBtn, isSaveDisabled && styles.saveBtnDisabled]}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isSaveDisabled }}
+                testID="garment-tagging-save"
+              >
+                <Text style={styles.saveText}>
+                  {isSaving ? t('wardrobe.tagging.saving') : t('wardrobe.tagging.save')}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>

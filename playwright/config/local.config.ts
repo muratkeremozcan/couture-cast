@@ -48,7 +48,7 @@ export default defineConfig(
     webServer: {
       command: 'node scripts/start-api-e2e-with-workers.mjs --with-web',
       url: environment.webBaseUrl,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 240_000,
       stdout: 'pipe',
       stderr: 'pipe',
@@ -56,7 +56,8 @@ export default defineConfig(
       env: {
         ...process.env,
         API_BASE_URL: environment.apiBaseUrl,
-        PUBLIC_API_URL: environment.webBaseUrl,
+        PUBLIC_API_URL: environment.apiBaseUrl,
+        REUSE_EXISTING_WEB_SERVER: process.env.CI ? 'false' : 'true',
         WEB_E2E_BASE_URL: environment.webBaseUrl,
         POSTHOG_API_KEY: '',
         TEST_ENV: 'local',

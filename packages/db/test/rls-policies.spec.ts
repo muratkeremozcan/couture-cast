@@ -28,7 +28,7 @@ const ownerOrGlobalReadTables = ['EventEnvelope'] as const
 
 const adminPool = new Pool({
   connectionString: databaseUrl,
-  max: 4,
+  max: 8,
 })
 
 type SeededScenario = {

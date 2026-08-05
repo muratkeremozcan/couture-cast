@@ -1195,6 +1195,50 @@ export type ForbiddenHttpErrorErrorEnum =
 /**
  *
  * @export
+ * @interface GarmentIdBadRequestError
+ */
+export interface GarmentIdBadRequestError {
+  /**
+   *
+   * @type {GarmentIdBadRequestErrorStatusCodeEnum}
+   * @memberof GarmentIdBadRequestError
+   */
+  statusCode: GarmentIdBadRequestErrorStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GarmentIdBadRequestError
+   */
+  message: string
+  /**
+   *
+   * @type {GarmentIdBadRequestErrorErrorEnum}
+   * @memberof GarmentIdBadRequestError
+   */
+  error: GarmentIdBadRequestErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const GarmentIdBadRequestErrorStatusCodeEnum = {
+  NUMBER_400: 400,
+} as const
+export type GarmentIdBadRequestErrorStatusCodeEnum =
+  (typeof GarmentIdBadRequestErrorStatusCodeEnum)[keyof typeof GarmentIdBadRequestErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GarmentIdBadRequestErrorErrorEnum = {
+  Bad_Request: 'Bad Request',
+} as const
+export type GarmentIdBadRequestErrorErrorEnum =
+  (typeof GarmentIdBadRequestErrorErrorEnum)[keyof typeof GarmentIdBadRequestErrorErrorEnum]
+
+/**
+ *
+ * @export
  * @interface GarmentListResponse
  */
 export interface GarmentListResponse {
@@ -1205,6 +1249,380 @@ export interface GarmentListResponse {
    */
   data: Array<CreateGarmentItemResponseData>
 }
+/**
+ *
+ * @export
+ * @interface GarmentSuggestionConflictError
+ */
+export interface GarmentSuggestionConflictError {
+  /**
+   *
+   * @type {GarmentSuggestionConflictErrorStatusCodeEnum}
+   * @memberof GarmentSuggestionConflictError
+   */
+  statusCode: GarmentSuggestionConflictErrorStatusCodeEnum
+  /**
+   *
+   * @type {GarmentSuggestionConflictErrorMessageEnum}
+   * @memberof GarmentSuggestionConflictError
+   */
+  message: GarmentSuggestionConflictErrorMessageEnum
+  /**
+   *
+   * @type {GarmentSuggestionConflictErrorErrorEnum}
+   * @memberof GarmentSuggestionConflictError
+   */
+  error: GarmentSuggestionConflictErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const GarmentSuggestionConflictErrorStatusCodeEnum = {
+  NUMBER_409: 409,
+} as const
+export type GarmentSuggestionConflictErrorStatusCodeEnum =
+  (typeof GarmentSuggestionConflictErrorStatusCodeEnum)[keyof typeof GarmentSuggestionConflictErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GarmentSuggestionConflictErrorMessageEnum = {
+  GARMENT_ANALYSIS_PENDING: 'GARMENT_ANALYSIS_PENDING',
+  GARMENT_NOT_TAGGABLE: 'GARMENT_NOT_TAGGABLE',
+} as const
+export type GarmentSuggestionConflictErrorMessageEnum =
+  (typeof GarmentSuggestionConflictErrorMessageEnum)[keyof typeof GarmentSuggestionConflictErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const GarmentSuggestionConflictErrorErrorEnum = {
+  Conflict: 'Conflict',
+} as const
+export type GarmentSuggestionConflictErrorErrorEnum =
+  (typeof GarmentSuggestionConflictErrorErrorEnum)[keyof typeof GarmentSuggestionConflictErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface GarmentTaggingForbiddenError
+ */
+export interface GarmentTaggingForbiddenError {
+  /**
+   *
+   * @type {GarmentTaggingForbiddenErrorStatusCodeEnum}
+   * @memberof GarmentTaggingForbiddenError
+   */
+  statusCode: GarmentTaggingForbiddenErrorStatusCodeEnum
+  /**
+   *
+   * @type {GarmentTaggingForbiddenErrorMessageEnum}
+   * @memberof GarmentTaggingForbiddenError
+   */
+  message: GarmentTaggingForbiddenErrorMessageEnum
+  /**
+   *
+   * @type {GarmentTaggingForbiddenErrorErrorEnum}
+   * @memberof GarmentTaggingForbiddenError
+   */
+  error: GarmentTaggingForbiddenErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const GarmentTaggingForbiddenErrorStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type GarmentTaggingForbiddenErrorStatusCodeEnum =
+  (typeof GarmentTaggingForbiddenErrorStatusCodeEnum)[keyof typeof GarmentTaggingForbiddenErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GarmentTaggingForbiddenErrorMessageEnum = {
+  Guardian_consent_required_before_continuing:
+    'Guardian consent required before continuing',
+  GUARDIAN_CONSENT_REQUIRED: 'GUARDIAN_CONSENT_REQUIRED',
+} as const
+export type GarmentTaggingForbiddenErrorMessageEnum =
+  (typeof GarmentTaggingForbiddenErrorMessageEnum)[keyof typeof GarmentTaggingForbiddenErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const GarmentTaggingForbiddenErrorErrorEnum = {
+  Forbidden: 'Forbidden',
+} as const
+export type GarmentTaggingForbiddenErrorErrorEnum =
+  (typeof GarmentTaggingForbiddenErrorErrorEnum)[keyof typeof GarmentTaggingForbiddenErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface GarmentTaggingNotFoundError
+ */
+export interface GarmentTaggingNotFoundError {
+  /**
+   *
+   * @type {GarmentTaggingNotFoundErrorStatusCodeEnum}
+   * @memberof GarmentTaggingNotFoundError
+   */
+  statusCode: GarmentTaggingNotFoundErrorStatusCodeEnum
+  /**
+   *
+   * @type {GarmentTaggingNotFoundErrorMessageEnum}
+   * @memberof GarmentTaggingNotFoundError
+   */
+  message: GarmentTaggingNotFoundErrorMessageEnum
+  /**
+   *
+   * @type {GarmentTaggingNotFoundErrorErrorEnum}
+   * @memberof GarmentTaggingNotFoundError
+   */
+  error: GarmentTaggingNotFoundErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const GarmentTaggingNotFoundErrorStatusCodeEnum = {
+  NUMBER_404: 404,
+} as const
+export type GarmentTaggingNotFoundErrorStatusCodeEnum =
+  (typeof GarmentTaggingNotFoundErrorStatusCodeEnum)[keyof typeof GarmentTaggingNotFoundErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GarmentTaggingNotFoundErrorMessageEnum = {
+  GARMENT_NOT_FOUND: 'GARMENT_NOT_FOUND',
+} as const
+export type GarmentTaggingNotFoundErrorMessageEnum =
+  (typeof GarmentTaggingNotFoundErrorMessageEnum)[keyof typeof GarmentTaggingNotFoundErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const GarmentTaggingNotFoundErrorErrorEnum = {
+  Not_Found: 'Not Found',
+} as const
+export type GarmentTaggingNotFoundErrorErrorEnum =
+  (typeof GarmentTaggingNotFoundErrorErrorEnum)[keyof typeof GarmentTaggingNotFoundErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface GarmentTaggingUnauthorizedError
+ */
+export interface GarmentTaggingUnauthorizedError {
+  /**
+   *
+   * @type {GarmentTaggingUnauthorizedErrorStatusCodeEnum}
+   * @memberof GarmentTaggingUnauthorizedError
+   */
+  statusCode: GarmentTaggingUnauthorizedErrorStatusCodeEnum
+  /**
+   *
+   * @type {GarmentTaggingUnauthorizedErrorMessageEnum}
+   * @memberof GarmentTaggingUnauthorizedError
+   */
+  message: GarmentTaggingUnauthorizedErrorMessageEnum
+  /**
+   *
+   * @type {GarmentTaggingUnauthorizedErrorErrorEnum}
+   * @memberof GarmentTaggingUnauthorizedError
+   */
+  error: GarmentTaggingUnauthorizedErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const GarmentTaggingUnauthorizedErrorStatusCodeEnum = {
+  NUMBER_401: 401,
+} as const
+export type GarmentTaggingUnauthorizedErrorStatusCodeEnum =
+  (typeof GarmentTaggingUnauthorizedErrorStatusCodeEnum)[keyof typeof GarmentTaggingUnauthorizedErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GarmentTaggingUnauthorizedErrorMessageEnum = {
+  Missing_or_invalid_bearer_token: 'Missing or invalid bearer token',
+  Invalid_access_token: 'Invalid access token',
+} as const
+export type GarmentTaggingUnauthorizedErrorMessageEnum =
+  (typeof GarmentTaggingUnauthorizedErrorMessageEnum)[keyof typeof GarmentTaggingUnauthorizedErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const GarmentTaggingUnauthorizedErrorErrorEnum = {
+  Unauthorized: 'Unauthorized',
+} as const
+export type GarmentTaggingUnauthorizedErrorErrorEnum =
+  (typeof GarmentTaggingUnauthorizedErrorErrorEnum)[keyof typeof GarmentTaggingUnauthorizedErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface GarmentTaggingUnavailableError
+ */
+export interface GarmentTaggingUnavailableError {
+  /**
+   *
+   * @type {GarmentTaggingUnavailableErrorStatusCodeEnum}
+   * @memberof GarmentTaggingUnavailableError
+   */
+  statusCode: GarmentTaggingUnavailableErrorStatusCodeEnum
+  /**
+   *
+   * @type {GarmentTaggingUnavailableErrorMessageEnum}
+   * @memberof GarmentTaggingUnavailableError
+   */
+  message: GarmentTaggingUnavailableErrorMessageEnum
+  /**
+   *
+   * @type {GarmentTaggingUnavailableErrorErrorEnum}
+   * @memberof GarmentTaggingUnavailableError
+   */
+  error: GarmentTaggingUnavailableErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const GarmentTaggingUnavailableErrorStatusCodeEnum = {
+  NUMBER_503: 503,
+} as const
+export type GarmentTaggingUnavailableErrorStatusCodeEnum =
+  (typeof GarmentTaggingUnavailableErrorStatusCodeEnum)[keyof typeof GarmentTaggingUnavailableErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GarmentTaggingUnavailableErrorMessageEnum = {
+  TAGGING_INFERENCE_UNAVAILABLE: 'TAGGING_INFERENCE_UNAVAILABLE',
+} as const
+export type GarmentTaggingUnavailableErrorMessageEnum =
+  (typeof GarmentTaggingUnavailableErrorMessageEnum)[keyof typeof GarmentTaggingUnavailableErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const GarmentTaggingUnavailableErrorErrorEnum = {
+  Service_Unavailable: 'Service Unavailable',
+} as const
+export type GarmentTaggingUnavailableErrorErrorEnum =
+  (typeof GarmentTaggingUnavailableErrorErrorEnum)[keyof typeof GarmentTaggingUnavailableErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface GarmentTagsBadRequestError
+ */
+export interface GarmentTagsBadRequestError {
+  /**
+   *
+   * @type {GarmentTagsBadRequestErrorStatusCodeEnum}
+   * @memberof GarmentTagsBadRequestError
+   */
+  statusCode: GarmentTagsBadRequestErrorStatusCodeEnum
+  /**
+   *
+   * @type {GarmentTagsBadRequestErrorMessage}
+   * @memberof GarmentTagsBadRequestError
+   */
+  message: GarmentTagsBadRequestErrorMessage
+  /**
+   *
+   * @type {GarmentTagsBadRequestErrorErrorEnum}
+   * @memberof GarmentTagsBadRequestError
+   */
+  error: GarmentTagsBadRequestErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const GarmentTagsBadRequestErrorStatusCodeEnum = {
+  NUMBER_400: 400,
+} as const
+export type GarmentTagsBadRequestErrorStatusCodeEnum =
+  (typeof GarmentTagsBadRequestErrorStatusCodeEnum)[keyof typeof GarmentTagsBadRequestErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GarmentTagsBadRequestErrorErrorEnum = {
+  Bad_Request: 'Bad Request',
+} as const
+export type GarmentTagsBadRequestErrorErrorEnum =
+  (typeof GarmentTagsBadRequestErrorErrorEnum)[keyof typeof GarmentTagsBadRequestErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface GarmentTagsBadRequestErrorMessage
+ */
+export interface GarmentTagsBadRequestErrorMessage {}
+/**
+ *
+ * @export
+ * @interface GarmentUpdateConflictError
+ */
+export interface GarmentUpdateConflictError {
+  /**
+   *
+   * @type {GarmentUpdateConflictErrorStatusCodeEnum}
+   * @memberof GarmentUpdateConflictError
+   */
+  statusCode: GarmentUpdateConflictErrorStatusCodeEnum
+  /**
+   *
+   * @type {GarmentUpdateConflictErrorMessageEnum}
+   * @memberof GarmentUpdateConflictError
+   */
+  message: GarmentUpdateConflictErrorMessageEnum
+  /**
+   *
+   * @type {GarmentUpdateConflictErrorErrorEnum}
+   * @memberof GarmentUpdateConflictError
+   */
+  error: GarmentUpdateConflictErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const GarmentUpdateConflictErrorStatusCodeEnum = {
+  NUMBER_409: 409,
+} as const
+export type GarmentUpdateConflictErrorStatusCodeEnum =
+  (typeof GarmentUpdateConflictErrorStatusCodeEnum)[keyof typeof GarmentUpdateConflictErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GarmentUpdateConflictErrorMessageEnum = {
+  GARMENT_ANALYSIS_PENDING: 'GARMENT_ANALYSIS_PENDING',
+  GARMENT_NOT_TAGGABLE: 'GARMENT_NOT_TAGGABLE',
+  CONCURRENT_TAG_UPDATE: 'CONCURRENT_TAG_UPDATE',
+} as const
+export type GarmentUpdateConflictErrorMessageEnum =
+  (typeof GarmentUpdateConflictErrorMessageEnum)[keyof typeof GarmentUpdateConflictErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const GarmentUpdateConflictErrorErrorEnum = {
+  Conflict: 'Conflict',
+} as const
+export type GarmentUpdateConflictErrorErrorEnum =
+  (typeof GarmentUpdateConflictErrorErrorEnum)[keyof typeof GarmentUpdateConflictErrorErrorEnum]
+
 /**
  *
  * @export
@@ -2749,7 +3167,7 @@ export interface SuggestGarmentTagsResponseDataSuggestionsCategory {
    * @type {SuggestGarmentTagsResponseDataSuggestionsCategoryValueEnum}
    * @memberof SuggestGarmentTagsResponseDataSuggestionsCategory
    */
-  value: SuggestGarmentTagsResponseDataSuggestionsCategoryValueEnum
+  value: SuggestGarmentTagsResponseDataSuggestionsCategoryValueEnum | null
   /**
    *
    * @type {number}
@@ -2789,7 +3207,7 @@ export interface SuggestGarmentTagsResponseDataSuggestionsComfortRange {
    * @type {SuggestGarmentTagsResponseDataSuggestionsComfortRangeValueEnum}
    * @memberof SuggestGarmentTagsResponseDataSuggestionsComfortRange
    */
-  value: SuggestGarmentTagsResponseDataSuggestionsComfortRangeValueEnum
+  value: SuggestGarmentTagsResponseDataSuggestionsComfortRangeValueEnum | null
   /**
    *
    * @type {number}
@@ -2828,7 +3246,7 @@ export interface SuggestGarmentTagsResponseDataSuggestionsMaterial {
    * @type {SuggestGarmentTagsResponseDataSuggestionsMaterialValueEnum}
    * @memberof SuggestGarmentTagsResponseDataSuggestionsMaterial
    */
-  value: SuggestGarmentTagsResponseDataSuggestionsMaterialValueEnum
+  value: SuggestGarmentTagsResponseDataSuggestionsMaterialValueEnum | null
   /**
    *
    * @type {number}
@@ -3058,7 +3476,7 @@ export interface UpdateGarmentTagsInput {
    * @type {UpdateGarmentTagsInputCategoryEnum}
    * @memberof UpdateGarmentTagsInput
    */
-  category: UpdateGarmentTagsInputCategoryEnum
+  category: UpdateGarmentTagsInputCategoryEnum | null
   /**
    *
    * @type {UpdateGarmentTagsInputMaterialEnum}
@@ -3070,7 +3488,7 @@ export interface UpdateGarmentTagsInput {
    * @type {UpdateGarmentTagsInputComfortRangeEnum}
    * @memberof UpdateGarmentTagsInput
    */
-  comfortRange: UpdateGarmentTagsInputComfortRangeEnum
+  comfortRange: UpdateGarmentTagsInputComfortRangeEnum | null
 }
 
 /**

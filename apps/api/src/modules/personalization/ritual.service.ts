@@ -16,6 +16,7 @@ import {
 import Redis from 'ioredis'
 
 export const RITUAL_REDIS_CLIENT = Symbol('RITUAL_REDIS_CLIENT')
+const RITUAL_GARMENT_CANDIDATE_LIMIT = 1_000
 
 import { WeatherQueryService } from '../weather/weather-query.service.js'
 import { LocationPreferencesService } from '../location-preferences/location-preferences.service.js'
@@ -1083,6 +1084,7 @@ export class RitualService implements OnModuleDestroy {
         comfort_range: { not: null },
       },
       orderBy: [{ updated_at: 'desc' }, { id: 'asc' }],
+      take: RITUAL_GARMENT_CANDIDATE_LIMIT,
     })
 
     // 6. Build or retrieve outfit recommendations
@@ -1449,7 +1451,7 @@ export class RitualService implements OnModuleDestroy {
   }
 
   // Story 2.2 Task 2 step 3 owner: implement chunk-based Redis key invalidation
-  async invalidateUserCache(userId: string): Promise<void> {
+  async invalidateUserCache(userId: string): Promise<boolean> {
     try {
       const matchPattern = `ritual:${userId}:*`
       let cursor = '0'
@@ -1466,10 +1468,12 @@ export class RitualService implements OnModuleDestroy {
           await this.redis.del(keys)
         }
       } while (cursor !== '0')
+      return true
     } catch (err) {
       this.logger.warn(
         `Redis cache invalidation failed: ${err instanceof Error ? err.message : String(err)}`
       )
+      return false
     }
   }
 

@@ -31,6 +31,10 @@ CREATE TYPE "GarmentComfortRange" AS ENUM (
 -- IRREVERSIBLE CHECKPOINT: back up GarmentItem and record row counts before deployment.
 -- PostgreSQL enum replacement drops GarmentUploadStatus and has no automatic down migration.
 -- Restore requires the pre-deployment backup plus an application rollback coordinated with workers.
+-- DOWNTIME REQUIRED: the upload_status type swap and tag enum casts rewrite GarmentItem and
+-- acquire table locks. Stop every API and worker process before this migration starts.
+-- DEPLOYMENT ORDER: stop old Prisma clients, apply this migration, deploy the compatible API and
+-- worker build, then resume traffic. Older clients must never run after GarmentUploadStatus drops.
 -- Update GarmentUploadStatus enum to include awaiting_tags
 CREATE TYPE "GarmentUploadStatus_new" AS ENUM (
   'pending_upload',
@@ -79,4 +83,17 @@ ALTER TABLE "GarmentItem"
 -- Add database check constraint requiring non-null category and comfort when status is ready
 ALTER TABLE "GarmentItem"
   ADD CONSTRAINT "GarmentItem_ready_tags_check"
-  CHECK ("upload_status" != 'ready' OR ("category" IS NOT NULL AND "comfort_range" IS NOT NULL));
+  CHECK ("upload_status" != 'ready' OR ("category" IS NOT NULL AND "comfort_range" IS NOT NULL))
+  NOT VALID;
+
+ALTER TABLE "GarmentItem"
+  VALIDATE CONSTRAINT "GarmentItem_ready_tags_check";
+
+CREATE INDEX "GarmentItem_ritual_candidates_idx"
+  ON "GarmentItem" (
+    "user_id",
+    "retention_status",
+    "upload_status",
+    "updated_at" DESC,
+    "id" ASC
+  );

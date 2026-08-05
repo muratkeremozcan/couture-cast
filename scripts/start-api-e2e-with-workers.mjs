@@ -15,8 +15,8 @@ const env = {
   GARMENT_TAGGING_ENGINE: 'fixture',
   PORT: process.env.PORT || '4000',
   API_BASE_URL: apiBaseUrl,
-  PUBLIC_API_URL:
-    process.env.PUBLIC_API_URL || (startWeb ? webBaseUrl : 'http://127.0.0.1:4000'),
+  HTTP_CORS_ORIGIN: process.env.HTTP_CORS_ORIGIN || webBaseUrl,
+  PUBLIC_API_URL: process.env.PUBLIC_API_URL || apiBaseUrl,
 }
 
 const processes = []
@@ -26,18 +26,29 @@ function waitForExit(child) {
   if (child.exitCode !== null || child.signalCode !== null) {
     return Promise.resolve()
   }
-  return new Promise((resolve) => child.once('exit', resolve))
+  return new Promise((resolve) => {
+    child.once('exit', resolve)
+    child.once('error', resolve)
+  })
 }
 
 async function shutdown(code = 0) {
   if (shuttingDown) return
   shuttingDown = true
   for (const proc of processes) {
-    if (proc && !proc.killed) {
+    if (proc && proc.exitCode === null && proc.signalCode === null) {
       proc.kill('SIGTERM')
     }
   }
-  await Promise.all(processes.map(waitForExit))
+  await Promise.race([
+    Promise.all(processes.map(waitForExit)),
+    new Promise((resolve) => setTimeout(resolve, 5_000)),
+  ])
+  const remaining = processes.filter(
+    (proc) => proc.exitCode === null && proc.signalCode === null
+  )
+  for (const proc of remaining) proc.kill('SIGKILL')
+  await Promise.all(remaining.map(waitForExit))
   process.exit(code)
 }
 
@@ -80,18 +91,71 @@ async function waitForUrl(url, timeoutMs) {
   throw new Error(`Timed out waiting for ${url}`, { cause: lastError })
 }
 
-function startManagedProcess(command, args, processEnv = env, cwd = repoRoot) {
+function startManagedProcess(command, args, processEnv = env, cwd = repoRoot, readyText) {
   const child = spawn(command, args, {
     cwd,
     env: processEnv,
-    stdio: 'inherit',
+    stdio: readyText ? ['inherit', 'pipe', 'pipe'] : 'inherit',
+  })
+  let resolveReady
+  let rejectReady
+  let readinessObserved = !readyText
+  let readinessOutput = ''
+  let readinessTimer
+  const ready = readyText
+    ? new Promise((resolve, reject) => {
+        resolveReady = resolve
+        rejectReady = reject
+        readinessTimer = setTimeout(
+          () =>
+            reject(new Error(`Timed out waiting for process readiness: ${readyText}`)),
+          60_000
+        )
+      })
+    : Promise.resolve()
+  const forwardOutput = (stream, destination) => {
+    stream?.on('data', (chunk) => {
+      destination.write(chunk)
+      readinessOutput = `${readinessOutput}${chunk.toString()}`.slice(-4096)
+      if (readyText && readinessOutput.includes(readyText)) {
+        readinessObserved = true
+        clearTimeout(readinessTimer)
+        resolveReady?.()
+      }
+    })
+  }
+  forwardOutput(child.stdout, process.stdout)
+  forwardOutput(child.stderr, process.stderr)
+  child.once('error', (error) => {
+    clearTimeout(readinessTimer)
+    rejectReady?.(error)
+    console.error(`[start-api-e2e-with-workers] Failed to spawn ${command}:`, error)
+    void shutdown(1)
+  })
+  child.once('exit', (code) => {
+    if (readyText && !readinessObserved) {
+      clearTimeout(readinessTimer)
+      rejectReady?.(new Error(`${command} exited before readiness with code ${code}`))
+    }
   })
   processes.push(child)
-  return child
+  return { child, ready }
+}
+
+async function isUrlHealthy(url) {
+  try {
+    return (await fetch(url)).ok
+  } catch {
+    return false
+  }
 }
 
 async function main() {
   console.log('[start-api-e2e-with-workers] Preparing database and application builds...')
+  const reuseExistingWeb =
+    startWeb &&
+    process.env.REUSE_EXISTING_WEB_SERVER === 'true' &&
+    (await isUrlHealthy(webBaseUrl))
   await runPreparation('npm', ['run', 'db:generate'])
   await runPreparation('node', ['scripts/prisma-migrate-deploy.mjs'])
   if (startWeb) {
@@ -99,7 +163,9 @@ async function main() {
       await runPreparation('npm', ['run', 'prepare:playwright'])
     }
     await runPreparation('npm', ['run', 'build:e2e', '--workspace', 'api'])
-    await runPreparation('npm', ['run', 'build:e2e', '--workspace', 'web'])
+    if (!reuseExistingWeb) {
+      await runPreparation('npm', ['run', 'build:e2e', '--workspace', 'web'])
+    }
   } else {
     await runPreparation('npm', ['run', 'build', '--workspace', 'api'])
   }
@@ -108,11 +174,15 @@ async function main() {
     '[start-api-e2e-with-workers] Starting API and Wardrobe Worker in E2E fixture mode...'
   )
 
-  const apiProcess = startManagedProcess('node', ['apps/api/dist/src/main.js'])
+  const { child: apiProcess } = startManagedProcess('node', ['apps/api/dist/src/main.js'])
 
-  const workerProcess = startManagedProcess('node', [
-    'apps/api/dist/src/workers/wardrobe.bootstrap.js',
-  ])
+  const { child: workerProcess, ready: workerReady } = startManagedProcess(
+    'node',
+    ['apps/api/dist/src/workers/wardrobe.bootstrap.js'],
+    env,
+    repoRoot,
+    'Dedicated wardrobe worker started'
+  )
 
   apiProcess.on('exit', (code) => {
     if (!shuttingDown) {
@@ -131,8 +201,17 @@ async function main() {
   })
 
   if (startWeb) {
-    await waitForUrl(new URL('/api/health', apiBaseUrl).toString(), 30_000)
-    const webProcess = startManagedProcess(
+    await Promise.all([
+      waitForUrl(new URL('/api/health', apiBaseUrl).toString(), 30_000),
+      workerReady,
+    ])
+    if (reuseExistingWeb) {
+      console.log(
+        `[start-api-e2e-with-workers] Reusing existing Web server at ${webBaseUrl}`
+      )
+      return
+    }
+    const { child: webProcess } = startManagedProcess(
       'node',
       [
         path.join(repoRoot, 'node_modules/next/dist/bin/next'),

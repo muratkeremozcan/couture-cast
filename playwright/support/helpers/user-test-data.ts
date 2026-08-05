@@ -51,13 +51,25 @@ export async function cleanupUserTestData(userId: string | undefined): Promise<v
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is required to clean local Playwright user data')
   }
+  const databaseUrl = new URL(process.env.DATABASE_URL)
+  const localHosts = new Set(['localhost', '127.0.0.1', '[::1]'])
+  const isSupportedLocalDatabase =
+    ['postgres:', 'postgresql:'].includes(databaseUrl.protocol) &&
+    localHosts.has(databaseUrl.hostname) &&
+    databaseUrl.port === '54322' &&
+    databaseUrl.pathname === '/postgres' &&
+    databaseUrl.username === 'postgres'
+  if (!isSupportedLocalDatabase) {
+    throw new Error(
+      `Refusing destructive Playwright cleanup outside the supported local Supabase database: ${databaseUrl.hostname}:${databaseUrl.port}${databaseUrl.pathname}`
+    )
+  }
 
-  const prisma = new PrismaClient()
+  const prisma = new PrismaClient({ datasourceUrl: databaseUrl.toString() })
 
   try {
     await prisma.$transaction(
       async (tx) => {
-        await tx.$executeRaw`SET LOCAL session_replication_role = 'replica'`
         const garments = await tx.garmentItem.findMany({
           where: { user_id: userId },
           select: { id: true },
@@ -80,10 +92,18 @@ export async function cleanupUserTestData(userId: string | undefined): Promise<v
           },
         })
         await tx.eventEnvelope.deleteMany({ where: { user_id: userId } })
-        await tx.telemetryEvent.deleteMany({ where: { user_id: userId } })
+        await tx.telemetryEvent.deleteMany({
+          where: {
+            OR: [
+              { user_id: userId },
+              ...garmentIds.map((garmentId) => ({
+                properties: { path: ['garment_id'], equals: garmentId },
+              })),
+            ],
+          },
+        })
         await tx.engagementEvent.deleteMany({ where: { user_id: userId } })
         await tx.lookbookPost.deleteMany({ where: { user_id: userId } })
-        await tx.auditLog.deleteMany({ where: { user_id: userId } })
         await tx.pushToken.deleteMany({ where: { user_id: userId } })
         await tx.alertRule.deleteMany({ where: { user_id: userId } })
         await tx.notificationPreference.deleteMany({ where: { user_id: userId } })
@@ -103,7 +123,24 @@ export async function cleanupUserTestData(userId: string | undefined): Promise<v
         })
         await tx.comfortPreferences.deleteMany({ where: { user_id: userId } })
         await tx.userProfile.deleteMany({ where: { user_id: userId } })
-        await tx.user.deleteMany({ where: { id: userId } })
+
+        await tx.$executeRawUnsafe('SAVEPOINT playwright_audit_cleanup')
+        let canDeleteImmutableAuditRows = false
+        try {
+          await tx.$executeRaw`SET LOCAL session_replication_role = 'replica'`
+          await tx.$executeRawUnsafe('RELEASE SAVEPOINT playwright_audit_cleanup')
+          canDeleteImmutableAuditRows = true
+        } catch {
+          await tx.$executeRawUnsafe('ROLLBACK TO SAVEPOINT playwright_audit_cleanup')
+          await tx.$executeRawUnsafe('RELEASE SAVEPOINT playwright_audit_cleanup')
+          console.warn(
+            'Playwright cleanup could not disable local audit triggers; immutable audit rows and the linked user were retained'
+          )
+        }
+        if (canDeleteImmutableAuditRows) {
+          await tx.auditLog.deleteMany({ where: { user_id: userId } })
+          await tx.user.deleteMany({ where: { id: userId } })
+        }
       },
       { timeout: 30_000 }
     )

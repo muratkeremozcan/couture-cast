@@ -6,7 +6,12 @@
     "allowImportingTsExtensions": true,
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@couture/utils": ["../utils/dist/index.d.ts"],
+      "@couture/testing": ["../testing/dist/index.d.ts"]
+    }
   },
   "include": ["prisma/**/*.ts", "test/**/*.ts", "vitest.config.ts"]
 }

@@ -5,6 +5,9 @@ import {
   type GarmentCategory,
   type GarmentMaterial,
   type GarmentComfortRange,
+  garmentListResponseSchema,
+  suggestGarmentTagsResponseSchema,
+  updateGarmentTagsResponseSchema,
 } from '@couture/api-client'
 import { createMobileApiClient } from './api-client'
 
@@ -12,14 +15,22 @@ async function actionableWardrobeError(error: unknown, fallback: string): Promis
   if (error instanceof ResponseError) {
     try {
       const payload = (await error.response.json()) as {
-        error?: { message?: string }
+        error?: string | { code?: string; message?: string }
+        code?: string
         message?: string
       }
-      return new Error(
-        payload.error?.message ??
-          payload.message ??
-          `Wardrobe request failed with status ${error.response.status}`
-      )
+      const message =
+        (typeof payload.error === 'object' ? payload.error.message : undefined) ??
+        payload.message ??
+        `Wardrobe request failed with status ${error.response.status}`
+      const normalized = new Error(message) as Error & { code?: string }
+      normalized.code =
+        (typeof payload.error === 'object' ? payload.error.code : undefined) ??
+        payload.code ??
+        (['GARMENT_ANALYSIS_PENDING', 'TAGGING_INFERENCE_UNAVAILABLE'].includes(message)
+          ? message
+          : undefined)
+      return normalized
     } catch {
       return new Error(`Wardrobe request failed with status ${error.response.status}`)
     }
@@ -70,7 +81,7 @@ export async function listGarmentsFromMobile(
         accessToken,
       }).apiV1WardrobeGarmentsGet({ signal: requestSignal })
     )
-    return response.data
+    return garmentListResponseSchema.parse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to load your wardrobe.')
   }
@@ -90,7 +101,7 @@ export async function suggestGarmentTagsFromMobile(
         { signal: requestSignal }
       )
     )
-    return response.data
+    return suggestGarmentTagsResponseSchema.parse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to load smart suggestions.')
   }
@@ -115,7 +126,7 @@ export async function updateGarmentTagsFromMobile(
         { signal: requestSignal }
       )
     )
-    return response.data
+    return updateGarmentTagsResponseSchema.parse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to save garment tags.')
   }

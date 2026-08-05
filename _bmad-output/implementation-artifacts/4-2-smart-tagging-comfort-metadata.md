@@ -892,6 +892,99 @@ And the user can complete confirmation.
       commands, results, notes, and changed files before marking the story done
       [_bmad-output/implementation-artifacts/4-2-smart-tagging-comfort-metadata.md:7]
 
+#### CodeRabbit follow-up review findings
+
+- [x] [Review][Patch] Serialize FashionCLIP requests, validate exact tensor dimensions and
+      output counts, cache prompt tokenization, stream snapshot hashes, and reuse one resolved
+      model path [apps/api/src/modules/wardrobe/fashion-clip-inference.worker.ts:73]
+- [x] [Review][Patch] Harden worker readiness with immediate promise rejection observation,
+      production path validation, bounded initialization timeout and failure cooldown, permanent
+      error supervision, and parsed output validation
+      [apps/api/src/modules/wardrobe/fashion-clip-tagging.engine.ts:31]
+- [x] [Review][Patch] Isolate FashionCLIP snapshot tests with temporary fixtures, exact error
+      assertions, and deterministic cleanup
+      [apps/api/src/modules/wardrobe/fashion-clip-tagging.engine.spec.ts:10]
+- [x] [Review][Patch] Prevent terminal garment resurrection, persist only supported tagging
+      failure codes, checkpoint inference across queue retries, and correct completion log levels
+      and metadata [apps/api/src/modules/wardrobe/wardrobe-color.processor.ts:41]
+- [x] [Review][Patch] Centralize suggestion taggability validation, treat malformed snapshots as
+      read-only unavailable data, and map exhausted concurrent updates to HTTP 409
+      [apps/api/src/modules/wardrobe/wardrobe.service.ts:591]
+- [x] [Review][Patch] Isolate upload telemetry provider failures, report real cache invalidation
+      outcomes, and avoid cache work on unchanged idempotent confirmations
+      [apps/api/src/modules/wardrobe/wardrobe.service.ts:664]
+- [x] [Review][Patch] Invalidate Ritual caches after retention mutations, return explicit cache
+      invalidation outcomes, bound Ritual candidate reads, and add the supporting composite index
+      [apps/api/src/modules/personalization/ritual.service.ts:939]
+- [x] [Review][Patch] Use a committed raster FashionCLIP smoke fixture with matching fixture
+      documentation [apps/api/src/modules/wardrobe/garment-tagging.smoke.spec.ts:18]
+- [x] [Review][Patch] Strengthen Wardrobe fixtures and focused tests for typed dates, malformed
+      snapshots, Zod response failures, idempotent cache behavior, concurrency conflicts,
+      telemetry isolation, and shared analysis versions
+      [apps/api/src/modules/wardrobe/wardrobe.service.regression.spec.ts:49]
+- [x] [Review][Patch] Add the ready-tag constraint through NOT VALID plus explicit validation,
+      document enum-swap downtime and deployment order, and add the Ritual query index
+      [packages/db/prisma/migrations/20260805120000_add_garment_smart_tags/migration.sql:80]
+- [x] [Review][Patch] Make tagging path parameters strict, generate nullable enum arrays with
+      explicit null values, and register route-specific strict tagging error schemas
+      [packages/api-client/src/contracts/http/wardrobe.ts:156]
+- [x] [Review][Patch] Enforce bounded analysis versions, unique override fields, three-field
+      limits, and was-overridden consistency in both telemetry schema variants
+      [packages/api-client/src/types/analytics-events.ts:228]
+- [x] [Review][Patch] Extend OpenAPI contract coverage for PATCH tags, nullable enums, every
+      documented status, request bodies, metadata columns, enum representatives, constraints,
+      and indexes [packages/api-client/testing/wardrobe-contract.spec.ts:214]
+- [x] [Review][Patch] Tighten Pact success matchers, add strict documented error interactions and
+      nullable-material coverage, make provider authorization state-driven, and exercise tagging
+      interactions from both Web and Mobile consumers
+      [pact/http/consumer/api-contract-interactions.ts:536]
+- [x] [Review][Patch] Keep Mobile tagging authorization fresh for upload and manual entry, use
+      deadline-correct polling, refresh after confirmation, expose recoverable timeout state, and
+      preserve a valid automatic focus invoker [apps/mobile/app/(tabs)/wardrobe.tsx:93]
+- [x] [Review][Patch] Separate Mobile visibility, focus, and unmount cancellation lifecycles;
+      isolate save errors; reset stale selections; enforce pending-state controls; ignore stale
+      completions; and complete modal accessibility
+      [apps/mobile/components/wardrobe/garment-tagging-modal.tsx:127]
+- [x] [Review][Patch] Restore deterministic Mobile mocks, label locale parity failures, and fix
+      German informal address plus French spelling
+      [apps/mobile/components/wardrobe/garment-tagging-modal.test.tsx:29]
+- [x] [Review][Patch] Add 15-second Web tagging timeouts, preserve structured API error codes,
+      and runtime-validate successful generated-client responses
+      [apps/web/src/lib/wardrobe.ts:287]
+- [x] [Review][Patch] Separate Web suggestion and save errors, reset stale selections, guard stale
+      saves, enforce analysis-pending behavior, label radiogroups, announce progress, and display
+      localized review state [apps/web/src/app/components/garment-tagging-modal.tsx:122]
+- [x] [Review][Patch] Refresh Web garments after confirmation, correct polling deadlines and
+      recovery, scope garment status selectors, and fall back from an unmounted tagging invoker
+      [apps/web/src/app/wardrobe/page.tsx:234]
+- [x] [Review][Patch] Give Web tagging mocks contract-exact signatures and resolve the E2E Next.js
+      binary through the workspace [apps/web/src/app/wardrobe/page.test.tsx:18]
+- [x] [Review][Patch] Use stable ready-status identifiers in Maestro, document Android relaunch
+      behavior, and cover abandoned-flow resume without ambiguous text matching
+      [maestro/garment-smart-tagging-flow.yaml:110]
+- [x] [Review][Patch] Point browser upload URLs at the API origin and reuse an existing Web server
+      without skipping required API and wardrobe-worker startup
+      [playwright/config/local.config.ts:48]
+- [x] [Review][Patch] Reject non-local destructive Playwright cleanup, remove privileged replica
+      role dependence, and remove pseudonymous garment telemetry during cleanup
+      [playwright/support/helpers/user-test-data.ts:47]
+- [x] [Review][Patch] Isolate Playwright cleanup state per test and scope category and ready-status
+      interactions to the intended radiogroup and garment card
+      [playwright/tests/wardrobe-smart-tagging.spec.ts:21]
+- [x] [Review][Patch] Stream model hashes, validate pinned analysis identity and safe nonempty
+      manifest paths, share file verification, and add bounded timeout retries with backoff
+      [scripts/prepare-garment-tagging-model.mjs:21]
+- [x] [Review][Patch] Isolate Maestro cleanup failures from original errors and process teardown,
+      remove privileged replica-role dependence, verify reusable API worker configuration, and
+      clean pseudonymous garment telemetry [scripts/run-maestro.mjs:383]
+- [x] [Review][Patch] Bound runner shutdown with SIGKILL fallback, supervise spawn errors, wait for
+      wardrobe-worker readiness, and preserve API and worker startup when reusing Web
+      [scripts/start-api-e2e-with-workers.mjs:32]
+- [x] [Review][Patch] Match guardian-aware RLS concurrency to its connection-pool capacity
+      [packages/db/test/rls-policies.spec.ts:460]
+- [x] [Review][Patch] Route wardrobe worker startup failures through resource shutdown before exit
+      [apps/api/src/workers/wardrobe.bootstrap.ts:98]
+
 ### Test Architect Review Findings
 
 - [x] [TEA][P1] Replace raw Playwright request usage with the merged `apiRequest` fixture, use
@@ -1036,7 +1129,7 @@ Paths marked generated are outputs of repository generators and must never be ed
 - `apps/api/src/workers/bootstrap.ts`: update
 - `apps/api/src/workers/wardrobe.bootstrap.ts`: new
 - `apps/api/src/workers/wardrobe.bootstrap.spec.ts`: new
-- `apps/api/test/fixtures/garment-tagging/neutral-top.svg`: new project-owned smoke fixture
+- `apps/api/test/fixtures/garment-tagging/neutral-top.png`: new project-owned raster smoke fixture
 - `apps/api/test/fixtures/garment-tagging/README.md`: new fixture provenance
 - `apps/web/src/app/components/accessible-modal.tsx`: new
 - `apps/web/src/app/components/garment-capture-modal.tsx`: update
@@ -1082,6 +1175,12 @@ Codex (GPT-5)
 
 ### Completion notes
 
+- Completed the CodeRabbit follow-up review: 30 valid finding bundles were fixed and verified.
+  Retained the project's NodeNext `.js` import convention and standards-correct `aria-checked`
+  radio semantics where two suggested nits conflicted with established project behavior.
+- Reproduced the browser upload failure through the real Playwright flow. Added explicit API CORS
+  configuration and hardened local cleanup for non-superuser PostgreSQL roles. The complete
+  upload, worker inference, override, persistence, Ritual, and cleanup journey now passes.
 - Resolved all 32 adversarial review findings across the model runtime, queue processor,
   persistence transaction, API contracts, generated clients, Web, Mobile, migration safety,
   automated tests, and delivery records.
@@ -1100,10 +1199,10 @@ Codex (GPT-5)
   Android passed in 48 seconds. Both runs deleted their garment through the public API during
   final cleanup.
 - Verification passed on 2026-08-05:
-  - API lint, typecheck, 498 tests with 5 skipped, and production build.
+  - API lint, typecheck, 504 tests with 5 skipped, and production build.
   - Mobile lint, typecheck, 119 tests, widget prebuild, watchOS prebuild, and production checks.
   - Web lint, typecheck, 65 tests, and production Next.js build.
-  - API client lint, typecheck, 40 tests, and build. Database lint, typecheck, and 39 tests.
+  - API client lint, typecheck, 40 tests, and build. Database lint, typecheck, and 41 tests.
   - OpenAPI validation, stable Web and Mobile Pact consumers, and API Pact provider verification.
   - Real FashionCLIP production-engine smoke test against the prepared pinned snapshot.
   - Full Playwright suite: 61 tests passed, including axe, keyboard, focus, persistence, worker
@@ -1116,6 +1215,7 @@ Codex (GPT-5)
 - `_bmad-output/implementation-artifacts/4-2-smart-tagging-comfort-metadata.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/project-knowledge/deployment-guide.md`
+- `_bmad-output/project-knowledge/development-guide.md`
 - `_bmad-output/test-artifacts/review-evidence.png`
 - `_bmad-output/test-artifacts/test-review.md`
 - `.env.example`
@@ -1124,7 +1224,9 @@ Codex (GPT-5)
 - `package.json`
 - `package-lock.json`
 - `apps/api/package.json`
+- `apps/api/src/main.ts`
 - `apps/api/model-manifests/fashion-clip-7e3ba62.json`
+- `apps/api/src/modules/personalization/ritual.service.spec.ts`
 - `apps/api/src/modules/personalization/ritual.service.ts`
 - `apps/api/src/modules/telemetry/telemetry.service.ts`
 - `apps/api/src/modules/wardrobe/fashion-clip-inference.worker.ts`
@@ -1136,6 +1238,8 @@ Codex (GPT-5)
 - `apps/api/src/modules/wardrobe/garment-tagging.smoke.spec.ts`
 - `apps/api/src/modules/wardrobe/wardrobe-color.processor.spec.ts`
 - `apps/api/src/modules/wardrobe/wardrobe-color.processor.ts`
+- `apps/api/src/modules/wardrobe/wardrobe-retention.service.spec.ts`
+- `apps/api/src/modules/wardrobe/wardrobe-retention.service.ts`
 - `apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts`
 - `apps/api/src/modules/wardrobe/wardrobe.controller.ts`
 - `apps/api/src/modules/wardrobe/wardrobe.module.ts`
@@ -1145,7 +1249,7 @@ Codex (GPT-5)
 - `apps/api/src/workers/bootstrap.ts`
 - `apps/api/src/workers/wardrobe.bootstrap.ts`
 - `apps/api/test/fixtures/garment-tagging/README.md`
-- `apps/api/test/fixtures/garment-tagging/neutral-top.svg`
+- `apps/api/test/fixtures/garment-tagging/neutral-top.png`
 - `apps/api/vitest.config.ts`
 - `apps/mobile/app/(tabs)/wardrobe.tsx`
 - `apps/mobile/assets/locales/de-DE.json`
@@ -1162,6 +1266,7 @@ Codex (GPT-5)
 - `apps/mobile/components/wardrobe/garment-tagging-modal.tsx`
 - `apps/mobile/src/i18n/wardrobe-tagging-locales.spec.ts`
 - `apps/mobile/src/lib/wardrobe.ts`
+- `apps/web/package.json`
 - `apps/web/src/app/components/accessible-modal.tsx`
 - `apps/web/src/app/components/garment-capture-modal.test.tsx`
 - `apps/web/src/app/components/garment-capture-modal.tsx`
@@ -1169,9 +1274,11 @@ Codex (GPT-5)
 - `apps/web/src/app/components/garment-tagging-modal.tsx`
 - `apps/web/src/app/wardrobe/page.test.tsx`
 - `apps/web/src/app/wardrobe/page.tsx`
+- `apps/web/src/lib/wardrobe.test.ts`
 - `apps/web/src/lib/wardrobe.ts`
 - `packages/api-client/docs/http.openapi.json` (generated)
 - `packages/api-client/src/contracts/http/common.ts`
+- `packages/api-client/src/contracts/http/openapi.ts`
 - `packages/api-client/src/contracts/http/wardrobe.ts`
 - `packages/api-client/src/generated/apis/WardrobeApi.ts` (generated)
 - `packages/api-client/src/generated/models/index.ts` (generated)
@@ -1185,7 +1292,9 @@ Codex (GPT-5)
 - `packages/db/test/garment-upload-schema.spec.ts`
 - `packages/db/test/rls-policies.spec.ts`
 - `pact/http/consumer/api-contract-interactions.ts`
+- `pact/http/consumer/mobile-api-client.pacttest.ts`
 - `pact/http/consumer/web-api-client.pacttest.ts`
+- `pact/http/provider/api-provider.pacttest.ts`
 - `pact/http/provider/provider-helper.ts`
 - `pact/http/provider/state-handlers.ts`
 - `playwright/config/local.config.ts`

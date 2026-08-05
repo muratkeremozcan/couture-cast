@@ -13,6 +13,7 @@ import {
   trackApiErrorOccurred,
   trackGarmentUploadCompleted,
   trackGarmentTaggingCompleted,
+  garmentTaggingCompletedEventSchema,
   type AnalyticsEventName,
   type GarmentTaggingCompletedProperties,
 } from '@couture/api-client'
@@ -136,55 +137,7 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
       durationMs: z.number().int().min(0).max(86_400_000),
     })
     .strict(),
-  garment_tagging_completed: z
-    .object({
-      analyticsSubjectId: z.string().min(1).max(128),
-      garmentId: z.string().min(1).max(128),
-      suggestedCategory: z
-        .enum(['top', 'bottom', 'outerwear', 'dress', 'shoes', 'accessory'])
-        .nullable(),
-      confirmedCategory: z.enum([
-        'top',
-        'bottom',
-        'outerwear',
-        'dress',
-        'shoes',
-        'accessory',
-      ]),
-      suggestedMaterial: z
-        .enum([
-          'cotton',
-          'wool',
-          'linen',
-          'leather',
-          'denim',
-          'fleece',
-          'synthetic',
-          'down',
-          'silk',
-        ])
-        .nullable(),
-      confirmedMaterial: z
-        .enum([
-          'cotton',
-          'wool',
-          'linen',
-          'leather',
-          'denim',
-          'fleece',
-          'synthetic',
-          'down',
-          'silk',
-        ])
-        .nullable(),
-      suggestedComfortRange: z.enum(['cold', 'cool', 'mild', 'warm', 'hot']).nullable(),
-      confirmedComfortRange: z.enum(['cold', 'cool', 'mild', 'warm', 'hot']),
-      suggestionAvailable: z.boolean(),
-      analysisVersion: z.string().nullable(),
-      wasOverridden: z.boolean(),
-      overrideFields: z.array(z.enum(['category', 'material', 'comfort_range'])),
-    })
-    .strict(),
+  garment_tagging_completed: garmentTaggingCompletedEventSchema,
 }
 
 function requireAnalyticsIdSecret(): string {

@@ -232,6 +232,11 @@ describe('Wardrobe HTTP Contracts', () => {
           path: '/api/v1/wardrobe/garments/{garmentId}/suggest-tags',
           statuses: ['200', '400', '401', '403', '404', '409', '503'],
         },
+        {
+          method: 'patch',
+          path: '/api/v1/wardrobe/garments/{garmentId}/tags',
+          statuses: ['200', '400', '401', '403', '404', '409'],
+        },
       ] as const
 
       for (const route of authenticatedRoutes) {
@@ -262,6 +267,28 @@ describe('Wardrobe HTTP Contracts', () => {
       expect(suggestions?.responses?.['503']).toHaveProperty(
         'content.application/json.schema'
       )
+      const tagUpdate = spec.paths?.['/api/v1/wardrobe/garments/{garmentId}/tags']?.patch
+      expect(tagUpdate?.requestBody).toMatchObject({
+        required: true,
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/UpdateGarmentTagsInput' },
+          },
+        },
+      })
+
+      const garmentResponse = spec.components?.schemas?.CreateGarmentItemResponse as
+        | {
+            properties?: {
+              data?: { properties?: Record<string, { enum?: unknown[] }> }
+            }
+          }
+        | undefined
+      for (const field of ['category', 'material', 'comfortRange']) {
+        expect(garmentResponse?.properties?.data?.properties?.[field]?.enum).toContain(
+          null
+        )
+      }
     })
   })
 

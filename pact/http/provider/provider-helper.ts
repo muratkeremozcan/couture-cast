@@ -1,5 +1,11 @@
 // Step 22 step 6 owner: mock localized database state response in Pact provider tests in pact/http/provider/provider-helper.ts
-import type { INestApplication } from '@nestjs/common'
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  ServiceUnavailableException,
+  type INestApplication,
+} from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import type { Prisma } from '@prisma/client'
 import { existsSync, mkdirSync } from 'node:fs'
@@ -29,6 +35,7 @@ import {
   type GarmentMaterial,
   type GarmentComfortRange,
 } from '@couture/api-client'
+import type { ApiRole } from '../../../apps/api/src/modules/auth/security.types'
 
 export type PactEvent = {
   id: string
@@ -53,9 +60,45 @@ type StartedPactProvider = {
 }
 
 let providerEvents: ProviderEventEnvelope[] = []
+type ProviderWardrobeOutcome =
+  | 'success'
+  | 'analysis_pending'
+  | 'inference_unavailable'
+  | 'not_found'
+
+type ProviderWardrobeState = {
+  garmentId: string | null
+  userId: string | null
+  outcome: ProviderWardrobeOutcome
+  guardianAllowed: boolean
+}
+
+let providerWardrobeState: ProviderWardrobeState = {
+  garmentId: null,
+  userId: null,
+  outcome: 'not_found',
+  guardianAllowed: true,
+}
 
 export function resetProviderState() {
   providerEvents = []
+  providerWardrobeState = {
+    garmentId: null,
+    userId: null,
+    outcome: 'not_found',
+    guardianAllowed: true,
+  }
+}
+
+export function configureProviderWardrobeState(
+  state: Partial<ProviderWardrobeState> & Pick<ProviderWardrobeState, 'outcome'>
+) {
+  providerWardrobeState = {
+    garmentId: state.garmentId ?? null,
+    userId: state.userId ?? null,
+    outcome: state.outcome,
+    guardianAllowed: state.guardianAllowed ?? true,
+  }
 }
 
 export function parsePactEvent(event: PactEvent | string) {
@@ -284,8 +327,28 @@ export async function startLocalPactProvider({
       Promise.resolve({ success: true }),
   } as unknown as UserService
 
+  const assertProviderWardrobeState = (userId: string, garmentId: string) => {
+    if (
+      providerWardrobeState.outcome === 'not_found' ||
+      providerWardrobeState.garmentId !== garmentId ||
+      providerWardrobeState.userId !== userId
+    ) {
+      throw new NotFoundException('GARMENT_NOT_FOUND')
+    }
+    if (!providerWardrobeState.guardianAllowed) {
+      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+    }
+    if (providerWardrobeState.outcome === 'analysis_pending') {
+      throw new ConflictException('GARMENT_ANALYSIS_PENDING')
+    }
+  }
+
   const mockWardrobeService = {
-    suggestGarmentTags: (userId: string, role: string, garmentId: string) => {
+    suggestGarmentTags: (userId: string, _role: ApiRole, garmentId: string) => {
+      assertProviderWardrobeState(userId, garmentId)
+      if (providerWardrobeState.outcome === 'inference_unavailable') {
+        throw new ServiceUnavailableException('TAGGING_INFERENCE_UNAVAILABLE')
+      }
       return Promise.resolve({
         data: {
           garmentId,
@@ -300,7 +363,7 @@ export async function startLocalPactProvider({
     },
     updateGarmentTags: (
       userId: string,
-      role: string,
+      _role: ApiRole,
       garmentId: string,
       input: {
         category: GarmentCategory
@@ -308,6 +371,7 @@ export async function startLocalPactProvider({
         comfortRange: GarmentComfortRange
       }
     ) => {
+      assertProviderWardrobeState(userId, garmentId)
       const categoryValue = input.category
       const materialValue = input.material ?? null
       const comfortValue = input.comfortRange
@@ -334,11 +398,16 @@ export async function startLocalPactProvider({
   } as unknown as WardrobeService
 
   const mockWardrobeRetentionService = {} as unknown as WardrobeRetentionService
-  const mockWardrobeUploadGuard = {
-    canActivate: () => true,
-  } as unknown as WardrobeUploadGuard
   const mockGuardianService = {
-    assertWardrobeUploadAllowed: () => Promise.resolve(),
+    assertWardrobeUploadAllowed: (userId: string) => {
+      if (
+        !providerWardrobeState.guardianAllowed ||
+        (providerWardrobeState.userId !== null && providerWardrobeState.userId !== userId)
+      ) {
+        throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+      }
+      return Promise.resolve()
+    },
   } as unknown as GuardianService
 
   const moduleFixture = await Test.createTestingModule({
@@ -391,7 +460,7 @@ export async function startLocalPactProvider({
       },
       {
         provide: WardrobeUploadGuard,
-        useValue: mockWardrobeUploadGuard,
+        useFactory: () => new WardrobeUploadGuard(mockGuardianService),
       },
     ],
   })

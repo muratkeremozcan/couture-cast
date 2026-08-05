@@ -41,6 +41,10 @@ describe('CoutureCastApi provider contract verification', () => {
         resetProviderState()
         return Promise.resolve()
       },
+      afterEach: () => {
+        resetProviderState()
+        return Promise.resolve()
+      },
       pactUrls: pactFiles,
       includeMainAndDeployed: true,
       publishVerificationResult: false,

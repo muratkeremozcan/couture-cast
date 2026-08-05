@@ -70,7 +70,7 @@ describe('WardrobeService Smart Tagging Operations', () => {
     mockFindUniqueOrThrow.mockReset()
     mockSignReadUrl.mockReset().mockResolvedValue('https://example.com/read.png')
     mockCaptureEvent.mockReset().mockResolvedValue(undefined)
-    mockInvalidateUserCache.mockReset().mockResolvedValue(undefined)
+    mockInvalidateUserCache.mockReset().mockResolvedValue(true)
     mockAssertWardrobeUploadAllowed.mockReset().mockResolvedValue(undefined)
     mockTransaction
       .mockReset()
@@ -110,6 +110,21 @@ describe('WardrobeService Smart Tagging Operations', () => {
     await expect(service.suggestGarmentTags('user_1', 'teen', 'g_1')).rejects.toThrow(
       ServiceUnavailableException
     )
+  })
+
+  it('throws ServiceUnavailableException for a malformed stored suggestion snapshot', async () => {
+    mockFindFirst.mockResolvedValueOnce({
+      id: 'g_invalid',
+      user_id: 'user_1',
+      upload_status: 'awaiting_tags',
+      retention_status: 'active',
+      tag_suggestions: { category: 'top' },
+    })
+
+    await expect(
+      service.suggestGarmentTags('user_1', 'teen', 'g_invalid')
+    ).rejects.toThrow(ServiceUnavailableException)
+    expect(mockUpdateMany).not.toHaveBeenCalled()
   })
 
   it('returns structured suggestions when valid snapshot exists', async () => {
@@ -153,6 +168,7 @@ describe('WardrobeService Smart Tagging Operations', () => {
     expect(res.data.status).toBe('ready')
     expect(mockUpdateMany).not.toHaveBeenCalled()
     expect(mockCaptureEvent).not.toHaveBeenCalled()
+    expect(mockInvalidateUserCache).not.toHaveBeenCalled()
   })
 
   it('updates awaiting_tags garment to ready, emits telemetry, and invalidates cache', async () => {

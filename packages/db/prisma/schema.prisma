@@ -323,6 +323,7 @@ model GarmentItem {
   @@unique([user_id, commit_idempotency_key])
   @@index([user_id])
   @@index([user_id, upload_status, upload_expires_at])
+  @@index([user_id, retention_status, upload_status, updated_at(sort: Desc), id(sort: Asc)], map: "GarmentItem_ritual_candidates_idx")
   @@index([retention_status, deletion_requested_at])
 }
 

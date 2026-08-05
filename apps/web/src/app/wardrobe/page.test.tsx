@@ -3,7 +3,11 @@ import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GarmentItemContract } from '@couture/api-client/contracts/http'
+import type {
+  GarmentItemContract,
+  SuggestGarmentTagsData,
+  UpdateGarmentTagsInput,
+} from '@couture/api-client/contracts/http'
 import type { UploadGarmentImageInput } from '../../lib/wardrobe'
 
 const {
@@ -15,8 +19,16 @@ const {
   listGarmentsFromWeb: vi.fn<(signal?: AbortSignal) => Promise<GarmentItemContract[]>>(),
   uploadGarmentImageFromWeb:
     vi.fn<(input: UploadGarmentImageInput) => Promise<GarmentItemContract>>(),
-  suggestGarmentTagsFromWeb: vi.fn(),
-  updateGarmentTagsFromWeb: vi.fn(),
+  suggestGarmentTagsFromWeb:
+    vi.fn<(garmentId: string, signal?: AbortSignal) => Promise<SuggestGarmentTagsData>>(),
+  updateGarmentTagsFromWeb:
+    vi.fn<
+      (
+        garmentId: string,
+        tags: UpdateGarmentTagsInput,
+        signal?: AbortSignal
+      ) => Promise<GarmentItemContract>
+    >(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -54,6 +66,8 @@ describe('WardrobePage persistence', () => {
   beforeEach(() => {
     listGarmentsFromWeb.mockReset()
     uploadGarmentImageFromWeb.mockReset()
+    suggestGarmentTagsFromWeb.mockReset()
+    updateGarmentTagsFromWeb.mockReset()
   })
 
   it('reconciles a committed garment and hydrates it again after reload', async () => {

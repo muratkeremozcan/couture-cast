@@ -99,6 +99,16 @@ tags:
     timeout: 30000
 
 - tapOn:
+    id: 'garment-tagging-close'
+
+- tapOn: 'Needs tags'
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-tagging-modal'
+    timeout: 15000
+
+- tapOn:
     id: 'garment-tag-category-bottom'
 
 - tapOn:
@@ -108,12 +118,14 @@ tags:
     id: 'garment-tagging-save'
 
 - extendedWaitUntil:
-    visible: 'ready'
+    visible:
+      id: 'garment-status-ready'
     timeout: 15000
 
 - stopApp:
     appId: ${MAESTRO_APP_ID}
 
+# Android requires an explicit relaunch after stopApp. openLink resumes either platform.
 - runFlow:
     when:
       platform: Android
@@ -134,7 +146,8 @@ tags:
     label: 'Reopen the Wardrobe tab after restart'
 
 - extendedWaitUntil:
-    visible: 'ready'
+    visible:
+      id: 'garment-status-ready'
     timeout: 30000
 
 - takeScreenshot:

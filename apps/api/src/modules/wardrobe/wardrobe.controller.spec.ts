@@ -104,6 +104,8 @@ describe('WardrobeController', () => {
       },
     })
 
-    await expect(controller.suggestGarmentTags(mockAuth, 'garment_99')).rejects.toThrow()
+    await expect(controller.suggestGarmentTags(mockAuth, 'garment_99')).rejects.toThrow(
+      'Invalid literal value'
+    )
   })
 })

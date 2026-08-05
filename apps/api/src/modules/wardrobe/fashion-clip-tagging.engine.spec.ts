@@ -1,5 +1,7 @@
+import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   assertValidLogits,
   extractLogits,
@@ -7,15 +9,35 @@ import {
 } from './fashion-clip-inference.worker'
 
 describe('FashionClipTaggingEngine & Snapshot Integrity', () => {
-  it('rejects an incomplete snapshot that is missing required model files', () => {
-    const incompleteSnapshotDir = path.join(__dirname, '../../../model-manifests')
-    expect(() => verifyModelSnapshot(incompleteSnapshotDir)).toThrow(
-      'missing required file'
+  const temporaryDirectories: string[] = []
+
+  const createSnapshotDirectory = () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fashion-clip-snapshot-'))
+    temporaryDirectories.push(directory)
+    return directory
+  }
+
+  afterEach(() => {
+    for (const directory of temporaryDirectories.splice(0)) {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects an incomplete snapshot with a specific checksum failure', async () => {
+    const incompleteSnapshotDir = createSnapshotDirectory()
+    fs.writeFileSync(path.join(incompleteSnapshotDir, 'config.json'), '{}')
+
+    await expect(verifyModelSnapshot(incompleteSnapshotDir)).rejects.toThrow(
+      'Model file checksum mismatch for config.json'
     )
   })
 
-  it('rejects a snapshot directory that does not exist', () => {
-    expect(() => verifyModelSnapshot('/non/existent/path')).toThrow()
+  it('rejects a snapshot directory that does not exist with a specific error', async () => {
+    const missingSnapshotDir = path.join(createSnapshotDirectory(), 'missing')
+
+    await expect(verifyModelSnapshot(missingSnapshotDir)).rejects.toThrow(
+      `Model snapshot missing required file: ${path.join(missingSnapshotDir, 'config.json')}`
+    )
   })
 
   it('extracts model logits from direct tensor output', () => {
@@ -43,5 +65,17 @@ describe('FashionClipTaggingEngine & Snapshot Integrity', () => {
     expect(() => assertValidLogits([0.1, Number.NaN], 2)).toThrow(
       'Inference returned non-finite score'
     )
+    expect(() => assertValidLogits([0.1, 0.2, 0.3], 2)).toThrow(
+      'Inference output logits count invalid'
+    )
+    expect(() =>
+      extractLogits(
+        {
+          image_embeds: new Float32Array([1, 2]),
+          text_embeds: new Float32Array([3, 4, 5]),
+        },
+        2
+      )
+    ).toThrow('Inference embedding dimensions are invalid')
   })
 })

@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { WardrobeRetentionService } from './wardrobe-retention.service'
+import type { RitualService } from '../personalization/ritual.service'
 import type { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
 
 function garment(overrides: Record<string, unknown> = {}) {
@@ -23,6 +24,7 @@ describe('WardrobeRetentionService', () => {
   let paletteDeleteMany: Mock
   let auditCreate: Mock
   let storageRemove: Mock
+  let invalidateUserCache: Mock
   let service: WardrobeRetentionService
 
   beforeEach(() => {
@@ -33,6 +35,7 @@ describe('WardrobeRetentionService', () => {
     paletteDeleteMany = vi.fn().mockResolvedValue({ count: 1 })
     auditCreate = vi.fn().mockResolvedValue(undefined)
     storageRemove = vi.fn().mockResolvedValue(undefined)
+    invalidateUserCache = vi.fn().mockResolvedValue(true)
     const transactionClient = {
       garmentItem: { update: garmentUpdate },
       paletteInsights: { deleteMany: paletteDeleteMany },
@@ -47,7 +50,8 @@ describe('WardrobeRetentionService', () => {
     }
     service = new WardrobeRetentionService(
       prisma as unknown as PrismaClient,
-      { remove: storageRemove } as unknown as SupabaseWardrobeStorageAdapter
+      { remove: storageRemove } as unknown as SupabaseWardrobeStorageAdapter,
+      { invalidateUserCache } as unknown as RitualService
     )
   })
 
@@ -57,6 +61,7 @@ describe('WardrobeRetentionService', () => {
     await service.requestDeletion('user-1', 'garment-1')
 
     expect(storageRemove).toHaveBeenCalledWith(['wardrobe/user-1/garment-1.png'])
+    expect(invalidateUserCache).toHaveBeenCalledWith('user-1')
     expect(paletteDeleteMany).toHaveBeenCalledWith({
       where: { garment_item_id: 'garment-1' },
     })
@@ -91,6 +96,7 @@ describe('WardrobeRetentionService', () => {
     expect(storageRemove).not.toHaveBeenCalled()
     expect(garmentUpdate).not.toHaveBeenCalled()
     expect(auditCreate).not.toHaveBeenCalled()
+    expect(invalidateUserCache).not.toHaveBeenCalled()
   })
 
   it('claims expired pending uploads for idempotent scheduled cleanup', async () => {
@@ -107,5 +113,6 @@ describe('WardrobeRetentionService', () => {
       })
     )
     expect(storageRemove).toHaveBeenCalledOnce()
+    expect(invalidateUserCache).toHaveBeenCalledWith('user-1')
   })
 })

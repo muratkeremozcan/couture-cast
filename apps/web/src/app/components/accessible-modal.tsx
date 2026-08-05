@@ -55,8 +55,8 @@ export function AccessibleModal({
 
     // Establish modal focus before paint so a user action cannot race delayed focus setup.
     ;(initialFocusRef?.current ?? closeButtonRef.current)?.focus()
+    const currentInvoker = invokingElementRef?.current
 
-    const invokingElement = invokingElementRef?.current
     return () => {
       document.body.style.overflow = originalStyle
       if (appShell) {
@@ -69,7 +69,12 @@ export function AccessibleModal({
       }
 
       // Restore focus to invoking element or previous active element
-      const targetToFocus = invokingElement ?? previousActiveElementRef.current
+      const targetToFocus =
+        currentInvoker?.isConnected === true
+          ? currentInvoker
+          : previousActiveElementRef.current?.isConnected === true
+            ? previousActiveElementRef.current
+            : null
       targetToFocus?.focus()
     }
   }, [initialFocusRef, isOpen, invokingElementRef])
