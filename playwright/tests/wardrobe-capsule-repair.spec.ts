@@ -3,10 +3,18 @@ import type { Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { log } from '@seontechnologies/playwright-utils/log'
 import type { OutfitCapsuleContract } from '@couture/api-client/contracts/http'
-import { expect, test } from '../support/fixtures/merged-fixtures'
+import {
+  capsuleTest as test,
+  createCapsuleForTest,
+  expect,
+  stubGarmentLibrary,
+} from '../support/helpers/capsule-session'
+import { resolveEnvironmentConfig } from '../config/environments'
 import { waitForAccessibilityReady } from '../support/helpers/accessibility'
 
 const CLIENT_RECONCILIATION_BUDGET_MS = 2_000
+
+const environment = resolveEnvironmentConfig()
 
 const CAPSULE_LIST_URL = '**/api/v1/wardrobe/*/capsules*'
 /** One extra segment, so this never collides with the list pattern above. */
@@ -22,16 +30,12 @@ type CapsuleListResponse = {
 
 type CapsuleResponse = { data: OutfitCapsuleContract }
 
-type RitualResponse = {
-  data?: {
-    outfits?: { capsuleId?: string | null; capsuleName?: string | null }[]
-  }
-}
-
 async function openCapsules(
   page: Page,
   interceptNetworkCall: InterceptNetworkCallFn
 ): Promise<CapsuleListResponse | null> {
+  stubGarmentLibrary(page)
+
   await log.step('Intercept the capsule library fetch before navigating to it')
   const listCall = interceptNetworkCall({ method: 'GET', url: CAPSULE_LIST_URL })
 
@@ -50,6 +54,7 @@ test.describe('Wardrobe capsule repair and lifecycle', () => {
    * and manageable, marked `needs_repair`, with its unavailable count surfaced.
    */
   test('4.3-E2E-05 surfaces a repair state and lets the owner repair it', async ({
+    capsuleSession: _capsuleSession,
     page,
     interceptNetworkCall,
   }) => {
@@ -98,16 +103,23 @@ test.describe('Wardrobe capsule repair and lifecycle', () => {
   })
 
   test('4.3-E2E-06 toggles favorite and reflects it within two seconds', async ({
+    capsuleSession,
+    apiRequest,
     page,
     interceptNetworkCall,
   }) => {
-    const listed = await openCapsules(page, interceptNetworkCall)
-    const target = listed?.data?.[0]
-    test.skip(!target, 'No capsules seeded.')
+    const seeded = await createCapsuleForTest(
+      apiRequest,
+      capsuleSession,
+      environment.apiBaseUrl,
+      `Favorite journey ${Date.now()}`
+    )
 
-    await log.step('Toggle favorite on the first listed capsule')
-    const favoriteButton = page.getByTestId(`favorite-button-${target?.id}`)
-    const before = target?.isFavorite ?? false
+    await openCapsules(page, interceptNetworkCall)
+
+    await log.step('Toggle favorite on the capsule this test created')
+    const favoriteButton = page.getByTestId(`favorite-button-${seeded.id}`)
+    const before = false
 
     const favoriteCall = interceptNetworkCall({
       method: 'PATCH',
@@ -134,15 +146,22 @@ test.describe('Wardrobe capsule repair and lifecycle', () => {
   })
 
   test('4.3-E2E-07 deletes a capsule through the confirmation dialog', async ({
+    capsuleSession,
+    apiRequest,
     page,
     interceptNetworkCall,
   }) => {
-    const listed = await openCapsules(page, interceptNetworkCall)
-    const target = listed?.data?.[0]
-    test.skip(!target, 'No capsules seeded.')
+    const seeded = await createCapsuleForTest(
+      apiRequest,
+      capsuleSession,
+      environment.apiBaseUrl,
+      `Delete journey ${Date.now()}`
+    )
 
-    const capsuleName = target?.name as string
-    const card = page.getByTestId(`capsule-card-${target?.id}`)
+    await openCapsules(page, interceptNetworkCall)
+
+    const capsuleName = seeded.name
+    const card = page.getByTestId(`capsule-card-${seeded.id}`)
 
     await log.step('Open the destructive confirmation and assert its accessible name')
     await card.locator('[data-testid^="delete-capsule-button-"]').click()
@@ -169,28 +188,15 @@ test.describe('Wardrobe capsule repair and lifecycle', () => {
     })
   })
 
-  /** A capsule that wins the ritual is attributed in the response contract. */
-  test('4.3-E2E-08 shows a saved-capsule recommendation badge when a capsule wins', async ({
-    page,
-    interceptNetworkCall,
-  }) => {
-    await log.step('Intercept the ritual call before loading the home page')
-    const ritualCall = interceptNetworkCall({
-      method: 'GET',
-      url: '**/api/v1/ritual*',
-    })
-
-    await page.goto('/')
-    const { status, responseJson } = await ritualCall
-
-    expect(status).toBe(200)
-
-    await log.step('Skip unless a capsule actually won a scenario in this environment')
-    const ritual = responseJson as RitualResponse | null
-    const winner = ritual?.data?.outfits?.find((outfit) => outfit.capsuleId)
-    test.skip(!winner, 'No capsule won a scenario in this environment.')
-
-    await log.step('Assert the localized badge renders; the capsule name stays separate')
-    await expect(page.getByText(/Saved capsule/i).first()).toBeVisible()
-  })
+  /*
+   * There is deliberately no web journey for the saved-capsule recommendation
+   * badge. The web app renders no ritual view: `apps/web/src/app/page.tsx` has a
+   * static "Daily ritual" marketing section and nothing in apps/web calls
+   * GET /api/v1/ritual. A spec here could only ever time out waiting for a
+   * request the app never makes.
+   *
+   * Capsule selection and the localized badge are covered where they exist:
+   * the ranking unit tests, the ritual service and controller suites, and the
+   * consumer contract. Add a journey here when web grows a ritual surface.
+   */
 })

@@ -18,4 +18,6 @@ regexes = [
   '''^34eff0f2-39b2-454e-b6b1-44a9ebfdb8ec$''',
   # Fixed HMAC key used only to sign and verify locally generated test tokens
   '''^wardrobe-test-secret-at-least-32-bytes$''',
+  # Fixed UUID used only as the capsule idempotency-key fixture in Pact contracts
+  '''^3f1e8c2a-9b47-4d21-8f6e-5a0c7d3b1e94$''',
 ]

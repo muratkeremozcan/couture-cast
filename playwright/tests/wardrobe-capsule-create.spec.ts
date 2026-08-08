@@ -1,12 +1,19 @@
 // Story 4.3 Task 8: capsule creation journey, ordering durability, and cross-client refresh.
 import type { Page } from '@playwright/test'
-import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
+import {
+  interceptNetworkCall as interceptOnPage,
+  type InterceptNetworkCallFn,
+} from '@seontechnologies/playwright-utils/intercept-network-call'
 import { log } from '@seontechnologies/playwright-utils/log'
 import type {
   CreateOutfitCapsuleInput,
   OutfitCapsuleContract,
 } from '@couture/api-client/contracts/http'
-import { expect, test } from '../support/fixtures/merged-fixtures'
+import {
+  capsuleTest as test,
+  expect,
+  stubGarmentLibrary,
+} from '../support/helpers/capsule-session'
 import { waitForAccessibilityReady } from '../support/helpers/accessibility'
 
 /**
@@ -36,6 +43,8 @@ async function openCapsules(
   page: Page,
   interceptNetworkCall: InterceptNetworkCallFn
 ): Promise<CapsuleListResponse | null> {
+  stubGarmentLibrary(page)
+
   await log.step('Intercept the capsule library fetch before navigating to it')
   const listCall = interceptNetworkCall({ method: 'GET', url: CAPSULE_LIST_URL })
 
@@ -59,6 +68,7 @@ async function fillCapsuleForm(page: Page, name: string) {
 
 test.describe('Wardrobe capsule creation', () => {
   test('4.3-E2E-01 creates a capsule and shows it in the library within two seconds', async ({
+    capsuleSession: _capsuleSession,
     page,
     interceptNetworkCall,
   }) => {
@@ -102,6 +112,7 @@ test.describe('Wardrobe capsule creation', () => {
   })
 
   test('4.3-E2E-02 preserves the exact garment order across a reload', async ({
+    capsuleSession: _capsuleSession,
     page,
     interceptNetworkCall,
   }) => {
@@ -145,7 +156,10 @@ test.describe('Wardrobe capsule creation', () => {
     await reloadCall
     await waitForAccessibilityReady(page)
 
-    await page.locator('[data-testid^="edit-capsule-button-"]').first().click()
+    // Reopen this test's own capsule. Picking the first card would open whatever
+    // a parallel worker created against the shared seeded owner.
+    const capsuleId = created?.data.id as string
+    await page.getByTestId(`edit-capsule-button-${capsuleId}`).click()
 
     const orderedAfter = await page
       .locator('[data-testid^="ordered-garment-item-"]')
@@ -155,6 +169,7 @@ test.describe('Wardrobe capsule creation', () => {
   })
 
   test('4.3-E2E-03 refreshes a second open client on focus', async ({
+    capsuleSession: _capsuleSession,
     page,
     context,
     interceptNetworkCall,
@@ -163,7 +178,12 @@ test.describe('Wardrobe capsule creation', () => {
 
     await log.step('Pre-open an observer client so it cannot load the state fresh')
     const observer = await context.newPage()
-    const observerListCall = interceptNetworkCall({
+    stubGarmentLibrary(observer)
+
+    // The interceptNetworkCall fixture is bound to the `page` fixture, so the
+    // observer needs the standalone form with its own page.
+    const observerListCall = interceptOnPage({
+      page: observer,
       method: 'GET',
       url: CAPSULE_LIST_URL,
     })
@@ -197,15 +217,32 @@ test.describe('Wardrobe capsule creation', () => {
   })
 
   test('4.3-E2E-04 applies a combined keyword, occasion, and favorite filter', async ({
+    capsuleSession: _capsuleSession,
     page,
     interceptNetworkCall,
   }) => {
     await openCapsules(page, interceptNetworkCall)
 
-    await log.step('Apply a keyword and an occasion, then intercept the favorite filter')
+    // The search box debounces, so the keyword only reaches the server after the
+    // timer flushes. Awaiting that request first means the favorite toggle below
+    // is applied on top of the keyword rather than racing it.
+    await log.step('Apply the keyword and await its debounced request')
+    const keywordCall = interceptNetworkCall({
+      method: 'GET',
+      url: '**/api/v1/wardrobe/*/capsules?*q=capsule*',
+    })
     await page.getByTestId('capsule-search-input').fill('capsule')
-    await page.getByTestId('capsule-occasion-filter').selectOption('work')
+    await keywordCall
 
+    await log.step('Add the occasion filter and await its request')
+    const occasionCall = interceptNetworkCall({
+      method: 'GET',
+      url: '**/api/v1/wardrobe/*/capsules?*occasion=work*',
+    })
+    await page.getByTestId('capsule-occasion-filter').selectOption('work')
+    await occasionCall
+
+    await log.step('Add the favorite filter, which must carry all three')
     const filteredCall = interceptNetworkCall({
       method: 'GET',
       url: '**/api/v1/wardrobe/*/capsules?*isFavorite=true*',

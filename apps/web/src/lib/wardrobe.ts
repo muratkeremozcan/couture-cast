@@ -7,6 +7,7 @@ import {
   updateGarmentTagsResponseSchema,
   outfitCapsuleResponseSchema,
   outfitCapsuleListResponseSchema,
+  userProfileResponseSchema,
   type GarmentCategory,
   type GarmentMaterial,
   type GarmentComfortRange,
@@ -65,29 +66,31 @@ function readAccessToken(): string {
 }
 
 /**
- * Resolves the signed-in user's id from the bearer token's `sub` claim.
+ * Resolves the signed-in user's id from the API.
  *
  * Capsule routes take an explicit owner path segment so guardians and admins can
- * act for another user. The signed-in user is the default owner, and it must
- * come from the session rather than a hardcoded value.
+ * act for another user. The signed-in user is the default owner, and the server
+ * is the only authority on who that is.
+ *
+ * This deliberately does not decode the bearer token. Reading the `sub` claim
+ * client-side couples the page to one token format, and the identity it derives
+ * is whatever the client chooses to believe rather than what the API enforces.
  */
-export function resolveCurrentUserId(): string {
-  const token = readAccessToken()
-  const payloadSegment = token.split('.')[1]
-  if (!payloadSegment) {
-    throw new Error('Your session token is malformed. Sign in again.')
-  }
+export async function resolveCurrentUserId(): Promise<string> {
+  const accessToken = readAccessToken()
 
   try {
-    const normalized = payloadSegment.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
-    const claims = JSON.parse(window.atob(padded)) as { sub?: unknown }
-    if (typeof claims.sub !== 'string' || claims.sub.length === 0) {
-      throw new Error('missing sub claim')
+    const profile = await createWebApiClient({ accessToken }).apiV1UserProfileGet()
+    const userId = userProfileResponseSchema.parse(profile).user.id
+    if (userId.length === 0) {
+      throw new Error('empty user id')
     }
-    return claims.sub
-  } catch {
-    throw new Error('Your session token is malformed. Sign in again.')
+    return userId
+  } catch (error: unknown) {
+    throw new WardrobeRequestError(
+      'Unable to confirm your account. Sign in again.',
+      error instanceof Error ? error.message : undefined
+    )
   }
 }
 

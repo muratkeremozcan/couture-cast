@@ -65,13 +65,27 @@ function CapsulesView() {
   /** Aborts the previous request so a slow earlier response cannot win. */
   const inFlightRef = useRef<AbortController | null>(null)
 
-  /** The owner defaults to the signed-in user, read from the session token. */
+  /** The owner defaults to the signed-in user, as confirmed by the API. */
   useEffect(() => {
-    try {
-      setOwnerUserId(resolveCurrentUserId())
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Sign in to manage capsules.')
-      setIsLoading(false)
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const userId = await resolveCurrentUserId()
+        if (!cancelled) {
+          setOwnerUserId(userId)
+        }
+      } catch (err: unknown) {
+        if (cancelled) {
+          return
+        }
+        setError(err instanceof Error ? err.message : 'Sign in to manage capsules.')
+        setIsLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
     }
   }, [])
 
@@ -196,7 +210,12 @@ function CapsulesView() {
   )
 
   return (
-    <div className="mx-auto max-w-6xl p-6">
+    /*
+     * The global "Skip to main content" link targets #main-content, so this page
+     * needs the landmark like every other route. Without it the skip link is a
+     * dead anchor and the page exposes no main landmark to assistive tech.
+     */
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl p-6 outline-none">
       {/* Success announcements are polite so they do not interrupt a screen reader. */}
       <p aria-live="polite" className="sr-only" data-testid="capsule-status-region">
         {statusMessage ?? ''}
@@ -467,6 +486,6 @@ function CapsulesView() {
           </div>
         </AccessibleModal>
       )}
-    </div>
+    </main>
   )
 }

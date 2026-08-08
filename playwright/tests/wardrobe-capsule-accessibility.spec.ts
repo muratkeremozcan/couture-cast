@@ -3,13 +3,21 @@ import type { Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { log } from '@seontechnologies/playwright-utils/log'
 import type { OutfitCapsuleContract } from '@couture/api-client/contracts/http'
-import { expect, test } from '../support/fixtures/merged-fixtures'
+import {
+  capsuleTest as test,
+  createCapsuleForTest,
+  expect,
+  stubGarmentLibrary,
+} from '../support/helpers/capsule-session'
+import { resolveEnvironmentConfig } from '../config/environments'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
 
 /** WCAG 2.2 AA target size minimum. */
 const MIN_TARGET_PX = 44
 
 const CAPSULE_LIST_URL = '**/api/v1/wardrobe/*/capsules*'
+
+const environment = resolveEnvironmentConfig()
 
 type CapsuleListResponse = {
   data: OutfitCapsuleContract[]
@@ -22,6 +30,8 @@ async function openCapsules(
   page: Page,
   interceptNetworkCall: InterceptNetworkCallFn
 ): Promise<CapsuleListResponse | null> {
+  stubGarmentLibrary(page)
+
   await log.step('Intercept the capsule library fetch before navigating to it')
   const listCall = interceptNetworkCall({ method: 'GET', url: CAPSULE_LIST_URL })
 
@@ -42,6 +52,7 @@ async function selectTwoGarments(page: Page) {
 
 test.describe('Wardrobe capsule accessibility', () => {
   test('4.3-A11Y-01 passes axe on the capsule library and the builder dialog', async ({
+    capsuleSession: _capsuleSession,
     page,
     interceptNetworkCall,
   }) => {
@@ -62,6 +73,7 @@ test.describe('Wardrobe capsule accessibility', () => {
   })
 
   test('4.3-A11Y-02 completes creation using only the keyboard', async ({
+    capsuleSession: _capsuleSession,
     page,
     interceptNetworkCall,
   }) => {
@@ -92,6 +104,7 @@ test.describe('Wardrobe capsule accessibility', () => {
    * disabled at the boundary, silently dropping the user onto <body>.
    */
   test('4.3-A11Y-03 keeps focus on a usable reorder control at the boundary', async ({
+    capsuleSession: _capsuleSession,
     page,
     interceptNetworkCall,
   }) => {
@@ -115,6 +128,7 @@ test.describe('Wardrobe capsule accessibility', () => {
   })
 
   test('4.3-A11Y-04 announces the move through a polite live region', async ({
+    capsuleSession: _capsuleSession,
     page,
     interceptNetworkCall,
   }) => {
@@ -137,6 +151,7 @@ test.describe('Wardrobe capsule accessibility', () => {
   })
 
   test('4.3-A11Y-05 meets the 44px minimum on every interactive capsule target', async ({
+    capsuleSession: _capsuleSession,
     page,
     interceptNetworkCall,
   }) => {
@@ -160,6 +175,7 @@ test.describe('Wardrobe capsule accessibility', () => {
   })
 
   test('4.3-A11Y-06 restores focus to the invoking control when the dialog closes', async ({
+    capsuleSession: _capsuleSession,
     page,
     interceptNetworkCall,
   }) => {
@@ -178,17 +194,22 @@ test.describe('Wardrobe capsule accessibility', () => {
   })
 
   test('4.3-A11Y-07 exposes the delete confirmation as a named dialog', async ({
+    capsuleSession,
+    apiRequest,
     page,
     interceptNetworkCall,
   }) => {
-    const listed = await openCapsules(page, interceptNetworkCall)
+    const seeded = await createCapsuleForTest(
+      apiRequest,
+      capsuleSession,
+      environment.apiBaseUrl,
+      `Delete dialog ${Date.now()}`
+    )
 
-    await log.step('Select a capsule from the payload, not the rendered DOM')
-    const target = listed?.data?.[0]
-    test.skip(!target, 'No capsules seeded.')
+    await openCapsules(page, interceptNetworkCall)
 
     await log.step('Open the destructive confirmation and run axe against it')
-    await page.getByTestId(`delete-capsule-button-${target?.id}`).click()
+    await page.getByTestId(`delete-capsule-button-${seeded.id}`).click()
 
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()

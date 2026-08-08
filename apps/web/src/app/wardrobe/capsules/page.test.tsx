@@ -61,7 +61,7 @@ function mockPage(items: OutfitCapsuleContract[], total = items.length) {
 describe('WardrobeCapsulesPage', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    vi.mocked(wardrobeApi.resolveCurrentUserId).mockReturnValue(SIGNED_IN_USER)
+    vi.mocked(wardrobeApi.resolveCurrentUserId).mockResolvedValue(SIGNED_IN_USER)
     vi.mocked(wardrobeApi.listCapsulesFromWeb).mockResolvedValue(
       mockPage([buildCapsule()])
     )
@@ -95,9 +95,9 @@ describe('WardrobeCapsulesPage', () => {
   })
 
   it('4.3-WEB-PAGE-03 surfaces a session error instead of querying with no user', async () => {
-    vi.mocked(wardrobeApi.resolveCurrentUserId).mockImplementation(() => {
-      throw new Error('Your session expired.')
-    })
+    vi.mocked(wardrobeApi.resolveCurrentUserId).mockRejectedValue(
+      new Error('Your session expired.')
+    )
 
     render(<WardrobeCapsulesPage />)
 
