@@ -55,3 +55,7 @@ _bmad/custom/*
 perf-test-plan.md
 .bmad-loop/
 .playwright-cli
+# TypeScript project-reference builds must emit to dist, never into src.
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts.map

@@ -6,6 +6,8 @@ export const DEFAULT_FACTORY_REGISTRY_KEYS = [
   'weatherSnapshots',
   'alertRules',
   'notificationPreferences',
+  'outfitCapsules',
+  'outfitCapsuleGarments',
 ] as const
 
 export type FactoryRegistryKey = (typeof DEFAULT_FACTORY_REGISTRY_KEYS)[number]

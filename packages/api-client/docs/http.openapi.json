@@ -3174,6 +3174,27 @@
           "comfortNotes": {
             "type": "string",
             "description": "Explanation string based on weather and comfort thresholds."
+          },
+          "capsuleId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional capsule ID if recommendation came from an outfit capsule."
+          },
+          "capsuleName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional capsule name if recommendation came from an outfit capsule."
+          },
+          "autoFilledGarmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional list of garment IDs auto-filled into a partial capsule."
           }
         },
         "required": [
@@ -3438,6 +3459,27 @@
                     "comfortNotes": {
                       "type": "string",
                       "description": "Explanation string based on weather and comfort thresholds."
+                    },
+                    "capsuleId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Optional capsule ID if recommendation came from an outfit capsule."
+                    },
+                    "capsuleName": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Optional capsule name if recommendation came from an outfit capsule."
+                    },
+                    "autoFilledGarmentIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Optional list of garment IDs auto-filled into a partial capsule."
                     }
                   },
                   "required": [
@@ -3490,6 +3532,20 @@
               "pt-PT"
             ],
             "description": "Optional locale override for this localized ritual response."
+          },
+          "occasion": {
+            "type": "string",
+            "enum": [
+              "work",
+              "casual",
+              "formal",
+              "sport",
+              "travel",
+              "evening",
+              "outdoor",
+              "home"
+            ],
+            "description": "Optional occasion filter for capsule recommendations."
           }
         },
         "additionalProperties": false
@@ -4692,6 +4748,699 @@
             "type": "string",
             "enum": [
               "Service Unavailable"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "CreateOutfitCapsuleInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "occasions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "work",
+                "casual",
+                "formal",
+                "sport",
+                "travel",
+                "evening",
+                "outdoor",
+                "home"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 8
+          },
+          "garmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "minItems": 2,
+            "maxItems": 10
+          },
+          "isFavorite": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "name",
+          "occasions",
+          "garmentIds"
+        ],
+        "additionalProperties": false
+      },
+      "OutfitCapsuleResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ownerUserId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 280
+              },
+              "occasions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "work",
+                    "casual",
+                    "formal",
+                    "sport",
+                    "travel",
+                    "evening",
+                    "outdoor",
+                    "home"
+                  ]
+                },
+                "minItems": 1,
+                "maxItems": 8
+              },
+              "isFavorite": {
+                "type": "boolean"
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "availabilityStatus": {
+                "type": "string",
+                "enum": [
+                  "ready",
+                  "needs_repair"
+                ]
+              },
+              "unavailableGarmentCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "garments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "category": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "top",
+                        "bottom",
+                        "outerwear",
+                        "dress",
+                        "shoes",
+                        "accessory",
+                        null
+                      ]
+                    },
+                    "material": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "cotton",
+                        "wool",
+                        "linen",
+                        "leather",
+                        "denim",
+                        "fleece",
+                        "synthetic",
+                        "down",
+                        "silk",
+                        null
+                      ]
+                    },
+                    "comfortRange": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "cold",
+                        "cool",
+                        "mild",
+                        "warm",
+                        "hot",
+                        null
+                      ]
+                    },
+                    "imageAccess": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "availabilityStatus": {
+                      "type": "string",
+                      "enum": [
+                        "ready",
+                        "needs_repair"
+                      ]
+                    },
+                    "garmentOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "category",
+                    "material",
+                    "comfortRange",
+                    "imageAccess",
+                    "availabilityStatus",
+                    "garmentOrder"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "ownerUserId",
+              "name",
+              "description",
+              "occasions",
+              "isFavorite",
+              "revision",
+              "availabilityStatus",
+              "unavailableGarmentCount",
+              "garments",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "OutfitCapsuleListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "ownerUserId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 280
+                },
+                "occasions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "work",
+                      "casual",
+                      "formal",
+                      "sport",
+                      "travel",
+                      "evening",
+                      "outdoor",
+                      "home"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 8
+                },
+                "isFavorite": {
+                  "type": "boolean"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "availabilityStatus": {
+                  "type": "string",
+                  "enum": [
+                    "ready",
+                    "needs_repair"
+                  ]
+                },
+                "unavailableGarmentCount": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "garments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "category": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "top",
+                          "bottom",
+                          "outerwear",
+                          "dress",
+                          "shoes",
+                          "accessory",
+                          null
+                        ]
+                      },
+                      "material": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "cotton",
+                          "wool",
+                          "linen",
+                          "leather",
+                          "denim",
+                          "fleece",
+                          "synthetic",
+                          "down",
+                          "silk",
+                          null
+                        ]
+                      },
+                      "comfortRange": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "cold",
+                          "cool",
+                          "mild",
+                          "warm",
+                          "hot",
+                          null
+                        ]
+                      },
+                      "imageAccess": {
+                        "type": [
+                          "object",
+                          "null"
+                        ],
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "url",
+                          "expiresAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "availabilityStatus": {
+                        "type": "string",
+                        "enum": [
+                          "ready",
+                          "needs_repair"
+                        ]
+                      },
+                      "garmentOrder": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "category",
+                      "material",
+                      "comfortRange",
+                      "imageAccess",
+                      "availabilityStatus",
+                      "garmentOrder"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "ownerUserId",
+                "name",
+                "description",
+                "occasions",
+                "isFavorite",
+                "revision",
+                "availabilityStatus",
+                "unavailableGarmentCount",
+                "garments",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateOutfitCapsuleInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "occasions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "work",
+                "casual",
+                "formal",
+                "sport",
+                "travel",
+                "evening",
+                "outdoor",
+                "home"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 8
+          },
+          "garmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "minItems": 2,
+            "maxItems": 10
+          },
+          "isFavorite": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FavoriteOutfitCapsuleInput": {
+        "type": "object",
+        "properties": {
+          "isFavorite": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "isFavorite"
+        ],
+        "additionalProperties": false
+      },
+      "CapsuleBadRequestError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              400
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Bad Request"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "CapsuleForbiddenError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              403
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "GUARDIAN_READ_ONLY",
+              "GUARDIAN_CONSENT_REQUIRED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Forbidden"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "CapsuleNotFoundError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              404
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "NOT_FOUND"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Not Found"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "CapsuleConflictError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              409
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "GARMENT_NOT_CAPSULE_ELIGIBLE",
+              "IDEMPOTENCY_KEY_REUSED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Conflict"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "CapsulePreconditionFailedError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              412
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "CAPSULE_REVISION_MISMATCH"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Precondition Failed"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "CapsulePreconditionRequiredError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              428
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "PRECONDITION_REQUIRED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Precondition Required"
             ]
           }
         },
@@ -5966,6 +6715,26 @@
             "description": "Optional locale override for this localized ritual response.",
             "name": "locale",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "work",
+                "casual",
+                "formal",
+                "sport",
+                "travel",
+                "evening",
+                "outdoor",
+                "home"
+              ],
+              "description": "Optional occasion filter for capsule recommendations."
+            },
+            "required": false,
+            "description": "Optional occasion filter for capsule recommendations.",
+            "name": "occasion",
+            "in": "query"
           }
         ],
         "responses": {
@@ -6694,6 +7463,713 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/{ownerUserId}/capsules": {
+      "post": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Create a new outfit capsule for an owner wardrobe",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique owner user ID."
+            },
+            "required": true,
+            "description": "Unique owner user ID.",
+            "name": "ownerUserId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "idempotency-key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOutfitCapsuleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent creation replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutfitCapsuleResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Capsule created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutfitCapsuleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid capsule creation payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent required or guardian read-only access.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleForbiddenError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owner user not found or unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleNotFoundError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ineligible garments or idempotency key reused with different payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleConflictError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "List and filter outfit capsules for an owner wardrobe",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique owner user ID."
+            },
+            "required": true,
+            "description": "Unique owner user ID.",
+            "name": "ownerUserId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "work",
+                "casual",
+                "formal",
+                "sport",
+                "travel",
+                "evening",
+                "outdoor",
+                "home"
+              ]
+            },
+            "required": false,
+            "name": "occasion",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "boolean"
+            },
+            "required": false,
+            "name": "isFavorite",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "required": false,
+            "name": "garmentId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "cold",
+                "cool",
+                "mild",
+                "warm",
+                "hot",
+                null
+              ]
+            },
+            "required": false,
+            "name": "comfortRange",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            },
+            "required": false,
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of outfit capsules.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutfitCapsuleListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Owner user not found or unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleNotFoundError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}": {
+      "get": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Get details of a specific outfit capsule",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique owner user ID."
+            },
+            "required": true,
+            "description": "Unique owner user ID.",
+            "name": "ownerUserId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique outfit capsule ID."
+            },
+            "required": true,
+            "description": "Unique outfit capsule ID.",
+            "name": "capsuleId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Outfit capsule details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutfitCapsuleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Capsule or owner not found or unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleNotFoundError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Update metadata or constituent garments of an outfit capsule",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique owner user ID."
+            },
+            "required": true,
+            "description": "Unique owner user ID.",
+            "name": "ownerUserId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique outfit capsule ID."
+            },
+            "required": true,
+            "description": "Unique outfit capsule ID.",
+            "name": "capsuleId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "if-match",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOutfitCapsuleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Capsule updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutfitCapsuleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid update payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian read-only or consent forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleForbiddenError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Capsule or owner not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleNotFoundError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Ineligible garments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleConflictError"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale ETag / capsule revision mismatch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsulePreconditionFailedError"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match header required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsulePreconditionRequiredError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Delete an outfit capsule and its join records",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique owner user ID."
+            },
+            "required": true,
+            "description": "Unique owner user ID.",
+            "name": "ownerUserId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique outfit capsule ID."
+            },
+            "required": true,
+            "description": "Unique outfit capsule ID.",
+            "name": "capsuleId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "if-match",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Capsule deleted successfully."
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian read-only or consent forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleForbiddenError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Capsule or owner not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleNotFoundError"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale ETag / capsule revision mismatch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsulePreconditionFailedError"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match header required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsulePreconditionRequiredError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}/favorite": {
+      "patch": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Set favorite status of an outfit capsule",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique owner user ID."
+            },
+            "required": true,
+            "description": "Unique owner user ID.",
+            "name": "ownerUserId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique outfit capsule ID."
+            },
+            "required": true,
+            "description": "Unique outfit capsule ID.",
+            "name": "capsuleId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "if-match",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FavoriteOutfitCapsuleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Capsule favorite status updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutfitCapsuleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian read-only or consent forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleForbiddenError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Capsule or owner not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsuleNotFoundError"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale ETag / capsule revision mismatch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsulePreconditionFailedError"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match header required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapsulePreconditionRequiredError"
                 }
               }
             }

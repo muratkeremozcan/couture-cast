@@ -17,10 +17,15 @@ import type {
   CreateGarmentItemResponse,
   CreateGarmentUploadUrlInput,
   CreateGarmentUploadUrlResponse,
+  CreateOutfitCapsuleInput,
+  FavoriteOutfitCapsuleInput,
   GarmentListResponse,
+  OutfitCapsuleListResponse,
+  OutfitCapsuleResponse,
   SuggestGarmentTagsResponse,
   UpdateGarmentTagsInput,
   UpdateGarmentTagsResponse,
+  UpdateOutfitCapsuleInput,
 } from '../models/index'
 
 export interface ApiV1WardrobeGarmentsGarmentIdSuggestTagsPostRequest {
@@ -35,6 +40,48 @@ export interface ApiV1WardrobeGarmentsGarmentIdTagsPatchRequest {
 export interface ApiV1WardrobeGarmentsPostRequest {
   idempotencyKey: string
   createGarmentItemInput: CreateGarmentItemInput
+}
+
+export interface ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdDeleteRequest {
+  ownerUserId: string
+  capsuleId: string
+  ifMatch: string
+}
+
+export interface ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatchRequest {
+  ownerUserId: string
+  capsuleId: string
+  ifMatch: string
+  favoriteOutfitCapsuleInput: FavoriteOutfitCapsuleInput
+}
+
+export interface ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdGetRequest {
+  ownerUserId: string
+  capsuleId: string
+}
+
+export interface ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatchRequest {
+  ownerUserId: string
+  capsuleId: string
+  ifMatch: string
+  updateOutfitCapsuleInput: UpdateOutfitCapsuleInput
+}
+
+export interface ApiV1WardrobeOwnerUserIdCapsulesGetRequest {
+  ownerUserId: string
+  q?: string
+  occasion?: ApiV1WardrobeOwnerUserIdCapsulesGetOccasionEnum
+  isFavorite?: boolean
+  garmentId?: string
+  comfortRange?: ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum
+  limit?: number
+  offset?: number | null
+}
+
+export interface ApiV1WardrobeOwnerUserIdCapsulesPostRequest {
+  ownerUserId: string
+  createOutfitCapsuleInput: CreateOutfitCapsuleInput
+  idempotencyKey?: string
 }
 
 export interface ApiV1WardrobeUploadUrlPostRequest {
@@ -329,6 +376,560 @@ export class WardrobeApi extends runtime.BaseAPI {
   }
 
   /**
+   * Creates request options for apiV1WardrobeOwnerUserIdCapsulesCapsuleIdDelete without sending the request
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesCapsuleIdDeleteRequestOpts(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdDeleteRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['ownerUserId'] == null) {
+      throw new runtime.RequiredError(
+        'ownerUserId',
+        'Required parameter "ownerUserId" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdDelete().'
+      )
+    }
+
+    if (requestParameters['capsuleId'] == null) {
+      throw new runtime.RequiredError(
+        'capsuleId',
+        'Required parameter "capsuleId" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdDelete().'
+      )
+    }
+
+    if (requestParameters['ifMatch'] == null) {
+      throw new runtime.RequiredError(
+        'ifMatch',
+        'Required parameter "ifMatch" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdDelete().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (requestParameters['ifMatch'] != null) {
+      headerParameters['if-match'] = String(requestParameters['ifMatch'])
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}`
+    urlPath = urlPath.replace(
+      `{${'ownerUserId'}}`,
+      encodeURIComponent(String(requestParameters['ownerUserId']))
+    )
+    urlPath = urlPath.replace(
+      `{${'capsuleId'}}`,
+      encodeURIComponent(String(requestParameters['capsuleId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'DELETE',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Delete an outfit capsule and its join records
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesCapsuleIdDeleteRaw(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdDeleteRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<void>> {
+    const requestOptions =
+      await this.apiV1WardrobeOwnerUserIdCapsulesCapsuleIdDeleteRequestOpts(
+        requestParameters
+      )
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.VoidApiResponse(response)
+  }
+
+  /**
+   * Delete an outfit capsule and its join records
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesCapsuleIdDelete(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdDeleteRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<void> {
+    await this.apiV1WardrobeOwnerUserIdCapsulesCapsuleIdDeleteRaw(
+      requestParameters,
+      initOverrides
+    )
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatch without sending the request
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatchRequestOpts(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatchRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['ownerUserId'] == null) {
+      throw new runtime.RequiredError(
+        'ownerUserId',
+        'Required parameter "ownerUserId" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatch().'
+      )
+    }
+
+    if (requestParameters['capsuleId'] == null) {
+      throw new runtime.RequiredError(
+        'capsuleId',
+        'Required parameter "capsuleId" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatch().'
+      )
+    }
+
+    if (requestParameters['ifMatch'] == null) {
+      throw new runtime.RequiredError(
+        'ifMatch',
+        'Required parameter "ifMatch" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatch().'
+      )
+    }
+
+    if (requestParameters['favoriteOutfitCapsuleInput'] == null) {
+      throw new runtime.RequiredError(
+        'favoriteOutfitCapsuleInput',
+        'Required parameter "favoriteOutfitCapsuleInput" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatch().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['ifMatch'] != null) {
+      headerParameters['if-match'] = String(requestParameters['ifMatch'])
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}/favorite`
+    urlPath = urlPath.replace(
+      `{${'ownerUserId'}}`,
+      encodeURIComponent(String(requestParameters['ownerUserId']))
+    )
+    urlPath = urlPath.replace(
+      `{${'capsuleId'}}`,
+      encodeURIComponent(String(requestParameters['capsuleId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'PATCH',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['favoriteOutfitCapsuleInput'],
+    }
+  }
+
+  /**
+   * Set favorite status of an outfit capsule
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatchRaw(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatchRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<OutfitCapsuleResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatchRequestOpts(
+        requestParameters
+      )
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Set favorite status of an outfit capsule
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatch(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatchRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<OutfitCapsuleResponse> {
+    const response = await this.apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatchRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeOwnerUserIdCapsulesCapsuleIdGet without sending the request
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesCapsuleIdGetRequestOpts(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdGetRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['ownerUserId'] == null) {
+      throw new runtime.RequiredError(
+        'ownerUserId',
+        'Required parameter "ownerUserId" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdGet().'
+      )
+    }
+
+    if (requestParameters['capsuleId'] == null) {
+      throw new runtime.RequiredError(
+        'capsuleId',
+        'Required parameter "capsuleId" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdGet().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}`
+    urlPath = urlPath.replace(
+      `{${'ownerUserId'}}`,
+      encodeURIComponent(String(requestParameters['ownerUserId']))
+    )
+    urlPath = urlPath.replace(
+      `{${'capsuleId'}}`,
+      encodeURIComponent(String(requestParameters['capsuleId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Get details of a specific outfit capsule
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesCapsuleIdGetRaw(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdGetRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<OutfitCapsuleResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeOwnerUserIdCapsulesCapsuleIdGetRequestOpts(
+        requestParameters
+      )
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Get details of a specific outfit capsule
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesCapsuleIdGet(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdGetRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<OutfitCapsuleResponse> {
+    const response = await this.apiV1WardrobeOwnerUserIdCapsulesCapsuleIdGetRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatch without sending the request
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatchRequestOpts(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatchRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['ownerUserId'] == null) {
+      throw new runtime.RequiredError(
+        'ownerUserId',
+        'Required parameter "ownerUserId" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatch().'
+      )
+    }
+
+    if (requestParameters['capsuleId'] == null) {
+      throw new runtime.RequiredError(
+        'capsuleId',
+        'Required parameter "capsuleId" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatch().'
+      )
+    }
+
+    if (requestParameters['ifMatch'] == null) {
+      throw new runtime.RequiredError(
+        'ifMatch',
+        'Required parameter "ifMatch" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatch().'
+      )
+    }
+
+    if (requestParameters['updateOutfitCapsuleInput'] == null) {
+      throw new runtime.RequiredError(
+        'updateOutfitCapsuleInput',
+        'Required parameter "updateOutfitCapsuleInput" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatch().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['ifMatch'] != null) {
+      headerParameters['if-match'] = String(requestParameters['ifMatch'])
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}`
+    urlPath = urlPath.replace(
+      `{${'ownerUserId'}}`,
+      encodeURIComponent(String(requestParameters['ownerUserId']))
+    )
+    urlPath = urlPath.replace(
+      `{${'capsuleId'}}`,
+      encodeURIComponent(String(requestParameters['capsuleId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'PATCH',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['updateOutfitCapsuleInput'],
+    }
+  }
+
+  /**
+   * Update metadata or constituent garments of an outfit capsule
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatchRaw(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatchRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<OutfitCapsuleResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatchRequestOpts(
+        requestParameters
+      )
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Update metadata or constituent garments of an outfit capsule
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatch(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatchRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<OutfitCapsuleResponse> {
+    const response = await this.apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatchRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeOwnerUserIdCapsulesGet without sending the request
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesGetRequestOpts(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesGetRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['ownerUserId'] == null) {
+      throw new runtime.RequiredError(
+        'ownerUserId',
+        'Required parameter "ownerUserId" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesGet().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    if (requestParameters['q'] != null) {
+      queryParameters['q'] = requestParameters['q']
+    }
+
+    if (requestParameters['occasion'] != null) {
+      queryParameters['occasion'] = requestParameters['occasion']
+    }
+
+    if (requestParameters['isFavorite'] != null) {
+      queryParameters['isFavorite'] = requestParameters['isFavorite']
+    }
+
+    if (requestParameters['garmentId'] != null) {
+      queryParameters['garmentId'] = requestParameters['garmentId']
+    }
+
+    if (requestParameters['comfortRange'] != null) {
+      queryParameters['comfortRange'] = requestParameters['comfortRange']
+    }
+
+    if (requestParameters['limit'] != null) {
+      queryParameters['limit'] = requestParameters['limit']
+    }
+
+    if (requestParameters['offset'] != null) {
+      queryParameters['offset'] = requestParameters['offset']
+    }
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/{ownerUserId}/capsules`
+    urlPath = urlPath.replace(
+      `{${'ownerUserId'}}`,
+      encodeURIComponent(String(requestParameters['ownerUserId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * List and filter outfit capsules for an owner wardrobe
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesGetRaw(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesGetRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<OutfitCapsuleListResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeOwnerUserIdCapsulesGetRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * List and filter outfit capsules for an owner wardrobe
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesGet(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesGetRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<OutfitCapsuleListResponse> {
+    const response = await this.apiV1WardrobeOwnerUserIdCapsulesGetRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeOwnerUserIdCapsulesPost without sending the request
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesPostRequestOpts(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesPostRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['ownerUserId'] == null) {
+      throw new runtime.RequiredError(
+        'ownerUserId',
+        'Required parameter "ownerUserId" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesPost().'
+      )
+    }
+
+    if (requestParameters['createOutfitCapsuleInput'] == null) {
+      throw new runtime.RequiredError(
+        'createOutfitCapsuleInput',
+        'Required parameter "createOutfitCapsuleInput" was null or undefined when calling apiV1WardrobeOwnerUserIdCapsulesPost().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['idempotencyKey'] != null) {
+      headerParameters['idempotency-key'] = String(requestParameters['idempotencyKey'])
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/{ownerUserId}/capsules`
+    urlPath = urlPath.replace(
+      `{${'ownerUserId'}}`,
+      encodeURIComponent(String(requestParameters['ownerUserId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['createOutfitCapsuleInput'],
+    }
+  }
+
+  /**
+   * Create a new outfit capsule for an owner wardrobe
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesPostRaw(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<OutfitCapsuleResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeOwnerUserIdCapsulesPostRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Create a new outfit capsule for an owner wardrobe
+   */
+  async apiV1WardrobeOwnerUserIdCapsulesPost(
+    requestParameters: ApiV1WardrobeOwnerUserIdCapsulesPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<OutfitCapsuleResponse> {
+    const response = await this.apiV1WardrobeOwnerUserIdCapsulesPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
    * Creates request options for apiV1WardrobeUploadUrlPost without sending the request
    */
   async apiV1WardrobeUploadUrlPostRequestOpts(
@@ -503,6 +1104,33 @@ export class WardrobeApi extends runtime.BaseAPI {
   }
 }
 
+/**
+ * @export
+ */
+export const ApiV1WardrobeOwnerUserIdCapsulesGetOccasionEnum = {
+  work: 'work',
+  casual: 'casual',
+  formal: 'formal',
+  sport: 'sport',
+  travel: 'travel',
+  evening: 'evening',
+  outdoor: 'outdoor',
+  home: 'home',
+} as const
+export type ApiV1WardrobeOwnerUserIdCapsulesGetOccasionEnum =
+  (typeof ApiV1WardrobeOwnerUserIdCapsulesGetOccasionEnum)[keyof typeof ApiV1WardrobeOwnerUserIdCapsulesGetOccasionEnum]
+/**
+ * @export
+ */
+export const ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum = {
+  cold: 'cold',
+  cool: 'cool',
+  mild: 'mild',
+  warm: 'warm',
+  hot: 'hot',
+} as const
+export type ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum =
+  (typeof ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum)[keyof typeof ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum]
 /**
  * @export
  */

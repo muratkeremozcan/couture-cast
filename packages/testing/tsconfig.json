@@ -12,5 +12,6 @@
       "@couture/utils": ["../utils/dist/index.d.ts"]
     }
   },
+  "references": [{ "path": "../utils" }],
   "include": ["src/**/*.ts"]
 }

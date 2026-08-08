@@ -1,0 +1,59 @@
+{
+  "wardrobe": {
+    "capsules": {
+      "title": "Kombin kapsülleri",
+      "create": "Kapsül oluştur",
+      "edit": "Kapsülü düzenle",
+      "save": "Kapsülü kaydet",
+      "delete": "Kapsülü sil",
+      "deleteConfirmTitle": "Bu kapsül silinsin mi?",
+      "deleteConfirmBody": "Bu işlem kapsülü kaldırır. Gardırobundaki parçalar kalır.",
+      "nameLabel": "Kapsül adı",
+      "namePlaceholder": "Ofis rahatlığı",
+      "descriptionLabel": "Açıklama",
+      "descriptionPlaceholder": "İsteğe bağlı açıklama",
+      "garmentsLabel": "Parçalar",
+      "garmentPosition": "{{count}} konumdan {{position}}. konum",
+      "moveGarmentUp": "{{garment}} parçasını yukarı taşı",
+      "moveGarmentDown": "{{garment}} parçasını aşağı taşı",
+      "garmentMoved": "{{garment}} parçası {{count}} konumdan {{position}}. konuma taşındı",
+      "occasionsLabel": "Durumlar",
+      "favoriteLabel": "Favori kapsül",
+      "searchLabel": "Kapsül ara",
+      "searchPlaceholder": "Ada veya açıklamaya göre ara",
+      "filterAll": "Tüm kapsüller",
+      "filterFavorites": "Favoriler",
+      "emptyTitle": "Henüz kapsül yok",
+      "emptyBody": "Parçaları daha sonra kullanmak üzere kayıtlı bir kombinde birleştir.",
+      "repairTitle": "Kapsülün onarılması gerekiyor",
+      "repairBody": "Bu kapsülü kullanmadan önce kullanılamayan parçaları değiştir veya kaldır.",
+      "unavailableCount_one": "{{count}} kullanılamayan parça",
+      "unavailableCount_other": "{{count}} kullanılamayan parça",
+      "created": "Kapsül oluşturuldu",
+      "updated": "Kapsül güncellendi",
+      "deleted": "Kapsül silindi",
+      "favoriteUpdated": "Favori durumu güncellendi",
+      "savedRecommendation": "Kayıtlı kapsül",
+      "errors": {
+        "load": "Kapsüller yüklenemiyor.",
+        "save": "Kapsül kaydedilemiyor.",
+        "delete": "Kapsül silinemiyor.",
+        "stale": "Bu kapsül değişti. En son sürümü gözden geçirip tekrar dene.",
+        "readOnlyGuardian": "Veli erişimin salt okunur.",
+        "nameRequired": "Bir kapsül adı gir.",
+        "garmentCount": "2 ile 10 arasında parça seç.",
+        "occasionRequired": "En az bir durum seç."
+      },
+      "occasions": {
+        "work": "İş",
+        "casual": "Günlük",
+        "formal": "Resmi",
+        "sport": "Spor",
+        "travel": "Seyahat",
+        "evening": "Akşam",
+        "outdoor": "Açık hava",
+        "home": "Ev"
+      }
+    }
+  }
+}

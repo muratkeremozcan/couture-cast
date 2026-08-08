@@ -1,0 +1,63 @@
+# Story 4.3 Task 8: repair a capsule and navigate from a recommendation.
+appId: ${MAESTRO_APP_ID}
+name: 'Outfit capsule repair and recommendation'
+tags:
+  - e2e
+  - wardrobe
+  - capsules
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+
+- tapOn:
+    id: 'wardrobe-capsules-link'
+
+- assertVisible:
+    id: 'create-capsule-button'
+
+# A capsule holding an unavailable garment reports the count and stays manageable.
+- assertVisible:
+    id: 'capsule-unavailable-count-.*'
+    optional: true
+    label: 'Repair state is surfaced when seed data provides one'
+
+- tapOn:
+    id: 'edit-capsule-button-.*'
+    index: 0
+
+- assertVisible:
+    id: 'capsule-repair-banner'
+    optional: true
+    label: 'Repair guidance explains the removed garments'
+
+- tapOn:
+    id: 'garment-checkbox-.*'
+    index: 0
+    label: 'Choose a replacement garment'
+
+- tapOn:
+    id: 'save-capsule-button'
+
+- assertVisible:
+    id: 'capsule-status-region'
+
+# Favorite the repaired capsule, then confirm the ritual can surface it.
+- tapOn:
+    id: 'favorite-button-.*'
+    index: 0
+
+- back
+
+- assertVisible:
+    text: 'Saved capsule'
+    optional: true
+    label: 'Saved-capsule badge appears when a capsule wins a scenario'

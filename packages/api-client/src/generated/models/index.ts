@@ -438,6 +438,317 @@ export type BadRequestHttpErrorErrorEnum =
 /**
  *
  * @export
+ * @interface CapsuleBadRequestError
+ */
+export interface CapsuleBadRequestError {
+  /**
+   *
+   * @type {CapsuleBadRequestErrorStatusCodeEnum}
+   * @memberof CapsuleBadRequestError
+   */
+  statusCode: CapsuleBadRequestErrorStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CapsuleBadRequestError
+   */
+  message: string
+  /**
+   *
+   * @type {CapsuleBadRequestErrorErrorEnum}
+   * @memberof CapsuleBadRequestError
+   */
+  error: CapsuleBadRequestErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const CapsuleBadRequestErrorStatusCodeEnum = {
+  NUMBER_400: 400,
+} as const
+export type CapsuleBadRequestErrorStatusCodeEnum =
+  (typeof CapsuleBadRequestErrorStatusCodeEnum)[keyof typeof CapsuleBadRequestErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const CapsuleBadRequestErrorErrorEnum = {
+  Bad_Request: 'Bad Request',
+} as const
+export type CapsuleBadRequestErrorErrorEnum =
+  (typeof CapsuleBadRequestErrorErrorEnum)[keyof typeof CapsuleBadRequestErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface CapsuleConflictError
+ */
+export interface CapsuleConflictError {
+  /**
+   *
+   * @type {CapsuleConflictErrorStatusCodeEnum}
+   * @memberof CapsuleConflictError
+   */
+  statusCode: CapsuleConflictErrorStatusCodeEnum
+  /**
+   *
+   * @type {CapsuleConflictErrorMessageEnum}
+   * @memberof CapsuleConflictError
+   */
+  message: CapsuleConflictErrorMessageEnum
+  /**
+   *
+   * @type {CapsuleConflictErrorErrorEnum}
+   * @memberof CapsuleConflictError
+   */
+  error: CapsuleConflictErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const CapsuleConflictErrorStatusCodeEnum = {
+  NUMBER_409: 409,
+} as const
+export type CapsuleConflictErrorStatusCodeEnum =
+  (typeof CapsuleConflictErrorStatusCodeEnum)[keyof typeof CapsuleConflictErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const CapsuleConflictErrorMessageEnum = {
+  GARMENT_NOT_CAPSULE_ELIGIBLE: 'GARMENT_NOT_CAPSULE_ELIGIBLE',
+  IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
+} as const
+export type CapsuleConflictErrorMessageEnum =
+  (typeof CapsuleConflictErrorMessageEnum)[keyof typeof CapsuleConflictErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const CapsuleConflictErrorErrorEnum = {
+  Conflict: 'Conflict',
+} as const
+export type CapsuleConflictErrorErrorEnum =
+  (typeof CapsuleConflictErrorErrorEnum)[keyof typeof CapsuleConflictErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface CapsuleForbiddenError
+ */
+export interface CapsuleForbiddenError {
+  /**
+   *
+   * @type {CapsuleForbiddenErrorStatusCodeEnum}
+   * @memberof CapsuleForbiddenError
+   */
+  statusCode: CapsuleForbiddenErrorStatusCodeEnum
+  /**
+   *
+   * @type {CapsuleForbiddenErrorMessageEnum}
+   * @memberof CapsuleForbiddenError
+   */
+  message: CapsuleForbiddenErrorMessageEnum
+  /**
+   *
+   * @type {CapsuleForbiddenErrorErrorEnum}
+   * @memberof CapsuleForbiddenError
+   */
+  error: CapsuleForbiddenErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const CapsuleForbiddenErrorStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type CapsuleForbiddenErrorStatusCodeEnum =
+  (typeof CapsuleForbiddenErrorStatusCodeEnum)[keyof typeof CapsuleForbiddenErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const CapsuleForbiddenErrorMessageEnum = {
+  GUARDIAN_READ_ONLY: 'GUARDIAN_READ_ONLY',
+  GUARDIAN_CONSENT_REQUIRED: 'GUARDIAN_CONSENT_REQUIRED',
+} as const
+export type CapsuleForbiddenErrorMessageEnum =
+  (typeof CapsuleForbiddenErrorMessageEnum)[keyof typeof CapsuleForbiddenErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const CapsuleForbiddenErrorErrorEnum = {
+  Forbidden: 'Forbidden',
+} as const
+export type CapsuleForbiddenErrorErrorEnum =
+  (typeof CapsuleForbiddenErrorErrorEnum)[keyof typeof CapsuleForbiddenErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface CapsuleNotFoundError
+ */
+export interface CapsuleNotFoundError {
+  /**
+   *
+   * @type {CapsuleNotFoundErrorStatusCodeEnum}
+   * @memberof CapsuleNotFoundError
+   */
+  statusCode: CapsuleNotFoundErrorStatusCodeEnum
+  /**
+   *
+   * @type {CapsuleNotFoundErrorMessageEnum}
+   * @memberof CapsuleNotFoundError
+   */
+  message: CapsuleNotFoundErrorMessageEnum
+  /**
+   *
+   * @type {CapsuleNotFoundErrorErrorEnum}
+   * @memberof CapsuleNotFoundError
+   */
+  error: CapsuleNotFoundErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const CapsuleNotFoundErrorStatusCodeEnum = {
+  NUMBER_404: 404,
+} as const
+export type CapsuleNotFoundErrorStatusCodeEnum =
+  (typeof CapsuleNotFoundErrorStatusCodeEnum)[keyof typeof CapsuleNotFoundErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const CapsuleNotFoundErrorMessageEnum = {
+  NOT_FOUND: 'NOT_FOUND',
+} as const
+export type CapsuleNotFoundErrorMessageEnum =
+  (typeof CapsuleNotFoundErrorMessageEnum)[keyof typeof CapsuleNotFoundErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const CapsuleNotFoundErrorErrorEnum = {
+  Not_Found: 'Not Found',
+} as const
+export type CapsuleNotFoundErrorErrorEnum =
+  (typeof CapsuleNotFoundErrorErrorEnum)[keyof typeof CapsuleNotFoundErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface CapsulePreconditionFailedError
+ */
+export interface CapsulePreconditionFailedError {
+  /**
+   *
+   * @type {CapsulePreconditionFailedErrorStatusCodeEnum}
+   * @memberof CapsulePreconditionFailedError
+   */
+  statusCode: CapsulePreconditionFailedErrorStatusCodeEnum
+  /**
+   *
+   * @type {CapsulePreconditionFailedErrorMessageEnum}
+   * @memberof CapsulePreconditionFailedError
+   */
+  message: CapsulePreconditionFailedErrorMessageEnum
+  /**
+   *
+   * @type {CapsulePreconditionFailedErrorErrorEnum}
+   * @memberof CapsulePreconditionFailedError
+   */
+  error: CapsulePreconditionFailedErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const CapsulePreconditionFailedErrorStatusCodeEnum = {
+  NUMBER_412: 412,
+} as const
+export type CapsulePreconditionFailedErrorStatusCodeEnum =
+  (typeof CapsulePreconditionFailedErrorStatusCodeEnum)[keyof typeof CapsulePreconditionFailedErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const CapsulePreconditionFailedErrorMessageEnum = {
+  CAPSULE_REVISION_MISMATCH: 'CAPSULE_REVISION_MISMATCH',
+} as const
+export type CapsulePreconditionFailedErrorMessageEnum =
+  (typeof CapsulePreconditionFailedErrorMessageEnum)[keyof typeof CapsulePreconditionFailedErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const CapsulePreconditionFailedErrorErrorEnum = {
+  Precondition_Failed: 'Precondition Failed',
+} as const
+export type CapsulePreconditionFailedErrorErrorEnum =
+  (typeof CapsulePreconditionFailedErrorErrorEnum)[keyof typeof CapsulePreconditionFailedErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface CapsulePreconditionRequiredError
+ */
+export interface CapsulePreconditionRequiredError {
+  /**
+   *
+   * @type {CapsulePreconditionRequiredErrorStatusCodeEnum}
+   * @memberof CapsulePreconditionRequiredError
+   */
+  statusCode: CapsulePreconditionRequiredErrorStatusCodeEnum
+  /**
+   *
+   * @type {CapsulePreconditionRequiredErrorMessageEnum}
+   * @memberof CapsulePreconditionRequiredError
+   */
+  message: CapsulePreconditionRequiredErrorMessageEnum
+  /**
+   *
+   * @type {CapsulePreconditionRequiredErrorErrorEnum}
+   * @memberof CapsulePreconditionRequiredError
+   */
+  error: CapsulePreconditionRequiredErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const CapsulePreconditionRequiredErrorStatusCodeEnum = {
+  NUMBER_428: 428,
+} as const
+export type CapsulePreconditionRequiredErrorStatusCodeEnum =
+  (typeof CapsulePreconditionRequiredErrorStatusCodeEnum)[keyof typeof CapsulePreconditionRequiredErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const CapsulePreconditionRequiredErrorMessageEnum = {
+  PRECONDITION_REQUIRED: 'PRECONDITION_REQUIRED',
+} as const
+export type CapsulePreconditionRequiredErrorMessageEnum =
+  (typeof CapsulePreconditionRequiredErrorMessageEnum)[keyof typeof CapsulePreconditionRequiredErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const CapsulePreconditionRequiredErrorErrorEnum = {
+  Precondition_Required: 'Precondition Required',
+} as const
+export type CapsulePreconditionRequiredErrorErrorEnum =
+  (typeof CapsulePreconditionRequiredErrorErrorEnum)[keyof typeof CapsulePreconditionRequiredErrorErrorEnum]
+
+/**
+ *
+ * @export
  * @interface ComfortPreferences
  */
 export interface ComfortPreferences {
@@ -965,6 +1276,60 @@ export interface CreateGarmentUploadUrlResponseDataRequiredHeaders {
 /**
  *
  * @export
+ * @interface CreateOutfitCapsuleInput
+ */
+export interface CreateOutfitCapsuleInput {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateOutfitCapsuleInput
+   */
+  name: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateOutfitCapsuleInput
+   */
+  description?: string | null
+  /**
+   *
+   * @type {Array<CreateOutfitCapsuleInputOccasionsEnum>}
+   * @memberof CreateOutfitCapsuleInput
+   */
+  occasions: Array<CreateOutfitCapsuleInputOccasionsEnum>
+  /**
+   *
+   * @type {Array<string>}
+   * @memberof CreateOutfitCapsuleInput
+   */
+  garmentIds: Array<string>
+  /**
+   *
+   * @type {boolean}
+   * @memberof CreateOutfitCapsuleInput
+   */
+  isFavorite?: boolean
+}
+
+/**
+ * @export
+ */
+export const CreateOutfitCapsuleInputOccasionsEnum = {
+  work: 'work',
+  casual: 'casual',
+  formal: 'formal',
+  sport: 'sport',
+  travel: 'travel',
+  evening: 'evening',
+  outdoor: 'outdoor',
+  home: 'home',
+} as const
+export type CreateOutfitCapsuleInputOccasionsEnum =
+  (typeof CreateOutfitCapsuleInputOccasionsEnum)[keyof typeof CreateOutfitCapsuleInputOccasionsEnum]
+
+/**
+ *
+ * @export
  * @interface CreateSavedLocationInput
  */
 export interface CreateSavedLocationInput {
@@ -1147,6 +1512,19 @@ export interface EventsPollResult {
    * @memberof EventsPollResult
    */
   error: string
+}
+/**
+ *
+ * @export
+ * @interface FavoriteOutfitCapsuleInput
+ */
+export interface FavoriteOutfitCapsuleInput {
+  /**
+   *
+   * @type {boolean}
+   * @memberof FavoriteOutfitCapsuleInput
+   */
+  isFavorite: boolean
 }
 /**
  *
@@ -2530,6 +2908,260 @@ export type NotFoundHttpErrorErrorEnum =
 /**
  *
  * @export
+ * @interface OutfitCapsuleListResponse
+ */
+export interface OutfitCapsuleListResponse {
+  /**
+   *
+   * @type {Array<OutfitCapsuleResponseData>}
+   * @memberof OutfitCapsuleListResponse
+   */
+  data: Array<OutfitCapsuleResponseData>
+  /**
+   *
+   * @type {number}
+   * @memberof OutfitCapsuleListResponse
+   */
+  total: number
+  /**
+   *
+   * @type {number}
+   * @memberof OutfitCapsuleListResponse
+   */
+  limit: number
+  /**
+   *
+   * @type {number}
+   * @memberof OutfitCapsuleListResponse
+   */
+  offset: number
+}
+/**
+ *
+ * @export
+ * @interface OutfitCapsuleResponse
+ */
+export interface OutfitCapsuleResponse {
+  /**
+   *
+   * @type {OutfitCapsuleResponseData}
+   * @memberof OutfitCapsuleResponse
+   */
+  data: OutfitCapsuleResponseData
+}
+/**
+ *
+ * @export
+ * @interface OutfitCapsuleResponseData
+ */
+export interface OutfitCapsuleResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof OutfitCapsuleResponseData
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof OutfitCapsuleResponseData
+   */
+  ownerUserId: string
+  /**
+   *
+   * @type {string}
+   * @memberof OutfitCapsuleResponseData
+   */
+  name: string
+  /**
+   *
+   * @type {string}
+   * @memberof OutfitCapsuleResponseData
+   */
+  description: string | null
+  /**
+   *
+   * @type {Array<OutfitCapsuleResponseDataOccasionsEnum>}
+   * @memberof OutfitCapsuleResponseData
+   */
+  occasions: Array<OutfitCapsuleResponseDataOccasionsEnum>
+  /**
+   *
+   * @type {boolean}
+   * @memberof OutfitCapsuleResponseData
+   */
+  isFavorite: boolean
+  /**
+   *
+   * @type {number}
+   * @memberof OutfitCapsuleResponseData
+   */
+  revision: number
+  /**
+   *
+   * @type {OutfitCapsuleResponseDataAvailabilityStatusEnum}
+   * @memberof OutfitCapsuleResponseData
+   */
+  availabilityStatus: OutfitCapsuleResponseDataAvailabilityStatusEnum
+  /**
+   *
+   * @type {number}
+   * @memberof OutfitCapsuleResponseData
+   */
+  unavailableGarmentCount: number
+  /**
+   *
+   * @type {Array<OutfitCapsuleResponseDataGarmentsInner>}
+   * @memberof OutfitCapsuleResponseData
+   */
+  garments: Array<OutfitCapsuleResponseDataGarmentsInner>
+  /**
+   *
+   * @type {string}
+   * @memberof OutfitCapsuleResponseData
+   */
+  createdAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof OutfitCapsuleResponseData
+   */
+  updatedAt: string
+}
+
+/**
+ * @export
+ */
+export const OutfitCapsuleResponseDataOccasionsEnum = {
+  work: 'work',
+  casual: 'casual',
+  formal: 'formal',
+  sport: 'sport',
+  travel: 'travel',
+  evening: 'evening',
+  outdoor: 'outdoor',
+  home: 'home',
+} as const
+export type OutfitCapsuleResponseDataOccasionsEnum =
+  (typeof OutfitCapsuleResponseDataOccasionsEnum)[keyof typeof OutfitCapsuleResponseDataOccasionsEnum]
+
+/**
+ * @export
+ */
+export const OutfitCapsuleResponseDataAvailabilityStatusEnum = {
+  ready: 'ready',
+  needs_repair: 'needs_repair',
+} as const
+export type OutfitCapsuleResponseDataAvailabilityStatusEnum =
+  (typeof OutfitCapsuleResponseDataAvailabilityStatusEnum)[keyof typeof OutfitCapsuleResponseDataAvailabilityStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface OutfitCapsuleResponseDataGarmentsInner
+ */
+export interface OutfitCapsuleResponseDataGarmentsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof OutfitCapsuleResponseDataGarmentsInner
+   */
+  id: string
+  /**
+   *
+   * @type {OutfitCapsuleResponseDataGarmentsInnerCategoryEnum}
+   * @memberof OutfitCapsuleResponseDataGarmentsInner
+   */
+  category: OutfitCapsuleResponseDataGarmentsInnerCategoryEnum | null
+  /**
+   *
+   * @type {OutfitCapsuleResponseDataGarmentsInnerMaterialEnum}
+   * @memberof OutfitCapsuleResponseDataGarmentsInner
+   */
+  material: OutfitCapsuleResponseDataGarmentsInnerMaterialEnum | null
+  /**
+   *
+   * @type {OutfitCapsuleResponseDataGarmentsInnerComfortRangeEnum}
+   * @memberof OutfitCapsuleResponseDataGarmentsInner
+   */
+  comfortRange: OutfitCapsuleResponseDataGarmentsInnerComfortRangeEnum | null
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @memberof OutfitCapsuleResponseDataGarmentsInner
+   */
+  imageAccess: CreateGarmentItemResponseDataImageAccess
+  /**
+   *
+   * @type {OutfitCapsuleResponseDataGarmentsInnerAvailabilityStatusEnum}
+   * @memberof OutfitCapsuleResponseDataGarmentsInner
+   */
+  availabilityStatus: OutfitCapsuleResponseDataGarmentsInnerAvailabilityStatusEnum
+  /**
+   *
+   * @type {number}
+   * @memberof OutfitCapsuleResponseDataGarmentsInner
+   */
+  garmentOrder: number
+}
+
+/**
+ * @export
+ */
+export const OutfitCapsuleResponseDataGarmentsInnerCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type OutfitCapsuleResponseDataGarmentsInnerCategoryEnum =
+  (typeof OutfitCapsuleResponseDataGarmentsInnerCategoryEnum)[keyof typeof OutfitCapsuleResponseDataGarmentsInnerCategoryEnum]
+
+/**
+ * @export
+ */
+export const OutfitCapsuleResponseDataGarmentsInnerMaterialEnum = {
+  cotton: 'cotton',
+  wool: 'wool',
+  linen: 'linen',
+  leather: 'leather',
+  denim: 'denim',
+  fleece: 'fleece',
+  synthetic: 'synthetic',
+  down: 'down',
+  silk: 'silk',
+} as const
+export type OutfitCapsuleResponseDataGarmentsInnerMaterialEnum =
+  (typeof OutfitCapsuleResponseDataGarmentsInnerMaterialEnum)[keyof typeof OutfitCapsuleResponseDataGarmentsInnerMaterialEnum]
+
+/**
+ * @export
+ */
+export const OutfitCapsuleResponseDataGarmentsInnerComfortRangeEnum = {
+  cold: 'cold',
+  cool: 'cool',
+  mild: 'mild',
+  warm: 'warm',
+  hot: 'hot',
+} as const
+export type OutfitCapsuleResponseDataGarmentsInnerComfortRangeEnum =
+  (typeof OutfitCapsuleResponseDataGarmentsInnerComfortRangeEnum)[keyof typeof OutfitCapsuleResponseDataGarmentsInnerComfortRangeEnum]
+
+/**
+ * @export
+ */
+export const OutfitCapsuleResponseDataGarmentsInnerAvailabilityStatusEnum = {
+  ready: 'ready',
+  needs_repair: 'needs_repair',
+} as const
+export type OutfitCapsuleResponseDataGarmentsInnerAvailabilityStatusEnum =
+  (typeof OutfitCapsuleResponseDataGarmentsInnerAvailabilityStatusEnum)[keyof typeof OutfitCapsuleResponseDataGarmentsInnerAvailabilityStatusEnum]
+
+/**
+ *
+ * @export
  * @interface PolledEvent
  */
 export interface PolledEvent {
@@ -2673,6 +3305,12 @@ export interface RitualQueryParams {
    * @memberof RitualQueryParams
    */
   locale?: RitualQueryParamsLocaleEnum
+  /**
+   * Optional occasion filter for capsule recommendations.
+   * @type {RitualQueryParamsOccasionEnum}
+   * @memberof RitualQueryParams
+   */
+  occasion?: RitualQueryParamsOccasionEnum
 }
 
 /**
@@ -2692,6 +3330,22 @@ export const RitualQueryParamsLocaleEnum = {
 } as const
 export type RitualQueryParamsLocaleEnum =
   (typeof RitualQueryParamsLocaleEnum)[keyof typeof RitualQueryParamsLocaleEnum]
+
+/**
+ * @export
+ */
+export const RitualQueryParamsOccasionEnum = {
+  work: 'work',
+  casual: 'casual',
+  formal: 'formal',
+  sport: 'sport',
+  travel: 'travel',
+  evening: 'evening',
+  outdoor: 'outdoor',
+  home: 'home',
+} as const
+export type RitualQueryParamsOccasionEnum =
+  (typeof RitualQueryParamsOccasionEnum)[keyof typeof RitualQueryParamsOccasionEnum]
 
 /**
  *
@@ -2767,6 +3421,24 @@ export interface RitualResponseDataOutfitsInner {
    * @memberof RitualResponseDataOutfitsInner
    */
   comfortNotes: string
+  /**
+   * Optional capsule ID if recommendation came from an outfit capsule.
+   * @type {string}
+   * @memberof RitualResponseDataOutfitsInner
+   */
+  capsuleId?: string | null
+  /**
+   * Optional capsule name if recommendation came from an outfit capsule.
+   * @type {string}
+   * @memberof RitualResponseDataOutfitsInner
+   */
+  capsuleName?: string | null
+  /**
+   * Optional list of garment IDs auto-filled into a partial capsule.
+   * @type {Array<string>}
+   * @memberof RitualResponseDataOutfitsInner
+   */
+  autoFilledGarmentIds?: Array<string>
 }
 
 /**
@@ -2926,6 +3598,24 @@ export interface ScenarioOutfit {
    * @memberof ScenarioOutfit
    */
   comfortNotes: string
+  /**
+   * Optional capsule ID if recommendation came from an outfit capsule.
+   * @type {string}
+   * @memberof ScenarioOutfit
+   */
+  capsuleId?: string | null
+  /**
+   * Optional capsule name if recommendation came from an outfit capsule.
+   * @type {string}
+   * @memberof ScenarioOutfit
+   */
+  capsuleName?: string | null
+  /**
+   * Optional list of garment IDs auto-filled into a partial capsule.
+   * @type {Array<string>}
+   * @memberof ScenarioOutfit
+   */
+  autoFilledGarmentIds?: Array<string>
 }
 
 /**
@@ -3611,6 +4301,60 @@ export interface UpdateNotificationPreferencesResponseData {
    */
   preferences: GetAlertPreferencesResponseDataPreferences
 }
+/**
+ *
+ * @export
+ * @interface UpdateOutfitCapsuleInput
+ */
+export interface UpdateOutfitCapsuleInput {
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateOutfitCapsuleInput
+   */
+  name?: string
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateOutfitCapsuleInput
+   */
+  description?: string | null
+  /**
+   *
+   * @type {Array<UpdateOutfitCapsuleInputOccasionsEnum>}
+   * @memberof UpdateOutfitCapsuleInput
+   */
+  occasions?: Array<UpdateOutfitCapsuleInputOccasionsEnum>
+  /**
+   *
+   * @type {Array<string>}
+   * @memberof UpdateOutfitCapsuleInput
+   */
+  garmentIds?: Array<string>
+  /**
+   *
+   * @type {boolean}
+   * @memberof UpdateOutfitCapsuleInput
+   */
+  isFavorite?: boolean
+}
+
+/**
+ * @export
+ */
+export const UpdateOutfitCapsuleInputOccasionsEnum = {
+  work: 'work',
+  casual: 'casual',
+  formal: 'formal',
+  sport: 'sport',
+  travel: 'travel',
+  evening: 'evening',
+  outdoor: 'outdoor',
+  home: 'home',
+} as const
+export type UpdateOutfitCapsuleInputOccasionsEnum =
+  (typeof UpdateOutfitCapsuleInputOccasionsEnum)[keyof typeof UpdateOutfitCapsuleInputOccasionsEnum]
+
 /**
  *
  * @export

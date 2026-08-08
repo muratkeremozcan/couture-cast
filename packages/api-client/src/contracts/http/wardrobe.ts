@@ -31,6 +31,17 @@ export const garmentMaterialEnum = z.enum([
 
 export const garmentComfortRangeEnum = z.enum(['cold', 'cool', 'mild', 'warm', 'hot'])
 
+export const capsuleOccasionEnum = z.enum([
+  'work',
+  'casual',
+  'formal',
+  'sport',
+  'travel',
+  'evening',
+  'outdoor',
+  'home',
+])
+
 export const GARMENT_TAGGING_ANALYSIS_VERSION =
   'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1' as const
 
@@ -290,9 +301,229 @@ const garmentTaggingUnavailableErrorSchema = z
   })
   .strict()
 
+export const ownerUserIdPathParamsSchema = z
+  .object({
+    ownerUserId: nonEmptyStringSchema.max(128).describe('Unique owner user ID.'),
+  })
+  .strict()
+
+export const capsuleIdPathParamsSchema = z
+  .object({
+    ownerUserId: nonEmptyStringSchema.max(128).describe('Unique owner user ID.'),
+    capsuleId: nonEmptyStringSchema.max(128).describe('Unique outfit capsule ID.'),
+  })
+  .strict()
+
+/**
+ * Capsule text limits are expressed in extended grapheme clusters, which is what
+ * a user perceives as a character. Counting UTF-16 code units would reject a
+ * five-emoji name and accept a 120-character combining-mark name.
+ */
+const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+
+function countGraphemes(value: string): number {
+  return [...graphemeSegmenter.segment(value)].length
+}
+
+/** PostgreSQL `text` cannot store a NUL byte, so it is invalid input, not a 500. */
+const hasNullByte = (value: string): boolean => value.includes('\u0000')
+
+/**
+ * Trims Unicode whitespace and applies NFC before validating, so that a
+ * whitespace-only name fails `min(1)` instead of being accepted and persisted as
+ * an empty string that later breaks response parsing.
+ */
+function graphemeBoundedText(maxGraphemes: number, minGraphemes = 0) {
+  return z
+    .string()
+    .transform((value) => value.trim().normalize('NFC'))
+    .superRefine((value, ctx) => {
+      if (hasNullByte(value)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'must not contain a null byte',
+        })
+        return
+      }
+      const length = countGraphemes(value)
+      if (length < minGraphemes) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.too_small,
+          minimum: minGraphemes,
+          type: 'string',
+          inclusive: true,
+          message: `must be at least ${minGraphemes} characters after normalization`,
+        })
+      }
+      if (length > maxGraphemes) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.too_big,
+          maximum: maxGraphemes,
+          type: 'string',
+          inclusive: true,
+          message: `must be at most ${maxGraphemes} characters after normalization`,
+        })
+      }
+    })
+}
+
+const capsuleNameSchema = graphemeBoundedText(60, 1)
+
+/** An empty normalized description is `null`, never `''`. */
+const capsuleDescriptionSchema = graphemeBoundedText(280)
+  .transform((value) => (value.length === 0 ? null : value))
+  .nullable()
+
+const capsuleGarmentIdsSchema = z
+  .array(nonEmptyStringSchema.max(128))
+  .min(2)
+  .max(10)
+  .refine((ids) => new Set(ids).size === ids.length, {
+    message: 'garmentIds must not contain duplicates',
+  })
+
+export const createOutfitCapsuleInputSchema = z
+  .object({
+    name: capsuleNameSchema,
+    description: capsuleDescriptionSchema.optional(),
+    occasions: z.array(capsuleOccasionEnum).min(1).max(8),
+    garmentIds: capsuleGarmentIdsSchema,
+    isFavorite: z.boolean().optional().default(false),
+  })
+  .strict()
+
+export const capsuleGarmentSchema = z
+  .object({
+    id: nonEmptyStringSchema,
+    category: garmentCategoryEnum.nullable(),
+    material: garmentMaterialEnum.nullable(),
+    comfortRange: garmentComfortRangeEnum.nullable(),
+    imageAccess: garmentImageAccessSchema.nullable(),
+    availabilityStatus: z.enum(['ready', 'needs_repair']),
+    garmentOrder: z.number().int().min(0).max(9),
+  })
+  .strict()
+
+export const outfitCapsuleSchema = z
+  .object({
+    id: nonEmptyStringSchema,
+    ownerUserId: nonEmptyStringSchema,
+    name: z.string().min(1).max(60),
+    description: z.string().max(280).nullable(),
+    occasions: z.array(capsuleOccasionEnum).min(1).max(8),
+    isFavorite: z.boolean(),
+    revision: z.number().int().min(0),
+    availabilityStatus: z.enum(['ready', 'needs_repair']),
+    unavailableGarmentCount: z.number().int().min(0),
+    garments: z.array(capsuleGarmentSchema),
+    createdAt: isoTimestampSchema,
+    updatedAt: isoTimestampSchema,
+  })
+  .strict()
+
+export const outfitCapsuleResponseSchema = z
+  .object({
+    data: outfitCapsuleSchema,
+  })
+  .strict()
+
+export const listOutfitCapsulesQuerySchema = z
+  .object({
+    q: graphemeBoundedText(120)
+      .transform((value) => (value.length === 0 ? undefined : value))
+      .optional(),
+    occasion: capsuleOccasionEnum.optional(),
+    isFavorite: z.preprocess((val) => {
+      if (typeof val === 'string') {
+        if (val === 'true') return true
+        if (val === 'false') return false
+      }
+      return val
+    }, z.boolean().optional()),
+    garmentId: nonEmptyStringSchema.max(128).optional(),
+    comfortRange: garmentComfortRangeEnum.optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).max(10000).default(0),
+  })
+  .strict()
+
+export const outfitCapsuleListResponseSchema = z
+  .object({
+    data: z.array(outfitCapsuleSchema),
+    total: z.number().int().min(0),
+    limit: z.number().int().min(1).max(100),
+    offset: z.number().int().min(0).max(10000),
+  })
+  .strict()
+
+export const updateOutfitCapsuleInputSchema = z
+  .object({
+    name: capsuleNameSchema.optional(),
+    description: capsuleDescriptionSchema.optional(),
+    occasions: z.array(capsuleOccasionEnum).min(1).max(8).optional(),
+    garmentIds: capsuleGarmentIdsSchema.optional(),
+    isFavorite: z.boolean().optional(),
+  })
+  .strict()
+
+export const favoriteOutfitCapsuleInputSchema = z
+  .object({
+    isFavorite: z.boolean(),
+  })
+  .strict()
+
+const capsuleBadRequestErrorSchema = z
+  .object({
+    statusCode: z.literal(400),
+    message: z.string(),
+    error: z.literal('Bad Request'),
+  })
+  .strict()
+
+const capsuleForbiddenErrorSchema = z
+  .object({
+    statusCode: z.literal(403),
+    message: z.enum(['GUARDIAN_READ_ONLY', 'GUARDIAN_CONSENT_REQUIRED']),
+    error: z.literal('Forbidden'),
+  })
+  .strict()
+
+const capsuleNotFoundErrorSchema = z
+  .object({
+    statusCode: z.literal(404),
+    message: z.literal('NOT_FOUND'),
+    error: z.literal('Not Found'),
+  })
+  .strict()
+
+const capsuleConflictErrorSchema = z
+  .object({
+    statusCode: z.literal(409),
+    message: z.enum(['GARMENT_NOT_CAPSULE_ELIGIBLE', 'IDEMPOTENCY_KEY_REUSED']),
+    error: z.literal('Conflict'),
+  })
+  .strict()
+
+const capsulePreconditionFailedErrorSchema = z
+  .object({
+    statusCode: z.literal(412),
+    message: z.literal('CAPSULE_REVISION_MISMATCH'),
+    error: z.literal('Precondition Failed'),
+  })
+  .strict()
+
+const capsulePreconditionRequiredErrorSchema = z
+  .object({
+    statusCode: z.literal(428),
+    message: z.literal('PRECONDITION_REQUIRED'),
+    error: z.literal('Precondition Required'),
+  })
+  .strict()
+
 export type GarmentCategory = z.infer<typeof garmentCategoryEnum>
 export type GarmentMaterial = z.infer<typeof garmentMaterialEnum>
 export type GarmentComfortRange = z.infer<typeof garmentComfortRangeEnum>
+export type CapsuleOccasion = z.infer<typeof capsuleOccasionEnum>
 export type GarmentTagSuggestionSnapshot = z.infer<
   typeof garmentTagSuggestionSnapshotSchema
 >
@@ -310,6 +541,14 @@ export type SuggestGarmentTagsData = z.infer<typeof suggestGarmentTagsDataSchema
 export type SuggestGarmentTagsResponse = z.infer<typeof suggestGarmentTagsResponseSchema>
 export type UpdateGarmentTagsInput = z.infer<typeof updateGarmentTagsInputSchema>
 export type UpdateGarmentTagsResponse = z.infer<typeof updateGarmentTagsResponseSchema>
+export type CreateOutfitCapsuleInput = z.infer<typeof createOutfitCapsuleInputSchema>
+export type CapsuleGarmentContract = z.infer<typeof capsuleGarmentSchema>
+export type OutfitCapsuleContract = z.infer<typeof outfitCapsuleSchema>
+export type OutfitCapsuleResponse = z.infer<typeof outfitCapsuleResponseSchema>
+export type ListOutfitCapsulesQuery = z.infer<typeof listOutfitCapsulesQuerySchema>
+export type OutfitCapsuleListResponse = z.infer<typeof outfitCapsuleListResponseSchema>
+export type UpdateOutfitCapsuleInput = z.infer<typeof updateOutfitCapsuleInputSchema>
+export type FavoriteOutfitCapsuleInput = z.infer<typeof favoriteOutfitCapsuleInputSchema>
 
 export function registerWardrobeContracts(
   registry: OpenAPIRegistry,
@@ -762,6 +1001,442 @@ export function registerWardrobeContracts(
         description: 'Idempotency key reused, session expired, or upload claimed.',
         content: {
           'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
+        },
+      },
+    },
+  })
+
+  const registeredCreateOutfitCapsuleInput = registry.register(
+    'CreateOutfitCapsuleInput',
+    createOutfitCapsuleInputSchema
+  )
+  const registeredOutfitCapsuleResponse = registry.register(
+    'OutfitCapsuleResponse',
+    outfitCapsuleResponseSchema
+  )
+  const registeredOutfitCapsuleListResponse = registry.register(
+    'OutfitCapsuleListResponse',
+    outfitCapsuleListResponseSchema
+  )
+  const registeredUpdateOutfitCapsuleInput = registry.register(
+    'UpdateOutfitCapsuleInput',
+    updateOutfitCapsuleInputSchema
+  )
+  const registeredFavoriteOutfitCapsuleInput = registry.register(
+    'FavoriteOutfitCapsuleInput',
+    favoriteOutfitCapsuleInputSchema
+  )
+  const registeredCapsuleBadRequestError = registry.register(
+    'CapsuleBadRequestError',
+    capsuleBadRequestErrorSchema
+  )
+  const registeredCapsuleForbiddenError = registry.register(
+    'CapsuleForbiddenError',
+    capsuleForbiddenErrorSchema
+  )
+  const registeredCapsuleNotFoundError = registry.register(
+    'CapsuleNotFoundError',
+    capsuleNotFoundErrorSchema
+  )
+  const registeredCapsuleConflictError = registry.register(
+    'CapsuleConflictError',
+    capsuleConflictErrorSchema
+  )
+  const registeredCapsulePreconditionFailedError = registry.register(
+    'CapsulePreconditionFailedError',
+    capsulePreconditionFailedErrorSchema
+  )
+  const registeredCapsulePreconditionRequiredError = registry.register(
+    'CapsulePreconditionRequiredError',
+    capsulePreconditionRequiredErrorSchema
+  )
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/wardrobe/{ownerUserId}/capsules',
+    tags: ['wardrobe'],
+    summary: 'Create a new outfit capsule for an owner wardrobe',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: ownerUserIdPathParamsSchema,
+      headers: z.object({
+        'idempotency-key': z.string().uuid().optional(),
+      }),
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: registeredCreateOutfitCapsuleInput,
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: 'Capsule created successfully.',
+        content: {
+          'application/json': {
+            schema: registeredOutfitCapsuleResponse,
+          },
+        },
+      },
+      200: {
+        description: 'Idempotent creation replay.',
+        content: {
+          'application/json': {
+            schema: registeredOutfitCapsuleResponse,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid capsule creation payload.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleBadRequestError,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian consent required or guardian read-only access.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleForbiddenError,
+          },
+        },
+      },
+      404: {
+        description: 'Owner user not found or unauthorized.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleNotFoundError,
+          },
+        },
+      },
+      409: {
+        description:
+          'Ineligible garments or idempotency key reused with different payload.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleConflictError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/v1/wardrobe/{ownerUserId}/capsules',
+    tags: ['wardrobe'],
+    summary: 'List and filter outfit capsules for an owner wardrobe',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: ownerUserIdPathParamsSchema,
+      query: listOutfitCapsulesQuerySchema,
+    },
+    responses: {
+      200: {
+        description: 'List of outfit capsules.',
+        content: {
+          'application/json': {
+            schema: registeredOutfitCapsuleListResponse,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid query parameters.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleBadRequestError,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      404: {
+        description: 'Owner user not found or unauthorized.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleNotFoundError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}',
+    tags: ['wardrobe'],
+    summary: 'Get details of a specific outfit capsule',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: capsuleIdPathParamsSchema,
+    },
+    responses: {
+      200: {
+        description: 'Outfit capsule details.',
+        content: {
+          'application/json': {
+            schema: registeredOutfitCapsuleResponse,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      404: {
+        description: 'Capsule or owner not found or unauthorized.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleNotFoundError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}',
+    tags: ['wardrobe'],
+    summary: 'Update metadata or constituent garments of an outfit capsule',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: capsuleIdPathParamsSchema,
+      headers: z.object({
+        'if-match': z.string(),
+      }),
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: registeredUpdateOutfitCapsuleInput,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Capsule updated successfully.',
+        content: {
+          'application/json': {
+            schema: registeredOutfitCapsuleResponse,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid update payload.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleBadRequestError,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian read-only or consent forbidden.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleForbiddenError,
+          },
+        },
+      },
+      404: {
+        description: 'Capsule or owner not found.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleNotFoundError,
+          },
+        },
+      },
+      409: {
+        description: 'Ineligible garments.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleConflictError,
+          },
+        },
+      },
+      412: {
+        description: 'Stale ETag / capsule revision mismatch.',
+        content: {
+          'application/json': {
+            schema: registeredCapsulePreconditionFailedError,
+          },
+        },
+      },
+      428: {
+        description: 'If-Match header required.',
+        content: {
+          'application/json': {
+            schema: registeredCapsulePreconditionRequiredError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}/favorite',
+    tags: ['wardrobe'],
+    summary: 'Set favorite status of an outfit capsule',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: capsuleIdPathParamsSchema,
+      headers: z.object({
+        'if-match': z.string(),
+      }),
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: registeredFavoriteOutfitCapsuleInput,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Capsule favorite status updated.',
+        content: {
+          'application/json': {
+            schema: registeredOutfitCapsuleResponse,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid request body.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleBadRequestError,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian read-only or consent forbidden.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleForbiddenError,
+          },
+        },
+      },
+      404: {
+        description: 'Capsule or owner not found.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleNotFoundError,
+          },
+        },
+      },
+      412: {
+        description: 'Stale ETag / capsule revision mismatch.',
+        content: {
+          'application/json': {
+            schema: registeredCapsulePreconditionFailedError,
+          },
+        },
+      },
+      428: {
+        description: 'If-Match header required.',
+        content: {
+          'application/json': {
+            schema: registeredCapsulePreconditionRequiredError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}',
+    tags: ['wardrobe'],
+    summary: 'Delete an outfit capsule and its join records',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: capsuleIdPathParamsSchema,
+      headers: z.object({
+        'if-match': z.string(),
+      }),
+    },
+    responses: {
+      204: {
+        description: 'Capsule deleted successfully.',
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian read-only or consent forbidden.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleForbiddenError,
+          },
+        },
+      },
+      404: {
+        description: 'Capsule or owner not found.',
+        content: {
+          'application/json': {
+            schema: registeredCapsuleNotFoundError,
+          },
+        },
+      },
+      412: {
+        description: 'Stale ETag / capsule revision mismatch.',
+        content: {
+          'application/json': {
+            schema: registeredCapsulePreconditionFailedError,
+          },
+        },
+      },
+      428: {
+        description: 'If-Match header required.',
+        content: {
+          'application/json': {
+            schema: registeredCapsulePreconditionRequiredError,
+          },
         },
       },
     },

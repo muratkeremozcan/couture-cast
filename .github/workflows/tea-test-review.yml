@@ -22,22 +22,30 @@ jobs:
       contents: read
       pull-requests: write # for the review comment
     steps:
-      - uses: muratkeremozcan/tea-test-review@v1
+      # Each review step automatically tags comments/artifacts with its agent name
+      # so both agents post separate PR comments without overwriting each other.
+      # A '@codex ...' or '@claude ...' comment re-runs on demand, and text after
+      # the mention becomes focus. Checkout and base-ref resolution are the action's own job.
+      - name: Review with Codex
+        uses: muratkeremozcan/tea-test-review@v2
         with:
-          # Auto on every PR with codex; a '@codex ...' or '@claude ...'
-          # comment re-runs on demand, the mention picks the agent, and text
-          # after it becomes the review's focus. Checkout and base-ref are
-          # the action's own job.
-          prompt: '@claude @codex'
+          prompt: '@codex'
           agent: codex
           model: gpt-5.6-luna
-          mode: 'manual'
+          mode: manual
           agent-args: -c model_reasoning_effort=low
-          # Only the selected agent's credential is required. Without this, a
-          # '@claude' comment triggers and fails with the error naming this
-          # exact input; trim prompt to '@codex' to ignore '@claude' instead.
-          # anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          use-playwright-utils: 'true'
+          use-pactjs-utils: 'true'
+
+      - name: Review with Claude
+        uses: muratkeremozcan/tea-test-review@v2
+        with:
+          prompt: '@claude'
+          agent: claude
+          mode: manual
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           use-playwright-utils: 'true'
           use-pactjs-utils: 'true'

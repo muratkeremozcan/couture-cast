@@ -17,9 +17,20 @@ import Redis from 'ioredis'
 
 export const RITUAL_REDIS_CLIENT = Symbol('RITUAL_REDIS_CLIENT')
 const RITUAL_GARMENT_CANDIDATE_LIMIT = 1_000
+/** Bounds the capsule graph loaded per ritual request the same way garments are bounded. */
+const RITUAL_CAPSULE_CANDIDATE_LIMIT = 1_000
 
 import { WeatherQueryService } from '../weather/weather-query.service.js'
 import { LocationPreferencesService } from '../location-preferences/location-preferences.service.js'
+import {
+  InjectAnalyticsClient,
+  type AnalyticsClient,
+} from '../../analytics/analytics.service.js'
+import {
+  type CapsuleOccasion,
+  trackWardrobeCapsuleRecommended,
+} from '@couture/api-client'
+import { evaluateCapsuleForScenario } from './capsule-recommendation.engine.js'
 import type { WeatherSnapshotWithSegments } from '../weather/weather.repository.js'
 import {
   defaultSupportedLocale,
@@ -412,6 +423,10 @@ export const badgeTranslations: Record<
       label: 'Daily base',
       bullets: ['Standard top and bottom suitable for the day'],
     },
+    saved_capsule: {
+      label: 'Saved capsule',
+      bullets: ['Selected from your saved capsule'],
+    },
   },
   'en-CA': {
     wind_layer: {
@@ -445,6 +460,10 @@ export const badgeTranslations: Record<
     daily_base: {
       label: 'Daily base',
       bullets: ['Standard top and bottom suitable for the day'],
+    },
+    saved_capsule: {
+      label: 'Saved capsule',
+      bullets: ['Selected from your saved capsule'],
     },
   },
   'es-419': {
@@ -482,6 +501,10 @@ export const badgeTranslations: Record<
       label: 'Base diaria',
       bullets: ['Prenda superior e inferior estándar adecuadas para el día'],
     },
+    saved_capsule: {
+      label: 'Cápsula guardada',
+      bullets: ['Seleccionado de tu cápsula guardada'],
+    },
   },
   'fr-CA': {
     wind_layer: {
@@ -515,6 +538,10 @@ export const badgeTranslations: Record<
     daily_base: {
       label: 'Base quotidienne',
       bullets: ['Haut et bas standard adaptés pour la journée'],
+    },
+    saved_capsule: {
+      label: 'Capsule enregistrée',
+      bullets: ['Sélectionné depuis votre capsule enregistrée'],
     },
   },
   'fr-FR': {
@@ -550,6 +577,10 @@ export const badgeTranslations: Record<
       label: 'Base quotidienne',
       bullets: ['Haut et bas standard adaptés pour la journée'],
     },
+    saved_capsule: {
+      label: 'Capsule enregistrée',
+      bullets: ['Sélectionné depuis votre capsule enregistrée'],
+    },
   },
   'tr-TR': {
     wind_layer: {
@@ -583,6 +614,10 @@ export const badgeTranslations: Record<
     daily_base: {
       label: 'Günlük temel',
       bullets: ['Gün için uygun standart üst ve alt giysi'],
+    },
+    saved_capsule: {
+      label: 'Kaydedilen kapsül',
+      bullets: ['Kaydedilen kapsülünüzden seçildi'],
     },
   },
   'de-DE': {
@@ -618,6 +653,10 @@ export const badgeTranslations: Record<
       label: 'Tägliche Basis',
       bullets: ['Standard-Oberteil und -Unterteil für den Tag geeignet'],
     },
+    saved_capsule: {
+      label: 'Gespeicherte Kapsel',
+      bullets: ['Aus Ihrer gespeicherten Kapsel ausgewählt'],
+    },
   },
   'it-IT': {
     wind_layer: {
@@ -651,6 +690,10 @@ export const badgeTranslations: Record<
     daily_base: {
       label: 'Base quotidiana',
       bullets: ['Top e fondo standard adatti alla giornata'],
+    },
+    saved_capsule: {
+      label: 'Capsula salvata',
+      bullets: ['Selezionato dalla tua capsula salvata'],
     },
   },
   'pt-BR': {
@@ -686,6 +729,10 @@ export const badgeTranslations: Record<
       label: 'Base diária',
       bullets: ['Camiseta e calça padrão adequados para o dia'],
     },
+    saved_capsule: {
+      label: 'Cápsula salva',
+      bullets: ['Selecionado da sua cápsula salva'],
+    },
   },
   'pt-PT': {
     wind_layer: {
@@ -719,6 +766,10 @@ export const badgeTranslations: Record<
     daily_base: {
       label: 'Base diária',
       bullets: ['Camisola e calças padrão adequadas para o dia'],
+    },
+    saved_capsule: {
+      label: 'Cápsula guardada',
+      bullets: ['Selecionado da sua cápsula guardada'],
     },
   },
 }
@@ -792,7 +843,9 @@ export class RitualService implements OnModuleDestroy {
     @Inject(LocationPreferencesService)
     private readonly locationPreferencesService: LocationPreferencesService,
     @Inject(RITUAL_REDIS_CLIENT)
-    private readonly redis: Redis
+    private readonly redis: Redis,
+    @InjectAnalyticsClient()
+    private readonly analyticsClient: AnalyticsClient
   ) {}
 
   // Refreshes a snapshot's forecast segments to a contiguous 48h window anchored to `now`,
@@ -818,7 +871,8 @@ export class RitualService implements OnModuleDestroy {
     userId: string,
     locationId?: string,
     acceptLanguage?: string,
-    localeOverride?: SupportedLocale
+    localeOverride?: SupportedLocale,
+    occasion?: CapsuleOccasion
   ): Promise<RitualResponse['data']> {
     // 1. Resolve Location
     const locations = await this.locationPreferencesService.listLocations(userId)
@@ -847,6 +901,14 @@ export class RitualService implements OnModuleDestroy {
       this.prisma.userProfile.findUnique({ where: { user_id: userId } }),
       this.weatherQueryService.getLatestWeather(selectedLocation.locationKey),
     ])
+
+    /**
+     * Authoritative capsule revision for this request. The schema default is
+     * 0, so defaulting a missing profile to anything else would make every
+     * cached and persisted recommendation compare either always stale or never
+     * stale.
+     */
+    const currentCapsuleRevision = userProfile?.capsule_revision ?? 0
 
     const savedLocaleCandidate =
       userProfile?.preferences &&
@@ -953,7 +1015,13 @@ export class RitualService implements OnModuleDestroy {
     )
 
     // 3. Check Redis Cache using target date in cache key
-    const cacheKey = `ritual:${userId}:${selectedLocation.locationKey}:${targetLocalDateStr}:${locale}`
+    /**
+     * `occasion` changes capsule eligibility, so it is part of the cache
+     * identity. Without it the first request of the day pins one occasion's
+     * result for every other occasion until the TTL expires.
+     */
+    const occasionKey = occasion ?? 'any'
+    const cacheKey = `ritual:${userId}:${selectedLocation.locationKey}:${targetLocalDateStr}:${locale}:${occasionKey}`
     let cachedString: string | null = null
     try {
       cachedString = await this.redis.get(cacheKey)
@@ -966,14 +1034,28 @@ export class RitualService implements OnModuleDestroy {
         const cachedPayload = JSON.parse(cachedString) as {
           weather: { fetchedAt: string }
           generatedAt: string
+          capsuleRevision?: unknown
           data: RitualResponse['data']
         }
         const cachedFetchedAt = cachedPayload.weather.fetchedAt
         const cachedGeneratedAt = new Date(cachedPayload.generatedAt)
 
+        /**
+         * A missing, malformed, or non-integer cached revision is treated as
+         * stale. Without this check the cache short-circuits before the
+         * database revision comparison and can serve a capsule the user has
+         * already changed or deleted.
+         */
+        const cachedCapsuleRevision = cachedPayload.capsuleRevision
+        const capsuleRevisionFresh =
+          typeof cachedCapsuleRevision === 'number' &&
+          Number.isInteger(cachedCapsuleRevision) &&
+          cachedCapsuleRevision === currentCapsuleRevision
+
         if (
           cachedFetchedAt === weatherSnapshot.fetched_at.toISOString() &&
-          cachedGeneratedAt.getTime() >= stalenessThreshold.getTime()
+          cachedGeneratedAt.getTime() >= stalenessThreshold.getTime() &&
+          capsuleRevisionFresh
         ) {
           return cachedPayload.data
         }
@@ -1074,18 +1156,28 @@ export class RitualService implements OnModuleDestroy {
         { scenario: 'evening', segment: eveningSegment },
       ]
 
-    // 5. Query user garments
-    const userGarments = await this.prisma.garmentItem.findMany({
-      where: {
-        user_id: userId,
-        retention_status: 'active',
-        upload_status: 'ready',
-        category: { not: null },
-        comfort_range: { not: null },
-      },
-      orderBy: [{ updated_at: 'desc' }, { id: 'asc' }],
-      take: RITUAL_GARMENT_CANDIDATE_LIMIT,
-    })
+    // 5. Query user garments and capsules
+    const [userGarments, userCapsules] = await Promise.all([
+      this.prisma.garmentItem.findMany({
+        where: {
+          user_id: userId,
+          retention_status: 'active',
+          upload_status: 'ready',
+          category: { not: null },
+          comfort_range: { not: null },
+        },
+        orderBy: [{ updated_at: 'desc' }, { id: 'asc' }],
+        take: RITUAL_GARMENT_CANDIDATE_LIMIT,
+      }),
+      this.prisma.outfitCapsule?.findMany
+        ? this.prisma.outfitCapsule.findMany({
+            where: { user_id: userId },
+            include: { garment_joins: { include: { garment: true } } },
+            orderBy: [{ is_favorite: 'desc' }, { updated_at: 'desc' }, { id: 'asc' }],
+            take: RITUAL_CAPSULE_CANDIDATE_LIMIT,
+          })
+        : Promise.resolve([]),
+    ])
 
     // 6. Build or retrieve outfit recommendations
     const outfits: ScenarioOutfit[] = []
@@ -1099,11 +1191,14 @@ export class RitualService implements OnModuleDestroy {
           },
         })
 
+      let persistedThisRequest = false
       const isStale =
         recommendation &&
-        recommendation.created_at.getTime() < stalenessThreshold.getTime()
+        (recommendation.created_at.getTime() < stalenessThreshold.getTime() ||
+          recommendation.capsule_revision !== currentCapsuleRevision)
 
       if (!recommendation || isStale) {
+        persistedThisRequest = true
         // Generate recommendation
         let adjustedFeelsLike = segment.feels_like
         if (runsColdWarm === 'cold') {
@@ -1111,6 +1206,18 @@ export class RitualService implements OnModuleDestroy {
         } else if (runsColdWarm === 'warm') {
           adjustedFeelsLike += 3
         }
+
+        const capsuleEval = evaluateCapsuleForScenario({
+          capsules: userCapsules as unknown as Parameters<
+            typeof evaluateCapsuleForScenario
+          >[0]['capsules'],
+          userGarments: userGarments as unknown as Parameters<
+            typeof evaluateCapsuleForScenario
+          >[0]['userGarments'],
+          adjustedFeelsLike,
+          requestedOccasion: occasion,
+        })
+        const recommendedCapsule = capsuleEval?.capsule
 
         // Category matching rules
         let requiredCategories: string[] = []
@@ -1140,8 +1247,14 @@ export class RitualService implements OnModuleDestroy {
           targetComfortRange = 'hot'
         }
 
-        // Choose garments
-        const garmentIds = requiredCategories.map((category) => {
+        /**
+         * When a capsule wins, its evaluated garment set is the recommendation:
+         * capsule garments in `garment_order`, then auto-filled garments in
+         * canonical slot order. Recomputing the list from the generic matcher
+         * would persist `capsule_id` alongside garments the capsule does not
+         * contain.
+         */
+        const genericGarmentIds = requiredCategories.map((category) => {
           const candidates = userGarments.filter((g) => g.category === category)
           if (candidates.length === 0) {
             return `default-${category}`
@@ -1168,6 +1281,8 @@ export class RitualService implements OnModuleDestroy {
           return candidates[0]!.id
         })
 
+        const garmentIds = capsuleEval ? capsuleEval.garmentIds : genericGarmentIds
+
         // Rounded values for consistent trigger logic and display formatting
         const roundedAdjustedFeelsLike = Math.round(adjustedFeelsLike)
 
@@ -1183,6 +1298,18 @@ export class RitualService implements OnModuleDestroy {
         // Reasoning badges
         // Story 2.3 Task 2 step 1 owner: refactor dynamic badge generation and interpolation
         const badgesList: { key: string; label: string; bullets: string[] }[] = []
+
+        /**
+         * The capsule name is user-authored, so it stays out of the translated
+         * label and is carried separately on the outfit as `capsuleName`.
+         */
+        if (recommendedCapsule) {
+          badgesList.push({
+            key: 'saved_capsule',
+            label: 'Saved capsule',
+            bullets: ['Selected from your saved capsule'],
+          })
+        }
 
         // Wind tolerance trigger
         const windThreshold = getWindThreshold(windTolerance)
@@ -1309,6 +1436,8 @@ export class RitualService implements OnModuleDestroy {
               data: {
                 garment_ids: garmentIds,
                 reasoning_badges: badgesList,
+                capsule_id: recommendedCapsule?.id ?? null,
+                capsule_revision: currentCapsuleRevision,
               },
             })
           } catch (error) {
@@ -1327,6 +1456,8 @@ export class RitualService implements OnModuleDestroy {
                 scenario,
                 garment_ids: garmentIds,
                 reasoning_badges: badgesList,
+                capsule_id: recommendedCapsule?.id ?? null,
+                capsule_revision: currentCapsuleRevision,
               },
             })
           } catch (error) {
@@ -1402,10 +1533,49 @@ export class RitualService implements OnModuleDestroy {
 
       const rec = recommendation
 
+      /**
+       * Auto-filled garments are derived rather than stored: they are exactly
+       * the persisted garments that the capsule itself does not contain.
+       */
+      const recCapsule = rec.capsule_id
+        ? userCapsules.find((capsule) => capsule.id === rec.capsule_id)
+        : undefined
+      const recGarmentIds = (rec.garment_ids as string[]) || []
+      const capsuleGarmentIds = new Set(
+        recCapsule?.garment_joins.map((join) => join.garment_id) ?? []
+      )
+      const autoFilledGarmentIds = recCapsule
+        ? recGarmentIds.filter((garmentId) => !capsuleGarmentIds.has(garmentId))
+        : []
+
+      if (persistedThisRequest && recCapsule) {
+        try {
+          this.analyticsClient.capture(
+            trackWardrobeCapsuleRecommended({
+              analyticsSubjectId: userId,
+              capsuleId: recCapsule.id,
+              scenario: rec.scenario as ScenarioName,
+              completeness: autoFilledGarmentIds.length === 0 ? 'complete' : 'partial',
+              autoFilledGarmentCount: autoFilledGarmentIds.length,
+              ...(occasion ? { requestedOccasion: occasion } : {}),
+            })
+          )
+        } catch (error) {
+          this.logger.warn(
+            `Capsule recommendation telemetry failed: ${
+              error instanceof Error ? error.message : 'unknown error'
+            }`
+          )
+        }
+      }
+
       outfits.push({
         id: rec.id,
         scenario: rec.scenario as ScenarioName,
-        garmentIds: (rec.garment_ids as string[]) || [],
+        garmentIds: recGarmentIds,
+        capsuleId: recCapsule?.id ?? null,
+        capsuleName: recCapsule?.name ?? null,
+        autoFilledGarmentIds,
         reasoningBadges: (Array.isArray(rec.reasoning_badges)
           ? (rec.reasoning_badges as unknown as {
               key?: string
@@ -1439,6 +1609,7 @@ export class RitualService implements OnModuleDestroy {
     const cachePayload = {
       generatedAt: new Date().toISOString(),
       weather: responseData.weather,
+      capsuleRevision: currentCapsuleRevision,
       data: responseData,
     }
     try {

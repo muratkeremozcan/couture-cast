@@ -1,0 +1,51 @@
+# Story 4.3 Task 8: capsule surface in one non-English locale.
+appId: ${MAESTRO_APP_ID}
+name: 'Outfit capsule localization'
+tags:
+  - e2e
+  - wardrobe
+  - capsules
+  - localization
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+    arguments:
+      locale: 'tr-TR'
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+
+- tapOn:
+    id: 'wardrobe-capsules-link'
+
+# Turkish strings come from the shared wardrobe.capsules key tree.
+- assertVisible:
+    text: 'Kombin kapsülleri'
+    label: 'Screen title is localized'
+
+- tapOn:
+    id: 'create-capsule-button'
+
+- assertVisible:
+    text: 'Kapsül adı'
+    label: 'Name label is localized'
+
+- assertVisible:
+    text: 'Parçalar'
+    label: 'Garments label is localized'
+
+- tapOn:
+    id: 'save-capsule-button'
+
+- assertVisible:
+    text: 'Bir kapsül adı gir.'
+    label: 'Validation error is localized'
+
+- tapOn:
+    id: 'close-modal-button'

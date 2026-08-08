@@ -2,6 +2,7 @@ import type { VerifierOptions } from '@pact-foundation/pact'
 import {
   configureProviderEvent,
   configureProviderWardrobeState,
+  configureProviderCapsuleState,
   parsePactEvent,
   type PactEvent,
 } from './provider-helper'
@@ -19,6 +20,70 @@ type GarmentStateParams = {
 }
 
 export const stateHandlers: StateHandlers = {
+  /* ----------------------------------------------------------------------- *
+   * Story 4.3 outfit capsules.
+   * Deterministic states: the provider is configured to present a known
+   * capsule graph, not to exercise authorization or concurrency logic, which
+   * lives in the API and PostgreSQL integration suites.
+   * ----------------------------------------------------------------------- */
+  'Two ready and active garments exist for owner': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as { userId?: string }
+    configureProviderCapsuleState({ ownerUserId: userId, scenario: 'eligible-garments' })
+    return Promise.resolve({ description: 'Configured two eligible garments' })
+  },
+  'Capsules exist for owner': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as { userId?: string }
+    configureProviderCapsuleState({ ownerUserId: userId, scenario: 'capsule-list' })
+    return Promise.resolve({ description: 'Configured owner capsule list' })
+  },
+  'A capsule exists for owner': (parameters?: unknown) => {
+    const { userId, capsuleId } = (parameters ?? {}) as {
+      userId?: string
+      capsuleId?: string
+    }
+    configureProviderCapsuleState({
+      ownerUserId: userId,
+      capsuleId,
+      scenario: 'capsule-detail',
+    })
+    return Promise.resolve({
+      description: `Configured capsule ${capsuleId ?? 'default'}`,
+    })
+  },
+  'A capsule exists for owner at a newer revision': (parameters?: unknown) => {
+    const { userId, capsuleId } = (parameters ?? {}) as {
+      userId?: string
+      capsuleId?: string
+    }
+    configureProviderCapsuleState({
+      ownerUserId: userId,
+      capsuleId,
+      scenario: 'stale-precondition',
+    })
+    return Promise.resolve({ description: 'Configured capsule ahead of client revision' })
+  },
+  'A capsule already exists for the idempotency key': (parameters?: unknown) => {
+    const { userId, capsuleId } = (parameters ?? {}) as {
+      userId?: string
+      capsuleId?: string
+    }
+    configureProviderCapsuleState({
+      ownerUserId: userId,
+      capsuleId,
+      scenario: 'idempotency-replay',
+    })
+    return Promise.resolve({ description: 'Configured existing idempotency key' })
+  },
+  'A garment pending deletion exists for owner': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as { userId?: string }
+    configureProviderCapsuleState({ ownerUserId: userId, scenario: 'ineligible-garment' })
+    return Promise.resolve({ description: 'Configured a deletion-pending garment' })
+  },
+  'The actor has no relationship with the owner': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as { userId?: string }
+    configureProviderCapsuleState({ ownerUserId: userId, scenario: 'unauthorized-owner' })
+    return Promise.resolve({ description: 'Configured masked 404 relationship' })
+  },
   '': () => Promise.resolve({ description: 'No provider state required' }),
   'A warning alert event exists after the polling cursor': (parameters?: unknown) => {
     const { event } = parameters as WarningAlertStateParams

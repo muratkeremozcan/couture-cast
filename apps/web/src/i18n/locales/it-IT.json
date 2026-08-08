@@ -1,0 +1,59 @@
+{
+  "wardrobe": {
+    "capsules": {
+      "title": "Capsule di outfit",
+      "create": "Crea capsula",
+      "edit": "Modifica capsula",
+      "save": "Salva capsula",
+      "delete": "Elimina capsula",
+      "deleteConfirmTitle": "Eliminare questa capsula?",
+      "deleteConfirmBody": "Questo rimuove la capsula. I tuoi capi restano.",
+      "nameLabel": "Nome della capsula",
+      "namePlaceholder": "Casual da ufficio",
+      "descriptionLabel": "Descrizione",
+      "descriptionPlaceholder": "Descrizione facoltativa",
+      "garmentsLabel": "Capi",
+      "garmentPosition": "Posizione {{position}} di {{count}}",
+      "moveGarmentUp": "Sposta {{garment}} in alto",
+      "moveGarmentDown": "Sposta {{garment}} in basso",
+      "garmentMoved": "{{garment}} spostato in posizione {{position}} di {{count}}",
+      "occasionsLabel": "Occasioni",
+      "favoriteLabel": "Capsula preferita",
+      "searchLabel": "Cerca capsule",
+      "searchPlaceholder": "Cerca per nome o descrizione",
+      "filterAll": "Tutte le capsule",
+      "filterFavorites": "Preferite",
+      "emptyTitle": "Ancora nessuna capsula",
+      "emptyBody": "Combina i capi in un outfit salvato per dopo.",
+      "repairTitle": "La capsula va riparata",
+      "repairBody": "Sostituisci o rimuovi i capi non disponibili prima di usare questa capsula.",
+      "unavailableCount_one": "{{count}} capo non disponibile",
+      "unavailableCount_other": "{{count}} capi non disponibili",
+      "created": "Capsula creata",
+      "updated": "Capsula aggiornata",
+      "deleted": "Capsula eliminata",
+      "favoriteUpdated": "Stato preferiti aggiornato",
+      "savedRecommendation": "Capsula salvata",
+      "errors": {
+        "load": "Impossibile caricare le capsule.",
+        "save": "Impossibile salvare la capsula.",
+        "delete": "Impossibile eliminare la capsula.",
+        "stale": "Questa capsula è cambiata. Controlla la versione più recente e riprova.",
+        "readOnlyGuardian": "Il tuo accesso come tutore è di sola lettura.",
+        "nameRequired": "Inserisci un nome per la capsula.",
+        "garmentCount": "Seleziona da 2 a 10 capi.",
+        "occasionRequired": "Seleziona almeno un’occasione."
+      },
+      "occasions": {
+        "work": "Lavoro",
+        "casual": "Casual",
+        "formal": "Formale",
+        "sport": "Sport",
+        "travel": "Viaggio",
+        "evening": "Sera",
+        "outdoor": "All’aperto",
+        "home": "Casa"
+      }
+    }
+  }
+}

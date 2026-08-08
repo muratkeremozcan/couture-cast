@@ -79,3 +79,20 @@ afterAll(() => {
   mockServer = null
   globalThis.__MSW_RUNTIME_CONTROLLER__ = undefined
 })
+
+/**
+ * Pin the browser language for the whole suite.
+ *
+ * Web locale resolution falls back to `navigator.languages`, so any test that
+ * asserts user-visible copy would otherwise depend on the ambient locale of the
+ * machine or CI image running it. Pinning removes that non-determinism; locale
+ * resolution itself is covered explicitly in the i18n parity spec.
+ */
+Object.defineProperty(window.navigator, 'languages', {
+  configurable: true,
+  get: () => ['en-US'],
+})
+Object.defineProperty(window.navigator, 'language', {
+  configurable: true,
+  get: () => 'en-US',
+})

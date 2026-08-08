@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type React from 'react'
 import { useTranslation } from 'react-i18next'
+import { router } from 'expo-router'
 import * as Crypto from 'expo-crypto'
 import { File, Paths } from 'expo-file-system'
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
@@ -412,15 +413,29 @@ export default function WardrobeScreen() {
               <Text style={styles.title}>{t('wardrobe.title')}</Text>
               <Text style={styles.subtitle}>{t('wardrobe.empty_desc')}</Text>
             </View>
-            <Pressable
-              ref={addGarmentButtonRef}
-              accessibilityRole="button"
-              testID="garment-capture-open"
-              style={styles.primaryButton}
-              onPress={() => setIsCaptureOpen(true)}
-            >
-              <Text style={styles.primaryButtonText}>{t('wardrobe.add_garment')}</Text>
-            </Pressable>
+            <View style={styles.headerActions}>
+              {/* The capsule screen had no entry point anywhere in the app. */}
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={t('wardrobe.capsules.title')}
+                testID="wardrobe-capsules-link"
+                style={styles.secondaryButton}
+                onPress={() => router.push('/wardrobe-capsules')}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  {t('wardrobe.capsules.title')}
+                </Text>
+              </Pressable>
+              <Pressable
+                ref={addGarmentButtonRef}
+                accessibilityRole="button"
+                testID="garment-capture-open"
+                style={styles.primaryButton}
+                onPress={() => setIsCaptureOpen(true)}
+              >
+                <Text style={styles.primaryButtonText}>{t('wardrobe.add_garment')}</Text>
+              </Pressable>
+            </View>
           </View>
 
           {isLoading ? (
@@ -669,6 +684,18 @@ const styles = StyleSheet.create({
   header: { gap: 16 },
   title: { fontSize: 28, fontWeight: '700' },
   subtitle: { marginTop: 6, opacity: 0.7 },
+  headerActions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  secondaryButton: {
+    alignItems: 'center',
+    borderColor: '#d4d4d8',
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 44,
+    paddingHorizontal: 12,
+  },
+  secondaryButtonText: { color: '#3f3f46', fontSize: 13, fontWeight: '600' },
   primaryButton: {
     minHeight: 48,
     alignItems: 'center',

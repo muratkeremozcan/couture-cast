@@ -1,3 +1,4 @@
+/* eslint-disable complexity */
 import {
   factoryRegistry,
   type FactoryRegistry,
@@ -23,6 +24,8 @@ export interface CleanupPrismaClient {
   lookbookPost: CleanupDelegate
   notificationPreference: CleanupDelegate
   outfitRecommendation: CleanupDelegate
+  outfitCapsule: CleanupDelegate
+  outfitCapsuleGarment: CleanupDelegate
   paletteInsights: CleanupDelegate
   pushToken: CleanupDelegate
   savedLocation: CleanupDelegate
@@ -181,7 +184,12 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const alertRuleIds = uniqueValues(tracked.alertRules)
   const notificationPreferenceIds = uniqueValues(tracked.notificationPreferences)
 
+  const outfitCapsuleIds = uniqueValues(tracked.outfitCapsules)
+  const outfitCapsuleGarmentIds = uniqueValues(tracked.outfitCapsuleGarments)
+
   const outfitRecommendationWhere = buildDeleteWhere(ritualIds, userIds)
+  const outfitCapsuleGarmentWhere = buildDeleteWhere(outfitCapsuleGarmentIds, userIds)
+  const outfitCapsuleWhere = buildDeleteWhere(outfitCapsuleIds, userIds)
   const garmentItemWhere = buildDeleteWhere(wardrobeItemIds, userIds)
   const paletteInsightWhere = buildPaletteInsightWhere(wardrobeItemIds, userIds)
 
@@ -261,6 +269,18 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
     if (outfitRecommendationWhere) {
       await prisma.outfitRecommendation.deleteMany({
         where: outfitRecommendationWhere,
+      })
+    }
+
+    if (outfitCapsuleGarmentWhere) {
+      await prisma.outfitCapsuleGarment.deleteMany({
+        where: outfitCapsuleGarmentWhere,
+      })
+    }
+
+    if (outfitCapsuleWhere) {
+      await prisma.outfitCapsule.deleteMany({
+        where: outfitCapsuleWhere,
       })
     }
 

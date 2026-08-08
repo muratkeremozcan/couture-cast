@@ -5,11 +5,18 @@ import {
   garmentListResponseSchema,
   suggestGarmentTagsResponseSchema,
   updateGarmentTagsResponseSchema,
+  outfitCapsuleResponseSchema,
+  outfitCapsuleListResponseSchema,
+  userProfileResponseSchema,
   type GarmentCategory,
   type GarmentMaterial,
   type GarmentComfortRange,
   type GarmentItemContract,
   type SuggestGarmentTagsData,
+  type OutfitCapsuleContract,
+  type CreateOutfitCapsuleInput,
+  type UpdateOutfitCapsuleInput,
+  type ListOutfitCapsulesQuery,
 } from '@couture/api-client/contracts/http'
 import { ResponseError } from '@couture/api-client'
 import { createWebApiClient } from './api-client'
@@ -56,6 +63,35 @@ function readAccessToken(): string {
     throw new Error('Your session expired. Sign in again before adding a garment.')
   }
   return token
+}
+
+/**
+ * Resolves the signed-in user's id from the API.
+ *
+ * Capsule routes take an explicit owner path segment so guardians and admins can
+ * act for another user. The signed-in user is the default owner, and the server
+ * is the only authority on who that is.
+ *
+ * This deliberately does not decode the bearer token. Reading the `sub` claim
+ * client-side couples the page to one token format, and the identity it derives
+ * is whatever the client chooses to believe rather than what the API enforces.
+ */
+export async function resolveCurrentUserId(): Promise<string> {
+  const accessToken = readAccessToken()
+
+  try {
+    const profile = await createWebApiClient({ accessToken }).apiV1UserProfileGet()
+    const userId = userProfileResponseSchema.parse(profile).user.id
+    if (userId.length === 0) {
+      throw new Error('empty user id')
+    }
+    return userId
+  } catch (error: unknown) {
+    throw new WardrobeRequestError(
+      'Unable to confirm your account. Sign in again.',
+      error instanceof Error ? error.message : undefined
+    )
+  }
 }
 
 function loadImage(source: string): Promise<HTMLImageElement> {
@@ -376,5 +412,162 @@ export async function updateGarmentTagsFromWeb(
     return updateGarmentTagsResponseSchema.parse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to save garment tags.')
+  }
+}
+
+export interface CapsulePage {
+  items: OutfitCapsuleContract[]
+  total: number
+  limit: number
+  offset: number
+}
+
+/** Returns the page plus its totals, so the caller can show what is not shown. */
+export async function listCapsulesFromWeb(
+  ownerUserId: string,
+  query?: ListOutfitCapsulesQuery,
+  signal?: AbortSignal
+): Promise<CapsulePage> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1WardrobeOwnerUserIdCapsulesGet(
+      { ownerUserId, limit: 50, offset: 0, ...query },
+      { signal }
+    )
+    const parsed = outfitCapsuleListResponseSchema.parse(response)
+    return {
+      items: parsed.data,
+      total: parsed.total,
+      limit: parsed.limit,
+      offset: parsed.offset,
+    }
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to load outfit capsules.')
+  }
+}
+
+export async function getCapsuleFromWeb(
+  ownerUserId: string,
+  capsuleId: string,
+  signal?: AbortSignal
+): Promise<OutfitCapsuleContract> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1WardrobeOwnerUserIdCapsulesCapsuleIdGet(
+      { ownerUserId, capsuleId },
+      { signal }
+    )
+    return outfitCapsuleResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to load capsule detail.')
+  }
+}
+
+/**
+ * `idempotencyKey` is required rather than generated here. Minting a fresh key
+ * per call meant a retry after a timeout created a second capsule, which is
+ * exactly what the server-side idempotency machinery exists to prevent. The
+ * caller generates one key when the form opens and reuses it for every attempt.
+ */
+export async function createCapsuleFromWeb(
+  ownerUserId: string,
+  input: CreateOutfitCapsuleInput,
+  idempotencyKey: string,
+  signal?: AbortSignal
+): Promise<OutfitCapsuleContract> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1WardrobeOwnerUserIdCapsulesPost(
+      {
+        ownerUserId,
+        idempotencyKey,
+        createOutfitCapsuleInput: input,
+      },
+      { signal }
+    )
+    return outfitCapsuleResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to create outfit capsule.')
+  }
+}
+
+export async function updateCapsuleFromWeb(
+  ownerUserId: string,
+  capsuleId: string,
+  input: UpdateOutfitCapsuleInput,
+  ifMatchHeader: string,
+  signal?: AbortSignal
+): Promise<OutfitCapsuleContract> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatch(
+      {
+        ownerUserId,
+        capsuleId,
+        ifMatch: ifMatchHeader,
+        updateOutfitCapsuleInput: input,
+      },
+      { signal }
+    )
+    return outfitCapsuleResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to update outfit capsule.')
+  }
+}
+
+export async function favoriteCapsuleFromWeb(
+  ownerUserId: string,
+  capsuleId: string,
+  isFavorite: boolean,
+  ifMatchHeader: string,
+  signal?: AbortSignal
+): Promise<OutfitCapsuleContract> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatch(
+      {
+        ownerUserId,
+        capsuleId,
+        ifMatch: ifMatchHeader,
+        favoriteOutfitCapsuleInput: { isFavorite },
+      },
+      { signal }
+    )
+    return outfitCapsuleResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to update favorite status.')
+  }
+}
+
+export async function deleteCapsuleFromWeb(
+  ownerUserId: string,
+  capsuleId: string,
+  ifMatchHeader: string,
+  signal?: AbortSignal
+): Promise<void> {
+  const accessToken = readAccessToken()
+  try {
+    await createWebApiClient({
+      accessToken,
+    }).apiV1WardrobeOwnerUserIdCapsulesCapsuleIdDelete(
+      {
+        ownerUserId,
+        capsuleId,
+        ifMatch: ifMatchHeader,
+      },
+      { signal }
+    )
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to delete outfit capsule.')
   }
 }

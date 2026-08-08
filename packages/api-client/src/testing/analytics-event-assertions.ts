@@ -14,6 +14,13 @@ import {
   localeSwitchedPropertiesSchema,
   garmentUploadCompletedPropertiesSchema,
   garmentTaggingCompletedPropertiesSchema,
+  wardrobeCapsuleCreatedPropertiesSchema,
+  wardrobeCapsuleUpdatedPropertiesSchema,
+  wardrobeCapsuleDeletedPropertiesSchema,
+  wardrobeCapsuleFavoriteChangedPropertiesSchema,
+  wardrobeCapsuleRecommendedPropertiesSchema,
+  wardrobeCapsuleRecommendationViewedPropertiesSchema,
+  wardrobeCapsuleRecommendationSelectedPropertiesSchema,
   type AnalyticsEventName,
 } from '../types/analytics-events'
 import type { ExpectLike } from './expect-like'
@@ -44,6 +51,15 @@ const analyticsPropertySchemas = {
   locale_switched: localeSwitchedPropertiesSchema,
   garment_upload_completed: garmentUploadCompletedPropertiesSchema,
   garment_tagging_completed: garmentTaggingCompletedPropertiesSchema,
+  wardrobe_capsule_created: wardrobeCapsuleCreatedPropertiesSchema,
+  wardrobe_capsule_updated: wardrobeCapsuleUpdatedPropertiesSchema,
+  wardrobe_capsule_deleted: wardrobeCapsuleDeletedPropertiesSchema,
+  wardrobe_capsule_favorite_changed: wardrobeCapsuleFavoriteChangedPropertiesSchema,
+  wardrobe_capsule_recommended: wardrobeCapsuleRecommendedPropertiesSchema,
+  wardrobe_capsule_recommendation_viewed:
+    wardrobeCapsuleRecommendationViewedPropertiesSchema,
+  wardrobe_capsule_recommendation_selected:
+    wardrobeCapsuleRecommendationSelectedPropertiesSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { AnalyticsModule } from '../../analytics/analytics.module.js'
 import { PrismaModule } from '../../prisma/prisma.module.js'
 import { AuthStateModule } from '../auth/auth-state.module.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
@@ -12,7 +13,13 @@ import Redis from 'ioredis'
 import { getRedisConfig, redisOptionsFromConfig } from '../../config/redis.js'
 
 @Module({
-  imports: [PrismaModule, AuthStateModule, WeatherModule, LocationPreferencesModule],
+  imports: [
+    AnalyticsModule,
+    PrismaModule,
+    AuthStateModule,
+    WeatherModule,
+    LocationPreferencesModule,
+  ],
   controllers: [RitualController, ComfortController],
   providers: [
     RitualService,

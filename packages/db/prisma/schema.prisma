@@ -4,12 +4,16 @@
 // Follows architecture Data Architecture and RLS requirements
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // Required to declare PostgreSQL extensions and GIN/trigram index types, so
+  // `prisma migrate diff` stays clean against the hand-authored migration.
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgTrgm(map: "pg_trgm")]
 }
 
 enum ConsentStatus {
@@ -70,6 +74,17 @@ enum GarmentComfortRange {
   hot
 }
 
+enum CapsuleOccasion {
+  work
+  casual
+  formal
+  sport
+  travel
+  evening
+  outdoor
+  home
+}
+
 enum GarmentUploadStatus {
   pending_upload
   bytes_uploaded
@@ -110,18 +125,22 @@ model User {
   notification_preference       NotificationPreference?
   event_envelopes               EventEnvelope[]
   telemetry_events              TelemetryEvent[]
+  capsules                      OutfitCapsule[]
+  capsule_garments              OutfitCapsuleGarment[]
+  capsule_telemetry_claims      CapsuleTelemetryClaim[]
 }
 
 /// RLS: user-scoped profile data keyed by user_id
 model UserProfile {
-  id           String    @id @default(cuid())
-  user         User      @relation(fields: [user_id], references: [id])
-  user_id      String    @unique
-  display_name String?
-  birthdate    DateTime?
-  preferences  Json?
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  user             User      @relation(fields: [user_id], references: [id])
+  user_id          String    @unique
+  display_name     String?
+  birthdate        DateTime?
+  preferences      Json?
+  capsule_revision Int       @default(0)
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
 }
 
 model GuardianConsent {
@@ -314,17 +333,24 @@ model GarmentItem {
   failure_code                    String?
   retention_trigger               String?
   deletion_requested_at           DateTime?
+  /// Set once the purge has actually run. Without it the hourly sweep keeps
+  /// re-purging every `deletion_pending` row forever, which re-bumps the
+  /// revision of every capsule that contains the garment on every pass.
+  retention_purged_at             DateTime?
   created_at                      DateTime               @default(now())
   updated_at                      DateTime               @updatedAt
   palette                         PaletteInsights?       @relation("GarmentPalette")
   moderation_events               ModerationEvent[]
+  capsule_joins                   OutfitCapsuleGarment[]
 
+  @@unique([id, user_id])
   @@unique([user_id, upload_idempotency_key])
   @@unique([user_id, commit_idempotency_key])
   @@index([user_id])
   @@index([user_id, upload_status, upload_expires_at])
   @@index([user_id, retention_status, upload_status, updated_at(sort: Desc), id(sort: Asc)], map: "GarmentItem_ritual_candidates_idx")
   @@index([retention_status, deletion_requested_at])
+  @@index([retention_status, retention_purged_at, created_at], map: "GarmentItem_retention_purge_sweep_idx")
 }
 
 /// RLS: palette insights derived from garments, scoped to user_id
@@ -354,11 +380,20 @@ model OutfitRecommendation {
   scenario            String
   garment_ids         Json?
   reasoning_badges    Json?
+  // Bound by the composite (id, user_id) key so a recommendation can never
+  // reference another user's capsule. The database clears only capsule_id on
+  // capsule deletion via a column-specific ON DELETE SET NULL, which Prisma
+  // cannot express while user_id stays required, so the relation is declared
+  // NoAction here and the delete path nulls the reference explicitly.
+  capsule             OutfitCapsule?   @relation(fields: [capsule_id, user_id], references: [id, user_id], onDelete: NoAction, onUpdate: NoAction)
+  capsule_id          String?
+  capsule_revision    Int              @default(0)
   created_at          DateTime         @default(now())
   updated_at          DateTime         @updatedAt
 
   @@unique([user_id, forecast_segment_id, scenario])
   @@index([user_id])
+  @@index([capsule_id])
 }
 
 /// RLS: lookbook posts tie to user_id and optional palette insight
@@ -514,3 +549,78 @@ model TelemetryEvent {
   @@index([user_id])
   @@map("telemetry_events")
 }
+
+/// RLS: outfit capsules are scoped to user_id
+model OutfitCapsule {
+  id                      String                 @id @default(cuid())
+  user                    User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                 String
+  name                    String
+  description             String?
+  occasions               CapsuleOccasion[]
+  is_favorite             Boolean                @default(false)
+  revision                Int                    @default(0)
+  idempotency_key         String?
+  idempotency_payload_hash String?
+  created_at              DateTime               @default(now())
+  updated_at              DateTime               @updatedAt
+  garment_joins           OutfitCapsuleGarment[]
+  recommendations         OutfitRecommendation[]
+
+  @@unique([id, user_id])
+  @@unique([user_id, idempotency_key])
+  @@index([user_id])
+  @@index([user_id, is_favorite(sort: Desc), updated_at(sort: Desc), id(sort: Asc)])
+  @@index([user_id, updated_at(sort: Desc)])
+  @@index([user_id, name])
+  /// Leading-wildcard case-insensitive search cannot use a btree index.
+  @@index([name(ops: raw("gin_trgm_ops"))], map: "OutfitCapsule_name_trgm_idx", type: Gin)
+  @@index([description(ops: raw("gin_trgm_ops"))], map: "OutfitCapsule_description_trgm_idx", type: Gin)
+  /// Array containment for the occasion filter.
+  @@index([occasions], map: "OutfitCapsule_occasions_idx", type: Gin)
+  @@map("OutfitCapsule")
+}
+
+/// One durable claim per state-changing capsule mutation. The unique
+/// mutation_key (capsule id, committed revision, event name) is what makes a
+/// logical analytics event exactly-once across retries and concurrent callers.
+/// Rows are written inside the mutation transaction and delivered after commit.
+model CapsuleTelemetryClaim {
+  id           String    @id @default(cuid())
+  user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id      String
+  capsule_id   String
+  revision     Int
+  event_name   String
+  mutation_key String    @unique
+  payload      Json
+  attempts     Int       @default(0)
+  last_error   String?
+  claimed_at   DateTime  @default(now())
+  delivered_at DateTime?
+
+  @@index([delivered_at, claimed_at])
+  @@index([user_id])
+  @@map("CapsuleTelemetryClaim")
+}
+
+/// RLS: outfit capsule garment join table scoped to user_id
+model OutfitCapsuleGarment {
+  id            String        @id @default(cuid())
+  user          User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id       String
+  capsule       OutfitCapsule @relation(fields: [capsule_id, user_id], references: [id, user_id], onDelete: Cascade)
+  capsule_id    String
+  garment       GarmentItem   @relation(fields: [garment_id, user_id], references: [id, user_id], onDelete: Cascade)
+  garment_id    String
+  garment_order Int
+  created_at    DateTime      @default(now())
+
+  @@unique([capsule_id, garment_id])
+  @@unique([capsule_id, garment_order])
+  @@index([user_id])
+  @@index([garment_id])
+  @@index([capsule_id, garment_order])
+  @@map("OutfitCapsuleGarment")
+}
+

@@ -18,6 +18,10 @@ export const SLO = isSmoke
       guardianRevoke: 5000,
       userProfile: 3000,
       moderationAction: 3000,
+      // Story 4.3 capsule capacity contract, relaxed for smoke runs.
+      capsuleRead: 3000,
+      capsuleWrite: 5000,
+      capsuleRitualCold: 5000,
     }
   : {
       aggregate: 1500,
@@ -30,6 +34,14 @@ export const SLO = isSmoke
       guardianRevoke: 1500,
       userProfile: 800,
       moderationAction: 800,
+      /**
+       * Story 4.3: list, detail, and filtered search at or below 300ms P95;
+       * create, PATCH, favorite, and delete at or below 500ms; cold ritual
+       * generation with capsule evaluation at or below 800ms.
+       */
+      capsuleRead: 300,
+      capsuleWrite: 500,
+      capsuleRitualCold: 800,
     }
 
 export function apiUrl(path: string) {

@@ -1,8 +1,8 @@
-import type { PrismaClient } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { WardrobeRetentionService } from './wardrobe-retention.service'
 import type { RitualService } from '../personalization/ritual.service'
 import type { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
+import { createMockPrisma } from '../../testing/prisma-mock'
 
 function garment(overrides: Record<string, unknown> = {}) {
   return {
@@ -12,44 +12,45 @@ function garment(overrides: Record<string, unknown> = {}) {
     retention_status: 'active',
     retention_trigger: null,
     deletion_requested_at: null,
+    retention_purged_at: null,
+    upload_status: 'ready',
     ...overrides,
   }
 }
 
 describe('WardrobeRetentionService', () => {
-  let findFirst: Mock
-  let findMany: Mock
-  let updateMany: Mock
-  let garmentUpdate: Mock
-  let paletteDeleteMany: Mock
-  let auditCreate: Mock
+  /** Aliases onto the shared Prisma double so assertions stay readable. */
+  type PrismaMock = ReturnType<typeof createMockPrisma>
+  type DelegateFn = PrismaMock['garmentItem']['findFirst']
+
+  let findFirst: DelegateFn
+  let findMany: DelegateFn
+  let updateMany: DelegateFn
+  let garmentUpdate: DelegateFn
+  let paletteDeleteMany: DelegateFn
+  let auditCreate: DelegateFn
   let storageRemove: Mock
   let invalidateUserCache: Mock
   let service: WardrobeRetentionService
+  let prisma: PrismaMock
 
   beforeEach(() => {
-    findFirst = vi.fn()
-    findMany = vi.fn().mockResolvedValue([])
-    updateMany = vi.fn().mockResolvedValue({ count: 1 })
-    garmentUpdate = vi.fn().mockResolvedValue(undefined)
-    paletteDeleteMany = vi.fn().mockResolvedValue({ count: 1 })
-    auditCreate = vi.fn().mockResolvedValue(undefined)
+    prisma = createMockPrisma()
     storageRemove = vi.fn().mockResolvedValue(undefined)
     invalidateUserCache = vi.fn().mockResolvedValue(true)
-    const transactionClient = {
-      garmentItem: { update: garmentUpdate },
-      paletteInsights: { deleteMany: paletteDeleteMany },
-      auditLog: { create: auditCreate },
-    }
-    const prisma = {
-      garmentItem: { findFirst, findMany, updateMany },
-      $transaction: vi.fn(
-        async (callback: (tx: typeof transactionClient) => Promise<void>) =>
-          callback(transactionClient)
-      ),
-    }
+
+    findFirst = prisma.garmentItem.findFirst
+    findMany = prisma.garmentItem.findMany
+    updateMany = prisma.garmentItem.updateMany
+    garmentUpdate = prisma.garmentItem.update
+    paletteDeleteMany = prisma.paletteInsights.deleteMany
+    auditCreate = prisma.auditLog.create
+
+    updateMany.mockResolvedValue({ count: 1 })
+    paletteDeleteMany.mockResolvedValue({ count: 1 })
+
     service = new WardrobeRetentionService(
-      prisma as unknown as PrismaClient,
+      prisma.asPrismaClient(),
       { remove: storageRemove } as unknown as SupabaseWardrobeStorageAdapter,
       { invalidateUserCache } as unknown as RitualService
     )

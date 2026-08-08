@@ -2,6 +2,7 @@ import {
   GARMENT_TAGGING_ANALYSIS_VERSION,
   type GarmentItemContract,
   type GarmentTagSuggestionSnapshot,
+  type OutfitCapsuleContract,
   type SuggestGarmentTagsData,
 } from '../contracts/http/wardrobe'
 
@@ -77,6 +78,51 @@ export function createReadyGarmentFixture(
       url: 'https://example.test/garment.png',
       expiresAt: FIXED_IMAGE_EXPIRY,
     },
+    ...overrides,
+  }
+}
+
+export function createOutfitCapsuleFixture(
+  overrides: Partial<OutfitCapsuleContract> = {}
+): OutfitCapsuleContract {
+  return {
+    id: 'capsule-1',
+    ownerUserId: 'user-1',
+    name: 'Work Capsule',
+    description: 'Essential office outfits',
+    occasions: ['work', 'casual'],
+    isFavorite: false,
+    revision: 1,
+    availabilityStatus: 'ready',
+    unavailableGarmentCount: 0,
+    garments: [
+      {
+        id: 'garment-1',
+        category: 'top',
+        material: 'cotton',
+        comfortRange: 'mild',
+        imageAccess: {
+          url: 'https://example.test/garment-1.png',
+          expiresAt: FIXED_IMAGE_EXPIRY,
+        },
+        availabilityStatus: 'ready',
+        garmentOrder: 0,
+      },
+      {
+        id: 'garment-2',
+        category: 'bottom',
+        material: 'denim',
+        comfortRange: 'mild',
+        imageAccess: {
+          url: 'https://example.test/garment-2.png',
+          expiresAt: FIXED_IMAGE_EXPIRY,
+        },
+        availabilityStatus: 'ready',
+        garmentOrder: 1,
+      },
+    ],
+    createdAt: FIXED_CREATED_AT,
+    updatedAt: FIXED_COMMITTED_AT,
     ...overrides,
   }
 }
