@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 // Step 22 step 4 owner: verify translation key parity and placeholder replacements in apps/api/src/modules/personalization/ritual.service.spec.ts
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import {
@@ -8,6 +9,7 @@ import {
 import type { PrismaClient, Prisma } from '@prisma/client'
 import type { WeatherQueryService } from '../weather/weather-query.service.js'
 import type { LocationPreferencesService } from '../location-preferences/location-preferences.service.js'
+import type { AnalyticsClient } from '../../analytics/analytics.service.js'
 import Redis from 'ioredis'
 
 // Mock ioredis
@@ -233,12 +235,14 @@ describe('RitualService', () => {
       listLocations: listLocationsMock,
     } as unknown as LocationPreferencesService
 
+    const analyticsMock = { capture: vi.fn().mockResolvedValue({ status: 'queued' }) }
     const redis = new Redis()
     service = new RitualService(
       prismaMock,
       weatherQueryMock,
       locationPreferencesMock,
-      redis as unknown as Redis
+      redis as unknown as Redis,
+      analyticsMock satisfies AnalyticsClient
     )
   })
 
@@ -361,15 +365,18 @@ describe('RitualService', () => {
       prismaMock,
       weatherQueryMock,
       locationPreferencesMock,
-      redis as unknown as Redis
+      redis as unknown as Redis,
+      { capture: vi.fn() } satisfies AnalyticsClient
     )
 
     vi.setSystemTime(new Date('2026-07-16T12:59:00.000Z'))
     await customService.getOrCreateRitual('user-1')
 
-    expect(getSpy).toHaveBeenLastCalledWith('ritual:user-1:chicago-il:07/16/2026:en-US')
+    expect(getSpy).toHaveBeenLastCalledWith(
+      'ritual:user-1:chicago-il:07/16/2026:en-US:any'
+    )
     expect(setSpy).toHaveBeenLastCalledWith(
-      'ritual:user-1:chicago-il:07/16/2026:en-US',
+      'ritual:user-1:chicago-il:07/16/2026:en-US:any',
       expect.any(String),
       'EX',
       900
@@ -378,9 +385,11 @@ describe('RitualService', () => {
     vi.setSystemTime(new Date('2026-07-16T13:00:00.000Z'))
     await customService.getOrCreateRitual('user-1')
 
-    expect(getSpy).toHaveBeenLastCalledWith('ritual:user-1:chicago-il:07/17/2026:en-US')
+    expect(getSpy).toHaveBeenLastCalledWith(
+      'ritual:user-1:chicago-il:07/17/2026:en-US:any'
+    )
     expect(setSpy).toHaveBeenLastCalledWith(
-      'ritual:user-1:chicago-il:07/17/2026:en-US',
+      'ritual:user-1:chicago-il:07/17/2026:en-US:any',
       expect.any(String),
       'EX',
       900
@@ -393,7 +402,8 @@ describe('RitualService', () => {
       prismaMock,
       weatherQueryMock,
       locationPreferencesMock,
-      redis as unknown as Redis
+      redis as unknown as Redis,
+      { capture: vi.fn() } satisfies AnalyticsClient
     )
 
     const initialRec = {
@@ -534,7 +544,8 @@ describe('RitualService', () => {
         prismaMock,
         weatherQueryMock,
         locationPreferencesMock,
-        redis as unknown as Redis
+        redis as unknown as Redis,
+        { capture: vi.fn() } satisfies AnalyticsClient
       )
 
       const recMock = {
@@ -557,8 +568,9 @@ describe('RitualService', () => {
           // 4. Key is absent, label has no match; preserves provided label
           { label: 'Completely unknown label', bullets: ['Bullet 4'] },
         ],
-        created_at: new Date('2026-07-16T04:00:00.000Z'),
-        updated_at: new Date('2026-07-16T04:00:00.000Z'),
+        capsule_revision: 0,
+        created_at: new Date('2026-07-16T05:30:00.000Z'),
+        updated_at: new Date('2026-07-16T05:30:00.000Z'),
       }
       outfitRecommendationFindFirst.mockResolvedValue(recMock)
 
@@ -608,7 +620,8 @@ describe('RitualService', () => {
         localPrisma,
         weatherQueryMock,
         locationPreferencesMock,
-        redis as unknown as Redis
+        redis as unknown as Redis,
+        { capture: vi.fn() } satisfies AnalyticsClient
       )
 
       const result = await customService.getOrCreateRitual('user-1')
@@ -635,7 +648,8 @@ describe('RitualService', () => {
         localPrisma,
         weatherQueryMock,
         locationPreferencesMock,
-        redis as unknown as Redis
+        redis as unknown as Redis,
+        { capture: vi.fn() } satisfies AnalyticsClient
       )
 
       const result = await customService.getOrCreateRitual('user-1', undefined, 'es-419')
@@ -667,7 +681,8 @@ describe('RitualService', () => {
         localPrisma,
         weatherQueryMock,
         locationPreferencesMock,
-        redis as unknown as Redis
+        redis as unknown as Redis,
+        { capture: vi.fn() } satisfies AnalyticsClient
       )
 
       const result = await customService.getOrCreateRitual('user-1', undefined, 'tr-TR')
@@ -683,7 +698,8 @@ describe('RitualService', () => {
         prismaMock,
         weatherQueryMock,
         locationPreferencesMock,
-        redis as unknown as Redis
+        redis as unknown as Redis,
+        { capture: vi.fn() } satisfies AnalyticsClient
       )
 
       const result = await customService.getOrCreateRitual(
@@ -701,7 +717,8 @@ describe('RitualService', () => {
         prismaMock,
         weatherQueryMock,
         locationPreferencesMock,
-        redis as unknown as Redis
+        redis as unknown as Redis,
+        { capture: vi.fn() } satisfies AnalyticsClient
       )
 
       const englishResult = await customService.getOrCreateRitual(
@@ -720,8 +737,12 @@ describe('RitualService', () => {
 
       expect(englishResult.outfits[0]?.comfortNotes).toContain('°F')
       expect(turkishResult.outfits[0]?.comfortNotes).toContain('Hissedilen sıcaklık')
-      expect(Object.keys(store).filter((key) => key.endsWith(':en-US'))).toHaveLength(1)
-      expect(Object.keys(store).filter((key) => key.endsWith(':tr-TR'))).toHaveLength(1)
+      expect(Object.keys(store).filter((key) => key.endsWith(':en-US:any'))).toHaveLength(
+        1
+      )
+      expect(Object.keys(store).filter((key) => key.endsWith(':tr-TR:any'))).toHaveLength(
+        1
+      )
     })
 
     it('preserves custom badge bullets when localizing a non-English response', async () => {
@@ -730,7 +751,8 @@ describe('RitualService', () => {
         prismaMock,
         weatherQueryMock,
         locationPreferencesMock,
-        redis as unknown as Redis
+        redis as unknown as Redis,
+        { capture: vi.fn() } satisfies AnalyticsClient
       )
       outfitRecommendationFindFirst.mockResolvedValue({
         id: 'rec-custom',
@@ -745,8 +767,9 @@ describe('RitualService', () => {
             bullets: ['Balances the custom evening silhouette'],
           },
         ],
-        created_at: new Date('2026-07-16T04:00:00.000Z'),
-        updated_at: new Date('2026-07-16T04:00:00.000Z'),
+        capsule_revision: 0,
+        created_at: new Date('2026-07-16T05:30:00.000Z'),
+        updated_at: new Date('2026-07-16T05:30:00.000Z'),
       })
 
       const result = await customService.getOrCreateRitual(
@@ -769,15 +792,16 @@ describe('RitualService', () => {
     it('should scan and delete matching user cache keys', async () => {
       const redis = new Redis()
       const mockRedisInstance = redis as unknown as { store: Record<string, string> }
-      mockRedisInstance.store['ritual:user-1:chicago:07/16/2026:en-US'] = 'data1'
-      mockRedisInstance.store['ritual:user-1:ny:07/16/2026:tr-TR'] = 'data2'
-      mockRedisInstance.store['ritual:user-2:chicago:07/16/2026:en-US'] = 'data3'
+      mockRedisInstance.store['ritual:user-1:chicago:07/16/2026:en-US:any'] = 'data1'
+      mockRedisInstance.store['ritual:user-1:ny:07/16/2026:tr-TR:any'] = 'data2'
+      mockRedisInstance.store['ritual:user-2:chicago:07/16/2026:en-US:any'] = 'data3'
 
       const customService = new RitualService(
         prismaMock,
         weatherQueryMock,
         locationPreferencesMock,
-        redis as unknown as Redis
+        redis as unknown as Redis,
+        { capture: vi.fn() } satisfies AnalyticsClient
       )
 
       const scanSpy = vi.spyOn(redis, 'scan')
@@ -787,15 +811,17 @@ describe('RitualService', () => {
 
       expect(scanSpy).toHaveBeenCalledWith('0', 'MATCH', 'ritual:user-1:*', 'COUNT', 100)
       expect(delSpy).toHaveBeenCalledWith([
-        'ritual:user-1:chicago:07/16/2026:en-US',
-        'ritual:user-1:ny:07/16/2026:tr-TR',
+        'ritual:user-1:chicago:07/16/2026:en-US:any',
+        'ritual:user-1:ny:07/16/2026:tr-TR:any',
       ])
 
       expect(
-        mockRedisInstance.store['ritual:user-1:chicago:07/16/2026:en-US']
+        mockRedisInstance.store['ritual:user-1:chicago:07/16/2026:en-US:any']
       ).toBeUndefined()
-      expect(mockRedisInstance.store['ritual:user-1:ny:07/16/2026:tr-TR']).toBeUndefined()
-      expect(mockRedisInstance.store['ritual:user-2:chicago:07/16/2026:en-US']).toBe(
+      expect(
+        mockRedisInstance.store['ritual:user-1:ny:07/16/2026:tr-TR:any']
+      ).toBeUndefined()
+      expect(mockRedisInstance.store['ritual:user-2:chicago:07/16/2026:en-US:any']).toBe(
         'data3'
       )
     })

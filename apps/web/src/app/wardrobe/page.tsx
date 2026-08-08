@@ -1,6 +1,7 @@
 // Story 4.1 & 4.2 owner: implement web wardrobe hub page with capture and smart tagging
 'use client'
 
+import Link from 'next/link'
 import React, { useEffect, useState, useRef } from 'react'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
 import { SkipToContent } from '../components/skip-to-content'
@@ -182,13 +183,23 @@ export default function WardrobePage() {
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
               Wardrobe Hub
             </h1>
-            <button
-              ref={addGarmentButtonRef}
-              onClick={(event) => openCapture(event.currentTarget)}
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
-            >
-              + Add Garment
-            </button>
+            <div className="flex items-center gap-3">
+              {/* The capsules route had no entry point anywhere in the app. */}
+              <Link
+                href="/wardrobe/capsules"
+                className="flex min-h-[44px] items-center rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                data-testid="wardrobe-capsules-link"
+              >
+                Outfit capsules
+              </Link>
+              <button
+                ref={addGarmentButtonRef}
+                onClick={(event) => openCapture(event.currentTarget)}
+                className="min-h-[44px] rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+              >
+                + Add Garment
+              </button>
+            </div>
           </div>
         </header>
 

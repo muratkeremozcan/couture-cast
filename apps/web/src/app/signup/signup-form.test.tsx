@@ -117,7 +117,11 @@ describe('SignupForm', () => {
         consentLevel: 'full_access',
       })
     })
-    expect(screen.getByTestId('guardian-invite-link')).toHaveTextContent(
+
+    // The request resolving does not mean React has committed the result, so
+    // this must await the element. A synchronous getByTestId here failed
+    // intermittently under a loaded full-monorepo run.
+    expect(await screen.findByTestId('guardian-invite-link')).toHaveTextContent(
       'https://app.couturecast.test/guardian/accept?token=abc'
     )
   })

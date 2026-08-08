@@ -1,8 +1,21 @@
 // Step 22 step 6 owner: mock localized database state response in Pact provider tests in pact/http/provider/provider-helper.ts
+
+/**
+ * Mirrors the identifiers the consumer contract pins in
+ * `pact/http/consumer/api-contract-interactions.ts`. Both sides must agree or
+ * the pinned `string()` matchers fail verification.
+ */
+const PACT_CAPSULE_OWNER_ID = 'guardian-1'
+const PACT_CAPSULE_ID = '00000000-0000-4000-8000-0000000000c1'
+const PACT_CAPSULE_GARMENT_A = '00000000-0000-4000-8000-0000000000a1'
+const PACT_CAPSULE_TIMESTAMP = '2026-08-07T10:00:00.000Z'
 import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
+  PreconditionFailedException,
+  HttpException,
+  HttpStatus,
   ServiceUnavailableException,
   type INestApplication,
 } from '@nestjs/common'
@@ -10,6 +23,7 @@ import { Test } from '@nestjs/testing'
 import type { Prisma } from '@prisma/client'
 import { existsSync, mkdirSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
+import type { NextFunction, Request, Response } from 'express'
 import { ApiHealthController } from '../../../apps/api/src/controllers/api-health.controller'
 import { HealthController } from '../../../apps/api/src/controllers/health.controller'
 import { AccessTokenIdentityService } from '../../../apps/api/src/modules/auth/access-token-identity.service'
@@ -29,6 +43,12 @@ import { WardrobeController } from '../../../apps/api/src/modules/wardrobe/wardr
 import { WardrobeService } from '../../../apps/api/src/modules/wardrobe/wardrobe.service'
 import { WardrobeRetentionService } from '../../../apps/api/src/modules/wardrobe/wardrobe-retention.service'
 import { WardrobeUploadGuard } from '../../../apps/api/src/modules/wardrobe/wardrobe.guard'
+import { WardrobeCapsuleController } from '../../../apps/api/src/modules/wardrobe/wardrobe-capsule.controller'
+// The `.js` specifier must match how wardrobe-capsule.controller.ts imports this
+// module. Resolving it both ways yields two distinct class objects, and the
+// controller's injection token then never matches this provider.
+import { WardrobeCapsuleService } from '../../../apps/api/src/modules/wardrobe/wardrobe-capsule.service.js'
+import { CapsuleCacheHeadersMiddleware } from '../../../apps/api/src/modules/wardrobe/wardrobe-capsule.cache-headers.middleware'
 import {
   GARMENT_TAGGING_ANALYSIS_VERSION,
   type GarmentCategory,
@@ -398,6 +418,112 @@ export async function startLocalPactProvider({
   } as unknown as WardrobeService
 
   const mockWardrobeRetentionService = {} as unknown as WardrobeRetentionService
+
+  /**
+   * Story 4.3 capsule provider double.
+   *
+   * The verifier sets a named scenario before each interaction and this returns
+   * the matching deterministic representation, or throws the documented error.
+   * An unconfigured scenario throws NotFound so a missing provider state fails
+   * loudly instead of verifying against stale in-memory data.
+   */
+  const capsuleRepresentation = (revision: number) => ({
+    id: PACT_CAPSULE_ID,
+    ownerUserId: PACT_CAPSULE_OWNER_ID,
+    name: 'Work capsule',
+    description: null,
+    occasions: ['work'] as const,
+    isFavorite: false,
+    revision,
+    availabilityStatus: 'ready' as const,
+    unavailableGarmentCount: 0,
+    garments: [
+      {
+        id: PACT_CAPSULE_GARMENT_A,
+        category: 'top' as const,
+        material: 'cotton' as const,
+        comfortRange: 'mild' as const,
+        imageAccess: null,
+        availabilityStatus: 'ready' as const,
+        garmentOrder: 0,
+      },
+    ],
+    createdAt: PACT_CAPSULE_TIMESTAMP,
+    updatedAt: PACT_CAPSULE_TIMESTAMP,
+  })
+
+  /**
+   * An unconfigured state, or one the provider models as unauthorized, is a
+   * masked 404. That matches the story rule that a missing capsule and an
+   * unauthorized relationship are indistinguishable to the client.
+   */
+  const requireCapsuleScenario = () => {
+    const state = getProviderCapsuleState()
+    if (!state || state.scenario === 'unauthorized-owner') {
+      throw new NotFoundException('CAPSULE_NOT_FOUND')
+    }
+    return state
+  }
+
+  const mockWardrobeCapsuleService = {
+    createCapsule: (_actor: unknown, _ownerUserId: string, body: { name?: string }) => {
+      const { scenario } = requireCapsuleScenario()
+      if (scenario === 'ineligible-garment') {
+        throw new ConflictException('GARMENT_NOT_CAPSULE_ELIGIBLE')
+      }
+
+      /**
+       * Replay and key-reuse share one provider state because they differ by
+       * payload, not by stored data: an identical normalized payload replays,
+       * a changed one conflicts.
+       */
+      if (scenario === 'idempotency-replay') {
+        if (body?.name !== 'Work capsule') {
+          throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
+        }
+        return Promise.resolve({ data: capsuleRepresentation(1), isReplay: true })
+      }
+
+      return Promise.resolve({ data: capsuleRepresentation(1), isReplay: false })
+    },
+    listCapsules: () => {
+      requireCapsuleScenario()
+      return Promise.resolve({
+        data: [capsuleRepresentation(1)],
+        total: 1,
+        limit: 20,
+        offset: 0,
+      })
+    },
+    getCapsule: () => {
+      requireCapsuleScenario()
+      return Promise.resolve({ data: capsuleRepresentation(1) })
+    },
+    updateCapsule: (
+      _actor: unknown,
+      _ownerUserId: string,
+      _capsuleId: string,
+      ifMatch: string | undefined
+    ) => {
+      const { scenario } = requireCapsuleScenario()
+      if (!ifMatch) {
+        throw new HttpException('PRECONDITION_REQUIRED', HttpStatus.PRECONDITION_REQUIRED)
+      }
+      if (scenario === 'stale-precondition') {
+        throw new PreconditionFailedException('CAPSULE_REVISION_MISMATCH')
+      }
+      return Promise.resolve({ data: capsuleRepresentation(1) })
+    },
+    setFavoriteStatus: () => {
+      requireCapsuleScenario()
+      return Promise.resolve({ data: capsuleRepresentation(1) })
+    },
+    deleteCapsule: () => {
+      requireCapsuleScenario()
+      return Promise.resolve()
+    },
+  } as unknown as WardrobeCapsuleService
+
   const mockGuardianService = {
     assertWardrobeUploadAllowed: (userId: string) => {
       if (
@@ -419,6 +545,7 @@ export async function startLocalPactProvider({
       ComfortController,
       UserController,
       WardrobeController,
+      WardrobeCapsuleController,
     ],
     providers: [
       EventsService,
@@ -462,6 +589,10 @@ export async function startLocalPactProvider({
         provide: WardrobeUploadGuard,
         useFactory: () => new WardrobeUploadGuard(mockGuardianService),
       },
+      {
+        provide: WardrobeCapsuleService,
+        useValue: mockWardrobeCapsuleService,
+      },
     ],
   })
     .overrideGuard(RequestAuthGuard)
@@ -471,6 +602,19 @@ export async function startLocalPactProvider({
     .compile()
 
   const localApp = moduleFixture.createNestApplication()
+
+  // WardrobeModule applies this through `configure`, which a bare testing module
+  // never calls. Without it every capsule response, including errors, would be
+  // missing the `Cache-Control: private, no-store` the contract pins.
+  const capsuleCacheHeaders = new CapsuleCacheHeadersMiddleware()
+  localApp.use('/api/v1/wardrobe', (req: Request, res: Response, next: NextFunction) => {
+    if (/^\/[^/]+\/capsules(\/|$|\?)/.test(req.url)) {
+      capsuleCacheHeaders.use(req, res, next)
+      return
+    }
+    next()
+  })
+
   await localApp.init()
   await localApp.listen(0, '127.0.0.1')
 
@@ -478,4 +622,50 @@ export async function startLocalPactProvider({
     app: localApp,
     providerBaseUrl: resolveProviderBaseUrl(localApp),
   }
+}
+
+/**
+ * Story 4.3 capsule provider states.
+ *
+ * The verifier configures a named, deterministic scenario before each
+ * interaction. Keeping the scenario as a discriminated string means a state the
+ * provider does not know fails loudly rather than silently verifying against
+ * whatever happened to be in memory.
+ */
+export type ProviderCapsuleScenario =
+  | 'eligible-garments'
+  | 'capsule-list'
+  | 'capsule-detail'
+  | 'stale-precondition'
+  | 'idempotency-replay'
+  | 'idempotency-conflict'
+  | 'ineligible-garment'
+  | 'unauthorized-owner'
+
+export type ProviderCapsuleState = {
+  ownerUserId: string | null
+  capsuleId: string | null
+  scenario: ProviderCapsuleScenario
+}
+
+let providerCapsuleState: ProviderCapsuleState | null = null
+
+export function configureProviderCapsuleState(state: {
+  ownerUserId?: string
+  capsuleId?: string
+  scenario: ProviderCapsuleScenario
+}) {
+  providerCapsuleState = {
+    ownerUserId: state.ownerUserId ?? null,
+    capsuleId: state.capsuleId ?? null,
+    scenario: state.scenario,
+  }
+}
+
+export function getProviderCapsuleState(): ProviderCapsuleState | null {
+  return providerCapsuleState
+}
+
+export function resetProviderCapsuleState() {
+  providerCapsuleState = null
 }

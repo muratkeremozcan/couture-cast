@@ -1,0 +1,59 @@
+{
+  "wardrobe": {
+    "capsules": {
+      "title": "Cápsulas de atuendo",
+      "create": "Crear cápsula",
+      "edit": "Editar cápsula",
+      "save": "Guardar cápsula",
+      "delete": "Eliminar cápsula",
+      "deleteConfirmTitle": "¿Eliminar esta cápsula?",
+      "deleteConfirmBody": "Esto elimina la cápsula. Tus prendas permanecen.",
+      "nameLabel": "Nombre de la cápsula",
+      "namePlaceholder": "Casual de oficina",
+      "descriptionLabel": "Descripción",
+      "descriptionPlaceholder": "Descripción opcional",
+      "garmentsLabel": "Prendas",
+      "garmentPosition": "Posición {{position}} de {{count}}",
+      "moveGarmentUp": "Mover {{garment}} hacia arriba",
+      "moveGarmentDown": "Mover {{garment}} hacia abajo",
+      "garmentMoved": "{{garment}} movida a la posición {{position}} de {{count}}",
+      "occasionsLabel": "Ocasiones",
+      "favoriteLabel": "Cápsula favorita",
+      "searchLabel": "Buscar cápsulas",
+      "searchPlaceholder": "Buscar por nombre o descripción",
+      "filterAll": "Todas las cápsulas",
+      "filterFavorites": "Favoritas",
+      "emptyTitle": "Aún no hay cápsulas",
+      "emptyBody": "Combina prendas en un atuendo guardado para después.",
+      "repairTitle": "La cápsula necesita reparación",
+      "repairBody": "Reemplaza o quita las prendas no disponibles antes de usar esta cápsula.",
+      "unavailableCount_one": "{{count}} prenda no disponible",
+      "unavailableCount_other": "{{count}} prendas no disponibles",
+      "created": "Cápsula creada",
+      "updated": "Cápsula actualizada",
+      "deleted": "Cápsula eliminada",
+      "favoriteUpdated": "Estado de favorita actualizado",
+      "savedRecommendation": "Cápsula guardada",
+      "errors": {
+        "load": "No se pueden cargar las cápsulas.",
+        "save": "No se puede guardar la cápsula.",
+        "delete": "No se puede eliminar la cápsula.",
+        "stale": "Esta cápsula cambió. Revisa la versión más reciente e inténtalo de nuevo.",
+        "readOnlyGuardian": "Tu acceso como tutor es de solo lectura.",
+        "nameRequired": "Ingresa un nombre para la cápsula.",
+        "garmentCount": "Selecciona de 2 a 10 prendas.",
+        "occasionRequired": "Selecciona al menos una ocasión."
+      },
+      "occasions": {
+        "work": "Trabajo",
+        "casual": "Casual",
+        "formal": "Formal",
+        "sport": "Deporte",
+        "travel": "Viaje",
+        "evening": "Noche",
+        "outdoor": "Aire libre",
+        "home": "Casa"
+      }
+    }
+  }
+}

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { nonEmptyStringSchema, type RegisteredCommonHttpSchemas } from './common'
 import { supportedLocaleSchema } from './localization'
 import { weatherSnapshotSchema } from './weather'
+import { capsuleOccasionEnum } from './wardrobe'
 
 export const scenarioNameSchema = z.enum(['morning', 'midday', 'evening'])
 
@@ -30,6 +31,20 @@ export const scenarioOutfitSchema = z.object({
   comfortNotes: z
     .string()
     .describe('Explanation string based on weather and comfort thresholds.'),
+  capsuleId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Optional capsule ID if recommendation came from an outfit capsule.'),
+  capsuleName: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Optional capsule name if recommendation came from an outfit capsule.'),
+  autoFilledGarmentIds: z
+    .array(z.string())
+    .optional()
+    .describe('Optional list of garment IDs auto-filled into a partial capsule.'),
 })
 
 export const ritualResponseSchema = z.object({
@@ -60,6 +75,9 @@ export const ritualQueryParamsSchema = z
     locale: supportedLocaleSchema
       .optional()
       .describe('Optional locale override for this localized ritual response.'),
+    occasion: capsuleOccasionEnum
+      .optional()
+      .describe('Optional occasion filter for capsule recommendations.'),
   })
   .strict()
 

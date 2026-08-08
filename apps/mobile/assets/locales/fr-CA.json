@@ -205,6 +205,61 @@
           "hot": "Très chaud (> 28 °C / 82 °F)"
         }
       }
+    },
+    "capsules": {
+      "title": "Capsules de tenue",
+      "create": "Créer une capsule",
+      "edit": "Modifier la capsule",
+      "save": "Enregistrer la capsule",
+      "delete": "Supprimer la capsule",
+      "deleteConfirmTitle": "Supprimer cette capsule?",
+      "deleteConfirmBody": "Cela supprime la capsule. Vos vêtements sont conservés.",
+      "nameLabel": "Nom de la capsule",
+      "namePlaceholder": "Tenue de bureau décontractée",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Description facultative",
+      "garmentsLabel": "Vêtements",
+      "garmentPosition": "Position {{position}} sur {{count}}",
+      "moveGarmentUp": "Déplacer {{garment}} vers le haut",
+      "moveGarmentDown": "Déplacer {{garment}} vers le bas",
+      "garmentMoved": "{{garment}} déplacé en position {{position}} sur {{count}}",
+      "occasionsLabel": "Occasions",
+      "favoriteLabel": "Capsule favorite",
+      "searchLabel": "Rechercher des capsules",
+      "searchPlaceholder": "Rechercher par nom ou description",
+      "filterAll": "Toutes les capsules",
+      "filterFavorites": "Favoris",
+      "emptyTitle": "Aucune capsule pour le moment",
+      "emptyBody": "Combinez des vêtements en une tenue enregistrée pour plus tard.",
+      "repairTitle": "La capsule doit être réparée",
+      "repairBody": "Remplacez ou retirez les vêtements indisponibles avant d’utiliser cette capsule.",
+      "unavailableCount_one": "{{count}} vêtement indisponible",
+      "unavailableCount_other": "{{count}} vêtements indisponibles",
+      "created": "Capsule créée",
+      "updated": "Capsule mise à jour",
+      "deleted": "Capsule supprimée",
+      "favoriteUpdated": "Statut favori mis à jour",
+      "savedRecommendation": "Capsule enregistrée",
+      "errors": {
+        "load": "Impossible de charger les capsules.",
+        "save": "Impossible d’enregistrer la capsule.",
+        "delete": "Impossible de supprimer la capsule.",
+        "stale": "Cette capsule a changé. Consultez la dernière version et réessayez.",
+        "readOnlyGuardian": "Votre accès de tuteur est en lecture seule.",
+        "nameRequired": "Saisissez un nom de capsule.",
+        "garmentCount": "Sélectionnez de 2 à 10 vêtements.",
+        "occasionRequired": "Sélectionnez au moins une occasion."
+      },
+      "occasions": {
+        "work": "Travail",
+        "casual": "Décontracté",
+        "formal": "Habillé",
+        "sport": "Sport",
+        "travel": "Voyage",
+        "evening": "Soirée",
+        "outdoor": "Extérieur",
+        "home": "Maison"
+      }
     }
   }
 }

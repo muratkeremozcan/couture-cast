@@ -59,6 +59,43 @@ export function putJson<T = JsonObject>(
   })
 }
 
+/** Story 4.3 capsule mutations use PATCH with an `If-Match` precondition. */
+export function patchJson<T = JsonObject>(
+  path: string,
+  body: unknown,
+  options: {
+    headers?: Record<string, string>
+    tags?: Record<string, string>
+    timeout?: string | number
+  } = {}
+): ApiResponse<T> {
+  return apiRequest<T>({
+    method: 'PATCH',
+    url: path,
+    body,
+    headers: options.headers,
+    tags: options.tags,
+    timeout: options.timeout,
+  })
+}
+
+export function deleteRequest<T = JsonObject>(
+  path: string,
+  options: {
+    headers?: Record<string, string>
+    tags?: Record<string, string>
+    timeout?: string | number
+  } = {}
+): ApiResponse<T> {
+  return apiRequest<T>({
+    method: 'DELETE',
+    url: path,
+    headers: options.headers,
+    tags: options.tags,
+    timeout: options.timeout,
+  })
+}
+
 export function responseBody(response: RefinedResponse<ResponseType>) {
   return typeof response.body === 'string' ? response.body : ''
 }

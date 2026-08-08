@@ -47,7 +47,8 @@ export class RitualController {
       auth.userId,
       parsedQuery.locationId,
       acceptLanguage,
-      parsedQuery.locale
+      parsedQuery.locale,
+      parsedQuery.occasion
     )
 
     try {

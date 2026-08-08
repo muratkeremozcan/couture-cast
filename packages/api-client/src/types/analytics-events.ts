@@ -41,6 +41,13 @@ export const analyticsEventNameSchema = z.enum([
   'locale_switched',
   'garment_upload_completed',
   'garment_tagging_completed',
+  'wardrobe_capsule_created',
+  'wardrobe_capsule_updated',
+  'wardrobe_capsule_deleted',
+  'wardrobe_capsule_favorite_changed',
+  'wardrobe_capsule_recommended',
+  'wardrobe_capsule_recommendation_viewed',
+  'wardrobe_capsule_recommendation_selected',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -252,6 +259,120 @@ export type GarmentTaggingCompletedEvent = z.infer<
   typeof garmentTaggingCompletedEventSchema
 >
 
+const capsuleOccasionAnalyticsEnum = z.enum([
+  'work',
+  'casual',
+  'formal',
+  'sport',
+  'travel',
+  'evening',
+  'outdoor',
+  'home',
+])
+
+const capsuleChangedFieldAnalyticsEnum = z.enum([
+  'name',
+  'description',
+  'occasions',
+  'garmentIds',
+  'isFavorite',
+])
+
+export const wardrobeCapsuleCreatedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString.max(128),
+    capsuleId: nonEmptyString.max(128),
+    garmentCount: z.number().int().min(2).max(10),
+    occasions: z.array(capsuleOccasionAnalyticsEnum),
+    isFavorite: z.boolean(),
+    actorRole: z.enum(['owner', 'guardian', 'admin']).optional(),
+  })
+  .strict()
+
+export type WardrobeCapsuleCreatedEvent = z.infer<
+  typeof wardrobeCapsuleCreatedEventSchema
+>
+
+export const wardrobeCapsuleUpdatedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString.max(128),
+    capsuleId: nonEmptyString.max(128),
+    changedFields: z.array(capsuleChangedFieldAnalyticsEnum),
+    garmentCount: z.number().int().min(2).max(10),
+    occasions: z.array(capsuleOccasionAnalyticsEnum),
+    isFavorite: z.boolean(),
+    actorRole: z.enum(['owner', 'guardian', 'admin']).optional(),
+  })
+  .strict()
+
+export type WardrobeCapsuleUpdatedEvent = z.infer<
+  typeof wardrobeCapsuleUpdatedEventSchema
+>
+
+export const wardrobeCapsuleDeletedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString.max(128),
+    capsuleId: nonEmptyString.max(128),
+    actorRole: z.enum(['owner', 'guardian', 'admin']).optional(),
+  })
+  .strict()
+
+export type WardrobeCapsuleDeletedEvent = z.infer<
+  typeof wardrobeCapsuleDeletedEventSchema
+>
+
+export const wardrobeCapsuleFavoriteChangedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString.max(128),
+    capsuleId: nonEmptyString.max(128),
+    requestedState: z.boolean(),
+    actorRole: z.enum(['owner', 'guardian', 'admin']).optional(),
+  })
+  .strict()
+
+export type WardrobeCapsuleFavoriteChangedEvent = z.infer<
+  typeof wardrobeCapsuleFavoriteChangedEventSchema
+>
+
+export const wardrobeCapsuleRecommendedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString.max(128),
+    capsuleId: nonEmptyString.max(128),
+    scenario: z.enum(['morning', 'midday', 'evening']),
+    completeness: z.enum(['complete', 'partial']),
+    autoFilledGarmentCount: z.number().int().min(0).max(10),
+    requestedOccasion: capsuleOccasionAnalyticsEnum.nullable().optional(),
+  })
+  .strict()
+
+export type WardrobeCapsuleRecommendedEvent = z.infer<
+  typeof wardrobeCapsuleRecommendedEventSchema
+>
+
+export const wardrobeCapsuleRecommendationViewedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString.max(128),
+    capsuleId: nonEmptyString.max(128),
+    scenario: z.enum(['morning', 'midday', 'evening']),
+  })
+  .strict()
+
+export type WardrobeCapsuleRecommendationViewedEvent = z.infer<
+  typeof wardrobeCapsuleRecommendationViewedEventSchema
+>
+
+export const wardrobeCapsuleRecommendationSelectedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString.max(128),
+    capsuleId: nonEmptyString.max(128),
+    scenario: z.enum(['morning', 'midday', 'evening']),
+  })
+  .strict()
+
+export type WardrobeCapsuleRecommendationSelectedEvent = z.infer<
+  typeof wardrobeCapsuleRecommendationSelectedEventSchema
+>
+
 export const analyticsEventSchemas = {
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
@@ -267,6 +388,14 @@ export const analyticsEventSchemas = {
   locale_switched: localeSwitchedEventSchema,
   garment_upload_completed: garmentUploadCompletedEventSchema,
   garment_tagging_completed: garmentTaggingCompletedEventSchema,
+  wardrobe_capsule_created: wardrobeCapsuleCreatedEventSchema,
+  wardrobe_capsule_updated: wardrobeCapsuleUpdatedEventSchema,
+  wardrobe_capsule_deleted: wardrobeCapsuleDeletedEventSchema,
+  wardrobe_capsule_favorite_changed: wardrobeCapsuleFavoriteChangedEventSchema,
+  wardrobe_capsule_recommended: wardrobeCapsuleRecommendedEventSchema,
+  wardrobe_capsule_recommendation_viewed: wardrobeCapsuleRecommendationViewedEventSchema,
+  wardrobe_capsule_recommendation_selected:
+    wardrobeCapsuleRecommendationSelectedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -731,6 +860,222 @@ export function trackGarmentTaggingCompleted(
       analysis_version: parsed.analysisVersion,
       was_overridden: parsed.wasOverridden,
       override_fields: parsed.overrideFields,
+    }),
+  }
+}
+
+export const wardrobeCapsuleCreatedPropertiesSchema = z
+  .object({
+    capsule_id: nonEmptyString.max(128),
+    garment_count: z.number().int().min(2).max(10),
+    occasions: z.array(capsuleOccasionAnalyticsEnum),
+    is_favorite: z.boolean(),
+    actor_role: z.enum(['owner', 'guardian', 'admin']).optional(),
+  })
+  .strict()
+
+export type WardrobeCapsuleCreatedProperties = z.infer<
+  typeof wardrobeCapsuleCreatedPropertiesSchema
+>
+
+export const wardrobeCapsuleUpdatedPropertiesSchema = z
+  .object({
+    capsule_id: nonEmptyString.max(128),
+    changed_fields: z.array(capsuleChangedFieldAnalyticsEnum),
+    garment_count: z.number().int().min(2).max(10),
+    occasions: z.array(capsuleOccasionAnalyticsEnum),
+    is_favorite: z.boolean(),
+    actor_role: z.enum(['owner', 'guardian', 'admin']).optional(),
+  })
+  .strict()
+
+export type WardrobeCapsuleUpdatedProperties = z.infer<
+  typeof wardrobeCapsuleUpdatedPropertiesSchema
+>
+
+export const wardrobeCapsuleDeletedPropertiesSchema = z
+  .object({
+    capsule_id: nonEmptyString.max(128),
+    actor_role: z.enum(['owner', 'guardian', 'admin']).optional(),
+  })
+  .strict()
+
+export type WardrobeCapsuleDeletedProperties = z.infer<
+  typeof wardrobeCapsuleDeletedPropertiesSchema
+>
+
+export const wardrobeCapsuleFavoriteChangedPropertiesSchema = z
+  .object({
+    capsule_id: nonEmptyString.max(128),
+    requested_state: z.boolean(),
+    actor_role: z.enum(['owner', 'guardian', 'admin']).optional(),
+  })
+  .strict()
+
+export type WardrobeCapsuleFavoriteChangedProperties = z.infer<
+  typeof wardrobeCapsuleFavoriteChangedPropertiesSchema
+>
+
+export const wardrobeCapsuleRecommendedPropertiesSchema = z
+  .object({
+    capsule_id: nonEmptyString.max(128),
+    scenario: z.enum(['morning', 'midday', 'evening']),
+    completeness: z.enum(['complete', 'partial']),
+    auto_filled_garment_count: z.number().int().min(0).max(10),
+    requested_occasion: capsuleOccasionAnalyticsEnum.nullable().optional(),
+  })
+  .strict()
+
+export type WardrobeCapsuleRecommendedProperties = z.infer<
+  typeof wardrobeCapsuleRecommendedPropertiesSchema
+>
+
+export const wardrobeCapsuleRecommendationViewedPropertiesSchema = z
+  .object({
+    capsule_id: nonEmptyString.max(128),
+    scenario: z.enum(['morning', 'midday', 'evening']),
+  })
+  .strict()
+
+export type WardrobeCapsuleRecommendationViewedProperties = z.infer<
+  typeof wardrobeCapsuleRecommendationViewedPropertiesSchema
+>
+
+export const wardrobeCapsuleRecommendationSelectedPropertiesSchema = z
+  .object({
+    capsule_id: nonEmptyString.max(128),
+    scenario: z.enum(['morning', 'midday', 'evening']),
+  })
+  .strict()
+
+export type WardrobeCapsuleRecommendationSelectedProperties = z.infer<
+  typeof wardrobeCapsuleRecommendationSelectedPropertiesSchema
+>
+
+export function trackWardrobeCapsuleCreated(
+  event: WardrobeCapsuleCreatedEvent
+): AnalyticsCapturePayload<'wardrobe_capsule_created', WardrobeCapsuleCreatedProperties> {
+  const parsed = wardrobeCapsuleCreatedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'wardrobe_capsule_created',
+    properties: wardrobeCapsuleCreatedPropertiesSchema.parse({
+      capsule_id: parsed.capsuleId,
+      garment_count: parsed.garmentCount,
+      occasions: parsed.occasions,
+      is_favorite: parsed.isFavorite,
+      actor_role: parsed.actorRole,
+    }),
+  }
+}
+
+export function trackWardrobeCapsuleUpdated(
+  event: WardrobeCapsuleUpdatedEvent
+): AnalyticsCapturePayload<'wardrobe_capsule_updated', WardrobeCapsuleUpdatedProperties> {
+  const parsed = wardrobeCapsuleUpdatedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'wardrobe_capsule_updated',
+    properties: wardrobeCapsuleUpdatedPropertiesSchema.parse({
+      capsule_id: parsed.capsuleId,
+      changed_fields: parsed.changedFields,
+      garment_count: parsed.garmentCount,
+      occasions: parsed.occasions,
+      is_favorite: parsed.isFavorite,
+      actor_role: parsed.actorRole,
+    }),
+  }
+}
+
+export function trackWardrobeCapsuleDeleted(
+  event: WardrobeCapsuleDeletedEvent
+): AnalyticsCapturePayload<'wardrobe_capsule_deleted', WardrobeCapsuleDeletedProperties> {
+  const parsed = wardrobeCapsuleDeletedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'wardrobe_capsule_deleted',
+    properties: wardrobeCapsuleDeletedPropertiesSchema.parse({
+      capsule_id: parsed.capsuleId,
+      actor_role: parsed.actorRole,
+    }),
+  }
+}
+
+export function trackWardrobeCapsuleFavoriteChanged(
+  event: WardrobeCapsuleFavoriteChangedEvent
+): AnalyticsCapturePayload<
+  'wardrobe_capsule_favorite_changed',
+  WardrobeCapsuleFavoriteChangedProperties
+> {
+  const parsed = wardrobeCapsuleFavoriteChangedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'wardrobe_capsule_favorite_changed',
+    properties: wardrobeCapsuleFavoriteChangedPropertiesSchema.parse({
+      capsule_id: parsed.capsuleId,
+      requested_state: parsed.requestedState,
+      actor_role: parsed.actorRole,
+    }),
+  }
+}
+
+export function trackWardrobeCapsuleRecommended(
+  event: WardrobeCapsuleRecommendedEvent
+): AnalyticsCapturePayload<
+  'wardrobe_capsule_recommended',
+  WardrobeCapsuleRecommendedProperties
+> {
+  const parsed = wardrobeCapsuleRecommendedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'wardrobe_capsule_recommended',
+    properties: wardrobeCapsuleRecommendedPropertiesSchema.parse({
+      capsule_id: parsed.capsuleId,
+      scenario: parsed.scenario,
+      completeness: parsed.completeness,
+      auto_filled_garment_count: parsed.autoFilledGarmentCount,
+      requested_occasion: parsed.requestedOccasion,
+    }),
+  }
+}
+
+export function trackWardrobeCapsuleRecommendationViewed(
+  event: WardrobeCapsuleRecommendationViewedEvent
+): AnalyticsCapturePayload<
+  'wardrobe_capsule_recommendation_viewed',
+  WardrobeCapsuleRecommendationViewedProperties
+> {
+  const parsed = wardrobeCapsuleRecommendationViewedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'wardrobe_capsule_recommendation_viewed',
+    properties: wardrobeCapsuleRecommendationViewedPropertiesSchema.parse({
+      capsule_id: parsed.capsuleId,
+      scenario: parsed.scenario,
+    }),
+  }
+}
+
+export function trackWardrobeCapsuleRecommendationSelected(
+  event: WardrobeCapsuleRecommendationSelectedEvent
+): AnalyticsCapturePayload<
+  'wardrobe_capsule_recommendation_selected',
+  WardrobeCapsuleRecommendationSelectedProperties
+> {
+  const parsed = wardrobeCapsuleRecommendationSelectedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'wardrobe_capsule_recommendation_selected',
+    properties: wardrobeCapsuleRecommendationSelectedPropertiesSchema.parse({
+      capsule_id: parsed.capsuleId,
+      scenario: parsed.scenario,
     }),
   }
 }

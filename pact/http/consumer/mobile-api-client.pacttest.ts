@@ -15,6 +15,14 @@ import {
   verifyUpdateUserPreferencesInteraction,
   verifySuggestGarmentTagsInteraction,
   verifyUpdateGarmentTagsInteraction,
+  verifyCreateCapsuleInteraction,
+  verifyCapsuleIdempotentReplayInteraction,
+  verifyListCapsulesInteraction,
+  verifyCapsuleDetailInteraction,
+  verifyUpdateCapsuleInteraction,
+  verifyFavoriteCapsuleInteraction,
+  verifyDeleteCapsuleInteraction,
+  verifyCapsuleErrorInteractions,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -70,5 +78,37 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
 
   it('updates garment smart tags', async () => {
     await verifyUpdateGarmentTagsInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('creates an outfit capsule', async () => {
+    await verifyCreateCapsuleInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('replays an idempotent capsule creation', async () => {
+    await verifyCapsuleIdempotentReplayInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('lists and filters outfit capsules', async () => {
+    await verifyListCapsulesInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('reads one outfit capsule', async () => {
+    await verifyCapsuleDetailInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('renames an outfit capsule under a current precondition', async () => {
+    await verifyUpdateCapsuleInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('sets the favorite state of an outfit capsule', async () => {
+    await verifyFavoriteCapsuleInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('deletes an outfit capsule', async () => {
+    await verifyDeleteCapsuleInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('preserves documented capsule error envelopes', async () => {
+    await verifyCapsuleErrorInteractions(pact)
   })
 })

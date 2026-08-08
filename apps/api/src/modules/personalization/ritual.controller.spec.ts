@@ -12,6 +12,7 @@ import { RitualService, RITUAL_REDIS_CLIENT } from './ritual.service.js'
 import { PrismaClient, type OutfitRecommendation, type Prisma } from '@prisma/client'
 import { WeatherQueryService } from '../weather/weather-query.service.js'
 import { LocationPreferencesService } from '../location-preferences/location-preferences.service.js'
+import { ANALYTICS_CLIENT } from '../../analytics/analytics.service.js'
 import Redis from 'ioredis'
 
 // In-memory store to simulate Redis in testing
@@ -145,6 +146,8 @@ describe('RitualController', () => {
             scenario: scenarioStr,
             garment_ids: input.garment_ids || null,
             reasoning_badges: input.reasoning_badges || null,
+            capsule_id: null,
+            capsule_revision: 1,
             created_at: new Date(),
             updated_at: new Date(),
           }
@@ -247,6 +250,10 @@ describe('RitualController', () => {
           provide: RITUAL_REDIS_CLIENT,
           useValue: new Redis(),
         },
+        {
+          provide: ANALYTICS_CLIENT,
+          useValue: { capture: vi.fn() },
+        },
       ],
     })
       .overrideGuard(RequestAuthGuard)
@@ -305,7 +312,7 @@ describe('RitualController', () => {
     expect(persistedRecommendations).toHaveLength(3)
     expect(outfitRecommendationCreateMock).toHaveBeenCalledTimes(3)
 
-    const cacheKey = 'ritual:user-1:chicago-il:07/16/2026:en-US'
+    const cacheKey = 'ritual:user-1:chicago-il:07/16/2026:en-US:any'
     expect(redisStore[cacheKey]).toBeDefined()
     expect(redisStore[cacheKey]?.ttl).toBe(900)
 
@@ -330,8 +337,8 @@ describe('RitualController', () => {
     expect(response.status).toBe(200)
     const parsed = ritualResponseSchema.parse(response.body)
     expect(parsed.data.outfits[0]?.comfortNotes).toContain('Hissedilen sıcaklık')
-    expect(redisStore['ritual:user-1:chicago-il:07/16/2026:tr-TR']).toBeDefined()
-    expect(redisStore['ritual:user-1:chicago-il:07/16/2026:en-US']).toBeUndefined()
+    expect(redisStore['ritual:user-1:chicago-il:07/16/2026:tr-TR:any']).toBeDefined()
+    expect(redisStore['ritual:user-1:chicago-il:07/16/2026:en-US:any']).toBeUndefined()
   })
 
   it('rejects unsupported explicit locales', async () => {

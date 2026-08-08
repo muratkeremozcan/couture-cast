@@ -53,7 +53,11 @@ export class AccessTokenIdentityService {
   constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
 
   private matchK6Bypass(token: string): AccessTokenIdentity | null {
-    const k6Match = /^k6-([a-zA-Z0-9_-]+)-([a-zA-Z0-9_-]+)$/.exec(token)
+    // The role must be anchored to the known set rather than a generic
+    // character class. A greedy `[a-zA-Z0-9_-]+` role swallows the leading
+    // segments of any hyphenated user id, so `k6-admin-teen-1` parsed as role
+    // "admin-teen" and user "1", which failed every seeded fixture owner.
+    const k6Match = /^k6-(guardian|teen|moderator|admin)-(.+)$/.exec(token)
     if (k6Match && k6Match[1] && k6Match[2]) {
       const role = parseApiRole(k6Match[1])
       if (role) {

@@ -237,6 +237,36 @@ describe('Wardrobe HTTP Contracts', () => {
           path: '/api/v1/wardrobe/garments/{garmentId}/tags',
           statuses: ['200', '400', '401', '403', '404', '409'],
         },
+        {
+          method: 'post',
+          path: '/api/v1/wardrobe/{ownerUserId}/capsules',
+          statuses: ['200', '201', '400', '401', '403', '404', '409'],
+        },
+        {
+          method: 'get',
+          path: '/api/v1/wardrobe/{ownerUserId}/capsules',
+          statuses: ['200', '400', '401', '404'],
+        },
+        {
+          method: 'get',
+          path: '/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}',
+          statuses: ['200', '401', '404'],
+        },
+        {
+          method: 'patch',
+          path: '/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}',
+          statuses: ['200', '400', '401', '403', '404', '409', '412', '428'],
+        },
+        {
+          method: 'patch',
+          path: '/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}/favorite',
+          statuses: ['200', '400', '401', '403', '404', '412', '428'],
+        },
+        {
+          method: 'delete',
+          path: '/api/v1/wardrobe/{ownerUserId}/capsules/{capsuleId}',
+          statuses: ['204', '401', '403', '404', '412', '428'],
+        },
       ] as const
 
       for (const route of authenticatedRoutes) {

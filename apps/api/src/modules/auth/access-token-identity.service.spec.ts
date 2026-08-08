@@ -38,6 +38,43 @@ describe('AccessTokenIdentityService', () => {
     vi.unstubAllEnvs()
   })
 
+  /**
+   * Regression: the k6 role segment used a generic character class that also
+   * matched hyphens, so a greedy match swallowed the leading segments of any
+   * hyphenated user id. Every seeded fixture owner (`teen-1`, and the capsule
+   * performance owner) authenticated as an unknown role and got a 401.
+   */
+  describe('k6 load-test bypass', () => {
+    beforeEach(() => {
+      vi.stubEnv('TEST_ENV', 'local')
+    })
+
+    it.each([
+      ['k6-admin-teen-1', 'admin', 'teen-1'],
+      ['k6-teen-teen-1', 'teen', 'teen-1'],
+      ['k6-admin-perf-capsule-owner', 'admin', 'perf-capsule-owner'],
+      ['k6-guardian-guardian-2', 'guardian', 'guardian-2'],
+      ['k6-admin-cmsk6t86h0000jp6mwows8lo7', 'admin', 'cmsk6t86h0000jp6mwows8lo7'],
+      ['k6-moderator-mod_1', 'moderator', 'mod_1'],
+    ])('resolves %s to a hyphen-safe identity', async (token, role, userId) => {
+      const { service } = createService()
+
+      await expect(service.resolveIdentity(token)).resolves.toEqual({
+        userId,
+        role,
+      })
+    })
+
+    it('still rejects a token whose role is outside the allowlist', async () => {
+      const { service } = createService()
+      mockSupabaseUser(null, 401)
+
+      await expect(service.resolveIdentity('k6-superuser-teen-1')).rejects.toBeInstanceOf(
+        UnauthorizedException
+      )
+    })
+  })
+
   it('prefers trusted app metadata and ignores client-controlled user metadata', async () => {
     const fetchMock = mockSupabaseUser({
       app_metadata: {

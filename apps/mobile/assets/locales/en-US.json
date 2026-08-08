@@ -205,6 +205,61 @@
           "hot": "Hot (> 28°C / 82°F)"
         }
       }
+    },
+    "capsules": {
+      "title": "Outfit capsules",
+      "create": "Create capsule",
+      "edit": "Edit capsule",
+      "save": "Save capsule",
+      "delete": "Delete capsule",
+      "deleteConfirmTitle": "Delete this capsule?",
+      "deleteConfirmBody": "This removes the capsule. Your wardrobe garments stay.",
+      "nameLabel": "Capsule name",
+      "namePlaceholder": "Work casual",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Optional description",
+      "garmentsLabel": "Garments",
+      "garmentPosition": "Position {{position}} of {{count}}",
+      "moveGarmentUp": "Move {{garment}} up",
+      "moveGarmentDown": "Move {{garment}} down",
+      "garmentMoved": "Moved {{garment}} to position {{position}} of {{count}}",
+      "occasionsLabel": "Occasions",
+      "favoriteLabel": "Favorite capsule",
+      "searchLabel": "Search capsules",
+      "searchPlaceholder": "Search by name or description",
+      "filterAll": "All capsules",
+      "filterFavorites": "Favorites",
+      "emptyTitle": "No capsules yet",
+      "emptyBody": "Combine garments into a saved outfit for later.",
+      "repairTitle": "Capsule needs repair",
+      "repairBody": "Replace or remove unavailable garments before using this capsule.",
+      "unavailableCount_one": "{{count}} unavailable garment",
+      "unavailableCount_other": "{{count}} unavailable garments",
+      "created": "Capsule created",
+      "updated": "Capsule updated",
+      "deleted": "Capsule deleted",
+      "favoriteUpdated": "Favorite status updated",
+      "savedRecommendation": "Saved capsule",
+      "errors": {
+        "load": "Unable to load capsules.",
+        "save": "Unable to save the capsule.",
+        "delete": "Unable to delete the capsule.",
+        "stale": "This capsule changed. Review the latest version and try again.",
+        "readOnlyGuardian": "Your guardian access is read-only.",
+        "nameRequired": "Enter a capsule name.",
+        "garmentCount": "Select 2 to 10 garments.",
+        "occasionRequired": "Select at least one occasion."
+      },
+      "occasions": {
+        "work": "Work",
+        "casual": "Casual",
+        "formal": "Formal",
+        "sport": "Sport",
+        "travel": "Travel",
+        "evening": "Evening",
+        "outdoor": "Outdoor",
+        "home": "Home"
+      }
     }
   }
 }

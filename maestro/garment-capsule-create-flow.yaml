@@ -1,0 +1,82 @@
+# Story 4.3 Task 8: mobile capsule creation and reopen, verifying persisted order.
+appId: ${MAESTRO_APP_ID}
+name: 'Outfit capsule create and reopen'
+tags:
+  - e2e
+  - wardrobe
+  - capsules
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go first-run sheet when present'
+
+- tapOn:
+    id: 'wardrobe-capsules-link'
+    label: 'Open the outfit capsule library'
+
+- assertVisible:
+    id: 'create-capsule-button'
+
+- tapOn:
+    id: 'create-capsule-button'
+
+- assertVisible:
+    id: 'capsule-name-input'
+
+- tapOn:
+    id: 'capsule-name-input'
+- inputText: 'Maestro capsule'
+
+- tapOn:
+    id: 'garment-checkbox-.*'
+    index: 0
+    label: 'Select the first garment'
+- tapOn:
+    id: 'garment-checkbox-.*'
+    index: 1
+    label: 'Select the second garment'
+
+# Reorder through the accessible controls, never through drag alone.
+- tapOn:
+    id: 'move-down-button-.*'
+    index: 0
+    label: 'Move the first garment down'
+
+- tapOn:
+    id: 'save-capsule-button'
+
+- assertVisible:
+    text: 'Maestro capsule'
+    label: 'Committed capsule appears in the library'
+
+# Reopen and confirm the order survived the round trip.
+- tapOn:
+    id: 'edit-capsule-button-.*'
+    index: 0
+
+- assertVisible:
+    id: 'reorder-row-.*'
+    label: 'Garment order list is restored'
+
+- tapOn:
+    id: 'close-modal-button'
+
+# Public-API cleanup: remove the capsule created by this flow.
+- tapOn:
+    id: 'delete-capsule-button-.*'
+    index: 0
+- tapOn:
+    text: 'Delete capsule'
+    label: 'Confirm the destructive action'
+
+- assertNotVisible:
+    text: 'Maestro capsule'

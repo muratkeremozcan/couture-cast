@@ -17,6 +17,7 @@ import type { RitualResponse } from '../models/index'
 export interface ApiV1RitualGetRequest {
   locationId?: string
   locale?: ApiV1RitualGetLocaleEnum
+  occasion?: ApiV1RitualGetOccasionEnum
 }
 
 /**
@@ -37,6 +38,10 @@ export class RitualApi extends runtime.BaseAPI {
 
     if (requestParameters['locale'] != null) {
       queryParameters['locale'] = requestParameters['locale']
+    }
+
+    if (requestParameters['occasion'] != null) {
+      queryParameters['occasion'] = requestParameters['occasion']
     }
 
     const headerParameters: runtime.HTTPHeaders = {}
@@ -104,3 +109,18 @@ export const ApiV1RitualGetLocaleEnum = {
 } as const
 export type ApiV1RitualGetLocaleEnum =
   (typeof ApiV1RitualGetLocaleEnum)[keyof typeof ApiV1RitualGetLocaleEnum]
+/**
+ * @export
+ */
+export const ApiV1RitualGetOccasionEnum = {
+  work: 'work',
+  casual: 'casual',
+  formal: 'formal',
+  sport: 'sport',
+  travel: 'travel',
+  evening: 'evening',
+  outdoor: 'outdoor',
+  home: 'home',
+} as const
+export type ApiV1RitualGetOccasionEnum =
+  (typeof ApiV1RitualGetOccasionEnum)[keyof typeof ApiV1RitualGetOccasionEnum]

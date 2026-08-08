@@ -1,14 +1,20 @@
+import { ResponseError } from '@couture/api-client'
 import {
-  ResponseError,
   type GarmentItemContract,
   type SuggestGarmentTagsData,
   type GarmentCategory,
   type GarmentMaterial,
   type GarmentComfortRange,
+  type CreateOutfitCapsuleInput,
+  type UpdateOutfitCapsuleInput,
+  type ListOutfitCapsulesQuery,
+  type OutfitCapsuleContract,
   garmentListResponseSchema,
   suggestGarmentTagsResponseSchema,
   updateGarmentTagsResponseSchema,
-} from '@couture/api-client'
+  outfitCapsuleResponseSchema,
+  outfitCapsuleListResponseSchema,
+} from '@couture/api-client/contracts/http'
 import { createMobileApiClient } from './api-client'
 
 async function actionableWardrobeError(error: unknown, fallback: string): Promise<Error> {
@@ -129,5 +135,166 @@ export async function updateGarmentTagsFromMobile(
     return updateGarmentTagsResponseSchema.parse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to save garment tags.')
+  }
+}
+
+/**
+ * Resolves the signed-in user from the bearer token's `sub` claim. Capsule routes
+ * take an explicit owner segment so guardians and admins can act for another
+ * user; the signed-in user is simply the default owner.
+ */
+export function resolveOwnerUserId(accessToken: string): string {
+  const payloadSegment = accessToken.split('.')[1]
+  if (!payloadSegment) {
+    throw new Error('Your session token is malformed. Sign in again.')
+  }
+
+  try {
+    const normalized = payloadSegment.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+    const claims = JSON.parse(
+      typeof atob === 'function'
+        ? atob(padded)
+        : Buffer.from(padded, 'base64').toString('utf8')
+    ) as { sub?: unknown }
+    if (typeof claims.sub !== 'string' || claims.sub.length === 0) {
+      throw new Error('missing sub claim')
+    }
+    return claims.sub
+  } catch {
+    throw new Error('Your session token is malformed. Sign in again.')
+  }
+}
+
+/** The strong entity tag the API issues and requires back on every mutation. */
+export function capsuleETag(capsuleId: string, revision: number): string {
+  return `"capsule:${capsuleId}:${revision}"`
+}
+
+export interface MobileCapsulePage {
+  items: OutfitCapsuleContract[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export async function listCapsulesFromMobile(
+  accessToken: string,
+  ownerUserId: string,
+  query?: ListOutfitCapsulesQuery,
+  signal?: AbortSignal
+): Promise<MobileCapsulePage> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({ accessToken }).apiV1WardrobeOwnerUserIdCapsulesGet(
+        { ownerUserId, limit: 20, offset: 0, ...query },
+        { signal: requestSignal }
+      )
+    )
+    const parsed = outfitCapsuleListResponseSchema.parse(response)
+    return {
+      items: parsed.data,
+      total: parsed.total,
+      limit: parsed.limit,
+      offset: parsed.offset,
+    }
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to load capsules.')
+  }
+}
+
+/**
+ * `idempotencyKey` is required rather than generated internally so a retry after
+ * a timeout replays the original request instead of creating a second capsule.
+ */
+export async function createCapsuleFromMobile(
+  accessToken: string,
+  ownerUserId: string,
+  input: CreateOutfitCapsuleInput,
+  idempotencyKey: string,
+  signal?: AbortSignal
+): Promise<OutfitCapsuleContract> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({ accessToken }).apiV1WardrobeOwnerUserIdCapsulesPost(
+        { ownerUserId, idempotencyKey, createOutfitCapsuleInput: input },
+        { signal: requestSignal }
+      )
+    )
+    return outfitCapsuleResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to save the capsule.')
+  }
+}
+
+export async function updateCapsuleFromMobile(
+  accessToken: string,
+  ownerUserId: string,
+  capsuleId: string,
+  input: UpdateOutfitCapsuleInput,
+  ifMatch: string,
+  signal?: AbortSignal
+): Promise<OutfitCapsuleContract> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({
+        accessToken,
+      }).apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatch(
+        { ownerUserId, capsuleId, ifMatch, updateOutfitCapsuleInput: input },
+        { signal: requestSignal }
+      )
+    )
+    return outfitCapsuleResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to save the capsule.')
+  }
+}
+
+export async function favoriteCapsuleFromMobile(
+  accessToken: string,
+  ownerUserId: string,
+  capsuleId: string,
+  isFavorite: boolean,
+  ifMatch: string,
+  signal?: AbortSignal
+): Promise<OutfitCapsuleContract> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({
+        accessToken,
+      }).apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatch(
+        {
+          ownerUserId,
+          capsuleId,
+          ifMatch,
+          favoriteOutfitCapsuleInput: { isFavorite },
+        },
+        { signal: requestSignal }
+      )
+    )
+    return outfitCapsuleResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to update favorite status.')
+  }
+}
+
+export async function deleteCapsuleFromMobile(
+  accessToken: string,
+  ownerUserId: string,
+  capsuleId: string,
+  ifMatch: string,
+  signal?: AbortSignal
+): Promise<void> {
+  try {
+    await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({
+        accessToken,
+      }).apiV1WardrobeOwnerUserIdCapsulesCapsuleIdDelete(
+        { ownerUserId, capsuleId, ifMatch },
+        { signal: requestSignal }
+      )
+    )
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to delete the capsule.')
   }
 }

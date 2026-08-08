@@ -205,6 +205,61 @@
           "hot": "Heiß (> 28 °C / 82 °F)"
         }
       }
+    },
+    "capsules": {
+      "title": "Outfit-Kapseln",
+      "create": "Kapsel erstellen",
+      "edit": "Kapsel bearbeiten",
+      "save": "Kapsel speichern",
+      "delete": "Kapsel löschen",
+      "deleteConfirmTitle": "Diese Kapsel löschen?",
+      "deleteConfirmBody": "Damit wird die Kapsel entfernt. Deine Kleidungsstücke bleiben erhalten.",
+      "nameLabel": "Kapselname",
+      "namePlaceholder": "Business Casual",
+      "descriptionLabel": "Beschreibung",
+      "descriptionPlaceholder": "Optionale Beschreibung",
+      "garmentsLabel": "Kleidungsstücke",
+      "garmentPosition": "Position {{position}} von {{count}}",
+      "moveGarmentUp": "{{garment}} nach oben verschieben",
+      "moveGarmentDown": "{{garment}} nach unten verschieben",
+      "garmentMoved": "{{garment}} auf Position {{position}} von {{count}} verschoben",
+      "occasionsLabel": "Anlässe",
+      "favoriteLabel": "Lieblingskapsel",
+      "searchLabel": "Kapseln suchen",
+      "searchPlaceholder": "Nach Name oder Beschreibung suchen",
+      "filterAll": "Alle Kapseln",
+      "filterFavorites": "Favoriten",
+      "emptyTitle": "Noch keine Kapseln",
+      "emptyBody": "Kombiniere Kleidungsstücke zu einem gespeicherten Outfit für später.",
+      "repairTitle": "Kapsel muss repariert werden",
+      "repairBody": "Ersetze oder entferne nicht verfügbare Kleidungsstücke, bevor du diese Kapsel verwendest.",
+      "unavailableCount_one": "{{count}} nicht verfügbares Kleidungsstück",
+      "unavailableCount_other": "{{count}} nicht verfügbare Kleidungsstücke",
+      "created": "Kapsel erstellt",
+      "updated": "Kapsel aktualisiert",
+      "deleted": "Kapsel gelöscht",
+      "favoriteUpdated": "Favoritenstatus aktualisiert",
+      "savedRecommendation": "Gespeicherte Kapsel",
+      "errors": {
+        "load": "Kapseln können nicht geladen werden.",
+        "save": "Die Kapsel kann nicht gespeichert werden.",
+        "delete": "Die Kapsel kann nicht gelöscht werden.",
+        "stale": "Diese Kapsel wurde geändert. Prüfe die neueste Version und versuche es erneut.",
+        "readOnlyGuardian": "Dein Zugriff als Erziehungsberechtigte Person ist schreibgeschützt.",
+        "nameRequired": "Gib einen Kapselnamen ein.",
+        "garmentCount": "Wähle 2 bis 10 Kleidungsstücke aus.",
+        "occasionRequired": "Wähle mindestens einen Anlass aus."
+      },
+      "occasions": {
+        "work": "Arbeit",
+        "casual": "Freizeit",
+        "formal": "Festlich",
+        "sport": "Sport",
+        "travel": "Reise",
+        "evening": "Abend",
+        "outdoor": "Draußen",
+        "home": "Zuhause"
+      }
     }
   }
 }

@@ -1,7 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-08-05. Added a plain-English project map and a standalone AI garment tagging
-explanation. Corrected the Story 4.2 flow and strengthened the LLM writing-style guidance.
+Updated: 2026-08-07. Added Step 31 (Outfit capsule builder) for Story 4.3, documenting ETag concurrency control, occasion-driven modeling, web/mobile capsule builder UI, and Ritual cache invalidation. Corrected the Story 4.2 flow and strengthened the LLM writing-style guidance.
 
 ## How to use this
 
@@ -44,6 +43,7 @@ explanation. Corrected the Story 4.2 flow and strengthened the LLM writing-style
 |   28 | Make the product usable with keyboards and assistive technology. |
 |   29 | Upload a garment safely and process it in the background.        |
 |   30 | Use AI to suggest garment tags. Let the user decide.             |
+|   31 | Group ready garments into outfit capsules with optimistic UI.    |
 
 ## Special feature: AI garment tagging
 
@@ -2860,3 +2860,150 @@ Current repo note:
 
 The standalone AI section near the top owns the plain-English explanation and architecture diagram.
 This numbered step remains the traceability and code-reading reference for Story 4.2.
+
+## Step 31 - Outfit capsule builder
+
+User/business impact:
+
+Lets a user group ready garments into reusable outfit capsules tagged by occasion
+(work, casual, formal, sport, travel, evening, outdoor, home), then find, reuse,
+favorite, repair, and delete them across web and mobile. Qualifying capsules feed
+the weather-aware recommendation engine. For the business it drives retention by
+making outfit selection a saved decision rather than a daily one.
+
+Key takeaways:
+
+1. **Composite same-owner keys.** `OutfitCapsule` and `OutfitCapsuleGarment` bind
+   every relation by `(id, user_id)`, so a join can never cross tenants. A capsule
+   holds 2 to 10 distinct garments in an explicit order, with a database check
+   constraining `garment_order` to 0 through 9.
+2. **Strong ETags, checked under lock.** Mutations require
+   `If-Match: "capsule:<capsuleId>:<revision>"`. The precondition is re-asserted
+   _inside_ the transaction while the row is locked. Checking it before the
+   transaction lets two callers holding the same ETag both commit, which is a
+   lost update that no test with a mocked database can catch.
+3. **One shared lock order.** Capsule mutation and `WardrobeRetentionService`
+   acquire the same rows in the same order: owner `UserProfile`, then affected
+   capsules by id, then garments by id. A different order between the two paths
+   deadlocks; no lock at all leaves the garment eligibility check racing a purge.
+4. **Eligibility is two conditions.** A garment may join a capsule only when
+   `upload_status = 'ready'` **and** `retention_status = 'active'`. Checking
+   retention alone admits a garment whose upload never finished.
+5. **Durable telemetry, not fire-and-forget.** Every state change writes a
+   `CapsuleTelemetryClaim` row inside its own transaction, keyed uniquely on
+   capsule id, committed revision, and event name. Delivery happens after commit
+   and is retried from the claim. An in-process `capture()` call loses the event
+   if the process dies between commit and flush.
+6. **Two independent freshness mechanisms.** The capsule revision is stamped into
+   both the Redis payload and the persisted recommendation and compared on read;
+   clearing Redis after a mutation is only an optimization. Revision comparison
+   is what makes a degraded Redis unable to serve a stale capsule.
+7. **Accessible reordering, never drag-only.** Each selected garment exposes
+   labelled Move up and Move down controls. After a move, focus stays on a
+   _usable_ control: at a boundary the control just pressed becomes disabled, and
+   focusing a disabled button is a silent no-op that drops the user on `<body>`.
+
+Hard-won lessons from the code review of this story:
+
+- A green suite over mocked persistence proves nothing about persistence. This
+  story shipped 530 passing tests while every capsule write raised
+  `relation "user_profiles" does not exist`, because the lock code sat behind
+  `if (typeof tx.$executeRaw === 'function')` and the mock had no such method.
+  Test doubles must model the real client surface; see
+  `apps/api/src/testing/prisma-mock.ts`.
+- Assert index _availability_, not index _usage_, at low volume. On a small table
+  PostgreSQL correctly prefers a sequential scan, so "must use the GIN index"
+  is a flaky assertion. Explain the predicate in isolation with
+  `enable_seqscan = off` instead.
+- Prefer a database constraint the ORM can express. A column-specific
+  `ON DELETE SET NULL` is valid PostgreSQL but inexpressible in `schema.prisma`,
+  which would leave permanent `migrate diff` drift.
+
+Story/Task mapping:
+
+- Story 4.3
+- Task 1 (Prisma schema, migration, RLS, revisioning)
+- Task 2 (Wardrobe, ritual, and analytics contracts)
+- Task 3 (Capsule authorization, controller, and service)
+- Task 4 (Deterministic recommendation integration)
+- Task 5 (Web capsule experience and localization)
+- Task 6 (Mobile capsule experience and localization)
+- Task 7 (Consumer and provider contracts)
+- Task 8 (End-to-end and accessibility automation)
+- Task 9 (Performance, determinism, and CI evidence)
+- Task 10 (Verification gate)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/4-3-outfit-capsule-builder.md`
+- `_bmad-output/test-artifacts/story-4.3-release-qa.md`
+
+Cross-links:
+
+- Step 3 provides Prisma schema modeling and migration conventions.
+- Step 4 provides Supabase environment isolation and guardian-aware RLS helpers.
+- Step 19 provides the scenario outfit generator this story extends.
+- Step 22 provides the localization pipeline and parity-test pattern.
+- Step 28 provides the accessibility baseline the reorder controls build on.
+- Steps 29 and 30 provide garment capture and smart tagging.
+
+Sequence to follow:
+
+1. `packages/db/prisma/schema.prisma` and
+   `packages/db/prisma/migrations/20260807080000_add_outfit_capsules/migration.sql`
+   for the models, composite keys, GIN and trigram indexes, RLS policies, and the
+   telemetry claim table.
+2. `packages/api-client/src/contracts/http/wardrobe.ts` for the canonical Zod
+   contracts, including grapheme-bounded text via `Intl.Segmenter`.
+3. `apps/api/src/modules/wardrobe/wardrobe-capsule.locks.ts` for the shared lock
+   protocol, then `wardrobe-capsule.repository.ts` for how it is applied.
+4. `wardrobe-capsule.service.ts` for ETag parsing, canonical normalization, and
+   response projection; `wardrobe-capsule.outbox.ts` for durable telemetry.
+5. `apps/api/src/modules/personalization/capsule-recommendation.engine.ts` for
+   pure scoring and slot filling, then `ritual.service.ts` for how the winner is
+   persisted and returned.
+6. `apps/web/src/app/wardrobe/capsules/page.tsx` and
+   `apps/mobile/app/wardrobe-capsules.tsx` for the two surfaces.
+7. Tests, in order of what they prove:
+   - `apps/api/integration/wardrobe-capsules.integration.spec.ts` (real
+     PostgreSQL: locks, concurrency, rollback, idempotency races)
+   - `apps/api/integration/wardrobe-capsules-query-plan.integration.spec.ts`
+     (`EXPLAIN` evidence)
+   - `apps/web/src/i18n/wardrobe-capsules-locales.spec.ts` and the mobile twin
+     (49-key parity, placeholders, plurals, untranslated-value detection)
+
+Task owner map:
+
+- Story 4.3 Task 1 step 1 owner: define OutfitCapsule and OutfitCapsuleGarment models in packages/db/prisma/schema.prisma
+- Story 4.3 Task 2 step 1 owner: define Outfit Capsule HTTP contracts and Zod schemas in packages/api-client/src/contracts/http/wardrobe.ts
+- Story 4.3 Task 3 step 1 owner: implement the shared capsule lock protocol in apps/api/src/modules/wardrobe/wardrobe-capsule.locks.ts
+- Story 4.3 Task 3 step 2 owner: implement WardrobeCapsuleRepository persistence and locking in apps/api/src/modules/wardrobe/wardrobe-capsule.repository.ts
+- Story 4.3 Task 3 step 3 owner: implement WardrobeCapsuleService domain rules and ETag semantics in apps/api/src/modules/wardrobe/wardrobe-capsule.service.ts
+- Story 4.3 Task 3 step 4 owner: expose WardrobeCapsuleController REST endpoints in apps/api/src/modules/wardrobe/wardrobe-capsule.controller.ts
+- Story 4.3 Task 3 step 5 owner: persist and dispatch durable telemetry claims in apps/api/src/modules/wardrobe/wardrobe-capsule.outbox.ts
+- Story 4.3 Task 4 step 1 owner: implement pure capsule scoring and slot filling in apps/api/src/modules/personalization/capsule-recommendation.engine.ts
+- Story 4.3 Task 5 step 1 owner: implement web CapsuleBuilderModal component in apps/web/src/app/components/capsule-builder-modal.tsx
+- Story 4.3 Task 5 step 2 owner: implement web wardrobe capsules page in apps/web/src/app/wardrobe/capsules/page.tsx
+- Story 4.3 Task 5 step 3 owner: implement web locale resolution in apps/web/src/i18n/index.ts
+- Story 4.3 Task 6 step 1 owner: implement native mobile CapsuleBuilderModal component in apps/mobile/components/wardrobe/capsule-builder-modal.tsx
+- Story 4.3 Task 6 step 2 owner: implement the mobile capsule screen in apps/mobile/app/wardrobe-capsules.tsx
+- Story 4.3 Task 8 step 1 owner: integration-test capsule locking and concurrency against real PostgreSQL in apps/api/integration/wardrobe-capsules.integration.spec.ts
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Client["Web / Mobile\n(CapsuleBuilderModal + capsule screen)"] --> MW["CapsuleCacheHeadersMiddleware\n(private, no-store on success and error)"]
+  MW --> API["WardrobeCapsuleController\n(If-Match, Idempotency-Key, strong ETag)"]
+  API --> Access["WardrobeAccessService\n(owner / guardian / admin, masked 404)"]
+  API --> Service["WardrobeCapsuleService\n(NFC + grapheme rules, payload hash)"]
+  Service --> Repo["WardrobeCapsuleRepository"]
+  Repo --> Locks["lockOwnerProfile -> lockCapsules -> lockGarments"]
+  Locks --> DB[("PostgreSQL\nOutfitCapsule, OutfitCapsuleGarment,\nCapsuleTelemetryClaim")]
+  Retention["WardrobeRetentionService\n(same lock order)"] --> Locks
+  Repo --> Claim["Telemetry claim written in-transaction"]
+  Claim --> Outbox["CapsuleTelemetryOutbox\n(dispatch after commit, retry from claim)"]
+  Service --> Cache["Clear Redis ritual keys\n(best effort)"]
+  DB --> Engine["capsule-recommendation.engine\n(comfort, slots, tie-breaks)"]
+  Engine --> Ritual["RitualService\n(capsule revision gates cache reuse)"]
+```

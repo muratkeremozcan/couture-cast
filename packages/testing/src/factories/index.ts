@@ -43,6 +43,11 @@ export {
   WEATHER_CONDITIONS,
 } from './weather.factory.js'
 export {
+  CAPSULE_OCCASIONS,
+  createOutfitCapsule,
+  persistOutfitCapsule,
+} from './outfit-capsule.factory.js'
+export {
   DEFAULT_FACTORY_REGISTRY_KEYS,
   createFactoryRegistry,
   factoryRegistry,
@@ -105,3 +110,10 @@ export type {
   WeatherSnapshotFactoryOverrides,
   WeatherSnapshotFixture,
 } from './weather.factory.js'
+export type {
+  CreatePersistedOutfitCapsuleOptions,
+  OutfitCapsuleFactoryOverrides,
+  OutfitCapsuleFixture,
+  OutfitCapsuleGarmentFixture,
+  PersistedOutfitCapsuleFixture,
+} from './outfit-capsule.factory.js'
