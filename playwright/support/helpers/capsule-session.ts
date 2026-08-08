@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test'
 import type { ApiRequestFixtureParams } from '@seontechnologies/playwright-utils/api-request'
 import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { expect, test } from '../fixtures/merged-fixtures'
+import { isNonLocalEnvironment } from './api-test'
 
 /**
  * Capsule journeys need an owner who already has eligible garments, because the
@@ -82,7 +83,18 @@ export function stubGarmentLibrary(page: Page): void {
 }
 
 export const capsuleTest = test.extend<{ capsuleSession: CapsuleSession }>({
-  capsuleSession: async ({ context }, use) => {
+  capsuleSession: async ({ context }, use, testInfo) => {
+    /**
+     * These journeys read and mutate the seeded wardrobe owner's garments, which
+     * only exist in the supervised local environment. A preview or production
+     * target has no such fixture, so the page renders an empty library and every
+     * spec would time out waiting for a request the app never makes.
+     */
+    test.skip(
+      isNonLocalEnvironment(testInfo),
+      'Capsule journeys require the seeded local wardrobe fixture.'
+    )
+
     const ownerUserId = SEEDED_WARDROBE_OWNER
 
     /**
