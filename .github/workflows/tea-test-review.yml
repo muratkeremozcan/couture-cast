@@ -27,7 +27,7 @@ jobs:
       # A '@codex ...' or '@claude ...' comment re-runs on demand, and text after
       # the mention becomes focus. Checkout and base-ref resolution are the action's own job.
       - name: Review with Codex
-        uses: muratkeremozcan/tea-test-review@v1
+        uses: muratkeremozcan/tea-test-review@v2
         with:
           prompt: '@codex'
           agent: codex
@@ -40,7 +40,7 @@ jobs:
           use-pactjs-utils: 'true'
 
       - name: Review with Claude
-        uses: muratkeremozcan/tea-test-review@v1
+        uses: muratkeremozcan/tea-test-review@v2
         with:
           prompt: '@claude'
           agent: claude
