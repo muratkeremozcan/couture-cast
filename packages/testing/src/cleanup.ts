@@ -27,6 +27,9 @@ export interface CleanupPrismaClient {
   outfitCapsule: CleanupDelegate
   outfitCapsuleGarment: CleanupDelegate
   paletteInsights: CleanupDelegate
+  wardrobeOnboardingState: CleanupDelegate
+  silhouetteProfile: CleanupDelegate
+  moderationEvent: CleanupDelegate
   pushToken: CleanupDelegate
   savedLocation: CleanupDelegate
   user: CleanupDelegate
@@ -158,6 +161,36 @@ function buildPaletteInsightWhere(
   return { OR: filters }
 }
 
+type ModerationEventWhereClause =
+  | { id: { in: string[] } }
+  | { silhouette_profile_id: { in: string[] } }
+
+/**
+ * ModerationEvent has no user_id column (it references garment_item_id,
+ * silhouette_profile_id, post_id, flagged_by_id, reviewed_by_id instead), so
+ * it needs its own where-builder rather than buildUserFilter.
+ */
+function buildModerationEventWhere(
+  moderationEventIds: readonly string[],
+  silhouetteProfileIds: readonly string[]
+): { OR: ModerationEventWhereClause[] } | null {
+  const filters: ModerationEventWhereClause[] = []
+
+  if (moderationEventIds.length > 0) {
+    filters.push({ id: { in: uniqueValues(moderationEventIds) } })
+  }
+
+  if (silhouetteProfileIds.length > 0) {
+    filters.push({ silhouette_profile_id: { in: uniqueValues(silhouetteProfileIds) } })
+  }
+
+  if (filters.length === 0) {
+    return null
+  }
+
+  return { OR: filters }
+}
+
 async function deleteByUserIds(
   userIds: readonly string[],
   deletes: (() => Promise<unknown>)[]
@@ -186,12 +219,24 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
 
   const outfitCapsuleIds = uniqueValues(tracked.outfitCapsules)
   const outfitCapsuleGarmentIds = uniqueValues(tracked.outfitCapsuleGarments)
+  const wardrobeOnboardingStateIds = uniqueValues(tracked.wardrobeOnboardingStates)
+  const silhouetteProfileIds = uniqueValues(tracked.silhouetteProfiles)
+  const moderationEventIds = uniqueValues(tracked.moderationEvents)
 
   const outfitRecommendationWhere = buildDeleteWhere(ritualIds, userIds)
   const outfitCapsuleGarmentWhere = buildDeleteWhere(outfitCapsuleGarmentIds, userIds)
   const outfitCapsuleWhere = buildDeleteWhere(outfitCapsuleIds, userIds)
   const garmentItemWhere = buildDeleteWhere(wardrobeItemIds, userIds)
   const paletteInsightWhere = buildPaletteInsightWhere(wardrobeItemIds, userIds)
+  const moderationEventWhere = buildModerationEventWhere(
+    moderationEventIds,
+    silhouetteProfileIds
+  )
+  const silhouetteProfileWhere = buildDeleteWhere(silhouetteProfileIds, userIds)
+  const wardrobeOnboardingStateWhere = buildDeleteWhere(
+    wardrobeOnboardingStateIds,
+    userIds
+  )
 
   try {
     await deleteByUserIds(userIds, [
@@ -287,6 +332,26 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
     if (paletteInsightWhere) {
       await prisma.paletteInsights.deleteMany({
         where: paletteInsightWhere,
+      })
+    }
+
+    // Moderation events reference a silhouette profile before the profile
+    // itself is removed, before the owning user (Story 4.4 Task 2).
+    if (moderationEventWhere) {
+      await prisma.moderationEvent.deleteMany({
+        where: moderationEventWhere,
+      })
+    }
+
+    if (silhouetteProfileWhere) {
+      await prisma.silhouetteProfile.deleteMany({
+        where: silhouetteProfileWhere,
+      })
+    }
+
+    if (wardrobeOnboardingStateWhere) {
+      await prisma.wardrobeOnboardingState.deleteMany({
+        where: wardrobeOnboardingStateWhere,
       })
     }
 

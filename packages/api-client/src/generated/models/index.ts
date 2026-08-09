@@ -891,6 +891,35 @@ export type ComfortRun = (typeof ComfortRun)[keyof typeof ComfortRun]
 /**
  *
  * @export
+ * @interface CommitSilhouettePhotoInput
+ */
+export interface CommitSilhouettePhotoInput {
+  /**
+   *
+   * @type {string}
+   * @memberof CommitSilhouettePhotoInput
+   */
+  uploadSessionId: string
+  /**
+   *
+   * @type {CommitSilhouettePhotoInputConfirmsBasewearGuidanceEnum}
+   * @memberof CommitSilhouettePhotoInput
+   */
+  confirmsBasewearGuidance: CommitSilhouettePhotoInputConfirmsBasewearGuidanceEnum
+}
+
+/**
+ * @export
+ */
+export const CommitSilhouettePhotoInputConfirmsBasewearGuidanceEnum = {
+  true: true,
+} as const
+export type CommitSilhouettePhotoInputConfirmsBasewearGuidanceEnum =
+  (typeof CommitSilhouettePhotoInputConfirmsBasewearGuidanceEnum)[keyof typeof CommitSilhouettePhotoInputConfirmsBasewearGuidanceEnum]
+
+/**
+ *
+ * @export
  * @interface ConflictHttpError
  */
 export interface ConflictHttpError {
@@ -1394,6 +1423,105 @@ export interface CreateSavedLocationResponse {
    * @memberof CreateSavedLocationResponse
    */
   data: ListSavedLocationsResponseDataInner
+}
+/**
+ *
+ * @export
+ * @interface CreateSilhouetteUploadUrlInput
+ */
+export interface CreateSilhouetteUploadUrlInput {
+  /**
+   *
+   * @type {number}
+   * @memberof CreateSilhouetteUploadUrlInput
+   */
+  fileSizeBytes: number
+  /**
+   *
+   * @type {CreateSilhouetteUploadUrlInputMimeTypeEnum}
+   * @memberof CreateSilhouetteUploadUrlInput
+   */
+  mimeType: CreateSilhouetteUploadUrlInputMimeTypeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSilhouetteUploadUrlInput
+   */
+  sha256: string
+  /**
+   *
+   * @type {number}
+   * @memberof CreateSilhouetteUploadUrlInput
+   */
+  widthPx: number
+  /**
+   *
+   * @type {number}
+   * @memberof CreateSilhouetteUploadUrlInput
+   */
+  heightPx: number
+}
+
+/**
+ * @export
+ */
+export const CreateSilhouetteUploadUrlInputMimeTypeEnum = {
+  image_jpeg: 'image/jpeg',
+  image_png: 'image/png',
+  image_webp: 'image/webp',
+} as const
+export type CreateSilhouetteUploadUrlInputMimeTypeEnum =
+  (typeof CreateSilhouetteUploadUrlInputMimeTypeEnum)[keyof typeof CreateSilhouetteUploadUrlInputMimeTypeEnum]
+
+/**
+ *
+ * @export
+ * @interface CreateSilhouetteUploadUrlResponse
+ */
+export interface CreateSilhouetteUploadUrlResponse {
+  /**
+   *
+   * @type {CreateSilhouetteUploadUrlResponseData}
+   * @memberof CreateSilhouetteUploadUrlResponse
+   */
+  data: CreateSilhouetteUploadUrlResponseData
+}
+/**
+ *
+ * @export
+ * @interface CreateSilhouetteUploadUrlResponseData
+ */
+export interface CreateSilhouetteUploadUrlResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSilhouetteUploadUrlResponseData
+   */
+  uploadSessionId: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSilhouetteUploadUrlResponseData
+   */
+  uploadUrl: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSilhouetteUploadUrlResponseData
+   */
+  uploadToken: string
+  /**
+   *
+   * @type {CreateGarmentUploadUrlResponseDataRequiredHeaders}
+   * @memberof CreateSilhouetteUploadUrlResponseData
+   */
+  requiredHeaders: CreateGarmentUploadUrlResponseDataRequiredHeaders
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSilhouetteUploadUrlResponseData
+   */
+  expiresAt: string
 }
 /**
  *
@@ -2908,6 +3036,263 @@ export type NotFoundHttpErrorErrorEnum =
 /**
  *
  * @export
+ * @interface OnboardingBadRequestError
+ */
+export interface OnboardingBadRequestError {
+  /**
+   *
+   * @type {OnboardingBadRequestErrorStatusCodeEnum}
+   * @memberof OnboardingBadRequestError
+   */
+  statusCode: OnboardingBadRequestErrorStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof OnboardingBadRequestError
+   */
+  message: string
+  /**
+   *
+   * @type {OnboardingBadRequestErrorErrorEnum}
+   * @memberof OnboardingBadRequestError
+   */
+  error: OnboardingBadRequestErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const OnboardingBadRequestErrorStatusCodeEnum = {
+  NUMBER_400: 400,
+} as const
+export type OnboardingBadRequestErrorStatusCodeEnum =
+  (typeof OnboardingBadRequestErrorStatusCodeEnum)[keyof typeof OnboardingBadRequestErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const OnboardingBadRequestErrorErrorEnum = {
+  Bad_Request: 'Bad Request',
+} as const
+export type OnboardingBadRequestErrorErrorEnum =
+  (typeof OnboardingBadRequestErrorErrorEnum)[keyof typeof OnboardingBadRequestErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface OnboardingConflictError
+ */
+export interface OnboardingConflictError {
+  /**
+   *
+   * @type {OnboardingConflictErrorStatusCodeEnum}
+   * @memberof OnboardingConflictError
+   */
+  statusCode: OnboardingConflictErrorStatusCodeEnum
+  /**
+   *
+   * @type {OnboardingConflictErrorMessageEnum}
+   * @memberof OnboardingConflictError
+   */
+  message: OnboardingConflictErrorMessageEnum
+  /**
+   *
+   * @type {OnboardingConflictErrorErrorEnum}
+   * @memberof OnboardingConflictError
+   */
+  error: OnboardingConflictErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const OnboardingConflictErrorStatusCodeEnum = {
+  NUMBER_409: 409,
+} as const
+export type OnboardingConflictErrorStatusCodeEnum =
+  (typeof OnboardingConflictErrorStatusCodeEnum)[keyof typeof OnboardingConflictErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const OnboardingConflictErrorMessageEnum = {
+  INVALID_STEP_TRANSITION: 'INVALID_STEP_TRANSITION',
+} as const
+export type OnboardingConflictErrorMessageEnum =
+  (typeof OnboardingConflictErrorMessageEnum)[keyof typeof OnboardingConflictErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const OnboardingConflictErrorErrorEnum = {
+  Conflict: 'Conflict',
+} as const
+export type OnboardingConflictErrorErrorEnum =
+  (typeof OnboardingConflictErrorErrorEnum)[keyof typeof OnboardingConflictErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface OnboardingForbiddenError
+ */
+export interface OnboardingForbiddenError {
+  /**
+   *
+   * @type {OnboardingForbiddenErrorStatusCodeEnum}
+   * @memberof OnboardingForbiddenError
+   */
+  statusCode: OnboardingForbiddenErrorStatusCodeEnum
+  /**
+   *
+   * @type {OnboardingForbiddenErrorMessageEnum}
+   * @memberof OnboardingForbiddenError
+   */
+  message: OnboardingForbiddenErrorMessageEnum
+  /**
+   *
+   * @type {OnboardingForbiddenErrorErrorEnum}
+   * @memberof OnboardingForbiddenError
+   */
+  error: OnboardingForbiddenErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const OnboardingForbiddenErrorStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type OnboardingForbiddenErrorStatusCodeEnum =
+  (typeof OnboardingForbiddenErrorStatusCodeEnum)[keyof typeof OnboardingForbiddenErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const OnboardingForbiddenErrorMessageEnum = {
+  GUARDIAN_READ_ONLY: 'GUARDIAN_READ_ONLY',
+  GUARDIAN_CONSENT_REQUIRED: 'GUARDIAN_CONSENT_REQUIRED',
+} as const
+export type OnboardingForbiddenErrorMessageEnum =
+  (typeof OnboardingForbiddenErrorMessageEnum)[keyof typeof OnboardingForbiddenErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const OnboardingForbiddenErrorErrorEnum = {
+  Forbidden: 'Forbidden',
+} as const
+export type OnboardingForbiddenErrorErrorEnum =
+  (typeof OnboardingForbiddenErrorErrorEnum)[keyof typeof OnboardingForbiddenErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface OnboardingPreconditionFailedError
+ */
+export interface OnboardingPreconditionFailedError {
+  /**
+   *
+   * @type {OnboardingPreconditionFailedErrorStatusCodeEnum}
+   * @memberof OnboardingPreconditionFailedError
+   */
+  statusCode: OnboardingPreconditionFailedErrorStatusCodeEnum
+  /**
+   *
+   * @type {OnboardingPreconditionFailedErrorMessageEnum}
+   * @memberof OnboardingPreconditionFailedError
+   */
+  message: OnboardingPreconditionFailedErrorMessageEnum
+  /**
+   *
+   * @type {OnboardingPreconditionFailedErrorErrorEnum}
+   * @memberof OnboardingPreconditionFailedError
+   */
+  error: OnboardingPreconditionFailedErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const OnboardingPreconditionFailedErrorStatusCodeEnum = {
+  NUMBER_412: 412,
+} as const
+export type OnboardingPreconditionFailedErrorStatusCodeEnum =
+  (typeof OnboardingPreconditionFailedErrorStatusCodeEnum)[keyof typeof OnboardingPreconditionFailedErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const OnboardingPreconditionFailedErrorMessageEnum = {
+  ONBOARDING_REVISION_MISMATCH: 'ONBOARDING_REVISION_MISMATCH',
+} as const
+export type OnboardingPreconditionFailedErrorMessageEnum =
+  (typeof OnboardingPreconditionFailedErrorMessageEnum)[keyof typeof OnboardingPreconditionFailedErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const OnboardingPreconditionFailedErrorErrorEnum = {
+  Precondition_Failed: 'Precondition Failed',
+} as const
+export type OnboardingPreconditionFailedErrorErrorEnum =
+  (typeof OnboardingPreconditionFailedErrorErrorEnum)[keyof typeof OnboardingPreconditionFailedErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface OnboardingPreconditionRequiredError
+ */
+export interface OnboardingPreconditionRequiredError {
+  /**
+   *
+   * @type {OnboardingPreconditionRequiredErrorStatusCodeEnum}
+   * @memberof OnboardingPreconditionRequiredError
+   */
+  statusCode: OnboardingPreconditionRequiredErrorStatusCodeEnum
+  /**
+   *
+   * @type {OnboardingPreconditionRequiredErrorMessageEnum}
+   * @memberof OnboardingPreconditionRequiredError
+   */
+  message: OnboardingPreconditionRequiredErrorMessageEnum
+  /**
+   *
+   * @type {OnboardingPreconditionRequiredErrorErrorEnum}
+   * @memberof OnboardingPreconditionRequiredError
+   */
+  error: OnboardingPreconditionRequiredErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const OnboardingPreconditionRequiredErrorStatusCodeEnum = {
+  NUMBER_428: 428,
+} as const
+export type OnboardingPreconditionRequiredErrorStatusCodeEnum =
+  (typeof OnboardingPreconditionRequiredErrorStatusCodeEnum)[keyof typeof OnboardingPreconditionRequiredErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const OnboardingPreconditionRequiredErrorMessageEnum = {
+  PRECONDITION_REQUIRED: 'PRECONDITION_REQUIRED',
+} as const
+export type OnboardingPreconditionRequiredErrorMessageEnum =
+  (typeof OnboardingPreconditionRequiredErrorMessageEnum)[keyof typeof OnboardingPreconditionRequiredErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const OnboardingPreconditionRequiredErrorErrorEnum = {
+  Precondition_Required: 'Precondition Required',
+} as const
+export type OnboardingPreconditionRequiredErrorErrorEnum =
+  (typeof OnboardingPreconditionRequiredErrorErrorEnum)[keyof typeof OnboardingPreconditionRequiredErrorErrorEnum]
+
+/**
+ *
+ * @export
  * @interface OutfitCapsuleListResponse
  */
 export interface OutfitCapsuleListResponse {
@@ -3775,6 +4160,441 @@ export type SignupResponseAccountStatusEnum =
 /**
  *
  * @export
+ * @interface SilhouetteBadRequestError
+ */
+export interface SilhouetteBadRequestError {
+  /**
+   *
+   * @type {SilhouetteBadRequestErrorStatusCodeEnum}
+   * @memberof SilhouetteBadRequestError
+   */
+  statusCode: SilhouetteBadRequestErrorStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof SilhouetteBadRequestError
+   */
+  message: string
+  /**
+   *
+   * @type {SilhouetteBadRequestErrorErrorEnum}
+   * @memberof SilhouetteBadRequestError
+   */
+  error: SilhouetteBadRequestErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const SilhouetteBadRequestErrorStatusCodeEnum = {
+  NUMBER_400: 400,
+} as const
+export type SilhouetteBadRequestErrorStatusCodeEnum =
+  (typeof SilhouetteBadRequestErrorStatusCodeEnum)[keyof typeof SilhouetteBadRequestErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const SilhouetteBadRequestErrorErrorEnum = {
+  Bad_Request: 'Bad Request',
+} as const
+export type SilhouetteBadRequestErrorErrorEnum =
+  (typeof SilhouetteBadRequestErrorErrorEnum)[keyof typeof SilhouetteBadRequestErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface SilhouetteConflictError
+ */
+export interface SilhouetteConflictError {
+  /**
+   *
+   * @type {SilhouetteConflictErrorStatusCodeEnum}
+   * @memberof SilhouetteConflictError
+   */
+  statusCode: SilhouetteConflictErrorStatusCodeEnum
+  /**
+   *
+   * @type {SilhouetteConflictErrorMessageEnum}
+   * @memberof SilhouetteConflictError
+   */
+  message: SilhouetteConflictErrorMessageEnum
+  /**
+   *
+   * @type {SilhouetteConflictErrorErrorEnum}
+   * @memberof SilhouetteConflictError
+   */
+  error: SilhouetteConflictErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const SilhouetteConflictErrorStatusCodeEnum = {
+  NUMBER_409: 409,
+} as const
+export type SilhouetteConflictErrorStatusCodeEnum =
+  (typeof SilhouetteConflictErrorStatusCodeEnum)[keyof typeof SilhouetteConflictErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const SilhouetteConflictErrorMessageEnum = {
+  CONFIRM_BASEWEAR_GUIDANCE_REQUIRED: 'CONFIRM_BASEWEAR_GUIDANCE_REQUIRED',
+  IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
+} as const
+export type SilhouetteConflictErrorMessageEnum =
+  (typeof SilhouetteConflictErrorMessageEnum)[keyof typeof SilhouetteConflictErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const SilhouetteConflictErrorErrorEnum = {
+  Conflict: 'Conflict',
+} as const
+export type SilhouetteConflictErrorErrorEnum =
+  (typeof SilhouetteConflictErrorErrorEnum)[keyof typeof SilhouetteConflictErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface SilhouetteForbiddenError
+ */
+export interface SilhouetteForbiddenError {
+  /**
+   *
+   * @type {SilhouetteForbiddenErrorStatusCodeEnum}
+   * @memberof SilhouetteForbiddenError
+   */
+  statusCode: SilhouetteForbiddenErrorStatusCodeEnum
+  /**
+   *
+   * @type {SilhouetteForbiddenErrorMessageEnum}
+   * @memberof SilhouetteForbiddenError
+   */
+  message: SilhouetteForbiddenErrorMessageEnum
+  /**
+   *
+   * @type {SilhouetteForbiddenErrorErrorEnum}
+   * @memberof SilhouetteForbiddenError
+   */
+  error: SilhouetteForbiddenErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const SilhouetteForbiddenErrorStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type SilhouetteForbiddenErrorStatusCodeEnum =
+  (typeof SilhouetteForbiddenErrorStatusCodeEnum)[keyof typeof SilhouetteForbiddenErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const SilhouetteForbiddenErrorMessageEnum = {
+  GUARDIAN_READ_ONLY: 'GUARDIAN_READ_ONLY',
+  GUARDIAN_CONSENT_REQUIRED: 'GUARDIAN_CONSENT_REQUIRED',
+} as const
+export type SilhouetteForbiddenErrorMessageEnum =
+  (typeof SilhouetteForbiddenErrorMessageEnum)[keyof typeof SilhouetteForbiddenErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const SilhouetteForbiddenErrorErrorEnum = {
+  Forbidden: 'Forbidden',
+} as const
+export type SilhouetteForbiddenErrorErrorEnum =
+  (typeof SilhouetteForbiddenErrorErrorEnum)[keyof typeof SilhouetteForbiddenErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface SilhouetteNotFoundError
+ */
+export interface SilhouetteNotFoundError {
+  /**
+   *
+   * @type {SilhouetteNotFoundErrorStatusCodeEnum}
+   * @memberof SilhouetteNotFoundError
+   */
+  statusCode: SilhouetteNotFoundErrorStatusCodeEnum
+  /**
+   *
+   * @type {SilhouetteNotFoundErrorMessageEnum}
+   * @memberof SilhouetteNotFoundError
+   */
+  message: SilhouetteNotFoundErrorMessageEnum
+  /**
+   *
+   * @type {SilhouetteNotFoundErrorErrorEnum}
+   * @memberof SilhouetteNotFoundError
+   */
+  error: SilhouetteNotFoundErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const SilhouetteNotFoundErrorStatusCodeEnum = {
+  NUMBER_404: 404,
+} as const
+export type SilhouetteNotFoundErrorStatusCodeEnum =
+  (typeof SilhouetteNotFoundErrorStatusCodeEnum)[keyof typeof SilhouetteNotFoundErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const SilhouetteNotFoundErrorMessageEnum = {
+  NOT_FOUND: 'NOT_FOUND',
+} as const
+export type SilhouetteNotFoundErrorMessageEnum =
+  (typeof SilhouetteNotFoundErrorMessageEnum)[keyof typeof SilhouetteNotFoundErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const SilhouetteNotFoundErrorErrorEnum = {
+  Not_Found: 'Not Found',
+} as const
+export type SilhouetteNotFoundErrorErrorEnum =
+  (typeof SilhouetteNotFoundErrorErrorEnum)[keyof typeof SilhouetteNotFoundErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface SilhouettePreconditionFailedError
+ */
+export interface SilhouettePreconditionFailedError {
+  /**
+   *
+   * @type {SilhouettePreconditionFailedErrorStatusCodeEnum}
+   * @memberof SilhouettePreconditionFailedError
+   */
+  statusCode: SilhouettePreconditionFailedErrorStatusCodeEnum
+  /**
+   *
+   * @type {SilhouettePreconditionFailedErrorMessageEnum}
+   * @memberof SilhouettePreconditionFailedError
+   */
+  message: SilhouettePreconditionFailedErrorMessageEnum
+  /**
+   *
+   * @type {SilhouettePreconditionFailedErrorErrorEnum}
+   * @memberof SilhouettePreconditionFailedError
+   */
+  error: SilhouettePreconditionFailedErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const SilhouettePreconditionFailedErrorStatusCodeEnum = {
+  NUMBER_412: 412,
+} as const
+export type SilhouettePreconditionFailedErrorStatusCodeEnum =
+  (typeof SilhouettePreconditionFailedErrorStatusCodeEnum)[keyof typeof SilhouettePreconditionFailedErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const SilhouettePreconditionFailedErrorMessageEnum = {
+  SILHOUETTE_REVISION_MISMATCH: 'SILHOUETTE_REVISION_MISMATCH',
+} as const
+export type SilhouettePreconditionFailedErrorMessageEnum =
+  (typeof SilhouettePreconditionFailedErrorMessageEnum)[keyof typeof SilhouettePreconditionFailedErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const SilhouettePreconditionFailedErrorErrorEnum = {
+  Precondition_Failed: 'Precondition Failed',
+} as const
+export type SilhouettePreconditionFailedErrorErrorEnum =
+  (typeof SilhouettePreconditionFailedErrorErrorEnum)[keyof typeof SilhouettePreconditionFailedErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface SilhouettePreconditionRequiredError
+ */
+export interface SilhouettePreconditionRequiredError {
+  /**
+   *
+   * @type {SilhouettePreconditionRequiredErrorStatusCodeEnum}
+   * @memberof SilhouettePreconditionRequiredError
+   */
+  statusCode: SilhouettePreconditionRequiredErrorStatusCodeEnum
+  /**
+   *
+   * @type {SilhouettePreconditionRequiredErrorMessageEnum}
+   * @memberof SilhouettePreconditionRequiredError
+   */
+  message: SilhouettePreconditionRequiredErrorMessageEnum
+  /**
+   *
+   * @type {SilhouettePreconditionRequiredErrorErrorEnum}
+   * @memberof SilhouettePreconditionRequiredError
+   */
+  error: SilhouettePreconditionRequiredErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const SilhouettePreconditionRequiredErrorStatusCodeEnum = {
+  NUMBER_428: 428,
+} as const
+export type SilhouettePreconditionRequiredErrorStatusCodeEnum =
+  (typeof SilhouettePreconditionRequiredErrorStatusCodeEnum)[keyof typeof SilhouettePreconditionRequiredErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const SilhouettePreconditionRequiredErrorMessageEnum = {
+  PRECONDITION_REQUIRED: 'PRECONDITION_REQUIRED',
+} as const
+export type SilhouettePreconditionRequiredErrorMessageEnum =
+  (typeof SilhouettePreconditionRequiredErrorMessageEnum)[keyof typeof SilhouettePreconditionRequiredErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const SilhouettePreconditionRequiredErrorErrorEnum = {
+  Precondition_Required: 'Precondition Required',
+} as const
+export type SilhouettePreconditionRequiredErrorErrorEnum =
+  (typeof SilhouettePreconditionRequiredErrorErrorEnum)[keyof typeof SilhouettePreconditionRequiredErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface SilhouetteProfileResponse
+ */
+export interface SilhouetteProfileResponse {
+  /**
+   *
+   * @type {SilhouetteProfileResponseData}
+   * @memberof SilhouetteProfileResponse
+   */
+  data: SilhouetteProfileResponseData
+}
+/**
+ *
+ * @export
+ * @interface SilhouetteProfileResponseData
+ */
+export interface SilhouetteProfileResponseData {
+  /**
+   *
+   * @type {SilhouetteProfileResponseDataModeEnum}
+   * @memberof SilhouetteProfileResponseData
+   */
+  mode: SilhouetteProfileResponseDataModeEnum
+  /**
+   *
+   * @type {number}
+   * @memberof SilhouetteProfileResponseData
+   */
+  heightSlider: number | null
+  /**
+   *
+   * @type {number}
+   * @memberof SilhouetteProfileResponseData
+   */
+  buildSlider: number | null
+  /**
+   *
+   * @type {SilhouetteProfileResponseDataMyForm}
+   * @memberof SilhouetteProfileResponseData
+   */
+  myForm: SilhouetteProfileResponseDataMyForm
+  /**
+   *
+   * @type {number}
+   * @memberof SilhouetteProfileResponseData
+   */
+  revision: number
+  /**
+   *
+   * @type {string}
+   * @memberof SilhouetteProfileResponseData
+   */
+  updatedAt: string
+}
+
+/**
+ * @export
+ */
+export const SilhouetteProfileResponseDataModeEnum = {
+  default_mannequin: 'default_mannequin',
+  my_form: 'my_form',
+} as const
+export type SilhouetteProfileResponseDataModeEnum =
+  (typeof SilhouetteProfileResponseDataModeEnum)[keyof typeof SilhouetteProfileResponseDataModeEnum]
+
+/**
+ *
+ * @export
+ * @interface SilhouetteProfileResponseDataMyForm
+ */
+export interface SilhouetteProfileResponseDataMyForm {
+  /**
+   *
+   * @type {SilhouetteProfileResponseDataMyFormStatusEnum}
+   * @memberof SilhouetteProfileResponseDataMyForm
+   */
+  status: SilhouetteProfileResponseDataMyFormStatusEnum
+  /**
+   *
+   * @type {SilhouetteProfileResponseDataMyFormFailureReasonEnum}
+   * @memberof SilhouetteProfileResponseDataMyForm
+   */
+  failureReason: SilhouetteProfileResponseDataMyFormFailureReasonEnum | null
+  /**
+   *
+   * @type {string}
+   * @memberof SilhouetteProfileResponseDataMyForm
+   */
+  committedAt: string | null
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @memberof SilhouetteProfileResponseDataMyForm
+   */
+  imageAccess: CreateGarmentItemResponseDataImageAccess
+}
+
+/**
+ * @export
+ */
+export const SilhouetteProfileResponseDataMyFormStatusEnum = {
+  pending_upload: 'pending_upload',
+  bytes_uploaded: 'bytes_uploaded',
+  processing: 'processing',
+  ready: 'ready',
+  failed: 'failed',
+} as const
+export type SilhouetteProfileResponseDataMyFormStatusEnum =
+  (typeof SilhouetteProfileResponseDataMyFormStatusEnum)[keyof typeof SilhouetteProfileResponseDataMyFormStatusEnum]
+
+/**
+ * @export
+ */
+export const SilhouetteProfileResponseDataMyFormFailureReasonEnum = {
+  contrast: 'contrast',
+  privacy_violation: 'privacy_violation',
+  timeout: 'timeout',
+  storage_error: 'storage_error',
+} as const
+export type SilhouetteProfileResponseDataMyFormFailureReasonEnum =
+  (typeof SilhouetteProfileResponseDataMyFormFailureReasonEnum)[keyof typeof SilhouetteProfileResponseDataMyFormFailureReasonEnum]
+
+/**
+ *
+ * @export
  * @interface SuggestGarmentTagsResponse
  */
 export interface SuggestGarmentTagsResponse {
@@ -4432,6 +5252,58 @@ export interface UpdateSavedLocationResponse {
 /**
  *
  * @export
+ * @interface UpdateSilhouetteSlidersInput
+ */
+export interface UpdateSilhouetteSlidersInput {
+  /**
+   *
+   * @type {number}
+   * @memberof UpdateSilhouetteSlidersInput
+   */
+  heightSlider: number
+  /**
+   *
+   * @type {number}
+   * @memberof UpdateSilhouetteSlidersInput
+   */
+  buildSlider: number
+}
+/**
+ *
+ * @export
+ * @interface UpdateWardrobeOnboardingStateInput
+ */
+export interface UpdateWardrobeOnboardingStateInput {
+  /**
+   *
+   * @type {UpdateWardrobeOnboardingStateInputTargetStepEnum}
+   * @memberof UpdateWardrobeOnboardingStateInput
+   */
+  targetStep: UpdateWardrobeOnboardingStateInputTargetStepEnum
+  /**
+   *
+   * @type {boolean}
+   * @memberof UpdateWardrobeOnboardingStateInput
+   */
+  usedStarterWardrobe?: boolean
+}
+
+/**
+ * @export
+ */
+export const UpdateWardrobeOnboardingStateInputTargetStepEnum = {
+  permission: 'permission',
+  capture: 'capture',
+  tagging: 'tagging',
+  silhouette: 'silhouette',
+  complete: 'complete',
+} as const
+export type UpdateWardrobeOnboardingStateInputTargetStepEnum =
+  (typeof UpdateWardrobeOnboardingStateInputTargetStepEnum)[keyof typeof UpdateWardrobeOnboardingStateInputTargetStepEnum]
+
+/**
+ *
+ * @export
  * @interface UserPreferencesInput
  */
 export interface UserPreferencesInput {
@@ -4632,6 +5504,93 @@ export const UserProfileResponseUserRoleEnum = {
 } as const
 export type UserProfileResponseUserRoleEnum =
   (typeof UserProfileResponseUserRoleEnum)[keyof typeof UserProfileResponseUserRoleEnum]
+
+/**
+ *
+ * @export
+ * @interface WardrobeOnboardingStateResponse
+ */
+export interface WardrobeOnboardingStateResponse {
+  /**
+   *
+   * @type {WardrobeOnboardingStateResponseData}
+   * @memberof WardrobeOnboardingStateResponse
+   */
+  data: WardrobeOnboardingStateResponseData
+}
+/**
+ *
+ * @export
+ * @interface WardrobeOnboardingStateResponseData
+ */
+export interface WardrobeOnboardingStateResponseData {
+  /**
+   *
+   * @type {WardrobeOnboardingStateResponseDataStatusEnum}
+   * @memberof WardrobeOnboardingStateResponseData
+   */
+  status: WardrobeOnboardingStateResponseDataStatusEnum
+  /**
+   *
+   * @type {WardrobeOnboardingStateResponseDataCurrentStepEnum}
+   * @memberof WardrobeOnboardingStateResponseData
+   */
+  currentStep: WardrobeOnboardingStateResponseDataCurrentStepEnum
+  /**
+   *
+   * @type {boolean}
+   * @memberof WardrobeOnboardingStateResponseData
+   */
+  usedStarterWardrobe: boolean
+  /**
+   *
+   * @type {number}
+   * @memberof WardrobeOnboardingStateResponseData
+   */
+  garmentsCapturedCount: number
+  /**
+   *
+   * @type {string}
+   * @memberof WardrobeOnboardingStateResponseData
+   */
+  startedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof WardrobeOnboardingStateResponseData
+   */
+  completedAt: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof WardrobeOnboardingStateResponseData
+   */
+  revision: number
+}
+
+/**
+ * @export
+ */
+export const WardrobeOnboardingStateResponseDataStatusEnum = {
+  not_started: 'not_started',
+  in_progress: 'in_progress',
+  completed: 'completed',
+} as const
+export type WardrobeOnboardingStateResponseDataStatusEnum =
+  (typeof WardrobeOnboardingStateResponseDataStatusEnum)[keyof typeof WardrobeOnboardingStateResponseDataStatusEnum]
+
+/**
+ * @export
+ */
+export const WardrobeOnboardingStateResponseDataCurrentStepEnum = {
+  permission: 'permission',
+  capture: 'capture',
+  tagging: 'tagging',
+  silhouette: 'silhouette',
+  complete: 'complete',
+} as const
+export type WardrobeOnboardingStateResponseDataCurrentStepEnum =
+  (typeof WardrobeOnboardingStateResponseDataCurrentStepEnum)[keyof typeof WardrobeOnboardingStateResponseDataCurrentStepEnum]
 
 /**
  *

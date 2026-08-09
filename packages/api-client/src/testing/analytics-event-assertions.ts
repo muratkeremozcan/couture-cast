@@ -21,6 +21,8 @@ import {
   wardrobeCapsuleRecommendedPropertiesSchema,
   wardrobeCapsuleRecommendationViewedPropertiesSchema,
   wardrobeCapsuleRecommendationSelectedPropertiesSchema,
+  wardrobeOnboardingStartedPropertiesSchema,
+  wardrobeOnboardingCompletedPropertiesSchema,
   type AnalyticsEventName,
 } from '../types/analytics-events'
 import type { ExpectLike } from './expect-like'
@@ -60,6 +62,8 @@ const analyticsPropertySchemas = {
     wardrobeCapsuleRecommendationViewedPropertiesSchema,
   wardrobe_capsule_recommendation_selected:
     wardrobeCapsuleRecommendationSelectedPropertiesSchema,
+  wardrobe_onboarding_started: wardrobeOnboardingStartedPropertiesSchema,
+  wardrobe_onboarding_completed: wardrobeOnboardingCompletedPropertiesSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

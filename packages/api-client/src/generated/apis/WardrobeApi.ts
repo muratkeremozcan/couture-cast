@@ -13,19 +13,26 @@
 
 import * as runtime from '../runtime'
 import type {
+  CommitSilhouettePhotoInput,
   CreateGarmentItemInput,
   CreateGarmentItemResponse,
   CreateGarmentUploadUrlInput,
   CreateGarmentUploadUrlResponse,
   CreateOutfitCapsuleInput,
+  CreateSilhouetteUploadUrlInput,
+  CreateSilhouetteUploadUrlResponse,
   FavoriteOutfitCapsuleInput,
   GarmentListResponse,
   OutfitCapsuleListResponse,
   OutfitCapsuleResponse,
+  SilhouetteProfileResponse,
   SuggestGarmentTagsResponse,
   UpdateGarmentTagsInput,
   UpdateGarmentTagsResponse,
   UpdateOutfitCapsuleInput,
+  UpdateSilhouetteSlidersInput,
+  UpdateWardrobeOnboardingStateInput,
+  WardrobeOnboardingStateResponse,
 } from '../models/index'
 
 export interface ApiV1WardrobeGarmentsGarmentIdSuggestTagsPostRequest {
@@ -40,6 +47,11 @@ export interface ApiV1WardrobeGarmentsGarmentIdTagsPatchRequest {
 export interface ApiV1WardrobeGarmentsPostRequest {
   idempotencyKey: string
   createGarmentItemInput: CreateGarmentItemInput
+}
+
+export interface ApiV1WardrobeOnboardingPatchRequest {
+  ifMatch: string
+  updateWardrobeOnboardingStateInput: UpdateWardrobeOnboardingStateInput
 }
 
 export interface ApiV1WardrobeOwnerUserIdCapsulesCapsuleIdDeleteRequest {
@@ -82,6 +94,29 @@ export interface ApiV1WardrobeOwnerUserIdCapsulesPostRequest {
   ownerUserId: string
   createOutfitCapsuleInput: CreateOutfitCapsuleInput
   idempotencyKey?: string
+}
+
+export interface ApiV1WardrobeSilhouetteMyFormCommitPostRequest {
+  idempotencyKey: string
+  commitSilhouettePhotoInput: CommitSilhouettePhotoInput
+}
+
+export interface ApiV1WardrobeSilhouetteMyFormDeleteRequest {
+  ifMatch: string
+}
+
+export interface ApiV1WardrobeSilhouetteMyFormUploadUrlPostRequest {
+  idempotencyKey: string
+  createSilhouetteUploadUrlInput: CreateSilhouetteUploadUrlInput
+}
+
+export interface ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequest {
+  uploadSessionId: string
+}
+
+export interface ApiV1WardrobeSilhouettePutRequest {
+  ifMatch: string
+  updateSilhouetteSlidersInput: UpdateSilhouetteSlidersInput
 }
 
 export interface ApiV1WardrobeUploadUrlPostRequest {
@@ -369,6 +404,133 @@ export class WardrobeApi extends runtime.BaseAPI {
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<CreateGarmentItemResponse> {
     const response = await this.apiV1WardrobeGarmentsPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeOnboardingGet without sending the request
+   */
+  async apiV1WardrobeOnboardingGetRequestOpts(): Promise<runtime.RequestOpts> {
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/onboarding`
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Read wardrobe onboarding progress (virtual not_started default when absent)
+   */
+  async apiV1WardrobeOnboardingGetRaw(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<WardrobeOnboardingStateResponse>> {
+    const requestOptions = await this.apiV1WardrobeOnboardingGetRequestOpts()
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Read wardrobe onboarding progress (virtual not_started default when absent)
+   */
+  async apiV1WardrobeOnboardingGet(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<WardrobeOnboardingStateResponse> {
+    const response = await this.apiV1WardrobeOnboardingGetRaw(initOverrides)
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeOnboardingPatch without sending the request
+   */
+  async apiV1WardrobeOnboardingPatchRequestOpts(
+    requestParameters: ApiV1WardrobeOnboardingPatchRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['ifMatch'] == null) {
+      throw new runtime.RequiredError(
+        'ifMatch',
+        'Required parameter "ifMatch" was null or undefined when calling apiV1WardrobeOnboardingPatch().'
+      )
+    }
+
+    if (requestParameters['updateWardrobeOnboardingStateInput'] == null) {
+      throw new runtime.RequiredError(
+        'updateWardrobeOnboardingStateInput',
+        'Required parameter "updateWardrobeOnboardingStateInput" was null or undefined when calling apiV1WardrobeOnboardingPatch().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['ifMatch'] != null) {
+      headerParameters['if-match'] = String(requestParameters['ifMatch'])
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/onboarding`
+
+    return {
+      path: urlPath,
+      method: 'PATCH',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['updateWardrobeOnboardingStateInput'],
+    }
+  }
+
+  /**
+   * Advance the onboarding state machine one forward-only step
+   */
+  async apiV1WardrobeOnboardingPatchRaw(
+    requestParameters: ApiV1WardrobeOnboardingPatchRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<WardrobeOnboardingStateResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeOnboardingPatchRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Advance the onboarding state machine one forward-only step
+   */
+  async apiV1WardrobeOnboardingPatch(
+    requestParameters: ApiV1WardrobeOnboardingPatchRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<WardrobeOnboardingStateResponse> {
+    const response = await this.apiV1WardrobeOnboardingPatchRaw(
       requestParameters,
       initOverrides
     )
@@ -923,6 +1085,426 @@ export class WardrobeApi extends runtime.BaseAPI {
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<OutfitCapsuleResponse> {
     const response = await this.apiV1WardrobeOwnerUserIdCapsulesPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeSilhouetteGet without sending the request
+   */
+  async apiV1WardrobeSilhouetteGetRequestOpts(): Promise<runtime.RequestOpts> {
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/silhouette`
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Read the silhouette profile (sliders and/or My Form photo state)
+   */
+  async apiV1WardrobeSilhouetteGetRaw(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<SilhouetteProfileResponse>> {
+    const requestOptions = await this.apiV1WardrobeSilhouetteGetRequestOpts()
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Read the silhouette profile (sliders and/or My Form photo state)
+   */
+  async apiV1WardrobeSilhouetteGet(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<SilhouetteProfileResponse> {
+    const response = await this.apiV1WardrobeSilhouetteGetRaw(initOverrides)
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeSilhouetteMyFormCommitPost without sending the request
+   */
+  async apiV1WardrobeSilhouetteMyFormCommitPostRequestOpts(
+    requestParameters: ApiV1WardrobeSilhouetteMyFormCommitPostRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['idempotencyKey'] == null) {
+      throw new runtime.RequiredError(
+        'idempotencyKey',
+        'Required parameter "idempotencyKey" was null or undefined when calling apiV1WardrobeSilhouetteMyFormCommitPost().'
+      )
+    }
+
+    if (requestParameters['commitSilhouettePhotoInput'] == null) {
+      throw new runtime.RequiredError(
+        'commitSilhouettePhotoInput',
+        'Required parameter "commitSilhouettePhotoInput" was null or undefined when calling apiV1WardrobeSilhouetteMyFormCommitPost().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['idempotencyKey'] != null) {
+      headerParameters['idempotency-key'] = String(requestParameters['idempotencyKey'])
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/silhouette/my-form/commit`
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['commitSilhouettePhotoInput'],
+    }
+  }
+
+  /**
+   * Commit uploaded My Form photo bytes and enqueue processing
+   */
+  async apiV1WardrobeSilhouetteMyFormCommitPostRaw(
+    requestParameters: ApiV1WardrobeSilhouetteMyFormCommitPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<SilhouetteProfileResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeSilhouetteMyFormCommitPostRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Commit uploaded My Form photo bytes and enqueue processing
+   */
+  async apiV1WardrobeSilhouetteMyFormCommitPost(
+    requestParameters: ApiV1WardrobeSilhouetteMyFormCommitPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<SilhouetteProfileResponse> {
+    const response = await this.apiV1WardrobeSilhouetteMyFormCommitPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeSilhouetteMyFormDelete without sending the request
+   */
+  async apiV1WardrobeSilhouetteMyFormDeleteRequestOpts(
+    requestParameters: ApiV1WardrobeSilhouetteMyFormDeleteRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['ifMatch'] == null) {
+      throw new runtime.RequiredError(
+        'ifMatch',
+        'Required parameter "ifMatch" was null or undefined when calling apiV1WardrobeSilhouetteMyFormDelete().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (requestParameters['ifMatch'] != null) {
+      headerParameters['if-match'] = String(requestParameters['ifMatch'])
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/silhouette/my-form`
+
+    return {
+      path: urlPath,
+      method: 'DELETE',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Immediately hard-delete the My Form photo and fall back to default_mannequin
+   */
+  async apiV1WardrobeSilhouetteMyFormDeleteRaw(
+    requestParameters: ApiV1WardrobeSilhouetteMyFormDeleteRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<SilhouetteProfileResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeSilhouetteMyFormDeleteRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Immediately hard-delete the My Form photo and fall back to default_mannequin
+   */
+  async apiV1WardrobeSilhouetteMyFormDelete(
+    requestParameters: ApiV1WardrobeSilhouetteMyFormDeleteRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<SilhouetteProfileResponse> {
+    const response = await this.apiV1WardrobeSilhouetteMyFormDeleteRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeSilhouetteMyFormUploadUrlPost without sending the request
+   */
+  async apiV1WardrobeSilhouetteMyFormUploadUrlPostRequestOpts(
+    requestParameters: ApiV1WardrobeSilhouetteMyFormUploadUrlPostRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['idempotencyKey'] == null) {
+      throw new runtime.RequiredError(
+        'idempotencyKey',
+        'Required parameter "idempotencyKey" was null or undefined when calling apiV1WardrobeSilhouetteMyFormUploadUrlPost().'
+      )
+    }
+
+    if (requestParameters['createSilhouetteUploadUrlInput'] == null) {
+      throw new runtime.RequiredError(
+        'createSilhouetteUploadUrlInput',
+        'Required parameter "createSilhouetteUploadUrlInput" was null or undefined when calling apiV1WardrobeSilhouetteMyFormUploadUrlPost().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['idempotencyKey'] != null) {
+      headerParameters['idempotency-key'] = String(requestParameters['idempotencyKey'])
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/silhouette/my-form/upload-url`
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['createSilhouetteUploadUrlInput'],
+    }
+  }
+
+  /**
+   * Allocate an upload session for a \"My Form\" full-body photo
+   */
+  async apiV1WardrobeSilhouetteMyFormUploadUrlPostRaw(
+    requestParameters: ApiV1WardrobeSilhouetteMyFormUploadUrlPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<CreateSilhouetteUploadUrlResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeSilhouetteMyFormUploadUrlPostRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Allocate an upload session for a \"My Form\" full-body photo
+   */
+  async apiV1WardrobeSilhouetteMyFormUploadUrlPost(
+    requestParameters: ApiV1WardrobeSilhouetteMyFormUploadUrlPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<CreateSilhouetteUploadUrlResponse> {
+    const response = await this.apiV1WardrobeSilhouetteMyFormUploadUrlPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPut without sending the request
+   */
+  async apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequestOpts(
+    requestParameters: ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['uploadSessionId'] == null) {
+      throw new runtime.RequiredError(
+        'uploadSessionId',
+        'Required parameter "uploadSessionId" was null or undefined when calling apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPut().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}`
+    urlPath = urlPath.replace(
+      `{${'uploadSessionId'}}`,
+      encodeURIComponent(String(requestParameters['uploadSessionId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'PUT',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Upload My Form photo bytes to a previously allocated session
+   */
+  async apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRaw(
+    requestParameters: ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<void>> {
+    const requestOptions =
+      await this.apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequestOpts(
+        requestParameters
+      )
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.VoidApiResponse(response)
+  }
+
+  /**
+   * Upload My Form photo bytes to a previously allocated session
+   */
+  async apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPut(
+    requestParameters: ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<void> {
+    await this.apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRaw(
+      requestParameters,
+      initOverrides
+    )
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeSilhouettePut without sending the request
+   */
+  async apiV1WardrobeSilhouettePutRequestOpts(
+    requestParameters: ApiV1WardrobeSilhouettePutRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['ifMatch'] == null) {
+      throw new runtime.RequiredError(
+        'ifMatch',
+        'Required parameter "ifMatch" was null or undefined when calling apiV1WardrobeSilhouettePut().'
+      )
+    }
+
+    if (requestParameters['updateSilhouetteSlidersInput'] == null) {
+      throw new runtime.RequiredError(
+        'updateSilhouetteSlidersInput',
+        'Required parameter "updateSilhouetteSlidersInput" was null or undefined when calling apiV1WardrobeSilhouettePut().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['ifMatch'] != null) {
+      headerParameters['if-match'] = String(requestParameters['ifMatch'])
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/silhouette`
+
+    return {
+      path: urlPath,
+      method: 'PUT',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['updateSilhouetteSlidersInput'],
+    }
+  }
+
+  /**
+   * Upsert mannequin slider values
+   */
+  async apiV1WardrobeSilhouettePutRaw(
+    requestParameters: ApiV1WardrobeSilhouettePutRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<SilhouetteProfileResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeSilhouettePutRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Upsert mannequin slider values
+   */
+  async apiV1WardrobeSilhouettePut(
+    requestParameters: ApiV1WardrobeSilhouettePutRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<SilhouetteProfileResponse> {
+    const response = await this.apiV1WardrobeSilhouettePutRaw(
       requestParameters,
       initOverrides
     )

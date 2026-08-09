@@ -290,27 +290,27 @@ user's body and closet change over time.
         grepping the migration file — Story 4.3's review found and fixed exactly that
         shortcut).
 
-- [ ] Task 2: Wardrobe contracts, fixtures, and factories (AC: 1 to 5)
-  - [ ] Define strict onboarding-state read/PATCH schemas, silhouette slider
+- [x] Task 2: Wardrobe contracts, fixtures, and factories (AC: 1 to 5)
+  - [x] Define strict onboarding-state read/PATCH schemas, silhouette slider
         read/PUT schemas, "My Form" upload-url/commit/delete schemas, revision, ETag,
         `If-Match`, and every error schema in
         `packages/api-client/src/contracts/http/wardrobe.ts`.
-  - [ ] Register every endpoint, header, response code, and error with
+  - [x] Register every endpoint, header, response code, and error with
         `OpenAPIRegistry` in `packages/api-client/src/contracts/http/openapi.ts`.
-  - [ ] Add `wardrobe_onboarding_started` and `wardrobe_onboarding_completed` to
+  - [x] Add `wardrobe_onboarding_started` and `wardrobe_onboarding_completed` to
         `analyticsEventNameSchema` and their strict property allowlists plus tracking
         wrappers in `packages/api-client/src/types/analytics-events.ts`. Add negative
         fixtures proving no photo, silhouette detail, or free-form text ever appears
         in analytics properties.
-  - [ ] Add deterministic onboarding/silhouette fixtures to
+  - [x] Add deterministic onboarding/silhouette fixtures to
         `packages/api-client/src/testing/wardrobe-fixtures.ts`.
-  - [ ] Add `packages/testing/src/factories/wardrobe-onboarding.factory.ts` and
+  - [x] Add `packages/testing/src/factories/wardrobe-onboarding.factory.ts` and
         `packages/testing/src/factories/silhouette-profile.factory.ts` with in-memory
         and persisted builders. Register both in
         `packages/testing/src/factories/registry.ts` and extend
         `packages/testing/src/cleanup.ts` for reverse-dependency cleanup (moderation
         events referencing a silhouette profile before the profile, before the user).
-  - [ ] Run `npm run generate:api-client`; inspect and commit the generated OpenAPI
+  - [x] Run `npm run generate:api-client`; inspect and commit the generated OpenAPI
         and SDK changes without hand-editing generated files.
 
 - [ ] Task 3: Onboarding-state and silhouette API (AC: 1 to 4)
@@ -814,7 +814,16 @@ Status of each branch is tracked here as work proceeds:
       Postgres, `db:reset` run to clear pre-existing unrelated drift on
       `outfit-capsule-schema.spec.ts`, full `@couture/db` suite green (72
       tests), lint and typecheck clean.
-- [ ] `feat/epic4-story4-t2-contracts` — not started
+- [x] `feat/epic4-story4-t2-contracts` — done: onboarding-state and
+      silhouette Zod contracts, 8 new OpenAPI paths, 2 new analytics events
+      with negative-fixture privacy tests, fixtures, 2 new
+      `@couture/testing` factories, cleanup ordering (moderation event before
+      silhouette profile before user). `generate:api-client` run, `optic
+    lint` clean, `build:packages` clean. `@couture/api-client` 192/192,
+      `@couture/testing` 9/9, both lint/typecheck clean.
+- [ ] `feat/epic4-story4-t3t4-api` — not started (in progress by this
+      session; not delegated to a peer, since Web/Mobile/Pact peers only need
+      this branch's contracts, not this branch's implementation, to start)
 - [ ] `feat/epic4-story4-t3t4-api` — not started
 - [ ] `feat/epic4-story4-t5-web` — not started
 - [ ] `feat/epic4-story4-t6-mobile` — not started
@@ -852,6 +861,31 @@ AI-agent safety guard requires explicit consent for this destructive command)
 to get a clean baseline. Full `@couture/db` suite: 72/72 passing, lint clean,
 typecheck clean.
 
+**Task 2 (branch `feat/epic4-story4-t2-contracts`).** Added onboarding-state
+and silhouette Zod contracts (enums, `wardrobeOnboardingStateSchema`,
+`silhouetteProfileSchema` with a nullable `myForm` sub-object, slider PUT,
+My Form upload-url/uploads/commit/delete, every error schema) plus 8
+`registry.registerPath` entries to `wardrobe.ts`, mirroring the existing
+garment upload-url/bytes/commit and capsule revision/`If-Match` patterns
+exactly — reused the existing generic `uploadGarmentBytes` helper for My Form
+bytes rather than duplicating it, since its signature has no garment-specific
+coupling. Added `wardrobe_onboarding_started`/`wardrobe_onboarding_completed`
+to `analytics-events.ts` (event schema, snake_case properties schema, track
+wrapper) and to the second properties-schema map in
+`testing/analytics-event-assertions.ts` that a first pass missed (caught by
+`tsc`, not by inspection). Added a `4.4-UNIT-001` negative-fixture spec
+mirroring Story 4.3's `4.3-UNIT-004` pattern, proving both events' schemas
+reject photo/media URLs, slider values, and free-form text. Added onboarding
+and silhouette fixtures to `wardrobe-fixtures.ts`, and
+`wardrobe-onboarding.factory.ts` / `silhouette-profile.factory.ts` with
+in-memory and persisted builders, registered in the factory registry and
+wired into `cleanup.ts` (`ModerationEvent` has no `user_id` column, so it
+needed its own where-builder keyed on `id` and `silhouette_profile_id`,
+deleted before `SilhouetteProfile`, before `WardrobeOnboardingState`, before
+`GarmentItem`). Ran `generate:api-client`; `optic lint` and `build:packages`
+both clean. Full suites: `@couture/api-client` 192/192 (was 161 before this
+task), `@couture/testing` 9/9, both lint and typecheck clean.
+
 ### File list
 
 **Task 1 (branch `feat/epic4-story4-t1-db`):**
@@ -860,3 +894,20 @@ typecheck clean.
 - `packages/db/prisma/migrations/20260809090000_add_wardrobe_onboarding_silhouette/migration.sql` (new)
 - `packages/db/test/wardrobe-onboarding-schema.spec.ts` (new)
 - `packages/db/test/rls-policies.spec.ts` (modified)
+
+**Task 2 (branch `feat/epic4-story4-t2-contracts`):**
+
+- `packages/api-client/src/contracts/http/wardrobe.ts` (modified)
+- `packages/api-client/src/types/analytics-events.ts` (modified)
+- `packages/api-client/src/testing/analytics-event-assertions.ts` (modified)
+- `packages/api-client/src/testing/wardrobe-fixtures.ts` (modified)
+- `packages/api-client/testing/wardrobe-onboarding-analytics.spec.ts` (new)
+- `packages/api-client/docs/http.openapi.json` (generated, modified)
+- `packages/api-client/src/generated/**` (generated, modified)
+- `packages/testing/src/factories/wardrobe-onboarding.factory.ts` (new)
+- `packages/testing/src/factories/silhouette-profile.factory.ts` (new)
+- `packages/testing/src/factories/index.ts` (modified)
+- `packages/testing/src/factories/registry.ts` (modified)
+- `packages/testing/src/cleanup.ts` (modified)
+- `packages/testing/test/cleanup.spec.ts` (modified)
+- `packages/testing/templates/test-template.spec.ts` (modified)
