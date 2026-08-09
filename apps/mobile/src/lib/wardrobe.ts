@@ -26,6 +26,7 @@ import {
   createSilhouetteUploadUrlResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { createMobileApiClient } from './api-client'
+import { waitForPoll } from './native-utils'
 
 async function actionableWardrobeError(error: unknown, fallback: string): Promise<Error> {
   if (error instanceof ResponseError) {
@@ -101,6 +102,45 @@ export async function listGarmentsFromMobile(
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to load your wardrobe.')
   }
+}
+
+const GARMENT_POLL_OFFSETS_MS = [1_000, 2_000, 4_000, 8_000]
+
+/**
+ * Polls the wardrobe list until `garmentId` leaves `processing`, or the
+ * schedule below is exhausted. `onUpdate` fires with every refreshed list so
+ * a caller can keep its own garment state in sync while polling runs.
+ *
+ * Every offset is measured from a single `startedAt`, not from the previous
+ * tick, so the four checks land at roughly +1s/+2s/+4s/+8s (~8s total) no
+ * matter how long each network round-trip takes. A prior version of this
+ * logic was duplicated across the wardrobe hub and onboarding screens, and
+ * one copy drifted to measuring each offset from the previous tick instead
+ * (an additive ~15s schedule) — this is the single implementation both now
+ * share, so that class of divergence can't recur.
+ */
+export async function pollGarmentUntilSettled(
+  accessToken: string,
+  garmentId: string,
+  signal: AbortSignal,
+  onUpdate: (garments: GarmentItemContract[]) => void,
+  /** Test-only override for the poll cadence. */
+  offsetsMs: readonly number[] = GARMENT_POLL_OFFSETS_MS
+): Promise<GarmentItemContract | undefined> {
+  const startedAt = Date.now()
+  for (const offsetMs of offsetsMs) {
+    await waitForPoll(Math.max(0, startedAt + offsetMs - Date.now()), signal)
+    const persisted = await listGarmentsFromMobile(accessToken, signal)
+    onUpdate(persisted)
+    const current = persisted.find((garment) => garment.id === garmentId)
+    if (current && current.status !== 'processing') {
+      return current
+    }
+    if (!current) {
+      return undefined
+    }
+  }
+  return undefined
 }
 
 export async function suggestGarmentTagsFromMobile(

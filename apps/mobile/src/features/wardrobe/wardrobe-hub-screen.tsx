@@ -7,38 +7,27 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type React from 'react'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
-import {
-  ActivityIndicator,
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  findNodeHandle,
-} from 'react-native'
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
 
 import { Text, View } from '@/components/themed'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
+import { safeFindNodeHandle } from '@/src/lib/expo-native-helpers'
 
 import { MobileGarmentCaptureModal } from '@/components/wardrobe/garment-capture-modal'
 import { MobileGarmentTaggingModal } from '@/components/wardrobe/garment-tagging-modal'
 import {
   getWardrobeOnboardingStateFromMobile,
   listGarmentsFromMobile,
+  pollGarmentUntilSettled,
 } from '@/src/lib/wardrobe'
 
-/**
- * react-native-web's `findNodeHandle` always throws ("not supported on web");
- * every call site must skip it on web, matching the guard already proven in
- * garment-tagging-modal.tsx and capsule-builder-modal.tsx.
- */
-function safeFindNodeHandle(node: unknown): number | null {
-  if (Platform.OS === 'web' || !node) return null
-  return findNodeHandle(node as never)
+export interface WardrobeHubScreenProps {
+  /** Test-only override for the still-processing garment poll cadence. */
+  pollOffsetsMs?: readonly number[]
 }
 
-export function WardrobeHubScreen() {
+export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}) {
   const { t } = useTranslation()
   const [garments, setGarments] = useState<GarmentItemContract[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -105,52 +94,37 @@ export function WardrobeHubScreen() {
     }
   }
 
-  const waitForPoll = (delayMs: number, signal: AbortSignal) =>
-    new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(resolve, delayMs)
-      signal.addEventListener(
-        'abort',
-        () => {
-          clearTimeout(timer)
-          reject(new Error('POLL_ABORTED'))
-        },
-        { once: true }
-      )
-    })
-
   const pollCommittedGarment = (garmentId: string, token: string) => {
     pollingAbortRef.current?.abort()
     const controller = new AbortController()
     pollingAbortRef.current = controller
     void (async () => {
       try {
-        const startedAt = Date.now()
-        for (const offsetMs of [1_000, 2_000, 4_000, 8_000]) {
-          await waitForPoll(
-            Math.max(0, startedAt + offsetMs - Date.now()),
-            controller.signal
-          )
-          const persisted = await listGarmentsFromMobile(token, controller.signal)
-          setGarments(persisted)
-          const current = persisted.find((garment) => garment.id === garmentId)
-          if (!current || current.status === 'processing') continue
-          setTimedOutGarmentIds((ids) => {
-            const next = new Set(ids)
-            next.delete(garmentId)
-            return next
-          })
-          if (current.status === 'awaiting_tags') {
-            if (isCaptureOpenRef.current) {
-              pendingTaggingGarmentIdRef.current = current.id
-            } else {
-              setTaggingInvokerNodeHandle(safeFindNodeHandle(addGarmentButtonRef.current))
-              setTaggingGarmentId(current.id)
-            }
-          }
+        const settled = await pollGarmentUntilSettled(
+          token,
+          garmentId,
+          controller.signal,
+          setGarments,
+          pollOffsetsMs
+        )
+        if (!settled) {
+          setTimedOutGarmentIds((ids) => new Set(ids).add(garmentId))
+          setErrorMessage(t('wardrobe.tagging.poll_timeout'))
           return
         }
-        setTimedOutGarmentIds((ids) => new Set(ids).add(garmentId))
-        setErrorMessage(t('wardrobe.tagging.poll_timeout'))
+        setTimedOutGarmentIds((ids) => {
+          const next = new Set(ids)
+          next.delete(garmentId)
+          return next
+        })
+        if (settled.status === 'awaiting_tags') {
+          if (isCaptureOpenRef.current) {
+            pendingTaggingGarmentIdRef.current = settled.id
+          } else {
+            setTaggingInvokerNodeHandle(safeFindNodeHandle(addGarmentButtonRef.current))
+            setTaggingGarmentId(settled.id)
+          }
+        }
       } catch (error) {
         if (!controller.signal.aborted) {
           setErrorMessage(

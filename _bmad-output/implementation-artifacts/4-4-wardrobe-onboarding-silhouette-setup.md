@@ -1372,6 +1372,101 @@ Re-verified after these fixes: full `api` suite green (671 passed, 5
 skipped), `wardrobe-silhouette` integration suite green (85 passed within
 that filtered run), `lint` and `typecheck` clean.
 
+**Task 6 review pass (branch `feat/epic4-story4-t6-mobile`).** After the
+initial Task 6 implementation above, ran two independent adversarial reviews
+against the diff — Murat (the bmad-tea test-architect skill, `bmad-testarch-test-review`)
+for test quality, and a second Claude Code peer session running as a plain
+senior-reviewer prompt against the same diff — and fixed every finding both
+surfaced rather than only the ones either found alone:
+
+- **Correctness (Codex-found, High).** My Form uploads declared
+  `mimeType: 'image/png'` even when the source photo needed no resize (skip
+  branch left the original — possibly JPEG/WebP — bytes untouched). Fixed by
+  always re-encoding through `manipulateAsync` regardless of scale, so the
+  declared mimeType is never false. Added a regression assertion in
+  `4.4-MOB-SIL-07` that fails if the re-encode is skipped.
+- **Correctness (Codex-found, High).** The onboarding checklist/Continue
+  gate only checked for `status === 'awaiting_tags'`; every other status
+  (`processing`, `pending_upload`, `bytes_uploaded`, `failed`) was silently
+  treated as "tags confirmed" and could enable Continue before tagging was
+  even possible. Fixed: only `status === 'ready'` counts as tagged;
+  `awaiting_tags` is the only tappable state. Added
+  `4.4-MOB-ONB-08B` covering a `processing` garment specifically.
+- **Correctness (Murat-found).** `saveSliders`'s live announcement always
+  said "Height" regardless of which slider changed or its new value — a
+  screen-reader user adjusting Build heard the wrong slider name with no
+  value. Fixed to announce `"<changed slider>: <new value>"`; added
+  `4.4-MOB-SIL-11` covering the Build slider specifically (SIL-10 only ever
+  exercised Height, which is why this shipped unnoticed).
+- **Correctness/consistency (Murat-found, converged with Codex's duplication
+  finding).** The onboarding screen's garment-status poller measured its
+  backoff offsets additively (~15s worst case) instead of cumulatively from a
+  fixed start (~8s), diverging from the nearly-identical poller in the
+  wardrobe hub screen purely from copy-paste drift, with zero test coverage
+  of the `processing` path in either screen. Fixed by extracting one
+  `pollGarmentUntilSettled` in `src/lib/wardrobe.ts` (injectable
+  `offsetsMs` for tests) that both screens now call; added unit coverage in
+  `wardrobe.test.ts` (3 tests: settles, times out, garment vanishes) plus an
+  integration regression test in `wardrobe-hub-screen.test.tsx`
+  (`4.4-MOB-HUB-03B`) for the `processing` → poll → auto-open-tagging wiring
+  4.4-R05 is actually about, which no prior test exercised.
+- **Correctness (Codex-found, Medium).** Resuming into an existing My Form
+  `processing`/`bytes_uploaded` state on a fresh mount (e.g. reopening the
+  app) never started polling — only a same-mount upload success did — leaving
+  a stale spinner forever. Fixed: `load()` now starts polling itself when it
+  discovers a non-terminal My Form state. Added `4.4-MOB-SIL-12`.
+- **Correctness (Codex-found, Medium).** Retrying a failed My Form upload
+  kept the failed attempt's idempotency key; picking a different photo then
+  risked a spurious `409 IDEMPOTENCY_KEY_REUSED` (different hash/size under
+  the old key). Fixed: `retryMyForm` clears the key so a post-retry pick is a
+  fresh attempt. Added `4.4-MOB-SIL-08B` proving two sequential attempts
+  mint two different keys (required making the `expo-crypto` mock's
+  `randomUUID` sequential instead of fixed, since a fixed mock can't
+  distinguish "reused" from "regenerated").
+- **Correctness (Codex-found, Medium).** Retrying a failed onboarding step
+  transition after a 412 resubmitted the same stale revision forever, with
+  no recovery short of a full reload. Fixed: retry now refreshes the current
+  state first (picking up the live revision) before resubmitting. Added
+  `4.4-MOB-ONB-12`.
+- **Robustness (Murat-found).** `SilhouetteEditor` called
+  `resolveOwnerUserId(accessToken)` unconditionally at the top of every
+  render, outside any try/catch or error boundary — a malformed token would
+  crash the tree instead of showing a friendly error. Fixed by resolving it
+  inside `load()`'s existing try/catch, matching the pattern the onboarding
+  screen already used.
+- **Duplication (Codex-found, Low, also fixes the poller-divergence bug
+  above).** `safeFindNodeHandle` was duplicated in two screens, `waitForPoll`
+  in three files, and `sha256Hex` in two upload components. Consolidated
+  into two new modules: `src/lib/native-utils.ts` (`waitForPoll` — no
+  react-native/expo-crypto imports, since `wardrobe.ts` needs to import it
+  too) and `src/lib/expo-native-helpers.ts` (`safeFindNodeHandle`,
+  `sha256Hex` — native-only, imported by screens/components which already
+  mock those modules in tests). The two-module split itself was a lesson
+  learned mid-fix: a first attempt put all three in one file, which pulled
+  `expo-crypto` into `wardrobe.ts`'s import graph and broke
+  `wardrobe.test.ts` and `garment-tagging-modal.test.tsx` (neither mocks
+  `expo-crypto`, since neither needed to before).
+- **Test-quality (Murat-found, Low).** `4.4-MOB-SIL-07` paid a real ~2s
+  wall-clock wait from the hardcoded `POLL_INTERVAL_MS` production constant
+  — the slowest test in the suite by ~20x, and a latent CI-flakiness risk.
+  Made the interval an injectable `pollIntervalMs` prop (mirrored as
+  `pollOffsetsMs` on the garment poller too); test file now overrides it to
+  10ms, dropping that file's total runtime from ~2.5s to ~340ms.
+- **Test-coverage (Murat-found, Low).** `4.4-MOB-ONB-08` ("resumes mid-flow
+  after a reload") asserted only the live-region announcement, not that the
+  checklist actually re-rendered the resumed garment — half of what AC1
+  requires. Extended the assertion.
+- **Naming precision (Murat-found, Low, not fixed).** Tests named "...for a
+  teen actor" only simulate the 403 `GUARDIAN_CONSENT_REQUIRED` outcome, not
+  an actual teen/guardian persona (correct scope for a component test — that
+  decision is server-side, Task 3/4). Left the test IDs as-is to avoid
+  churning cross-referenced identifiers; added a one-line comment noting the
+  scope boundary instead.
+
+Full suite after all fixes: `npm run test --workspace mobile` → 36 files,
+207 tests (up from 198 before this pass), all green; lint and typecheck both
+clean; no `.only`/`.skip`.
+
 ### File list
 
 **Task 1 (branch `feat/epic4-story4-t1-db`):**
@@ -1451,7 +1546,7 @@ that filtered run), `lint` and `typecheck` clean.
 - `apps/web/src/i18n/locales/pt-PT.json` (modified)
 - `apps/web/src/i18n/locales/tr-TR.json` (modified)
 - `apps/web/src/i18n/wardrobe-onboarding-locales.spec.ts` (new)
-**Task 6 (branch `feat/epic4-story4-t6-mobile`):**
+  **Task 6 (branch `feat/epic4-story4-t6-mobile`):**
 
 - `apps/mobile/components/wardrobe/garment-capture-modal.tsx` (new — extracted
   from `apps/mobile/app/(tabs)/wardrobe.tsx`)
@@ -1471,8 +1566,13 @@ that filtered run), `lint` and `typecheck` clean.
 - `apps/mobile/app/wardrobe-onboarding.tsx` (new — thin route wrapper)
 - `apps/mobile/app/wardrobe-silhouette.tsx` (new — thin route wrapper)
 - `apps/mobile/src/lib/wardrobe.ts` (modified — onboarding/silhouette
-  generated-SDK wrappers and ETag helpers)
-- `apps/mobile/src/lib/wardrobe.test.ts` (new)
+  generated-SDK wrappers, ETag helpers, and the shared
+  `pollGarmentUntilSettled` added during the post-implementation review pass)
+- `apps/mobile/src/lib/wardrobe.test.ts` (new; extended in the review pass)
+- `apps/mobile/src/lib/native-utils.ts` (new, review pass — shared
+  `waitForPoll`, no react-native/expo-crypto imports)
+- `apps/mobile/src/lib/expo-native-helpers.ts` (new, review pass — shared
+  `safeFindNodeHandle`/`sha256Hex`)
 - `apps/mobile/src/i18n/wardrobe-onboarding-silhouette-locales.spec.ts` (new)
 - `apps/mobile/assets/locales/en-US.json` (modified)
 - `apps/mobile/assets/locales/en-CA.json` (modified)

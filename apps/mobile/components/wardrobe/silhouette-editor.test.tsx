@@ -30,12 +30,15 @@ const imagePicker = vi.hoisted(() => ({
 }))
 vi.mock('expo-image-picker', () => imagePicker)
 
-vi.mock('expo-image-manipulator', () => ({
+const imageManipulator = vi.hoisted(() => ({
   manipulateAsync: vi.fn().mockResolvedValue({
     uri: 'file:///resized.png',
     width: 1024,
     height: 1536,
   }),
+}))
+vi.mock('expo-image-manipulator', () => ({
+  manipulateAsync: imageManipulator.manipulateAsync,
   SaveFormat: { PNG: 'png' },
 }))
 
@@ -52,10 +55,13 @@ vi.mock('expo-file-system', () => ({
   Paths: { cache: 'file:///cache/' },
 }))
 
+// Sequential (not fixed) so a test can prove two upload attempts actually
+// mint two different idempotency keys instead of accidentally reusing one.
+let idempotencyKeyCounter = 0
 vi.mock('expo-crypto', () => ({
   digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
   CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
-  randomUUID: vi.fn(() => 'idem-key-1'),
+  randomUUID: vi.fn(() => `idem-key-${(idempotencyKeyCounter += 1)}`),
 }))
 
 /** Base64url-shaped JWT payload so `resolveOwnerUserId` can decode a userId. */
@@ -75,11 +81,15 @@ const defaultProfile = {
   updatedAt: '2026-08-09T00:00:00.000Z',
 }
 
-function renderEditor() {
+function renderEditor(pollIntervalMs = 10) {
   const onProfileChange = vi.fn()
   render(
     <AccessibilityAnnouncerProvider>
-      <SilhouetteEditor accessToken={ACCESS_TOKEN} onProfileChange={onProfileChange} />
+      <SilhouetteEditor
+        accessToken={ACCESS_TOKEN}
+        onProfileChange={onProfileChange}
+        pollIntervalMs={pollIntervalMs}
+      />
     </AccessibilityAnnouncerProvider>
   )
   return { onProfileChange }
@@ -94,6 +104,7 @@ describe('SilhouetteEditor', () => {
   })
 
   beforeEach(() => {
+    idempotencyKeyCounter = 0
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
     imagePicker.requestCameraPermissionsAsync.mockResolvedValue({ granted: true })
     imagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true })
@@ -228,19 +239,31 @@ describe('SilhouetteEditor', () => {
       http.get('*/api/v1/wardrobe/silhouette', () =>
         HttpResponse.json({ data: defaultProfile })
       ),
-      http.post('*/api/v1/wardrobe/silhouette/my-form/upload-url', () =>
-        HttpResponse.json(
-          {
-            data: {
-              uploadSessionId: 'session-1',
-              uploadUrl: `${window.location.origin}/mock-storage/session-1`,
-              uploadToken: 'upload-token-1',
-              requiredHeaders: { 'content-type': 'image/png' },
-              expiresAt: '2026-08-09T01:00:00.000Z',
+      http.post(
+        '*/api/v1/wardrobe/silhouette/my-form/upload-url',
+        async ({ request }) => {
+          // The picked asset (1000x1600, set in beforeEach) is already under the
+          // 4096px cap, so no resize is needed -- but the photo must still be
+          // re-encoded through manipulateAsync so the declared mimeType below
+          // is actually true. A prior version skipped re-encoding whenever no
+          // resize was needed, silently uploading the original (possibly JPEG)
+          // bytes under a false 'image/png' declaration.
+          expect(imageManipulator.manipulateAsync).toHaveBeenCalled()
+          const body = (await request.json()) as { mimeType: string }
+          expect(body.mimeType).toBe('image/png')
+          return HttpResponse.json(
+            {
+              data: {
+                uploadSessionId: 'session-1',
+                uploadUrl: `${window.location.origin}/mock-storage/session-1`,
+                uploadToken: 'upload-token-1',
+                requiredHeaders: { 'content-type': 'image/png' },
+                expiresAt: '2026-08-09T01:00:00.000Z',
+              },
             },
-          },
-          { status: 201 }
-        )
+            { status: 201 }
+          )
+        }
       ),
       http.put('*/mock-storage/session-1', () => new HttpResponse(null, { status: 204 })),
       http.post('*/api/v1/wardrobe/silhouette/my-form/commit', () =>
@@ -296,12 +319,11 @@ describe('SilhouetteEditor', () => {
       )
     )
 
-    await waitFor(
-      () => {
-        expect(screen.getByTestId('silhouette-my-form-ready')).toBeInTheDocument()
-      },
-      { timeout: 5_000 }
-    )
+    // pollIntervalMs is overridden to 10ms in renderEditor(), so this settles
+    // almost immediately instead of paying the real 2s production interval.
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-ready')).toBeInTheDocument()
+    })
     expect(screen.getByTestId('silhouette-my-form-image')).toBeInTheDocument()
   })
 
@@ -347,6 +369,49 @@ describe('SilhouetteEditor', () => {
     }
   )
 
+  it('4.4-MOB-SIL-08B mints a fresh idempotency key when retrying with a different photo after a failure', async () => {
+    const seenIdempotencyKeys: string[] = []
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: defaultProfile })
+      ),
+      http.post('*/api/v1/wardrobe/silhouette/my-form/upload-url', ({ request }) => {
+        seenIdempotencyKeys.push(request.headers.get('idempotency-key') ?? '')
+        return HttpResponse.json(
+          { statusCode: 500, message: 'boom', error: 'Internal Server Error' },
+          { status: 500 }
+        )
+      })
+    )
+    renderEditor()
+    await waitFor(() => screen.getByTestId('silhouette-height-value'))
+    fireEvent.click(screen.getByTestId('silhouette-tab-my-form'))
+    await waitFor(() => screen.getByTestId('silhouette-my-form-confirm'))
+    fireEvent.click(screen.getByRole('switch'))
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-library')).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    })
+
+    // First attempt fails at allocation.
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+    await waitFor(() => screen.getByTestId('silhouette-my-form-failed'))
+    expect(seenIdempotencyKeys).toHaveLength(1)
+
+    // Retry sends the user back to source selection; picking a photo again
+    // (same or different) must not resubmit the failed attempt's key.
+    fireEvent.click(screen.getByTestId('silhouette-my-form-retry'))
+    await waitFor(() => screen.getByTestId('silhouette-my-form-library'))
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+    await waitFor(() => {
+      expect(seenIdempotencyKeys).toHaveLength(2)
+    })
+
+    expect(seenIdempotencyKeys[0]).not.toBe(seenIdempotencyKeys[1])
+  })
+
   it('4.4-MOB-SIL-09 removes the My Form photo and reverts to the default mannequin', async () => {
     server.use(
       http.get('*/api/v1/wardrobe/silhouette', () =>
@@ -391,7 +456,7 @@ describe('SilhouetteEditor', () => {
     })
   })
 
-  it('4.4-MOB-SIL-10 announces a live region message when a slider save completes', async () => {
+  it('4.4-MOB-SIL-10 announces the changed slider name and its new value', async () => {
     server.use(
       http.get('*/api/v1/wardrobe/silhouette', () =>
         HttpResponse.json({ data: defaultProfile })
@@ -407,7 +472,78 @@ describe('SilhouetteEditor', () => {
 
     await waitFor(() => {
       const liveRegion = document.getElementById('a11y-live-announcer')
-      expect(liveRegion?.textContent).toBe('Height')
+      expect(liveRegion?.textContent).toBe('Height: 55')
+    })
+  })
+
+  it('4.4-MOB-SIL-11 announces the build slider by name, not a hardcoded height announcement', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: defaultProfile })
+      ),
+      http.put('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: { ...defaultProfile, buildSlider: 45, revision: 2 } })
+      )
+    )
+    renderEditor()
+    await waitFor(() => screen.getByTestId('silhouette-build-value'))
+
+    fireEvent.click(screen.getByTestId('silhouette-build-decrement'))
+
+    await waitFor(() => {
+      const liveRegion = document.getElementById('a11y-live-announcer')
+      expect(liveRegion?.textContent).toBe('Build: 45')
+    })
+  })
+
+  it('4.4-MOB-SIL-12 resumes polling a My Form photo still processing from a prior session', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({
+          data: {
+            ...defaultProfile,
+            mode: 'my_form',
+            myForm: {
+              status: 'processing',
+              failureReason: null,
+              committedAt: '2026-08-09T00:05:00.000Z',
+              imageAccess: null,
+            },
+          },
+        })
+      )
+    )
+    renderEditor()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-processing')).toBeInTheDocument()
+    })
+
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({
+          data: {
+            ...defaultProfile,
+            mode: 'my_form',
+            myForm: {
+              status: 'ready',
+              failureReason: null,
+              committedAt: '2026-08-09T00:05:00.000Z',
+              imageAccess: {
+                url: 'https://example.test/my-form.png',
+                expiresAt: '2026-08-09T02:00:00.000Z',
+              },
+            },
+          },
+        })
+      )
+    )
+
+    // Nothing re-triggers the upload flow here; a resumed 'processing' state
+    // must start polling on its own from load(), not only from a same-mount
+    // upload success.
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-ready')).toBeInTheDocument()
     })
   })
 })
