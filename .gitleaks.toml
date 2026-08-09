@@ -29,4 +29,7 @@ regexes = [
   # but gitleaks scans every commit's diff in history, so this allowlist entry
   # covers the already-committed literal rather than requiring a history rewrite.
   '''^header\.eyJzdWIiOiJ1c2VyLTEifQ\.signature$''',
+  # Fixed UUIDs used only as My Form upload/commit idempotency-key fixtures in Pact contracts
+  '''^6eae27b8-8335-476e-a3bf-371e9fa5fd26$''',
+  '''^760490a0-5049-4cdd-afcf-ac8e7ba0b436$''',
 ]
