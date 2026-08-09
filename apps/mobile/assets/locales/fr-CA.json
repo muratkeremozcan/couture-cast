@@ -260,6 +260,46 @@
         "outdoor": "Extérieur",
         "home": "Maison"
       }
+    },
+    "onboarding": {
+      "title": "Configurez votre garde-robe",
+      "permission_title": "Autoriser l'accès à l'appareil photo et aux photos",
+      "permission_body": "CoutureCast a besoin d'accéder à l'appareil photo ou à la photothèque pour capturer vos vêtements.",
+      "permission_denied": "Nous n'avons pas pu accéder à votre appareil photo ni à vos photos. Vous pouvez tout de même importer des fichiers ou utiliser la garde-robe de départ.",
+      "use_starter_wardrobe": "Utiliser la garde-robe de départ",
+      "add_another": "Ajouter un autre vêtement",
+      "continue": "Continuer",
+      "back": "Retour",
+      "checklist_tagged": "{{garment}} : étiquettes confirmées",
+      "checklist_pending": "{{garment}} : étiquettes requises",
+      "complete": "Votre garde-robe est prête",
+      "resumed": "Reprise là où vous vous étiez arrêté",
+      "errors": {
+        "load_failed": "Impossible de charger votre progression de configuration.",
+        "save_failed": "Impossible d'enregistrer cette étape. Réessayez.",
+        "stale": "Cette étape a changé ailleurs. Consultez la dernière version et réessayez."
+      }
+    },
+    "silhouette": {
+      "title": "Silhouette",
+      "mode_default": "Silhouette ajustable",
+      "mode_my_form": "Photo Ma Silhouette",
+      "height_slider_label": "Taille",
+      "build_slider_label": "Carrure",
+      "my_form_upload": "Téléverser une photo en pied",
+      "my_form_guidance": "Portez des vêtements unis blancs ou noirs devant un arrière-plan uni pour la meilleure superposition.",
+      "my_form_confirm": "Je porte des vêtements unis blancs ou noirs",
+      "my_form_retry": "Réessayer le téléversement",
+      "my_form_remove": "Supprimer la photo Ma Silhouette",
+      "processing": "Traitement de votre photo...",
+      "ready": "Photo Ma Silhouette prête",
+      "errors": {
+        "contrast": "Nous n'avons pas pu bien vous distinguer de l'arrière-plan. Reprenez la photo avec des vêtements ou un arrière-plan plus uni.",
+        "privacy_violation": "Cette photo ne peut pas être utilisée. Choisissez une autre photo.",
+        "timeout": "Le traitement a pris trop de temps. Réessayez.",
+        "storage_error": "Nous n'avons pas pu enregistrer cette photo. Réessayez.",
+        "confirm_required": "Confirmez la consigne sur les vêtements de base avant de téléverser."
+      }
     }
   }
 }

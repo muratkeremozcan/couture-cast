@@ -260,6 +260,46 @@
         "outdoor": "Açık hava",
         "home": "Ev"
       }
+    },
+    "onboarding": {
+      "title": "Gardırobunu oluştur",
+      "permission_title": "Kamera ve fotoğraf erişimine izin ver",
+      "permission_body": "CoutureCast, kıyafetlerini yakalamak için kamera veya kitaplık erişimine ihtiyaç duyar.",
+      "permission_denied": "Kameranıza veya fotoğraflarınıza erişemedik. Yine de dosya içe aktarabilir veya başlangıç gardırobunu kullanabilirsiniz.",
+      "use_starter_wardrobe": "Başlangıç gardırobunu kullan",
+      "add_another": "Başka bir kıyafet ekle",
+      "continue": "Devam et",
+      "back": "Geri",
+      "checklist_tagged": "{{garment}}: etiketler onaylandı",
+      "checklist_pending": "{{garment}}: etiket gerekiyor",
+      "complete": "Gardırobunuz hazır",
+      "resumed": "Kaldığınız yerden devam ediliyor",
+      "errors": {
+        "load_failed": "Kurulum ilerlemeniz yüklenemedi.",
+        "save_failed": "Bu adım kaydedilemedi. Tekrar deneyin.",
+        "stale": "Bu adım başka bir yerde değişti. En güncel sürümü inceleyip tekrar deneyin."
+      }
+    },
+    "silhouette": {
+      "title": "Silüet",
+      "mode_default": "Ayarlanabilir silüet",
+      "mode_my_form": "Formum fotoğrafı",
+      "height_slider_label": "Boy",
+      "build_slider_label": "Yapı",
+      "my_form_upload": "Tam boy bir fotoğraf yükle",
+      "my_form_guidance": "En temiz kaplama için düz beyaz veya siyah kıyafet giyip düz bir arka plan kullanın.",
+      "my_form_confirm": "Düz beyaz veya siyah kıyafet giyiyorum",
+      "my_form_retry": "Yüklemeyi tekrar dene",
+      "my_form_remove": "Formum fotoğrafını kaldır",
+      "processing": "Fotoğrafınız işleniyor...",
+      "ready": "Formum fotoğrafı hazır",
+      "errors": {
+        "contrast": "Sizi arka plandan net biçimde ayıramadık. Daha sade kıyafet veya arka planla fotoğrafı tekrar çekin.",
+        "privacy_violation": "Bu fotoğraf kullanılamaz. Farklı bir fotoğraf seçin.",
+        "timeout": "İşlem çok uzun sürdü. Tekrar deneyin.",
+        "storage_error": "Bu fotoğraf kaydedilemedi. Tekrar deneyin.",
+        "confirm_required": "Yüklemeden önce temel giysi yönergesini onaylayın."
+      }
     }
   }
 }

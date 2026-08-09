@@ -9,11 +9,21 @@ import {
   type UpdateOutfitCapsuleInput,
   type ListOutfitCapsulesQuery,
   type OutfitCapsuleContract,
+  type WardrobeOnboardingStateContract,
+  type UpdateWardrobeOnboardingStateInput,
+  type SilhouetteProfileContract,
+  type UpdateSilhouetteSlidersInput,
+  type CreateSilhouetteUploadUrlInput,
+  type CreateSilhouetteUploadUrlResponse,
+  type CommitSilhouettePhotoInput,
   garmentListResponseSchema,
   suggestGarmentTagsResponseSchema,
   updateGarmentTagsResponseSchema,
   outfitCapsuleResponseSchema,
   outfitCapsuleListResponseSchema,
+  wardrobeOnboardingStateResponseSchema,
+  silhouetteProfileResponseSchema,
+  createSilhouetteUploadUrlResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { createMobileApiClient } from './api-client'
 
@@ -296,5 +306,152 @@ export async function deleteCapsuleFromMobile(
     )
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to delete the capsule.')
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Story 4.4: wardrobe onboarding state machine and silhouette profile.
+// Routes are self-scoped to the caller's own `auth.userId` (decision 11), so
+// unlike capsules there is no `ownerUserId` path segment here.
+// ---------------------------------------------------------------------------
+
+/**
+ * The onboarding row is one-per-user with no separate entity id in the response
+ * body, so the strong entity tag is built from the caller's own user id (decoded
+ * from the bearer token via {@link resolveOwnerUserId}) plus the row's revision,
+ * matching the format the API documents: `"onboarding:<userId>:<revision>"`.
+ */
+export function onboardingETag(userId: string, revision: number): string {
+  return `"onboarding:${userId}:${revision}"`
+}
+
+/** Same shape as {@link onboardingETag}, for the sibling singleton-per-user table. */
+export function silhouetteETag(userId: string, revision: number): string {
+  return `"silhouette:${userId}:${revision}"`
+}
+
+export async function getWardrobeOnboardingStateFromMobile(
+  accessToken: string,
+  signal?: AbortSignal
+): Promise<WardrobeOnboardingStateContract> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({ accessToken }).apiV1WardrobeOnboardingGet({
+        signal: requestSignal,
+      })
+    )
+    return wardrobeOnboardingStateResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to load your onboarding progress.')
+  }
+}
+
+export async function updateWardrobeOnboardingStateFromMobile(
+  accessToken: string,
+  input: UpdateWardrobeOnboardingStateInput,
+  ifMatch: string,
+  signal?: AbortSignal
+): Promise<WardrobeOnboardingStateContract> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({ accessToken }).apiV1WardrobeOnboardingPatch(
+        { ifMatch, updateWardrobeOnboardingStateInput: input },
+        { signal: requestSignal }
+      )
+    )
+    return wardrobeOnboardingStateResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to save this onboarding step.')
+  }
+}
+
+export async function getSilhouetteProfileFromMobile(
+  accessToken: string,
+  signal?: AbortSignal
+): Promise<SilhouetteProfileContract> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({ accessToken }).apiV1WardrobeSilhouetteGet({
+        signal: requestSignal,
+      })
+    )
+    return silhouetteProfileResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to load your silhouette profile.')
+  }
+}
+
+export async function updateSilhouetteSlidersFromMobile(
+  accessToken: string,
+  input: UpdateSilhouetteSlidersInput,
+  ifMatch: string,
+  signal?: AbortSignal
+): Promise<SilhouetteProfileContract> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({ accessToken }).apiV1WardrobeSilhouettePut(
+        { ifMatch, updateSilhouetteSlidersInput: input },
+        { signal: requestSignal }
+      )
+    )
+    return silhouetteProfileResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to save your silhouette sliders.')
+  }
+}
+
+export async function createSilhouetteUploadUrlFromMobile(
+  accessToken: string,
+  input: CreateSilhouetteUploadUrlInput,
+  idempotencyKey: string,
+  signal?: AbortSignal
+): Promise<CreateSilhouetteUploadUrlResponse['data']> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({ accessToken }).apiV1WardrobeSilhouetteMyFormUploadUrlPost(
+        { idempotencyKey, createSilhouetteUploadUrlInput: input },
+        { signal: requestSignal }
+      )
+    )
+    return createSilhouetteUploadUrlResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to start the My Form upload.')
+  }
+}
+
+export async function commitSilhouettePhotoFromMobile(
+  accessToken: string,
+  input: CommitSilhouettePhotoInput,
+  idempotencyKey: string,
+  signal?: AbortSignal
+): Promise<SilhouetteProfileContract> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({ accessToken }).apiV1WardrobeSilhouetteMyFormCommitPost(
+        { idempotencyKey, commitSilhouettePhotoInput: input },
+        { signal: requestSignal }
+      )
+    )
+    return silhouetteProfileResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to save your My Form photo.')
+  }
+}
+
+export async function deleteSilhouettePhotoFromMobile(
+  accessToken: string,
+  ifMatch: string,
+  signal?: AbortSignal
+): Promise<SilhouetteProfileContract> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({ accessToken }).apiV1WardrobeSilhouetteMyFormDelete(
+        { ifMatch },
+        { signal: requestSignal }
+      )
+    )
+    return silhouetteProfileResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to remove your My Form photo.')
   }
 }
