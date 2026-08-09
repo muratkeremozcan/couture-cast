@@ -9320,6 +9320,16 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Replayed idempotent commit (already committed with this key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteProfileResponse"
+                }
+              }
+            }
+          },
           "201": {
             "description": "Photo committed and queued for processing.",
             "content": {

@@ -66,6 +66,56 @@ function requireSchema(context: { skip: () => void }): boolean {
   return true
 }
 
+/**
+ * `moderation-review` is a real, persistent Redis-backed queue, so any test
+ * that enqueues a job (any successful `commitMyForm`) must drain it before
+ * finishing -- an un-drained job otherwise sits in Redis and gets picked up
+ * by whichever *other* test's `Worker` happens to run next, breaking that
+ * test's "exactly one job" assertion. This starts one short-lived real
+ * `Worker`, waits for the specific profile's job to complete, and closes.
+ */
+async function drainModerationJob(
+  prisma: PrismaClient,
+  storage: WardrobeStorage,
+  profileId: string
+): Promise<void> {
+  const redisOptions = redisOptionsFromConfig(getRedisConfig())
+  const engine: SilhouettePhotoModerationEngine = {
+    moderate: () => Promise.resolve({ outcome: 'ready' as const }),
+  }
+  const processor = new SilhouettePhotoProcessor(prisma, storage, engine)
+
+  const worker = new Worker<{ silhouetteProfileId: string }>(
+    'moderation-review',
+    async (job) => {
+      const data = silhouettePhotoProcessingJobSchema.parse(job.data)
+      await processor.process(data.silhouetteProfileId)
+    },
+    { connection: redisOptions, concurrency: 1 }
+  )
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error('job did not complete in time')),
+        10_000
+      )
+      worker.on('completed', (job) => {
+        if (job.data.silhouetteProfileId === profileId) {
+          clearTimeout(timeout)
+          resolve()
+        }
+      })
+      worker.on('failed', (_job, err) => {
+        clearTimeout(timeout)
+        reject(err)
+      })
+    })
+  } finally {
+    await worker.close()
+  }
+}
+
 class StubGuardianService {
   allowed = true
   assertWardrobeUploadAllowed(): Promise<void> {
@@ -419,5 +469,92 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
     })
     expect(row.my_form_object_path).toBeNull()
     expect(row.my_form_status).toBeNull()
+  })
+
+  /**
+   * Flagged by Task 7 (Pact)'s review: commitMyForm must distinguish a
+   * fresh commit from an idempotent replay the same way
+   * createMyFormUploadUrl already does, so the controller can return 200 on
+   * replay instead of always 201.
+   */
+  it('4.4-INT-17 replays an identical commit idempotently and conflicts on a reused key with a different session', async (context) => {
+    if (!requireSchema(context)) return
+
+    const image = buildFixtureSilhouettePhoto('ready')
+    const { createHash } = await import('node:crypto')
+    const sha256 = createHash('sha256').update(image).digest('hex')
+
+    const uploadUrlResult = await serviceA.createMyFormUploadUrl(
+      userId,
+      'guardian',
+      {
+        fileSizeBytes: image.length,
+        mimeType: 'image/png',
+        sha256,
+        widthPx: 300,
+        heightPx: 800,
+      },
+      randomUUID()
+    )
+    await prismaA.silhouetteProfile.update({
+      where: { user_id: userId },
+      data: { my_form_status: 'bytes_uploaded' },
+    })
+    await storage.upload(
+      (await prismaA.silhouetteProfile.findUniqueOrThrow({ where: { user_id: userId } }))
+        .my_form_object_path!,
+      image,
+      'image/png'
+    )
+
+    const commitKey = randomUUID()
+    const first = await serviceA.commitMyForm(
+      userId,
+      'guardian',
+      {
+        uploadSessionId: uploadUrlResult.response.data.uploadSessionId,
+        confirmsBasewearGuidance: true,
+      },
+      commitKey
+    )
+    expect(first.replayed).toBe(false)
+
+    const profileId = (
+      await prismaA.silhouetteProfile.findUniqueOrThrow({ where: { user_id: userId } })
+    ).id
+
+    const replay = await serviceA.commitMyForm(
+      userId,
+      'guardian',
+      {
+        uploadSessionId: uploadUrlResult.response.data.uploadSessionId,
+        confirmsBasewearGuidance: true,
+      },
+      commitKey
+    )
+    expect(replay.replayed).toBe(true)
+    expect(replay.response.data.revision).toBe(first.response.data.revision)
+
+    await expect(
+      serviceA.commitMyForm(
+        userId,
+        'guardian',
+        {
+          uploadSessionId: uploadUrlResult.response.data.uploadSessionId,
+          confirmsBasewearGuidance: true,
+        },
+        randomUUID()
+      )
+    ).rejects.toMatchObject({ message: 'IDEMPOTENCY_KEY_REUSED' })
+
+    // The fresh commit above enqueued a real `moderation-review` job. Drain
+    // it only now, after every assertion in this test -- draining it earlier
+    // would let the background worker advance the row's revision mid-test
+    // and break the replay-returns-the-same-revision assertion above. An
+    // un-drained job would otherwise leak into whichever other test's
+    // Worker runs next (see 4.4-INT-15's "exactly one job" assertion),
+    // since this queue is real, shared Redis state, not per-test-scoped
+    // like the database.
+    await drainModerationJob(prismaA, storage, profileId)
   })
 })

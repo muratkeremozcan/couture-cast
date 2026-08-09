@@ -2153,6 +2153,14 @@ export function registerWardrobeContracts(
           },
         },
       },
+      200: {
+        description: 'Replayed idempotent commit (already committed with this key).',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteProfileResponse,
+          },
+        },
+      },
       400: {
         description: 'Invalid commit payload.',
         content: {

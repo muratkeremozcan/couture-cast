@@ -158,7 +158,6 @@ export class WardrobeSilhouetteController {
   }
 
   @Post('my-form/commit')
-  @HttpCode(201)
   async commitMyForm(
     @AuthContext() auth: RequestAuthContext,
     @Headers('idempotency-key') idempotencyKey: string,
@@ -171,14 +170,18 @@ export class WardrobeSilhouetteController {
       throw new BadRequestException('INVALID_IDEMPOTENCY_KEY')
     }
 
-    const { response } = await this.silhouetteService.commitMyForm(
+    const result = await this.silhouetteService.commitMyForm(
       auth.userId,
       auth.role,
       input,
       parsedKey.data
     )
-    res.setHeader('ETag', formatSilhouetteETag(auth.userId, response.data.revision))
-    return response
+    res.setHeader(
+      'ETag',
+      formatSilhouetteETag(auth.userId, result.response.data.revision)
+    )
+    res.status(result.replayed ? 200 : 201)
+    return result.response
   }
 
   @Delete('my-form')

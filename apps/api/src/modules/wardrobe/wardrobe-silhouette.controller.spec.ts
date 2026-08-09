@@ -41,7 +41,9 @@ describe('WardrobeSilhouetteController', () => {
         .fn()
         .mockResolvedValue({ replayed: false, response: uploadUrlResponse }),
       uploadMyFormBytes: vi.fn().mockResolvedValue(undefined),
-      commitMyForm: vi.fn().mockResolvedValue({ response: profileResponse }),
+      commitMyForm: vi
+        .fn()
+        .mockResolvedValue({ replayed: false, response: profileResponse }),
       deleteMyForm: vi.fn().mockResolvedValue({ response: profileResponse }),
     }) as unknown as WardrobeSilhouetteService
 
@@ -195,6 +197,24 @@ describe('WardrobeSilhouetteController', () => {
       res
     )
     expect(res.headers.etag).toBe('"silhouette:user-1:1"')
+  })
+
+  it('4.4-UNIT-CTRL-08 POST commit returns 201 for a fresh commit and 200 for a replay', async () => {
+    const service = createMockService()
+    const controller = new WardrobeSilhouetteController(service)
+    const idempotencyKey = '4b6b3b0a-1c8a-4a9e-8b8e-1a2b3c4d5e6f'
+    const body = { uploadSessionId: 'session-1', confirmsBasewearGuidance: true as const }
+
+    const freshRes = createMockRes()
+    await controller.commitMyForm(auth, idempotencyKey, body, freshRes)
+    expect(freshRes.status).toHaveBeenCalledWith(201)
+    ;(service.commitMyForm as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      replayed: true,
+      response: profileResponse,
+    })
+    const replayRes = createMockRes()
+    await controller.commitMyForm(auth, idempotencyKey, body, replayRes)
+    expect(replayRes.status).toHaveBeenCalledWith(200)
   })
 
   it('4.4-UNIT-CTRL-09 DELETE forwards If-Match and stamps a fresh ETag', async () => {

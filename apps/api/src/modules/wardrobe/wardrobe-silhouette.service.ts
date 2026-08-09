@@ -106,7 +106,7 @@ function mapImageValidationError(error: GarmentImageValidationError): never {
 
 type SliderResult = { response: SilhouetteProfileResponse; isNoOp: boolean }
 type UploadUrlResult = { replayed: boolean; response: CreateSilhouetteUploadUrlResponse }
-type CommitResult = { response: SilhouetteProfileResponse }
+type CommitResult = { replayed: boolean; response: SilhouetteProfileResponse }
 
 @Injectable()
 export class WardrobeSilhouetteService {
@@ -487,7 +487,7 @@ export class WardrobeSilhouetteService {
       profile.my_form_status === 'failed'
     ) {
       if (profile.my_form_commit_idempotency_key === idempotencyKey) {
-        return { response: await this.toResponse(profile) }
+        return { replayed: true, response: await this.toResponse(profile) }
       }
       throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
     }
@@ -516,7 +516,7 @@ export class WardrobeSilhouetteService {
     const refreshed = await this.prisma.silhouetteProfile.findUniqueOrThrow({
       where: { id: profile.id },
     })
-    return { response: await this.toResponse(refreshed) }
+    return { replayed: false, response: await this.toResponse(refreshed) }
   }
 
   /**

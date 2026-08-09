@@ -1219,6 +1219,46 @@ Fixed by registering `201` in `wardrobe.ts` and adding an explicit
 of relying on the implicit default), then regenerated the SDK. `optic:lint`
 clean; full `api`/`api-client` suites still green.
 
+**Second fix on `feat/epic4-story4-t8-e2e` (this integrator session), also
+found by Task 7's provider verification.** Pact flagged that the unconditional
+`@HttpCode(201)` above was itself incomplete: unlike
+`createMyFormUploadUrl`, `commitMyForm` had no way to distinguish a fresh
+commit from an idempotent replay, so a replay (same `Idempotency-Key`,
+identical payload) also returned `201` instead of the `200` this codebase's
+established replay convention uses. Fixed at the source: `CommitResult`
+in `wardrobe-silhouette.service.ts` now carries `replayed: boolean`
+(`true` on the pre-existing-key branch, `false` on the fresh-commit branch);
+removed the unconditional `@HttpCode(201)` decorator and replaced it with
+`res.status(result.replayed ? 200 : 201)` in the controller, matching
+`createMyFormUploadUrl`'s existing pattern exactly. Registered `200` as an
+additional documented response in `wardrobe.ts` alongside the existing `201`,
+regenerated the SDK (no generated-code diff — only the OpenAPI doc changed).
+Added `4.4-UNIT-CTRL-08`'s fresh/replay status-code case and a new
+integration test, `4.4-INT-17`, exercising commit → replay → conflicting-key
+reuse end to end against real Postgres.
+
+`4.4-INT-17`'s first version introduced a test-isolation bug: its fresh
+commit enqueues a real job on the real Redis-backed `moderation-review`
+BullMQ queue (same as `4.4-INT-15`'s), but the test never drained it. That
+queue is shared external state across the whole suite, not scoped per test
+like the database, so the dangling job was later picked up by `4.4-INT-15`'s
+own `Worker`, inflating its "exactly one job processed" assertion to two and
+failing the regression Risk 4.4-R01 exists to catch. Fixed by extracting
+`drainModerationJob(prisma, storage, profileId)` (mirrors INT-15's real-Worker
+pattern: trivial always-`'ready'` engine, one short-lived `Worker`, waits for
+the specific profile's job, closes) and calling it from `4.4-INT-17` only
+after every assertion in the test body — draining mid-test was tried first
+and rejected, since letting the background worker advance the row's revision
+before the replay assertion broke `replay.response.data.revision` matching
+`first.response.data.revision`. Also obliterated a batch of already-stale
+completed jobs left over in the local Redis instance from earlier failed
+runs of this same fix, which were masking whether the fix actually worked.
+Full `api` suite green (670 passed, 5 skipped) after the fix; the only other
+failures seen mid-session (`wardrobe-capsules-query-plan.integration.spec.ts`,
+Story 4.3, untouched by this branch) were a pre-existing Postgres
+planner-statistics flake confirmed by running that file alone twice — not
+caused by this change.
+
 ### File list
 
 **Task 1 (branch `feat/epic4-story4-t1-db`):**
