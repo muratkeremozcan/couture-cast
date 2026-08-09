@@ -27,15 +27,17 @@ import {
   verifyOnboardingStateInteraction,
   verifyOnboardingVirtualDefaultInteraction,
   verifyPatchOnboardingStateInteraction,
-  verifyOnboardingErrorInteractions,
+  verifyWardrobeErrorInteraction,
+  onboardingErrorInteractions,
   verifySilhouetteProfileInteraction,
   verifyUpdateSilhouetteSlidersInteraction,
-  verifySilhouetteGuardianConsentInteractions,
+  silhouetteGuardianErrorInteractions,
   verifySilhouetteStalePreconditionInteraction,
   verifyMyFormUploadUrlInteraction,
   verifyMyFormCommitInteraction,
   verifyMyFormReadyInteraction,
-  verifyMyFormFailureInteractions,
+  verifyMyFormFailureInteraction,
+  myFormFailureReasons,
   verifyMyFormGuardianNotificationInteraction,
   verifyMyFormDeleteInteraction,
 } from './api-contract-interactions'
@@ -146,9 +148,12 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
     await verifyPatchOnboardingStateInteraction(pact, createMobileClientForMockServer)
   })
 
-  it('preserves documented onboarding error envelopes', async () => {
-    await verifyOnboardingErrorInteractions(pact)
-  })
+  it.each(onboardingErrorInteractions)(
+    'preserves the documented onboarding error envelope: $description',
+    async (interaction) => {
+      await verifyWardrobeErrorInteraction(pact, interaction)
+    }
+  )
 
   it('reads the silhouette profile', async () => {
     await verifySilhouetteProfileInteraction(pact, createMobileClientForMockServer)
@@ -158,9 +163,12 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
     await verifyUpdateSilhouetteSlidersInteraction(pact, createMobileClientForMockServer)
   })
 
-  it('enforces guardian consent on silhouette reads and writes', async () => {
-    await verifySilhouetteGuardianConsentInteractions(pact)
-  })
+  it.each(silhouetteGuardianErrorInteractions)(
+    'enforces guardian consent on silhouette access: $description',
+    async (interaction) => {
+      await verifyWardrobeErrorInteraction(pact, interaction)
+    }
+  )
 
   it('rejects a stale silhouette revision precondition', async () => {
     await verifySilhouetteStalePreconditionInteraction(pact)
@@ -178,9 +186,16 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
     await verifyMyFormReadyInteraction(pact, createMobileClientForMockServer)
   })
 
-  it('preserves each documented My Form failure reason', async () => {
-    await verifyMyFormFailureInteractions(pact, createMobileClientForMockServer)
-  })
+  it.each(myFormFailureReasons)(
+    'preserves the documented My Form failure reason: %s',
+    async (failureReason) => {
+      await verifyMyFormFailureInteraction(
+        pact,
+        createMobileClientForMockServer,
+        failureReason
+      )
+    }
+  )
 
   it('queues a guardian notification for a teen privacy_violation verdict', async () => {
     await verifyMyFormGuardianNotificationInteraction(

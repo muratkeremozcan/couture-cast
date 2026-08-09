@@ -1694,8 +1694,15 @@ export async function verifyPatchOnboardingStateInteraction(
  * Mirrors `verifySmartTagErrorInteraction`/`capsuleErrorInteractions`, but
  * generalized over both new tables' state params in one place instead of
  * duplicating the helper a third time.
+ *
+ * Exported, along with the interaction tables below, so each pacttest file
+ * can drive one `it.each(...)` row per interaction rather than looping over
+ * the table inside a single `it()` — PactV4's Rust FFI non-deterministically
+ * drops an interaction when more than one `addInteraction()...executeTest()`
+ * chain is awaited inside one test body, so "one interaction per test" (the
+ * task's own wording) means one per `it()`, not one per exported function.
  */
-type WardrobeErrorInteraction = {
+export type WardrobeErrorInteraction = {
   description: string
   method: 'GET' | 'PATCH' | 'PUT' | 'POST' | 'DELETE'
   path: string
@@ -1708,7 +1715,7 @@ type WardrobeErrorInteraction = {
   reason: string
 }
 
-async function verifyWardrobeErrorInteraction(
+export async function verifyWardrobeErrorInteraction(
   pact: PactV4,
   interaction: WardrobeErrorInteraction
 ) {
@@ -1758,7 +1765,7 @@ async function verifyWardrobeErrorInteraction(
     })
 }
 
-const onboardingErrorInteractions: WardrobeErrorInteraction[] = [
+export const onboardingErrorInteractions: WardrobeErrorInteraction[] = [
   {
     description: 'a request that skips ahead to an unreachable onboarding step',
     method: 'PATCH',
@@ -1796,12 +1803,6 @@ const onboardingErrorInteractions: WardrobeErrorInteraction[] = [
     reason: 'Precondition Required',
   },
 ]
-
-export async function verifyOnboardingErrorInteractions(pact: PactV4) {
-  for (const interaction of onboardingErrorInteractions) {
-    await verifyWardrobeErrorInteraction(pact, interaction)
-  }
-}
 
 // --- Silhouette sliders (ownership: owner reading/writing own profile) -----
 
@@ -1894,7 +1895,12 @@ export async function verifyUpdateSilhouetteSlidersInteraction(
     })
 }
 
-const silhouetteGuardianErrorInteractions: WardrobeErrorInteraction[] = [
+/**
+ * "Guardian access" for onboarding/silhouette (decision 11) is the
+ * `WardrobeUploadGuard` consent gate, not a guardian dashboard route:
+ * proven here for both a read and a write by a teen actor.
+ */
+export const silhouetteGuardianErrorInteractions: WardrobeErrorInteraction[] = [
   {
     description:
       'a request from a teen without active guardian consent to read the silhouette profile',
@@ -1921,17 +1927,6 @@ const silhouetteGuardianErrorInteractions: WardrobeErrorInteraction[] = [
     reason: 'Forbidden',
   },
 ]
-
-/**
- * "Guardian access" for onboarding/silhouette (decision 11) is the
- * `WardrobeUploadGuard` consent gate, not a guardian dashboard route:
- * proven here for both a read and a write by a teen actor.
- */
-export async function verifySilhouetteGuardianConsentInteractions(pact: PactV4) {
-  for (const interaction of silhouetteGuardianErrorInteractions) {
-    await verifyWardrobeErrorInteraction(pact, interaction)
-  }
-}
 
 export async function verifySilhouetteStalePreconditionInteraction(pact: PactV4) {
   await verifyWardrobeErrorInteraction(pact, {
@@ -2052,8 +2047,14 @@ export async function verifyMyFormCommitInteraction(
       setJsonContent({
         headers: { ETag: string(silhouetteETagFor(2)) },
         body: {
+          // `mode` stays `default_mannequin` while the photo is still
+          // `processing`: AC2/decision 5 say a *ready* photo becomes the
+          // active silhouette mode, and a failed attempt never switches it
+          // either (see the failure-reason interactions below) — so an
+          // in-flight commit can't jump ahead of that rule and switch mode
+          // before the pipeline has produced a `ready` result.
           data: silhouetteProfileBody(2, {
-            mode: 'my_form',
+            mode: 'default_mannequin',
             heightSlider: 50,
             buildSlider: 50,
             myForm: {
@@ -2077,9 +2078,9 @@ export async function verifyMyFormCommitInteraction(
         },
       })
 
-      expect(silhouetteProfileResponseSchema.parse(response).data.myForm?.status).toBe(
-        'processing'
-      )
+      const parsed = silhouetteProfileResponseSchema.parse(response).data
+      expect(parsed.myForm?.status).toBe('processing')
+      expect(parsed.mode).toBe('default_mannequin')
     })
 }
 
@@ -2133,67 +2134,70 @@ export async function verifyMyFormReadyInteraction(
     })
 }
 
-const myFormFailureReasons = [
+export const myFormFailureReasons = [
   'contrast',
   'privacy_violation',
   'timeout',
   'storage_error',
 ] as const satisfies readonly SilhouettePhotoFailureReason[]
 
-/** Covers each documented "My Form" failure reason (decision 5/9), one interaction per reason. */
-export async function verifyMyFormFailureInteractions(
+/**
+ * Covers one documented "My Form" failure reason (decision 5/9). Exported as
+ * a single-interaction function, driven by `it.each(myFormFailureReasons)`
+ * in each pacttest file, rather than looping over all four reasons inside
+ * one exported function/`it()` — PactV4's FFI non-deterministically drops an
+ * interaction when more than one `addInteraction()...executeTest()` chain is
+ * awaited inside a single test body (see `verifyWardrobeErrorInteraction`'s
+ * doc comment above).
+ */
+export async function verifyMyFormFailureInteraction(
   pact: PactV4,
-  createClient: CreateClient
+  createClient: CreateClient,
+  failureReason: SilhouettePhotoFailureReason
 ) {
-  for (const failureReason of myFormFailureReasons) {
-    await pact
-      .addInteraction()
-      .given(
-        ...createProviderState({
-          name: 'A My Form photo failed for user',
-          params: { userId: ONBOARDING_OWNER_ID, reason: failureReason },
-        })
-      )
-      .uponReceiving(
-        `a request to read a My Form photo that failed with ${failureReason}`
-      )
-      .withRequest(
-        'GET',
-        '/api/v1/wardrobe/silhouette',
-        setJsonContent({ headers: pactEventHeaders })
-      )
-      .willRespondWith(
-        200,
-        setJsonContent({
-          headers: { ETag: string(silhouetteETagFor(2)) },
-          body: {
-            // A failed My Form attempt never switches the active mode; the
-            // previous mannequin sliders remain in effect (AC2/decision 5).
-            data: silhouetteProfileBody(2, {
-              mode: 'default_mannequin',
-              heightSlider: 50,
-              buildSlider: 50,
-              myForm: {
-                status: 'failed',
-                failureReason,
-                committedAt: null,
-                imageAccess: null,
-              },
-            }),
-          },
-        })
-      )
-      .executeTest(async (mockServer: V3MockServer) => {
-        const response = await createClient(mockServer).apiV1WardrobeSilhouetteGet()
-
-        expect(silhouetteProfileResponseSchema.parse(response).data.myForm).toMatchObject(
-          {
-            status: 'failed',
-            failureReason,
-          }
-        )
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A My Form photo failed for user',
+        params: { userId: ONBOARDING_OWNER_ID, reason: failureReason },
       })
-  }
+    )
+    .uponReceiving(`a request to read a My Form photo that failed with ${failureReason}`)
+    .withRequest(
+      'GET',
+      '/api/v1/wardrobe/silhouette',
+      setJsonContent({ headers: pactEventHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(silhouetteETagFor(2)) },
+        body: {
+          // A failed My Form attempt never switches the active mode; the
+          // previous mannequin sliders remain in effect (AC2/decision 5).
+          data: silhouetteProfileBody(2, {
+            mode: 'default_mannequin',
+            heightSlider: 50,
+            buildSlider: 50,
+            myForm: {
+              status: 'failed',
+              failureReason,
+              committedAt: null,
+              imageAccess: null,
+            },
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeSilhouetteGet()
+
+      expect(silhouetteProfileResponseSchema.parse(response).data.myForm).toMatchObject({
+        status: 'failed',
+        failureReason,
+      })
+    })
 }
 
 /**

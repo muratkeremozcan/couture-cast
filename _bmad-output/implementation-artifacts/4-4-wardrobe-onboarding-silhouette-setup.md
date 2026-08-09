@@ -1586,6 +1586,61 @@ Full suite after all fixes: `npm run test --workspace mobile` → 36 files,
 207 tests (up from 198 before this pass), all green; lint and typecheck both
 clean; no `.only`/`.skip`.
 
+**Task 7 test-architect review (Murat, `bmad-tea`).** Reviewed the above
+against this repo's Pact/TEA knowledge base and found two real defects in
+the newly-added consumer interactions, both fixed in place (interaction
+count unchanged: still 47 Web / 42 Mobile, `test:pact:consumer` stable
+across 3 determinism runs after the fix):
+
+- **Mandatory "one `addInteraction()` per `it()`" rule violated.** Three of
+  the new grouped verify functions
+  (`verifyOnboardingErrorInteractions`, `verifySilhouetteGuardianConsentInteractions`,
+  `verifyMyFormFailureInteractions`) looped over multiple interactions and
+  awaited each `addInteraction()...executeTest()` chain sequentially inside
+  one exported function, itself called from a single `it()` block. PactV4's
+  Rust FFI is documented to non-deterministically drop whole interactions
+  (not fields) when this happens, roughly 1 run in N — a flake that would
+  not necessarily show up in a handful of local determinism runs but could
+  bite in CI or at publish time with `Cannot change pact content for
+already published pact`. Fixed by exporting the single-interaction
+  primitives and interaction tables
+  (`verifyWardrobeErrorInteraction`, `onboardingErrorInteractions`,
+  `silhouetteGuardianErrorInteractions`, `verifyMyFormFailureInteraction`,
+  `myFormFailureReasons`) and driving them with `it.each(...)` in both
+  pacttest files instead, so each interaction gets its own `it()`. Note for
+  a future pass: the pre-existing capsule/smart-tagging error interactions
+  (`verifyCapsuleErrorInteractions`, `verifySuggestGarmentTagsErrorInteractions`,
+  `verifyUpdateGarmentTagsErrorInteractions`, from Stories 4.1/4.2/4.3) have
+  the identical latent issue; left untouched here as pre-existing code
+  outside Task 7's scope, but worth the same `it.each` treatment in a
+  follow-up.
+- **Internal inconsistency in the My Form commit interaction's fixture.**
+  `verifyMyFormCommitInteraction`'s response set `mode: 'my_form'`
+  immediately after commit while `myForm.status` was still `processing`,
+  contradicting this same file's own failure-reason interactions (and
+  AC2/decision 5's precise wording: "a _ready_ photo becomes the active
+  silhouette mode"), which correctly keep `mode: 'default_mannequin'` for a
+  `failed` result. If left uncorrected this would have baked an incorrect
+  assumption into the contract that the real Task 3/4 implementation would
+  either have to wrongly match or fail provider verification against later.
+  Fixed: the commit interaction now asserts `mode: 'default_mannequin'`
+  while `myForm.status` is `processing`; only `verifyMyFormReadyInteraction`
+  asserts `mode: 'my_form'`.
+
+Also checked, no changes needed: `zodToPactMatchers` (the schema-driven
+matcher generator the TEA knowledge base recommends over hand-written
+matcher objects) is not available in this repo's installed
+`@seontechnologies/pactjs-utils@1.1.0` — confirmed absent from its type
+declarations — so the hand-written `onboardingStateBody`/
+`silhouetteProfileBody` helpers correctly mirror this file's 100%-consistent
+existing convention (`capsuleBody`, the ritual/comfort inline matchers) and
+are the only option available; not a gap to fix. Provider verifier
+assembly (`buildVerifierOptions`, `pool: 'forks'` + `singleFork: true`) was
+already compliant and untouched. Dispatched a second, independent review
+(`$bmad-code-review` via a Codex peer session in this same worktree) in
+parallel; its findings, if any beyond the above, will be triaged and
+remediated as a follow-up note.
+
 ### File list
 
 **Task 1 (branch `feat/epic4-story4-t1-db`):**
