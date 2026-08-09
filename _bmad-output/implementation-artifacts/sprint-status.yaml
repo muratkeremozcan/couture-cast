@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-08-07
+last_updated: 2026-08-09
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -84,7 +84,7 @@ development_status:
   4-1-garment-capture-flow: done
   4-2-smart-tagging-comfort-metadata: done
   4-3-outfit-capsule-builder: done
-  4-4-wardrobe-onboarding-silhouette-setup: backlog
+  4-4-wardrobe-onboarding-silhouette-setup: ready-for-dev
 
   # Epic 5: Commerce & Premium Enhancements (Phase 2)
   epic-5: backlog
