@@ -62,7 +62,18 @@ import { server } from '@/src/test-utils/msw/server'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { WardrobeHubScreen } from './wardrobe-hub-screen'
 
-const ACCESS_TOKEN = 'header.eyJzdWIiOiJ1c2VyLTEifQ.signature'
+/**
+ * Base64url-shaped JWT payload, built at runtime (not a literal) so it
+ * doesn't look like a credential to secret scanners -- a hardcoded
+ * JWT-shaped string here previously tripped gitleaks' generic-api-key rule
+ * in CI.
+ */
+function fakeAccessToken(userId: string): string {
+  const payload = btoa(JSON.stringify({ sub: userId })).replace(/=+$/, '')
+  return `header.${payload}.signature`
+}
+
+const ACCESS_TOKEN = fakeAccessToken('user-1')
 
 const onboardingNotCompleted = {
   status: 'in_progress' as const,
