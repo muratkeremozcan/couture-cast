@@ -60,17 +60,67 @@ describe('Wardrobe Onboarding HTTP Contracts', () => {
       })
     })
 
-    it('validates every documented onboarding status and step value', () => {
+    it('validates every documented onboarding status paired with its only valid step/timestamp combination', () => {
+      // Grounded in wardrobe-onboarding.service.ts's VIRTUAL_STATE and
+      // createFirstState/advanceExistingState: not_started only ever pairs
+      // with currentStep 'permission' and null timestamps at revision 0;
+      // completed only ever pairs with currentStep 'complete' and a set
+      // completedAt (the cross-field invariants below, not independent
+      // per-field overrides -- overriding only `status` on an otherwise
+      // unrelated fixture is exactly what let an invalid combination like
+      // {status: 'not_started', currentStep: 'silhouette'} slip through
+      // before the schema enforced this).
+      const validStateForStatus: Record<
+        z.infer<typeof wardrobeOnboardingStatusEnum>,
+        Record<string, unknown>
+      > = {
+        not_started: {
+          status: 'not_started',
+          currentStep: 'permission',
+          startedAt: null,
+          completedAt: null,
+          revision: 0,
+        },
+        in_progress: {
+          status: 'in_progress',
+          currentStep: 'capture',
+          startedAt: '2026-08-09T09:00:00.000Z',
+          completedAt: null,
+          revision: 1,
+        },
+        completed: {
+          status: 'completed',
+          currentStep: 'complete',
+          startedAt: '2026-08-09T09:00:00.000Z',
+          completedAt: '2026-08-09T09:20:00.000Z',
+          revision: 5,
+        },
+      }
+
       for (const status of wardrobeOnboardingStatusEnum.options) {
         expect(
-          wardrobeOnboardingStateSchema.safeParse(buildOnboardingState({ status }))
-            .success
+          wardrobeOnboardingStateSchema.safeParse(
+            buildOnboardingState(validStateForStatus[status])
+          ).success
         ).toBe(true)
       }
+
+      const validStateForStep: Record<
+        z.infer<typeof wardrobeOnboardingStepEnum>,
+        Record<string, unknown>
+      > = {
+        permission: validStateForStatus.not_started,
+        capture: validStateForStatus.in_progress,
+        tagging: { ...validStateForStatus.in_progress, currentStep: 'tagging' },
+        silhouette: { ...validStateForStatus.in_progress, currentStep: 'silhouette' },
+        complete: validStateForStatus.completed,
+      }
+
       for (const currentStep of wardrobeOnboardingStepEnum.options) {
         expect(
-          wardrobeOnboardingStateSchema.safeParse(buildOnboardingState({ currentStep }))
-            .success
+          wardrobeOnboardingStateSchema.safeParse(
+            buildOnboardingState(validStateForStep[currentStep])
+          ).success
         ).toBe(true)
       }
     })
@@ -109,6 +159,63 @@ describe('Wardrobe Onboarding HTTP Contracts', () => {
       expectIssuePath(
         wardrobeOnboardingStateSchema,
         buildOnboardingState({ currentStep: 'checkout' }),
+        'currentStep'
+      )
+    })
+
+    it('rejects lifecycle combinations the state machine can never produce (MEDIUM 1, bmad-code-review)', () => {
+      // not_started is only ever the virtual default: any other step,
+      // non-null timestamp, or non-zero revision paired with it is
+      // impossible per VIRTUAL_STATE/createFirstState.
+      expectIssuePath(
+        wardrobeOnboardingStateSchema,
+        buildOnboardingState({
+          status: 'not_started',
+          currentStep: 'silhouette',
+          startedAt: null,
+          completedAt: null,
+          revision: 0,
+        }),
+        'currentStep'
+      )
+      expectIssuePath(
+        wardrobeOnboardingStateSchema,
+        buildOnboardingState({
+          status: 'not_started',
+          currentStep: 'permission',
+          startedAt: '2026-08-09T09:00:00.000Z',
+          completedAt: null,
+          revision: 0,
+        }),
+        'startedAt'
+      )
+      // completed is the one terminal step: completedAt must be set, and
+      // currentStep must be 'complete', in both directions.
+      expectIssuePath(
+        wardrobeOnboardingStateSchema,
+        buildOnboardingState({
+          status: 'completed',
+          currentStep: 'complete',
+          completedAt: null,
+        }),
+        'completedAt'
+      )
+      expectIssuePath(
+        wardrobeOnboardingStateSchema,
+        buildOnboardingState({
+          status: 'in_progress',
+          currentStep: 'complete',
+          completedAt: null,
+        }),
+        'currentStep'
+      )
+      expectIssuePath(
+        wardrobeOnboardingStateSchema,
+        buildOnboardingState({
+          status: 'completed',
+          currentStep: 'silhouette',
+          completedAt: '2026-08-09T09:20:00.000Z',
+        }),
         'currentStep'
       )
     })

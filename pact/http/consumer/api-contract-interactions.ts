@@ -1690,6 +1690,67 @@ export async function verifyPatchOnboardingStateInteraction(
 }
 
 /**
+ * AC4: "a repeated identical mutation is a safe no-op that changes no
+ * revision or telemetry." Grounded in
+ * `wardrobe-onboarding.service.ts`'s `advanceExistingState`: a PATCH whose
+ * `targetStep`/`usedStarterWardrobe` exactly match the current row is an
+ * `isIdenticalReplay`, returned unchanged (same revision, same ETag) rather
+ * than incrementing. `verifyPatchOnboardingStateInteraction`'s "Wardrobe
+ * onboarding state exists for user" fixture implies `currentStep: 'capture'`
+ * at revision 1 (that interaction advances it to `'tagging'`); replaying
+ * with `targetStep: 'capture'` (the *current* step, not the next one) is
+ * exactly the identical-replay condition.
+ */
+export async function verifyOnboardingReplayInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Wardrobe onboarding state exists for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a repeated identical onboarding step transition')
+    .withRequest(
+      'PATCH',
+      '/api/v1/wardrobe/onboarding',
+      setJsonContent({
+        headers: { ...pactEventHeaders, 'If-Match': onboardingETagFor(1) },
+        body: { targetStep: 'capture' },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(onboardingETagFor(1)) },
+        body: {
+          data: onboardingStateBody(1, {
+            status: 'in_progress',
+            currentStep: 'capture',
+            usedStarterWardrobe: false,
+            garmentsCapturedCount: 1,
+            startedAt: ONBOARDING_STARTED_AT,
+            completedAt: null,
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeOnboardingPatch({
+        ifMatch: onboardingETagFor(1),
+        updateWardrobeOnboardingStateInput: { targetStep: 'capture' },
+      })
+
+      const parsed = wardrobeOnboardingStateResponseSchema.parse(response).data
+      expect(parsed.currentStep).toBe('capture')
+      expect(parsed.revision).toBe(1)
+    })
+}
+
+/**
  * Shared documented-error-envelope interaction for the Story 4.4 routes.
  * Mirrors `verifySmartTagErrorInteraction`/`capsuleErrorInteractions`, but
  * generalized over both new tables' state params in one place instead of
@@ -1712,7 +1773,14 @@ export type WardrobeErrorInteraction = {
   body?: Record<string, unknown>
   status: number
   code: string
-  reason: string
+  /**
+   * Nest's reason phrase, carried in `error`. `null` for the 428 case: real
+   * provider verification confirmed `parseOnboardingIfMatchHeader`/
+   * `parseSilhouetteIfMatchHeader` raise a bare `HttpException` for a
+   * missing `If-Match`, which carries no `error` field at all — mirroring
+   * `CapsuleErrorInteraction`'s identical, already-documented 428 case.
+   */
+  reason: string | null
 }
 
 export async function verifyWardrobeErrorInteraction(
@@ -1740,7 +1808,7 @@ export async function verifyWardrobeErrorInteraction(
         body: {
           statusCode: like(interaction.status),
           message: string(interaction.code),
-          error: string(interaction.reason),
+          ...(interaction.reason ? { error: string(interaction.reason) } : {}),
         },
       })
     )
@@ -1761,7 +1829,7 @@ export async function verifyWardrobeErrorInteraction(
       }
       expect(payload.statusCode).toBe(interaction.status)
       expect(payload.message).toBe(interaction.code)
-      expect(payload.error).toBe(interaction.reason)
+      expect(payload.error).toBe(interaction.reason ?? undefined)
     })
 }
 
@@ -1800,7 +1868,10 @@ export const onboardingErrorInteractions: WardrobeErrorInteraction[] = [
     body: { targetStep: 'tagging' },
     status: 428,
     code: 'PRECONDITION_REQUIRED',
-    reason: 'Precondition Required',
+    // 428 is raised as a bare HttpException, not a named Nest exception, so
+    // the response carries no `error` reason phrase — confirmed against the
+    // real provider (see the capsule 428 case's identical, pre-existing note).
+    reason: null,
   },
 ]
 
@@ -1892,6 +1963,63 @@ export async function verifyUpdateSilhouetteSlidersInteraction(
         heightSlider: 62,
         buildSlider: 40,
       })
+    })
+}
+
+/**
+ * AC4's safe-no-op replay requirement, for silhouette sliders. Grounded in
+ * `wardrobe-silhouette.service.ts`'s `updateSliders`: a PUT whose slider
+ * values (and implicit `mode: 'default_mannequin'`) exactly match the
+ * existing row is an `isIdenticalReplay`, returned unchanged rather than
+ * incrementing. "Silhouette profile exists for user" implies
+ * `heightSlider: 50, buildSlider: 50` at revision 1
+ * (`verifySilhouetteProfileInteraction`'s fixture); resending those same
+ * values is exactly the identical-replay condition.
+ */
+export async function verifyUpdateSilhouetteSlidersReplayInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Silhouette profile exists for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a repeated identical silhouette slider save')
+    .withRequest(
+      'PUT',
+      '/api/v1/wardrobe/silhouette',
+      setJsonContent({
+        headers: { ...pactEventHeaders, 'If-Match': silhouetteETagFor(1) },
+        body: { heightSlider: 50, buildSlider: 50 },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(silhouetteETagFor(1)) },
+        body: {
+          data: silhouetteProfileBody(1, {
+            mode: 'default_mannequin',
+            heightSlider: 50,
+            buildSlider: 50,
+            myForm: null,
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeSilhouettePut({
+        ifMatch: silhouetteETagFor(1),
+        updateSilhouetteSlidersInput: { heightSlider: 50, buildSlider: 50 },
+      })
+
+      const parsed = silhouetteProfileResponseSchema.parse(response).data
+      expect(parsed).toMatchObject({ heightSlider: 50, buildSlider: 50 })
+      expect(parsed.revision).toBe(1)
     })
 }
 
@@ -2043,7 +2171,9 @@ export async function verifyMyFormCommitInteraction(
       })
     )
     .willRespondWith(
-      200,
+      // The commit handler has no `@HttpCode` override, so it falls to
+      // Nest's POST default (201), confirmed against the real provider.
+      201,
       setJsonContent({
         headers: { ETag: string(silhouetteETagFor(2)) },
         body: {
@@ -2176,6 +2306,10 @@ export async function verifyMyFormFailureInteraction(
         body: {
           // A failed My Form attempt never switches the active mode; the
           // previous mannequin sliders remain in effect (AC2/decision 5).
+          // `committedAt` stays set: silhouette-photo.processor.ts's failure
+          // branch never clears `my_form_committed_at` (only a full DELETE
+          // does) because the record was already committed before
+          // processing failed.
           data: silhouetteProfileBody(2, {
             mode: 'default_mannequin',
             heightSlider: 50,
@@ -2183,7 +2317,7 @@ export async function verifyMyFormFailureInteraction(
             myForm: {
               status: 'failed',
               failureReason,
-              committedAt: null,
+              committedAt: SILHOUETTE_COMMITTED_AT,
               imageAccess: null,
             },
           }),
@@ -2196,6 +2330,7 @@ export async function verifyMyFormFailureInteraction(
       expect(silhouetteProfileResponseSchema.parse(response).data.myForm).toMatchObject({
         status: 'failed',
         failureReason,
+        committedAt: SILHOUETTE_COMMITTED_AT,
       })
     })
 }
@@ -2243,7 +2378,7 @@ export async function verifyMyFormGuardianNotificationInteraction(
             myForm: {
               status: 'failed',
               failureReason: 'privacy_violation',
-              committedAt: null,
+              committedAt: SILHOUETTE_COMMITTED_AT,
               imageAccess: null,
             },
           }),
@@ -2256,6 +2391,7 @@ export async function verifyMyFormGuardianNotificationInteraction(
       expect(silhouetteProfileResponseSchema.parse(response).data.myForm).toMatchObject({
         status: 'failed',
         failureReason: 'privacy_violation',
+        committedAt: SILHOUETTE_COMMITTED_AT,
       })
     })
 }
