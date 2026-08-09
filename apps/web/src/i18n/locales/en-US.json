@@ -54,6 +54,46 @@
         "outdoor": "Outdoor",
         "home": "Home"
       }
+    },
+    "onboarding": {
+      "title": "Set up your closet",
+      "permissionTitle": "Allow camera and photo access",
+      "permissionBody": "CoutureCast needs camera or library access to capture your garments.",
+      "permissionDenied": "We couldn't access your camera or photos. You can still import files or use the starter wardrobe.",
+      "useStarterWardrobe": "Use starter wardrobe",
+      "addAnother": "Add another garment",
+      "continue": "Continue",
+      "back": "Back",
+      "checklistTagged": "{{garment}}: tags confirmed",
+      "checklistPending": "{{garment}}: needs tags",
+      "complete": "Your closet is ready",
+      "resumed": "Picking up where you left off",
+      "errors": {
+        "loadFailed": "Unable to load your onboarding progress.",
+        "saveFailed": "Unable to save this step. Try again.",
+        "stale": "This step changed elsewhere. Review the latest version and try again."
+      }
+    },
+    "silhouette": {
+      "title": "Silhouette",
+      "modeDefault": "Adjustable silhouette",
+      "modeMyForm": "My Form photo",
+      "heightSliderLabel": "Height",
+      "buildSliderLabel": "Build",
+      "myFormUpload": "Upload a full-body photo",
+      "myFormGuidance": "Wear plain white or black clothing against a plain background for the cleanest overlay.",
+      "myFormConfirm": "I'm wearing plain white or black clothing",
+      "myFormRetry": "Retry upload",
+      "myFormRemove": "Remove My Form photo",
+      "processing": "Processing your photo…",
+      "ready": "My Form photo ready",
+      "errors": {
+        "contrast": "We couldn't separate you from the background clearly. Retake the photo with plainer clothing or a plainer background.",
+        "privacyViolation": "This photo can't be used. Choose a different photo.",
+        "timeout": "Processing took too long. Try again.",
+        "storageError": "We couldn't save this photo. Try again.",
+        "confirmRequired": "Confirm the basewear guidance before uploading."
+      }
     }
   }
 }

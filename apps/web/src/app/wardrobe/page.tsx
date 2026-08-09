@@ -1,16 +1,38 @@
 // Story 4.1 & 4.2 owner: implement web wardrobe hub page with capture and smart tagging
+// Story 4.4 Task 5 owner: "Set up your closet" onboarding entry card and the
+// silhouette settings surface reachable outside onboarding (decision 3).
 'use client'
 
 import Link from 'next/link'
 import React, { useEffect, useState, useRef } from 'react'
-import type { GarmentItemContract } from '@couture/api-client/contracts/http'
+import { I18nextProvider, useTranslation } from 'react-i18next'
+import type {
+  GarmentItemContract,
+  WardrobeOnboardingStatus,
+} from '@couture/api-client/contracts/http'
+import { getI18n } from '../../i18n'
 import { SkipToContent } from '../components/skip-to-content'
+import { AccessibleModal } from '../components/accessible-modal'
 import { GarmentCaptureModal } from '../components/garment-capture-modal'
 import { GarmentTaggingModal } from '../components/garment-tagging-modal'
+import { SilhouetteSettingsPanel } from '../components/silhouette-settings-panel'
 import { StickyBottomNav } from '../components/sticky-bottom-nav'
-import { listGarmentsFromWeb } from '../../lib/wardrobe'
+import {
+  listGarmentsFromWeb,
+  getOnboardingStateFromWeb,
+  resolveCurrentUserId,
+} from '../../lib/wardrobe'
 
 export default function WardrobePage() {
+  return (
+    <I18nextProvider i18n={getI18n()}>
+      <WardrobeHubView />
+    </I18nextProvider>
+  )
+}
+
+function WardrobeHubView() {
+  const { t } = useTranslation()
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false)
   const [taggingGarmentId, setTaggingGarmentId] = useState<string | null>(null)
   const [garments, setGarments] = useState<GarmentItemContract[]>([])
@@ -19,6 +41,11 @@ export default function WardrobePage() {
   const [timedOutGarmentIds, setTimedOutGarmentIds] = useState<Set<string>>(
     () => new Set()
   )
+  const [onboardingStatus, setOnboardingStatus] =
+    useState<WardrobeOnboardingStatus | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [isSilhouetteModalOpen, setIsSilhouetteModalOpen] = useState(false)
+
   const addGarmentButtonRef = useRef<HTMLButtonElement | null>(null)
   const captureInvokerRef = useRef<HTMLElement | null>(null)
   const taggingInvokerRef = useRef<HTMLElement | null>(null)
@@ -26,10 +53,31 @@ export default function WardrobePage() {
   const pendingTaggingGarmentIdRef = useRef<string | null>(null)
   const isCaptureOpenRef = useRef(false)
   const pollingControllerRef = useRef<AbortController | null>(null)
+  const silhouetteButtonRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
     isCaptureOpenRef.current = isCaptureModalOpen
   }, [isCaptureModalOpen])
+
+  /**
+   * Best-effort: the onboarding entry card is a convenience, not a dependency
+   * the rest of the hub relies on, so a failed fetch here silently leaves the
+   * card unshown rather than surfacing a second, unrelated error banner.
+   */
+  useEffect(() => {
+    const controller = new AbortController()
+    void resolveCurrentUserId()
+      .then((id) => {
+        if (!controller.signal.aborted) setUserId(id)
+      })
+      .catch(() => undefined)
+    void getOnboardingStateFromWeb(controller.signal)
+      .then((state) => {
+        if (!controller.signal.aborted) setOnboardingStatus(state.status)
+      })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -193,6 +241,14 @@ export default function WardrobePage() {
                 Outfit capsules
               </Link>
               <button
+                ref={silhouetteButtonRef}
+                type="button"
+                onClick={() => setIsSilhouetteModalOpen(true)}
+                className="flex min-h-[44px] items-center rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              >
+                {t('wardrobe.silhouette.title')}
+              </button>
+              <button
                 ref={addGarmentButtonRef}
                 onClick={(event) => openCapture(event.currentTarget)}
                 className="min-h-[44px] rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
@@ -208,6 +264,16 @@ export default function WardrobePage() {
           tabIndex={-1}
           className="mx-auto max-w-5xl px-6 py-8 pb-24 outline-none md:pb-8"
         >
+          {onboardingStatus && onboardingStatus !== 'completed' && (
+            <Link
+              href="/wardrobe/onboarding"
+              className="mb-6 flex min-h-[44px] items-center justify-between rounded-xl border border-gold-500/40 bg-gold-500/10 px-6 py-4 text-sm font-semibold text-zinc-900 transition hover:bg-gold-500/20 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:text-zinc-100"
+            >
+              {t('wardrobe.onboarding.title')}
+              <span aria-hidden="true">→</span>
+            </Link>
+          )}
+
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Your Digital Closet
@@ -318,6 +384,18 @@ export default function WardrobePage() {
         onTagsConfirmed={handleTagsConfirmed}
         invokingElementRef={taggingInvokerRef}
       />
+
+      {isSilhouetteModalOpen && userId && (
+        <AccessibleModal
+          isOpen={isSilhouetteModalOpen}
+          onClose={() => setIsSilhouetteModalOpen(false)}
+          titleId="silhouette-settings-title"
+          title={t('wardrobe.silhouette.title')}
+          invokingElementRef={silhouetteButtonRef}
+        >
+          <SilhouetteSettingsPanel userId={userId} />
+        </AccessibleModal>
+      )}
     </>
   )
 }

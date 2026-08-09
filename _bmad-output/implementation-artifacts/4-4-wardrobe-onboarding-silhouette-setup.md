@@ -380,31 +380,31 @@ user's body and closet change over time.
 'email.guardian-silhouette-flag'`) inside the same transaction, mirroring
         `guardian.service.ts`'s existing `email.guardian-invitation` outbox pattern.
 
-- [ ] Task 5: Web onboarding and silhouette experience (AC: 1, 2, 3, 5)
-  - [ ] Add `apps/web/src/app/wardrobe/onboarding/page.tsx` as the guided flow: a
+- [x] Task 5: Web onboarding and silhouette experience (AC: 1, 2, 3, 5)
+  - [x] Add `apps/web/src/app/wardrobe/onboarding/page.tsx` as the guided flow: a
         permission step, a capture/tagging loop that renders the existing
         `GarmentCaptureModal` and `GarmentTaggingModal` inline with a running
         checklist, a "Use starter wardrobe" skip action, a silhouette step (sliders
         plus "My Form" upload with the basewear-confirmation checkbox and inline
         retry), and a completion step that routes to the wardrobe hub.
-  - [ ] Add a "Set up your closet" entry-point card to
+  - [x] Add a "Set up your closet" entry-point card to
         `apps/web/src/app/wardrobe/page.tsx` (read the current file fully before
         editing — it already owns polling, capture-modal invocation, and focus-
         restoration state) shown while `WardrobeOnboardingState.status` is not
         `completed`.
-  - [ ] Add a silhouette settings section reachable outside onboarding (decision 3),
+  - [x] Add a silhouette settings section reachable outside onboarding (decision 3),
         reusing the same slider and "My Form" components.
-  - [ ] Extend `apps/web/src/lib/wardrobe.ts` through generated API-client wrappers.
+  - [x] Extend `apps/web/src/lib/wardrobe.ts` through generated API-client wrappers.
         Reuse one idempotency key per logical upload attempt; do not mint a fresh key
         per call, the exact bug Story 4.3's review found in
         `capsule-builder-modal.tsx`.
-  - [ ] Add the `wardrobe.onboarding.*` and `wardrobe.silhouette.*` key trees to all
+  - [x] Add the `wardrobe.onboarding.*` and `wardrobe.silhouette.*` key trees to all
         10 Web locale catalogs under `apps/web/src/i18n/locales`, following the
         camelCase convention Story 4.3 established there (the Web catalogs currently
         contain only `wardrobe.capsules`; garment capture/tagging strings on Web
         remain hardcoded from Story 4.1/4.2 — do not silently fix that pre-existing
         gap as part of this story's scope, call it out in Dev Notes instead).
-  - [ ] Add component and integration tests for every state: permission grant/deny,
+  - [x] Add component and integration tests for every state: permission grant/deny,
         capture-loop checklist, starter-wardrobe skip, slider persistence, "My Form"
         upload through `ready`/each `failed` reason with retry, guardian-consent
         rejection for a teen actor, focus trap and restoration, live announcements,
@@ -828,19 +828,27 @@ lint` clean, `build:packages` clean. `@couture/api-client` 192/192,
       revision/If-Match races (4.4-R02) and the exactly-once worker
       handoff (4.4-R01). 668 unit + 67 integration tests passing, lint and
       typecheck clean.
-- [ ] `feat/epic4-story4-t5-web` — in progress, peer session "web" in
-      `~/.herdr/worktrees/couture-cast/feat-epic4-story4-t5-web`, briefed and
-      working on Task 5
-- [ ] `feat/epic4-story4-t6-mobile` — in progress, peer session "mobile" in
-      `~/.herdr/worktrees/couture-cast/feat-epic4-story4-t6-mobile`, briefed
-      and working on Task 6
+- [x] `feat/epic4-story4-t5-web` — done: onboarding guided flow, silhouette
+      settings panel, wardrobe hub entry points, `lib/wardrobe.ts` API
+      wrappers, and all 10 Web locale catalogs. Web `apps/web` suite 25/25
+      files, 138/138 tests, lint and typecheck clean.
+- [x] `feat/epic4-story4-t6-mobile` — done: extracted the previously-inline
+      capture flow into `garment-capture-modal.tsx`, onboarding/silhouette
+      feature screens, wardrobe hub entry points, `src/lib/wardrobe.ts`
+      wrappers, all 10 Mobile locale catalogs. Found and fixed two
+      pre-existing bugs along the way: `vitest.config.ts`'s include glob
+      excluded `app/**` entirely (zero coverage on `wardrobe.tsx` before
+      this), and unguarded `findNodeHandle` calls that throw on
+      `react-native-web`. Mobile suite 36 files, 198 tests, lint and
+      typecheck clean.
 - [ ] `feat/epic4-story4-t7-pact` — in progress, peer session "pact" in
-      `~/.herdr/worktrees/couture-cast/feat-epic4-story4-t7-pact`, briefed on
-      Task 7 scoped to what doesn't need a live API yet (contract specs,
-      optic:lint, consumer Pact interactions, provider state-handler code);
-      provider verification against real endpoints is unblocked now that
-      `t3t4-api` is pushed
-- [ ] `feat/epic4-story4-t8-e2e` — not started
+      `~/.herdr/worktrees/couture-cast/feat-epic4-story4-t7-pact`; ran its
+      own adversarial self-review after an initial pass, found real gaps,
+      fixing them now with provider verification unblocked against the
+      pushed `t3t4-api`
+- [ ] `feat/epic4-story4-t8-e2e` — in progress, this session, merging
+      `t3t4-api` + `t5-web` + `t6-mobile` (not `t7-pact`, which only needs
+      Web/Mobile at the code level and lands on `main` independently)
 - [ ] `feat/epic4-story4-t9-verify` — not started
 
 All three peers were spawned via `herdr worktree create` (one worktree per
@@ -988,6 +996,98 @@ dedicated test cases per the risk register.
 Full `api` workspace: 668 unit + 67 integration tests passing (0 skipped
 beyond 5 pre-existing, unrelated skips), lint clean, typecheck clean.
 
+**Task 5 (branch `feat/epic4-story4-t5-web`).** Built the Web onboarding and
+silhouette experience against the `t2-contracts` Zod contracts and generated
+SDK only (Task 3/4's API implementation is not in this branch), per the
+orchestration plan's note that Web/Mobile/Pact only hard-depend on Task 2.
+Extended `apps/web/src/lib/wardrobe.ts` with `getOnboardingStateFromWeb` /
+`advanceOnboardingStepFromWeb`, `getSilhouetteProfileFromWeb` /
+`updateSilhouetteSlidersFromWeb`, `uploadMyFormPhotoFromWeb` /
+`deleteMyFormPhotoFromWeb`, and `onboardingETag` / `silhouetteETag` helpers
+building the `"onboarding:<userId>:<revision>"` / `"silhouette:<userId>:<revision>"`
+strong entity tags exactly as decision 3 specifies, mirroring the capsule
+`If-Match` discipline exactly. `uploadMyFormPhotoFromWeb` reuses the existing
+generic `uploadGarmentBytes` helper (same pattern Task 2 already established
+for the SDK side) and takes `idempotencyKey` as a caller-supplied parameter
+rather than minting one internally, so the caller can reuse one key across an
+upload attempt's retries — the exact bug class Story 4.3's review found in
+`capsule-builder-modal.tsx`.
+
+Built `apps/web/src/app/components/silhouette-settings-panel.tsx`: height/build
+sliders that auto-save on change (400ms debounce) using the loaded revision's
+strong entity tag, and a "My Form" upload flow (basewear-confirmation
+checkbox gate with an inline `confirmRequired` error before any upload
+starts, a file picker, a processing poll loop mirroring the wardrobe hub's
+existing `pollCommittedGarment` cadence, all four reason-specific failure
+messages with a retry action that reuses the same `idempotencyKey` and cached
+image preview, and a ready state with a "Remove My Form photo" action).
+Extracted the upload/error/ready UI into a `MyFormPanel` subcomponent to keep
+the outer component's cyclomatic complexity under the project's lint budget.
+
+Built `apps/web/src/app/wardrobe/onboarding/page.tsx`: on mount, fetches the
+onboarding state and redirects to `/wardrobe` if already `completed` (decision
+3); otherwise resumes directly at the persisted `currentStep` (no
+`not_started`-only entry path) and announces `resumed` via a polite live
+region when status was already `in_progress`. The permission step requests
+`getUserMedia`, and either way immediately calls `PATCH targetStep: 'capture'`
+(permission has no server-persisted screen of its own); a denial keeps a
+local `permissionDenied` reminder visible through the capture step since the
+view moves on before the user could otherwise see it. The capture/tagging
+step reuses `GarmentCaptureModal`/`GarmentTaggingModal` exactly as the
+wardrobe hub does (same auto-chain-into-tagging pattern, same invoker-ref
+focus-restoration convention) with a live checklist rendered from
+`tagsConfirmedAt`; "Use starter wardrobe" sends `usedStarterWardrobe: true`
+with `targetStep: 'silhouette'` in one call per decision 2. The silhouette
+step embeds `SilhouetteSettingsPanel` inline (no modal wrapper — the whole
+route already is the guided surface) with a "Continue" button that PATCHes
+`targetStep: 'complete'`, and the complete step routes to `/wardrobe`. Found
+and fixed a real bug during TDD, not just a test artifact: an early draft
+nested `<GarmentCaptureModal>`/`<GarmentTaggingModal>` inside the
+`[data-app-shell]` div, so `AccessibleModal`'s own inert/`aria-hidden` on the
+shell while open also hid the modal it belongs to; fixed by rendering both
+modals as siblings of the app shell via a top-level fragment, matching
+`wardrobe/page.tsx`'s existing structure exactly.
+
+Added a "Set up your closet" entry-point card to `apps/web/src/app/wardrobe/page.tsx`,
+shown while a best-effort onboarding-status fetch reports anything other than
+`completed` (a failed fetch here silently leaves the card unshown rather than
+surfacing a second, unrelated error banner on top of the hub's own). Added a
+"Silhouette" header button opening `SilhouetteSettingsPanel` inside the
+existing `AccessibleModal`, giving the settings surface decision 3 requires
+outside onboarding and a second, real proof point for focus-trap/restoration
+beyond the onboarding flow's inherited capture/tagging modals.
+
+Added the full `wardrobe.onboarding.*` / `wardrobe.silhouette.*` camelCase key
+tree (the story's canonical `en-US` JSON block, translated) to all 10 Web
+locale catalogs, plus `wardrobe-onboarding-locales.spec.ts` mirroring Story
+4.3's `wardrobe-capsules-locales.spec.ts` parity/placeholder/no-untranslated/
+no-empty-string checks. "Silhouette" is a deliberate, approved cognate for
+`de-DE`/`fr-FR`/`fr-CA`/`it-IT` (native loanword, identical spelling); every
+other locale has a genuinely distinct translation. Did not touch the
+pre-existing hardcoded garment capture/tagging strings on Web, per the task's
+explicit scope note — that gap is unchanged.
+
+The `wardrobe.onboarding.back` key ships in every locale catalog (the
+canonical shape requires it) but is not wired to a control in this pass: the
+onboarding state machine is forward-only server-side, no user journey in AC1
+through AC5 requires stepping backward, and building a client-only
+"review previous step" affordance risked exactly the state-machine edge cases
+Story 4.3's review flagged for this kind of flow. Left as an explicit,
+documented gap rather than an invented interaction.
+
+Followed the project's TDD workflow throughout: every new function and
+component has a test file written and run red before implementation, with
+tests exercising the full Task 5 matrix — permission grant/deny, the
+capture-loop checklist, the starter-wardrobe skip, slider persistence, "My
+Form" upload through `ready` and each of the four `failed` reasons with
+retry, a guardian-consent (`GUARDIAN_CONSENT_REQUIRED`) rejection surfaced
+inline both at the silhouette-panel level and through the onboarding page's
+capture step, focus trap and restoration (both the onboarding flow's
+inherited capture-modal restoration and the wardrobe hub's own silhouette
+modal), live announcements, and resume-after-reload. Full `apps/web` suite:
+25/25 test files, 138/138 tests passing; `npm run lint --workspace web` and
+`npm run typecheck --workspace web` both clean; no `.only` or skipped tests.
+
 ### File list
 
 **Task 1 (branch `feat/epic4-story4-t1-db`):**
@@ -1045,3 +1145,25 @@ beyond 5 pre-existing, unrelated skips), lint clean, typecheck clean.
 - `apps/api/src/workers/bootstrap.ts` (modified — removes the placeholder consumer)
 - `apps/api/integration/wardrobe-onboarding.integration.spec.ts` (new)
 - `apps/api/integration/wardrobe-silhouette.integration.spec.ts` (new)
+
+**Task 5 (branch `feat/epic4-story4-t5-web`):**
+
+- `apps/web/src/lib/wardrobe.ts` (modified)
+- `apps/web/src/lib/wardrobe.test.ts` (modified)
+- `apps/web/src/app/components/silhouette-settings-panel.tsx` (new)
+- `apps/web/src/app/components/silhouette-settings-panel.test.tsx` (new)
+- `apps/web/src/app/wardrobe/onboarding/page.tsx` (new)
+- `apps/web/src/app/wardrobe/onboarding/page.test.tsx` (new)
+- `apps/web/src/app/wardrobe/page.tsx` (modified)
+- `apps/web/src/app/wardrobe/page.test.tsx` (modified)
+- `apps/web/src/i18n/locales/en-US.json` (modified)
+- `apps/web/src/i18n/locales/en-CA.json` (modified)
+- `apps/web/src/i18n/locales/de-DE.json` (modified)
+- `apps/web/src/i18n/locales/es-419.json` (modified)
+- `apps/web/src/i18n/locales/fr-CA.json` (modified)
+- `apps/web/src/i18n/locales/fr-FR.json` (modified)
+- `apps/web/src/i18n/locales/it-IT.json` (modified)
+- `apps/web/src/i18n/locales/pt-BR.json` (modified)
+- `apps/web/src/i18n/locales/pt-PT.json` (modified)
+- `apps/web/src/i18n/locales/tr-TR.json` (modified)
+- `apps/web/src/i18n/wardrobe-onboarding-locales.spec.ts` (new)

@@ -8,6 +8,8 @@ import {
   outfitCapsuleResponseSchema,
   outfitCapsuleListResponseSchema,
   userProfileResponseSchema,
+  wardrobeOnboardingStateResponseSchema,
+  silhouetteProfileResponseSchema,
   type GarmentCategory,
   type GarmentMaterial,
   type GarmentComfortRange,
@@ -17,6 +19,10 @@ import {
   type CreateOutfitCapsuleInput,
   type UpdateOutfitCapsuleInput,
   type ListOutfitCapsulesQuery,
+  type WardrobeOnboardingStateContract,
+  type UpdateWardrobeOnboardingStateInput,
+  type SilhouetteProfileContract,
+  type UpdateSilhouetteSlidersInput,
 } from '@couture/api-client/contracts/http'
 import { ResponseError } from '@couture/api-client'
 import { createWebApiClient } from './api-client'
@@ -570,4 +576,199 @@ export async function deleteCapsuleFromWeb(
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to delete outfit capsule.')
   }
+}
+
+// ---------------------------------------------------------------------------
+// Story 4.4: wardrobe onboarding state machine and silhouette profile
+// ---------------------------------------------------------------------------
+
+/** The strong entity tag the onboarding API issues and requires back on every mutation. */
+export function onboardingETag(userId: string, revision: number): string {
+  return `"onboarding:${userId}:${revision}"`
+}
+
+/** The strong entity tag the silhouette API issues and requires back on every mutation. */
+export function silhouetteETag(userId: string, revision: number): string {
+  return `"silhouette:${userId}:${revision}"`
+}
+
+export async function getOnboardingStateFromWeb(
+  signal?: AbortSignal
+): Promise<WardrobeOnboardingStateContract> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1WardrobeOnboardingGet({ signal })
+    return wardrobeOnboardingStateResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to load your onboarding progress.')
+  }
+}
+
+/**
+ * `ifMatch` is required and built by the caller from the previously read
+ * state's revision (see `onboardingETag`), mirroring the capsule revision
+ * discipline. The server treats a replay of the same target step as a safe
+ * no-op, so this is also the correct call to make on retry.
+ */
+export async function advanceOnboardingStepFromWeb(
+  input: UpdateWardrobeOnboardingStateInput,
+  ifMatch: string,
+  signal?: AbortSignal
+): Promise<WardrobeOnboardingStateContract> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1WardrobeOnboardingPatch(
+      { ifMatch, updateWardrobeOnboardingStateInput: input },
+      { signal }
+    )
+    return wardrobeOnboardingStateResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to save this step.')
+  }
+}
+
+export async function getSilhouetteProfileFromWeb(
+  signal?: AbortSignal
+): Promise<SilhouetteProfileContract> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1WardrobeSilhouetteGet({ signal })
+    return silhouetteProfileResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to load your silhouette profile.')
+  }
+}
+
+export async function updateSilhouetteSlidersFromWeb(
+  input: UpdateSilhouetteSlidersInput,
+  ifMatch: string,
+  signal?: AbortSignal
+): Promise<SilhouetteProfileContract> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1WardrobeSilhouettePut(
+      { ifMatch, updateSilhouetteSlidersInput: input },
+      { signal }
+    )
+    return silhouetteProfileResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to save silhouette sliders.')
+  }
+}
+
+export async function deleteMyFormPhotoFromWeb(
+  ifMatch: string,
+  signal?: AbortSignal
+): Promise<SilhouetteProfileContract> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1WardrobeSilhouetteMyFormDelete({ ifMatch }, { signal })
+    return silhouetteProfileResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to remove My Form photo.')
+  }
+}
+
+export interface UploadMyFormPhotoInput {
+  imagePreview: string
+  /**
+   * Reused for every request this one upload attempt makes (allocate, then
+   * commit) and across any retry of the same attempt. Minting a fresh key per
+   * call is the exact bug Story 4.3's review found in
+   * `capsule-builder-modal.tsx`: a retry after a timeout would allocate (and
+   * bill) a second upload session instead of safely replaying the first.
+   */
+  idempotencyKey: string
+  signal?: AbortSignal
+  onStateChange?: (state: GarmentUploadState) => void
+  onProgress?: (percentage: number) => void
+}
+
+/**
+ * "My Form" photos are portrait-framed full-body shots, not garment crops, so
+ * this always prepares a `4:3` (portrait) image with background cleanup
+ * disabled; the server's contrast/moderation heuristics need the original
+ * background, not a matted one.
+ */
+export async function uploadMyFormPhotoFromWeb({
+  imagePreview,
+  idempotencyKey,
+  signal,
+  onStateChange,
+  onProgress,
+}: UploadMyFormPhotoInput): Promise<SilhouetteProfileContract> {
+  const accessToken = readAccessToken()
+  onStateChange?.('preparing')
+  onProgress?.(10)
+  const image = await prepareGarmentImage(imagePreview, '4:3', false)
+
+  onStateChange?.('requesting_upload')
+  onProgress?.(25)
+  const api = createWebApiClient({ accessToken })
+  let allocation
+  try {
+    allocation = (
+      await api.apiV1WardrobeSilhouetteMyFormUploadUrlPost(
+        {
+          idempotencyKey,
+          createSilhouetteUploadUrlInput: {
+            fileSizeBytes: image.blob.size,
+            mimeType: image.mimeType,
+            sha256: image.sha256,
+            widthPx: image.widthPx,
+            heightPx: image.heightPx,
+          },
+        },
+        { signal }
+      )
+    ).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to allocate My Form upload.')
+  }
+
+  onStateChange?.('uploading')
+  onProgress?.(35)
+  await uploadGarmentBytes({
+    uploadUrl: allocation.uploadUrl,
+    uploadToken: allocation.uploadToken,
+    bearerToken: accessToken,
+    mimeType: image.mimeType,
+    body: image.blob,
+    signal,
+    timeoutMs: 30_000,
+    onProgress: () => onProgress?.(80),
+  })
+
+  onStateChange?.('verifying')
+  onProgress?.(90)
+  let profile
+  try {
+    profile = (
+      await api.apiV1WardrobeSilhouetteMyFormCommitPost(
+        {
+          idempotencyKey,
+          commitSilhouettePhotoInput: {
+            uploadSessionId: allocation.uploadSessionId,
+            confirmsBasewearGuidance: true,
+          },
+        },
+        { signal }
+      )
+    ).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to commit My Form upload.')
+  }
+  onStateChange?.('processing')
+  onProgress?.(100)
+  return profile
 }
