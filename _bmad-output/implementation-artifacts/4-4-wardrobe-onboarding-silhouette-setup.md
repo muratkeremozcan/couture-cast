@@ -854,6 +854,25 @@ only its own task's checkboxes, append (not overwrite) its own Completion
 Notes/File List entries, and push its branch when its own verification gate
 is green.
 
+**Incident, self-corrected:** the original brief to the "web" peer gave an
+absolute path prefixed `/Users/murat/opensource/couture-cast (this
+worktree)/apps/web/...` intending "this worktree" to mean _its own_
+worktree, but the literal path was the _main_ worktree's. The web peer
+followed the literal path and wrote its first ~12 Task 5 files/edits into
+the main worktree (this session's, on `feat/epic4-story4-t3t4-api`) instead
+of its own. Caught via `git worktree list` + comparing `git status` across
+worktrees before committing Task 3/4 — the API branch's commit never
+included any `apps/web/**` files. Fix applied: copied the 12 stray
+files/dirs into the web peer's actual worktree at matching relative paths,
+reverted the main worktree's `apps/web/**` back to clean, and re-briefed the
+web peer to verify from its own worktree and use only relative/cwd-rooted
+paths going forward. Mobile and pact peers were unaffected (checked
+directly). Lesson for future orchestration: never hand a peer an absolute
+path into a _different_ worktree, even inside a parenthetical meant to
+clarify context — say "your own worktree" and let the peer resolve its own
+`pwd`, or give the exact worktree-specific absolute path if one must be
+given at all.
+
 ### Completion notes list
 
 **Task 1 (branch `feat/epic4-story4-t1-db`).** Added the five new enums,
