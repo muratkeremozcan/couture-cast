@@ -27,10 +27,12 @@ import {
   verifyOnboardingStateInteraction,
   verifyOnboardingVirtualDefaultInteraction,
   verifyPatchOnboardingStateInteraction,
+  verifyOnboardingReplayInteraction,
   verifyWardrobeErrorInteraction,
   onboardingErrorInteractions,
   verifySilhouetteProfileInteraction,
   verifyUpdateSilhouetteSlidersInteraction,
+  verifyUpdateSilhouetteSlidersReplayInteraction,
   silhouetteGuardianErrorInteractions,
   verifySilhouetteStalePreconditionInteraction,
   verifyMyFormUploadUrlInteraction,
@@ -148,6 +150,10 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
     await verifyPatchOnboardingStateInteraction(pact, createWebClientForMockServer)
   })
 
+  it('replays a repeated identical onboarding step transition as a no-op', async () => {
+    await verifyOnboardingReplayInteraction(pact, createWebClientForMockServer)
+  })
+
   it.each(onboardingErrorInteractions)(
     'preserves the documented onboarding error envelope: $description',
     async (interaction) => {
@@ -161,6 +167,13 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   it('saves silhouette slider values', async () => {
     await verifyUpdateSilhouetteSlidersInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('replays a repeated identical silhouette slider save as a no-op', async () => {
+    await verifyUpdateSilhouetteSlidersReplayInteraction(
+      pact,
+      createWebClientForMockServer
+    )
   })
 
   it.each(silhouetteGuardianErrorInteractions)(

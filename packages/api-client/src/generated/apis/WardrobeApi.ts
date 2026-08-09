@@ -112,6 +112,9 @@ export interface ApiV1WardrobeSilhouetteMyFormUploadUrlPostRequest {
 
 export interface ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequest {
   uploadSessionId: string
+  xUploadToken: string
+  contentType: ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutContentTypeEnum
+  body: Blob
 }
 
 export interface ApiV1WardrobeSilhouettePutRequest {
@@ -1377,9 +1380,40 @@ export class WardrobeApi extends runtime.BaseAPI {
       )
     }
 
+    if (requestParameters['xUploadToken'] == null) {
+      throw new runtime.RequiredError(
+        'xUploadToken',
+        'Required parameter "xUploadToken" was null or undefined when calling apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPut().'
+      )
+    }
+
+    if (requestParameters['contentType'] == null) {
+      throw new runtime.RequiredError(
+        'contentType',
+        'Required parameter "contentType" was null or undefined when calling apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPut().'
+      )
+    }
+
+    if (requestParameters['body'] == null) {
+      throw new runtime.RequiredError(
+        'body',
+        'Required parameter "body" was null or undefined when calling apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPut().'
+      )
+    }
+
     const queryParameters: any = {}
 
     const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'image/jpeg'
+
+    if (requestParameters['xUploadToken'] != null) {
+      headerParameters['x-upload-token'] = String(requestParameters['xUploadToken'])
+    }
+
+    if (requestParameters['contentType'] != null) {
+      headerParameters['content-type'] = String(requestParameters['contentType'])
+    }
 
     if (this.configuration && this.configuration.accessToken) {
       const token = this.configuration.accessToken
@@ -1401,6 +1435,7 @@ export class WardrobeApi extends runtime.BaseAPI {
       method: 'PUT',
       headers: headerParameters,
       query: queryParameters,
+      body: requestParameters['body'] as any,
     }
   }
 
@@ -1713,6 +1748,16 @@ export const ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum = {
 } as const
 export type ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum =
   (typeof ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum)[keyof typeof ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum]
+/**
+ * @export
+ */
+export const ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutContentTypeEnum = {
+  image_jpeg: 'image/jpeg',
+  image_png: 'image/png',
+  image_webp: 'image/webp',
+} as const
+export type ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutContentTypeEnum =
+  (typeof ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutContentTypeEnum)[keyof typeof ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutContentTypeEnum]
 /**
  * @export
  */

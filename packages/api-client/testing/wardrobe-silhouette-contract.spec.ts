@@ -85,10 +85,17 @@ describe('Wardrobe Silhouette HTTP Contracts', () => {
         'storage_error',
       ] as const
       for (const failureReason of reasons) {
+        // committedAt stays set on a failed attempt: silhouette-photo.processor.ts's
+        // failure branch never clears my_form_committed_at (only a full DELETE
+        // does), because the record was already committed before processing
+        // failed. A failed My Form attempt never switches the profile's active
+        // `mode` either (see wardrobe-silhouette-contract.spec.ts's sibling
+        // profile-level test and the Pact interactions), which is a
+        // profile-level fact, not part of this myForm sub-object.
         const myForm = buildMyForm({
           status: 'failed',
           failureReason,
-          committedAt: null,
+          committedAt: '2026-08-09T09:10:00.000Z',
           imageAccess: null,
         })
         expect(silhouetteMyFormSchema.parse(myForm).failureReason).toBe(failureReason)
@@ -186,6 +193,60 @@ describe('Wardrobe Silhouette HTTP Contracts', () => {
       )
     })
 
+    it('rejects My Form lifecycle combinations the real pipeline can never produce (HIGH 3, bmad-code-review)', () => {
+      // Grounded in wardrobe-silhouette.service.ts/silhouette-photo.processor.ts
+      // rather than guessed: committedAt is set exactly once, at commit, and
+      // never cleared by a later failure; failureReason is set if and only if
+      // status is failed; imageAccess is set if and only if status is ready.
+      expectIssuePath(
+        silhouetteMyFormSchema,
+        buildMyForm({ status: 'ready', failureReason: 'contrast' }),
+        'failureReason'
+      )
+      expectIssuePath(
+        silhouetteMyFormSchema,
+        buildMyForm({
+          status: 'failed',
+          failureReason: null,
+          committedAt: '2026-08-09T09:10:00.000Z',
+          imageAccess: null,
+        }),
+        'failureReason'
+      )
+      expectIssuePath(
+        silhouetteMyFormSchema,
+        buildMyForm({ status: 'ready', imageAccess: null }),
+        'imageAccess'
+      )
+      expectIssuePath(
+        silhouetteMyFormSchema,
+        buildMyForm({
+          status: 'processing',
+          failureReason: null,
+          committedAt: '2026-08-09T09:10:00.000Z',
+        }),
+        'imageAccess'
+      )
+      expectIssuePath(
+        silhouetteMyFormSchema,
+        buildMyForm({
+          status: 'bytes_uploaded',
+          failureReason: null,
+          imageAccess: null,
+        }),
+        'committedAt'
+      )
+      expectIssuePath(
+        silhouetteMyFormSchema,
+        buildMyForm({
+          status: 'pending_upload',
+          failureReason: null,
+          imageAccess: null,
+        }),
+        'committedAt'
+      )
+    })
+
     it('rejects an invalid sha256 or unsupported MIME type on the upload declaration', () => {
       expectIssuePath(
         createSilhouetteUploadUrlInputSchema,
@@ -241,7 +302,7 @@ describe('Wardrobe Silhouette HTTP Contracts', () => {
         {
           method: 'post',
           path: '/api/v1/wardrobe/silhouette/my-form/commit',
-          statuses: ['200', '400', '401', '403', '404', '409'],
+          statuses: ['200', '201', '400', '401', '403', '404', '409'],
         },
         {
           method: 'delete',
@@ -278,6 +339,65 @@ describe('Wardrobe Silhouette HTTP Contracts', () => {
           expect.objectContaining({ name: 'if-match', in: 'header', required: true }),
         ])
       )
+    })
+
+    it('requires If-Match on the slider PUT and Idempotency-Key on My Form upload-url/commit', () => {
+      const spec = generateHttpOpenApiDocument()
+
+      const sliderPut = spec.paths?.['/api/v1/wardrobe/silhouette']?.put
+      expect(sliderPut?.parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'if-match', in: 'header', required: true }),
+        ])
+      )
+
+      const uploadUrlPost =
+        spec.paths?.['/api/v1/wardrobe/silhouette/my-form/upload-url']?.post
+      expect(uploadUrlPost?.parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'idempotency-key',
+            in: 'header',
+            required: true,
+          }),
+        ])
+      )
+
+      const commitPost = spec.paths?.['/api/v1/wardrobe/silhouette/my-form/commit']?.post
+      expect(commitPost?.parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'idempotency-key',
+            in: 'header',
+            required: true,
+          }),
+        ])
+      )
+    })
+
+    it('declares the raw My Form upload token/content-type headers and binary body (HIGH 4, bmad-code-review)', () => {
+      const spec = generateHttpOpenApiDocument()
+
+      const uploadBytesPut =
+        spec.paths?.['/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}']?.put
+      expect(uploadBytesPut?.parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'x-upload-token',
+            in: 'header',
+            required: true,
+          }),
+          expect.objectContaining({ name: 'content-type', in: 'header', required: true }),
+        ])
+      )
+      expect(uploadBytesPut?.requestBody).toMatchObject({
+        required: true,
+        content: {
+          'image/jpeg': { schema: { type: 'string', format: 'binary' } },
+          'image/png': { schema: { type: 'string', format: 'binary' } },
+          'image/webp': { schema: { type: 'string', format: 'binary' } },
+        },
+      })
     })
   })
 })
