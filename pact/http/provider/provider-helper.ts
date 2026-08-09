@@ -55,6 +55,10 @@ import {
   type GarmentMaterial,
   type GarmentComfortRange,
 } from '@couture/api-client'
+// `SilhouettePhotoFailureReason` is not part of the curated top-level
+// @couture/api-client barrel (packages/api-client/src/index.ts); the
+// contracts/http subpath re-exports everything from wardrobe.ts instead.
+import type { SilhouettePhotoFailureReason } from '@couture/api-client/contracts/http'
 import type { ApiRole } from '../../../apps/api/src/modules/auth/security.types'
 
 export type PactEvent = {
@@ -108,6 +112,8 @@ export function resetProviderState() {
     outcome: 'not_found',
     guardianAllowed: true,
   }
+  resetProviderOnboardingState()
+  resetProviderSilhouetteState()
 }
 
 export function configureProviderWardrobeState(
@@ -194,9 +200,18 @@ export async function startLocalPactProvider({
   } as unknown as GuardianConsentStateService
   const accessTokenIdentityService = {
     resolveIdentity(token: string) {
-      return token === 'pact-event-token'
-        ? Promise.resolve({ userId: 'guardian-1', role: 'guardian' as const })
-        : Promise.reject(new Error('Unknown Pact access token'))
+      if (token === 'pact-event-token') {
+        return Promise.resolve({ userId: 'guardian-1', role: 'guardian' as const })
+      }
+      // Story 4.4 wardrobe onboarding/silhouette: a second identity whose
+      // role is 'teen', needed by the guardian-consent-gate and
+      // guardian-notification consumer interactions in
+      // pact/http/consumer/api-contract-interactions.ts
+      // (pactTeenAuth/verifyMyFormGuardianNotificationInteraction).
+      if (token === 'pact-teen-token') {
+        return Promise.resolve({ userId: 'teen-1', role: 'teen' as const })
+      }
+      return Promise.reject(new Error('Unknown Pact access token'))
     },
   } as unknown as AccessTokenIdentityService
 
@@ -668,4 +683,86 @@ export function getProviderCapsuleState(): ProviderCapsuleState | null {
 
 export function resetProviderCapsuleState() {
   providerCapsuleState = null
+}
+
+/**
+ * Story 4.4 wardrobe onboarding and silhouette setup — provider state
+ * storage, mirroring the capsule state above exactly.
+ *
+ * Task 3/4's real `wardrobe-onboarding.controller.ts` and
+ * `wardrobe-silhouette.controller.ts` are being built concurrently on
+ * `feat/epic4-story4-t3t4-api` and are not present in this worktree, so
+ * `startLocalPactProvider`'s `moduleFixture` above cannot yet register them
+ * or a service double that reads this state. This is state-setup scaffolding
+ * only: it lets `pact/http/provider/state-handlers.ts` configure a named,
+ * deterministic scenario per interaction exactly like every other state
+ * handler here, ready for a service double to consume once those
+ * controllers land. Until then, `test:pact:provider`/`npm run test:pact`
+ * legitimately fails on the new onboarding/silhouette interactions with 404s
+ * (no matching route), not a bug in this state-setup code.
+ */
+export type ProviderOnboardingScenario = 'existing' | 'not-started' | 'stale-precondition'
+
+export type ProviderOnboardingState = {
+  userId: string | null
+  scenario: ProviderOnboardingScenario
+}
+
+let providerOnboardingState: ProviderOnboardingState | null = null
+
+export function configureProviderOnboardingState(state: {
+  userId?: string
+  scenario: ProviderOnboardingScenario
+}) {
+  providerOnboardingState = {
+    userId: state.userId ?? null,
+    scenario: state.scenario,
+  }
+}
+
+export function getProviderOnboardingState(): ProviderOnboardingState | null {
+  return providerOnboardingState
+}
+
+export function resetProviderOnboardingState() {
+  providerOnboardingState = null
+}
+
+export type ProviderSilhouetteScenario =
+  | 'profile-exists'
+  | 'guardian-forbidden'
+  | 'stale-precondition'
+  | 'my-form-awaiting-commit'
+  | 'my-form-ready'
+  | 'my-form-failed'
+  | 'my-form-privacy-violation-teen-notified'
+  | 'my-form-exists'
+
+export type ProviderSilhouetteState = {
+  userId: string | null
+  scenario: ProviderSilhouetteScenario
+  /** Only set for the `my-form-failed` scenario, which the state handler parameterizes by reason. */
+  failureReason: SilhouettePhotoFailureReason | null
+}
+
+let providerSilhouetteState: ProviderSilhouetteState | null = null
+
+export function configureProviderSilhouetteState(state: {
+  userId?: string
+  scenario: ProviderSilhouetteScenario
+  failureReason?: SilhouettePhotoFailureReason
+}) {
+  providerSilhouetteState = {
+    userId: state.userId ?? null,
+    scenario: state.scenario,
+    failureReason: state.failureReason ?? null,
+  }
+}
+
+export function getProviderSilhouetteState(): ProviderSilhouetteState | null {
+  return providerSilhouetteState
+}
+
+export function resetProviderSilhouetteState() {
+  providerSilhouetteState = null
 }

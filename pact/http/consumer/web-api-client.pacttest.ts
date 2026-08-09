@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, it } from 'vitest'
 import {
   pactEventAuth,
+  pactTeenAuth,
   verifyApiHealthInteraction,
   verifyEventsPollInteraction,
   verifyInvalidCursorInteraction,
@@ -23,6 +24,20 @@ import {
   verifyFavoriteCapsuleInteraction,
   verifyDeleteCapsuleInteraction,
   verifyCapsuleErrorInteractions,
+  verifyOnboardingStateInteraction,
+  verifyOnboardingVirtualDefaultInteraction,
+  verifyPatchOnboardingStateInteraction,
+  verifyOnboardingErrorInteractions,
+  verifySilhouetteProfileInteraction,
+  verifyUpdateSilhouetteSlidersInteraction,
+  verifySilhouetteGuardianConsentInteractions,
+  verifySilhouetteStalePreconditionInteraction,
+  verifyMyFormUploadUrlInteraction,
+  verifyMyFormCommitInteraction,
+  verifyMyFormReadyInteraction,
+  verifyMyFormFailureInteractions,
+  verifyMyFormGuardianNotificationInteraction,
+  verifyMyFormDeleteInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -35,6 +50,11 @@ const pact = new PactV4({
 const createWebClientForMockServer = (mockServer: { url: string }) =>
   createApiClient(mockServer.url, {
     accessToken: pactEventAuth.accessToken,
+  })
+
+const createWebTeenClientForMockServer = (mockServer: { url: string }) =>
+  createApiClient(mockServer.url, {
+    accessToken: pactTeenAuth.accessToken,
   })
 
 describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
@@ -112,5 +132,64 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   it('preserves documented capsule error envelopes', async () => {
     await verifyCapsuleErrorInteractions(pact)
+  })
+
+  it('reads existing wardrobe onboarding progress', async () => {
+    await verifyOnboardingStateInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('reads the virtual not_started onboarding default', async () => {
+    await verifyOnboardingVirtualDefaultInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('advances the onboarding state machine one step', async () => {
+    await verifyPatchOnboardingStateInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('preserves documented onboarding error envelopes', async () => {
+    await verifyOnboardingErrorInteractions(pact)
+  })
+
+  it('reads the silhouette profile', async () => {
+    await verifySilhouetteProfileInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('saves silhouette slider values', async () => {
+    await verifyUpdateSilhouetteSlidersInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('enforces guardian consent on silhouette reads and writes', async () => {
+    await verifySilhouetteGuardianConsentInteractions(pact)
+  })
+
+  it('rejects a stale silhouette revision precondition', async () => {
+    await verifySilhouetteStalePreconditionInteraction(pact)
+  })
+
+  it('allocates a My Form upload session', async () => {
+    await verifyMyFormUploadUrlInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('commits the My Form photo for processing', async () => {
+    await verifyMyFormCommitInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('reads a ready My Form photo', async () => {
+    await verifyMyFormReadyInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('preserves each documented My Form failure reason', async () => {
+    await verifyMyFormFailureInteractions(pact, createWebClientForMockServer)
+  })
+
+  it('queues a guardian notification for a teen privacy_violation verdict', async () => {
+    await verifyMyFormGuardianNotificationInteraction(
+      pact,
+      createWebTeenClientForMockServer
+    )
+  })
+
+  it('deletes the My Form photo and reverts to the default mannequin', async () => {
+    await verifyMyFormDeleteInteraction(pact, createWebClientForMockServer)
   })
 })
