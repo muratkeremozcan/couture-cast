@@ -1206,6 +1206,19 @@ implemented here against the contracts and the documented
 story's own Task 8 (Playwright/Maestro) and Task 9 (verify:changed/validate)
 are out of this branch's scope entirely.
 
+**Fix on `feat/epic4-story4-t8-e2e` (this integrator session), found by
+Task 7's real provider verification against `t3t4-api`.** The My Form commit
+route's Task 2 contract registered `200` as its success response, but
+`wardrobe-silhouette.controller.ts`'s `commitMyForm` handler had no explicit
+`@HttpCode` override, so it actually returned `201` (Nest's POST default) —
+and `201` is also this codebase's established convention for a commit
+endpoint (`wardrobe.controller.ts`'s `commitGarment` explicitly declares
+`@HttpCode(201)`). The contract, not the runtime behavior, was wrong.
+Fixed by registering `201` in `wardrobe.ts` and adding an explicit
+`@HttpCode(201)` to `commitMyForm` (matching the garment precedent instead
+of relying on the implicit default), then regenerated the SDK. `optic:lint`
+clean; full `api`/`api-client` suites still green.
+
 ### File list
 
 **Task 1 (branch `feat/epic4-story4-t1-db`):**

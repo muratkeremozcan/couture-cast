@@ -2145,7 +2145,7 @@ export function registerWardrobeContracts(
       },
     },
     responses: {
-      200: {
+      201: {
         description: 'Photo committed and queued for processing.',
         content: {
           'application/json': {

@@ -158,6 +158,7 @@ export class WardrobeSilhouetteController {
   }
 
   @Post('my-form/commit')
+  @HttpCode(201)
   async commitMyForm(
     @AuthContext() auth: RequestAuthContext,
     @Headers('idempotency-key') idempotencyKey: string,
