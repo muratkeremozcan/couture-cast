@@ -84,7 +84,7 @@ development_status:
   4-1-garment-capture-flow: done
   4-2-smart-tagging-comfort-metadata: done
   4-3-outfit-capsule-builder: done
-  4-4-wardrobe-onboarding-silhouette-setup: ready-for-dev
+  4-4-wardrobe-onboarding-silhouette-setup: in-progress
 
   # Epic 5: Commerce & Premium Enhancements (Phase 2)
   epic-5: backlog

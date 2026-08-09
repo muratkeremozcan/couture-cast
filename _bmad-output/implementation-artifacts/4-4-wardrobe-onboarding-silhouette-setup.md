@@ -6,7 +6,7 @@ baseline_commit: 45d584c2f90debccef9bc6f89f008069ab612a48
 
 # Story 4.4: Wardrobe onboarding and silhouette setup
 
-Status: ready-for-dev
+Status: in-progress
 
 ## Story
 
@@ -377,7 +377,7 @@ user's body and closet change over time.
   - [ ] For a `privacy_violation` verdict on a teen actor's photo: write a
         `ModerationEvent` row (`silhouette_profile_id`, `action`, `reason`) and enqueue
         a guardian-notification `EventEnvelope` (`channel:
-    'email.guardian-silhouette-flag'`) inside the same transaction, mirroring
+'email.guardian-silhouette-flag'`) inside the same transaction, mirroring
         `guardian.service.ts`'s existing `email.guardian-invitation` outbox pattern.
 
 - [ ] Task 5: Web onboarding and silhouette experience (AC: 1, 2, 3, 5)
