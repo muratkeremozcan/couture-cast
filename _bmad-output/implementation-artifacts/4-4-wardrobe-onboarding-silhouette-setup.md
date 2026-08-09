@@ -1206,6 +1206,7 @@ inherited capture-modal restoration and the wardrobe hub's own silhouette
 modal), live announcements, and resume-after-reload. Full `apps/web` suite:
 25/25 test files, 138/138 tests passing; `npm run lint --workspace web` and
 `npm run typecheck --workspace web` both clean; no `.only` or skipped tests.
+
 **Task 6 (branch `feat/epic4-story4-t6-mobile`).** Required first step:
 extracted the garment-capture flow inline in `apps/mobile/app/(tabs)/wardrobe.tsx`
 (ImagePicker calls, crop/upload state machine, inline `<Modal>`) into
@@ -1668,7 +1669,8 @@ clean; no `.only`/`.skip`.
 - `apps/web/src/i18n/locales/pt-PT.json` (modified)
 - `apps/web/src/i18n/locales/tr-TR.json` (modified)
 - `apps/web/src/i18n/wardrobe-onboarding-locales.spec.ts` (new)
-  **Task 6 (branch `feat/epic4-story4-t6-mobile`):**
+
+**Task 6 (branch `feat/epic4-story4-t6-mobile`):**
 
 - `apps/mobile/components/wardrobe/garment-capture-modal.tsx` (new — extracted
   from `apps/mobile/app/(tabs)/wardrobe.tsx`)
