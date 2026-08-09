@@ -9,6 +9,11 @@ import { FixtureGarmentTaggingEngine } from '../modules/wardrobe/fixture-garment
 import type { GarmentTaggingEngine } from '../modules/wardrobe/garment-tagging.engine'
 import { garmentColorProcessingJobSchema } from '../modules/wardrobe/wardrobe-processing.queue'
 import { WardrobeColorProcessor } from '../modules/wardrobe/wardrobe-color.processor'
+import { FixtureSilhouettePhotoModerationEngine } from '../modules/wardrobe/fixture-silhouette-photo-moderation.engine'
+import { HeuristicSilhouettePhotoModerationEngine } from '../modules/wardrobe/heuristic-silhouette-photo-moderation.engine'
+import type { SilhouettePhotoModerationEngine } from '../modules/wardrobe/silhouette-photo-moderation.engine'
+import { silhouettePhotoProcessingJobSchema } from '../modules/wardrobe/silhouette-photo-processing.queue'
+import { SilhouettePhotoProcessor } from '../modules/wardrobe/silhouette-photo.processor'
 import { SupabaseWardrobeStorageAdapter } from '../modules/wardrobe/wardrobe-storage.adapter'
 import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
@@ -53,6 +58,50 @@ export async function createTaggingEngine(): Promise<GarmentTaggingEngine> {
   return engine
 }
 
+export function createSilhouetteModerationEngine(): SilhouettePhotoModerationEngine {
+  const requestedEngine = process.env.SILHOUETTE_MODERATION_ENGINE?.trim() || 'heuristic'
+  if (requestedEngine === 'fixture') {
+    if (!allowsTestOnlySecrets()) {
+      throw new Error(
+        'SILHOUETTE_MODERATION_ENGINE=fixture is forbidden outside test environments'
+      )
+    }
+    logger.info({ engine: requestedEngine }, 'Using silhouette moderation engine')
+    return new FixtureSilhouettePhotoModerationEngine()
+  }
+  if (requestedEngine !== 'heuristic') {
+    throw new Error(`Unsupported SILHOUETTE_MODERATION_ENGINE value: ${requestedEngine}`)
+  }
+  logger.info({ engine: requestedEngine }, 'Using silhouette moderation engine')
+  return new HeuristicSilhouettePhotoModerationEngine()
+}
+
+/**
+ * `storage_error` and `timeout` are both genuine processing faults that
+ * propagate out of `SilhouettePhotoProcessor.process` (decision 5). This
+ * codebase has no more precise signal than the error shape itself to
+ * distinguish them at final-attempt exhaustion, so a recognizable
+ * timeout/abort signature classifies as `timeout` and everything else
+ * classifies as `storage_error`.
+ */
+export function classifySilhouetteProcessingFailure(
+  error: unknown
+): 'timeout' | 'storage_error' {
+  if (error instanceof Error) {
+    const name = error.name.toLowerCase()
+    const message = error.message.toLowerCase()
+    if (
+      name.includes('timeout') ||
+      name === 'aborterror' ||
+      message.includes('timeout') ||
+      message.includes('timed out')
+    ) {
+      return 'timeout'
+    }
+  }
+  return 'storage_error'
+}
+
 async function startWardrobeWorker() {
   try {
     const startedQueues = createQueues()
@@ -94,7 +143,49 @@ async function startWardrobeWorker() {
       )
     )
 
-    logger.info('Dedicated wardrobe worker started for color-extraction at concurrency 1')
+    const moderationReviewQueue = startedQueues.find(
+      (queue) => queue.name === 'moderation-review'
+    )
+    if (!moderationReviewQueue) {
+      throw new Error('Required moderation-review queue was not created')
+    }
+
+    const silhouetteProcessor = new SilhouettePhotoProcessor(
+      prisma,
+      new SupabaseWardrobeStorageAdapter(),
+      createSilhouetteModerationEngine()
+    )
+
+    workers.push(
+      // Moderation pipeline uses explicit throttling to protect downstream systems,
+      // matching the placeholder's rate limit this replaces (workers/bootstrap.ts).
+      createWorker(
+        'moderation-review',
+        async (job) => {
+          const data = silhouettePhotoProcessingJobSchema.parse(job.data)
+          try {
+            await silhouetteProcessor.process(data.silhouetteProfileId)
+          } catch (error) {
+            const maxAttempts = job.opts.attempts ?? 1
+            if (job.attemptsMade + 1 >= maxAttempts) {
+              await silhouetteProcessor.markFailed(
+                data.silhouetteProfileId,
+                classifySilhouetteProcessingFailure(error)
+              )
+            }
+            throw error
+          }
+        },
+        {
+          ...defaultWorkerOptions(10),
+          limiter: { max: 10, duration: 1000 },
+        }
+      )
+    )
+
+    logger.info(
+      'Dedicated wardrobe worker started for color-extraction at concurrency 1 and moderation-review at concurrency 10'
+    )
   } catch (err) {
     logger.error(err, 'Failed to start dedicated wardrobe worker')
     await shutdown(1)

@@ -141,13 +141,13 @@ async function startWorkers() {
       )
     )
 
-    workers.push(
-      // Moderation pipeline also uses explicit throttling to protect downstream systems.
-      createWorker('moderation-review', async () => Promise.resolve(), {
-        ...defaultWorkerOptions(10),
-        limiter: { max: 10, duration: 1000 },
-      })
-    )
+    // Story 4.4: the moderation-review consumer moved to
+    // wardrobe.bootstrap.ts, the model-capable process gated by
+    // verify:tagging-model. BullMQ splits jobs nondeterministically across
+    // every Worker instance subscribed to the same queue name regardless of
+    // process, so this lightweight process group must not also subscribe --
+    // leaving both running would silently "succeed" a fraction of
+    // silhouette jobs without ever running moderation.
 
     logger.info({ queues: queueConfigs.map((q) => q.name) }, 'Workers started for queues')
   } catch (err) {

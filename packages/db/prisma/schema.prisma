@@ -542,18 +542,26 @@ model JobFailure {
 /// (decision 3). Absent or `not_started` means the client renders the virtual
 /// default; a row is created only once the flow actually starts.
 model WardrobeOnboardingState {
-  id                      String                   @id @default(cuid())
-  user                    User                     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  user_id                 String                   @unique
-  status                  WardrobeOnboardingStatus @default(not_started)
-  current_step            WardrobeOnboardingStep   @default(permission)
-  used_starter_wardrobe   Boolean                  @default(false)
-  garments_captured_count Int                      @default(0)
-  started_at              DateTime?
-  completed_at            DateTime?
-  revision                Int                      @default(0)
-  created_at              DateTime                 @default(now())
-  updated_at              DateTime                 @updatedAt
+  id                             String                   @id @default(cuid())
+  user                           User                     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                        String                   @unique
+  status                         WardrobeOnboardingStatus @default(not_started)
+  current_step                   WardrobeOnboardingStep   @default(permission)
+  used_starter_wardrobe          Boolean                  @default(false)
+  garments_captured_count        Int                      @default(0)
+  started_at                     DateTime?
+  completed_at                   DateTime?
+  /// Exactly-once guards for the two onboarding telemetry events (Task 3).
+  /// Row creation alone would make "started" exactly-once, but a crash
+  /// between commit and emission followed by an identical-payload replay
+  /// must not re-emit either event, so both get the same
+  /// emitted-at-guarded-updateMany pattern GarmentItem already uses for
+  /// completion_telemetry_emitted_at.
+  started_telemetry_emitted_at   DateTime?
+  completed_telemetry_emitted_at DateTime?
+  revision                       Int                      @default(0)
+  created_at                     DateTime                 @default(now())
+  updated_at                     DateTime                 @updatedAt
 
   @@index([user_id])
 }

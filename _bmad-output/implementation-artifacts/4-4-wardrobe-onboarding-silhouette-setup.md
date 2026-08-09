@@ -313,15 +313,15 @@ user's body and closet change over time.
   - [x] Run `npm run generate:api-client`; inspect and commit the generated OpenAPI
         and SDK changes without hand-editing generated files.
 
-- [ ] Task 3: Onboarding-state and silhouette API (AC: 1 to 4)
-  - [ ] Add `wardrobe-onboarding.controller.ts` and `wardrobe-onboarding.service.ts`
+- [x] Task 3: Onboarding-state and silhouette API (AC: 1 to 4)
+  - [x] Add `wardrobe-onboarding.controller.ts` and `wardrobe-onboarding.service.ts`
         under `RequestAuthGuard` at `/api/v1/wardrobe/onboarding`. `GET` returns
         current state or a virtual `not_started` default (ETag
         `"onboarding:<userId>:0"`) without persisting a row. `PATCH` validates the
         requested step transition against the forward-only state machine, requires
         `If-Match`, and is a no-op-safe replay for an identical payload against the
         current revision.
-  - [ ] Add `wardrobe-silhouette.controller.ts` and `wardrobe-silhouette.service.ts`
+  - [x] Add `wardrobe-silhouette.controller.ts` and `wardrobe-silhouette.service.ts`
         at `/api/v1/wardrobe/silhouette`. Apply the existing `WardrobeUploadGuard`
         class-level (`@UseGuards(RequestAuthGuard, WardrobeUploadGuard)`, the same guard
         class `WardrobeController` uses — do not write a new guard) so every route,
@@ -333,29 +333,29 @@ user's body and closet change over time.
         endpoints in `wardrobe.controller.ts`/`wardrobe.service.ts`, and
         `confirmsBasewearGuidance: true` is required in the commit payload.
         `DELETE /my-form` performs the immediate hard delete described in decision 12.
-  - [ ] Set `Cache-Control: private, no-store` on every success and error response for
+  - [x] Set `Cache-Control: private, no-store` on every success and error response for
         both controllers; follow the `CapsuleCacheHeadersMiddleware` pattern from
         `wardrobe-capsule.cache-headers.middleware.ts` if per-handler headers cannot
         reach guard- or validation-raised errors, exactly the gap Story 4.3 found and
         fixed.
-  - [ ] Register both controllers and services, plus the new queue class from Task 4,
+  - [x] Register both controllers and services, plus the new queue class from Task 4,
         in `wardrobe.module.ts`.
 
-- [ ] Task 4: "My Form" processing pipeline (AC: 2, 3)
-  - [ ] Add `verifySilhouettePhoto` alongside `verifyGarmentImage` in a new
+- [x] Task 4: "My Form" processing pipeline (AC: 2, 3)
+  - [x] Add `verifySilhouettePhoto` alongside `verifyGarmentImage` in a new
         `wardrobe-silhouette-image-validation.ts`, reusing its declared-payload and
         decoded-metadata checks with a portrait-framing constraint
         (`heightPx >= widthPx * 1.2`).
-  - [ ] Add `SilhouettePhotoModerationEngine` interface, `garment-tagging.engine.ts`-
+  - [x] Add `SilhouettePhotoModerationEngine` interface, `garment-tagging.engine.ts`-
         style, plus `HeuristicSilhouettePhotoModerationEngine` (Sharp-based border-vs-
         center contrast distance and bare-skin-pixel-ratio heuristic) and
         `FixtureSilhouettePhotoModerationEngine` (gated by
         `SILHOUETTE_MODERATION_ENGINE=fixture` and `allowsTestOnlySecrets()`,
         mirroring `FixtureGarmentTaggingEngine`).
-  - [ ] Add `SilhouettePhotoProcessingQueue`, mirroring `WardrobeProcessingQueue`
+  - [x] Add `SilhouettePhotoProcessingQueue`, mirroring `WardrobeProcessingQueue`
         exactly, enqueuing onto the existing `moderation-review` BullMQ queue
         (`apps/api/src/config/queues.ts`) with `jobId: silhouetteProfileId`.
-  - [ ] Add `SilhouettePhotoProcessor`, mirroring `WardrobeColorProcessor`: downloads
+  - [x] Add `SilhouettePhotoProcessor`, mirroring `WardrobeColorProcessor`: downloads
         the photo, runs the contrast check then the moderation engine, writes a
         terminal `ready`/`contrast`/`privacy_violation` result without throwing, and
         lets a genuine storage/timeout fault propagate so BullMQ's existing 3-attempt
@@ -365,7 +365,7 @@ user's body and closet change over time.
         `WardrobeColorProcessor.markFailed(garmentId)` today. That existing method
         takes one argument because `GarmentItem.failure_code` is free-form text; this
         is a new two-argument signature on the new processor, not a literal copy.
-  - [ ] Register the worker consumer for the `moderation-review` queue in
+  - [x] Register the worker consumer for the `moderation-review` queue in
         `apps/api/src/workers/wardrobe.bootstrap.ts`, following the exact
         `color-extraction` worker registration already there. In the same change,
         remove the no-op placeholder consumer for `moderation-review` from
@@ -374,7 +374,7 @@ user's body and closet change over time.
         Two Worker instances subscribed to the same queue name from different
         processes split jobs nondeterministically; leaving the placeholder running
         would silently drop a fraction of silhouette jobs with no error.
-  - [ ] For a `privacy_violation` verdict on a teen actor's photo: write a
+  - [x] For a `privacy_violation` verdict on a teen actor's photo: write a
         `ModerationEvent` row (`silhouette_profile_id`, `action`, `reason`) and enqueue
         a guardian-notification `EventEnvelope` (`channel:
 'email.guardian-silhouette-flag'`) inside the same transaction, mirroring
@@ -819,10 +819,15 @@ Status of each branch is tracked here as work proceeds:
       with negative-fixture privacy tests, fixtures, 2 new
       `@couture/testing` factories, cleanup ordering (moderation event before
       silhouette profile before user). `generate:api-client` run, `optic
-  lint` clean, `build:packages` clean. `@couture/api-client` 192/192,
+lint` clean, `build:packages` clean. `@couture/api-client` 192/192,
       `@couture/testing` 9/9, both lint/typecheck clean.
-- [ ] `feat/epic4-story4-t3t4-api` — in progress, this session (main
-      worktree), directly on this branch
+- [x] `feat/epic4-story4-t3t4-api` — done: onboarding state machine and
+      silhouette sliders/My Form pipeline, full moderation engine pair,
+      BullMQ worker swap, guardian outbox notification. Real-Postgres and
+      real-Redis integration tests (15 cases across two files) prove the
+      revision/If-Match races (4.4-R02) and the exactly-once worker
+      handoff (4.4-R01). 668 unit + 67 integration tests passing, lint and
+      typecheck clean.
 - [ ] `feat/epic4-story4-t5-web` — in progress, peer session "web" in
       `~/.herdr/worktrees/couture-cast/feat-epic4-story4-t5-web`, briefed and
       working on Task 5
@@ -833,8 +838,10 @@ Status of each branch is tracked here as work proceeds:
       `~/.herdr/worktrees/couture-cast/feat-epic4-story4-t7-pact`, briefed on
       Task 7 scoped to what doesn't need a live API yet (contract specs,
       optic:lint, consumer Pact interactions, provider state-handler code);
-      provider verification against real endpoints is explicitly deferred
-      until this branch merges with `t3t4-api`
+      provider verification against real endpoints is unblocked now that
+      `t3t4-api` is pushed
+- [ ] `feat/epic4-story4-t8-e2e` — not started
+- [ ] `feat/epic4-story4-t9-verify` — not started
 
 All three peers were spawned via `herdr worktree create` (one worktree per
 branch, based on `origin/feat/epic4-story4-t2-contracts`) and
@@ -846,13 +853,6 @@ picking this up, do the same. Each peer's brief instructed it to check off
 only its own task's checkboxes, append (not overwrite) its own Completion
 Notes/File List entries, and push its branch when its own verification gate
 is green.
-
-- [ ] `feat/epic4-story4-t3t4-api` — not started
-- [ ] `feat/epic4-story4-t5-web` — not started
-- [ ] `feat/epic4-story4-t6-mobile` — not started
-- [ ] `feat/epic4-story4-t7-pact` — not started
-- [ ] `feat/epic4-story4-t8-e2e` — not started
-- [ ] `feat/epic4-story4-t9-verify` — not started
 
 ### Completion notes list
 
@@ -909,6 +909,66 @@ deleted before `SilhouetteProfile`, before `WardrobeOnboardingState`, before
 both clean. Full suites: `@couture/api-client` 192/192 (was 161 before this
 task), `@couture/testing` 9/9, both lint and typecheck clean.
 
+**Task 3 + 4 (branch `feat/epic4-story4-t3t4-api`).** Onboarding:
+server-authoritative forward-only step machine (`permission → capture →
+{tagging|silhouette skip} → silhouette → complete`), garment count
+recomputed server-side (never client-supplied) by counting real `ready`/
+`awaiting_tags` `GarmentItem` rows created since `started_at` at the
+transition into `silhouette`, so decision 3's "server-authoritative"
+principle holds for the completion-telemetry payload too. Added two
+telemetry-guard columns (`started_telemetry_emitted_at`,
+`completed_telemetry_emitted_at`) via a small follow-up migration
+discovered while implementing the exactly-once emission requirement —
+row creation alone makes "started" exactly-once only on the happy path; a
+crash between commit and emission needs its own guard, mirroring
+`GarmentItem.completion_telemetry_emitted_at`.
+
+Both onboarding and silhouette use a Postgres advisory transaction lock
+(`pg_advisory_xact_lock(hashtext(...))`) rather than
+`wardrobe-capsule.locks.ts`'s `SELECT ... FOR UPDATE` pattern, because that
+pattern cannot lock a row that does not exist yet and the first-ever
+PATCH/PUT for a user always starts from the no-row virtual-default state.
+`$queryRaw` cannot deserialize `pg_advisory_xact_lock`'s `void` return
+(`$executeRaw` can); documented as a P2010 gotcha for the next person who
+reaches for this pattern.
+
+Silhouette: sliders always set `mode: 'default_mannequin'` on save (the
+explicit "switch back to sliders" action per AC2); extracted
+`wardrobe.service.ts`'s upload-token HMAC helpers into
+`wardrobe-upload-token.ts` so My Form reuses the identical signed-token
+protocol instead of a second implementation. My Form upload-url allocation
+upserts the one `SilhouetteProfile` row per user (unlike `GarmentItem`'s
+one-row-per-attempt), best-effort removing a superseded storage object
+after a successful reallocation.
+
+Task 4: `HeuristicSilhouettePhotoModerationEngine` combines the border-vs-
+center contrast check and a bare-skin-pixel-ratio heuristic in one engine
+(Task 4's own bullet lists both inside the same class, resolving an
+apparent tension with decision 8's "processing worker independently
+measures contrast" wording). While building it, found and worked around a
+real Sharp/libvips 0.34.5 behavior: `.stats()` chained directly after
+`.extract()` reports the _pre-crop_ image's statistics, not the extracted
+region's — confirmed by comparing raw pixel bytes against reported stats.
+Materializing each extracted region to its own buffer first, then opening
+a fresh `sharp()` instance on that buffer, is the workaround; documented
+in the source so it isn't "fixed" back into the broken form later.
+`FixtureSilhouettePhotoModerationEngine` reads its outcome from a
+`FIXTURE:<outcome>:` marker prefix in the buffer, mirroring
+`FixtureGarmentTaggingEngine`'s env-gate exactly.
+
+Guardian notification (decision 6) is scoped to teen actors only, per
+Task 4's literal bullet: an actor with no active `GuardianConsent` row gets
+the failure marked on the profile alone, no `ModerationEvent`, no outbox
+row. Risk 4.4-R01's real-BullMQ-Worker integration test
+(`4.4-INT-15`) is the one genuinely novel test infrastructure this story
+added: no existing suite in this repo ran a real `Worker` against real
+Redis before. Risk 4.4-R03 (heuristic false-positive/false-negative
+boundaries) and Risk 4.4-R02 (revision races, both tables) both have
+dedicated test cases per the risk register.
+
+Full `api` workspace: 668 unit + 67 integration tests passing (0 skipped
+beyond 5 pre-existing, unrelated skips), lint clean, typecheck clean.
+
 ### File list
 
 **Task 1 (branch `feat/epic4-story4-t1-db`):**
@@ -934,3 +994,35 @@ task), `@couture/testing` 9/9, both lint and typecheck clean.
 - `packages/testing/src/cleanup.ts` (modified)
 - `packages/testing/test/cleanup.spec.ts` (modified)
 - `packages/testing/templates/test-template.spec.ts` (modified)
+
+**Task 3 + 4 (branch `feat/epic4-story4-t3t4-api`):**
+
+- `packages/db/prisma/schema.prisma` (modified — telemetry-guard columns)
+- `packages/db/prisma/migrations/20260809110000_add_onboarding_telemetry_guards/migration.sql` (new)
+- `packages/utils/src/wardrobe-object-path.ts` (modified — `buildSilhouetteObjectPath`)
+- `packages/utils/src/wardrobe-object-path.spec.ts` (modified)
+- `apps/api/src/modules/wardrobe/wardrobe-onboarding.controller.ts` (new)
+- `apps/api/src/modules/wardrobe/wardrobe-onboarding.controller.spec.ts` (new)
+- `apps/api/src/modules/wardrobe/wardrobe-onboarding.service.ts` (new)
+- `apps/api/src/modules/wardrobe/wardrobe-onboarding.service.spec.ts` (new)
+- `apps/api/src/modules/wardrobe/wardrobe-silhouette.controller.ts` (new)
+- `apps/api/src/modules/wardrobe/wardrobe-silhouette.controller.spec.ts` (new)
+- `apps/api/src/modules/wardrobe/wardrobe-silhouette.service.ts` (new)
+- `apps/api/src/modules/wardrobe/wardrobe-silhouette-image-validation.ts` (new)
+- `apps/api/src/modules/wardrobe/wardrobe-silhouette-image-validation.spec.ts` (new)
+- `apps/api/src/modules/wardrobe/wardrobe-upload-token.ts` (new — extracted from `wardrobe.service.ts`)
+- `apps/api/src/modules/wardrobe/wardrobe-upload-token.spec.ts` (new)
+- `apps/api/src/modules/wardrobe/wardrobe.service.ts` (modified — consumes extracted upload-token helpers)
+- `apps/api/src/modules/wardrobe/silhouette-photo-moderation.engine.ts` (new)
+- `apps/api/src/modules/wardrobe/heuristic-silhouette-photo-moderation.engine.ts` (new)
+- `apps/api/src/modules/wardrobe/fixture-silhouette-photo-moderation.engine.ts` (new)
+- `apps/api/src/modules/wardrobe/silhouette-photo-moderation.engine.spec.ts` (new)
+- `apps/api/src/modules/wardrobe/silhouette-photo-processing.queue.ts` (new)
+- `apps/api/src/modules/wardrobe/silhouette-photo-processing.queue.spec.ts` (new)
+- `apps/api/src/modules/wardrobe/silhouette-photo.processor.ts` (new)
+- `apps/api/src/modules/wardrobe/silhouette-photo.processor.spec.ts` (new)
+- `apps/api/src/modules/wardrobe/wardrobe.module.ts` (modified)
+- `apps/api/src/workers/wardrobe.bootstrap.ts` (modified — registers `moderation-review` consumer)
+- `apps/api/src/workers/bootstrap.ts` (modified — removes the placeholder consumer)
+- `apps/api/integration/wardrobe-onboarding.integration.spec.ts` (new)
+- `apps/api/integration/wardrobe-silhouette.integration.spec.ts` (new)
