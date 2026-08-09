@@ -54,6 +54,46 @@
         "outdoor": "Ar livre",
         "home": "Casa"
       }
+    },
+    "onboarding": {
+      "title": "Configure seu closet",
+      "permissionTitle": "Permita o acesso à câmera e às fotos",
+      "permissionBody": "O CoutureCast precisa de acesso à câmera ou à galeria para capturar suas peças.",
+      "permissionDenied": "Não conseguimos acessar sua câmera ou suas fotos. Você ainda pode importar arquivos ou usar o closet inicial.",
+      "useStarterWardrobe": "Usar closet inicial",
+      "addAnother": "Adicionar outra peça",
+      "continue": "Continuar",
+      "back": "Voltar",
+      "checklistTagged": "{{garment}}: tags confirmadas",
+      "checklistPending": "{{garment}}: precisa de tags",
+      "complete": "Seu closet está pronto",
+      "resumed": "Continuando de onde você parou",
+      "errors": {
+        "loadFailed": "Não é possível carregar seu progresso de configuração.",
+        "saveFailed": "Não é possível salvar esta etapa. Tente novamente.",
+        "stale": "Esta etapa mudou em outro lugar. Revise a versão mais recente e tente novamente."
+      }
+    },
+    "silhouette": {
+      "title": "Silhueta",
+      "modeDefault": "Silhueta ajustável",
+      "modeMyForm": "Foto Minha Forma",
+      "heightSliderLabel": "Altura",
+      "buildSliderLabel": "Compleição",
+      "myFormUpload": "Enviar uma foto de corpo inteiro",
+      "myFormGuidance": "Use roupas lisas brancas ou pretas com um fundo liso para a sobreposição mais precisa.",
+      "myFormConfirm": "Estou usando roupas lisas brancas ou pretas",
+      "myFormRetry": "Tentar envio novamente",
+      "myFormRemove": "Remover foto Minha Forma",
+      "processing": "Processando sua foto…",
+      "ready": "Foto Minha Forma pronta",
+      "errors": {
+        "contrast": "Não conseguimos separar você do fundo com clareza. Refaça a foto com roupas ou um fundo mais lisos.",
+        "privacyViolation": "Esta foto não pode ser usada. Escolha outra foto.",
+        "timeout": "O processamento demorou demais. Tente novamente.",
+        "storageError": "Não conseguimos salvar esta foto. Tente novamente.",
+        "confirmRequired": "Confirme a orientação de roupa base antes de enviar."
+      }
     }
   }
 }

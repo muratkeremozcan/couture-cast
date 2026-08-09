@@ -54,6 +54,46 @@
         "outdoor": "All’aperto",
         "home": "Casa"
       }
+    },
+    "onboarding": {
+      "title": "Configura il tuo guardaroba",
+      "permissionTitle": "Consenti l’accesso a fotocamera e foto",
+      "permissionBody": "CoutureCast ha bisogno dell’accesso a fotocamera o libreria per acquisire i tuoi capi.",
+      "permissionDenied": "Non siamo riusciti ad accedere alla fotocamera o alle foto. Puoi comunque importare file o usare il guardaroba iniziale.",
+      "useStarterWardrobe": "Usa il guardaroba iniziale",
+      "addAnother": "Aggiungi un altro capo",
+      "continue": "Continua",
+      "back": "Indietro",
+      "checklistTagged": "{{garment}}: tag confermati",
+      "checklistPending": "{{garment}}: tag da assegnare",
+      "complete": "Il tuo guardaroba è pronto",
+      "resumed": "Riprendiamo da dove avevi lasciato",
+      "errors": {
+        "loadFailed": "Impossibile caricare l’avanzamento della configurazione.",
+        "saveFailed": "Impossibile salvare questo passaggio. Riprova.",
+        "stale": "Questo passaggio è cambiato altrove. Controlla la versione più recente e riprova."
+      }
+    },
+    "silhouette": {
+      "title": "Silhouette",
+      "modeDefault": "Silhouette regolabile",
+      "modeMyForm": "Foto La Mia Forma",
+      "heightSliderLabel": "Altezza",
+      "buildSliderLabel": "Corporatura",
+      "myFormUpload": "Carica una foto a figura intera",
+      "myFormGuidance": "Indossa abiti bianchi o neri a tinta unita su uno sfondo semplice per la sovrapposizione più pulita.",
+      "myFormConfirm": "Indosso abiti bianchi o neri a tinta unita",
+      "myFormRetry": "Riprova il caricamento",
+      "myFormRemove": "Rimuovi la foto La Mia Forma",
+      "processing": "Elaborazione della tua foto in corso…",
+      "ready": "Foto La Mia Forma pronta",
+      "errors": {
+        "contrast": "Non siamo riusciti a distinguerti chiaramente dallo sfondo. Rifai la foto con abiti o uno sfondo più semplici.",
+        "privacyViolation": "Questa foto non può essere usata. Scegli un’altra foto.",
+        "timeout": "L’elaborazione ha impiegato troppo tempo. Riprova.",
+        "storageError": "Non siamo riusciti a salvare questa foto. Riprova.",
+        "confirmRequired": "Conferma le indicazioni sull’abbigliamento base prima di caricare."
+      }
     }
   }
 }
