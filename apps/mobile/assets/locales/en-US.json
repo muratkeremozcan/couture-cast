@@ -260,6 +260,46 @@
         "outdoor": "Outdoor",
         "home": "Home"
       }
+    },
+    "onboarding": {
+      "title": "Set up your closet",
+      "permission_title": "Allow camera and photo access",
+      "permission_body": "CoutureCast needs camera or library access to capture your garments.",
+      "permission_denied": "We couldn't access your camera or photos. You can still import files or use the starter wardrobe.",
+      "use_starter_wardrobe": "Use starter wardrobe",
+      "add_another": "Add another garment",
+      "continue": "Continue",
+      "back": "Back",
+      "checklist_tagged": "{{garment}}: tags confirmed",
+      "checklist_pending": "{{garment}}: needs tags",
+      "complete": "Your closet is ready",
+      "resumed": "Picking up where you left off",
+      "errors": {
+        "load_failed": "Unable to load your onboarding progress.",
+        "save_failed": "Unable to save this step. Try again.",
+        "stale": "This step changed elsewhere. Review the latest version and try again."
+      }
+    },
+    "silhouette": {
+      "title": "Silhouette",
+      "mode_default": "Adjustable silhouette",
+      "mode_my_form": "My Form photo",
+      "height_slider_label": "Height",
+      "build_slider_label": "Build",
+      "my_form_upload": "Upload a full-body photo",
+      "my_form_guidance": "Wear plain white or black clothing against a plain background for the cleanest overlay.",
+      "my_form_confirm": "I'm wearing plain white or black clothing",
+      "my_form_retry": "Retry upload",
+      "my_form_remove": "Remove My Form photo",
+      "processing": "Processing your photo...",
+      "ready": "My Form photo ready",
+      "errors": {
+        "contrast": "We couldn't separate you from the background clearly. Retake the photo with plainer clothing or a plainer background.",
+        "privacy_violation": "This photo can't be used. Choose a different photo.",
+        "timeout": "Processing took too long. Try again.",
+        "storage_error": "We couldn't save this photo. Try again.",
+        "confirm_required": "Confirm the basewear guidance before uploading."
+      }
     }
   }
 }
