@@ -819,11 +819,34 @@ Status of each branch is tracked here as work proceeds:
       with negative-fixture privacy tests, fixtures, 2 new
       `@couture/testing` factories, cleanup ordering (moderation event before
       silhouette profile before user). `generate:api-client` run, `optic
-    lint` clean, `build:packages` clean. `@couture/api-client` 192/192,
+  lint` clean, `build:packages` clean. `@couture/api-client` 192/192,
       `@couture/testing` 9/9, both lint/typecheck clean.
-- [ ] `feat/epic4-story4-t3t4-api` — not started (in progress by this
-      session; not delegated to a peer, since Web/Mobile/Pact peers only need
-      this branch's contracts, not this branch's implementation, to start)
+- [ ] `feat/epic4-story4-t3t4-api` — in progress, this session (main
+      worktree), directly on this branch
+- [ ] `feat/epic4-story4-t5-web` — in progress, peer session "web" in
+      `~/.herdr/worktrees/couture-cast/feat-epic4-story4-t5-web`, briefed and
+      working on Task 5
+- [ ] `feat/epic4-story4-t6-mobile` — in progress, peer session "mobile" in
+      `~/.herdr/worktrees/couture-cast/feat-epic4-story4-t6-mobile`, briefed
+      and working on Task 6
+- [ ] `feat/epic4-story4-t7-pact` — in progress, peer session "pact" in
+      `~/.herdr/worktrees/couture-cast/feat-epic4-story4-t7-pact`, briefed on
+      Task 7 scoped to what doesn't need a live API yet (contract specs,
+      optic:lint, consumer Pact interactions, provider state-handler code);
+      provider verification against real endpoints is explicitly deferred
+      until this branch merges with `t3t4-api`
+
+All three peers were spawned via `herdr worktree create` (one worktree per
+branch, based on `origin/feat/epic4-story4-t2-contracts`) and
+`peer-sessions`' `spawn-fleet.py` (herdr backend). This machine's
+`SendMessage` does not reach herdr-spawned siblings (see this project's
+`herdr, not cmux` memory), so progress is polled with `herdr agent
+read/wait <name>` rather than an inbound reply — if you are a future session
+picking this up, do the same. Each peer's brief instructed it to check off
+only its own task's checkboxes, append (not overwrite) its own Completion
+Notes/File List entries, and push its branch when its own verification gate
+is green.
+
 - [ ] `feat/epic4-story4-t3t4-api` — not started
 - [ ] `feat/epic4-story4-t5-web` — not started
 - [ ] `feat/epic4-story4-t6-mobile` — not started
