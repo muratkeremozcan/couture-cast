@@ -23,4 +23,7 @@ regexes = [
   # Fixed UUID used only as the My Form commit idempotency-key fixture in
   # wardrobe-silhouette.controller.spec.ts
   '''^4b6b3b0a-1c8a-4a9e-8b8e-1a2b3c4d5e6f$''',
+  # Fixed UUIDs used only as My Form upload/commit idempotency-key fixtures in Pact contracts
+  '''^6eae27b8-8335-476e-a3bf-371e9fa5fd26$''',
+  '''^760490a0-5049-4cdd-afcf-ac8e7ba0b436$''',
 ]
