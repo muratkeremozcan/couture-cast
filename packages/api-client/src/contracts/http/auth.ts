@@ -43,6 +43,13 @@ const birthdateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
   .refine(isValidCalendarBirthdate, 'Birthdate must be a valid date')
+  .openapi({
+    description: [
+      'Invariant enforced at runtime and NOT expressible in this schema: beyond the',
+      'YYYY-MM-DD pattern, the value must be a real calendar date. The pattern alone',
+      'accepts 2026-02-31 and 2026-13-01; both are rejected here.',
+    ].join(' '),
+  })
 const accountStatusSchema = z.enum(['active', 'pending_guardian_consent'])
 
 export const signupInputSchema = z.object({
@@ -67,6 +74,15 @@ export const signupResponseSchema = z
         path: ['guardianConsentRequired'],
       })
     }
+  })
+  .openapi({
+    description: [
+      'Cross-field invariant enforced at runtime and NOT expressible in this schema:',
+      'guardianConsentRequired is true if and only if accountStatus is',
+      'pending_guardian_consent. The two fields are never independent, so treat',
+      'accountStatus as the source of truth and do not construct fixtures where',
+      'they disagree.',
+    ].join(' '),
   })
 
 export type SignupInput = z.infer<typeof signupInputSchema>

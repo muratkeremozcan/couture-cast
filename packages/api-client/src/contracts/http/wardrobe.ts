@@ -365,6 +365,16 @@ function graphemeBoundedText(maxGraphemes: number, minGraphemes = 0) {
         })
       }
     })
+    .openapi({
+      description: [
+        'Trimmed and NFC-normalized before validation, then bounded to',
+        `${minGraphemes}-${maxGraphemes} extended grapheme clusters (user-perceived`,
+        'characters), not UTF-16 code units. A JSON Schema maxLength cannot express',
+        'this: an emoji with a skin-tone modifier counts as one here and as four',
+        'code units there. Null bytes are rejected because PostgreSQL text cannot',
+        'store them.',
+      ].join(' '),
+    })
 }
 
 const capsuleNameSchema = graphemeBoundedText(60, 1)
@@ -380,6 +390,14 @@ const capsuleGarmentIdsSchema = z
   .max(10)
   .refine((ids) => new Set(ids).size === ids.length, {
     message: 'garmentIds must not contain duplicates',
+  })
+  .openapi({
+    description: [
+      'Collection invariant enforced at runtime and NOT expressible in this schema:',
+      'garmentIds must contain no duplicates. JSON Schema uniqueItems would express',
+      'this for a plain string array, but it is not emitted here, so the rule is only',
+      'visible in this description and in the 400 returned when it is violated.',
+    ].join(' '),
   })
 
 export const createOutfitCapsuleInputSchema = z
@@ -649,6 +667,17 @@ export const wardrobeOnboardingStateSchema = z
       })
     }
   })
+  .openapi({
+    description: [
+      'Cross-field invariants enforced at runtime and NOT expressible in this schema:',
+      '(1) startedAt is null if and only if status is not_started;',
+      '(2) status not_started occurs only at currentStep permission and revision 0;',
+      '(3) status is completed if and only if currentStep is complete;',
+      '(4) completedAt is non-null if and only if status is completed.',
+      'Combinations outside these rules are never emitted by the server and are',
+      'rejected when parsed, so do not construct them in fixtures or mocks.',
+    ].join(' '),
+  })
 
 export const wardrobeOnboardingStateResponseSchema = z
   .object({
@@ -769,6 +798,16 @@ export const silhouetteMyFormSchema = z
         message: 'imageAccess is set if and only if status is ready',
       })
     }
+  })
+  .openapi({
+    description: [
+      'Cross-field invariants enforced at runtime and NOT expressible in this schema:',
+      '(1) committedAt is non-null if and only if status is processing, ready, or failed;',
+      '(2) failureReason is non-null if and only if status is failed;',
+      '(3) imageAccess is non-null if and only if status is ready.',
+      'Combinations outside these rules are never emitted by the server and are',
+      'rejected when parsed, so do not construct them in fixtures or mocks.',
+    ].join(' '),
   })
 
 export const silhouetteProfileSchema = z

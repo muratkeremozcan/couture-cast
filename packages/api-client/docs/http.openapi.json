@@ -344,7 +344,8 @@
           "timezone": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
           }
         },
         "required": [
@@ -354,7 +355,8 @@
           "quietHoursEnd",
           "timezone"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Cross-field invariant enforced at runtime and NOT expressible in this schema: when quietHoursEnabled is true, quietHoursStart and quietHoursEnd must differ. JSON Schema has no operator comparing two sibling properties, so this rule is only visible here and in the 400 returned when it is violated."
       },
       "UpdateAlertRulesInput": {
         "type": "object",
@@ -447,7 +449,8 @@
         "required": [
           "rules"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Collection invariant enforced at runtime and NOT expressible in this schema: ruleType must be unique across rules. JSON Schema uniqueItems compares whole items, so two rules sharing a ruleType but differing elsewhere would pass it while being rejected here."
       },
       "UpdateNotificationPreferencesInput": {
         "type": "object",
@@ -469,7 +472,8 @@
           "timezone": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 120
+            "maxLength": 120,
+            "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
           }
         },
         "required": [
@@ -479,7 +483,8 @@
           "quietHoursEnd",
           "timezone"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Cross-field invariant enforced at runtime and NOT expressible in this schema: when quietHoursEnabled is true, quietHoursStart and quietHoursEnd must differ. JSON Schema has no operator comparing two sibling properties, so this rule is only visible here and in the 400 returned when it is violated."
       },
       "GetAlertPreferencesResponse": {
         "type": "object",
@@ -507,7 +512,8 @@
                   "timezone": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 120
+                    "maxLength": 120,
+                    "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
                   }
                 },
                 "required": [
@@ -517,7 +523,8 @@
                   "quietHoursEnd",
                   "timezone"
                 ],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "Cross-field invariant enforced at runtime and NOT expressible in this schema: when quietHoursEnabled is true, quietHoursStart and quietHoursEnd must differ. JSON Schema has no operator comparing two sibling properties, so this rule is only visible here and in the 400 returned when it is violated."
               },
               "rules": {
                 "type": "array",
@@ -738,7 +745,8 @@
                   "timezone": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 120
+                    "maxLength": 120,
+                    "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
                   }
                 },
                 "required": [
@@ -748,7 +756,8 @@
                   "quietHoursEnd",
                   "timezone"
                 ],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "Cross-field invariant enforced at runtime and NOT expressible in this schema: when quietHoursEnabled is true, quietHoursStart and quietHoursEnd must differ. JSON Schema has no operator comparing two sibling properties, so this rule is only visible here and in the 400 returned when it is violated."
               }
             },
             "required": [
@@ -769,7 +778,8 @@
           },
           "birthdate": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Invariant enforced at runtime and NOT expressible in this schema: beyond the YYYY-MM-DD pattern, the value must be a real calendar date. The pattern alone accepts 2026-02-31 and 2026-13-01; both are rejected here."
           }
         },
         "required": [
@@ -804,7 +814,8 @@
           "age",
           "accountStatus",
           "guardianConsentRequired"
-        ]
+        ],
+        "description": "Cross-field invariant enforced at runtime and NOT expressible in this schema: guardianConsentRequired is true if and only if accountStatus is pending_guardian_consent. The two fields are never independent, so treat accountStatus as the source of truth and do not construct fixtures where they disagree."
       },
       "GuardianConsentInput": {
         "type": "object",
@@ -1353,7 +1364,8 @@
             "maximum": 2147483647
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Cross-field invariants enforced at runtime and NOT expressible in this schema: (1) at least one property must be present, so an empty patch body is rejected rather than treated as a no-op; (2) locationKey, latitude, longitude, and timezone form one identity group and must be sent all together or not at all, because updating a coordinate without its key would leave the row internally inconsistent."
       },
       "SavedLocation": {
         "type": "object",
@@ -3489,7 +3501,10 @@
                     "reasoningBadges",
                     "comfortNotes"
                   ]
-                }
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Collection invariant enforced at runtime and NOT expressible in this schema: the three outfits always cover three distinct scenarios (morning, midday, evening), one each. The server never emits a repeated scenario, so consumers may key on scenario without deduplicating, and fixtures must not repeat one."
               },
               "badges": {
                 "type": "array",
@@ -4762,13 +4777,15 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Trimmed and NFC-normalized before validation, then bounded to 1-60 extended grapheme clusters (user-perceived characters), not UTF-16 code units. A JSON Schema maxLength cannot express this: an emoji with a skin-tone modifier counts as one here and as four code units there. Null bytes are rejected because PostgreSQL text cannot store them."
           },
           "description": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Trimmed and NFC-normalized before validation, then bounded to 0-280 extended grapheme clusters (user-perceived characters), not UTF-16 code units. A JSON Schema maxLength cannot express this: an emoji with a skin-tone modifier counts as one here and as four code units there. Null bytes are rejected because PostgreSQL text cannot store them."
           },
           "occasions": {
             "type": "array",
@@ -4796,7 +4813,8 @@
               "maxLength": 128
             },
             "minItems": 2,
-            "maxItems": 10
+            "maxItems": 10,
+            "description": "Collection invariant enforced at runtime and NOT expressible in this schema: garmentIds must contain no duplicates. JSON Schema uniqueItems would express this for a plain string array, but it is not emitted here, so the rule is only visible in this description and in the 400 returned when it is violated."
           },
           "isFavorite": {
             "type": "boolean",
@@ -5224,13 +5242,15 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Trimmed and NFC-normalized before validation, then bounded to 1-60 extended grapheme clusters (user-perceived characters), not UTF-16 code units. A JSON Schema maxLength cannot express this: an emoji with a skin-tone modifier counts as one here and as four code units there. Null bytes are rejected because PostgreSQL text cannot store them."
           },
           "description": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Trimmed and NFC-normalized before validation, then bounded to 0-280 extended grapheme clusters (user-perceived characters), not UTF-16 code units. A JSON Schema maxLength cannot express this: an emoji with a skin-tone modifier counts as one here and as four code units there. Null bytes are rejected because PostgreSQL text cannot store them."
           },
           "occasions": {
             "type": "array",
@@ -5258,7 +5278,8 @@
               "maxLength": 128
             },
             "minItems": 2,
-            "maxItems": 10
+            "maxItems": 10,
+            "description": "Collection invariant enforced at runtime and NOT expressible in this schema: garmentIds must contain no duplicates. JSON Schema uniqueItems would express this for a plain string array, but it is not emitted here, so the rule is only visible in this description and in the 400 returned when it is violated."
           },
           "isFavorite": {
             "type": "boolean"
@@ -5510,7 +5531,8 @@
               "completedAt",
               "revision"
             ],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "Cross-field invariants enforced at runtime and NOT expressible in this schema: (1) startedAt is null if and only if status is not_started; (2) status not_started occurs only at currentStep permission and revision 0; (3) status is completed if and only if currentStep is complete; (4) completedAt is non-null if and only if status is completed. Combinations outside these rules are never emitted by the server and are rejected when parsed, so do not construct them in fixtures or mocks."
           }
         },
         "required": [
@@ -5775,7 +5797,8 @@
                   "committedAt",
                   "imageAccess"
                 ],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "Cross-field invariants enforced at runtime and NOT expressible in this schema: (1) committedAt is non-null if and only if status is processing, ready, or failed; (2) failureReason is non-null if and only if status is failed; (3) imageAccess is non-null if and only if status is ready. Combinations outside these rules are never emitted by the server and are rejected when parsed, so do not construct them in fixtures or mocks."
               },
               "revision": {
                 "type": "integer",
@@ -8267,7 +8290,8 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "Trimmed and NFC-normalized before validation, then bounded to 0-120 extended grapheme clusters (user-perceived characters), not UTF-16 code units. A JSON Schema maxLength cannot express this: an emoji with a skin-tone modifier counts as one here and as four code units there. Null bytes are rejected because PostgreSQL text cannot store them."
             },
             "required": false,
             "name": "q",

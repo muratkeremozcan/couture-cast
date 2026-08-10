@@ -90,6 +90,16 @@ export const updateSavedLocationInputSchema = z
       message: 'locationKey, latitude, longitude, and timezone must be updated together.',
     }
   )
+  .openapi({
+    description: [
+      'Cross-field invariants enforced at runtime and NOT expressible in this schema:',
+      '(1) at least one property must be present, so an empty patch body is rejected',
+      'rather than treated as a no-op;',
+      '(2) locationKey, latitude, longitude, and timezone form one identity group and',
+      'must be sent all together or not at all, because updating a coordinate without',
+      'its key would leave the row internally inconsistent.',
+    ].join(' '),
+  })
 
 export const listSavedLocationsResponseSchema = z.object({
   data: z.array(savedLocationSchema),
