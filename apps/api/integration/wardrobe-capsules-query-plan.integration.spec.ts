@@ -33,19 +33,15 @@ let schemaReady = false
 
 async function probeSchema(): Promise<void> {
   try {
-    await prisma.$queryRaw`SELECT 1 FROM "OutfitCapsule" LIMIT 1`
     /*
-     * A missing index returns zero rows rather than throwing, so the result
-     * has to be inspected. Without this check a database that has the table
-     * but not the Story 4.3 indexes reported itself as ready and every plan
-     * assertion failed as a hard error instead of skipping.
+     * Table availability only. A missing *index* must stay an assertion
+     * failure: 4.3-PLAN-01 exists precisely to catch a regressed migration, so
+     * folding an index check in here would skip the suite in the one case it
+     * is meant to report. The original probe also queried pg_indexes, but a
+     * missing index returns zero rows without throwing, so that query never
+     * affected the outcome.
      */
-    const indexes = await prisma.$queryRaw<
-      { indexname: string }[]
-    >`SELECT indexname FROM pg_indexes WHERE indexname = 'OutfitCapsule_name_trgm_idx'`
-    if (indexes.length === 0) {
-      throw new Error('OutfitCapsule_name_trgm_idx is missing')
-    }
+    await prisma.$queryRaw`SELECT 1 FROM "OutfitCapsule" LIMIT 1`
     schemaReady = true
   } catch {
     schemaReady = false
