@@ -29,10 +29,12 @@ import { MobileGarmentTaggingModal } from '@/components/wardrobe/garment-tagging
 import { SilhouetteEditor } from '@/components/wardrobe/silhouette-editor'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
+import { safeFindNodeHandle } from '@/src/lib/expo-native-helpers'
 import {
   getWardrobeOnboardingStateFromMobile,
   listGarmentsFromMobile,
   onboardingETag,
+  pollGarmentUntilSettled,
   resolveOwnerUserId,
   updateWardrobeOnboardingStateFromMobile,
 } from '@/src/lib/wardrobe'
@@ -46,30 +48,6 @@ function uiPhaseFor(step: string): UiPhase {
   if (step === 'capture' || step === 'tagging') return 'capture'
   if (step === 'silhouette') return 'silhouette'
   return 'complete'
-}
-
-/**
- * react-native-web's `findNodeHandle` always throws ("not supported on web");
- * every call site must skip it on web, matching the guard already proven in
- * garment-tagging-modal.tsx and capsule-builder-modal.tsx.
- */
-function safeFindNodeHandle(node: unknown): number | null {
-  if (Platform.OS === 'web' || !node) return null
-  return findNodeHandle(node as never)
-}
-
-function waitForPoll(delayMs: number, signal: AbortSignal): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, delayMs)
-    signal.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer)
-        reject(new Error('POLL_ABORTED'))
-      },
-      { once: true }
-    )
-  })
 }
 
 // eslint-disable-next-line complexity
@@ -195,6 +173,25 @@ export function WardrobeOnboardingScreen() {
     [accessToken, announce, t]
   )
 
+  /**
+   * A stale-revision (412) failure leaves `revisionRef` unchanged, so simply
+   * resubmitting the same attempt would repeat the same 412 forever. Refresh
+   * the current state first so the retry carries a live If-Match.
+   */
+  const retryAdvance = useCallback(async () => {
+    const attempt = lastAttemptRef.current
+    if (!attempt) return
+    try {
+      const fresh = await getWardrobeOnboardingStateFromMobile(accessToken)
+      revisionRef.current = fresh.revision
+      setPhase(uiPhaseFor(fresh.currentStep))
+    } catch {
+      // If the refresh itself fails, fall through and retry with the
+      // last-known revision anyway; advanceTo's own error handling covers it.
+    }
+    await advanceTo(attempt.targetStep, attempt.usedStarterWardrobe)
+  }, [accessToken, advanceTo])
+
   const requestPermissionsAndContinue = async () => {
     const camera = await ImagePicker.requestCameraPermissionsAsync()
     const library = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -206,22 +203,12 @@ export function WardrobeOnboardingScreen() {
     pollAbortRef.current?.abort()
     const controller = new AbortController()
     pollAbortRef.current = controller
-    void (async () => {
-      try {
-        for (const offsetMs of [1_000, 2_000, 4_000, 8_000]) {
-          await waitForPoll(offsetMs, controller.signal)
-          const persisted = await listGarmentsFromMobile(token, controller.signal)
-          if (controller.signal.aborted) return
-          setGarments(persisted)
-          const current = persisted.find((garment) => garment.id === garmentId)
-          if (!current || current.status === 'processing') continue
-          return
-        }
-      } catch {
+    void pollGarmentUntilSettled(token, garmentId, controller.signal, setGarments).catch(
+      () => {
         // Aborted or transient network failure; the checklist row simply
         // keeps its last-known status until the user retries or reopens.
       }
-    })()
+    )
   }, [])
 
   const handleGarmentCommitted = (garment: GarmentItemContract, token: string) => {
@@ -241,8 +228,9 @@ export function WardrobeOnboardingScreen() {
     void advanceTo('silhouette', true)
   }
 
-  const hasPendingTags = garments.some((garment) => garment.status === 'awaiting_tags')
-  const canContinueFromCapture = garments.length > 0 && !hasPendingTags
+  const allGarmentsTagged =
+    garments.length > 0 && garments.every((garment) => garment.status === 'ready')
+  const canContinueFromCapture = allGarmentsTagged
 
   const garmentLabel = (garment: GarmentItemContract, index: number) =>
     garment.category
@@ -289,10 +277,7 @@ export function WardrobeOnboardingScreen() {
           <Pressable
             accessibilityRole="button"
             testID="onboarding-advance-retry"
-            onPress={() => {
-              const attempt = lastAttemptRef.current
-              if (attempt) void advanceTo(attempt.targetStep, attempt.usedStarterWardrobe)
-            }}
+            onPress={() => void retryAdvance()}
           >
             <Text style={styles.link}>
               {t('common.retry', { defaultValue: 'Retry' })}
@@ -328,7 +313,14 @@ export function WardrobeOnboardingScreen() {
           <View testID="onboarding-checklist">
             {garments.map((garment, index) => {
               const label = garmentLabel(garment, index)
-              const isPending = garment.status === 'awaiting_tags'
+              // Only 'ready' means tags are actually confirmed. Every other
+              // status (pending_upload/bytes_uploaded/processing/
+              // awaiting_tags/failed) must keep showing "needs tags" — a
+              // garment still uploading or analyzing is not done, and
+              // treating it as done here previously let Continue advance
+              // before tagging was even possible.
+              const isTagged = garment.status === 'ready'
+              const isTappable = garment.status === 'awaiting_tags'
               return (
                 <View
                   key={garment.id}
@@ -336,11 +328,11 @@ export function WardrobeOnboardingScreen() {
                   testID={`onboarding-checklist-${garment.id}`}
                 >
                   <Text>
-                    {isPending
-                      ? t('wardrobe.onboarding.checklist_pending', { garment: label })
-                      : t('wardrobe.onboarding.checklist_tagged', { garment: label })}
+                    {isTagged
+                      ? t('wardrobe.onboarding.checklist_tagged', { garment: label })
+                      : t('wardrobe.onboarding.checklist_pending', { garment: label })}
                   </Text>
-                  {isPending ? (
+                  {isTappable ? (
                     <Pressable
                       accessibilityRole="button"
                       testID={`onboarding-tag-${garment.id}`}

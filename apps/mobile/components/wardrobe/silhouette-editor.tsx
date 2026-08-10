@@ -25,6 +25,8 @@ import {
 } from '@couture/api-client/contracts/http'
 
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
+import { sha256Hex } from '@/src/lib/expo-native-helpers'
+import { waitForPoll } from '@/src/lib/native-utils'
 import {
   commitSilhouettePhotoFromMobile,
   createSilhouetteUploadUrlFromMobile,
@@ -38,32 +40,11 @@ import {
 const SLIDER_MIN = 0
 const SLIDER_MAX = 100
 const SLIDER_STEP = 5
-const POLL_INTERVAL_MS = 2_000
+const DEFAULT_POLL_INTERVAL_MS = 2_000
 const POLL_MAX_ATTEMPTS = 15
 const GUARDIAN_CONSENT_CODE = 'GUARDIAN_CONSENT_REQUIRED'
 
 type MyFormPhase = 'idle' | 'uploading' | 'processing' | 'ready' | 'failed'
-
-async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
-  const digest = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, bytes)
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, '0')
-  ).join('')
-}
-
-function waitForPoll(delayMs: number, signal: AbortSignal): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, delayMs)
-    signal.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer)
-        reject(new Error('POLL_ABORTED'))
-      },
-      { once: true }
-    )
-  })
-}
 
 function failureReasonKey(reason: SilhouettePhotoFailureReason | null): string {
   switch (reason) {
@@ -84,6 +65,8 @@ export interface SilhouetteEditorProps {
   accessToken: string
   /** Fires on every successful profile read/write, for a host screen that cares. */
   onProfileChange?: (profile: SilhouetteProfileContract) => void
+  /** Test-only override for the My Form processing poll cadence. */
+  pollIntervalMs?: number
 }
 
 interface SliderRowProps {
@@ -149,10 +132,10 @@ function SliderRow({
 export function SilhouetteEditor({
   accessToken,
   onProfileChange,
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
 }: SilhouetteEditorProps) {
   const { t } = useTranslation()
   const { announce } = useAccessibilityAnnouncer()
-  const userId = resolveOwnerUserId(accessToken)
 
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -170,8 +153,10 @@ export function SilhouetteEditor({
   const [myFormErrorKey, setMyFormErrorKey] = useState<string | null>(null)
 
   const revisionRef = useRef(0)
+  const userIdRef = useRef('')
   const attemptIdempotencyKeyRef = useRef<string | null>(null)
   const pollAbortRef = useRef<AbortController | null>(null)
+  const lastChangedFieldRef = useRef<'height' | 'build'>('height')
 
   const applyProfile = useCallback(
     (next: SilhouetteProfileContract) => {
@@ -199,84 +184,14 @@ export function SilhouetteEditor({
     [onProfileChange]
   )
 
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    setLoadError(null)
-    try {
-      const next = await getSilhouetteProfileFromMobile(accessToken)
-      applyProfile(next)
-    } catch (error) {
-      setLoadError(
-        error instanceof Error && error.message === GUARDIAN_CONSENT_CODE
-          ? t('wardrobe.error.consent_required')
-          : error instanceof Error
-            ? error.message
-            : t('wardrobe.silhouette.errors.storage_error')
-      )
-    } finally {
-      setIsLoading(false)
-    }
-  }, [accessToken, applyProfile, t])
-
-  useEffect(() => {
-    void load()
-    return () => pollAbortRef.current?.abort()
-  }, [load])
-
-  const saveSliders = useCallback(
-    async (nextHeight: number, nextBuild: number) => {
-      setIsSavingSliders(true)
-      setSliderError(null)
-      try {
-        const next = await updateSilhouetteSlidersFromMobile(
-          accessToken,
-          { heightSlider: nextHeight, buildSlider: nextBuild },
-          silhouetteETag(userId, revisionRef.current)
-        )
-        applyProfile(next)
-        announce('feedback', t('wardrobe.silhouette.height_slider_label'))
-      } catch (error) {
-        const message =
-          error instanceof Error && error.message === GUARDIAN_CONSENT_CODE
-            ? t('wardrobe.error.consent_required')
-            : error instanceof Error
-              ? error.message
-              : t('wardrobe.onboarding.errors.save_failed')
-        setSliderError(message)
-        announce('error', message)
-      } finally {
-        setIsSavingSliders(false)
-      }
-    },
-    [accessToken, announce, applyProfile, t, userId]
-  )
-
-  const adjustHeight = (direction: 1 | -1) => {
-    const next = Math.min(
-      SLIDER_MAX,
-      Math.max(SLIDER_MIN, heightSlider + direction * SLIDER_STEP)
-    )
-    setHeightSlider(next)
-    void saveSliders(next, buildSlider)
-  }
-
-  const adjustBuild = (direction: 1 | -1) => {
-    const next = Math.min(
-      SLIDER_MAX,
-      Math.max(SLIDER_MIN, buildSlider + direction * SLIDER_STEP)
-    )
-    setBuildSlider(next)
-    void saveSliders(heightSlider, next)
-  }
-
   const pollMyForm = useCallback(() => {
-    pollAbortRef.current?.abort()
+    if (pollAbortRef.current) return
     const controller = new AbortController()
     pollAbortRef.current = controller
     void (async () => {
       try {
         for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt += 1) {
-          await waitForPoll(POLL_INTERVAL_MS, controller.signal)
+          await waitForPoll(pollIntervalMs, controller.signal)
           const next = await getSilhouetteProfileFromMobile(accessToken)
           if (controller.signal.aborted) return
           applyProfile(next)
@@ -296,9 +211,101 @@ export function SilhouetteEditor({
         // Aborted (component unmounted or a new attempt started) or a transient
         // network failure; either way the server-side job remains the source of
         // truth and the next explicit load will pick up its terminal state.
+      } finally {
+        if (pollAbortRef.current === controller) {
+          pollAbortRef.current = null
+        }
       }
     })()
-  }, [accessToken, announce, applyProfile, t])
+  }, [accessToken, announce, applyProfile, pollIntervalMs, t])
+
+  const load = useCallback(async () => {
+    setIsLoading(true)
+    setLoadError(null)
+    try {
+      userIdRef.current = resolveOwnerUserId(accessToken)
+      const next = await getSilhouetteProfileFromMobile(accessToken)
+      applyProfile(next)
+      // A fresh mount (e.g. reopening this screen after the app was closed
+      // mid-processing) must resume polling itself; runMyFormUpload only
+      // starts it for an upload that happened in *this* mount.
+      if (
+        next.myForm?.status === 'processing' ||
+        next.myForm?.status === 'bytes_uploaded'
+      ) {
+        pollMyForm()
+      }
+    } catch (error) {
+      setLoadError(
+        error instanceof Error && error.message === GUARDIAN_CONSENT_CODE
+          ? t('wardrobe.error.consent_required')
+          : error instanceof Error
+            ? error.message
+            : t('wardrobe.silhouette.errors.storage_error')
+      )
+    } finally {
+      setIsLoading(false)
+    }
+  }, [accessToken, applyProfile, pollMyForm, t])
+
+  useEffect(() => {
+    void load()
+    return () => pollAbortRef.current?.abort()
+  }, [load])
+
+  const saveSliders = useCallback(
+    async (nextHeight: number, nextBuild: number, changedField: 'height' | 'build') => {
+      lastChangedFieldRef.current = changedField
+      setIsSavingSliders(true)
+      setSliderError(null)
+      try {
+        const next = await updateSilhouetteSlidersFromMobile(
+          accessToken,
+          { heightSlider: nextHeight, buildSlider: nextBuild },
+          silhouetteETag(userIdRef.current, revisionRef.current)
+        )
+        applyProfile(next)
+        const changedLabel = t(
+          changedField === 'height'
+            ? 'wardrobe.silhouette.height_slider_label'
+            : 'wardrobe.silhouette.build_slider_label'
+        )
+        const changedValue =
+          changedField === 'height' ? next.heightSlider : next.buildSlider
+        announce('feedback', `${changedLabel}: ${changedValue}`)
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message === GUARDIAN_CONSENT_CODE
+            ? t('wardrobe.error.consent_required')
+            : error instanceof Error
+              ? error.message
+              : t('wardrobe.onboarding.errors.save_failed')
+        setSliderError(message)
+        announce('error', message)
+      } finally {
+        setIsSavingSliders(false)
+      }
+    },
+    [accessToken, announce, applyProfile, t]
+  )
+
+  const adjustHeight = (direction: 1 | -1) => {
+    const next = Math.min(
+      SLIDER_MAX,
+      Math.max(SLIDER_MIN, heightSlider + direction * SLIDER_STEP)
+    )
+    setHeightSlider(next)
+    void saveSliders(next, buildSlider, 'height')
+  }
+
+  const adjustBuild = (direction: 1 | -1) => {
+    const next = Math.min(
+      SLIDER_MAX,
+      Math.max(SLIDER_MIN, buildSlider + direction * SLIDER_STEP)
+    )
+    setBuildSlider(next)
+    void saveSliders(heightSlider, next, 'build')
+  }
 
   const runMyFormUpload = async (asset: ImagePicker.ImagePickerAsset) => {
     setMyFormPhase('uploading')
@@ -310,21 +317,24 @@ export function SilhouetteEditor({
     try {
       const maxDimension = Math.max(asset.width, asset.height)
       const scale = Math.min(1, 4096 / maxDimension)
-      const prepared =
-        scale < 1
-          ? await manipulateAsync(
-              asset.uri,
-              [
-                {
-                  resize: {
-                    width: Math.round(asset.width * scale),
-                    height: Math.round(asset.height * scale),
-                  },
-                },
-              ],
-              { compress: 0.92, format: SaveFormat.PNG }
-            )
-          : { uri: asset.uri, width: asset.width, height: asset.height }
+      // Always re-encode, even when scale is 1 (no resize needed): the source
+      // asset can be a JPEG or WebP (camera/library both hand back whatever
+      // format the OS captured), and the allocation/upload/commit calls below
+      // unconditionally declare `mimeType: 'image/png'`. Skipping this step
+      // for an already-small photo previously uploaded the original bytes
+      // under a false mimeType.
+      const prepared = await manipulateAsync(
+        asset.uri,
+        [
+          {
+            resize: {
+              width: Math.round(asset.width * scale),
+              height: Math.round(asset.height * scale),
+            },
+          },
+        ],
+        { compress: 0.92, format: SaveFormat.PNG }
+      )
 
       const file = new File(prepared.uri)
       const bytes = await file.bytes()
@@ -405,7 +415,7 @@ export function SilhouetteEditor({
     try {
       const next = await deleteSilhouettePhotoFromMobile(
         accessToken,
-        silhouetteETag(userId, revisionRef.current)
+        silhouetteETag(userIdRef.current, revisionRef.current)
       )
       applyProfile(next)
       setMyFormPhase('idle')
@@ -424,6 +434,12 @@ export function SilhouetteEditor({
   }
 
   const retryMyForm = () => {
+    // Retry sends the user back to source selection, not back to the exact
+    // failed request — a photo picked from here on is a new logical attempt
+    // and must get a fresh idempotency key. Reusing the failed attempt's key
+    // here previously risked a spurious 409 IDEMPOTENCY_KEY_REUSED once the
+    // user picked a different photo (different hash/size under the old key).
+    attemptIdempotencyKeyRef.current = null
     setMyFormPhase('idle')
     setMyFormError(null)
     setMyFormErrorKey(null)
@@ -508,7 +524,9 @@ export function SilhouetteEditor({
               <Pressable
                 accessibilityRole="button"
                 testID="silhouette-slider-retry"
-                onPress={() => void saveSliders(heightSlider, buildSlider)}
+                onPress={() =>
+                  void saveSliders(heightSlider, buildSlider, lastChangedFieldRef.current)
+                }
               >
                 <Text style={styles.link}>
                   {t('common.retry', { defaultValue: 'Retry' })}

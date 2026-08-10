@@ -9,10 +9,28 @@ import {
   getSilhouetteProfileFromMobile,
   getWardrobeOnboardingStateFromMobile,
   onboardingETag,
+  pollGarmentUntilSettled,
   silhouetteETag,
   updateSilhouetteSlidersFromMobile,
   updateWardrobeOnboardingStateFromMobile,
 } from './wardrobe'
+
+function garmentFixture(overrides: { id: string; status: string }) {
+  return {
+    id: overrides.id,
+    status: overrides.status,
+    category: null,
+    material: null,
+    comfortRange: null,
+    tagsConfirmedAt: null,
+    fileSizeBytes: 1024,
+    mimeType: 'image/png',
+    retentionStatus: 'active',
+    createdAt: '2026-08-09T00:00:00.000Z',
+    committedAt: '2026-08-09T00:00:01.000Z',
+    imageAccess: null,
+  }
+}
 
 const onboardingState = {
   status: 'in_progress' as const,
@@ -201,5 +219,82 @@ describe('mobile wardrobe onboarding + silhouette API wrappers', () => {
 
     const result = await deleteSilhouettePhotoFromMobile('token', '"silhouette:user-1:2"')
     expect(result.mode).toBe('default_mannequin')
+  })
+})
+
+describe('pollGarmentUntilSettled', () => {
+  const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
+
+  beforeEach(() => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
+  })
+
+  afterEach(() => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
+  })
+
+  it('4.4-MOB-LIB-11 resolves once the garment leaves processing, reporting every tick', async () => {
+    let call = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => {
+        call += 1
+        const status = call < 3 ? 'processing' : 'awaiting_tags'
+        return HttpResponse.json({ data: [garmentFixture({ id: 'g-1', status })] })
+      })
+    )
+    const updates: string[][] = []
+    const controller = new AbortController()
+
+    const settled = await pollGarmentUntilSettled(
+      'token',
+      'g-1',
+      controller.signal,
+      (garments) => updates.push(garments.map((g) => g.status)),
+      [1, 1, 1, 1]
+    )
+
+    expect(settled?.status).toBe('awaiting_tags')
+    expect(updates).toEqual([['processing'], ['processing'], ['awaiting_tags']])
+  })
+
+  it('4.4-MOB-LIB-12 gives up once the schedule is exhausted while still processing', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({ data: [garmentFixture({ id: 'g-1', status: 'processing' })] })
+      )
+    )
+    const controller = new AbortController()
+
+    const settled = await pollGarmentUntilSettled(
+      'token',
+      'g-1',
+      controller.signal,
+      () => undefined,
+      [1, 1]
+    )
+
+    expect(settled).toBeUndefined()
+  })
+
+  it('4.4-MOB-LIB-13 stops immediately if the garment disappears from the list', async () => {
+    let call = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => {
+        call += 1
+        return HttpResponse.json({ data: [] })
+      })
+    )
+    const controller = new AbortController()
+
+    const settled = await pollGarmentUntilSettled(
+      'token',
+      'g-1',
+      controller.signal,
+      () => undefined,
+      [1, 1, 1, 1]
+    )
+
+    expect(settled).toBeUndefined()
+    expect(call).toBe(1)
   })
 })

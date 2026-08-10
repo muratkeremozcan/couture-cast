@@ -62,7 +62,18 @@ import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import { WardrobeOnboardingScreen } from './wardrobe-onboarding-screen'
 
-const ACCESS_TOKEN = 'header.eyJzdWIiOiJ1c2VyLTEifQ.signature'
+/**
+ * Base64url-shaped JWT payload so `resolveOwnerUserId` can decode a userId.
+ * Built at runtime (not a literal) so it doesn't look like a credential to
+ * secret scanners -- a hardcoded JWT-shaped string here previously tripped
+ * gitleaks' generic-api-key rule in CI.
+ */
+function fakeAccessToken(userId: string): string {
+  const payload = btoa(JSON.stringify({ sub: userId })).replace(/=+$/, '')
+  return `header.${payload}.signature`
+}
+
+const ACCESS_TOKEN = fakeAccessToken('user-1')
 
 const notStartedState = {
   status: 'not_started' as const,
@@ -306,7 +317,7 @@ describe('WardrobeOnboardingScreen', () => {
     })
   })
 
-  it('4.4-MOB-ONB-08 announces resuming mid-flow after a reload', async () => {
+  it('4.4-MOB-ONB-08 resumes mid-flow after a reload with both the announcement and the checklist state', async () => {
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
@@ -323,9 +334,54 @@ describe('WardrobeOnboardingScreen', () => {
       const liveRegion = document.getElementById('a11y-live-announcer')
       expect(liveRegion?.textContent).toBe('Picking up where you left off')
     })
+    // AC1 requires resuming "at the same step with the same checklist
+    // state" -- the announcement alone doesn't prove the checklist itself
+    // came back; a regression that dropped listGarmentsFromMobile on resume
+    // would still pass on the announcement check alone.
+    await waitFor(() => {
+      expect(
+        screen.getByTestId(`onboarding-checklist-${readyGarment.id}`)
+      ).toHaveTextContent('tags confirmed')
+    })
+  })
+
+  it('4.4-MOB-ONB-08B never claims a still-processing garment is tagged, and keeps Continue disabled', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/onboarding', () =>
+        HttpResponse.json({
+          data: { ...notStartedState, currentStep: 'tagging', revision: 1 },
+        })
+      ),
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({ data: [{ ...readyGarment, status: 'processing' }] })
+      )
+    )
+    renderScreen()
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId(`onboarding-checklist-${readyGarment.id}`)
+      ).toHaveTextContent('needs tags')
+    })
+    // A 'processing' garment previously satisfied the "no awaiting_tags
+    // garments" check and let Continue advance before tagging was even
+    // possible; only every garment reaching 'ready' may enable it.
+    expect(screen.getByTestId('onboarding-continue')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    // 'processing' is also not tappable -- there's no suggestion data to
+    // tag yet, unlike 'awaiting_tags'.
+    expect(
+      screen.queryByTestId(`onboarding-tag-${readyGarment.id}`)
+    ).not.toBeInTheDocument()
   })
 
   it('4.4-MOB-ONB-09 surfaces a guardian-consent block for a teen actor', async () => {
+    // Simulates the *outcome* a real guardian-consent-revoked teen actor
+    // triggers (the API's 403 GUARDIAN_CONSENT_REQUIRED response) rather than
+    // constructing a teen/guardian persona -- that decision lives server-side
+    // (Task 3/4), out of this component test's scope.
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json(
@@ -380,5 +436,57 @@ describe('WardrobeOnboardingScreen', () => {
 
     fireEvent.click(screen.getByTestId('onboarding-done'))
     expect(routerMock.replace).toHaveBeenCalledWith('/wardrobe')
+  })
+
+  it('4.4-MOB-ONB-12 recovers from a stale revision by refreshing before retrying, instead of repeating the same 412 forever', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/onboarding', () =>
+        HttpResponse.json({ data: notStartedState })
+      )
+    )
+    renderScreen()
+    await waitFor(() => screen.getByTestId('onboarding-request-permission'))
+
+    // The first PATCH races another device that already advanced the
+    // revision: reject with a stale precondition.
+    server.use(
+      http.patch('*/api/v1/wardrobe/onboarding', ({ request }) => {
+        expect(request.headers.get('if-match')).toBe('"onboarding:user-1:0"')
+        return HttpResponse.json(
+          {
+            statusCode: 412,
+            message: 'ONBOARDING_REVISION_MISMATCH',
+            error: 'Precondition Failed',
+          },
+          { status: 412 }
+        )
+      })
+    )
+    fireEvent.click(screen.getByTestId('onboarding-request-permission'))
+    await waitFor(() => {
+      expect(screen.getByText('ONBOARDING_REVISION_MISMATCH')).toBeInTheDocument()
+    })
+
+    // Retry must first pick up the revision the other device already
+    // advanced to (a GET refresh), then resubmit with a live If-Match --
+    // not blindly repeat the same stale header.
+    server.use(
+      http.get('*/api/v1/wardrobe/onboarding', () =>
+        HttpResponse.json({ data: { ...notStartedState, revision: 5 } })
+      ),
+      http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
+        expect(request.headers.get('if-match')).toBe('"onboarding:user-1:5"')
+        expect(await request.json()).toEqual({ targetStep: 'capture' })
+        return HttpResponse.json({
+          data: { ...notStartedState, currentStep: 'capture', revision: 6 },
+        })
+      }),
+      http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [] }))
+    )
+    fireEvent.click(screen.getByTestId('onboarding-advance-retry'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('onboarding-capture-step')).toBeInTheDocument()
+    })
   })
 })

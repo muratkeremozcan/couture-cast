@@ -35,6 +35,7 @@ import {
 
 import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
+import { sha256Hex } from '@/src/lib/expo-native-helpers'
 
 type CaptureStep = 'source' | 'crop' | 'uploading' | 'complete'
 type AspectRatio = '1:1' | '4:3'
@@ -47,14 +48,6 @@ async function responseError(response: Response): Promise<Error> {
   } catch {
     return new Error(`Wardrobe request failed with ${response.status}`)
   }
-}
-
-function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
-  return Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, bytes).then((digest) =>
-    Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(
-      ''
-    )
-  )
 }
 
 function cropForAspect(image: SelectedImage, aspectRatio: AspectRatio) {
