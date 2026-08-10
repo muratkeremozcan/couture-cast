@@ -43,25 +43,13 @@ const authSession = base.extend<AuthFixtures>({
   page: authFixtures.page,
 })
 
-/**
- * Story 4.4 Task 5 (this branch) calls `GET /api/v1/wardrobe/onboarding` from
- * every `/wardrobe` visit (the onboarding entry card's best-effort status
- * fetch) and `GET /api/v1/wardrobe/silhouette` from the Silhouette settings
- * modal. Both routes are implemented on `feat/epic4-story4-t3t4-api`, a
- * sibling task branch not yet merged to `main`, so every E2E run against
- * this branch's own environment 404s on them — a real gap between two
- * stacked task branches, not an app defect (the web app already treats both
- * fetches as best-effort and degrades gracefully). Remove this exclusion
- * once Task 3/4 merges to `main` and the routes exist for real.
- */
-const networkErrorMonitor = base.extend(
-  createNetworkErrorMonitorFixture({
-    excludePatterns: [
-      /\/api\/v1\/wardrobe\/onboarding(\?|$)/,
-      /\/api\/v1\/wardrobe\/silhouette(\?|$|\/)/,
-    ],
-  })
-)
+// Story 4.4 Task 8 owner: `wardrobe-onboarding.controller.ts` and
+// `wardrobe-silhouette.controller.ts` (Task 3/4) merged to `main` well before
+// this task, so the exclusion previously here (dated from a stacked-branch
+// window where those routes genuinely 404'd) is stale and has been removed;
+// both routes are real and should be held to the same network-error bar as
+// every other endpoint.
+const networkErrorMonitor = base.extend(createNetworkErrorMonitorFixture())
 
 // Compose base Playwright test with playwright-utils fixtures and local fixtures.
 export const test = mergeTests(
