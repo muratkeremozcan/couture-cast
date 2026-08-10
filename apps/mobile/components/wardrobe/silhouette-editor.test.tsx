@@ -81,6 +81,66 @@ const defaultProfile = {
   updatedAt: '2026-08-09T00:00:00.000Z',
 }
 
+/** Mirrors the discriminated union in `silhouetteMyFormSchema`. */
+function myFormProfile(myForm: unknown, overrides: Record<string, unknown> = {}) {
+  return { ...defaultProfile, mode: 'my_form', myForm, ...overrides }
+}
+
+const readyMyForm = {
+  status: 'ready',
+  failureReason: null,
+  committedAt: '2026-08-09T00:05:00.000Z',
+  imageAccess: {
+    url: 'https://example.test/my-form.png',
+    expiresAt: '2026-08-09T02:00:00.000Z',
+  },
+}
+
+const processingMyForm = {
+  status: 'processing',
+  failureReason: null,
+  committedAt: '2026-08-09T00:05:00.000Z',
+  imageAccess: null,
+}
+
+/** The full allocate/put/commit chain a My Form upload walks through. */
+function uploadHandlers() {
+  return [
+    http.post('*/api/v1/wardrobe/silhouette/my-form/upload-url', () =>
+      HttpResponse.json(
+        {
+          data: {
+            uploadSessionId: 'session-1',
+            uploadUrl: `${window.location.origin}/mock-storage/session-1`,
+            uploadToken: 'upload-token-1',
+            requiredHeaders: { 'content-type': 'image/png' },
+            expiresAt: '2026-08-09T01:00:00.000Z',
+          },
+        },
+        { status: 201 }
+      )
+    ),
+    http.put('*/mock-storage/session-1', () => new HttpResponse(null, { status: 204 })),
+    http.post('*/api/v1/wardrobe/silhouette/my-form/commit', () =>
+      HttpResponse.json({ data: myFormProfile(processingMyForm) })
+    ),
+  ]
+}
+
+/** Opens the My Form tab and confirms the basewear guidance switch. */
+async function openConfirmedMyFormTab() {
+  await waitFor(() => screen.getByTestId('silhouette-height-value'))
+  fireEvent.click(screen.getByTestId('silhouette-tab-my-form'))
+  await waitFor(() => screen.getByTestId('silhouette-my-form-confirm'))
+  fireEvent.click(screen.getByRole('switch'))
+  await waitFor(() => {
+    expect(screen.getByTestId('silhouette-my-form-camera')).not.toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+  })
+}
+
 function renderEditor(pollIntervalMs = 10) {
   const onProfileChange = vi.fn()
   render(
@@ -545,5 +605,305 @@ describe('SilhouetteEditor', () => {
     await waitFor(() => {
       expect(screen.getByTestId('silhouette-my-form-ready')).toBeInTheDocument()
     })
+  })
+
+  it('4.4-MOB-SIL-13 reports a denied camera permission without opening the camera', async () => {
+    imagePicker.requestCameraPermissionsAsync.mockResolvedValue({ granted: false })
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: defaultProfile })
+      )
+    )
+    renderEditor()
+    await openConfirmedMyFormTab()
+
+    fireEvent.click(screen.getByTestId('silhouette-my-form-camera'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Camera permission was denied.')).toBeInTheDocument()
+    })
+    expect(imagePicker.launchCameraAsync).not.toHaveBeenCalled()
+  })
+
+  it('4.4-MOB-SIL-14 uploads a photo taken with the camera', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: defaultProfile })
+      ),
+      ...uploadHandlers()
+    )
+    renderEditor()
+    await openConfirmedMyFormTab()
+
+    fireEvent.click(screen.getByTestId('silhouette-my-form-camera'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-processing')).toBeInTheDocument()
+    })
+  })
+
+  /** Backing out of the camera must leave the source choices, not a stuck spinner. */
+  it('4.4-MOB-SIL-15 keeps the source choices when the camera is cancelled', async () => {
+    imagePicker.launchCameraAsync.mockResolvedValue({ canceled: true, assets: null })
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: defaultProfile })
+      )
+    )
+    renderEditor()
+    await openConfirmedMyFormTab()
+
+    fireEvent.click(screen.getByTestId('silhouette-my-form-camera'))
+
+    await waitFor(() => expect(imagePicker.launchCameraAsync).toHaveBeenCalled())
+    expect(screen.getByTestId('silhouette-my-form-camera')).toBeInTheDocument()
+    expect(screen.queryByTestId('silhouette-my-form-processing')).not.toBeInTheDocument()
+  })
+
+  it('4.4-MOB-SIL-16 reports a denied photo-library permission', async () => {
+    imagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: false })
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: defaultProfile })
+      )
+    )
+    renderEditor()
+    await openConfirmedMyFormTab()
+
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Photo library permission was denied.')).toBeInTheDocument()
+    })
+    expect(imagePicker.launchImageLibraryAsync).not.toHaveBeenCalled()
+  })
+
+  it('4.4-MOB-SIL-17 keeps the source choices when the photo library is cancelled', async () => {
+    imagePicker.launchImageLibraryAsync.mockResolvedValue({
+      canceled: true,
+      assets: null,
+    })
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: defaultProfile })
+      )
+    )
+    renderEditor()
+    await openConfirmedMyFormTab()
+
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+
+    await waitFor(() => expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalled())
+    expect(screen.getByTestId('silhouette-my-form-library')).toBeInTheDocument()
+  })
+
+  /**
+   * A slider write is fire-and-forget from the user's point of view, so a failed
+   * one has to surface inline with a retry rather than silently reverting.
+   */
+  it('4.4-MOB-SIL-18 surfaces a failed slider save and recovers through retry', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: defaultProfile })
+      ),
+      http.put('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json(
+          { statusCode: 403, message: 'GUARDIAN_CONSENT_REQUIRED', error: 'Forbidden' },
+          { status: 403 }
+        )
+      )
+    )
+    renderEditor()
+    await waitFor(() => screen.getByTestId('silhouette-height-value'))
+
+    fireEvent.click(screen.getByTestId('silhouette-height-decrement'))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Guardian consent required for wardrobe uploads.')
+      ).toBeInTheDocument()
+    })
+
+    server.use(
+      http.put('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: { ...defaultProfile, heightSlider: 45, revision: 2 } })
+      )
+    )
+    fireEvent.click(screen.getByTestId('silhouette-slider-retry'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-height-value')).toHaveTextContent('45')
+    })
+    expect(screen.queryByTestId('silhouette-slider-retry')).not.toBeInTheDocument()
+  })
+
+  it('4.4-MOB-SIL-19 keeps the photo visible when removal fails', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: myFormProfile(readyMyForm, { revision: 3 }) })
+      ),
+      http.delete('*/api/v1/wardrobe/silhouette/my-form', () =>
+        HttpResponse.json(
+          { statusCode: 500, message: 'Storage is unavailable.', error: 'Server Error' },
+          { status: 500 }
+        )
+      )
+    )
+    renderEditor()
+
+    await waitFor(() => screen.getByTestId('silhouette-my-form-remove'))
+    fireEvent.click(screen.getByTestId('silhouette-my-form-remove'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Storage is unavailable.')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('silhouette-my-form-ready')).toBeInTheDocument()
+  })
+
+  it('4.4-MOB-SIL-20 surfaces the guardian-consent block when removal is forbidden', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: myFormProfile(readyMyForm, { revision: 3 }) })
+      ),
+      http.delete('*/api/v1/wardrobe/silhouette/my-form', () =>
+        HttpResponse.json(
+          { statusCode: 403, message: 'GUARDIAN_CONSENT_REQUIRED', error: 'Forbidden' },
+          { status: 403 }
+        )
+      )
+    )
+    renderEditor()
+
+    await waitFor(() => screen.getByTestId('silhouette-my-form-remove'))
+    fireEvent.click(screen.getByTestId('silhouette-my-form-remove'))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Guardian consent required for wardrobe uploads.')
+      ).toBeInTheDocument()
+    })
+  })
+
+  /** The terminal failure arrives from the poll, not from the initial read. */
+  it('4.4-MOB-SIL-21 shows the failure reason when processing fails mid-poll', async () => {
+    let call = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () => {
+        call += 1
+        return HttpResponse.json({
+          data:
+            call < 3
+              ? myFormProfile(processingMyForm)
+              : myFormProfile({
+                  status: 'failed',
+                  failureReason: 'privacy_violation',
+                  committedAt: '2026-08-09T00:05:00.000Z',
+                  imageAccess: null,
+                }),
+        })
+      })
+    )
+    renderEditor()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-failed').textContent).toContain(
+        'Choose a different photo.'
+      )
+    })
+  })
+
+  it('4.4-MOB-SIL-22 resumes polling a photo whose bytes are uploaded but not yet processed', async () => {
+    let call = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () => {
+        call += 1
+        return HttpResponse.json({
+          data:
+            call === 1
+              ? myFormProfile({
+                  status: 'bytes_uploaded',
+                  failureReason: null,
+                  committedAt: null,
+                  imageAccess: null,
+                })
+              : myFormProfile(readyMyForm),
+        })
+      })
+    )
+    renderEditor()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-processing')).toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-ready')).toBeInTheDocument()
+    })
+  })
+
+  /**
+   * `pending_upload` means the allocation exists but no bytes landed, so there is
+   * nothing to poll for and the user must be able to pick a photo again.
+   */
+  it('4.4-MOB-SIL-23 offers the source choices again for an abandoned pending upload', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({
+          data: myFormProfile({
+            status: 'pending_upload',
+            failureReason: null,
+            committedAt: null,
+            imageAccess: null,
+          }),
+        })
+      )
+    )
+    renderEditor()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-library')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('silhouette-my-form-processing')).not.toBeInTheDocument()
+  })
+
+  /** A never-adjusted profile stores nulls; the steppers still need a number. */
+  it('4.4-MOB-SIL-24 falls back to the midpoint when the sliders have never been set', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({
+          data: { ...defaultProfile, heightSlider: null, buildSlider: null },
+        })
+      )
+    )
+    renderEditor()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-height-value')).toHaveTextContent('50')
+      expect(screen.getByTestId('silhouette-build-value')).toHaveTextContent('50')
+    })
+  })
+
+  /** Deleting the photo on another device must settle this one back to idle. */
+  it('4.4-MOB-SIL-25 returns to the source choices when the photo disappears mid-poll', async () => {
+    let call = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () => {
+        call += 1
+        return HttpResponse.json({
+          data: call === 1 ? myFormProfile(processingMyForm) : defaultProfile,
+        })
+      })
+    )
+    renderEditor()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-processing')).toBeInTheDocument()
+    })
+
+    // Decision 12 again: with no photo the profile is back on the default
+    // mannequin, which is the tab the editor must land on.
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-sliders')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('silhouette-my-form-processing')).not.toBeInTheDocument()
   })
 })

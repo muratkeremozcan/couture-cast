@@ -529,4 +529,186 @@ describe('AlertFanoutProcessor', () => {
       channel: 'realtime',
     })
   })
+
+  describe('failure and audit paths', () => {
+    it('records an event_lookup failure before rethrowing a repository error', async () => {
+      const harness = createHarness()
+      harness.repository.findEventById.mockRejectedValue(new Error('database down'))
+
+      await expect(
+        harness.processor.process({ eventId: 'event-1' }, now)
+      ).rejects.toThrow('database down')
+      // With no user resolved yet there is nothing to audit, but the failure must
+      // still be logged so the DLQ entry is explainable.
+      expect(harness.repository.recordOutcome).not.toHaveBeenCalled()
+      expect(harness.logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ failureStage: 'event_lookup', errorCode: 'Error' }),
+        'alert_fanout_failed'
+      )
+    })
+
+    it('labels a thrown non-Error with a generic error code', async () => {
+      const harness = createHarness()
+      harness.repository.findEventById.mockRejectedValue('database down')
+
+      await expect(
+        harness.processor.process({ eventId: 'event-1' }, now)
+      ).rejects.toBeDefined()
+      expect(harness.logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ errorCode: 'UnknownError' }),
+        'alert_fanout_failed'
+      )
+    })
+
+    it('rejects a stored event that has no owner', async () => {
+      // An ownerless event cannot be routed to anyone; delivering it would be a leak.
+      const harness = createHarness({
+        event: {
+          id: 'event-1',
+          channel: 'alert:weather',
+          payload,
+          userId: '   ',
+          createdAt: new Date(payload.timestamp),
+        },
+      })
+
+      await expect(
+        harness.processor.process({ eventId: 'event-1' }, now)
+      ).rejects.toThrow('event-1 has no owner')
+      expect(harness.repository.recordOutcome).not.toHaveBeenCalled()
+    })
+
+    it('audits a validation failure against the owner recorded on the event', async () => {
+      const harness = createHarness({
+        event: {
+          id: 'event-1',
+          channel: 'notification:digest',
+          payload,
+          userId: 'user-1',
+          createdAt: new Date(payload.timestamp),
+        },
+      })
+
+      await expect(
+        harness.processor.process({ eventId: 'event-1' }, now)
+      ).rejects.toThrow('is not an alert:weather event')
+      expect(outcomeCalls(harness.repository.recordOutcome)[0]).toMatchObject({
+        eventId: 'event-1',
+        userId: 'user-1',
+        outcome: 'failed',
+        failureStage: 'event_validation',
+      })
+    })
+
+    it('records a tokens-stage failure when the push token lookup throws', async () => {
+      const harness = createHarness()
+      harness.repository.findPushTokensByUserId.mockRejectedValue(
+        new Error('token table locked')
+      )
+
+      await expect(
+        harness.processor.process({ eventId: 'event-1' }, now)
+      ).rejects.toThrow('token table locked')
+      expect(outcomeCalls(harness.repository.recordOutcome)[0]).toMatchObject({
+        userId: 'user-1',
+        outcome: 'failed',
+        failureStage: 'tokens',
+        tokenCount: 0,
+      })
+    })
+
+    it('still surfaces the original failure when the audit write also fails', async () => {
+      // Losing the audit row must not swallow the job failure; the retry has to run.
+      const harness = createHarness()
+      harness.repository.findPushTokensByUserId.mockRejectedValue(
+        new Error('token table locked')
+      )
+      harness.repository.recordOutcome.mockRejectedValue(new Error('audit table locked'))
+
+      await expect(
+        harness.processor.process({ eventId: 'event-1' }, now)
+      ).rejects.toThrow('token table locked')
+      expect(harness.logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ failureStage: 'audit', errorCode: 'Error' }),
+        'alert_fanout_audit_failed'
+      )
+    })
+
+    it('carries the realtime error code into the failure audit row', async () => {
+      const harness = createHarness()
+      harness.repository.findPushTokensByUserId.mockRejectedValue(
+        new Error('token table locked')
+      )
+      harness.realtimePublisher.publish.mockRejectedValue(new Error('redis unavailable'))
+
+      await expect(
+        harness.processor.process({ eventId: 'event-1' }, now)
+      ).rejects.toBeDefined()
+      expect(outcomeCalls(harness.repository.recordOutcome)[0]).toMatchObject({
+        realtimePublished: false,
+        realtimeErrorCode: 'Error',
+      })
+    })
+  })
+
+  it('does not re-publish or re-push an event whose realtime delivery already landed', async () => {
+    // BullMQ retries the whole job, so a second run must not duplicate the alert.
+    const harness = createHarness({
+      alreadyPublished: true,
+      tokens: ['ExponentPushToken[token-1]'],
+    })
+
+    await expect(
+      harness.processor.process({ eventId: 'event-1' }, now)
+    ).resolves.toMatchObject({
+      realtimePublished: true,
+      push: { outcome: 'suppressed', reason: 'realtime_active' },
+    })
+    expect(harness.realtimePublisher.publish).not.toHaveBeenCalled()
+    expect(harness.sendPushNotificationsAsync).not.toHaveBeenCalled()
+  })
+
+  describe('push notification titles', () => {
+    it.each([
+      ['critical', 'Critical weather alert for Chicago'],
+      ['warning', 'Weather warning for Chicago'],
+      ['info', 'Weather alert for Chicago'],
+    ] as const)('titles a %s alert as "%s"', async (severity, title) => {
+      const harness = createHarness({
+        event: {
+          id: 'event-1',
+          channel: 'alert:weather',
+          payload: { ...payload, data: { ...payload.data, severity } },
+          userId: 'user-1',
+          createdAt: new Date(payload.timestamp),
+        },
+        tokens: ['ExponentPushToken[token-1]'],
+      })
+
+      await harness.processor.process({ eventId: 'event-1' }, now)
+
+      expect(harness.sendPushNotificationsAsync).toHaveBeenCalledWith([
+        expect.objectContaining({ title }),
+      ])
+    })
+  })
+
+  it('builds its own logger when none is injected', async () => {
+    // Nest resolves the logger as optional, so the processor must not depend on it.
+    const harness = createHarness()
+    const processor = new AlertFanoutProcessor(
+      harness.repository as never,
+      harness.realtimePublisher,
+      new PushNotificationService(
+        { deleteTokens: vi.fn() } as never,
+        { sendPushNotificationsAsync: vi.fn().mockResolvedValue([]) } as never
+      ),
+      { captureEvent: vi.fn() } as unknown as TelemetryService
+    )
+
+    await expect(processor.process({ eventId: 'event-1' }, now)).resolves.toMatchObject({
+      eventId: 'event-1',
+      userId: 'user-1',
+    })
+  })
 })

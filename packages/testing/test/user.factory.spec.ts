@@ -1,11 +1,34 @@
 import { ComfortRun, PrecipPreparedness, WindTolerance } from '@prisma/client'
-import { describe, expect, it } from 'vitest'
+import type { PrismaClient } from '@prisma/client'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   buildUserCreateInput,
+  createGuardianUser,
   createTeenUser,
   createUser,
+  persistUser,
 } from '../src/factories/user.factory.js'
+import { getTrackedEntityIds, resetTrackedEntities } from '../src/factories/registry.js'
+
+type UserCreateArgs = {
+  data: Record<string, unknown>
+  include: Record<string, unknown>
+}
+
+/**
+ * Only `user.create` is exercised by the persistence path, so the stub models
+ * that one delegate and is cast to the client type the factory expects.
+ */
+function createPrismaStub(row: { id: string }) {
+  const create = vi.fn<(args: UserCreateArgs) => Promise<{ id: string }>>()
+  create.mockResolvedValue(row)
+
+  return {
+    prisma: { user: { create } } as unknown as PrismaClient,
+    create,
+  }
+}
 
 describe('user factory', () => {
   it('creates a schema-valid user fixture and nested Prisma input', () => {
@@ -80,5 +103,77 @@ describe('user factory', () => {
       windTolerance: WindTolerance.high,
       precipPreparedness: PrecipPreparedness.medium,
     })
+  })
+
+  it('gives the guardian variant an adult default age and neutral comfort', () => {
+    // Guardian fixtures back the consent flows, so the default must land well
+    // clear of the 16-year age gate without the test having to say so.
+    const guardian = createGuardianUser()
+
+    expect(guardian.role).toBe('guardian')
+    expect(guardian.age).toBe(42)
+    expect(guardian.profilePreferences).toMatchObject({ role: 'guardian' })
+    expect(guardian.comfortPreferences.runsColdWarm).toBe(ComfortRun.neutral)
+  })
+
+  it('keeps the unqualified user variant in the adult age range', () => {
+    const user = createUser()
+
+    expect(user.role).toBe('user')
+    expect(user.age).toBeGreaterThanOrEqual(18)
+    expect(user.age).toBeLessThanOrEqual(65)
+    expect(user.birthdate).toBeInstanceOf(Date)
+  })
+})
+
+describe('user factory persistence', () => {
+  afterEach(() => {
+    resetTrackedEntities()
+  })
+
+  it('writes the nested create input and registers the row for cleanup', async () => {
+    // A persisted fixture that never reaches the cleanup registry survives the
+    // suite and breaks the next run on a unique email.
+    const row = { id: 'user-persisted' }
+    const { prisma, create } = createPrismaStub(row)
+
+    const persisted = await createUser(
+      { id: 'user-persisted', email: 'persisted@example.com' },
+      { persist: true, prisma }
+    )
+
+    expect(persisted).toBe(row)
+    expect(create.mock.calls[0]?.[0]).toMatchObject({
+      data: { id: 'user-persisted', email: 'persisted@example.com' },
+      include: { profile: true, comfort_profile: true },
+    })
+    expect(getTrackedEntityIds('users')).toEqual(['user-persisted'])
+  })
+
+  it('registers the id Prisma returned rather than the requested one', async () => {
+    // Database defaults can rewrite the id; cleanup has to chase the real row.
+    const { prisma } = createPrismaStub({ id: 'user-from-database' })
+
+    await persistUser(prisma, createUser({ id: 'user-requested' }))
+
+    expect(getTrackedEntityIds('users')).toEqual(['user-from-database'])
+  })
+
+  it('persists the teen and guardian variants through the same path', async () => {
+    const teenStub = createPrismaStub({ id: 'teen-persisted' })
+    const guardianStub = createPrismaStub({ id: 'guardian-persisted' })
+
+    await createTeenUser(
+      { id: 'teen-persisted' },
+      { persist: true, prisma: teenStub.prisma }
+    )
+    await createGuardianUser(
+      { id: 'guardian-persisted' },
+      { persist: true, prisma: guardianStub.prisma }
+    )
+
+    expect(teenStub.create).toHaveBeenCalledTimes(1)
+    expect(guardianStub.create).toHaveBeenCalledTimes(1)
+    expect(getTrackedEntityIds('users')).toEqual(['teen-persisted', 'guardian-persisted'])
   })
 })

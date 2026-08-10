@@ -1,19 +1,32 @@
 import { http, HttpResponse } from 'msw'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { server } from '../test-utils/msw/server'
 import {
+  capsuleETag,
   commitSilhouettePhotoFromMobile,
   createSilhouetteUploadUrlFromMobile,
   deleteSilhouettePhotoFromMobile,
   getSilhouetteProfileFromMobile,
   getWardrobeOnboardingStateFromMobile,
+  listGarmentsFromMobile,
   onboardingETag,
   pollGarmentUntilSettled,
+  resolveOwnerUserId,
   silhouetteETag,
+  suggestGarmentTagsFromMobile,
   updateSilhouetteSlidersFromMobile,
   updateWardrobeOnboardingStateFromMobile,
 } from './wardrobe'
+
+/** Base64url-shaped JWT payload, the only part `resolveOwnerUserId` reads. */
+function fakeAccessToken(claims: Record<string, unknown>): string {
+  const payload = btoa(JSON.stringify(claims))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  return `header.${payload}.signature`
+}
 
 function garmentFixture(overrides: { id: string; status: string }) {
   return {
@@ -296,5 +309,105 @@ describe('pollGarmentUntilSettled', () => {
 
     expect(settled).toBeUndefined()
     expect(call).toBe(1)
+  })
+})
+
+describe('resolveOwnerUserId', () => {
+  it('4.4-MOB-LIB-14 reads the owner from the bearer token sub claim', () => {
+    expect(resolveOwnerUserId(fakeAccessToken({ sub: 'user-42' }))).toBe('user-42')
+  })
+
+  it.each([
+    ['a token with no payload segment', 'not-a-jwt'],
+    ['a payload that is not JSON', 'header.bm90LWpzb24.signature'],
+    ['a payload with no sub claim', fakeAccessToken({ role: 'guardian' })],
+    ['a payload with an empty sub claim', fakeAccessToken({ sub: '' })],
+  ])('4.4-MOB-LIB-15 rejects %s with a re-authenticate message', (_label, token) => {
+    expect(() => resolveOwnerUserId(token)).toThrow(
+      'Your session token is malformed. Sign in again.'
+    )
+  })
+
+  it('4.4-MOB-LIB-16 builds the documented capsule ETag format', () => {
+    expect(capsuleETag('capsule-1', 4)).toBe('"capsule:capsule-1:4"')
+  })
+})
+
+describe('wardrobe request error handling', () => {
+  const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
+
+  beforeEach(() => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
+  })
+
+  afterEach(() => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
+    vi.useRealTimers()
+  })
+
+  /** An empty error body must still name the failure, not surface "undefined". */
+  it('4.4-MOB-LIB-17 falls back to a status message when the error body carries none', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({}, { status: 502 }))
+    )
+
+    await expect(listGarmentsFromMobile('token')).rejects.toThrow(
+      'Wardrobe request failed with status 502'
+    )
+  })
+
+  /**
+   * The tagging modal branches on `error.code`. The API sends this particular
+   * failure as a bare message with no code field, so the wrapper has to infer it
+   * or the modal falls through to generic "load failed" copy.
+   */
+  it('4.4-MOB-LIB-18 infers the analysis-pending code from a bare message', async () => {
+    server.use(
+      http.post('*/api/v1/wardrobe/garments/:garmentId/suggest-tags', () =>
+        HttpResponse.json(
+          { statusCode: 409, message: 'GARMENT_ANALYSIS_PENDING', error: 'Conflict' },
+          { status: 409 }
+        )
+      )
+    )
+
+    const error = await suggestGarmentTagsFromMobile('token', 'g-1').catch(
+      (err: unknown) => err
+    )
+
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error & { code?: string }).code).toBe('GARMENT_ANALYSIS_PENDING')
+  })
+
+  /** A caller that aborts before the request starts must not reach the network. */
+  it('4.4-MOB-LIB-19 refuses to issue a request for an already-aborted signal', async () => {
+    let requestCount = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => {
+        requestCount += 1
+        return HttpResponse.json({ data: [] })
+      })
+    )
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(listGarmentsFromMobile('token', controller.signal)).rejects.toThrow()
+    expect(requestCount).toBe(0)
+  })
+
+  /** Without the 15s ceiling a stalled request leaves the UI spinning forever. */
+  it('4.4-MOB-LIB-20 gives a hung request a timeout message of its own', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => new Promise<never>(() => undefined))
+    )
+    vi.useFakeTimers()
+
+    const pending = listGarmentsFromMobile('token')
+    const assertion = expect(pending).rejects.toThrow(
+      'Wardrobe request timed out. Please try again.'
+    )
+    await vi.advanceTimersByTimeAsync(15_000)
+
+    await assertion
   })
 })

@@ -195,6 +195,188 @@ describe('AlertWeatherRelayService', () => {
     ])
     expect(vi.getTimerCount()).toBe(0)
   })
+
+  const createDeferred = <T>() => {
+    let resolve!: (value: T) => void
+    let reject!: (reason?: unknown) => void
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+    return { promise, resolve, reject }
+  }
+
+  const createSubscriberStub = () => {
+    const listeners = new Map<string, Set<(...args: unknown[]) => void>>()
+    const subscriber = {
+      status: 'wait',
+      connect: vi.fn().mockResolvedValue(undefined),
+      subscribe: vi.fn().mockResolvedValue(1),
+      unsubscribe: vi.fn().mockResolvedValue(0),
+      on: vi.fn((name: string, listener: (...args: unknown[]) => void) => {
+        const eventListeners = listeners.get(name) ?? new Set()
+        eventListeners.add(listener)
+        listeners.set(name, eventListeners)
+      }),
+      off: vi.fn((name: string, listener: (...args: unknown[]) => void) => {
+        listeners.get(name)?.delete(listener)
+      }),
+      quit: vi.fn().mockResolvedValue('OK'),
+    }
+
+    return {
+      subscriber,
+      emit: (name: string, ...args: unknown[]) => {
+        listeners.get(name)?.forEach((listener) => listener(...args))
+      },
+      listenerFor: (name: string) => [...(listeners.get(name) ?? [])][0],
+    }
+  }
+
+  it('stays inert when no Redis subscriber is configured', async () => {
+    // Tests and local runs boot without Redis; the relay must not break startup.
+    const service = new AlertWeatherRelayService(
+      null,
+      { emitWeatherAlert: vi.fn() } as never,
+      logger
+    )
+
+    expect(() => service.onModuleInit()).not.toThrow()
+    await expect(service.onModuleDestroy()).resolves.toBeUndefined()
+  })
+
+  it('attaches its listeners only once across repeated init calls', async () => {
+    const { subscriber } = createSubscriberStub()
+    const service = new AlertWeatherRelayService(
+      subscriber as never,
+      { emitWeatherAlert: vi.fn() } as never,
+      logger
+    )
+
+    service.onModuleInit()
+    service.onModuleInit()
+
+    await vi.waitFor(() => {
+      expect(subscriber.subscribe).toHaveBeenCalledTimes(1)
+    })
+    // Duplicate listeners would broadcast every alert twice.
+    expect(subscriber.on).toHaveBeenCalledTimes(4)
+    await service.onModuleDestroy()
+  })
+
+  it('quits a subscriber it never attached listeners to', async () => {
+    const { subscriber } = createSubscriberStub()
+    const service = new AlertWeatherRelayService(
+      subscriber as never,
+      { emitWeatherAlert: vi.fn() } as never,
+      logger
+    )
+
+    await service.onModuleDestroy()
+
+    expect(subscriber.off).not.toHaveBeenCalled()
+    expect(subscriber.unsubscribe).not.toHaveBeenCalled()
+    expect(subscriber.quit).toHaveBeenCalledOnce()
+  })
+
+  it('reports an unknown reason when the subscribe failure is not an Error', async () => {
+    const failingLogger = pino({ level: 'silent' })
+    const errorSpy = vi.spyOn(failingLogger, 'error')
+    const { subscriber } = createSubscriberStub()
+    subscriber.connect.mockRejectedValue('redis said no')
+    const service = new AlertWeatherRelayService(
+      subscriber as never,
+      { emitWeatherAlert: vi.fn() } as never,
+      failingLogger
+    )
+
+    service.onModuleInit()
+
+    await vi.waitFor(() => {
+      expect(errorSpy).toHaveBeenCalledWith(
+        { error: 'unknown' },
+        'alert_weather_relay_subscribe_failed'
+      )
+    })
+    await service.onModuleDestroy()
+  })
+
+  it('discards a subscribe that completed against a stale connection', async () => {
+    // The socket dropped while the subscribe was in flight, so the SUBSCRIBE
+    // landed on a connection that is already gone and must be retried.
+    vi.useFakeTimers()
+    const connectDeferred = createDeferred<void>()
+    const { subscriber, emit } = createSubscriberStub()
+    subscriber.connect.mockReturnValue(connectDeferred.promise)
+    const service = new AlertWeatherRelayService(
+      subscriber as never,
+      { emitWeatherAlert: vi.fn() } as never,
+      logger
+    )
+
+    service.onModuleInit()
+    await Promise.resolve()
+    emit('error', new Error('socket reset'))
+    expect(vi.getTimerCount()).toBe(1)
+
+    // The retry fires while the first attempt is still connecting, so it must
+    // reuse the in-flight promise rather than starting a second connect.
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(subscriber.subscribe).not.toHaveBeenCalled()
+    expect(subscriber.connect).toHaveBeenCalledTimes(1)
+
+    connectDeferred.resolve()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(subscriber.subscribe).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(1)
+
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(subscriber.subscribe).toHaveBeenCalledTimes(2)
+
+    await service.onModuleDestroy()
+  })
+
+  it('abandons an in-flight subscribe when the module is destroyed', async () => {
+    const connectDeferred = createDeferred<void>()
+    const { subscriber } = createSubscriberStub()
+    subscriber.connect.mockReturnValue(connectDeferred.promise)
+    const service = new AlertWeatherRelayService(
+      subscriber as never,
+      { emitWeatherAlert: vi.fn() } as never,
+      logger
+    )
+
+    service.onModuleInit()
+    await Promise.resolve()
+    const destroyed = service.onModuleDestroy()
+    connectDeferred.resolve()
+    await destroyed
+
+    // Subscribing after shutdown would leak a live Redis subscription.
+    expect(subscriber.subscribe).not.toHaveBeenCalled()
+    expect(subscriber.unsubscribe).not.toHaveBeenCalled()
+    expect(subscriber.quit).toHaveBeenCalledOnce()
+  })
+
+  it('ignores connection events that arrive after shutdown', async () => {
+    vi.useFakeTimers()
+    const { subscriber, listenerFor } = createSubscriberStub()
+    const service = new AlertWeatherRelayService(
+      subscriber as never,
+      { emitWeatherAlert: vi.fn() } as never,
+      logger
+    )
+
+    service.onModuleInit()
+    await vi.advanceTimersByTimeAsync(0)
+    const closeListener = listenerFor('close')
+    await service.onModuleDestroy()
+
+    // ioredis can emit a trailing close after quit; rescheduling here would
+    // resurrect a timer on a torn-down module.
+    expect(() => closeListener?.()).not.toThrow()
+    expect(vi.getTimerCount()).toBe(0)
+  })
 })
 
 describe('alert weather Redis subscriber provider', () => {
@@ -206,5 +388,29 @@ describe('alert weather Redis subscriber provider', () => {
     vi.stubEnv('NODE_ENV', 'test')
 
     expect(alertWeatherRedisSubscriberProvider.useFactory()).toBeNull()
+  })
+
+  it('builds a lazy, fail-fast subscriber outside test mode', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('REDIS_URL', 'redis://relay.example.com:6390')
+
+    const subscriber = alertWeatherRedisSubscriberProvider.useFactory()
+
+    try {
+      expect(subscriber).not.toBeNull()
+      const options = (subscriber as unknown as { options: Record<string, unknown> })
+        .options
+      expect(options).toMatchObject({
+        host: 'relay.example.com',
+        port: 6390,
+        lazyConnect: true,
+        connectTimeout: 5_000,
+      })
+      // Returning null from retryStrategy stops ioredis reconnecting forever; the
+      // relay owns its own five-second retry loop instead.
+      expect((options.retryStrategy as () => number | null)()).toBeNull()
+    } finally {
+      ;(subscriber as unknown as { disconnect(): void } | null)?.disconnect()
+    }
   })
 })

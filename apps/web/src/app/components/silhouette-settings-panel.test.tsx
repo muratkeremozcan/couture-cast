@@ -1,7 +1,7 @@
 // Story 4.4 Task 5 owner: unit-test the web silhouette settings panel
 // @vitest-environment jsdom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { I18nextProvider } from 'react-i18next'
@@ -13,6 +13,7 @@ import { getI18n } from '../../i18n'
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 function buildProfile(
@@ -143,8 +144,9 @@ describe('SilhouetteSettingsPanel', () => {
     await screen.findByLabelText('Height')
     await confirmAndStartMyFormUpload(user)
 
-    await waitFor(() => expect(uploadMyFormPhoto).toHaveBeenCalledTimes(1))
-    expect(screen.getByRole('alert')).toHaveTextContent('network down')
+    // Waiting on the call count only proves the request was issued; the alert
+    // is rendered by the rejection handler a tick later, so wait on the alert.
+    expect(await screen.findByRole('alert')).toHaveTextContent('network down')
 
     await user.click(screen.getByRole('button', { name: 'Retry upload' }))
 
@@ -731,5 +733,517 @@ describe('SilhouetteSettingsPanel', () => {
     await waitFor(() => {
       expect(mannequin.querySelector('g')?.getAttribute('style')).not.toBe(scaleYBefore)
     })
+  })
+})
+
+const PROCESSING_MY_FORM = {
+  status: 'processing',
+  failureReason: null,
+  committedAt: '2026-08-09T09:05:00.000Z',
+  imageAccess: null,
+} as const
+
+const READY_MY_FORM = {
+  status: 'ready',
+  failureReason: null,
+  committedAt: '2026-08-09T09:05:00.000Z',
+  imageAccess: {
+    url: 'https://example.test/me.png',
+    expiresAt: '2026-08-09T10:00:00.000Z',
+  },
+} as const
+
+const FILE_READ_FAILED_MESSAGE = 'The selected photo could not be read.'
+
+/**
+ * jsdom's FileReader always succeeds, so the panel's read-failure path is only
+ * reachable by standing in a reader that produces the failing outcome.
+ */
+function stubFileReader(behaviour: 'nonStringResult' | 'error') {
+  class StubFileReader {
+    onload: ((event: { target: { result: unknown } }) => void) | null = null
+    onerror: (() => void) | null = null
+    readAsDataURL() {
+      setTimeout(() => {
+        if (behaviour === 'error') {
+          this.onerror?.()
+          return
+        }
+        this.onload?.({ target: { result: new ArrayBuffer(8) } })
+      }, 0)
+    }
+  }
+  vi.stubGlobal('FileReader', StubFileReader)
+}
+
+describe('SilhouetteSettingsPanel slider persistence edge cases', () => {
+  it('saves build-slider edits with the height value left untouched', async () => {
+    const getProfile = vi.fn().mockResolvedValue(buildProfile({ revision: 2 }))
+    const saveSliders = vi.fn().mockResolvedValue(buildProfile({ revision: 3 }))
+    renderPanel({ userId: 'user-1', getProfile, saveSliders, sliderSaveDebounceMs: 5 })
+
+    const buildSlider = await screen.findByLabelText('Build')
+    fireEvent.change(buildSlider, { target: { value: '80' } })
+
+    await waitFor(() => {
+      expect(saveSliders).toHaveBeenCalledWith(
+        { heightSlider: 50, buildSlider: 80 },
+        '"silhouette:user-1:2"',
+        expect.anything()
+      )
+    })
+  })
+
+  it('coalesces a rapid drag into a single save of the final value', async () => {
+    const getProfile = vi.fn().mockResolvedValue(buildProfile({ revision: 2 }))
+    const saveSliders = vi.fn().mockResolvedValue(buildProfile({ revision: 3 }))
+    renderPanel({ userId: 'user-1', getProfile, saveSliders, sliderSaveDebounceMs: 15 })
+
+    const heightSlider = await screen.findByLabelText('Height')
+    fireEvent.change(heightSlider, { target: { value: '60' } })
+    fireEvent.change(heightSlider, { target: { value: '70' } })
+    fireEvent.change(heightSlider, { target: { value: '80' } })
+
+    // One request per gesture, not one per pixel of drag.
+    await waitFor(() => expect(saveSliders).toHaveBeenCalledTimes(1))
+    expect(saveSliders).toHaveBeenCalledWith(
+      { heightSlider: 80, buildSlider: 50 },
+      '"silhouette:user-1:2"',
+      expect.anything()
+    )
+  })
+
+  it('defaults both sliders to the midpoint when the server has no saved values', async () => {
+    const getProfile = vi
+      .fn()
+      .mockResolvedValue(buildProfile({ heightSlider: null, buildSlider: null }))
+    renderPanel({ userId: 'user-1', getProfile })
+
+    // A never-configured profile must render usable controls, not empty ones.
+    expect(await screen.findByLabelText('Height')).toHaveValue('50')
+    expect(screen.getByLabelText('Build')).toHaveValue('50')
+  })
+
+  it('reports a non-Error slider-save rejection instead of rendering nothing', async () => {
+    const getProfile = vi.fn().mockResolvedValue(buildProfile({ revision: 2 }))
+    const saveSliders = vi.fn().mockRejectedValue('ECONNRESET')
+    renderPanel({ userId: 'user-1', getProfile, saveSliders, sliderSaveDebounceMs: 5 })
+
+    fireEvent.change(await screen.findByLabelText('Height'), { target: { value: '80' } })
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('ECONNRESET'))
+  })
+
+  it('ignores a superseded slider save so the newer edit is not snapped back', async () => {
+    const getProfile = vi.fn().mockResolvedValue(buildProfile({ revision: 2 }))
+    const settlers: ((profile: SilhouetteProfileContract) => void)[] = []
+    const saveSliders = vi.fn(
+      () =>
+        new Promise<SilhouetteProfileContract>((resolve) => {
+          settlers.push(resolve)
+        })
+    )
+    const onProfileChange = vi.fn()
+    renderPanel({
+      userId: 'user-1',
+      getProfile,
+      saveSliders,
+      onProfileChange,
+      sliderSaveDebounceMs: 5,
+    })
+
+    const heightSlider = await screen.findByLabelText('Height')
+    fireEvent.change(heightSlider, { target: { value: '60' } })
+    await waitFor(() => expect(saveSliders).toHaveBeenCalledTimes(1))
+    fireEvent.change(heightSlider, { target: { value: '70' } })
+    await waitFor(() => expect(saveSliders).toHaveBeenCalledTimes(2))
+    onProfileChange.mockClear()
+
+    await act(async () => {
+      settlers[0]?.(buildProfile({ revision: 3, heightSlider: 60 }))
+      await Promise.resolve()
+    })
+
+    // The first request was aborted when the second started; letting its answer
+    // land would drag the slider back under the user's finger.
+    expect(onProfileChange).not.toHaveBeenCalled()
+    expect(heightSlider).toHaveValue('70')
+  })
+
+  it('stays silent when a superseded slider save fails', async () => {
+    const getProfile = vi.fn().mockResolvedValue(buildProfile({ revision: 2 }))
+    const rejecters: ((reason: Error) => void)[] = []
+    const saveSliders = vi.fn(
+      () =>
+        new Promise<SilhouetteProfileContract>((_resolve, reject) => {
+          rejecters.push(reject)
+        })
+    )
+    renderPanel({ userId: 'user-1', getProfile, saveSliders, sliderSaveDebounceMs: 5 })
+
+    const heightSlider = await screen.findByLabelText('Height')
+    fireEvent.change(heightSlider, { target: { value: '60' } })
+    await waitFor(() => expect(saveSliders).toHaveBeenCalledTimes(1))
+    fireEvent.change(heightSlider, { target: { value: '70' } })
+    await waitFor(() => expect(saveSliders).toHaveBeenCalledTimes(2))
+
+    await act(async () => {
+      rejecters[0]?.(new Error('aborted in flight'))
+      await Promise.resolve()
+    })
+
+    // An error banner for a request the client itself replaced is noise.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('surfaces a failed reload after a stale-revision conflict', async () => {
+    const user = userEvent.setup()
+    const getProfile = vi
+      .fn()
+      .mockResolvedValueOnce(buildProfile({ revision: 2 }))
+      .mockRejectedValueOnce(new Error('reload rejected'))
+    const saveSliders = vi
+      .fn()
+      .mockRejectedValue(new Error('SILHOUETTE_REVISION_MISMATCH'))
+    renderPanel({ userId: 'user-1', getProfile, saveSliders, sliderSaveDebounceMs: 5 })
+
+    fireEvent.change(await screen.findByLabelText('Height'), { target: { value: '80' } })
+    await user.click(
+      await screen.findByRole('button', { name: 'Reload the latest version' })
+    )
+
+    // The reconciliation route itself can fail; failing silently would leave the
+    // user clicking a button that does nothing.
+    expect(await screen.findByText('reload rejected')).toBeInTheDocument()
+  })
+
+  it('surfaces a non-Error reload rejection', async () => {
+    const user = userEvent.setup()
+    const getProfile = vi
+      .fn()
+      .mockResolvedValueOnce(buildProfile({ revision: 2 }))
+      .mockRejectedValueOnce('reload socket closed')
+    const saveSliders = vi
+      .fn()
+      .mockRejectedValue(new Error('SILHOUETTE_REVISION_MISMATCH'))
+    renderPanel({ userId: 'user-1', getProfile, saveSliders, sliderSaveDebounceMs: 5 })
+
+    fireEvent.change(await screen.findByLabelText('Height'), { target: { value: '80' } })
+    await user.click(
+      await screen.findByRole('button', { name: 'Reload the latest version' })
+    )
+
+    expect(await screen.findByText('reload socket closed')).toBeInTheDocument()
+  })
+})
+
+describe('SilhouetteSettingsPanel lifecycle guards', () => {
+  it('discards an initial profile that arrives after the panel unmounts', async () => {
+    let settleLoad: (profile: SilhouetteProfileContract) => void = () => undefined
+    const getProfile = vi.fn().mockReturnValue(
+      new Promise<SilhouetteProfileContract>((resolve) => {
+        settleLoad = resolve
+      })
+    )
+    const onProfileChange = vi.fn()
+    const { unmount } = renderPanel({ userId: 'user-1', getProfile, onProfileChange })
+
+    await screen.findByTestId('silhouette-loading')
+    unmount()
+
+    await act(async () => {
+      settleLoad(buildProfile({ revision: 9 }))
+      await Promise.resolve()
+    })
+
+    // The parent modal was already torn down; notifying it now would apply a
+    // profile change nothing is listening for.
+    expect(onProfileChange).not.toHaveBeenCalled()
+  })
+
+  it('discards an initial profile failure that arrives after the panel unmounts', async () => {
+    let failLoad: (reason: Error) => void = () => undefined
+    const failingGetProfile = vi.fn().mockReturnValue(
+      new Promise<SilhouetteProfileContract>((_resolve, reject) => {
+        failLoad = reject
+      })
+    )
+    const { unmount } = renderPanel({ userId: 'user-1', getProfile: failingGetProfile })
+    await screen.findByTestId('silhouette-loading')
+    unmount()
+
+    await act(async () => {
+      failLoad(new Error('late load failure'))
+      await Promise.resolve()
+    })
+
+    renderPanel({
+      userId: 'user-1',
+      getProfile: vi.fn().mockResolvedValue(buildProfile({ revision: 1 })),
+    })
+
+    // A fresh panel must not inherit the discarded failure.
+    expect(await screen.findByLabelText('Height')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('reports a non-Error initial load rejection', async () => {
+    const getProfile = vi.fn().mockRejectedValue('profile socket closed')
+    renderPanel({ userId: 'user-1', getProfile })
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('profile socket closed')
+    )
+  })
+
+  it('discards a poll response that arrives after the panel unmounts', async () => {
+    let settlePoll: (profile: SilhouetteProfileContract) => void = () => undefined
+    const getProfile = vi
+      .fn()
+      .mockResolvedValueOnce(
+        buildProfile({ mode: 'my_form', revision: 1, myForm: PROCESSING_MY_FORM })
+      )
+      .mockReturnValueOnce(
+        new Promise<SilhouetteProfileContract>((resolve) => {
+          settlePoll = resolve
+        })
+      )
+    const onProfileChange = vi.fn()
+    const { unmount } = renderPanel({
+      userId: 'user-1',
+      getProfile,
+      onProfileChange,
+      pollIntervalsMs: [1, 1],
+    })
+
+    await waitFor(() => expect(getProfile).toHaveBeenCalledTimes(2))
+    onProfileChange.mockClear()
+    unmount()
+
+    await act(async () => {
+      settlePoll(buildProfile({ mode: 'my_form', revision: 2, myForm: READY_MY_FORM }))
+      await Promise.resolve()
+    })
+
+    expect(onProfileChange).not.toHaveBeenCalled()
+  })
+
+  it('surfaces the reason when a poll request fails outright', async () => {
+    const getProfile = vi
+      .fn()
+      .mockResolvedValueOnce(
+        buildProfile({ mode: 'my_form', revision: 1, myForm: PROCESSING_MY_FORM })
+      )
+      .mockRejectedValue(new Error('poll request failed'))
+    renderPanel({ userId: 'user-1', getProfile, pollIntervalsMs: [1, 1] })
+
+    // A dead poll must not leave the panel showing "processing" forever.
+    expect(await screen.findByText('poll request failed')).toBeInTheDocument()
+  })
+
+  it('surfaces a non-Error poll rejection', async () => {
+    const getProfile = vi
+      .fn()
+      .mockResolvedValueOnce(
+        buildProfile({ mode: 'my_form', revision: 1, myForm: PROCESSING_MY_FORM })
+      )
+      .mockRejectedValue('poll socket closed')
+    renderPanel({ userId: 'user-1', getProfile, pollIntervalsMs: [1, 1] })
+
+    expect(await screen.findByText('poll socket closed')).toBeInTheDocument()
+  })
+})
+
+describe('SilhouetteSettingsPanel My Form file handling', () => {
+  it('does nothing when the file picker is dismissed without a choice', async () => {
+    const user = userEvent.setup()
+    const getProfile = vi.fn().mockResolvedValue(buildProfile())
+    const uploadMyFormPhoto = vi.fn()
+    renderPanel({ userId: 'user-1', getProfile, uploadMyFormPhoto })
+
+    await screen.findByLabelText('Height')
+    await user.click(screen.getByLabelText(CONFIRM_CHECKBOX_LABEL))
+    fireEvent.change(screen.getByLabelText('My Form photo file', { selector: 'input' }))
+
+    expect(uploadMyFormPhoto).not.toHaveBeenCalled()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('reports a photo whose bytes could not be decoded', async () => {
+    stubFileReader('nonStringResult')
+    const user = userEvent.setup()
+    const getProfile = vi.fn().mockResolvedValue(buildProfile())
+    const uploadMyFormPhoto = vi.fn()
+    renderPanel({ userId: 'user-1', getProfile, uploadMyFormPhoto })
+
+    await screen.findByLabelText('Height')
+    await confirmAndStartMyFormUpload(user)
+
+    expect(await screen.findByText(FILE_READ_FAILED_MESSAGE)).toBeInTheDocument()
+    // Nothing is sent when the local read never produced an image.
+    expect(uploadMyFormPhoto).not.toHaveBeenCalled()
+  })
+
+  it('reports a photo the reader failed on outright', async () => {
+    stubFileReader('error')
+    const user = userEvent.setup()
+    const getProfile = vi.fn().mockResolvedValue(buildProfile())
+    const uploadMyFormPhoto = vi.fn()
+    renderPanel({ userId: 'user-1', getProfile, uploadMyFormPhoto })
+
+    await screen.findByLabelText('Height')
+    await confirmAndStartMyFormUpload(user)
+
+    expect(await screen.findByText(FILE_READ_FAILED_MESSAGE)).toBeInTheDocument()
+    expect(uploadMyFormPhoto).not.toHaveBeenCalled()
+  })
+
+  it('reports a non-Error upload rejection', async () => {
+    const user = userEvent.setup()
+    const getProfile = vi.fn().mockResolvedValue(buildProfile())
+    const uploadMyFormPhoto = vi.fn().mockRejectedValue('upload socket closed')
+    renderPanel({ userId: 'user-1', getProfile, uploadMyFormPhoto })
+
+    await screen.findByLabelText('Height')
+    await confirmAndStartMyFormUpload(user)
+
+    expect(await screen.findByText('upload socket closed')).toBeInTheDocument()
+  })
+
+  it('renders actionable copy for a failure reason this client does not recognize', async () => {
+    const getProfile = vi.fn().mockResolvedValue(
+      buildProfile({
+        revision: 1,
+        myForm: {
+          status: 'failed',
+          // Deliberately out of contract: the commit response is not schema
+          // validated at the call site, so a newer backend can hand this client
+          // a reason it has no translation for.
+          failureReason: 'moderation_hold',
+          committedAt: '2026-08-09T09:05:00.000Z',
+          imageAccess: null,
+        },
+      } as unknown as Partial<SilhouetteProfileContract>)
+    )
+    renderPanel({ userId: 'user-1', getProfile })
+
+    await screen.findByLabelText('Height')
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Something went wrong with this photo. Try again.'
+    )
+  })
+})
+
+describe('SilhouetteSettingsPanel My Form removal failures', () => {
+  function readyProfile() {
+    return buildProfile({ mode: 'my_form', revision: 4, myForm: READY_MY_FORM })
+  }
+
+  it('maps a stale-revision conflict on removal to the translated message with a reload', async () => {
+    const user = userEvent.setup()
+    const getProfile = vi.fn().mockResolvedValue(readyProfile())
+    const removeMyFormPhoto = vi
+      .fn()
+      .mockRejectedValue(new Error('SILHOUETTE_REVISION_MISMATCH'))
+    renderPanel({ userId: 'user-1', getProfile, removeMyFormPhoto })
+
+    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+
+    expect(
+      await screen.findByText(
+        'This step changed elsewhere. Review the latest version and try again.'
+      )
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Reload the latest version' })
+    ).toBeInTheDocument()
+  })
+
+  it('surfaces the reason when removal fails for an ordinary error', async () => {
+    const user = userEvent.setup()
+    const getProfile = vi.fn().mockResolvedValue(readyProfile())
+    const removeMyFormPhoto = vi.fn().mockRejectedValue(new Error('storage unavailable'))
+    renderPanel({ userId: 'user-1', getProfile, removeMyFormPhoto })
+
+    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+
+    expect(await screen.findByText('storage unavailable')).toBeInTheDocument()
+    // The photo is still there, so the remove affordance has to come back.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Remove My Form photo' })).toBeEnabled()
+    )
+  })
+
+  it('surfaces a non-Error removal rejection', async () => {
+    const user = userEvent.setup()
+    const getProfile = vi.fn().mockResolvedValue(readyProfile())
+    const removeMyFormPhoto = vi.fn().mockRejectedValue('remove socket closed')
+    renderPanel({ userId: 'user-1', getProfile, removeMyFormPhoto })
+
+    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+
+    expect(await screen.findByText('remove socket closed')).toBeInTheDocument()
+  })
+
+  it('discards a removal result that arrives after the panel unmounts', async () => {
+    const user = userEvent.setup()
+    const getProfile = vi.fn().mockResolvedValue(readyProfile())
+    let settleRemove: (profile: SilhouetteProfileContract) => void = () => undefined
+    const removeMyFormPhoto = vi.fn().mockReturnValue(
+      new Promise<SilhouetteProfileContract>((resolve) => {
+        settleRemove = resolve
+      })
+    )
+    const onProfileChange = vi.fn()
+    const { unmount } = renderPanel({
+      userId: 'user-1',
+      getProfile,
+      removeMyFormPhoto,
+      onProfileChange,
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+    await waitFor(() => expect(removeMyFormPhoto).toHaveBeenCalled())
+    onProfileChange.mockClear()
+    unmount()
+
+    await act(async () => {
+      settleRemove(buildProfile({ revision: 5 }))
+      await Promise.resolve()
+    })
+
+    expect(onProfileChange).not.toHaveBeenCalled()
+  })
+
+  it('discards a removal failure that arrives after the panel unmounts', async () => {
+    const user = userEvent.setup()
+    const getProfile = vi.fn().mockResolvedValue(readyProfile())
+    let failRemove: (reason: Error) => void = () => undefined
+    const removeMyFormPhoto = vi.fn().mockReturnValue(
+      new Promise<SilhouetteProfileContract>((_resolve, reject) => {
+        failRemove = reject
+      })
+    )
+    const onBusyChange = vi.fn()
+    const { unmount } = renderPanel({
+      userId: 'user-1',
+      getProfile,
+      removeMyFormPhoto,
+      onBusyChange,
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+    await waitFor(() => expect(onBusyChange).toHaveBeenCalledWith(true))
+    unmount()
+    onBusyChange.mockClear()
+
+    await act(async () => {
+      failRemove(new Error('late removal failure'))
+      await Promise.resolve()
+    })
+
+    // Nothing left to tell; reporting busy=false into a torn-down parent would
+    // be a state update on a component that no longer exists.
+    expect(onBusyChange).not.toHaveBeenCalled()
   })
 })

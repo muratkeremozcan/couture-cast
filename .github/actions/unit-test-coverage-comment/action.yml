@@ -92,10 +92,10 @@ inputs:
     description: |
       Minimum line coverage % required for new/changed lines in this PR.
       Fails the action after posting the PR comment if diff coverage drops below this floor.
-      Defaults to 50. Pass empty string '' to report without enforcing.
+      Defaults to 80. Pass empty string '' to report without enforcing.
       Only evaluated on pull_request events when lcov.info is present.
     required: false
-    default: '50'
+    default: '80'
   lcov-path:
     description: 'Path to lcov.info for diff coverage. Auto-discovered at {coverage-path}/lcov.info when omitted.'
     required: false

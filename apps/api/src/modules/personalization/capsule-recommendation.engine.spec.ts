@@ -243,4 +243,157 @@ describe('capsule-recommendation.engine', () => {
       })
     ).toBeNull()
   })
+
+  /** A single-garment capsule is not an outfit. */
+  it('4.3-UNIT-ENGINE-10 excludes a capsule holding fewer than two garments', () => {
+    const top = createGarment('g-top', 'top')
+    const capsule = createCapsule('cap-1', 'Lonely', ['casual'], [top], false)
+
+    expect(
+      evaluateCapsuleForScenario({
+        capsules: [capsule],
+        userGarments: [top],
+        adjustedFeelsLike: 20,
+      })
+    ).toBeNull()
+  })
+
+  /** One garment two ranges from the target disqualifies the whole capsule. */
+  it('4.3-UNIT-ENGINE-11 excludes a capsule containing a garment far from the target range', () => {
+    const top = createGarment('g-top', 'top', 'hot')
+    const bottom = createGarment('g-bot', 'bottom', 'cold')
+    const shoes = createGarment('g-shoes', 'shoes', 'hot')
+    const capsule = createCapsule('cap-1', 'Mixed', ['casual'], [top, bottom, shoes])
+
+    expect(
+      evaluateCapsuleForScenario({
+        capsules: [capsule],
+        userGarments: [top, bottom, shoes],
+        adjustedFeelsLike: 28,
+      })
+    ).toBeNull()
+  })
+
+  it('4.3-UNIT-ENGINE-12 excludes a capsule whose untagged garment cannot be scored', () => {
+    const top = createGarment('g-top', 'top')
+    top.comfort_range = null
+    const bottom = createGarment('g-bot', 'bottom')
+    const capsule = createCapsule('cap-1', 'Untagged', ['casual'], [top, bottom])
+
+    expect(
+      evaluateCapsuleForScenario({
+        capsules: [capsule],
+        userGarments: [top, bottom],
+        adjustedFeelsLike: 20,
+      })
+    ).toBeNull()
+  })
+
+  /** An unrecognized comfort range must not be treated as an exact match. */
+  it('4.3-UNIT-ENGINE-13 excludes a capsule with an unrecognized comfort range', () => {
+    const top = createGarment('g-top', 'top', 'arctic')
+    const bottom = createGarment('g-bot', 'bottom')
+    const capsule = createCapsule('cap-1', 'Odd', ['casual'], [top, bottom])
+
+    expect(
+      evaluateCapsuleForScenario({
+        capsules: [capsule],
+        userGarments: [top, bottom],
+        adjustedFeelsLike: 20,
+      })
+    ).toBeNull()
+  })
+
+  /** Recommending a capsule with an unfilled slot would leave the user underdressed. */
+  it('4.3-UNIT-ENGINE-14 excludes a capsule whose missing slot cannot be filled', () => {
+    const top = createGarment('g-top', 'top')
+    const bottom = createGarment('g-bot', 'bottom')
+    const capsule = createCapsule('cap-1', 'No shoes', ['casual'], [top, bottom])
+
+    expect(
+      evaluateCapsuleForScenario({
+        capsules: [capsule],
+        userGarments: [top, bottom],
+        adjustedFeelsLike: 20,
+      })
+    ).toBeNull()
+  })
+
+  it.each([
+    { adjustedFeelsLike: 5, range: 'cold' },
+    { adjustedFeelsLike: 17, range: 'mild' },
+    { adjustedFeelsLike: 28, range: 'hot' },
+  ])(
+    '4.3-UNIT-ENGINE-15 scores capsules against the $range band at $adjustedFeelsLike C',
+    ({ adjustedFeelsLike, range }) => {
+      const top = createGarment('g-top', 'top', range)
+      const bottom = createGarment('g-bot', 'bottom', range)
+      const shoes = createGarment('g-shoes', 'shoes', range)
+      const coat = createGarment('g-coat', 'outerwear', range)
+      const capsule = createCapsule('cap-1', 'Banded', ['casual'], [top, bottom])
+
+      const result = evaluateCapsuleForScenario({
+        capsules: [capsule],
+        userGarments: [top, bottom, shoes, coat],
+        adjustedFeelsLike,
+      })
+
+      expect(result).not.toBeNull()
+      expect(result?.garmentIds).toContain('g-shoes')
+    }
+  )
+
+  /** Auto-fill ordering has to be deterministic or the same wardrobe drifts between requests. */
+  it('4.3-UNIT-ENGINE-16 auto-fills by comfort score, then recency, then id', () => {
+    const top = createGarment('g-top', 'top')
+    const bottom = createGarment('g-bot', 'bottom')
+
+    const adjacentShoes = createGarment('g-shoes-a-adjacent', 'shoes', 'cool')
+    adjacentShoes.updated_at = new Date('2026-08-09T00:00:00Z')
+    const olderExactShoes = createGarment('g-shoes-b-old', 'shoes', 'mild')
+    olderExactShoes.updated_at = new Date('2026-08-01T00:00:00Z')
+    const newerExactShoes = createGarment('g-shoes-c-new', 'shoes', 'mild')
+    newerExactShoes.updated_at = new Date('2026-08-05T00:00:00Z')
+    const tiedExactShoes = createGarment('g-shoes-d-tied', 'shoes', 'mild')
+    tiedExactShoes.updated_at = new Date('2026-08-05T00:00:00Z')
+
+    const capsule = createCapsule('cap-1', 'Needs shoes', ['casual'], [top, bottom])
+
+    const result = evaluateCapsuleForScenario({
+      capsules: [capsule],
+      userGarments: [
+        top,
+        bottom,
+        adjacentShoes,
+        tiedExactShoes,
+        newerExactShoes,
+        olderExactShoes,
+      ],
+      adjustedFeelsLike: 17,
+    })
+
+    // Exact beats adjacent, newer beats older, and the lower id breaks a full tie.
+    expect(result?.autoFilledGarmentIds).toEqual(['g-shoes-c-new'])
+  })
+
+  /** Without the id tie-break two identical capsules would alternate between requests. */
+  it('4.3-UNIT-ENGINE-17 breaks a full score and recency tie by capsule id', () => {
+    const top = createGarment('g-top', 'top')
+    const bottom = createGarment('g-bot', 'bottom')
+    const shoes = createGarment('g-shoes', 'shoes')
+
+    const first = createCapsule('cap-a', 'A', ['casual'], [top, bottom])
+    const second = createCapsule('cap-b', 'B', ['casual'], [top, bottom])
+    const sharedUpdatedAt = new Date('2026-08-05T10:00:00Z')
+    first.updated_at = sharedUpdatedAt
+    second.updated_at = sharedUpdatedAt
+
+    const result = evaluateCapsuleForScenario({
+      capsules: [second, first],
+      userGarments: [top, bottom, shoes],
+      adjustedFeelsLike: 20,
+    })
+
+    expect(result?.capsule.id).toBe('cap-a')
+  })
 })

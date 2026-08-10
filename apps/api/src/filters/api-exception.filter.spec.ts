@@ -121,4 +121,106 @@ describe('ApiExceptionFilter', () => {
     expect(() => filter.catch(exception, mockHost)).not.toThrow()
     expect(captureEventMock).not.toHaveBeenCalled()
   })
+
+  const buildHost = (request: unknown): ArgumentsHost => {
+    const response = { headersSent: false }
+    return {
+      switchToHttp: vi.fn().mockReturnValue({
+        getRequest: vi.fn().mockReturnValue(request),
+        getResponse: vi.fn().mockReturnValue(response),
+      }),
+      getType: vi.fn().mockReturnValue('http'),
+      getArgByIndex: vi.fn().mockReturnValue(request),
+      getArgs: vi.fn().mockReturnValue([request, response]),
+    } as unknown as ArgumentsHost
+  }
+
+  it.each([
+    [HttpStatus.UNAUTHORIZED, 'UNAUTHORIZED'],
+    [HttpStatus.FORBIDDEN, 'FORBIDDEN'],
+    [HttpStatus.NOT_FOUND, 'NOT_FOUND'],
+    [HttpStatus.TOO_MANY_REQUESTS, 'RATE_LIMIT'],
+    [HttpStatus.CONFLICT, 'CLIENT_ERROR'],
+    [HttpStatus.BAD_GATEWAY, 'INTERNAL_ERROR'],
+  ])('labels status %i as %s in the telemetry event', (status, errorCode) => {
+    // The error code is what dashboards group on, so each class must stay distinct.
+    const host = buildHost({ path: '/api/v1/alerts', method: 'GET', auth: {} })
+
+    filter.catch(new HttpException('boom', status), host)
+
+    expect(captureEventMock).toHaveBeenCalledWith(
+      null,
+      'api_error_occurred',
+      expect.objectContaining({ statusCode: status, errorCode })
+    )
+  })
+
+  it('prefers the routing path and drops the query string from a raw url', () => {
+    // Query strings carry user data and would explode telemetry cardinality.
+    filter.catch(
+      new HttpException('boom', HttpStatus.BAD_REQUEST),
+      buildHost({ url: '/api/v1/weather/chicago-il?units=metric', method: 'GET' })
+    )
+
+    expect(captureEventMock).toHaveBeenCalledWith(
+      null,
+      'api_error_occurred',
+      expect.objectContaining({ route: '/api/v1/weather/chicago-il', method: 'GET' })
+    )
+  })
+
+  it('falls back to unknown route and method when the request carries neither', () => {
+    filter.catch(new HttpException('boom', HttpStatus.BAD_REQUEST), buildHost({}))
+
+    expect(captureEventMock).toHaveBeenCalledWith(
+      null,
+      'api_error_occurred',
+      expect.objectContaining({ route: 'unknown', method: 'unknown', userId: null })
+    )
+  })
+
+  it('attaches a rejection handler so a telemetry outage cannot escape the filter', () => {
+    // The dispatch is fire-and-forget; an unhandled rejection here would crash
+    // the process on an error path that is already degraded.
+    const catchSpy = vi.fn()
+    captureEventMock.mockReturnValue({ catch: catchSpy })
+
+    filter.catch(
+      new HttpException('boom', HttpStatus.BAD_REQUEST),
+      buildHost({ path: '/api/v1/alerts', method: 'GET' })
+    )
+
+    expect(catchSpy).toHaveBeenCalledWith(expect.any(Function))
+    const onRejected = catchSpy.mock.calls[0]?.[0] as (err: unknown) => void
+    expect(() => onRejected(new Error('posthog unreachable'))).not.toThrow()
+  })
+
+  it.each([
+    { name: 'nothing at all', value: undefined },
+    { name: 'a non-thenable value', value: { ok: true } },
+  ])('tolerates a telemetry service that returns $name', ({ value }) => {
+    captureEventMock.mockReturnValue(value)
+
+    expect(() =>
+      filter.catch(
+        new HttpException('boom', HttpStatus.BAD_REQUEST),
+        buildHost({ path: '/api/v1/alerts', method: 'GET' })
+      )
+    ).not.toThrow()
+  })
+
+  it('still returns the HTTP response when telemetry extraction throws', () => {
+    // Telemetry is best-effort; the client must still receive its error response.
+    captureEventMock.mockImplementation(() => {
+      throw new Error('telemetry client not initialised')
+    })
+
+    expect(() =>
+      filter.catch(
+        new HttpException('boom', HttpStatus.BAD_REQUEST),
+        buildHost({ path: '/api/v1/alerts', method: 'GET' })
+      )
+    ).not.toThrow()
+    expect(replyMock).toHaveBeenCalled()
+  })
 })

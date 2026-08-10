@@ -14,6 +14,31 @@ test('creates a generated DefaultApi client from the root export surface', () =>
   expect(typeof configuration.accessToken).toBe('function')
 })
 
+// Public and health routes are called before a session exists, so the factory
+// has to produce a usable client with no second argument at all.
+test('creates an unauthenticated client when no token or options are given', () => {
+  const client = createApiClient('https://api.couturecast.test')
+  const configuration = (client as unknown as { configuration: Configuration })
+    .configuration
+
+  expect(client).toBeInstanceOf(DefaultApi)
+  expect(configuration.basePath).toBe('https://api.couturecast.test')
+  expect(configuration.accessToken).toBeUndefined()
+})
+
+// A token that is still resolving is a token, not an options bag. Misreading a
+// pending promise as options would silently drop the Authorization header.
+test('treats a pending token promise as an access token rather than options', async () => {
+  const client = createApiClient(
+    'https://api.couturecast.test',
+    Promise.resolve('token-async')
+  )
+  const configuration = (client as unknown as { configuration: Configuration })
+    .configuration
+
+  expect(await configuration.accessToken?.()).toBe('token-async')
+})
+
 test('accepts configuration overrides through the stable wrapper surface', async () => {
   const client = createApiClient('https://api.couturecast.test', {
     accessToken: () => 'token-456',

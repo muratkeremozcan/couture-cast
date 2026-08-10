@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RitualResponse } from '@couture/api-client/contracts/http'
 import { mockRitualResponse } from '../test-utils/msw/handlers'
-import { createWidgetData, resolveWidgetScenario, shareWidgetData } from './widget-share'
+import {
+  createWidgetData,
+  getScenarioForInstant,
+  resolveWidgetScenario,
+  shareWidgetData,
+} from './widget-share'
 
 function cloneRitual(): RitualResponse {
   return JSON.parse(JSON.stringify(mockRitualResponse)) as RitualResponse
@@ -149,5 +154,19 @@ describe('widget share serialization', () => {
 
     expect(widgetData.alertsEnabled).toBe(false)
     expect(widgetData.quietHoursEnabled).toBe(false)
+  })
+
+  /**
+   * A stored location can carry a timezone this device's ICU build does not
+   * know. Throwing there would blank the widget, so the scenario falls back to
+   * UTC rather than failing.
+   */
+  it('falls back to UTC when the stored timezone is unknown to Intl', () => {
+    const midnightUtc = new Date('2026-07-27T00:30:00.000Z')
+
+    expect(getScenarioForInstant(midnightUtc, 'Mars/Olympus_Mons')).toBe('evening')
+    expect(getScenarioForInstant(new Date('2026-07-27T08:00:00.000Z'), 'Not/AZone')).toBe(
+      'morning'
+    )
   })
 })

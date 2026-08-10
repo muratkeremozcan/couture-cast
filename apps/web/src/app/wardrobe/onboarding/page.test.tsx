@@ -842,3 +842,244 @@ describe('WardrobeOnboardingPage', () => {
     })
   })
 })
+
+describe('WardrobeOnboardingPage bootstrap and step-advance failures', () => {
+  it('surfaces the reason when onboarding progress cannot be loaded', async () => {
+    getOnboardingStateFromWeb.mockRejectedValue(new Error('onboarding service down'))
+    render(<WardrobeOnboardingPage />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('onboarding service down')
+    // The spinner must clear, or the flow looks hung with no way forward.
+    expect(
+      screen.queryByText('Loading your onboarding progress…')
+    ).not.toBeInTheDocument()
+  })
+
+  it('falls back to translated copy when the load rejection is not an Error', async () => {
+    getOnboardingStateFromWeb.mockRejectedValue('ECONNRESET')
+    render(<WardrobeOnboardingPage />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to load your onboarding progress.'
+    )
+  })
+
+  it('surfaces the reason when a step advance is rejected outright', async () => {
+    const user = userEvent.setup()
+    getOnboardingStateFromWeb.mockResolvedValue(state())
+    advanceOnboardingStepFromWeb.mockRejectedValue(new Error('step write rejected'))
+    installMediaDevicesMock({
+      getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+    })
+    render(<WardrobeOnboardingPage />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Allow camera and photo access' })
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('step write rejected')
+    // A failed advance must not announce progress the user did not make.
+    expect(screen.getByTestId('onboarding-status-region')).not.toHaveTextContent(
+      'Camera access granted'
+    )
+    expect(
+      screen.getByRole('button', { name: 'Allow camera and photo access' })
+    ).toBeEnabled()
+  })
+
+  it('falls back to translated copy when a step advance rejects with a non-Error', async () => {
+    const user = userEvent.setup()
+    getOnboardingStateFromWeb.mockResolvedValue(state())
+    advanceOnboardingStepFromWeb.mockRejectedValue('socket hang up')
+    installMediaDevicesMock({
+      getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+    })
+    render(<WardrobeOnboardingPage />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Allow camera and photo access' })
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to save this step. Try again.'
+    )
+  })
+
+  it('discards a bootstrap result that lands after the page unmounts', async () => {
+    let settleState: (next: WardrobeOnboardingStateContract) => void = () => undefined
+    getOnboardingStateFromWeb.mockReturnValue(
+      new Promise((resolve) => {
+        settleState = resolve
+      })
+    )
+    const { unmount } = render(<WardrobeOnboardingPage />)
+    await screen.findByRole('status')
+    unmount()
+
+    settleState(state({ status: 'completed', currentStep: 'complete' }))
+    await waitFor(() => expect(getOnboardingStateFromWeb).toHaveBeenCalledTimes(1))
+
+    // A completed state normally redirects; after teardown it must not navigate
+    // a page the user has already left.
+    expect(routerReplace).not.toHaveBeenCalled()
+  })
+
+  it('discards a bootstrap failure that lands after the page unmounts', async () => {
+    let failState: (reason: Error) => void = () => undefined
+    getOnboardingStateFromWeb.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        failState = reject
+      })
+    )
+    const { unmount } = render(<WardrobeOnboardingPage />)
+    await screen.findByRole('status')
+    unmount()
+
+    failState(new Error('late bootstrap failure'))
+    await waitFor(() => expect(getOnboardingStateFromWeb).toHaveBeenCalledTimes(1))
+
+    getOnboardingStateFromWeb.mockReset().mockResolvedValue(state())
+    render(<WardrobeOnboardingPage />)
+
+    // A fresh mount must start clean rather than inherit the discarded failure.
+    await screen.findByRole('button', { name: 'Allow camera and photo access' })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('discards a garment list that lands after the page unmounts', async () => {
+    let settleGarments: (garments: GarmentItemContract[]) => void = () => undefined
+    getOnboardingStateFromWeb.mockResolvedValue(
+      state({ status: 'in_progress', currentStep: 'capture' })
+    )
+    listGarmentsFromWeb.mockReset().mockReturnValue(
+      new Promise((resolve) => {
+        settleGarments = resolve
+      })
+    )
+    const { unmount } = render(<WardrobeOnboardingPage />)
+    await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(1))
+    unmount()
+
+    settleGarments([committedGarment])
+    await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(1))
+
+    // Nothing to render into; the checklist must not resurrect itself.
+    expect(screen.queryByTestId('onboarding-garment-checklist')).not.toBeInTheDocument()
+  })
+
+  it('discards a step-advance result that lands after the page unmounts', async () => {
+    const user = userEvent.setup()
+    let settleAdvance: (next: WardrobeOnboardingStateContract) => void = () => undefined
+    getOnboardingStateFromWeb.mockResolvedValue(state())
+    advanceOnboardingStepFromWeb.mockReturnValue(
+      new Promise((resolve) => {
+        settleAdvance = resolve
+      })
+    )
+    installMediaDevicesMock({
+      getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+    })
+    const { unmount } = render(<WardrobeOnboardingPage />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Allow camera and photo access' })
+    )
+    await waitFor(() => expect(advanceOnboardingStepFromWeb).toHaveBeenCalledTimes(1))
+    unmount()
+
+    settleAdvance(state({ status: 'in_progress', currentStep: 'capture', revision: 1 }))
+    await waitFor(() => expect(advanceOnboardingStepFromWeb).toHaveBeenCalledTimes(1))
+
+    expect(
+      screen.queryByRole('button', { name: 'Add another garment' })
+    ).not.toBeInTheDocument()
+  })
+
+  it('stays silent when a step-advance rejection lands after the page unmounts', async () => {
+    const user = userEvent.setup()
+    let failAdvance: (reason: Error) => void = () => undefined
+    getOnboardingStateFromWeb.mockResolvedValue(state())
+    advanceOnboardingStepFromWeb.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        failAdvance = reject
+      })
+    )
+    installMediaDevicesMock({
+      getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+    })
+    const { unmount } = render(<WardrobeOnboardingPage />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Allow camera and photo access' })
+    )
+    await waitFor(() => expect(advanceOnboardingStepFromWeb).toHaveBeenCalledTimes(1))
+    unmount()
+
+    failAdvance(new Error('late advance failure'))
+    await waitFor(() => expect(advanceOnboardingStepFromWeb).toHaveBeenCalledTimes(1))
+
+    advanceOnboardingStepFromWeb
+      .mockReset()
+      .mockResolvedValue(
+        state({ status: 'in_progress', currentStep: 'capture', revision: 1 })
+      )
+    render(<WardrobeOnboardingPage />)
+
+    await screen.findByRole('button', { name: 'Allow camera and photo access' })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('WardrobeOnboardingPage remaining guided-flow paths', () => {
+  it('treats a rejected camera prompt as denied and still advances', async () => {
+    const user = userEvent.setup()
+    getOnboardingStateFromWeb.mockResolvedValue(state())
+    advanceOnboardingStepFromWeb.mockResolvedValue(
+      state({ status: 'in_progress', currentStep: 'capture', revision: 1 })
+    )
+    installMediaDevicesMock({
+      getUserMedia: vi.fn().mockRejectedValue(new Error('NotAllowedError')),
+    })
+
+    render(<WardrobeOnboardingPage />)
+    await user.click(
+      await screen.findByRole('button', { name: 'Allow camera and photo access' })
+    )
+
+    // A refused prompt must not dead-end the flow; file import still works.
+    await screen.findByRole('button', { name: 'Add another garment' })
+    await waitFor(() =>
+      expect(screen.getByTestId('onboarding-status-region')).toHaveTextContent(/camera/i)
+    )
+  })
+
+  it('continues from tagging to the silhouette step once every garment is tagged', async () => {
+    const user = userEvent.setup()
+    getOnboardingStateFromWeb.mockResolvedValue(
+      state({ status: 'in_progress', currentStep: 'tagging', revision: 2 })
+    )
+    listGarmentsFromWeb.mockResolvedValue([
+      createReadyGarmentFixture({ id: committedGarment.id, category: 'top' }),
+    ])
+    advanceOnboardingStepFromWeb.mockResolvedValue(
+      state({ status: 'in_progress', currentStep: 'silhouette', revision: 3 })
+    )
+
+    render(<WardrobeOnboardingPage />)
+
+    await user.click(await screen.findByRole('button', { name: 'Continue' }))
+
+    await waitFor(() =>
+      expect(advanceOnboardingStepFromWeb).toHaveBeenCalledWith(
+        { targetStep: 'silhouette' },
+        '"onboarding:user-onboarding-1:2"',
+        expect.anything()
+      )
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('onboarding-status-region')).toHaveTextContent(
+        /silhouette/i
+      )
+    )
+  })
+})

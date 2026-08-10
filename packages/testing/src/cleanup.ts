@@ -51,12 +51,25 @@ export interface CleanupOptions {
 
 let defaultCleanupPrisma: CleanupPrismaClient | null = null
 
+/*
+ * AlertCooldownReservation is keyed by a hash of (userId, locationKey,
+ * fingerprint) and carries no owner column, so it cannot be filtered by the
+ * tracked user ids the way every other table here is. It was therefore emptied
+ * with an unscoped deleteMany({}), which destroys rows this run never created —
+ * harmless against a disposable database, not harmless the moment
+ * configureCleanup is pointed at a shared one. This anchor bounds the delete to
+ * rows that could plausibly belong to the current process.
+ */
+let cleanupScopeStartedAt = new Date()
+
 export function configureCleanup({ prisma }: CleanupConfiguration): void {
   defaultCleanupPrisma = prisma
+  cleanupScopeStartedAt = new Date()
 }
 
 export function resetCleanupConfiguration(): void {
   defaultCleanupPrisma = null
+  cleanupScopeStartedAt = new Date()
 }
 
 export function registerForCleanup(type: FactoryRegistryKey, id: string): string {
@@ -244,7 +257,10 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
         prisma.eventEnvelope.deleteMany({
           where: buildUserFilter(userIds),
         }),
-      () => prisma.alertCooldownReservation.deleteMany({}),
+      () =>
+        prisma.alertCooldownReservation.deleteMany({
+          where: { created_at: { gte: cleanupScopeStartedAt } },
+        }),
       () =>
         prisma.engagementEvent.deleteMany({
           where: buildUserFilter(userIds),

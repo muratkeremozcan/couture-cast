@@ -371,5 +371,106 @@ describe('Wardrobe HTTP Contracts', () => {
       expect(bufferProgress).toHaveBeenCalledOnce()
       expect(bufferProgress).toHaveBeenCalledWith(buffer.byteLength, buffer.byteLength)
     })
+
+    // The relay returns the shared `{ error: { message } }` envelope, so the
+    // upload surface should show the server's reason rather than a bare status.
+    it('surfaces the server error message from a JSON failure envelope', async () => {
+      const failedFetch = vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { code: 'UPLOAD_EXPIRED', message: 'Upload session expired' },
+          }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        )
+      )
+
+      await expect(
+        uploadGarmentBytes({
+          uploadUrl: 'https://api.example.test/upload',
+          uploadToken: 'upload-token',
+          bearerToken: 'access-token',
+          mimeType: 'image/png',
+          body: new Blob(['fixture-body'], { type: 'image/png' }),
+          fetchFn: failedFetch,
+        })
+      ).rejects.toThrow('Upload session expired')
+    })
+
+    it('falls back to the status message when the error body carries no message', async () => {
+      const failedFetch = vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(JSON.stringify({ error: { code: 'UPLOAD_EXPIRED' } }), {
+          status: 409,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+
+      await expect(
+        uploadGarmentBytes({
+          uploadUrl: 'https://api.example.test/upload',
+          uploadToken: 'upload-token',
+          bearerToken: 'access-token',
+          mimeType: 'image/png',
+          body: new Blob(['fixture-body'], { type: 'image/png' }),
+          fetchFn: failedFetch,
+        })
+      ).rejects.toThrow('Upload failed with HTTP 409')
+    })
+
+    // A caller-supplied cancel signal and the upload timeout must both be able
+    // to abort the request; composing them is what keeps a user cancel working
+    // on a slow upload.
+    it('aborts when the caller signal fires even though a timeout is also set', async () => {
+      const controller = new AbortController()
+      const abortingFetch = vi.fn<typeof fetch>().mockImplementation(
+        (_input, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new Error('aborted'))
+            })
+          })
+      )
+
+      const uploading = uploadGarmentBytes({
+        uploadUrl: 'https://api.example.test/upload',
+        uploadToken: 'upload-token',
+        bearerToken: 'access-token',
+        mimeType: 'image/png',
+        body: new Blob(['fixture-body'], { type: 'image/png' }),
+        signal: controller.signal,
+        timeoutMs: 60_000,
+        fetchFn: abortingFetch,
+      })
+
+      controller.abort()
+
+      await expect(uploading).rejects.toThrow('aborted')
+      expect(abortingFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
+    })
+
+    it('sends the upload token and bearer token as headers', async () => {
+      const successfulFetch = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(null, { status: 204 }))
+
+      await uploadGarmentBytes({
+        uploadUrl: 'https://api.example.test/upload',
+        uploadToken: 'upload-token',
+        bearerToken: 'access-token',
+        mimeType: 'image/webp',
+        body: new Blob(['fixture-body'], { type: 'image/webp' }),
+        fetchFn: successfulFetch,
+      })
+
+      expect(successfulFetch.mock.calls[0]?.[1]).toMatchObject({
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer access-token',
+          'X-Upload-Token': 'upload-token',
+          'Content-Type': 'image/webp',
+        },
+      })
+      // No timeout and no caller signal means no composed AbortSignal at all.
+      expect(successfulFetch.mock.calls[0]?.[1]?.signal).toBeUndefined()
+    })
   })
 })

@@ -91,4 +91,32 @@ describe('age utilities', () => {
       message: INVALID_BIRTHDATE_MESSAGE,
     })
   })
+
+  it('rejects birthdates that are not in YYYY-MM-DD form', () => {
+    // Native date pickers, autofill and paste all bypass the HTML input mask,
+    // so the parser has to reject free-form dates on its own.
+    expect(() => parseBirthdateInput('04/03/2012')).toThrow(
+      'Birthdate must use YYYY-MM-DD format'
+    )
+    expect(() => parseBirthdateInput('2012-4-3')).toThrow(
+      'Birthdate must use YYYY-MM-DD format'
+    )
+  })
+
+  it('treats blank input as unanswered rather than invalid', () => {
+    // The age gate must not paint a validation error before the user has typed.
+    const empty = { kind: 'empty', gate: null, message: null }
+
+    expect(evaluateBirthdateInput('')).toEqual(empty)
+    expect(evaluateBirthdateInput('   ')).toEqual(empty)
+  })
+
+  it('waits for the birthday itself before ageing a user up', () => {
+    // The 13 and 16 thresholds are consent boundaries, so the day-of edge has
+    // to land exactly on the birthday and not a day early.
+    const birthdate = new Date('2010-04-16T12:00:00.000Z')
+
+    expect(calculateAge(birthdate, new Date('2026-04-15T12:00:00.000Z'))).toBe(15)
+    expect(calculateAge(birthdate, new Date('2026-04-16T12:00:00.000Z'))).toBe(16)
+  })
 })

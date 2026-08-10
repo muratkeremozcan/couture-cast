@@ -22,10 +22,11 @@ const imagePicker = vi.hoisted(() => ({
 }))
 vi.mock('expo-image-picker', () => imagePicker)
 
-vi.mock('expo-image-manipulator', () => ({
+const imageManipulator = vi.hoisted(() => ({
   manipulateAsync: vi.fn(),
   SaveFormat: { PNG: 'png' },
 }))
+vi.mock('expo-image-manipulator', () => imageManipulator)
 
 vi.mock('expo-file-system', () => ({
   File: class {
@@ -56,6 +57,7 @@ vi.mock('react-native', async (importOriginal) => {
   }
 })
 
+import { createSuggestGarmentTagsDataFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
@@ -127,6 +129,18 @@ function renderScreen() {
       <WardrobeOnboardingScreen />
     </AccessibilityAnnouncerProvider>
   )
+}
+
+/**
+ * Presses a react-native-web Touchable the way a real tap does. `TouchableOpacity`
+ * refreshes its `disabled`/`onPress` config in a passive effect, and `waitFor`
+ * resolves off the DOM mutation that enables a button one task earlier, so a
+ * bare `fireEvent.click` on a just-enabled Touchable is silently dropped.
+ */
+function press(element: HTMLElement) {
+  fireEvent.pointerDown(element)
+  fireEvent.pointerUp(element)
+  fireEvent.click(element)
 }
 
 describe('WardrobeOnboardingScreen', () => {
@@ -532,5 +546,124 @@ describe('WardrobeOnboardingScreen', () => {
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-capture-step')).toBeInTheDocument()
     })
+  })
+
+  it('4.4-MOB-ONB-13 tags a garment from the checklist and unblocks Continue', async () => {
+    // The checklist is the only place in onboarding where tagging can be
+    // started, and Continue stays blocked until every garment is ready --
+    // so the tagging round trip has to update the checklist in place.
+    let garmentListReads = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/onboarding', () =>
+        HttpResponse.json({
+          data: { ...inProgressState, currentStep: 'tagging', revision: 1 },
+        })
+      ),
+      http.get('*/api/v1/wardrobe/garments', () => {
+        garmentListReads += 1
+        return HttpResponse.json({
+          data: [{ ...readyGarment, status: 'awaiting_tags', category: null }],
+        })
+      }),
+      http.post('*/api/v1/wardrobe/garments/:garmentId/suggest-tags', () =>
+        HttpResponse.json({
+          data: createSuggestGarmentTagsDataFixture({ garmentId: readyGarment.id }),
+        })
+      ),
+      http.patch('*/api/v1/wardrobe/garments/:garmentId/tags', () =>
+        HttpResponse.json({ data: readyGarment })
+      )
+    )
+    renderScreen()
+
+    await waitFor(() => screen.getByTestId(`onboarding-tag-${readyGarment.id}`))
+    fireEvent.click(screen.getByTestId(`onboarding-tag-${readyGarment.id}`))
+
+    await screen.findByText('AI suggested: Top')
+    await waitFor(() => {
+      expect(screen.getByTestId('garment-tagging-save')).toBeEnabled()
+    })
+    press(screen.getByTestId('garment-tagging-save'))
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId(`onboarding-checklist-${readyGarment.id}`)
+      ).toHaveTextContent('tags confirmed')
+    })
+    expect(screen.getByTestId('onboarding-continue')).not.toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    // The checklist is updated from the tagging response, not by re-reading
+    // the whole wardrobe.
+    expect(garmentListReads).toBe(1)
+  })
+
+  it('4.4-MOB-ONB-14 keeps polling a garment captured during onboarding until it is tagged', async () => {
+    // A garment that commits as `processing` has no tags yet; onboarding owns
+    // the poll that turns it into a completed checklist row.
+    let garmentListReads = 0
+    imageManipulator.manipulateAsync.mockResolvedValue({
+      uri: 'file:///cropped.png',
+      width: 512,
+      height: 512,
+    })
+    imagePicker.launchImageLibraryAsync.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///library-shot.png', width: 900, height: 900 }],
+    })
+    server.use(
+      http.get('*/api/v1/wardrobe/onboarding', () =>
+        HttpResponse.json({
+          data: { ...inProgressState, currentStep: 'capture', revision: 1 },
+        })
+      ),
+      http.get('*/api/v1/wardrobe/garments', () => {
+        garmentListReads += 1
+        return HttpResponse.json({
+          data:
+            garmentListReads === 1 ? [] : [{ ...readyGarment, id: 'garment-processing' }],
+        })
+      }),
+      http.post('*/api/v1/wardrobe/upload-url', () =>
+        HttpResponse.json({
+          data: {
+            garmentId: 'garment-processing',
+            uploadSessionId: 'session-1',
+            uploadUrl: `${window.location.origin}/mock-storage/session-1`,
+            uploadToken: 'upload-token-1',
+            requiredHeaders: { 'content-type': 'image/png' },
+            expiresAt: '2026-08-09T01:00:00.000Z',
+          },
+        })
+      ),
+      http.put('*/mock-storage/session-1', () => new HttpResponse(null, { status: 204 })),
+      http.post('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({
+          data: { ...readyGarment, id: 'garment-processing', status: 'processing' },
+        })
+      )
+    )
+    renderScreen()
+
+    await waitFor(() => screen.getByTestId('onboarding-add-garment'))
+    fireEvent.click(screen.getByTestId('onboarding-add-garment'))
+    await waitFor(() => screen.getByTestId('garment-source-library'))
+    fireEvent.click(screen.getByTestId('garment-source-library'))
+    await waitFor(() => screen.getByTestId('garment-crop-preview'))
+    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await waitFor(() => screen.getByTestId('garment-capture-complete'))
+    fireEvent.click(screen.getByTestId('garment-capture-done'))
+
+    // The onboarding poll runs on the production 1s/2s/4s/8s schedule, so the
+    // first refresh lands a second after the commit.
+    await waitFor(
+      () => {
+        expect(
+          screen.getByTestId('onboarding-checklist-garment-processing')
+        ).toHaveTextContent('tags confirmed')
+      },
+      { timeout: 4_000 }
+    )
   })
 })
