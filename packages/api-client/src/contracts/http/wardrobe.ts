@@ -2290,9 +2290,9 @@ export function registerWardrobeContracts(
     },
     responses: {
       // Real provider verification confirmed `POST /my-form/commit` returns
-      // 201 for a first commit (`commitMyForm` has no `@HttpCode` override,
-      // so it falls to Nest's POST default), matching the garment-commit
-      // sibling this endpoint is documented to mirror
+      // 201 for a first commit and 200 for an idempotent replay, via the
+      // controller's `res.status(result.replayed ? 200 : 201)`, matching the
+      // garment-commit sibling this endpoint is documented to mirror
       // (`POST /api/v1/wardrobe/garments` also registers 201-first/200-replay).
       201: {
         description: 'Photo committed and queued for processing.',

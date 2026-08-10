@@ -885,16 +885,19 @@ export async function startLocalPactProvider({
       // `profile.my_form_commit_idempotency_key === idempotencyKey` branch: a
       // repeated commit with the same key returns the existing row
       // unchanged (no re-processing, no revision increment, no re-enqueue).
-      // Still 201, not 200: unlike upload-url, `commitMyForm` has no
-      // `@HttpCode`/`res.status()` override, so both a first commit and a
-      // replay fall to Nest's POST default (confirmed against the real
-      // provider; a known, separately-flagged apps/api gap, out of this
-      // contract's scope -- see the story's completion notes).
+      // Like upload-url, the real service returns `CommitResult['replayed']`
+      // and the controller's `res.status(result.replayed ? 200 : 201)` reads
+      // it, so a replay answers 200 where a first commit answers 201. The
+      // flag must be set here: this stub is cast to the service type, so an
+      // omitted `replayed` reads as `undefined` and silently pins 201.
       if (
         state?.scenario === 'my-form-commit-already-processed' &&
         idempotencyKey === PACT_SILHOUETTE_COMMIT_IDEMPOTENCY_KEY
       ) {
-        return Promise.resolve({ response: toSilhouetteResponse(row) })
+        return Promise.resolve({
+          replayed: true,
+          response: toSilhouetteResponse(row),
+        })
       }
       const committed: SilhouetteRow = {
         mode: 'default_mannequin',
@@ -908,7 +911,10 @@ export async function startLocalPactProvider({
         },
         revision: row.revision + 1,
       }
-      return Promise.resolve({ response: toSilhouetteResponse(committed) })
+      return Promise.resolve({
+        replayed: false,
+        response: toSilhouetteResponse(committed),
+      })
     },
     deleteMyForm: (userId: string, ifMatchHeader: string | undefined) => {
       const expectedRevision = parseSilhouetteIfMatchHeader(ifMatchHeader, userId)

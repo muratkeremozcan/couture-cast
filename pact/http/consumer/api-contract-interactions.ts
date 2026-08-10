@@ -2280,8 +2280,8 @@ export async function verifyMyFormCommitInteraction(
       })
     )
     .willRespondWith(
-      // The commit handler has no `@HttpCode` override, so it falls to
-      // Nest's POST default (201), confirmed against the real provider.
+      // A first commit: the controller's
+      // `res.status(result.replayed ? 200 : 201)` answers 201 here.
       201,
       setJsonContent({
         headers: { ETag: string(silhouetteETagFor(2)) },
@@ -2328,13 +2328,11 @@ export async function verifyMyFormCommitInteraction(
  * `WardrobeSilhouetteService.commitMyForm`'s real
  * `profile.my_form_commit_idempotency_key === idempotencyKey` branch: a
  * repeated commit with the same idempotency key returns the existing row
- * unchanged (same revision, same `committedAt`), no re-processing. Still
- * expects 201, not 200: unlike upload-url, `commitMyForm` has no
- * `@HttpCode`/`res.status()` override, so it falls to Nest's POST default
- * for both a first commit and a replay (confirmed against the real
- * provider). That's a known, separately-flagged `apps/api` gap (see the
- * story's completion notes) -- asserting 200 here would pin a status code
- * the real API does not currently produce for any input.
+ * unchanged (same revision, same `committedAt`), no re-processing. Expects
+ * 200, not 201: like upload-url, `commitMyForm` returns
+ * `CommitResult['replayed']` and the controller applies
+ * `res.status(result.replayed ? 200 : 201)`, so a replay answers 200 while
+ * a first commit answers 201. Both statuses are registered on the contract.
  */
 export async function verifyMyFormCommitReplayInteraction(
   pact: PactV4,
@@ -2364,7 +2362,9 @@ export async function verifyMyFormCommitReplayInteraction(
       })
     )
     .willRespondWith(
-      201,
+      // A replay: the controller's `res.status(result.replayed ? 200 : 201)`
+      // answers 200 here, where a first commit answers 201.
+      200,
       setJsonContent({
         headers: { ETag: string(silhouetteETagFor(2)) },
         body: {
