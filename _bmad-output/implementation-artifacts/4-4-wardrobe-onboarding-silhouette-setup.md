@@ -1317,6 +1317,61 @@ was untouched, so no SDK regeneration was required. Full `api` suite green
 including the Story 4.3 planner flake), silhouette suite green on two
 back-to-back runs (cross-run isolation), `lint` and `typecheck` clean.
 
+**Correction, and a second, independent Murat pass over the same three
+commits.** The review pass above's claim that "Task 7's Pact interaction
+pins `201` for a fresh commit" does not hold: `grep -rniIc silhouette pact/`
+is `0` across all 11 files on this branch — there is no My Form commit
+interaction anywhere in `pact/`. (`t7-pact`, PR #106, is a sibling branch not
+merged into this one; whether it independently added such an interaction is
+that PR's own concern, not verified here.) The supertest round trip added
+above is therefore the _only_ wire-status guard for this change, not one of
+two.
+
+A second Murat (`bmad-tea`) pass, run independently and concurrently with
+the above, initially flagged two more High findings against an earlier,
+mid-flight copy of `4.4-INT-17`: no `15_000` test timeout, and
+`drainModerationJob` registered as a trailing statement rather than via
+`onTestFinished`. Both turned out to already be fixed by the time of the
+final push (items 1 and 3 above) — a race between the review reading an
+in-progress worktree and the fix landing, not a real remaining gap. Its
+correct, still-open findings (the same `grep` result above, plus three real
+Medium/Low robustness gaps) were fixed directly in this session:
+
+- `drainModerationJob`'s `failed` handler now also gates on
+  `job.attemptsMade >= (job.opts.attempts ?? 1)` — `defaultJobOptions`
+  configures `attempts: 3` with backoff, and `failed` fires on _every_
+  attempt, so rejecting on attempt 1 would abandon a job BullMQ has already
+  re-queued into `delayed`, leaking it back into Redis for the next run.
+- Added `worker.on('error', ...)` capturing the last connection error and
+  interpolating it into the timeout's rejection message — BullMQ swallows
+  an unhandled `'error'` into `console.error`, and this repo's Redis config
+  sets `maxRetriesPerRequest: null`, so a down Redis previously produced a
+  bare "job did not complete in time" with no clue why.
+- `afterEach` now calls `queue.onModuleDestroy()` — the per-test
+  `SilhouettePhotoProcessingQueue` lazily opens a real ioredis connection on
+  first `enqueue`, and nothing was ever closing it (two leaked connections
+  per run, `4.4-INT-15` and `4.4-INT-17`).
+- Added an explicit comment on `4.4-INT-17`'s replay-revision assertion
+  noting it assumes no other live consumer (e.g. a manually started
+  `npm run start:workers:wardrobe`) processes the job first.
+
+Deliberately not fixed tonight, left as known follow-up: folding
+`4.4-INT-15`'s inline worker onto the shared `drainModerationJob` helper to
+stop the two from drifting (a real DRY gap, but a riskier refactor of a
+Risk-4.4-R01 regression test under time pressure — safer to defer than rush).
+Also flagged but explicitly out of this branch's scope: `test:integration`
+is not invoked by any GitHub Actions workflow (`pr-checks.yml`'s
+`test:coverage` job has neither Postgres nor Redis, so `probeSchema()` fails
+and every case in this file `context.skip()`s there), so `4.4-INT-15`,
+`4.4-INT-17`, and everything fixed here only ever runs locally or in a
+scheduled/manual invocation, never as a PR-blocking gate. This is a
+pre-existing, repo-wide gap predating this story, not something introduced
+by it — worth the team's attention, not a fix for tonight.
+
+Re-verified after these fixes: full `api` suite green (671 passed, 5
+skipped), `wardrobe-silhouette` integration suite green (85 passed within
+that filtered run), `lint` and `typecheck` clean.
+
 ### File list
 
 **Task 1 (branch `feat/epic4-story4-t1-db`):**

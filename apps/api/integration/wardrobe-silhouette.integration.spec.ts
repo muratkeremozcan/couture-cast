@@ -138,12 +138,25 @@ async function drainModerationJob(
     { connection: redisOptions, concurrency: 1 }
   )
 
+  let lastConnectionError: unknown
+  // BullMQ swallows an unhandled 'error' into console.error, and this
+  // repo's Redis config sets maxRetriesPerRequest: null, so a down Redis
+  // never rejects -- it just hangs until the timeout below fires with no
+  // clue why. Capture the last error so the timeout message says something
+  // useful instead of a bare "job did not complete in time".
+  worker.on('error', (error) => {
+    lastConnectionError = error
+  })
+
   try {
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(
-        () => reject(new Error('job did not complete in time')),
-        10_000
-      )
+      const timeout = setTimeout(() => {
+        reject(
+          lastConnectionError instanceof Error
+            ? new Error(`job did not complete in time: ${lastConnectionError.message}`)
+            : new Error('job did not complete in time')
+        )
+      }, 10_000)
       worker.on('completed', (job) => {
         if (job.data.silhouetteProfileId === profileId) {
           clearTimeout(timeout)
@@ -152,12 +165,17 @@ async function drainModerationJob(
       })
       // Filter on the same profile the `completed` handler does: this Worker
       // is a consumer on a shared queue, so a stray job's failure must not
-      // be reported as this test's failure.
+      // be reported as this test's failure. Also wait for the final retry
+      // attempt (defaultJobOptions configures attempts: 3 with backoff) --
+      // 'failed' fires on every attempt, and rejecting on attempt 1 would
+      // abandon a job BullMQ has already re-queued into 'delayed', leaking
+      // it right back into Redis for the next run to trip over.
       worker.on('failed', (job, err) => {
-        if (job?.data.silhouetteProfileId === profileId) {
-          clearTimeout(timeout)
-          reject(err)
-        }
+        if (job?.data.silhouetteProfileId !== profileId) return
+        const attempts = job.opts.attempts ?? 1
+        if (job.attemptsMade < attempts) return
+        clearTimeout(timeout)
+        reject(err)
       })
     })
   } finally {
@@ -251,6 +269,11 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
 
   afterEach(async () => {
     if (!schemaReady) return
+    // `beforeEach` constructs a fresh queue per test; `getQueue()` lazily
+    // opens a real ioredis connection on first `enqueue`, and nothing else
+    // in this file (there is no Nest module here) ever calls
+    // `onModuleDestroy()` to close it.
+    await queue.onModuleDestroy()
     await prismaA.moderationEvent.deleteMany({
       where: { silhouette_profile: { user: { email: { contains: namespace } } } },
     })
@@ -594,6 +617,12 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
       commitKey
     )
     expect(replay.replayed).toBe(true)
+    // Assumes no other consumer processes this profile's job before this
+    // assertion runs -- e.g. `npm run start:workers:wardrobe` pointed at the
+    // same Redis would flip the row to `ready` and bump the revision out
+    // from under this. Same shared-external-state class as everywhere else
+    // in this file; harmless in CI/local test runs where no such worker is
+    // started, but don't run this suite alongside a live wardrobe worker.
     expect(replay.response.data.revision).toBe(first.response.data.revision)
 
     // Asserting the exception type too, not just the message: the whole point
