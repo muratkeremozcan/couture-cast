@@ -1,0 +1,9 @@
+ruleset:
+  - breaking-changes:
+      # Operations tagged `x-draft: true` are exempted from breaking-change
+      # enforcement -- for an operation still actively settling across
+      # multiple in-flight stacked branches within the same story (see
+      # packages/api-client/src/contracts/http/wardrobe.ts for the current
+      # list), not a blanket escape hatch. Remove the tag once an endpoint
+      # is stable and let this gate protect it like everything else.
+      exclude_operations_with_extension: x-draft

@@ -3260,7 +3260,7 @@ export interface OnboardingPreconditionRequiredError {
    * @type {OnboardingPreconditionRequiredErrorErrorEnum}
    * @memberof OnboardingPreconditionRequiredError
    */
-  error: OnboardingPreconditionRequiredErrorErrorEnum
+  error?: OnboardingPreconditionRequiredErrorErrorEnum
 }
 
 /**
@@ -4438,7 +4438,7 @@ export interface SilhouettePreconditionRequiredError {
    * @type {SilhouettePreconditionRequiredErrorErrorEnum}
    * @memberof SilhouettePreconditionRequiredError
    */
-  error: SilhouettePreconditionRequiredErrorErrorEnum
+  error?: SilhouettePreconditionRequiredErrorErrorEnum
 }
 
 /**

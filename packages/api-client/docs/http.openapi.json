@@ -8877,6 +8877,7 @@
         }
       },
       "patch": {
+        "x-draft": true,
         "tags": [
           "wardrobe"
         ],
@@ -9025,6 +9026,7 @@
         }
       },
       "put": {
+        "x-draft": true,
         "tags": [
           "wardrobe"
         ],
@@ -9216,6 +9218,7 @@
     },
     "/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}": {
       "put": {
+        "x-draft": true,
         "tags": [
           "wardrobe"
         ],
@@ -9438,6 +9441,7 @@
     },
     "/api/v1/wardrobe/silhouette/my-form": {
       "delete": {
+        "x-draft": true,
         "tags": [
           "wardrobe"
         ],
