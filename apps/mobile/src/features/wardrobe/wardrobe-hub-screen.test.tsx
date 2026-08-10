@@ -282,6 +282,10 @@ describe('WardrobeHubScreen', () => {
             ...onboardingNotCompleted,
             status: 'completed',
             currentStep: 'complete',
+            // `onboardingStateSchema` sets `completedAt` exactly when the
+            // status is `completed`; without it the client rejects the
+            // response and the card would stay visible for the wrong reason.
+            completedAt: '2026-08-09T00:10:00.000Z',
           },
         })
       )

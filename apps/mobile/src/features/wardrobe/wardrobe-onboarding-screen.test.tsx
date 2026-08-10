@@ -85,6 +85,27 @@ const notStartedState = {
   revision: 0,
 }
 
+// `onboardingStateSchema` enforces the API's cross-field invariants, so a
+// mid-flow or completed state cannot be spelled by spreading
+// `notStartedState`: `startedAt` is null only for the virtual `not_started`
+// default, `not_started` only occurs at the permission step at revision 0,
+// and `currentStep: 'complete'` holds exactly when `status` is `completed`
+// with a `completedAt`. Seeding an impossible state makes the client reject
+// the response, which surfaces as the screen never leaving its initial phase.
+const inProgressState = {
+  ...notStartedState,
+  status: 'in_progress' as const,
+  startedAt: '2026-08-09T00:00:00.000Z',
+}
+
+const completedState = {
+  ...inProgressState,
+  status: 'completed' as const,
+  currentStep: 'complete' as const,
+  completedAt: '2026-08-09T00:10:00.000Z',
+  revision: 3,
+}
+
 const readyGarment = {
   id: 'garment-1',
   status: 'ready' as const,
@@ -147,7 +168,7 @@ describe('WardrobeOnboardingScreen', () => {
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
-          data: { ...notStartedState, status: 'completed', currentStep: 'complete' },
+          data: completedState,
         })
       )
     )
@@ -167,7 +188,7 @@ describe('WardrobeOnboardingScreen', () => {
         expect(request.headers.get('if-match')).toBe('"onboarding:user-1:0"')
         expect(await request.json()).toEqual({ targetStep: 'capture' })
         return HttpResponse.json({
-          data: { ...notStartedState, currentStep: 'capture', revision: 1 },
+          data: { ...inProgressState, currentStep: 'capture', revision: 1 },
         })
       }),
       http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [] }))
@@ -192,7 +213,7 @@ describe('WardrobeOnboardingScreen', () => {
       ),
       http.patch('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
-          data: { ...notStartedState, currentStep: 'capture', revision: 1 },
+          data: { ...inProgressState, currentStep: 'capture', revision: 1 },
         })
       ),
       http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [] }))
@@ -213,7 +234,7 @@ describe('WardrobeOnboardingScreen', () => {
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
-          data: { ...notStartedState, currentStep: 'capture', revision: 1 },
+          data: { ...inProgressState, currentStep: 'capture', revision: 1 },
         })
       ),
       http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [] })),
@@ -235,7 +256,7 @@ describe('WardrobeOnboardingScreen', () => {
           usedStarterWardrobe: true,
         })
         return HttpResponse.json({
-          data: { ...notStartedState, currentStep: 'silhouette', revision: 2 },
+          data: { ...inProgressState, currentStep: 'silhouette', revision: 2 },
         })
       })
     )
@@ -253,7 +274,7 @@ describe('WardrobeOnboardingScreen', () => {
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
-          data: { ...notStartedState, currentStep: 'tagging', revision: 1 },
+          data: { ...inProgressState, currentStep: 'tagging', revision: 1 },
         })
       ),
       http.get('*/api/v1/wardrobe/garments', () =>
@@ -277,7 +298,7 @@ describe('WardrobeOnboardingScreen', () => {
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
-          data: { ...notStartedState, currentStep: 'tagging', revision: 1 },
+          data: { ...inProgressState, currentStep: 'tagging', revision: 1 },
         })
       ),
       http.get('*/api/v1/wardrobe/garments', () =>
@@ -298,7 +319,7 @@ describe('WardrobeOnboardingScreen', () => {
       http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
         expect(await request.json()).toEqual({ targetStep: 'silhouette' })
         return HttpResponse.json({
-          data: { ...notStartedState, currentStep: 'silhouette', revision: 2 },
+          data: { ...inProgressState, currentStep: 'silhouette', revision: 2 },
         })
       })
     )
@@ -321,7 +342,7 @@ describe('WardrobeOnboardingScreen', () => {
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
-          data: { ...notStartedState, currentStep: 'tagging', revision: 1 },
+          data: { ...inProgressState, currentStep: 'tagging', revision: 1 },
         })
       ),
       http.get('*/api/v1/wardrobe/garments', () =>
@@ -349,7 +370,7 @@ describe('WardrobeOnboardingScreen', () => {
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
-          data: { ...notStartedState, currentStep: 'tagging', revision: 1 },
+          data: { ...inProgressState, currentStep: 'tagging', revision: 1 },
         })
       ),
       http.get('*/api/v1/wardrobe/garments', () =>
@@ -421,14 +442,37 @@ describe('WardrobeOnboardingScreen', () => {
   })
 
   it('4.4-MOB-ONB-11 reaches the completion step and returns to the wardrobe hub', async () => {
+    // The completion step has to be advanced into rather than loaded: an
+    // initial GET already at `complete` is necessarily `status: 'completed'`,
+    // which the screen redirects straight to the hub (see 4.4-MOB-ONB-02).
+    // Only the post-PATCH path renders it, which is what a real user hits.
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
-          data: { ...notStartedState, currentStep: 'complete', revision: 3 },
+          data: { ...inProgressState, currentStep: 'silhouette', revision: 2 },
         })
-      )
+      ),
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({
+          data: {
+            mode: 'default_mannequin',
+            heightSlider: 50,
+            buildSlider: 50,
+            myForm: null,
+            revision: 0,
+            updatedAt: '2026-08-09T00:00:00.000Z',
+          },
+        })
+      ),
+      http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
+        expect(await request.json()).toEqual({ targetStep: 'complete' })
+        return HttpResponse.json({ data: completedState })
+      })
     )
     renderScreen()
+    await waitFor(() => screen.getByTestId('onboarding-finish'))
+
+    fireEvent.click(screen.getByTestId('onboarding-finish'))
 
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-complete-step')).toBeInTheDocument()
@@ -472,13 +516,13 @@ describe('WardrobeOnboardingScreen', () => {
     // not blindly repeat the same stale header.
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
-        HttpResponse.json({ data: { ...notStartedState, revision: 5 } })
+        HttpResponse.json({ data: { ...inProgressState, revision: 5 } })
       ),
       http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
         expect(request.headers.get('if-match')).toBe('"onboarding:user-1:5"')
         expect(await request.json()).toEqual({ targetStep: 'capture' })
         return HttpResponse.json({
-          data: { ...notStartedState, currentStep: 'capture', revision: 6 },
+          data: { ...inProgressState, currentStep: 'capture', revision: 6 },
         })
       }),
       http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [] }))
