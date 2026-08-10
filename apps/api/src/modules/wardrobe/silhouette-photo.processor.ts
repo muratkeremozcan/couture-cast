@@ -1,11 +1,16 @@
 // Story 4.4 Task 4: BullMQ processor for "My Form" photo moderation,
 // mirroring wardrobe-color.processor.ts's shape.
-import { type PrismaClient, type SilhouetteProfile } from '@prisma/client'
+import { type Prisma, type PrismaClient, type SilhouetteProfile } from '@prisma/client'
 import { createBaseLogger } from '../../logger/pino.config'
 import type { SilhouettePhotoModerationEngine } from './silhouette-photo-moderation.engine'
 import type { WardrobeStorage } from './wardrobe-storage.adapter'
 
 type ProcessableSilhouetteProfile = SilhouetteProfile & { my_form_object_path: string }
+
+type GuardianNotificationContext = {
+  guardianEmails: string[]
+  teen: { email: string }
+}
 
 function isProcessableProfile(
   profile: SilhouetteProfile | null
@@ -65,21 +70,64 @@ export class SilhouettePhotoProcessor {
       return
     }
 
-    const applied = await this.prisma.silhouetteProfile.updateMany({
-      where: this.processingGuard(profile),
-      data: {
-        my_form_status: 'failed',
-        my_form_failure_reason: verdict.outcome,
-        my_form_moderation_flagged_at:
-          verdict.outcome === 'privacy_violation' ? new Date() : undefined,
-        revision: { increment: 1 },
-      },
-    })
-    this.logCompletion(profile.id, startedAt, verdict.outcome, applied.count === 1)
+    // Read the guardian context before opening the transaction so the
+    // transaction itself stays short, then commit the status flip and the
+    // guardian notification together. Marking the profile `failed` in one
+    // statement and notifying in a second left a window where a crash between
+    // them lost the notification permanently: the retry re-reads a profile
+    // whose status is no longer `processing`, returns early, and never
+    // notifies. One transaction makes the retry replay both or neither.
+    // Bound to a local const: TypeScript drops property narrowing inside a
+    // closure, so `verdict.outcome` would widen back to include `'ready'`
+    // inside the transaction callback and no longer match the failure enum.
+    const failureReason = verdict.outcome
+    const guardianContext =
+      failureReason === 'privacy_violation'
+        ? await this.loadGuardianNotificationContext(profile)
+        : null
 
-    if (verdict.outcome === 'privacy_violation' && applied.count === 1) {
-      await this.notifyGuardiansOfPrivacyViolation(profile)
+    const applied = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.silhouetteProfile.updateMany({
+        where: this.processingGuard(profile),
+        data: {
+          my_form_status: 'failed',
+          my_form_failure_reason: failureReason,
+          my_form_moderation_flagged_at:
+            failureReason === 'privacy_violation' ? new Date() : undefined,
+          revision: { increment: 1 },
+        },
+      })
+      if (result.count === 1 && guardianContext) {
+        await this.writeGuardianNotification(tx, profile, guardianContext)
+      }
+      return result
+    })
+    this.logCompletion(profile.id, startedAt, failureReason, applied.count === 1)
+  }
+
+  /**
+   * Decision 6 is scoped to teen actors (its literal scope): an actor with no
+   * active `GuardianConsent` row gets the failure marked on the profile alone,
+   * with no ModerationEvent and no notification, so this returns `null` and the
+   * caller writes nothing.
+   */
+  private async loadGuardianNotificationContext(
+    profile: ProcessableSilhouetteProfile
+  ): Promise<GuardianNotificationContext | null> {
+    const activeConsents = await this.prisma.guardianConsent.findMany({
+      where: { teen_id: profile.user_id, status: 'granted', revoked_at: null },
+      include: { guardian: true },
+    })
+    if (activeConsents.length === 0) {
+      return null
     }
+
+    const teen = await this.prisma.user.findUnique({ where: { id: profile.user_id } })
+    if (!teen) {
+      return null
+    }
+
+    return { guardianEmails: activeConsents.map((c) => c.guardian.email), teen }
   }
 
   /**
@@ -87,53 +135,39 @@ export class SilhouettePhotoProcessor {
    * durable guardian-notification `EventEnvelope` per currently active
    * guardian, mirroring `guardian.service.ts`'s existing
    * `email.guardian-invitation` outbox pattern rather than sending email
-   * synchronously. Scoped to teen actors only (decision 6's literal scope):
-   * an actor with no active `GuardianConsent` row gets the failure marked on
-   * the profile alone, with no ModerationEvent or notification.
+   * synchronously. Runs inside the caller's transaction so the notification
+   * and the terminal `failed` status commit atomically.
    */
-  private async notifyGuardiansOfPrivacyViolation(
-    profile: ProcessableSilhouetteProfile
+  private async writeGuardianNotification(
+    tx: Prisma.TransactionClient,
+    profile: ProcessableSilhouetteProfile,
+    context: GuardianNotificationContext
   ): Promise<void> {
-    const activeConsents = await this.prisma.guardianConsent.findMany({
-      where: { teen_id: profile.user_id, status: 'granted', revoked_at: null },
-      include: { guardian: true },
+    const moderationEvent = await tx.moderationEvent.create({
+      data: {
+        silhouette_profile_id: profile.id,
+        action: 'flagged',
+        reason: 'privacy_violation',
+      },
     })
-    if (activeConsents.length === 0) {
-      return
-    }
 
-    const teen = await this.prisma.user.findUnique({ where: { id: profile.user_id } })
-    if (!teen) {
-      return
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      const moderationEvent = await tx.moderationEvent.create({
+    for (const guardianEmail of context.guardianEmails) {
+      await tx.eventEnvelope.create({
         data: {
-          silhouette_profile_id: profile.id,
-          action: 'flagged',
-          reason: 'privacy_violation',
+          channel: 'email.guardian-silhouette-flag',
+          user_id: profile.user_id,
+          payload: {
+            to: guardianEmail,
+            teenId: profile.user_id,
+            teenEmail: context.teen.email,
+            silhouetteProfileId: profile.id,
+            moderationEventId: moderationEvent.id,
+            reason: 'privacy_violation',
+            flaggedAt: new Date().toISOString(),
+          },
         },
       })
-
-      for (const consent of activeConsents) {
-        await tx.eventEnvelope.create({
-          data: {
-            channel: 'email.guardian-silhouette-flag',
-            user_id: profile.user_id,
-            payload: {
-              to: consent.guardian.email,
-              teenId: profile.user_id,
-              teenEmail: teen.email,
-              silhouetteProfileId: profile.id,
-              moderationEventId: moderationEvent.id,
-              reason: 'privacy_violation',
-              flaggedAt: new Date().toISOString(),
-            },
-          },
-        })
-      }
-    })
+    }
   }
 
   /**

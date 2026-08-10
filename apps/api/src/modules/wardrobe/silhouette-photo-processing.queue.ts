@@ -1,6 +1,6 @@
 // Story 4.4 Task 4: BullMQ producer for "My Form" photo processing, mirroring
 // wardrobe-processing.queue.ts exactly but enqueuing onto the existing
-// moderation-review queue with jobId: silhouetteProfileId (decision 5).
+// moderation-review queue, keyed per commit rather than per profile (decision 5).
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
 import { Queue } from 'bullmq'
 import { z } from 'zod'
@@ -19,7 +19,29 @@ export type SilhouettePhotoProcessingJob = z.infer<
 >
 
 export interface SilhouettePhotoProcessingPublisher {
-  enqueue(silhouetteProfileId: string): Promise<void>
+  enqueue(silhouetteProfileId: string, uploadSessionId: string): Promise<void>
+}
+
+/**
+ * BullMQ refuses to add a job whose custom `jobId` already exists in Redis,
+ * including jobs still retained in the completed/failed sets. `SilhouetteProfile`
+ * is one row per user, so its id is stable for the life of the account -- keying
+ * on it alone (as `WardrobeProcessingQueue` legitimately does with `garmentId`,
+ * which is one row per upload attempt) would silently drop every My Form photo a
+ * user commits after their first for the whole `JOB_RETENTION_SECONDS` window,
+ * leaving the profile stuck in `processing` forever. The upload session id is
+ * regenerated per upload-url allocation, so pairing the two keeps the job id
+ * unique per genuine commit while still deduplicating a double-enqueue of the
+ * same commit.
+ *
+ * The separator is `__`, not `:`: BullMQ rejects a custom job id containing a
+ * colon, because it composes its own Redis keys with one.
+ */
+export function buildSilhouettePhotoJobId(
+  silhouetteProfileId: string,
+  uploadSessionId: string
+): string {
+  return `${silhouetteProfileId}__${uploadSessionId}`
 }
 
 /**
@@ -53,10 +75,10 @@ export class SilhouettePhotoProcessingQueue
     return this.queue
   }
 
-  async enqueue(silhouetteProfileId: string): Promise<void> {
+  async enqueue(silhouetteProfileId: string, uploadSessionId: string): Promise<void> {
     const data = silhouettePhotoProcessingJobSchema.parse({ silhouetteProfileId })
     await this.getQueue().add(SILHOUETTE_PHOTO_PROCESSING_JOB, data, {
-      jobId: silhouetteProfileId,
+      jobId: buildSilhouettePhotoJobId(silhouetteProfileId, uploadSessionId),
       removeOnComplete: { age: JOB_RETENTION_SECONDS },
       removeOnFail: { age: JOB_RETENTION_SECONDS },
     })

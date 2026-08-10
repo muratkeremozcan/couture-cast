@@ -459,7 +459,15 @@ export class WardrobeSilhouetteService {
     await this.storage.upload(profile.my_form_object_path!, body, declaration.mimeType)
 
     const updated = await this.prisma.silhouetteProfile.updateMany({
-      where: { id: profile.id, my_form_status: 'pending_upload' },
+      // Guarded on the session id as well as the status: a concurrent
+      // upload-url reallocation replaces the session in place on this same
+      // one-row-per-user profile, and a status-only guard would let these
+      // bytes be accepted as the *new* session's upload.
+      where: {
+        id: profile.id,
+        my_form_upload_session_id: uploadSessionId,
+        my_form_status: 'pending_upload',
+      },
       data: { my_form_status: 'bytes_uploaded', my_form_consent_checked_at: new Date() },
     })
     if (updated.count !== 1) {
@@ -511,7 +519,29 @@ export class WardrobeSilhouetteService {
       throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
     }
 
-    await this.processingQueue.enqueue(profile.id)
+    // Nothing re-enqueues a job for a row that is already `processing`: a
+    // replay returns the cached processing response and a fresh key is
+    // rejected as reused, so an enqueue failure here would strand the photo
+    // forever. Release the claim instead, which puts the row back in the one
+    // state from which the client's commit retry can legitimately re-enqueue.
+    // (`GarmentItem` solves the same problem with a persisted
+    // `processing_job_enqueued_at` handoff column; this profile has no such
+    // column, and a compensating release needs no schema change.)
+    try {
+      await this.processingQueue.enqueue(profile.id, input.uploadSessionId)
+    } catch (error) {
+      await this.prisma.silhouetteProfile
+        .updateMany({
+          where: { id: profile.id, my_form_status: 'processing' },
+          data: {
+            my_form_status: 'bytes_uploaded',
+            my_form_committed_at: null,
+            my_form_commit_idempotency_key: null,
+          },
+        })
+        .catch(() => undefined)
+      throw error
+    }
 
     const refreshed = await this.prisma.silhouetteProfile.findUniqueOrThrow({
       where: { id: profile.id },
