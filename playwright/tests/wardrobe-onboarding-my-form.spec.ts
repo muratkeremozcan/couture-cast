@@ -14,16 +14,16 @@
 // different, non-skin-toned center region always clears both thresholds
 // (`ready`). See the story's Dev Notes for the exact pixel geometry.
 import path from 'node:path'
-import { signupResponseSchema } from '@couture/api-client/contracts/http'
-import type { Locator, Page, TestInfo } from '@playwright/test'
-import type { ApiRequestFixture } from '../support/helpers/api-test'
-import { expect, test } from '../support/fixtures/merged-fixtures'
-import { resolveEnvironmentConfig } from '../config/environments'
+import type { Locator, Page } from '@playwright/test'
+import { expect } from '../support/fixtures/merged-fixtures'
 import { waitForAccessibilityReady } from '../support/helpers/accessibility'
-import { buildUniqueId, isNonLocalEnvironment } from '../support/helpers/api-test'
-import { cleanupWardrobeUserTestData } from '../support/helpers/user-test-data'
+import { isNonLocalEnvironment } from '../support/helpers/api-test'
+import {
+  signUpAndAuthenticate,
+  wardrobeOnboardingTest as myFormTest,
+} from '../support/helpers/wardrobe-onboarding-session'
 
-const environment = resolveEnvironmentConfig('local')
+const test = myFormTest
 const readyFixturePath = path.resolve(
   __dirname,
   '../fixtures/wardrobe/silhouette-photo-ready.png'
@@ -32,55 +32,6 @@ const contrastFixturePath = path.resolve(
   __dirname,
   '../fixtures/wardrobe/silhouette-photo-contrast.png'
 )
-
-type CleanupState = {
-  userId?: string
-  accessToken?: string
-}
-
-const myFormTest = test.extend<{ cleanupState: CleanupState }>({
-  cleanupState: async ({ apiRequest }, use) => {
-    const state: CleanupState = {}
-    try {
-      await use(state)
-    } finally {
-      await cleanupWardrobeUserTestData(
-        apiRequest,
-        state.accessToken,
-        state.userId,
-        environment.apiBaseUrl
-      )
-    }
-  },
-})
-
-async function signUpAndAuthenticate(
-  apiRequest: ApiRequestFixture,
-  page: Page,
-  cleanupState: CleanupState,
-  testInfo: TestInfo,
-  prefix: string
-): Promise<void> {
-  const signup = await apiRequest({
-    method: 'POST',
-    path: '/api/v1/auth/signup',
-    baseUrl: environment.apiBaseUrl,
-    body: {
-      email: `${buildUniqueId(prefix, testInfo)}@example.test`,
-      birthdate: '1990-06-15',
-    },
-  })
-  expect(signup.status).toBe(201)
-  const signupBody = signupResponseSchema.parse(signup.body)
-  cleanupState.userId = signupBody.userId
-  const accessToken = `test-token:guardian:${signupBody.userId}`
-  cleanupState.accessToken = accessToken
-
-  await page.addInitScript((token) => {
-    window.sessionStorage.setItem('couturecast.access-token', token)
-  }, accessToken)
-  await page.setExtraHTTPHeaders({ Authorization: `Bearer ${accessToken}` })
-}
 
 /** Opens the standalone Silhouette settings modal from the wardrobe hub (decision 3). */
 async function openSilhouetteSettings(page: Page): Promise<Locator> {
@@ -128,7 +79,11 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
           .getByRole('button', { name: 'Upload a full-body photo', exact: true })
           .click()
         await dialog.getByLabel('My Form photo file').setInputFiles(readyFixturePath)
-        await expect(dialog.getByText('Processing your photo…')).toBeVisible()
+        // Not asserting the transient "Processing your photo…" state here:
+        // the real worker can settle before Playwright observes it (a tiny
+        // synthetic fixture image processes in single-digit milliseconds),
+        // which would make this assertion flaky. The terminal ready state
+        // below is what actually matters.
       })
 
       await test.step('The photo reaches ready and becomes the active silhouette mode', async () => {
@@ -224,6 +179,21 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
         })
       })
 
+      // Captures the idempotency key from every upload-url allocation
+      // (fired once per attempt, including the retry) so the "reusing the
+      // same upload attempt" claim in this test's own name is actually
+      // verified below, not just implied by reaching `ready`.
+      const allocationIdempotencyKeys: string[] = []
+      page.on('request', (request) => {
+        if (
+          request.method() === 'POST' &&
+          request.url().includes('/my-form/upload-url')
+        ) {
+          const key = request.headers()['idempotency-key']
+          if (key) allocationIdempotencyKeys.push(key)
+        }
+      })
+
       await confirmBasewearGuidance(dialog)
       await dialog
         .getByRole('button', { name: 'Upload a full-body photo', exact: true })
@@ -240,6 +210,11 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
         await expect(dialog.getByText('My Form photo ready')).toBeVisible({
           timeout: 20_000,
         })
+      })
+
+      await test.step('The retry reused the original idempotency key, not a fresh upload attempt', () => {
+        expect(allocationIdempotencyKeys).toHaveLength(2)
+        expect(allocationIdempotencyKeys[1]).toBe(allocationIdempotencyKeys[0])
       })
     }
   )

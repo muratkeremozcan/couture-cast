@@ -59,6 +59,7 @@
       "title": "Set up your closet",
       "garmentFallback": "Garment {{position}}",
       "permissionTitle": "Allow camera and photo access",
+      "permissionAction": "Allow camera and photo access",
       "permissionBody": "CoutureCast needs camera or library access to capture your garments.",
       "permissionDenied": "We couldn't access your camera or photos. You can still import files or use the starter wardrobe.",
       "useStarterWardrobe": "Use starter wardrobe",

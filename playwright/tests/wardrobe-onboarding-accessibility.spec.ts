@@ -1,68 +1,31 @@
 // Story 4.4 Task 8 owner: keyboard-only completion, visible focus, slider
 // target geometry, live announcements, and axe for the guided onboarding flow
 // and the standalone silhouette settings surface (AC 5).
-import { signupResponseSchema } from '@couture/api-client/contracts/http'
-import type { Page, TestInfo } from '@playwright/test'
-import type { ApiRequestFixture } from '../support/helpers/api-test'
-import { expect, test } from '../support/fixtures/merged-fixtures'
-import { resolveEnvironmentConfig } from '../config/environments'
+import { expect } from '../support/fixtures/merged-fixtures'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
-import { buildUniqueId, isNonLocalEnvironment } from '../support/helpers/api-test'
-import { cleanupWardrobeUserTestData } from '../support/helpers/user-test-data'
+import { isNonLocalEnvironment } from '../support/helpers/api-test'
+import {
+  signUpAndAuthenticate,
+  wardrobeOnboardingTest as a11yTest,
+} from '../support/helpers/wardrobe-onboarding-session'
+
+const test = a11yTest
 
 /** WCAG 2.2 AA target size minimum. */
 const MIN_TARGET_PX = 44
 
-const environment = resolveEnvironmentConfig('local')
-
-type CleanupState = {
-  userId?: string
-  accessToken?: string
-}
-
-const a11yTest = test.extend<{ cleanupState: CleanupState }>({
-  cleanupState: async ({ apiRequest }, use) => {
-    const state: CleanupState = {}
-    try {
-      await use(state)
-    } finally {
-      await cleanupWardrobeUserTestData(
-        apiRequest,
-        state.accessToken,
-        state.userId,
-        environment.apiBaseUrl
-      )
-    }
+// A fake video device makes the permission-granted `getUserMedia` path
+// deterministic in this suite: without it, Chromium has no real camera in a
+// headless/CI environment, so `getUserMedia` rejects even once permission is
+// granted (confirmed directly: `grantPermissions(['camera'])` alone still
+// produced "Camera access unavailable" here). Must be file-level, not inside
+// a `describe` block: Playwright forces a new worker for `launchOptions` and
+// refuses to apply it at describe scope.
+a11yTest.use({
+  launchOptions: {
+    args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
   },
 })
-
-async function signUpAndAuthenticate(
-  apiRequest: ApiRequestFixture,
-  page: Page,
-  cleanupState: CleanupState,
-  testInfo: TestInfo,
-  prefix: string
-): Promise<void> {
-  const signup = await apiRequest({
-    method: 'POST',
-    path: '/api/v1/auth/signup',
-    baseUrl: environment.apiBaseUrl,
-    body: {
-      email: `${buildUniqueId(prefix, testInfo)}@example.test`,
-      birthdate: '1990-06-15',
-    },
-  })
-  expect(signup.status).toBe(201)
-  const signupBody = signupResponseSchema.parse(signup.body)
-  cleanupState.userId = signupBody.userId
-  const accessToken = `test-token:guardian:${signupBody.userId}`
-  cleanupState.accessToken = accessToken
-
-  await page.addInitScript((token) => {
-    window.sessionStorage.setItem('couturecast.access-token', token)
-  }, accessToken)
-  await page.setExtraHTTPHeaders({ Authorization: `Bearer ${accessToken}` })
-}
 
 a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
   a11yTest.use({ authSessionEnabled: false })
@@ -85,6 +48,16 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
         'onboarding-a11y-axe'
       )
       await page.goto('/wardrobe/onboarding')
+      // Gate the first scan on the permission step's real content, not just
+      // `waitForAccessibilityReady`'s landmark check (which `checkA11y` also
+      // runs internally): the onboarding flow renders a loading state and
+      // then briefly `null` before the permission step itself mounts, and
+      // neither of those intermediate states carries the `main#main-content`
+      // id `waitForAccessibilityReady` waits for -- but asserting the actual
+      // heading here makes that guarantee explicit rather than implicit.
+      await expect(
+        page.getByRole('heading', { level: 2, name: 'Allow camera and photo access' })
+      ).toBeVisible()
       await checkA11y(page, {
         includedImpacts: ['critical', 'serious', 'moderate', 'minor'],
       })
@@ -187,6 +160,12 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
         testInfo,
         'onboarding-a11y-live'
       )
+      // Grant camera before navigating so the permission outcome is
+      // deterministic: without this, whether the browser context has a real
+      // or fake camera device varies by environment, and the test would
+      // otherwise have to accept either the granted or the denied
+      // announcement to avoid flaking.
+      await page.context().grantPermissions(['camera'])
       await page.goto('/wardrobe/onboarding')
       await waitForAccessibilityReady(page)
 
@@ -194,7 +173,9 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
       await expect(liveRegion).toHaveAttribute('aria-live', 'polite')
 
       await page.getByRole('button', { name: 'Allow camera and photo access' }).click()
-      await expect(liveRegion).toContainText(/Camera access/)
+      await expect(liveRegion).toContainText(
+        'Camera access granted. Capture your garments.'
+      )
 
       await page.getByRole('button', { name: 'Use starter wardrobe' }).click()
       await expect(liveRegion).toContainText('Set up your silhouette.')
@@ -230,6 +211,7 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
         expect(box!.height, `target ${index} height`).toBeGreaterThanOrEqual(
           MIN_TARGET_PX
         )
+        expect(box!.width, `target ${index} width`).toBeGreaterThanOrEqual(MIN_TARGET_PX)
       }
     }
   )
@@ -255,6 +237,22 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
       await expect(dialog).toBeVisible()
       await checkA11y(page, {
         includedImpacts: ['critical', 'serious', 'moderate', 'minor'],
+      })
+
+      await test.step('Tab cycles never move focus outside the dialog', async () => {
+        // More presses than the panel's known focusable elements (close
+        // button, two sliders, confirm checkbox, upload button), so any cycle
+        // wrap is exercised at least once.
+        for (let index = 0; index < 15; index += 1) {
+          await page.keyboard.press('Tab')
+          const focusStayedInsideDialog = await dialog.evaluate((dialogEl) =>
+            dialogEl.contains(document.activeElement)
+          )
+          expect(
+            focusStayedInsideDialog,
+            `focus after Tab press ${index + 1} must stay inside the dialog`
+          ).toBe(true)
+        }
       })
 
       await page.keyboard.press('Escape')

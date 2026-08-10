@@ -20,6 +20,13 @@ tags:
     appId: ${MAESTRO_APP_ID}
     clearState: true
     stopApp: false
+    # Pre-grant both permissions this flow's own onboarding-request-permission
+    # tap requests (camera and media-library, via expo-image-picker/expo-camera):
+    # without this, a first-run native permission dialog would block whatever
+    # command runs next, on both iOS and Android.
+    permissions:
+      camera: allow
+      photos: allow
 
 # iOS can preserve an Authentication Services sheet across Expo Go app-data
 # resets; dismiss it before opening the test deep link, matching the other
@@ -90,11 +97,38 @@ tags:
 - assertVisible:
     id: 'silhouette-height-increment'
 
+# Each slider tap fires an immediate PUT with the profile's current revision;
+# a second tap before the first save settles (real network round-trip, not
+# fixed timing) can race it. Wait for the stepper to re-enable (persist-in-
+# flight disables it -- see silhouette-editor.tsx's `isSavingSliders`) and for
+# the displayed value to reach the expected step before the next tap, so
+# every save genuinely completes -- explicit Maestro-visible state, not a
+# timing assumption.
 - tapOn:
     id: 'silhouette-height-increment'
 
+- extendedWaitUntil:
+    visible:
+      id: 'silhouette-height-increment'
+      enabled: true
+    timeout: 10000
+
+- assertVisible:
+    id: 'silhouette-height-value'
+    text: '55'
+
 - tapOn:
     id: 'silhouette-height-increment'
+
+- extendedWaitUntil:
+    visible:
+      id: 'silhouette-height-increment'
+      enabled: true
+    timeout: 10000
+
+- assertVisible:
+    id: 'silhouette-height-value'
+    text: '60'
 
 - tapOn:
     id: 'onboarding-finish'

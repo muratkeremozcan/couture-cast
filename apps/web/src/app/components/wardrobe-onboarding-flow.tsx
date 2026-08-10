@@ -130,7 +130,15 @@ function OnboardingFlow({
   const pendingTaggingGarmentIdRef = useRef<string | null>(null)
   const advanceControllerRef = useRef<AbortController | null>(null)
   const isCaptureOpenRef = useRef(false)
-  const garmentPollControllerRef = useRef<AbortController | null>(null)
+  /**
+   * One controller per garment id, not a single shared ref: capturing a
+   * second `processing` garment while the first is still polling must not
+   * abort the first garment's poll. A shared ref previously did exactly
+   * that, silently swallowing the abort in the loop's `catch` block and
+   * leaving the first garment's checklist row stuck on "Processing" with no
+   * recheck action until a reload.
+   */
+  const garmentPollControllersRef = useRef(new Map<string, AbortController>())
   /**
    * Stable per-garment checklist position, assigned the first time a garment
    * id is seen (resume load or a fresh capture) and never reassigned.
@@ -201,9 +209,12 @@ function OnboardingFlow({
   }, [])
 
   useEffect(() => {
+    const garmentPollControllers = garmentPollControllersRef.current
     return () => {
       advanceControllerRef.current?.abort()
-      garmentPollControllerRef.current?.abort()
+      for (const controller of garmentPollControllers.values()) {
+        controller.abort()
+      }
     }
   }, [])
 
@@ -298,9 +309,11 @@ function OnboardingFlow({
    * hub offers rather than leaving the row silently stuck forever.
    */
   const pollCommittedGarment = (garmentId: string) => {
-    garmentPollControllerRef.current?.abort()
+    // Abort only this garment's own prior poll (a stale retry of the same
+    // garment), never another garment's still-running poll.
+    garmentPollControllersRef.current.get(garmentId)?.abort()
     const controller = new AbortController()
-    garmentPollControllerRef.current = controller
+    garmentPollControllersRef.current.set(garmentId, controller)
 
     void (async () => {
       try {
@@ -337,6 +350,13 @@ function OnboardingFlow({
         // Aborted (a newer poll superseded this one) or a transient refresh
         // failure; either way the row just keeps showing "Processing" until
         // the next successful refresh, matching the hub's own handling.
+      } finally {
+        // Only clear this garment's own entry, and only if it's still the
+        // current one (a superseding call for the same garment already
+        // replaced it in the map, in which case leave that newer entry alone).
+        if (garmentPollControllersRef.current.get(garmentId) === controller) {
+          garmentPollControllersRef.current.delete(garmentId)
+        }
       }
     })()
   }
@@ -573,12 +593,21 @@ function OnboardingStepContent({
     permissionDenied && (currentStep === 'permission' || currentStep === 'capture')
 
   const stepRegionRef = useRef<HTMLDivElement | null>(null)
+  const previousStepRef = useRef<WardrobeOnboardingStep | null>(null)
   useEffect(() => {
     // AC 5 requires moving focus to the new step, not only announcing it:
     // the prior step's focused control (a button that was just clicked) is
     // gone from this region entirely once the server confirms the
     // transition, so focus would otherwise silently fall back to <body>.
-    stepRegionRef.current?.focus()
+    // Skipped on the component's first mount (this component mounts exactly
+    // once the async load resolves and `currentStep` gets its first value,
+    // so this effect would otherwise steal focus into the region on every
+    // page load with no user action -- pulling focus past the
+    // `SkipToContent` link before a keyboard user has pressed anything).
+    if (previousStepRef.current !== null && previousStepRef.current !== currentStep) {
+      stepRegionRef.current?.focus()
+    }
+    previousStepRef.current = currentStep
   }, [currentStep])
 
   return (
@@ -687,7 +716,7 @@ function PermissionStep({ t, isRequesting, onAllow }: PermissionStepProps) {
         onClick={onAllow}
         className="min-h-[44px] self-start rounded-lg bg-zinc-900 px-6 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
       >
-        {t('wardrobe.onboarding.permissionTitle')}
+        {t('wardrobe.onboarding.permissionAction')}
       </button>
     </div>
   )

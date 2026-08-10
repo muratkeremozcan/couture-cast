@@ -4,80 +4,34 @@
 // and resuming mid-flow after a reload against the real server-authoritative
 // state machine (decision 3).
 import path from 'node:path'
-import { signupResponseSchema } from '@couture/api-client/contracts/http'
-import type { Page, TestInfo } from '@playwright/test'
-import type { ApiRequestFixture } from '../support/helpers/api-test'
-import { expect, test } from '../support/fixtures/merged-fixtures'
+import { garmentListResponseSchema } from '@couture/api-client/contracts/http'
+import type { Page } from '@playwright/test'
+import { expect } from '../support/fixtures/merged-fixtures'
 import { resolveEnvironmentConfig } from '../config/environments'
 import { waitForAccessibilityReady } from '../support/helpers/accessibility'
-import { buildUniqueId, isNonLocalEnvironment } from '../support/helpers/api-test'
-import { cleanupWardrobeUserTestData } from '../support/helpers/user-test-data'
+import { isNonLocalEnvironment } from '../support/helpers/api-test'
+import {
+  signUpAndAuthenticate,
+  wardrobeOnboardingTest as onboardingTest,
+} from '../support/helpers/wardrobe-onboarding-session'
 
+const test = onboardingTest
 const environment = resolveEnvironmentConfig('local')
 const garmentFixturePath = path.resolve(
   __dirname,
   '../../apps/api/test/fixtures/garment-tagging/neutral-top.png'
 )
 
-type CleanupState = {
-  userId?: string
-  accessToken?: string
-}
-
-const onboardingTest = test.extend<{ cleanupState: CleanupState }>({
-  cleanupState: async ({ apiRequest }, use) => {
-    const state: CleanupState = {}
-    try {
-      await use(state)
-    } finally {
-      await cleanupWardrobeUserTestData(
-        apiRequest,
-        state.accessToken,
-        state.userId,
-        environment.apiBaseUrl
-      )
-    }
-  },
-})
-
-/** Signs up an isolated user through the real API and authenticates the browser as them. */
-async function signUpAndAuthenticate(
-  apiRequest: ApiRequestFixture,
-  page: Page,
-  cleanupState: CleanupState,
-  testInfo: TestInfo,
-  prefix: string
-): Promise<string> {
-  const signup = await apiRequest({
-    method: 'POST',
-    path: '/api/v1/auth/signup',
-    baseUrl: environment.apiBaseUrl,
-    body: {
-      email: `${buildUniqueId(prefix, testInfo)}@example.test`,
-      birthdate: '1990-06-15',
-    },
-  })
-  expect(signup.status).toBe(201)
-  const signupBody = signupResponseSchema.parse(signup.body)
-  cleanupState.userId = signupBody.userId
-  const accessToken = `test-token:guardian:${signupBody.userId}`
-  cleanupState.accessToken = accessToken
-
-  await page.addInitScript((token) => {
-    window.sessionStorage.setItem('couturecast.access-token', token)
-  }, accessToken)
-  await page.setExtraHTTPHeaders({ Authorization: `Bearer ${accessToken}` })
-
-  return accessToken
-}
-
 /**
  * Clicks the step's "Continue" button and waits for the onboarding PATCH to
- * resolve. The capture/tagging UI phase covers two distinct server steps
- * (`capture` then `tagging`) sharing one component, so advancing from a
- * captured-and-tagged garment to the silhouette step takes two of these in a
- * row -- the first moves `capture -> tagging`, the second `tagging ->
- * silhouette` (AC1's forward-only state machine, decision 3).
+ * resolve successfully. The capture/tagging UI phase covers two distinct
+ * server steps (`capture` then `tagging`) sharing one component, so
+ * advancing from a captured-and-tagged garment to the silhouette step takes
+ * two of these in a row -- the first moves `capture -> tagging`, the second
+ * `tagging -> silhouette` (AC1's forward-only state machine, decision 3).
+ * Asserting the status here (not just that some response arrived) surfaces a
+ * real rejected transition as its own failure instead of an unrelated
+ * downstream timeout.
  */
 async function clickContinueAndWaitForAdvance(page: Page) {
   const advanceResponse = page.waitForResponse(
@@ -86,7 +40,7 @@ async function clickContinueAndWaitForAdvance(page: Page) {
       response.request().method() === 'PATCH'
   )
   await page.getByRole('button', { name: 'Continue' }).click()
-  await advanceResponse
+  expect((await advanceResponse).status()).toBe(200)
 }
 
 async function captureAndTagOneGarment(page: Page) {
@@ -259,14 +213,26 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
         await expect(page.getByTestId('silhouette-height-slider')).toHaveValue('75')
       })
 
-      await test.step('The captured garment checklist state also survived the reload', async () => {
+      await test.step('The captured garment persisted server-side through the reload', async () => {
         // Reload while still on the silhouette step keeps the checklist off-screen
-        // (only one step's content renders at a time), but the underlying capture
-        // state is still there: going back through the flow is out of this
-        // story's scope (decision: forward-only state machine), so this is
-        // proven indirectly by the completion telemetry the server tracked
-        // across the reload -- finishing onboarding reports the real captured
-        // count, not a reset one.
+        // (only one step's content renders at a time), so the claim this step
+        // makes has to be verified directly against the real API rather than
+        // through UI text that isn't showing the checklist right now.
+        const accessToken = cleanupState.accessToken
+        if (!accessToken) throw new Error('Expected an authenticated test user.')
+        const garmentsResponse = await apiRequest({
+          method: 'GET',
+          path: '/api/v1/wardrobe/garments',
+          baseUrl: environment.apiBaseUrl,
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        expect(garmentsResponse.status).toBe(200)
+        const garments = garmentListResponseSchema.parse(garmentsResponse.body)
+        expect(garments.data).toHaveLength(1)
+        expect(garments.data[0]?.tagsConfirmedAt).not.toBeNull()
+      })
+
+      await test.step('Finishing onboarding from the resumed session still works', async () => {
         await page.getByRole('button', { name: 'Continue' }).click()
         await expect(page.getByText('Your closet is ready')).toBeVisible()
       })

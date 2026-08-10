@@ -59,6 +59,7 @@
       "title": "Configura o teu roupeiro",
       "garmentFallback": "Peça {{position}}",
       "permissionTitle": "Permite o acesso à câmara e às fotos",
+      "permissionAction": "Permite o acesso à câmara e às fotos",
       "permissionBody": "A CoutureCast precisa de acesso à câmara ou à galeria para captar as tuas peças.",
       "permissionDenied": "Não conseguimos aceder à tua câmara ou às tuas fotos. Ainda podes importar ficheiros ou usar o roupeiro inicial.",
       "useStarterWardrobe": "Usar roupeiro inicial",

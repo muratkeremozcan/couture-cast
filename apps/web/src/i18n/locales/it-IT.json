@@ -59,6 +59,7 @@
       "title": "Configura il tuo guardaroba",
       "garmentFallback": "Capo {{position}}",
       "permissionTitle": "Consenti l’accesso a fotocamera e foto",
+      "permissionAction": "Consenti l’accesso a fotocamera e foto",
       "permissionBody": "CoutureCast ha bisogno dell’accesso a fotocamera o libreria per acquisire i tuoi capi.",
       "permissionDenied": "Non siamo riusciti ad accedere alla fotocamera o alle foto. Puoi comunque importare file o usare il guardaroba iniziale.",
       "useStarterWardrobe": "Usa il guardaroba iniziale",
