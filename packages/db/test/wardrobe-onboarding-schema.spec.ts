@@ -226,6 +226,30 @@ describe('wardrobe onboarding and silhouette schema and migration', () => {
         constraint: 'SilhouetteProfile_my_form_object_path_key',
       })
     })
+
+    await inRolledBackTransaction(async (client) => {
+      const fixture = await seedUsers(client)
+      const sharedSessionId = `upload-session-${randomUUID()}`
+
+      await client.query(
+        `INSERT INTO public."SilhouetteProfile"
+          ("id", "user_id", "my_form_upload_session_id", "updated_at")
+         VALUES ($1, $2, $3, NOW())`,
+        [`silhouette-${randomUUID()}`, fixture.userId, sharedSessionId]
+      )
+
+      await expect(
+        client.query(
+          `INSERT INTO public."SilhouetteProfile"
+            ("id", "user_id", "my_form_upload_session_id", "updated_at")
+           VALUES ($1, $2, $3, NOW())`,
+          [`silhouette-${randomUUID()}`, fixture.otherUserId, sharedSessionId]
+        )
+      ).rejects.toMatchObject({
+        code: '23505',
+        constraint: 'SilhouetteProfile_my_form_upload_session_id_key',
+      })
+    })
   })
 
   it('4.4-DB-002 cascades user deletion to both onboarding state and silhouette profile', async () => {
