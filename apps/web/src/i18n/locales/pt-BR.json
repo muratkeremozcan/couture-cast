@@ -57,6 +57,7 @@
     },
     "onboarding": {
       "title": "Configure seu closet",
+      "garmentFallback": "Peça {{position}}",
       "permissionTitle": "Permita o acesso à câmera e às fotos",
       "permissionBody": "O CoutureCast precisa de acesso à câmera ou à galeria para capturar suas peças.",
       "permissionDenied": "Não conseguimos acessar sua câmera ou suas fotos. Você ainda pode importar arquivos ou usar o closet inicial.",
@@ -66,8 +67,18 @@
       "back": "Voltar",
       "checklistTagged": "{{garment}}: tags confirmadas",
       "checklistPending": "{{garment}}: precisa de tags",
+      "checklistProcessing": "{{garment}}: processando",
+      "checklistFailed": "{{garment}}: falha no processamento",
       "complete": "Seu closet está pronto",
       "resumed": "Continuando de onde você parou",
+      "announcements": {
+        "permissionRequesting": "Solicitando acesso à câmera…",
+        "permissionGranted": "Acesso à câmera concedido. Capture suas peças.",
+        "permissionDenied": "Acesso à câmera indisponível. Importe fotos ou use o guarda-roupa inicial.",
+        "tagging": "Todas as peças capturadas. Confirme as tags para continuar.",
+        "silhouette": "Configure sua silhueta.",
+        "garmentTagged": "{{garment}} marcada."
+      },
       "errors": {
         "loadFailed": "Não é possível carregar seu progresso de configuração.",
         "saveFailed": "Não é possível salvar esta etapa. Tente novamente.",
@@ -87,12 +98,17 @@
       "myFormRemove": "Remover foto Minha Forma",
       "processing": "Processando sua foto…",
       "ready": "Foto Minha Forma pronta",
+      "loading": "Carregando sua silhueta…",
+      "myFormFileLabel": "Arquivo de foto Minha Forma",
+      "myFormImageAlt": "Minha Forma",
       "errors": {
         "contrast": "Não conseguimos separar você do fundo com clareza. Refaça a foto com roupas ou um fundo mais lisos.",
         "privacyViolation": "Esta foto não pode ser usada. Escolha outra foto.",
         "timeout": "O processamento demorou demais. Tente novamente.",
         "storageError": "Não conseguimos salvar esta foto. Tente novamente.",
-        "confirmRequired": "Confirme a orientação de roupa base antes de enviar."
+        "confirmRequired": "Confirme a orientação de roupa base antes de enviar.",
+        "fileReadFailed": "Não foi possível ler a foto selecionada.",
+        "unknown": "Algo deu errado com esta foto. Tente novamente."
       }
     }
   }

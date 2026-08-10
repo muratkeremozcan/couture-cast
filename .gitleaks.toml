@@ -32,4 +32,7 @@ regexes = [
   # Fixed UUIDs used only as My Form upload/commit idempotency-key fixtures in Pact contracts
   '''^6eae27b8-8335-476e-a3bf-371e9fa5fd26$''',
   '''^760490a0-5049-4cdd-afcf-ac8e7ba0b436$''',
+  # Fixed idempotency-key fixtures used only in the web My Form upload transport tests
+  '''^idempotency-key-1$''',
+  '''^idempotency-key-reused$''',
 ]

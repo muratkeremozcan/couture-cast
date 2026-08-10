@@ -14,6 +14,7 @@ describe('SilhouettePhotoProcessor', () => {
   const mockUserFindUnique = vi.fn()
   const mockModerationEventCreate = vi.fn()
   const mockEventEnvelopeCreate = vi.fn()
+  const mockEventEnvelopeCreateMany = vi.fn()
   const mockTransaction = vi
     .fn()
     .mockImplementation((callback: (tx: PrismaClient) => Promise<unknown>) =>
@@ -36,6 +37,7 @@ describe('SilhouettePhotoProcessor', () => {
     },
     eventEnvelope: {
       create: mockEventEnvelopeCreate,
+      createMany: mockEventEnvelopeCreateMany,
     },
     $transaction: mockTransaction,
   } as unknown as PrismaClient
@@ -144,16 +146,33 @@ describe('SilhouettePhotoProcessor', () => {
         reason: 'privacy_violation',
       },
     })
-    expect(mockEventEnvelopeCreate).toHaveBeenCalledTimes(2)
-    expect(mockEventEnvelopeCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
+    expect(mockEventEnvelopeCreateMany).toHaveBeenCalledTimes(1)
+    const call = mockEventEnvelopeCreateMany.mock.calls[0]?.[0] as {
+      data: {
+        channel: string
+        user_id: string
+        payload: { to: string; flaggedAt: string }
+      }[]
+    }
+    expect(call.data).toHaveLength(2)
+    expect(call.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
           channel: 'email.guardian-silhouette-flag',
           user_id: 'teen-1',
           payload: expect.objectContaining({ to: 'guardian1@example.test' }),
         }),
-      })
+        expect.objectContaining({
+          channel: 'email.guardian-silhouette-flag',
+          user_id: 'teen-1',
+          payload: expect.objectContaining({ to: 'guardian2@example.test' }),
+        }),
+      ])
     )
+    // Every guardian's envelope shares one flaggedAt timestamp rather than
+    // one `new Date()` call per iteration, which could otherwise disagree by
+    // a few milliseconds across guardians for the same moderation event.
+    expect(call.data[0]?.payload.flaggedAt).toBe(call.data[1]?.payload.flaggedAt)
   })
 
   it('4.4-UNIT-06 does not write a ModerationEvent for a privacy_violation with no active guardian', async () => {

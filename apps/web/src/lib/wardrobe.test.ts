@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { Blob as NodeBlob } from 'node:buffer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   WEB_ACCESS_TOKEN_STORAGE_KEY,
@@ -17,7 +18,45 @@ import {
 afterEach(() => {
   window.sessionStorage.clear()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
+
+/**
+ * `prepareGarmentImage` (shared by every upload wrapper) decodes the source
+ * image and re-encodes it through a real `<canvas>`, neither of which jsdom
+ * implements. Stubbed here rather than skipped so `uploadMyFormPhotoFromWeb`'s
+ * actual transport sequence (allocate -> upload bytes -> commit) gets real
+ * coverage instead of only ever being exercised through a fully-mocked
+ * component-level `uploadMyFormPhotoFromWeb` stub.
+ */
+function installImagePrepMocks() {
+  class FakeImage {
+    naturalWidth = 900
+    naturalHeight = 1200
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+    set src(_value: string) {
+      queueMicrotask(() => this.onload?.())
+    }
+  }
+  vi.stubGlobal('Image', FakeImage as unknown as typeof Image)
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage: vi.fn(),
+  } as unknown as CanvasRenderingContext2D)
+  vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (
+    this: HTMLCanvasElement,
+    callback: BlobCallback,
+    type?: string
+  ) {
+    // jsdom's own `Blob` lacks `arrayBuffer()`, which `prepareGarmentImage`
+    // needs to compute the sha256 digest; Node's `Blob` implements it.
+    callback(
+      new NodeBlob(['fixture-image-bytes'], {
+        type: type ?? 'image/png',
+      }) as unknown as Blob
+    )
+  })
+}
 
 describe('uploadGarmentImageFromWeb & listGarmentsFromWeb', () => {
   it('throws error when access token is missing', async () => {
@@ -198,6 +237,7 @@ describe('silhouette profile', () => {
       uploadMyFormPhotoFromWeb({
         imagePreview: 'data:image/png;base64,sample',
         idempotencyKey: 'key-1',
+        confirmsBasewearGuidance: true,
       })
     ).rejects.toThrow('Your session expired.')
   })
@@ -262,5 +302,165 @@ describe('silhouette profile', () => {
     expect((init.headers as Record<string, string>)['if-match']).toBe(
       '"silhouette:user-1:2"'
     )
+  })
+})
+
+/** `input.toString()` on a `Request` yields `"[object Request]"`, not its URL. */
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input
+  if (input instanceof URL) return input.href
+  return input.url
+}
+
+describe('uploadMyFormPhotoFromWeb transport sequence', () => {
+  const mockAllocation = {
+    uploadSessionId: 'upload-session-1',
+    uploadUrl: 'https://storage.test/silhouette/upload-session-1',
+    uploadToken: 'upload-token-1',
+    requiredHeaders: { 'content-type': 'image/png' },
+    expiresAt: '2026-08-09T10:00:00.000Z',
+  }
+  const processingProfile = {
+    mode: 'my_form',
+    heightSlider: 50,
+    buildSlider: 50,
+    myForm: {
+      status: 'processing',
+      failureReason: null,
+      committedAt: '2026-08-09T09:05:00.000Z',
+      imageAccess: null,
+    },
+    revision: 1,
+    updatedAt: '2026-08-09T09:05:00.000Z',
+  }
+
+  function jsonResponse(body: unknown) {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  /** Routes each of the three legs (source-blob fetch, allocate, upload PUT, commit) to its own canned response. */
+  function installTransportFetchMock(overrides: { allocation?: unknown } = {}) {
+    const handleFetch = (
+      input: RequestInfo | URL,
+      _init?: RequestInit
+    ): Promise<Response> => {
+      const url = requestUrl(input)
+      if (url.startsWith('data:')) {
+        return Promise.resolve(
+          new Response(new Blob(['source-bytes'], { type: 'image/png' }), {
+            headers: { 'Content-Type': 'image/png' },
+          })
+        )
+      }
+      if (url.includes('/silhouette/my-form/upload-url')) {
+        return Promise.resolve(
+          jsonResponse({ data: overrides.allocation ?? mockAllocation })
+        )
+      }
+      if (url === mockAllocation.uploadUrl) {
+        return Promise.resolve(new Response(null, { status: 200 }))
+      }
+      if (url.includes('/silhouette/my-form/commit')) {
+        return Promise.resolve(jsonResponse({ data: processingProfile }))
+      }
+      return Promise.reject(new Error(`Unhandled fetch in test: ${url}`))
+    }
+    const fetchMock = vi.fn(handleFetch)
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('runs allocate, upload, and commit in sequence and returns the committed profile', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    installImagePrepMocks()
+    const fetchMock = installTransportFetchMock()
+
+    const result = await uploadMyFormPhotoFromWeb({
+      imagePreview: 'data:image/png;base64,c2FtcGxl',
+      idempotencyKey: 'idempotency-key-1',
+      confirmsBasewearGuidance: true,
+    })
+
+    expect(result.myForm?.status).toBe('processing')
+
+    const calledUrls = fetchMock.mock.calls.map(([input]) => requestUrl(input))
+    expect(calledUrls.some((url) => url.includes('/silhouette/my-form/upload-url'))).toBe(
+      true
+    )
+    expect(calledUrls).toContain(mockAllocation.uploadUrl)
+    expect(calledUrls.some((url) => url.includes('/silhouette/my-form/commit'))).toBe(
+      true
+    )
+  })
+
+  it('reuses one idempotency key across the allocate and commit requests', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    installImagePrepMocks()
+    const fetchMock = installTransportFetchMock()
+
+    await uploadMyFormPhotoFromWeb({
+      imagePreview: 'data:image/png;base64,c2FtcGxl',
+      idempotencyKey: 'idempotency-key-reused',
+      confirmsBasewearGuidance: true,
+    })
+
+    const allocateCall = fetchMock.mock.calls.find(([input]) =>
+      requestUrl(input).includes('/silhouette/my-form/upload-url')
+    )
+    const commitCall = fetchMock.mock.calls.find(([input]) =>
+      requestUrl(input).includes('/silhouette/my-form/commit')
+    )
+    const allocateHeaders = (allocateCall?.[1] as RequestInit).headers as Record<
+      string,
+      string
+    >
+    const commitHeaders = (commitCall?.[1] as RequestInit).headers as Record<
+      string,
+      string
+    >
+    expect(allocateHeaders['idempotency-key']).toBe('idempotency-key-reused')
+    expect(commitHeaders['idempotency-key']).toBe('idempotency-key-reused')
+  })
+
+  it('sends the confirmed basewear guidance flag in the commit payload', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    installImagePrepMocks()
+    const fetchMock = installTransportFetchMock()
+
+    await uploadMyFormPhotoFromWeb({
+      imagePreview: 'data:image/png;base64,c2FtcGxl',
+      idempotencyKey: 'idempotency-key-1',
+      confirmsBasewearGuidance: true,
+    })
+
+    const commitCall = fetchMock.mock.calls.find(([input]) =>
+      requestUrl(input).includes('/silhouette/my-form/commit')
+    )
+    const body = JSON.parse((commitCall?.[1] as RequestInit).body as string) as {
+      confirmsBasewearGuidance: boolean
+      uploadSessionId: string
+    }
+    expect(body.confirmsBasewearGuidance).toBe(true)
+    expect(body.uploadSessionId).toBe(mockAllocation.uploadSessionId)
+  })
+
+  it('rejects instead of silently accepting a malformed allocation response', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    installImagePrepMocks()
+    // Missing the required `uploadToken` field the schema demands.
+    installTransportFetchMock({
+      allocation: { ...mockAllocation, uploadToken: undefined },
+    })
+
+    await expect(
+      uploadMyFormPhotoFromWeb({
+        imagePreview: 'data:image/png;base64,c2FtcGxl',
+        idempotencyKey: 'idempotency-key-1',
+        confirmsBasewearGuidance: true,
+      })
+    ).rejects.toThrow()
   })
 })

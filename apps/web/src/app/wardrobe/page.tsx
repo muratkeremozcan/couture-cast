@@ -43,8 +43,11 @@ function WardrobeHubView() {
   )
   const [onboardingStatus, setOnboardingStatus] =
     useState<WardrobeOnboardingStatus | null>(null)
+  const [onboardingStatusError, setOnboardingStatusError] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [userIdError, setUserIdError] = useState(false)
   const [isSilhouetteModalOpen, setIsSilhouetteModalOpen] = useState(false)
+  const [isSilhouetteBusy, setIsSilhouetteBusy] = useState(false)
 
   const addGarmentButtonRef = useRef<HTMLButtonElement | null>(null)
   const captureInvokerRef = useRef<HTMLElement | null>(null)
@@ -60,9 +63,13 @@ function WardrobeHubView() {
   }, [isCaptureModalOpen])
 
   /**
-   * Best-effort: the onboarding entry card is a convenience, not a dependency
-   * the rest of the hub relies on, so a failed fetch here silently leaves the
-   * card unshown rather than surfacing a second, unrelated error banner.
+   * The user id is not optional: the Silhouette button below stays disabled
+   * until it resolves, so a failure has to be surfaced or the button is
+   * disabled forever with no explanation. The onboarding entry card used to
+   * treat its own fetch as best-effort and swallow a failure silently, but an
+   * incomplete user who hits a transient network blip would then lose their
+   * only visible route back into a required setup flow with no way to know
+   * it happened; it gets the same visible-error-with-retry treatment.
    */
   useEffect(() => {
     const controller = new AbortController()
@@ -70,14 +77,28 @@ function WardrobeHubView() {
       .then((id) => {
         if (!controller.signal.aborted) setUserId(id)
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (!controller.signal.aborted) setUserIdError(true)
+      })
     void getOnboardingStateFromWeb(controller.signal)
       .then((state) => {
-        if (!controller.signal.aborted) setOnboardingStatus(state.status)
+        if (!controller.signal.aborted) {
+          setOnboardingStatus(state.status)
+          setOnboardingStatusError(false)
+        }
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (!controller.signal.aborted) setOnboardingStatusError(true)
+      })
     return () => controller.abort()
   }, [])
+
+  const retryOnboardingStatus = () => {
+    setOnboardingStatusError(false)
+    void getOnboardingStateFromWeb()
+      .then((state) => setOnboardingStatus(state.status))
+      .catch(() => setOnboardingStatusError(true))
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -244,7 +265,13 @@ function WardrobeHubView() {
                 ref={silhouetteButtonRef}
                 type="button"
                 onClick={() => setIsSilhouetteModalOpen(true)}
-                className="flex min-h-[44px] items-center rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                disabled={!userId}
+                title={
+                  userIdError
+                    ? 'Unable to load your account. Reload the page to try again.'
+                    : undefined
+                }
+                className="flex min-h-[44px] items-center rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
               >
                 {t('wardrobe.silhouette.title')}
               </button>
@@ -264,6 +291,32 @@ function WardrobeHubView() {
           tabIndex={-1}
           className="mx-auto max-w-5xl px-6 py-8 pb-24 outline-none md:pb-8"
         >
+          {userIdError && (
+            <p
+              role="alert"
+              className="mb-6 rounded-lg bg-red-50 p-3 text-sm text-red-800"
+            >
+              Unable to load your account, so Silhouette settings are unavailable right
+              now. Reload the page to try again.
+            </p>
+          )}
+
+          {onboardingStatusError && (
+            <div
+              role="alert"
+              className="mb-6 flex min-h-[44px] items-center justify-between rounded-xl border border-red-200 bg-red-50 px-6 py-4 text-sm text-red-800"
+            >
+              <span>Unable to check your closet setup progress.</span>
+              <button
+                type="button"
+                onClick={retryOnboardingStatus}
+                className="min-h-[44px] font-semibold underline"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           {onboardingStatus && onboardingStatus !== 'completed' && (
             <Link
               href="/wardrobe/onboarding"
@@ -388,12 +441,19 @@ function WardrobeHubView() {
       {isSilhouetteModalOpen && userId && (
         <AccessibleModal
           isOpen={isSilhouetteModalOpen}
-          onClose={() => setIsSilhouetteModalOpen(false)}
+          onClose={() => {
+            // Escape and the ✕ button both funnel through this handler; ignore
+            // both while a slider save or My Form upload is still in flight so
+            // an in-progress edit is never silently discarded by closing.
+            if (isSilhouetteBusy) return
+            setIsSilhouetteModalOpen(false)
+          }}
           titleId="silhouette-settings-title"
           title={t('wardrobe.silhouette.title')}
           invokingElementRef={silhouetteButtonRef}
+          ariaLiveMessage={isSilhouetteBusy ? 'Saving changes. Please wait.' : null}
         >
-          <SilhouetteSettingsPanel userId={userId} />
+          <SilhouetteSettingsPanel userId={userId} onBusyChange={setIsSilhouetteBusy} />
         </AccessibleModal>
       )}
     </>

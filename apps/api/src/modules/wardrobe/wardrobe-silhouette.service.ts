@@ -527,6 +527,19 @@ export class WardrobeSilhouetteService {
     // (`GarmentItem` solves the same problem with a persisted
     // `processing_job_enqueued_at` handoff column; this profile has no such
     // column, and a compensating release needs no schema change.)
+    //
+    // Also clear the upload session identity, not just status/commit fields:
+    // the BullMQ job id is `buildSilhouettePhotoJobId(profileId,
+    // uploadSessionId)`, so a retry against the *same* session would recompute
+    // the identical job id. `Queue.add` throwing almost always means no job
+    // was created, but an ambiguous network failure (Redis processed the
+    // add, the ack was lost) cannot be ruled out -- and if a job with that id
+    // already exists, `Queue.add` is a silent no-op (the exact bug this
+    // job-id scheme was built to prevent). Clearing the session id forces
+    // `commitMyForm`'s `my_form_upload_session_id !== input.uploadSessionId`
+    // check to reject a same-session retry with `UPLOAD_SESSION_NOT_FOUND`,
+    // so recovery goes through `createMyFormUploadUrl` and gets a genuinely
+    // fresh session id (and job id) instead.
     try {
       await this.processingQueue.enqueue(profile.id, input.uploadSessionId)
     } catch (error) {
@@ -537,6 +550,8 @@ export class WardrobeSilhouetteService {
             my_form_status: 'bytes_uploaded',
             my_form_committed_at: null,
             my_form_commit_idempotency_key: null,
+            my_form_upload_session_id: null,
+            my_form_upload_idempotency_key: null,
           },
         })
         .catch(() => undefined)

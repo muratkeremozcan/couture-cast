@@ -57,6 +57,7 @@
     },
     "onboarding": {
       "title": "Configura il tuo guardaroba",
+      "garmentFallback": "Capo {{position}}",
       "permissionTitle": "Consenti l’accesso a fotocamera e foto",
       "permissionBody": "CoutureCast ha bisogno dell’accesso a fotocamera o libreria per acquisire i tuoi capi.",
       "permissionDenied": "Non siamo riusciti ad accedere alla fotocamera o alle foto. Puoi comunque importare file o usare il guardaroba iniziale.",
@@ -66,8 +67,18 @@
       "back": "Indietro",
       "checklistTagged": "{{garment}}: tag confermati",
       "checklistPending": "{{garment}}: tag da assegnare",
+      "checklistProcessing": "{{garment}}: elaborazione in corso",
+      "checklistFailed": "{{garment}}: elaborazione non riuscita",
       "complete": "Il tuo guardaroba è pronto",
       "resumed": "Riprendiamo da dove avevi lasciato",
+      "announcements": {
+        "permissionRequesting": "Richiesta di accesso alla fotocamera…",
+        "permissionGranted": "Accesso alla fotocamera concesso. Cattura i tuoi capi.",
+        "permissionDenied": "Accesso alla fotocamera non disponibile. Importa foto o usa il guardaroba iniziale.",
+        "tagging": "Tutti i capi catturati. Conferma i tag per continuare.",
+        "silhouette": "Configura la tua silhouette.",
+        "garmentTagged": "{{garment}} taggato."
+      },
       "errors": {
         "loadFailed": "Impossibile caricare l’avanzamento della configurazione.",
         "saveFailed": "Impossibile salvare questo passaggio. Riprova.",
@@ -87,12 +98,17 @@
       "myFormRemove": "Rimuovi la foto La Mia Forma",
       "processing": "Elaborazione della tua foto in corso…",
       "ready": "Foto La Mia Forma pronta",
+      "loading": "Caricamento della tua silhouette…",
+      "myFormFileLabel": "File foto La Mia Forma",
+      "myFormImageAlt": "La Mia Forma",
       "errors": {
         "contrast": "Non siamo riusciti a distinguerti chiaramente dallo sfondo. Rifai la foto con abiti o uno sfondo più semplici.",
         "privacyViolation": "Questa foto non può essere usata. Scegli un’altra foto.",
         "timeout": "L’elaborazione ha impiegato troppo tempo. Riprova.",
         "storageError": "Non siamo riusciti a salvare questa foto. Riprova.",
-        "confirmRequired": "Conferma le indicazioni sull’abbigliamento base prima di caricare."
+        "confirmRequired": "Conferma le indicazioni sull’abbigliamento base prima di caricare.",
+        "fileReadFailed": "Impossibile leggere la foto selezionata.",
+        "unknown": "Si è verificato un problema con questa foto. Riprova."
       }
     }
   }

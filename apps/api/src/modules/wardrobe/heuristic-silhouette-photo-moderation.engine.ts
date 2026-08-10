@@ -15,6 +15,15 @@ type RgbMean = { r: number; g: number; b: number }
 /** Every region is analysed as 3-channel sRGB, whatever the source encoding. */
 const ANALYSIS_CHANNELS = 3 as const
 
+/**
+ * Fixed, documented background a transparent pixel is composited onto before
+ * analysis. Any solid colour works equally well here (the heuristic compares
+ * border-vs-center contrast and bare-skin ratio, not absolute colour), but it
+ * must be fixed and deterministic so the same photo always produces the same
+ * verdict.
+ */
+const FLATTEN_BACKGROUND = { r: 0, g: 0, b: 0 } as const
+
 function meanRgb(stats: { channels: { mean: number }[] }): RgbMean {
   return {
     r: stats.channels[0]?.mean ?? 0,
@@ -94,9 +103,18 @@ export class HeuristicSilhouettePhotoModerationEngine
     // be assessed by an RGB skin-tone heuristic; that is a documented
     // limitation of this safety net (decision 9), not something normalization
     // can fix.
+    //
+    // `.flatten()`, not `.removeAlpha()`: `removeAlpha()` only drops the
+    // alpha channel's data, it does not touch the RGB values underneath a
+    // transparent pixel, which are frequently undefined/arbitrary. A photo
+    // with real transparent regions (an edited PNG, a background-removed
+    // upload) would then feed garbage RGB into borderStats/centerStats/
+    // estimateSkinRatio for every fully-transparent pixel. `.flatten()`
+    // composites onto a fixed background first, so every pixel this engine
+    // measures has a well-defined RGB value regardless of alpha.
     const borderBuffer = await sharp(imageBuffer)
       .extract({ left: 0, top: 0, width, height: borderMargin })
-      .removeAlpha()
+      .flatten({ background: FLATTEN_BACKGROUND })
       .toColourspace('srgb')
       .raw()
       .toBuffer()
@@ -107,7 +125,7 @@ export class HeuristicSilhouettePhotoModerationEngine
         width: centerWidth,
         height: centerHeight,
       })
-      .removeAlpha()
+      .flatten({ background: FLATTEN_BACKGROUND })
       .toColourspace('srgb')
       .raw()
       .toBuffer()

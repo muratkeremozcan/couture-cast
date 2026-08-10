@@ -57,6 +57,7 @@
     },
     "onboarding": {
       "title": "Configura tu clóset",
+      "garmentFallback": "Prenda {{position}}",
       "permissionTitle": "Permite el acceso a la cámara y las fotos",
       "permissionBody": "CoutureCast necesita acceso a la cámara o a la galería para capturar tus prendas.",
       "permissionDenied": "No pudimos acceder a tu cámara ni a tus fotos. Aún puedes importar archivos o usar el clóset inicial.",
@@ -66,8 +67,18 @@
       "back": "Atrás",
       "checklistTagged": "{{garment}}: etiquetas confirmadas",
       "checklistPending": "{{garment}}: necesita etiquetas",
+      "checklistProcessing": "{{garment}}: procesando",
+      "checklistFailed": "{{garment}}: error al procesar",
       "complete": "Tu clóset está listo",
       "resumed": "Continuando donde lo dejaste",
+      "announcements": {
+        "permissionRequesting": "Solicitando acceso a la cámara…",
+        "permissionGranted": "Acceso a la cámara concedido. Captura tus prendas.",
+        "permissionDenied": "Acceso a la cámara no disponible. Importa fotos o usa el armario inicial.",
+        "tagging": "Todas las prendas capturadas. Confirma las etiquetas para continuar.",
+        "silhouette": "Configura tu silueta.",
+        "garmentTagged": "{{garment}} etiquetada."
+      },
       "errors": {
         "loadFailed": "No se puede cargar tu progreso de configuración.",
         "saveFailed": "No se puede guardar este paso. Inténtalo de nuevo.",
@@ -87,12 +98,17 @@
       "myFormRemove": "Eliminar foto Mi Forma",
       "processing": "Procesando tu foto…",
       "ready": "Foto Mi Forma lista",
+      "loading": "Cargando tu silueta…",
+      "myFormFileLabel": "Archivo de foto Mi Forma",
+      "myFormImageAlt": "Mi Forma",
       "errors": {
         "contrast": "No pudimos separarte del fondo con claridad. Vuelve a tomar la foto con ropa o un fondo más lisos.",
         "privacyViolation": "Esta foto no se puede usar. Elige otra foto.",
         "timeout": "El procesamiento tardó demasiado. Inténtalo de nuevo.",
         "storageError": "No pudimos guardar esta foto. Inténtalo de nuevo.",
-        "confirmRequired": "Confirma la indicación de ropa base antes de subir la foto."
+        "confirmRequired": "Confirma la indicación de ropa base antes de subir la foto.",
+        "fileReadFailed": "No se pudo leer la foto seleccionada.",
+        "unknown": "Algo salió mal con esta foto. Inténtalo de nuevo."
       }
     }
   }
