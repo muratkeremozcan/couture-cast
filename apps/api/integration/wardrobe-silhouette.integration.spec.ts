@@ -103,7 +103,10 @@ async function clearModerationQueue(): Promise<void> {
       error
     )
   } finally {
-    await queue.close()
+    // Never let tidying up the probe connection fail `beforeAll` itself:
+    // that would take down all eight cases, including the six that need no
+    // Redis at all, over a queue this hook only ever tries to tidy.
+    await queue.close().catch(() => undefined)
   }
 }
 
