@@ -30,6 +30,15 @@ const OBJECT_PATH = `wardrobe/${USER_ID}/silhouette/${SESSION_ID}.png`
 const COMMITTED_MY_FORM_STATUSES = new Set(['processing', 'ready', 'failed'])
 const DEFAULT_MY_FORM_COMMITTED_AT = new Date('2026-08-09T11:00:00Z')
 
+/** Fixed upload-window boundary fixtures. Deliberately not derived from
+ * `Date.now()`: the service only ever compares `my_form_upload_expires_at`
+ * against the live clock, so a fixture built from a wall-clock read couples
+ * test-fixture construction to execution time for no behavioral benefit.
+ * These two constants make every "not yet expired" / "already expired" case
+ * in this file reproducible regardless of when the suite runs. */
+const NOT_YET_EXPIRED = new Date('2099-01-01T00:00:00.000Z')
+const ALREADY_EXPIRED = new Date('2020-01-01T00:00:00.000Z')
+
 /**
  * A deliberately partial row: only the columns the service actually reads.
  *
@@ -181,7 +190,7 @@ describe('WardrobeSilhouetteService', () => {
       my_form_status: 'pending_upload',
       my_form_object_path: OBJECT_PATH,
       my_form_upload_session_id: SESSION_ID,
-      my_form_upload_expires_at: new Date(Date.now() + 60_000),
+      my_form_upload_expires_at: NOT_YET_EXPIRED,
       my_form_file_size_bytes: bytes.length,
       my_form_mime_type: 'image/png',
       my_form_content_sha256: createHash('sha256').update(bytes).digest('hex'),
@@ -393,7 +402,7 @@ describe('WardrobeSilhouetteService', () => {
           my_form_upload_idempotency_key: 'key-1',
           my_form_upload_session_id: SESSION_ID,
           my_form_mime_type: 'image/png',
-          my_form_upload_expires_at: new Date(Date.now() + 60_000),
+          my_form_upload_expires_at: NOT_YET_EXPIRED,
         })
       )
 
@@ -415,7 +424,7 @@ describe('WardrobeSilhouetteService', () => {
           my_form_status: 'pending_upload',
           my_form_upload_idempotency_key: 'key-1',
           my_form_upload_session_id: SESSION_ID,
-          my_form_upload_expires_at: new Date(Date.now() - 1),
+          my_form_upload_expires_at: ALREADY_EXPIRED,
         })
       )
 
@@ -532,7 +541,7 @@ describe('WardrobeSilhouetteService', () => {
       findUnique.mockResolvedValueOnce(
         profileRow({
           my_form_status: 'pending_upload',
-          my_form_upload_expires_at: new Date(Date.now() - 1),
+          my_form_upload_expires_at: ALREADY_EXPIRED,
         })
       )
 
@@ -970,7 +979,7 @@ describe('WardrobeSilhouetteService', () => {
           my_form_upload_idempotency_key: 'a3f7c2d1-5b9e-4a86-9c31-2e7d4b8f6a05',
           my_form_upload_session_id: null,
           my_form_mime_type: 'image/png',
-          my_form_upload_expires_at: new Date(Date.now() + 60_000),
+          my_form_upload_expires_at: NOT_YET_EXPIRED,
         })
       )
 
