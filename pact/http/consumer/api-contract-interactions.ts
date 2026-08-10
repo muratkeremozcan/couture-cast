@@ -25,7 +25,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { expect } from 'vitest'
 
-const { decimal, eachLike, like, nullValue, regex, string } = MatchersV3
+const { decimal, eachLike, equal, like, nullValue, regex, string } = MatchersV3
 
 export const pactEventAuth = {
   accessToken: 'pact-event-token',
@@ -1551,10 +1551,15 @@ function silhouetteProfileBody(
         ? nullValue()
         : {
             status: string(fields.myForm.status),
+            // `equal`, not `string`: this field distinguishes one documented
+            // failure reason from another (`verifyMyFormFailureInteraction`
+            // drives 4 interactions off this same helper, one per reason), so
+            // a type-only matcher would let a provider bug that returns the
+            // wrong reason for a given named state still pass verification.
             failureReason:
               fields.myForm.failureReason === null
                 ? nullValue()
-                : string(fields.myForm.failureReason),
+                : equal(fields.myForm.failureReason),
             committedAt:
               fields.myForm.committedAt === null
                 ? nullValue()
@@ -2168,6 +2173,82 @@ export async function verifyMyFormUploadUrlInteraction(
     })
 }
 
+/**
+ * Idempotent-replay coverage for My Form upload-url allocation, grounded in
+ * `WardrobeSilhouetteService.createMyFormUploadUrl`'s real
+ * `existing.my_form_upload_idempotency_key === idempotencyKey` branch: a
+ * repeated request with the same idempotency key returns the same session
+ * unchanged, and the controller's `res.status(result.replayed ? 200 : 201)`
+ * branches to 200.
+ */
+export async function verifyMyFormUploadUrlReplayInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A My Form upload session was already allocated for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving(
+      'a repeated My Form upload session allocation with the same idempotency key'
+    )
+    .withRequest(
+      'POST',
+      '/api/v1/wardrobe/silhouette/my-form/upload-url',
+      setJsonContent({
+        headers: {
+          ...pactEventHeaders,
+          'Idempotency-Key': SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
+        },
+        body: {
+          fileSizeBytes: 2048576,
+          mimeType: 'image/png',
+          sha256: SILHOUETTE_SHA256,
+          widthPx: 1024,
+          heightPx: 1536,
+        },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: {
+            uploadSessionId: string(SILHOUETTE_UPLOAD_SESSION_ID),
+            uploadUrl: string(
+              `https://api.example/wardrobe/silhouette/uploads/${SILHOUETTE_UPLOAD_SESSION_ID}`
+            ),
+            uploadToken: string('token_my_form_upload'),
+            requiredHeaders: { 'content-type': string('image/png') },
+            expiresAt: isoTimestamp(SILHOUETTE_UPLOAD_EXPIRY),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(
+        mockServer
+      ).apiV1WardrobeSilhouetteMyFormUploadUrlPost({
+        idempotencyKey: SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
+        createSilhouetteUploadUrlInput: {
+          fileSizeBytes: 2048576,
+          mimeType: 'image/png',
+          sha256: SILHOUETTE_SHA256,
+          widthPx: 1024,
+          heightPx: 1536,
+        },
+      })
+
+      expect(
+        createSilhouetteUploadUrlResponseSchema.parse(response).data.uploadSessionId
+      ).toBe(SILHOUETTE_UPLOAD_SESSION_ID)
+    })
+}
+
 export async function verifyMyFormCommitInteraction(
   pact: PactV4,
   createClient: CreateClient
@@ -2239,6 +2320,82 @@ export async function verifyMyFormCommitInteraction(
       const parsed = silhouetteProfileResponseSchema.parse(response).data
       expect(parsed.myForm?.status).toBe('processing')
       expect(parsed.mode).toBe('default_mannequin')
+    })
+}
+
+/**
+ * Idempotent-replay coverage for My Form commit, grounded in
+ * `WardrobeSilhouetteService.commitMyForm`'s real
+ * `profile.my_form_commit_idempotency_key === idempotencyKey` branch: a
+ * repeated commit with the same idempotency key returns the existing row
+ * unchanged (same revision, same `committedAt`), no re-processing. Still
+ * expects 201, not 200: unlike upload-url, `commitMyForm` has no
+ * `@HttpCode`/`res.status()` override, so it falls to Nest's POST default
+ * for both a first commit and a replay (confirmed against the real
+ * provider). That's a known, separately-flagged `apps/api` gap (see the
+ * story's completion notes) -- asserting 200 here would pin a status code
+ * the real API does not currently produce for any input.
+ */
+export async function verifyMyFormCommitReplayInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A My Form photo commit was already processed for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a repeated My Form commit with the same idempotency key')
+    .withRequest(
+      'POST',
+      '/api/v1/wardrobe/silhouette/my-form/commit',
+      setJsonContent({
+        headers: {
+          ...pactEventHeaders,
+          'Idempotency-Key': SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
+        },
+        body: {
+          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
+          confirmsBasewearGuidance: true,
+        },
+      })
+    )
+    .willRespondWith(
+      201,
+      setJsonContent({
+        headers: { ETag: string(silhouetteETagFor(2)) },
+        body: {
+          data: silhouetteProfileBody(2, {
+            mode: 'default_mannequin',
+            heightSlider: 50,
+            buildSlider: 50,
+            myForm: {
+              status: 'processing',
+              failureReason: null,
+              committedAt: SILHOUETTE_COMMITTED_AT,
+              imageAccess: null,
+            },
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(
+        mockServer
+      ).apiV1WardrobeSilhouetteMyFormCommitPost({
+        idempotencyKey: SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
+        commitSilhouettePhotoInput: {
+          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
+          confirmsBasewearGuidance: true,
+        },
+      })
+
+      const parsed = silhouetteProfileResponseSchema.parse(response).data
+      expect(parsed.myForm?.status).toBe('processing')
+      expect(parsed.revision).toBe(2)
     })
 }
 

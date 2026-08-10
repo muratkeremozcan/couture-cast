@@ -316,5 +316,18 @@ describe('Wardrobe Onboarding HTTP Contracts', () => {
         ])
       )
     })
+
+    it('does not require `error` on the 428 precondition-required envelope', () => {
+      // `parseOnboardingIfMatchHeader` raises a bare `HttpException`, which
+      // Nest serializes with no `error` reason phrase -- unlike the 409/412
+      // envelopes below, whose Nest exception classes always add one.
+      const spec = generateHttpOpenApiDocument()
+      const schema = spec.components?.schemas?.['OnboardingPreconditionRequiredError'] as
+        | { required?: string[] }
+        | undefined
+
+      expect(schema?.required).toEqual(expect.arrayContaining(['statusCode', 'message']))
+      expect(schema?.required).not.toContain('error')
+    })
   })
 })

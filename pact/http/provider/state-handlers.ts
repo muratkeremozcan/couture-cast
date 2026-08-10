@@ -251,4 +251,24 @@ export const stateHandlers: StateHandlers = {
     configureProviderSilhouetteState({ userId, scenario: 'my-form-exists' })
     return Promise.resolve({ description: 'Configured an existing My Form photo' })
   },
+  'A My Form upload session was already allocated for user': (parameters?: unknown) => {
+    const { userId } = parameters as SilhouetteStateParams
+    configureProviderSilhouetteState({
+      userId,
+      scenario: 'my-form-upload-already-allocated',
+    })
+    return Promise.resolve({
+      description: 'Configured an already-allocated My Form upload session',
+    })
+  },
+  'A My Form photo commit was already processed for user': (parameters?: unknown) => {
+    const { userId } = parameters as SilhouetteStateParams
+    configureProviderSilhouetteState({
+      userId,
+      scenario: 'my-form-commit-already-processed',
+    })
+    return Promise.resolve({
+      description: 'Configured an already-processed My Form commit',
+    })
+  },
 }

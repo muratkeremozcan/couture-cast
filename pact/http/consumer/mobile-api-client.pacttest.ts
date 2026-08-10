@@ -37,7 +37,9 @@ import {
   silhouetteGuardianErrorInteractions,
   verifySilhouetteStalePreconditionInteraction,
   verifyMyFormUploadUrlInteraction,
+  verifyMyFormUploadUrlReplayInteraction,
   verifyMyFormCommitInteraction,
+  verifyMyFormCommitReplayInteraction,
   verifyMyFormReadyInteraction,
   verifyMyFormFailureInteraction,
   myFormFailureReasons,
@@ -195,8 +197,16 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
     await verifyMyFormUploadUrlInteraction(pact, createMobileClientForMockServer)
   })
 
+  it('replays a repeated My Form upload session allocation', async () => {
+    await verifyMyFormUploadUrlReplayInteraction(pact, createMobileClientForMockServer)
+  })
+
   it('commits the My Form photo for processing', async () => {
     await verifyMyFormCommitInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('replays a repeated My Form commit', async () => {
+    await verifyMyFormCommitReplayInteraction(pact, createMobileClientForMockServer)
   })
 
   it('reads a ready My Form photo', async () => {

@@ -404,5 +404,17 @@ describe('Wardrobe Silhouette HTTP Contracts', () => {
         },
       })
     })
+
+    it('does not require `error` on the 428 precondition-required envelope', () => {
+      // `parseSilhouetteIfMatchHeader` raises a bare `HttpException`, which
+      // Nest serializes with no `error` reason phrase -- unlike the 412
+      // envelope, whose Nest exception class always adds one.
+      const schema = spec.components?.schemas?.['SilhouettePreconditionRequiredError'] as
+        | { required?: string[] }
+        | undefined
+
+      expect(schema?.required).toEqual(expect.arrayContaining(['statusCode', 'message']))
+      expect(schema?.required).not.toContain('error')
+    })
   })
 })

@@ -700,11 +700,18 @@ const onboardingPreconditionFailedErrorSchema = z
   })
   .strict()
 
+/**
+ * `error` is optional, not absent: `parseOnboardingIfMatchHeader` raises a
+ * bare `HttpException('PRECONDITION_REQUIRED', 428)`, which Nest serializes
+ * with no `error` reason phrase at all (confirmed against the real
+ * provider), unlike every other error schema in this file, whose Nest
+ * exception classes (`ConflictException`, etc.) always add one.
+ */
 const onboardingPreconditionRequiredErrorSchema = z
   .object({
     statusCode: z.literal(428),
     message: z.literal('PRECONDITION_REQUIRED'),
-    error: z.literal('Precondition Required'),
+    error: z.literal('Precondition Required').optional(),
   })
   .strict()
 
@@ -874,11 +881,16 @@ const silhouettePreconditionFailedErrorSchema = z
   })
   .strict()
 
+/**
+ * `error` is optional, not absent: `parseSilhouetteIfMatchHeader` raises the
+ * same bare `HttpException('PRECONDITION_REQUIRED', 428)` as its onboarding
+ * sibling (see `onboardingPreconditionRequiredErrorSchema`'s identical note).
+ */
 const silhouettePreconditionRequiredErrorSchema = z
   .object({
     statusCode: z.literal(428),
     message: z.literal('PRECONDITION_REQUIRED'),
-    error: z.literal('Precondition Required'),
+    error: z.literal('Precondition Required').optional(),
   })
   .strict()
 

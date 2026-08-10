@@ -1980,6 +1980,91 @@ satisfied. No `.only` in any touched file. No changes to
 or `apps/api`; this pass was contained entirely to Pact consumer/provider
 code and the two contract-spec test files.
 
+**CodeRabbit review triage (2026-08-10).** CodeRabbit reviewed the PR
+independently and left 8 inline findings (5 refactor-severity, 3 nitpicks).
+Verified each against the code as it stood after the dedicated
+test-architecture review above, not against the commit CodeRabbit actually
+saw, since three had already been fixed by that review:
+
+- **Real, fixed: `error` was required, not optional, on the 428
+  precondition-required envelope.** `onboardingPreconditionRequiredErrorSchema`/
+  `silhouettePreconditionRequiredErrorSchema` declared `error:
+z.literal('Precondition Required')` as required, but
+  `parseOnboardingIfMatchHeader`/`parseSilhouetteIfMatchHeader` raise a bare
+  `HttpException`, which Nest serializes with no `error` field at all --
+  confirmed against the real provider, and already correctly modeled by
+  `verifyWardrobeErrorInteraction`'s `reason: null` case. A real client
+  parsing a genuine 428 response with the old schema would have thrown.
+  Fixed: `error` is now `.optional()` on both schemas; regenerated
+  `http.openapi.json`. Added a dedicated OpenAPI-registration test to both
+  contract-spec files asserting `error` is absent from the component
+  schema's `required` array. The identical bug exists in the pre-existing
+  `capsulePreconditionRequiredErrorSchema` (Story 4.3); left unfixed as
+  out-of-scope pre-existing code, flagged here as a repo-wide note.
+- **Real, fixed: My Form failure-reason matcher was type-only, not
+  exact.** `silhouetteProfileBody`'s `myForm.failureReason` used `string()`
+  (any-string type matching) instead of an exact-value matcher, even though
+  `verifyMyFormFailureInteraction` drives 4 separate interactions off this
+  same helper, one per documented reason. A provider bug that returned the
+  wrong reason for a given named state would have still passed verification.
+  Fixed: switched to `MatchersV3.equal()` for this field only, leaving every
+  other field's established type-only convention untouched.
+- **Real, fixed: no idempotent-replay handling for My Form upload-url
+  allocation or commit.** Already an acknowledged, explicitly deferred gap
+  from the remediation pass above ("did not add upload-url/commit replay
+  coverage in this pass... noting this as a real, small, deferred gap").
+  Grounded in `WardrobeSilhouetteService`'s real replay branches (read
+  before implementing, not guessed): `createMyFormUploadUrl` returns
+  `replayed: true` with the existing session when
+  `existing.my_form_upload_idempotency_key === idempotencyKey`, and the
+  controller's `res.status(result.replayed ? 200 : 201)` branches on it;
+  `commitMyForm` returns the existing row unchanged (no re-processing, no
+  revision increment) when `profile.my_form_commit_idempotency_key ===
+idempotencyKey`, but its controller has no `@HttpCode`/`res.status()`
+  override, so it always returns 201 regardless -- the same known,
+  separately-flagged `apps/api` gap noted in the remediation pass above.
+  Added two new provider-double scenarios
+  (`my-form-upload-already-allocated`, `my-form-commit-already-processed`),
+  wired `createMyFormUploadUrl`/`commitMyForm` to branch on the incoming
+  idempotency-key header against these scenarios, and added
+  `verifyMyFormUploadUrlReplayInteraction` (200, replayed session unchanged)
+  and `verifyMyFormCommitReplayInteraction` (201 -- not 200, per the real,
+  confirmed controller behavior above; asserting 200 would have pinned a
+  status code the real API does not currently produce for any input) to
+  both pacttest files.
+- **Real, fixed: guardian-forbidden check compared against a hardcoded
+  teen ID instead of the configured scenario's own user.**
+  `mockGuardianService.assertWardrobeUploadAllowed` checked `userId ===
+PACT_SILHOUETTE_TEEN_ID`, accidentally correct only because every current
+  `'guardian-forbidden'` interaction happens to configure that exact ID.
+  Fixed to compare against `silhouetteState.userId`, falling back to the
+  constant only when the state didn't set one -- correct by construction
+  rather than by coincidence, matching how the real
+  `GuardianService.assertWardrobeUploadAllowed` scopes its check to the
+  actual actor, not a fixed identity.
+- **Already fixed by the dedicated test-architecture review above, before
+  CodeRabbit's review ran: the two stale "not wired yet" doc comments and
+  the dead-code `new Date()` timestamp.** Confirmed both fixes still hold
+  (`state-handlers.ts`/`provider-helper.ts` doc comments accurately describe
+  the real wiring; `PACT_ONBOARDING_COMPLETED_AT` is a fixed constant). No
+  further change needed.
+- **Real, but already reviewed and deliberately deferred twice: duplicate
+  error-envelope verification logic across three near-identical functions.**
+  Same finding the dedicated test-architecture review above already
+  surfaced and left open with the same reasoning (`WardrobeErrorInteraction`'s
+  own doc comment, and now two separate review passes on record). Not
+  re-litigated a third time; still real, still deferred, same rationale.
+
+Verification after all fixes: `npx tsc -p pact/tsconfig.json --noEmit`
+clean; `npx eslint --max-warnings=0 --ext .ts,.tsx,.mts pact` and the two
+touched contract-spec files clean (prettier-only errors auto-fixed,
+re-verified); `npm run test --workspace @couture/api-client` 222/222 (was
+220, +2 from the new 428-envelope regression tests); `npm run test:pact`
+green end to end: consumer determinism stable at 51 Web + 46 Mobile = 97
+interactions across all 3 runs (+2 each from the two new replay
+interactions), real provider verification 1/1 passed, all 97 interactions
+satisfied against the real controllers. No `.only` in any touched file.
+
 ### File list
 
 **Task 1 (branch `feat/epic4-story4-t1-db`):**
@@ -2160,3 +2245,25 @@ code and the two contract-spec test files.
   the three OpenAPI Registration tests)
 - `_bmad-output/test-artifacts/test-reviews/wardrobe-onboarding-silhouette-pact-test-review-2026-08-10.md`
   (new: the review report)
+
+**CodeRabbit review triage (2026-08-10):**
+
+- `packages/api-client/src/contracts/http/wardrobe.ts` (modified: `error`
+  optional on `onboardingPreconditionRequiredErrorSchema`/
+  `silhouettePreconditionRequiredErrorSchema`)
+- `packages/api-client/docs/http.openapi.json` (generated, modified)
+- `packages/api-client/testing/wardrobe-onboarding-contract.spec.ts`
+  (modified: OpenAPI-registration test proving `error` is optional)
+- `packages/api-client/testing/wardrobe-silhouette-contract.spec.ts`
+  (modified: same test for the silhouette 428 envelope)
+- `pact/http/consumer/api-contract-interactions.ts` (modified: `equal()`
+  matcher for `myForm.failureReason`, two new replay-interaction functions)
+- `pact/http/consumer/web-api-client.pacttest.ts` (modified: wired the two
+  new replay interactions)
+- `pact/http/consumer/mobile-api-client.pacttest.ts` (modified: same)
+- `pact/http/provider/provider-helper.ts` (modified: two new provider-double
+  scenarios and idempotency-key branching for `createMyFormUploadUrl`/
+  `commitMyForm`, guardian-forbidden check compares against the scenario's
+  own `userId`)
+- `pact/http/provider/state-handlers.ts` (modified: two new state-handler
+  entries for the replay scenarios)

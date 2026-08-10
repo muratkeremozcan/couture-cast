@@ -17,6 +17,16 @@ const PACT_SILHOUETTE_IMAGE_EXPIRY = '2026-08-09T09:25:00.000Z'
 const PACT_SILHOUETTE_UPLOAD_SESSION_ID = '85b4dde2-3df2-4e81-8c18-d51ae3408ca0'
 const PACT_SILHOUETTE_UPLOAD_EXPIRY = '2026-08-09T09:15:00.000Z'
 /**
+ * Mirrors `SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY`/`SILHOUETTE_COMMIT_IDEMPOTENCY_KEY`
+ * in the consumer file exactly: the replay interactions send these same
+ * header values, and the doubles below compare the incoming header against
+ * them to decide `replayed`/unchanged-row behavior, mirroring
+ * `WardrobeSilhouetteService`'s real `*_idempotency_key === idempotencyKey`
+ * checks.
+ */
+const PACT_SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY = '6eae27b8-8335-476e-a3bf-371e9fa5fd26'
+const PACT_SILHOUETTE_COMMIT_IDEMPOTENCY_KEY = '760490a0-5049-4cdd-afcf-ac8e7ba0b436'
+/**
  * Fixed stand-in for the onboarding-complete double's `completedAt`, kept
  * deterministic like every other timestamp in this file rather than reading
  * the wall clock. Currently unreachable: `requireOnboardingScenario()` only
@@ -732,6 +742,7 @@ export async function startLocalPactProvider({
       case 'profile-exists':
       case 'guardian-forbidden':
       case 'my-form-awaiting-commit':
+      case 'my-form-upload-already-allocated':
         return {
           mode: 'default_mannequin',
           heightSlider: 50,
@@ -778,6 +789,22 @@ export async function startLocalPactProvider({
           },
           revision: 2,
         }
+      case 'my-form-commit-already-processed':
+        // Identical to a fresh commit's resulting row (see `commitMyForm`
+        // below): the replay interaction asserts this exact shape stays
+        // unchanged rather than being re-derived, proving no re-processing.
+        return {
+          mode: 'default_mannequin',
+          heightSlider: 50,
+          buildSlider: 50,
+          myForm: {
+            status: 'processing',
+            failureReason: null,
+            committedAt: PACT_SILHOUETTE_COMMITTED_AT,
+            imageAccess: null,
+          },
+          revision: 2,
+        }
     }
   }
 
@@ -817,10 +844,24 @@ export async function startLocalPactProvider({
       }
       return Promise.resolve({ response: toSilhouetteResponse(updated), isNoOp: false })
     },
-    createMyFormUploadUrl: () => {
+    createMyFormUploadUrl: (
+      _userId: string,
+      _role: unknown,
+      _input: unknown,
+      idempotencyKey: string
+    ) => {
+      const state = getProviderSilhouetteState()
       requireSilhouetteScenario()
+      // Mirrors `createMyFormUploadUrl`'s real
+      // `existing.my_form_upload_idempotency_key === idempotencyKey` branch:
+      // a repeated call with the same key replays the same session instead
+      // of allocating a new one, and the controller's
+      // `res.status(result.replayed ? 200 : 201)` reads this flag.
+      const replayed =
+        state?.scenario === 'my-form-upload-already-allocated' &&
+        idempotencyKey === PACT_SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY
       return Promise.resolve({
-        replayed: false,
+        replayed,
         response: {
           data: {
             uploadSessionId: PACT_SILHOUETTE_UPLOAD_SESSION_ID,
@@ -832,8 +873,29 @@ export async function startLocalPactProvider({
         },
       })
     },
-    commitMyForm: () => {
+    commitMyForm: (
+      _userId: string,
+      _role: unknown,
+      _input: unknown,
+      idempotencyKey: string
+    ) => {
+      const state = getProviderSilhouetteState()
       const row = requireSilhouetteScenario()
+      // Mirrors `commitMyForm`'s real
+      // `profile.my_form_commit_idempotency_key === idempotencyKey` branch: a
+      // repeated commit with the same key returns the existing row
+      // unchanged (no re-processing, no revision increment, no re-enqueue).
+      // Still 201, not 200: unlike upload-url, `commitMyForm` has no
+      // `@HttpCode`/`res.status()` override, so both a first commit and a
+      // replay fall to Nest's POST default (confirmed against the real
+      // provider; a known, separately-flagged apps/api gap, out of this
+      // contract's scope -- see the story's completion notes).
+      if (
+        state?.scenario === 'my-form-commit-already-processed' &&
+        idempotencyKey === PACT_SILHOUETTE_COMMIT_IDEMPOTENCY_KEY
+      ) {
+        return Promise.resolve({ response: toSilhouetteResponse(row) })
+      }
       const committed: SilhouetteRow = {
         mode: 'default_mannequin',
         heightSlider: row.heightSlider,
@@ -874,7 +936,7 @@ export async function startLocalPactProvider({
       const silhouetteState = getProviderSilhouetteState()
       if (
         silhouetteState?.scenario === 'guardian-forbidden' &&
-        userId === PACT_SILHOUETTE_TEEN_ID
+        userId === (silhouetteState.userId ?? PACT_SILHOUETTE_TEEN_ID)
       ) {
         throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
       }
@@ -1089,6 +1151,8 @@ export type ProviderSilhouetteScenario =
   | 'my-form-failed'
   | 'my-form-privacy-violation-teen-notified'
   | 'my-form-exists'
+  | 'my-form-upload-already-allocated'
+  | 'my-form-commit-already-processed'
 
 export type ProviderSilhouetteState = {
   userId: string | null
