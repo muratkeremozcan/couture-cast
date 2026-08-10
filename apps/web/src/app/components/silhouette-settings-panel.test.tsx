@@ -559,7 +559,10 @@ describe('SilhouetteSettingsPanel', () => {
           status: 'ready',
           failureReason: null,
           committedAt: '2026-08-09T09:05:00.000Z',
-          imageAccess: null,
+          imageAccess: {
+            url: 'https://example.test/me.png',
+            expiresAt: '2026-08-09T10:00:00.000Z',
+          },
         },
       })
     )
@@ -591,7 +594,10 @@ describe('SilhouetteSettingsPanel', () => {
           status: 'ready',
           failureReason: null,
           committedAt: '2026-08-09T09:05:00.000Z',
-          imageAccess: null,
+          imageAccess: {
+            url: 'https://example.test/me.png',
+            expiresAt: '2026-08-09T10:00:00.000Z',
+          },
         },
       })
     )

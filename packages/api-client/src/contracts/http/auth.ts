@@ -50,38 +50,38 @@ const birthdateSchema = z
       'accepts 2026-02-31 and 2026-13-01; both are rejected here.',
     ].join(' '),
   })
-const accountStatusSchema = z.enum(['active', 'pending_guardian_consent'])
-
 export const signupInputSchema = z.object({
   email: z.string().email(),
   birthdate: birthdateSchema,
 })
 
+const signupResponseFields = {
+  userId: nonEmptyStringSchema,
+  age: z.number().int().min(13),
+}
+
 export const signupResponseSchema = z
-  .object({
-    userId: nonEmptyStringSchema,
-    age: z.number().int().min(13),
-    accountStatus: accountStatusSchema,
-    guardianConsentRequired: z.boolean(),
-  })
-  .superRefine((value, ctx) => {
-    const expectedGuardianConsent = value.accountStatus === 'pending_guardian_consent'
-    if (value.guardianConsentRequired !== expectedGuardianConsent) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          'guardianConsentRequired must match the selected accountStatus invariant',
-        path: ['guardianConsentRequired'],
+  .discriminatedUnion('accountStatus', [
+    z
+      .object({
+        ...signupResponseFields,
+        accountStatus: z.literal('active'),
+        guardianConsentRequired: z.literal(false),
       })
-    }
-  })
+      .strict(),
+    z
+      .object({
+        ...signupResponseFields,
+        accountStatus: z.literal('pending_guardian_consent'),
+        guardianConsentRequired: z.literal(true),
+      })
+      .strict(),
+  ])
   .openapi({
     description: [
-      'Cross-field invariant enforced at runtime and NOT expressible in this schema:',
-      'guardianConsentRequired is true if and only if accountStatus is',
-      'pending_guardian_consent. The two fields are never independent, so treat',
-      'accountStatus as the source of truth and do not construct fixtures where',
-      'they disagree.',
+      'guardianConsentRequired is a function of accountStatus, never independent of',
+      'it, so each variant fixes both together. Treat accountStatus as the source of',
+      'truth; a response where the two disagree is unrepresentable.',
     ].join(' '),
   })
 

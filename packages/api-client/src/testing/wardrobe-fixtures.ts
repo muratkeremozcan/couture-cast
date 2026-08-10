@@ -129,9 +129,20 @@ export function createOutfitCapsuleFixture(
   }
 }
 
+/**
+ * `WardrobeOnboardingStateContract` is a discriminated union, so a builder
+ * accepting `Partial<Union>` cannot be type-safe: spreading arbitrary overrides
+ * onto one variant widens the result into something that is no longer any valid
+ * variant. Each builder is therefore pinned to the variant it produces, which is
+ * also what stops a fixture from expressing an impossible state.
+ */
+type WardrobeOnboardingStateOf<
+  TStatus extends WardrobeOnboardingStateContract['status'],
+> = Extract<WardrobeOnboardingStateContract, { status: TStatus }>
+
 export function createWardrobeOnboardingStateFixture(
-  overrides: Partial<WardrobeOnboardingStateContract> = {}
-): WardrobeOnboardingStateContract {
+  overrides: Partial<WardrobeOnboardingStateOf<'in_progress'>> = {}
+): WardrobeOnboardingStateOf<'in_progress'> {
   return {
     status: 'in_progress',
     currentStep: 'silhouette',
@@ -144,8 +155,8 @@ export function createWardrobeOnboardingStateFixture(
   }
 }
 
-export function createNotStartedOnboardingStateFixture(): WardrobeOnboardingStateContract {
-  return createWardrobeOnboardingStateFixture({
+export function createNotStartedOnboardingStateFixture(): WardrobeOnboardingStateOf<'not_started'> {
+  return {
     status: 'not_started',
     currentStep: 'permission',
     usedStarterWardrobe: false,
@@ -153,7 +164,22 @@ export function createNotStartedOnboardingStateFixture(): WardrobeOnboardingStat
     startedAt: null,
     completedAt: null,
     revision: 0,
-  })
+  }
+}
+
+export function createCompletedOnboardingStateFixture(
+  overrides: Partial<WardrobeOnboardingStateOf<'completed'>> = {}
+): WardrobeOnboardingStateOf<'completed'> {
+  return {
+    status: 'completed',
+    currentStep: 'complete',
+    usedStarterWardrobe: false,
+    garmentsCapturedCount: 3,
+    startedAt: FIXED_CREATED_AT,
+    completedAt: FIXED_COMMITTED_AT,
+    revision: 4,
+    ...overrides,
+  }
 }
 
 export function createSilhouetteProfileFixture(

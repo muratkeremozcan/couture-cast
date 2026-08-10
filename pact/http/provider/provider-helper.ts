@@ -683,18 +683,29 @@ export async function startLocalPactProvider({
         throw new ConflictException('INVALID_STEP_TRANSITION')
       }
 
-      const advanced: OnboardingRow = {
-        status: input.targetStep === 'complete' ? 'completed' : 'in_progress',
-        currentStep: input.targetStep,
+      // Built per variant rather than as one wide object: the contract is a
+      // discriminated union, so `completed` carries its terminal step and
+      // timestamp together and `in_progress` cannot carry a completedAt at all.
+      const advancedShared = {
         usedStarterWardrobe,
         garmentsCapturedCount: row.garmentsCapturedCount,
         startedAt: row.startedAt ?? PACT_ONBOARDING_STARTED_AT,
-        completedAt:
-          input.targetStep === 'complete'
-            ? PACT_ONBOARDING_COMPLETED_AT
-            : row.completedAt,
         revision: row.revision + 1,
       }
+      const advanced: OnboardingRow =
+        input.targetStep === 'complete'
+          ? {
+              status: 'completed',
+              currentStep: 'complete',
+              ...advancedShared,
+              completedAt: PACT_ONBOARDING_COMPLETED_AT,
+            }
+          : {
+              status: 'in_progress',
+              currentStep: input.targetStep,
+              ...advancedShared,
+              completedAt: null,
+            }
       return Promise.resolve({ response: toOnboardingResponse(advanced), isNoOp: false })
     },
   } as unknown as WardrobeOnboardingService

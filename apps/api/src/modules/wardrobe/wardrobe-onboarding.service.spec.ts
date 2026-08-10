@@ -60,7 +60,26 @@ describe('formatOnboardingETag / parseOnboardingIfMatchHeader', () => {
 const USER_ID = 'user-1'
 
 /** A deliberately partial row: only the columns the service actually reads. */
+const ROW_COMPLETED_AT = new Date('2026-08-09T10:30:00Z')
+
+/**
+ * `status`, `current_step` and `completed_at` move together in a real row: the
+ * terminal step is exactly the completed status, and only a completed row
+ * carries a completion timestamp. A test sets whichever of the three its case is
+ * about, so the factory fills in the others rather than making every call site
+ * restate the invariant. The response contract now rejects the combinations this
+ * prevents.
+ */
 function stateRow(overrides: Partial<WardrobeOnboardingState> = {}) {
+  const isTerminal =
+    overrides.current_step === 'complete' || overrides.status === 'completed'
+  const derived: Record<string, unknown> = {}
+  if (isTerminal) {
+    if (!('status' in overrides)) derived.status = 'completed'
+    if (!('current_step' in overrides)) derived.current_step = 'complete'
+    if (!('completed_at' in overrides)) derived.completed_at = ROW_COMPLETED_AT
+  }
+
   return {
     user_id: USER_ID,
     status: 'in_progress',
@@ -73,6 +92,7 @@ function stateRow(overrides: Partial<WardrobeOnboardingState> = {}) {
     started_telemetry_emitted_at: new Date('2026-08-09T10:00:00Z'),
     completed_telemetry_emitted_at: null,
     ...overrides,
+    ...derived,
   } as unknown as WardrobeOnboardingState
 }
 

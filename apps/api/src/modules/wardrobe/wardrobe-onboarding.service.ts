@@ -12,6 +12,7 @@ import {
   type UpdateWardrobeOnboardingStateInput,
   type WardrobeOnboardingStateResponse,
   type WardrobeOnboardingStep,
+  wardrobeOnboardingStateSchema,
 } from '@couture/api-client/contracts/http'
 import {
   trackWardrobeOnboardingCompleted,
@@ -133,8 +134,12 @@ function toResponse(row: {
   completed_at: Date | null
   revision: number
 }): WardrobeOnboardingStateResponse {
+  // The contract is a discriminated union, so the row's independently-typed
+  // columns cannot be assigned to it directly. Parsing selects the variant and
+  // makes a row that violates the lifecycle invariant fail loudly here rather
+  // than shipping a payload every client would reject anyway.
   return {
-    data: {
+    data: wardrobeOnboardingStateSchema.parse({
       status: row.status,
       currentStep: row.current_step,
       usedStarterWardrobe: row.used_starter_wardrobe,
@@ -142,7 +147,7 @@ function toResponse(row: {
       startedAt: row.started_at?.toISOString() ?? null,
       completedAt: row.completed_at?.toISOString() ?? null,
       revision: row.revision,
-    },
+    }),
   }
 }
 

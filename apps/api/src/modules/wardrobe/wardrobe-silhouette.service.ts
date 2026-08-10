@@ -20,6 +20,7 @@ import {
   type CreateSilhouetteUploadUrlResponse,
   type SilhouetteProfileResponse,
   type UpdateSilhouetteSlidersInput,
+  silhouetteMyFormSchema,
 } from '@couture/api-client/contracts/http'
 import { buildSilhouetteObjectPath } from '@couture/utils'
 import type { ApiRole } from '../auth/security.types.js'
@@ -152,12 +153,16 @@ export class WardrobeSilhouetteService {
           expiresAt: new Date(Date.now() + READ_URL_EXPIRY_SECONDS * 1000).toISOString(),
         }
       }
-      myForm = {
+      // Discriminated union: parsing selects the variant and makes a profile
+      // that violates the photo-lifecycle invariant (a ready photo with no
+      // signed URL, say) fail here instead of reaching the client as a payload
+      // it would reject.
+      myForm = silhouetteMyFormSchema.parse({
         status: profile.my_form_status,
         failureReason: profile.my_form_failure_reason,
         committedAt: profile.my_form_committed_at?.toISOString() ?? null,
         imageAccess,
-      }
+      })
     }
 
     return {

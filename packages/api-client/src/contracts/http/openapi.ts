@@ -76,7 +76,12 @@ export function generateHttpOpenApiDocument() {
     openapi: '3.1.0',
     info: {
       title: 'CoutureCast HTTP API',
-      version: '0.1.0',
+      // 1.0.0 marks the point where the published contract is treated as stable
+      // and gated accordingly. The major bump is also what lets Optic accept the
+      // one-time response-schema narrowing in this change: `breaking-changes`
+      // defaults to `skip_when_major_version_changes`, which is the mechanism
+      // intended for exactly this, rather than an operation-level exemption.
+      version: '1.0.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [
