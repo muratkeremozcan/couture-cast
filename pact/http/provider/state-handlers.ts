@@ -164,15 +164,13 @@ export const stateHandlers: StateHandlers = {
   /* ----------------------------------------------------------------------- *
    * Story 4.4 wardrobe onboarding and silhouette setup.
    *
-   * State-setup only, following the exact pattern above: these configure a
-   * named, deterministic scenario before each interaction. No provider
-   * service double consumes this state yet — Task 3/4's
-   * wardrobe-onboarding.controller.ts and wardrobe-silhouette.controller.ts
-   * are being built concurrently on feat/epic4-story4-t3t4-api and are not
-   * present in this worktree (see provider-helper.ts), so
-   * `test:pact:provider` legitimately fails on these interactions with 404s
-   * until that branch lands and wires a real (or double) service into
-   * startLocalPactProvider's moduleFixture.
+   * These configure a named, deterministic scenario before each interaction,
+   * following the exact pattern above. The state is consumed by the real
+   * `mockWardrobeOnboardingService`/`mockWardrobeSilhouetteService` doubles
+   * in provider-helper.ts, wired against the real
+   * `WardrobeOnboardingController`/`WardrobeSilhouetteController` -- see
+   * provider-helper.ts for the doubles' fidelity level. `test:pact:provider`
+   * verifies every onboarding/silhouette interaction through this wiring.
    * ----------------------------------------------------------------------- */
   'Wardrobe onboarding state exists for user': (parameters?: unknown) => {
     const { userId } = parameters as OnboardingStateParams

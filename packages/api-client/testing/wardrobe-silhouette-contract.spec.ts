@@ -1,7 +1,7 @@
 // Story 4.4 Task 7 step 1 owner: prove the silhouette-slider and "My Form"
 // Zod schemas parse and reject correctly, mirroring wardrobe-contract.spec.ts's
 // structure.
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import type { z } from 'zod'
 import {
   commitSilhouettePhotoInputSchema,
@@ -275,9 +275,18 @@ describe('Wardrobe Silhouette HTTP Contracts', () => {
   })
 
   describe('OpenAPI Registration', () => {
-    it('registers the silhouette and My Form routes with the documented status codes', () => {
-      const spec = generateHttpOpenApiDocument()
+    // Shared across the three tests below: generateHttpOpenApiDocument()
+    // rebuilds the entire registry (every register*Contracts slice, not just
+    // wardrobe) and runs the full OpenAPI document generator each call, and
+    // its output does not change between these tests. Computing it once in
+    // beforeAll avoids paying that cost three times over.
+    let spec: ReturnType<typeof generateHttpOpenApiDocument>
 
+    beforeAll(() => {
+      spec = generateHttpOpenApiDocument()
+    })
+
+    it('registers the silhouette and My Form routes with the documented status codes', () => {
       const routes = [
         {
           method: 'get',
@@ -342,8 +351,6 @@ describe('Wardrobe Silhouette HTTP Contracts', () => {
     })
 
     it('requires If-Match on the slider PUT and Idempotency-Key on My Form upload-url/commit', () => {
-      const spec = generateHttpOpenApiDocument()
-
       const sliderPut = spec.paths?.['/api/v1/wardrobe/silhouette']?.put
       expect(sliderPut?.parameters).toEqual(
         expect.arrayContaining([
@@ -376,8 +383,6 @@ describe('Wardrobe Silhouette HTTP Contracts', () => {
     })
 
     it('declares the raw My Form upload token/content-type headers and binary body (HIGH 4, bmad-code-review)', () => {
-      const spec = generateHttpOpenApiDocument()
-
       const uploadBytesPut =
         spec.paths?.['/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}']?.put
       expect(uploadBytesPut?.parameters).toEqual(

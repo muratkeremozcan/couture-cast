@@ -12,9 +12,10 @@ import {
   verifyGetComfortPreferencesInteraction,
   verifyUpdateComfortPreferencesInteraction,
   verifySuggestGarmentTagsInteraction,
-  verifySuggestGarmentTagsErrorInteractions,
+  verifySmartTagErrorInteraction,
+  suggestGarmentTagsErrorInteractions,
   verifyUpdateGarmentTagsInteraction,
-  verifyUpdateGarmentTagsErrorInteractions,
+  updateGarmentTagsErrorInteractions,
   verifyUpdateGarmentTagsNullMaterialInteraction,
   verifyCreateCapsuleInteraction,
   verifyCapsuleIdempotentReplayInteraction,
@@ -23,7 +24,8 @@ import {
   verifyUpdateCapsuleInteraction,
   verifyFavoriteCapsuleInteraction,
   verifyDeleteCapsuleInteraction,
-  verifyCapsuleErrorInteractions,
+  verifyCapsuleErrorInteraction,
+  capsuleErrorInteractions,
   verifyOnboardingStateInteraction,
   verifyOnboardingVirtualDefaultInteraction,
   verifyPatchOnboardingStateInteraction,
@@ -94,10 +96,19 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
     await verifyUpdateGarmentTagsInteraction(pact, createWebClientForMockServer)
   })
 
-  it('preserves documented smart-tagging error envelopes', async () => {
-    await verifySuggestGarmentTagsErrorInteractions(pact)
-    await verifyUpdateGarmentTagsErrorInteractions(pact)
-  })
+  it.each(suggestGarmentTagsErrorInteractions)(
+    'preserves the documented smart-tag suggestion error envelope: $description',
+    async (interaction) => {
+      await verifySmartTagErrorInteraction(pact, interaction)
+    }
+  )
+
+  it.each(updateGarmentTagsErrorInteractions)(
+    'preserves the documented smart-tag update error envelope: $description',
+    async (interaction) => {
+      await verifySmartTagErrorInteraction(pact, interaction)
+    }
+  )
 
   it('clears nullable garment material', async () => {
     await verifyUpdateGarmentTagsNullMaterialInteraction(
@@ -134,9 +145,12 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
     await verifyDeleteCapsuleInteraction(pact, createWebClientForMockServer)
   })
 
-  it('preserves documented capsule error envelopes', async () => {
-    await verifyCapsuleErrorInteractions(pact)
-  })
+  it.each(capsuleErrorInteractions)(
+    'preserves the documented capsule error envelope that $description',
+    async (interaction) => {
+      await verifyCapsuleErrorInteraction(pact, interaction)
+    }
+  )
 
   it('reads existing wardrobe onboarding progress', async () => {
     await verifyOnboardingStateInteraction(pact, createWebClientForMockServer)

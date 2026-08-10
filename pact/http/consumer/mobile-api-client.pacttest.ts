@@ -23,7 +23,8 @@ import {
   verifyUpdateCapsuleInteraction,
   verifyFavoriteCapsuleInteraction,
   verifyDeleteCapsuleInteraction,
-  verifyCapsuleErrorInteractions,
+  verifyCapsuleErrorInteraction,
+  capsuleErrorInteractions,
   verifyOnboardingStateInteraction,
   verifyOnboardingVirtualDefaultInteraction,
   verifyPatchOnboardingStateInteraction,
@@ -134,9 +135,12 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
     await verifyDeleteCapsuleInteraction(pact, createMobileClientForMockServer)
   })
 
-  it('preserves documented capsule error envelopes', async () => {
-    await verifyCapsuleErrorInteractions(pact)
-  })
+  it.each(capsuleErrorInteractions)(
+    'preserves the documented capsule error envelope that $description',
+    async (interaction) => {
+      await verifyCapsuleErrorInteraction(pact, interaction)
+    }
+  )
 
   it('reads existing wardrobe onboarding progress', async () => {
     await verifyOnboardingStateInteraction(pact, createMobileClientForMockServer)
