@@ -24,6 +24,7 @@ import {
 } from '../src/modules/wardrobe/wardrobe-silhouette.service.js'
 import type { GuardianService } from '../src/modules/guardian/guardian.service.js'
 import {
+  buildSilhouettePhotoJobId,
   SilhouettePhotoProcessingQueue,
   silhouettePhotoProcessingJobSchema,
 } from '../src/modules/wardrobe/silhouette-photo-processing.queue.js'
@@ -214,6 +215,25 @@ class MemoryWardrobeStorage implements WardrobeStorage {
   }
   signReadUrl(objectPath: string): Promise<string> {
     return Promise.resolve(`https://storage.test/${objectPath}`)
+  }
+}
+
+/**
+ * `moderation-review` is a real, shared BullMQ queue on the developer's and
+ * CI's real Redis. Every job this suite enqueues must be removed again before
+ * the test ends: BullMQ retains completed jobs for `JOB_RETENTION_SECONDS`
+ * (7 days), so an undrained job is shared external state that outlives the
+ * run, and any leftover job is picked up by the next test's worker, which
+ * subscribes to the queue name rather than to a single job.
+ */
+async function removeModerationJob(jobId: string): Promise<void> {
+  const queue = new Queue('moderation-review', {
+    connection: redisOptionsFromConfig(getRedisConfig()),
+  })
+  try {
+    await queue.remove(jobId)
+  } finally {
+    await queue.close()
   }
 }
 
@@ -458,6 +478,11 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
       await prismaA.silhouetteProfile.findUniqueOrThrow({ where: { user_id: userId } })
     ).id
 
+    const expectedJobId = buildSilhouettePhotoJobId(
+      profileId,
+      uploadUrlResult.response.data.uploadSessionId
+    )
+
     const redisOptions = redisOptionsFromConfig(getRedisConfig())
     const processedJobIds: string[] = []
     const engine: SilhouettePhotoModerationEngine = {
@@ -481,31 +506,118 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
           () => reject(new Error('job did not complete in time')),
           10_000
         )
+        // Both listeners filter on this test's own job. The worker subscribes
+        // to the shared `moderation-review` queue name, so an unrelated job
+        // left behind by another suite would otherwise resolve this promise
+        // early or reject the test with a failure that is not ours.
         worker.on('completed', (job) => {
-          if (job.data.silhouetteProfileId === profileId) {
+          if (job.id === expectedJobId) {
             clearTimeout(timeout)
             resolve()
           }
         })
-        worker.on('failed', (_job, err) => {
-          clearTimeout(timeout)
-          reject(err)
+        worker.on('failed', (job, err) => {
+          if (job?.id === expectedJobId) {
+            clearTimeout(timeout)
+            reject(err)
+          }
         })
       })
     } finally {
       await worker.close()
+      await removeModerationJob(expectedJobId)
     }
 
     // Exactly one worker instance processed exactly one job for this
     // profile -- the regression Risk 4.4-R01 exists to prevent is two live
     // consumers splitting jobs so a fraction are silently never moderated.
-    expect(processedJobIds).toHaveLength(1)
+    // Counted by job id rather than by array length so a stray job from
+    // another suite cannot turn this into a flake.
+    expect(processedJobIds.filter((id) => id === expectedJobId)).toHaveLength(1)
 
     const finalRow = await prismaA.silhouetteProfile.findUniqueOrThrow({
       where: { id: profileId },
     })
     expect(finalRow.my_form_status).toBe('ready')
     expect(finalRow.mode).toBe('my_form')
+  }, 15_000)
+
+  /**
+   * Regression for the BullMQ job-id collision. `SilhouetteProfile` is one row
+   * per user, so its id is stable across My Form re-uploads; keying the job on
+   * the profile id alone meant BullMQ refused the second commit's job for the
+   * whole 7-day retention window and the profile sat in `processing` forever.
+   * Runs against real Redis because the drop is a Redis-side behavior a double
+   * cannot reproduce.
+   */
+  it('4.4-INT-18 enqueues a distinct job for a second My Form commit on the same profile', async (context) => {
+    if (!requireSchema(context)) return
+
+    const bullQueue = new Queue('moderation-review', {
+      connection: redisOptionsFromConfig(getRedisConfig()),
+    })
+    const enqueuedJobIds: string[] = []
+
+    try {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const image = buildFixtureSilhouettePhoto('ready')
+        const { createHash } = await import('node:crypto')
+        const uploadUrlResult = await serviceA.createMyFormUploadUrl(
+          userId,
+          'guardian',
+          {
+            fileSizeBytes: image.length,
+            mimeType: 'image/png',
+            sha256: createHash('sha256').update(image).digest('hex'),
+            widthPx: 300,
+            heightPx: 800,
+          },
+          randomUUID()
+        )
+        await prismaA.silhouetteProfile.update({
+          where: { user_id: userId },
+          data: { my_form_status: 'bytes_uploaded' },
+        })
+        await serviceA.commitMyForm(
+          userId,
+          'guardian',
+          {
+            uploadSessionId: uploadUrlResult.response.data.uploadSessionId,
+            confirmsBasewearGuidance: true,
+          },
+          randomUUID()
+        )
+
+        const profile = await prismaA.silhouetteProfile.findUniqueOrThrow({
+          where: { user_id: userId },
+        })
+        enqueuedJobIds.push(
+          buildSilhouettePhotoJobId(
+            profile.id,
+            uploadUrlResult.response.data.uploadSessionId
+          )
+        )
+
+        // The second attempt models the user deleting and re-uploading: the
+        // profile row (and therefore its id) survives, only the upload session
+        // is new.
+        if (attempt === 0) {
+          await prismaA.silhouetteProfile.update({
+            where: { user_id: userId },
+            data: { my_form_status: null, my_form_commit_idempotency_key: null },
+          })
+        }
+      }
+
+      expect(enqueuedJobIds[0]).not.toBe(enqueuedJobIds[1])
+      const jobs = await Promise.all(enqueuedJobIds.map((id) => bullQueue.getJob(id)))
+      expect(jobs.map((job) => job?.id)).toEqual(enqueuedJobIds)
+    } finally {
+      for (const jobId of enqueuedJobIds) {
+        await bullQueue.remove(jobId).catch(() => undefined)
+      }
+      await bullQueue.close()
+    }
   }, 15_000)
 
   it('4.4-INT-16 hard-deletes the My Form photo and reverts to default_mannequin', async (context) => {

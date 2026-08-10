@@ -34,8 +34,14 @@ export function verifyUploadToken(
   secret: string
 ): boolean {
   const expected = generateUploadToken(uploadSessionId, userId, expiresAtIso, secret)
-  if (token.length !== expected.length) {
+  // Compare buffer byte lengths, not string lengths: a caller-supplied token
+  // containing multi-byte characters can match `expected` in code points while
+  // differing in bytes, and `timingSafeEqual` throws a RangeError on unequal
+  // buffer lengths -- turning a forged token into a 500 instead of a 403.
+  const candidate = Buffer.from(token, 'utf8')
+  const expectedBytes = Buffer.from(expected, 'utf8')
+  if (candidate.length !== expectedBytes.length) {
     return false
   }
-  return timingSafeEqual(Buffer.from(token), Buffer.from(expected))
+  return timingSafeEqual(candidate, expectedBytes)
 }

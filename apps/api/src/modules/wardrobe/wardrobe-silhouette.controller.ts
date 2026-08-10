@@ -76,7 +76,13 @@ export class WardrobeSilhouetteController {
     @Body() rawBody: unknown,
     @Res({ passthrough: true }) res: Response
   ) {
-    const input = updateSilhouetteSlidersInputSchema.parse(rawBody)
+    const parsedBody = updateSilhouetteSlidersInputSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      throw new BadRequestException(
+        validationMessage('Invalid silhouette sliders', parsedBody.error)
+      )
+    }
+    const input = parsedBody.data
     const { response } = await this.silhouetteService.updateSliders(
       auth.userId,
       ifMatchHeader,
@@ -164,7 +170,13 @@ export class WardrobeSilhouetteController {
     @Body() rawBody: unknown,
     @Res({ passthrough: true }) res: Response
   ) {
-    const input = commitSilhouettePhotoInputSchema.parse(rawBody)
+    const parsedBody = commitSilhouettePhotoInputSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      throw new BadRequestException(
+        validationMessage('Invalid commit payload', parsedBody.error)
+      )
+    }
+    const input = parsedBody.data
     const parsedKey = z.string().uuid().safeParse(idempotencyKey)
     if (!parsedKey.success) {
       throw new BadRequestException('INVALID_IDEMPOTENCY_KEY')

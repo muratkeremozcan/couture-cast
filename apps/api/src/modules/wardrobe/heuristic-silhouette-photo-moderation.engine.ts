@@ -12,6 +12,9 @@ import type {
 
 type RgbMean = { r: number; g: number; b: number }
 
+/** Every region is analysed as 3-channel sRGB, whatever the source encoding. */
+const ANALYSIS_CHANNELS = 3 as const
+
 function meanRgb(stats: { channels: { mean: number }[] }): RgbMean {
   return {
     r: stats.channels[0]?.mean ?? 0,
@@ -82,8 +85,19 @@ export class HeuristicSilhouettePhotoModerationEngine
      * reported stats. Materializing the crop to its own buffer first, then
      * opening a fresh `sharp()` instance on that buffer, is the workaround.
      */
+    // Both crops are normalized to exactly 3 sRGB channels. Reinterpreting the
+    // raw buffer with `metadata.channels` was wrong whenever the two disagreed
+    // -- a PNG with an alpha channel, a palette image, a CMYK JPEG -- which
+    // both skewed the mean-RGB comparison and could drop `estimateSkinRatio`
+    // into its `channels < 3` early return, silently disabling the bare-skin
+    // check for a full-colour photo. A genuinely grayscale photo still cannot
+    // be assessed by an RGB skin-tone heuristic; that is a documented
+    // limitation of this safety net (decision 9), not something normalization
+    // can fix.
     const borderBuffer = await sharp(imageBuffer)
       .extract({ left: 0, top: 0, width, height: borderMargin })
+      .removeAlpha()
+      .toColourspace('srgb')
       .raw()
       .toBuffer()
     const centerBuffer = await sharp(imageBuffer)
@@ -93,22 +107,16 @@ export class HeuristicSilhouettePhotoModerationEngine
         width: centerWidth,
         height: centerHeight,
       })
+      .removeAlpha()
+      .toColourspace('srgb')
       .raw()
       .toBuffer()
 
     const borderStats = await sharp(borderBuffer, {
-      raw: {
-        width,
-        height: borderMargin,
-        channels: (metadata.channels ?? 3) as 1 | 2 | 3 | 4,
-      },
+      raw: { width, height: borderMargin, channels: ANALYSIS_CHANNELS },
     }).stats()
     const centerStats = await sharp(centerBuffer, {
-      raw: {
-        width: centerWidth,
-        height: centerHeight,
-        channels: (metadata.channels ?? 3) as 1 | 2 | 3 | 4,
-      },
+      raw: { width: centerWidth, height: centerHeight, channels: ANALYSIS_CHANNELS },
     }).stats()
 
     const distance = euclideanDistance(meanRgb(borderStats), meanRgb(centerStats))
@@ -118,7 +126,7 @@ export class HeuristicSilhouettePhotoModerationEngine
 
     const skinRatio = this.estimateSkinRatio(
       centerBuffer,
-      metadata.channels ?? 3,
+      ANALYSIS_CHANNELS,
       centerWidth * centerHeight
     )
     if (skinRatio > this.skinRatioThreshold) {

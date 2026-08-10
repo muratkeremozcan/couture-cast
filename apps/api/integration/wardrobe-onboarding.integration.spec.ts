@@ -302,20 +302,26 @@ describe('4.4 wardrobe onboarding state machine against real PostgreSQL', () => 
     ])
 
     const fulfilled = results.filter((result) => result.status === 'fulfilled')
-    expect(fulfilled.length).toBeGreaterThanOrEqual(1)
+    const rejected = results.filter((result) => result.status === 'rejected')
+    expect(fulfilled).toHaveLength(1)
+    expect(rejected).toHaveLength(1)
+
+    // This is the assertion that actually proves the advisory lock is doing
+    // the work. Both callers hold `If-Match` for revision 0. Serialized, the
+    // loser reads the row the winner just created and fails the precondition,
+    // so it must be a 412. Without the lock both callers would see no row,
+    // both would INSERT, and the loser would surface a Prisma unique-constraint
+    // violation instead -- a 500. Asserting only "one row exists" cannot tell
+    // those two worlds apart, because the unique index guarantees it either way.
+    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(
+      PreconditionFailedException
+    )
 
     const row = await prismaA.wardrobeOnboardingState.findUniqueOrThrow({
       where: { user_id: userId },
     })
     expect(row.revision).toBe(1)
     expect(row.current_step).toBe('capture')
-
-    // Regardless of how many callers "won" the no-op-replay path, the started
-    // event was captured by only one underlying row creation.
-    const rows = await prismaA.wardrobeOnboardingState.findMany({
-      where: { user_id: userId },
-    })
-    expect(rows).toHaveLength(1)
   })
 
   /**
@@ -352,5 +358,102 @@ describe('4.4 wardrobe onboarding state machine against real PostgreSQL', () => 
       where: { user_id: userId },
     })
     expect(row.revision).toBe(2)
+  })
+
+  /**
+   * Regression: `usedStarterWardrobe` is optional on the PATCH body and only
+   * meaningful on the capture -> silhouette skip. Defaulting an omitted value
+   * to `false` erased a recorded `true` on the next step, so the completion
+   * telemetry reported the wrong acquisition path for every starter-wardrobe
+   * user, and an identical retry that omitted the flag was rejected as an
+   * illegal transition instead of replayed.
+   */
+  it('4.4-INT-09 keeps usedStarterWardrobe set when a later step omits it', async (context) => {
+    if (!requireSchema(context)) return
+
+    await serviceA.advanceStep(userId, formatOnboardingETag(userId, 0), {
+      targetStep: 'capture',
+    })
+    await serviceA.advanceStep(userId, formatOnboardingETag(userId, 1), {
+      targetStep: 'silhouette',
+      usedStarterWardrobe: true,
+    })
+
+    const replay = await serviceA.advanceStep(userId, formatOnboardingETag(userId, 2), {
+      targetStep: 'silhouette',
+    })
+    expect(replay.isNoOp).toBe(true)
+    expect(replay.response.data.usedStarterWardrobe).toBe(true)
+
+    const completed = await serviceA.advanceStep(
+      userId,
+      formatOnboardingETag(userId, 2),
+      {
+        targetStep: 'complete',
+      }
+    )
+    expect(completed.response.data.usedStarterWardrobe).toBe(true)
+
+    const row = await prismaA.wardrobeOnboardingState.findUniqueOrThrow({
+      where: { user_id: userId },
+    })
+    expect(row.used_starter_wardrobe).toBe(true)
+
+    const completedEvents = analyticsA.events.filter(
+      (event) => (event as { event: string }).event === 'wardrobe_onboarding_completed'
+    )
+    expect(completedEvents).toHaveLength(1)
+    expect(
+      (completedEvents[0] as { properties: Record<string, unknown> }).properties
+    ).toMatchObject({ used_starter_wardrobe: true })
+  })
+
+  /**
+   * Regression: the telemetry-guard columns exist so an event lost to a crash
+   * between transaction commit and emission can still be emitted by the
+   * client's retry. Skipping emission on the no-op replay path defeated that
+   * entirely -- the row already existed, the replay was a no-op, and the event
+   * was dropped permanently. A persisted row with a null guard column IS the
+   * post-crash state, so seeding one is a faithful reproduction.
+   */
+  it('4.4-INT-10 emits telemetry lost to a crash on the next identical replay, exactly once', async (context) => {
+    if (!requireSchema(context)) return
+
+    const startedAt = new Date(Date.now() - 60_000)
+    await prismaA.wardrobeOnboardingState.create({
+      data: {
+        user_id: userId,
+        status: 'completed',
+        current_step: 'complete',
+        used_starter_wardrobe: false,
+        garments_captured_count: 2,
+        started_at: startedAt,
+        completed_at: new Date(),
+        revision: 4,
+        started_telemetry_emitted_at: null,
+        completed_telemetry_emitted_at: null,
+      },
+    })
+
+    const replay = await serviceA.advanceStep(userId, formatOnboardingETag(userId, 4), {
+      targetStep: 'complete',
+    })
+    expect(replay.isNoOp).toBe(true)
+
+    const eventNames = analyticsA.events.map(
+      (event) => (event as { event: string }).event
+    )
+    expect(
+      eventNames.filter((name) => name === 'wardrobe_onboarding_started')
+    ).toHaveLength(1)
+    expect(
+      eventNames.filter((name) => name === 'wardrobe_onboarding_completed')
+    ).toHaveLength(1)
+
+    // A second replay must not re-emit: the guard columns are now stamped.
+    await serviceA.advanceStep(userId, formatOnboardingETag(userId, 4), {
+      targetStep: 'complete',
+    })
+    expect(analyticsA.events).toHaveLength(2)
   })
 })

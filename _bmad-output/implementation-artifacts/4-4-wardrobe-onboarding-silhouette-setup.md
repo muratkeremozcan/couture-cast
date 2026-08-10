@@ -996,6 +996,125 @@ dedicated test cases per the risk register.
 Full `api` workspace: 668 unit + 67 integration tests passing (0 skipped
 beyond 5 pre-existing, unrelated skips), lint clean, typecheck clean.
 
+**Adversarial review pass on `feat/epic4-story4-t3t4-api` (PR #110).** Ran
+the three-layer `bmad-code-review` (Blind Hunter on the diff alone, Edge
+Case Hunter with project read access, Acceptance Auditor against this story
+and `project-context.md`) plus a `bmad-tea` test-architecture pass. All
+three layers independently reported the same top finding, and it was a real
+production bug, reproduced against local Redis before fixing:
+
+- **BullMQ job-id collision (High).** `SilhouettePhotoProcessingQueue.enqueue`
+  keyed the job on `silhouetteProfileId`. Unlike `GarmentItem` (one row per
+  upload attempt), `SilhouetteProfile` is one row per user, so that id is
+  stable for the life of the account, and `Queue.add` with an existing job id
+  is a silent no-op while the job remains in the retained completed set. Every
+  My Form photo a user committed after their first — delete-and-reupload, or a
+  retry after a flagged photo — was therefore never enqueued, leaving the row
+  in `my_form_status: 'processing'` forever. Fixed with
+  `buildSilhouettePhotoJobId(profileId, uploadSessionId)`; the separator is
+  `__` because BullMQ rejects a colon in a custom job id (caught by the new
+  test, not by inspection). Covered by `4.4-UNIT-05` and by `4.4-INT-18`
+  against real Redis.
+- **`usedStarterWardrobe` clobbering (High).** The flag is optional on the
+  PATCH body and only meaningful on the capture → silhouette skip, but an
+  omitted value defaulted to `false` on every subsequent transition. The
+  silhouette → complete PATCH therefore erased a recorded `true`, so
+  `wardrobe_onboarding_completed` reported the wrong acquisition path for
+  every starter-wardrobe user, and an identical retry that omitted the flag
+  409'd instead of replaying. Now sticky (`input.usedStarterWardrobe ??
+existing.used_starter_wardrobe`), covered by `4.4-INT-09`.
+- **Onboarding telemetry dropped on replay (Medium).** `emitTelemetry` was
+  skipped whenever the transition was a no-op, which defeated the entire
+  purpose of the guard columns added in this task: a crash between commit and
+  emission left the event unemitted, and the client's replay — the one thing
+  that could recover it — took the no-op path. The claim now runs on replays
+  too, and a failed analytics handoff releases the claim instead of leaving a
+  column asserting an event that never fired. Covered by `4.4-INT-10`.
+- **Guardian notification could be lost (Medium).** The terminal `failed`
+  status flip and the `ModerationEvent`/outbox write were two separate
+  statements; a crash between them lost the notification permanently, because
+  the retry re-reads a profile that is no longer `processing` and returns
+  early. Both now commit in one transaction.
+- **Commit could strand a photo in `processing` (Medium).** If
+  `processingQueue.enqueue` threw after the status flip committed, nothing
+  could re-enqueue: a replay returned the cached processing response and a
+  fresh key was rejected as reused. The claim is now released on enqueue
+  failure, back to the one state a commit retry can legitimately re-enter.
+- Smaller fixes: the bytes-upload guard now includes
+  `my_form_upload_session_id`, so a concurrent upload-url reallocation cannot
+  credit bytes to the wrong session; the moderation engine normalizes both
+  crops to 3-channel sRGB (reinterpreting raw buffers with `metadata.channels`
+  was wrong for alpha/palette/CMYK sources and could drop the bare-skin check
+  into its `channels < 3` early return); `verifyUploadToken` compares buffer
+  byte lengths, so a multi-byte token returns 403 instead of throwing a
+  `RangeError` into a 500; and the two new controllers use `safeParse`, so a
+  malformed body returns the contract-documented 400 rather than a 500.
+
+Test-architecture findings (`bmad-tea`), all fixed:
+
+- **`4.4-INT-15` leaked shared external state.** It left its BullMQ job in the
+  real `moderation-review` queue — retained seven days by `removeOnComplete`
+  — and never closed the per-test `SilhouettePhotoProcessingQueue`, leaking a
+  Redis connection per test. Confirmed empirically: ten completed jobs had
+  accumulated in local Redis before the fix. The suite now drains its own job,
+  closes the queue in `afterEach`, and filters both the `completed` and
+  `failed` listeners on its own job id — previously a stray job from any other
+  suite could resolve the promise early, fail the test with an unrelated
+  error, or break the `toHaveLength(1)` count. Verified by clearing Redis and
+  confirming zero residual keys after a full-suite run, plus a five-run
+  burn-in.
+- **`4.4-INT-07` could not fail.** It asserted one row exists, which the
+  unique index guarantees with or without the advisory lock. It now asserts
+  the loser is rejected with `PreconditionFailedException`, which is precisely
+  what distinguishes a serialized transaction from two racing inserts (whose
+  loser surfaces a Prisma unique-constraint violation).
+- **Risk 4.4-R01 had no test for its actual claim.** The real-worker test
+  proves one worker processes the job, not that only one consumer is
+  registered. Added `4.4-UNIT-15`, which asserts exactly one worker bootstrap
+  registers `moderation-review`.
+- **Diff coverage was below the CI gate.** Both services were reachable only
+  through integration tests, which the coverage job does not run:
+  `wardrobe-silhouette.service.ts` sat at 6/155 lines and
+  `wardrobe-onboarding.service.ts` at 24/84, putting PR diff coverage at 44.4%
+  against a 50% threshold. Added `wardrobe-silhouette.service.spec.ts` (42
+  cases) and extended `wardrobe-onboarding.service.spec.ts` (21 cases), taking
+  those files to 95% and 98% and diff coverage to **74.3%**.
+
+Two findings were deliberately not fixed here. First, the integration suites
+build fixtures with direct `prisma.*.create` calls and clean up by email
+namespace rather than using Task 2's `wardrobe-onboarding.factory.ts` /
+`silhouette-profile.factory.ts` and `registerForCleanup`; the PR's test-quality
+checklist claims otherwise, which is inaccurate. No integration spec anywhere
+in `apps/api/integration/` uses `@couture/testing`, so this is a repo-wide
+convention gap and converting only this story's suites would make them the
+outlier — recommended as a separate cross-cutting change. Second, the
+moderation worker sets `mode: 'my_form'` on a ready verdict even if the user
+explicitly saved sliders (switching back to the mannequin) while the photo was
+still processing, silently overriding that choice. Which behavior is correct is
+a product decision, not an obvious defect, so it is flagged rather than guessed
+at. Separately, the `commitMyForm` status-code and replay-distinction issues
+the reviewers raised were left alone because PR #108 already fixes them
+downstream, and `my_form_commit_payload_hash` remains an unused column.
+
+Full `api` workspace after the review pass: 742 unit + 70 integration tests
+passing (5 pre-existing unrelated skips), lint and typecheck clean, no
+contract files touched so no api-client regeneration needed.
+
+**Merge note (this integration session, after PR #108/#110 diverged post
+squash-merge).** `feat/epic4-story4-t3t4-api`'s review-pass commit
+(`abfe16a`) was cherry-picked onto `main` rather than branch-merged, since
+`main` already carried an earlier snapshot of this code via #108's squash
+merge and a real branch merge produced spurious add/add conflicts on every
+shared file. The cherry-pick itself was clean except for two genuine
+overlaps: `wardrobe-silhouette.integration.spec.ts` had picked up its own,
+independently-written `drainModerationJob` hardening in #108 (attempt-count
+gating, a captured connection error for the timeout message) — kept as-is,
+since it's the superset of what abfe16a's version did — and a second,
+differently-shaped helper of the same name from abfe16a's `4.4-INT-18`
+(removes a job by id directly, no processing) was renamed to
+`removeModerationJob` to resolve the resulting duplicate declaration, which
+git's line-based merge did not itself flag as a conflict.
+
 **Task 5 (branch `feat/epic4-story4-t5-web`).** Built the Web onboarding and
 silhouette experience against the `t2-contracts` Zod contracts and generated
 SDK only (Task 3/4's API implementation is not in this branch), per the
@@ -1399,6 +1518,9 @@ that filtered run), `lint` and `typecheck` clean.
 - `packages/testing/templates/test-template.spec.ts` (modified)
 
 **Task 3 + 4 (branch `feat/epic4-story4-t3t4-api`):**
+
+- `apps/api/src/modules/wardrobe/wardrobe-silhouette.service.spec.ts` (new — review pass)
+- `apps/api/src/workers/wardrobe.bootstrap.spec.ts` (new — review pass)
 
 - `packages/db/prisma/schema.prisma` (modified — telemetry-guard columns)
 - `packages/db/prisma/migrations/20260809110000_add_onboarding_telemetry_guards/migration.sql` (new)

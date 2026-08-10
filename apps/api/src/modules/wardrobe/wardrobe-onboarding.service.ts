@@ -200,7 +200,6 @@ export class WardrobeOnboardingService {
     input: UpdateWardrobeOnboardingStateInput
   ): Promise<AdvanceResult> {
     const expectedRevision = parseOnboardingIfMatchHeader(ifMatchHeader, userId)
-    const usedStarterWardrobe = input.usedStarterWardrobe ?? false
 
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('wardrobe_onboarding:' || ${userId}))`
@@ -210,20 +209,23 @@ export class WardrobeOnboardingService {
       })
 
       return existing
-        ? this.advanceExistingState(
+        ? this.advanceExistingState(tx, userId, existing, expectedRevision, input)
+        : this.createFirstState(
             tx,
             userId,
-            existing,
             expectedRevision,
             input,
-            usedStarterWardrobe
+            input.usedStarterWardrobe ?? false
           )
-        : this.createFirstState(tx, userId, expectedRevision, input, usedStarterWardrobe)
     })
 
-    if (!result.isNoOp) {
-      await this.emitTelemetry(userId, result.row)
-    }
+    // Emitted for replays too, not only for applied transitions: the guard
+    // columns are what make each event exactly-once, so running the claim on a
+    // no-op replay is safe and is the only thing that lets a client recover an
+    // event lost to a crash between transaction commit and emission. Skipping
+    // it here would drop the event permanently -- the exact failure the guard
+    // columns were added to prevent.
+    await this.emitTelemetry(userId, result.row)
 
     return { response: toResponse(result.row), isNoOp: result.isNoOp }
   }
@@ -270,12 +272,20 @@ export class WardrobeOnboardingService {
     userId: string,
     existing: WardrobeOnboardingState,
     expectedRevision: number | null,
-    input: UpdateWardrobeOnboardingStateInput,
-    usedStarterWardrobe: boolean
+    input: UpdateWardrobeOnboardingStateInput
   ): Promise<TransitionOutcome> {
     if (expectedRevision !== null && existing.revision !== expectedRevision) {
       throw new PreconditionFailedException('ONBOARDING_REVISION_MISMATCH')
     }
+
+    // `usedStarterWardrobe` is optional and only meaningful on the
+    // capture -> silhouette skip. Defaulting an omitted value to `false` here
+    // would erase a previously recorded `true` on every later step (the
+    // silhouette -> complete PATCH has no reason to resend it), corrupting the
+    // flag the completion-telemetry payload reports, and would also make an
+    // identical retry that omits the flag fail the replay check and 409.
+    const usedStarterWardrobe =
+      input.usedStarterWardrobe ?? existing.used_starter_wardrobe
 
     const isIdenticalReplay =
       existing.current_step === input.targetStep &&
@@ -348,12 +358,17 @@ export class WardrobeOnboardingService {
         data: { started_telemetry_emitted_at: new Date() },
       })
       if (startedClaim.count === 1) {
-        this.analyticsClient.capture(
-          trackWardrobeOnboardingStarted({
-            analyticsSubjectId: userId,
-            timestamp: new Date().toISOString(),
-          })
-        )
+        try {
+          this.analyticsClient.capture(
+            trackWardrobeOnboardingStarted({
+              analyticsSubjectId: userId,
+              timestamp: new Date().toISOString(),
+            })
+          )
+        } catch (captureError) {
+          await this.releaseTelemetryClaim(userId, 'started_telemetry_emitted_at')
+          throw captureError
+        }
       }
     } catch (error) {
       this.logger.error(
@@ -384,21 +399,43 @@ export class WardrobeOnboardingService {
           ? Math.max(0, row.completed_at.getTime() - row.started_at.getTime())
           : 0
 
-      this.analyticsClient.capture(
-        trackWardrobeOnboardingCompleted({
-          analyticsSubjectId: userId,
-          durationMs,
-          usedStarterWardrobe: row.used_starter_wardrobe,
-          garmentCount: row.garments_captured_count,
-          silhouetteMode: silhouette?.mode ?? 'default_mannequin',
-          timestamp: new Date().toISOString(),
-        })
-      )
+      try {
+        this.analyticsClient.capture(
+          trackWardrobeOnboardingCompleted({
+            analyticsSubjectId: userId,
+            durationMs,
+            usedStarterWardrobe: row.used_starter_wardrobe,
+            garmentCount: row.garments_captured_count,
+            silhouetteMode: silhouette?.mode ?? 'default_mannequin',
+            timestamp: new Date().toISOString(),
+          })
+        )
+      } catch (captureError) {
+        await this.releaseTelemetryClaim(userId, 'completed_telemetry_emitted_at')
+        throw captureError
+      }
     } catch (error) {
       this.logger.error(
         { error, userId, message: 'wardrobe_onboarding_completed_emit_failed' },
         'Failed to emit wardrobe_onboarding_completed telemetry'
       )
     }
+  }
+
+  /**
+   * The guard column is claimed *before* the event is handed to the analytics
+   * client, so that concurrent callers cannot both emit. If the handoff then
+   * throws, the claim has to be released again -- otherwise the column says
+   * "emitted" for an event that never was, and no later replay can recover it.
+   * Releasing turns an at-most-once guard into an at-most-once guard that is
+   * still retryable, which is the property the columns were added for.
+   */
+  private async releaseTelemetryClaim(
+    userId: string,
+    column: 'started_telemetry_emitted_at' | 'completed_telemetry_emitted_at'
+  ): Promise<void> {
+    await this.prisma.wardrobeOnboardingState
+      .updateMany({ where: { user_id: userId }, data: { [column]: null } })
+      .catch(() => undefined)
   }
 }

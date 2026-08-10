@@ -5,6 +5,24 @@ import {
   verifyUploadToken,
 } from './wardrobe-upload-token'
 
+describe('verifyUploadToken byte-length safety', () => {
+  it('4.4-UNIT-02 rejects a multi-byte token instead of throwing a RangeError', () => {
+    const secret = 'x'.repeat(32)
+    const expected = generateUploadToken('session-1', 'user-1', 'expiry', secret)
+    // Same code-point length as the real token, different byte length: the
+    // string-length guard let this through to `timingSafeEqual`, which throws
+    // a RangeError on mismatched buffer lengths -- a 500 for a forged token.
+    const multiByte = 'é'.repeat(expected.length)
+
+    expect(() =>
+      verifyUploadToken(multiByte, 'session-1', 'user-1', 'expiry', secret)
+    ).not.toThrow()
+    expect(verifyUploadToken(multiByte, 'session-1', 'user-1', 'expiry', secret)).toBe(
+      false
+    )
+  })
+})
+
 describe('wardrobe upload token', () => {
   const originalSecret = process.env.WARDROBE_UPLOAD_TOKEN_SECRET
   const originalNodeEnv = process.env.NODE_ENV
