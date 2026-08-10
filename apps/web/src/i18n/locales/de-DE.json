@@ -59,6 +59,7 @@
       "title": "Richte deinen Kleiderschrank ein",
       "garmentFallback": "Kleidungsstück {{position}}",
       "permissionTitle": "Kamera- und Fotozugriff erlauben",
+      "permissionAction": "Kamera- und Fotozugriff erlauben",
       "permissionBody": "CoutureCast benötigt Kamera- oder Mediathekzugriff, um deine Kleidungsstücke zu erfassen.",
       "permissionDenied": "Wir konnten nicht auf deine Kamera oder Fotos zugreifen. Du kannst weiterhin Dateien importieren oder den Starter-Kleiderschrank verwenden.",
       "useStarterWardrobe": "Starter-Kleiderschrank verwenden",

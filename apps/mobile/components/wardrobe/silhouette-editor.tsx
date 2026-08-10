@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as Crypto from 'expo-crypto'
-import { File } from 'expo-file-system'
+import { File, Paths } from 'expo-file-system'
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
 import {
@@ -307,7 +307,9 @@ export function SilhouetteEditor({
     void saveSliders(heightSlider, next, 'build')
   }
 
-  const runMyFormUpload = async (asset: ImagePicker.ImagePickerAsset) => {
+  const runMyFormUpload = async (
+    asset: Pick<ImagePicker.ImagePickerAsset, 'uri' | 'width' | 'height'>
+  ) => {
     setMyFormPhase('uploading')
     setMyFormError(null)
     setMyFormErrorKey(null)
@@ -378,6 +380,39 @@ export function SilhouetteEditor({
       setMyFormPhase('failed')
       setMyFormError(message)
       announce('error', message)
+    }
+  }
+
+  /**
+   * `__DEV__`-only deterministic fixture, mirroring `garment-capture-modal.tsx`'s
+   * `garment-e2e-fixture-source`: there is no other way for Maestro to drive a
+   * real My Form photo through camera/library pickers deterministically. The
+   * bundled asset is a portrait two-tone PNG engineered so the real production
+   * `HeuristicSilhouettePhotoModerationEngine` deterministically returns
+   * `ready` (see the story's Dev Notes for the exact pixel geometry) — this
+   * exercises the real heuristic engine end to end, not a stubbed outcome.
+   */
+  const selectMyFormFixture = async () => {
+    // Required lazily, matching garment-capture-modal.tsx's own reasoning: a
+    // Vite/vitest environment has no Metro `require` for static assets, so
+    // this must only ever run from the __DEV__-only button press below.
+    const fixtureImage =
+      require('../../assets/images/silhouette-my-form-fixture.png') as number
+    const source = Image.resolveAssetSource(fixtureImage)
+    try {
+      const fixtureFile = await File.downloadFileAsync(
+        source.uri,
+        new File(Paths.cache, 'silhouette-my-form-fixture.png'),
+        { idempotent: true }
+      )
+      await runMyFormUpload({
+        uri: fixtureFile.uri,
+        width: source.width,
+        height: source.height,
+      })
+    } catch {
+      setMyFormPhase('failed')
+      setMyFormError(t('wardrobe.silhouette.errors.storage_error'))
     }
   }
 
@@ -588,6 +623,24 @@ export function SilhouetteEditor({
                   {t('wardrobe.silhouette.my_form_upload')}
                 </Text>
               </Pressable>
+              {__DEV__ ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Use deterministic My Form fixture"
+                  accessibilityState={{ disabled: !guidanceConfirmed }}
+                  disabled={!guidanceConfirmed}
+                  testID="silhouette-my-form-fixture-source"
+                  style={[
+                    styles.secondaryButton,
+                    !guidanceConfirmed && styles.stepperDisabled,
+                  ]}
+                  onPress={() => void selectMyFormFixture()}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    Use deterministic My Form fixture
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
 

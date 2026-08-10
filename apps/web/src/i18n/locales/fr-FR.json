@@ -59,6 +59,7 @@
       "title": "Configurez votre garde-robe",
       "garmentFallback": "Vêtement {{position}}",
       "permissionTitle": "Autoriser l’accès à l’appareil photo et aux photos",
+      "permissionAction": "Autoriser l’accès à l’appareil photo et aux photos",
       "permissionBody": "CoutureCast a besoin d’accéder à votre appareil photo ou à votre photothèque pour capturer vos vêtements.",
       "permissionDenied": "Nous n’avons pas pu accéder à votre appareil photo ni à vos photos. Vous pouvez toujours importer des fichiers ou utiliser la garde-robe de démarrage.",
       "useStarterWardrobe": "Utiliser la garde-robe de démarrage",

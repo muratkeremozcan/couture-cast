@@ -59,6 +59,7 @@
       "title": "Configura tu clóset",
       "garmentFallback": "Prenda {{position}}",
       "permissionTitle": "Permite el acceso a la cámara y las fotos",
+      "permissionAction": "Permite el acceso a la cámara y las fotos",
       "permissionBody": "CoutureCast necesita acceso a la cámara o a la galería para capturar tus prendas.",
       "permissionDenied": "No pudimos acceder a tu cámara ni a tus fotos. Aún puedes importar archivos o usar el clóset inicial.",
       "useStarterWardrobe": "Usar clóset inicial",

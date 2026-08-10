@@ -59,6 +59,7 @@
       "title": "Gardırobunu oluştur",
       "garmentFallback": "Kıyafet {{position}}",
       "permissionTitle": "Kamera ve fotoğraf erişimine izin ver",
+      "permissionAction": "Kamera ve fotoğraf erişimine izin ver",
       "permissionBody": "CoutureCast, parçalarını çekebilmek için kamera veya kitaplık erişimine ihtiyaç duyar.",
       "permissionDenied": "Kameranıza veya fotoğraflarınıza erişemedik. Yine de dosya içe aktarabilir veya başlangıç gardırobunu kullanabilirsiniz.",
       "useStarterWardrobe": "Başlangıç gardırobunu kullan",

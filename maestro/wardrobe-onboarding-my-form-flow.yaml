@@ -1,0 +1,103 @@
+# Story 4.4 Task 8: the "My Form" silhouette photo path, reached from the
+# standalone silhouette settings screen (decision 3: reachable outside
+# onboarding). Uses the `__DEV__`-only `silhouette-my-form-fixture-source`
+# button (silhouette-editor.tsx), mirroring garment capture's own
+# `garment-e2e-fixture-source` convention: there is no deterministic way to
+# drive a real camera/library picker from Maestro. The bundled fixture is a
+# portrait two-tone PNG engineered so the real, default
+# `HeuristicSilhouettePhotoModerationEngine` deterministically verdicts
+# `ready` -- this exercises the real production engine, not a stub.
+appId: ${MAESTRO_APP_ID}
+name: 'Wardrobe silhouette My Form flow'
+tags:
+  - e2e
+  - wardrobe
+  - silhouette
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow:
+    when:
+      visible: 'Sign in with Google'
+    commands:
+      - tapOn:
+          text: 'close'
+          optional: true
+      - tapOn:
+          point: '9%,29%'
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: 'tab-wardrobe'
+    timeout: 60000
+
+- runFlow:
+    file: subflows/open-wardrobe.yaml
+    label: 'Open the Wardrobe tab'
+
+- tapOn:
+    id: 'wardrobe-silhouette-link'
+
+- extendedWaitUntil:
+    visible:
+      id: 'wardrobe-silhouette-screen'
+    timeout: 15000
+
+- assertVisible:
+    id: 'silhouette-editor'
+
+- tapOn:
+    id: 'silhouette-tab-my-form'
+
+- assertVisible:
+    id: 'silhouette-my-form'
+
+- tapOn:
+    id: 'silhouette-my-form-confirm'
+
+- extendedWaitUntil:
+    visible:
+      id: 'silhouette-my-form-fixture-source'
+    timeout: 15000
+
+- tapOn:
+    id: 'silhouette-my-form-fixture-source'
+
+- extendedWaitUntil:
+    visible:
+      id: 'silhouette-my-form-ready'
+    timeout: 30000
+
+- assertVisible:
+    id: 'silhouette-my-form-image'
+
+# Public-API cleanup: the in-app Remove action performs the real DELETE
+# /my-form hard-delete (decision 12) rather than leaving a committed photo
+# for scripts/run-maestro.mjs's post-run identity teardown to clean up
+# incidentally -- proving the same route the story's AC2 removal path
+# describes, not only relying on the whole-user deletion that happens anyway.
+- tapOn:
+    id: 'silhouette-my-form-remove'
+
+- extendedWaitUntil:
+    notVisible:
+      id: 'silhouette-my-form-ready'
+    timeout: 15000
+
+# Decision 12: removal falls the profile back to `default_mannequin`, so the
+# sliders panel re-renders without needing to tap the "Default" tab.
+- assertVisible:
+    id: 'silhouette-sliders'
+
+- takeScreenshot:
+    path: maestro/artifacts/wardrobe-onboarding-my-form-flow

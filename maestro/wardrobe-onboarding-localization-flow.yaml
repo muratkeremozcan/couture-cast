@@ -1,0 +1,97 @@
+# Story 4.4 Task 8: wardrobe onboarding and silhouette surfaces in one
+# non-English locale. tr-TR is deliberately chosen over de-DE/fr-FR/fr-CA/
+# it-IT: those four keep "Silhouette" as an approved cognate (see Task 5's
+# completion notes), so a literal string match there would not actually
+# prove translation happened. Turkish has a genuinely distinct translation
+# for every key exercised below.
+appId: ${MAESTRO_APP_ID}
+name: 'Wardrobe onboarding and silhouette localization'
+tags:
+  - e2e
+  - wardrobe
+  - onboarding
+  - localization
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+    arguments:
+      locale: 'tr-TR'
+
+- runFlow:
+    when:
+      visible: 'Sign in with Google'
+    commands:
+      - tapOn:
+          text: 'close'
+          optional: true
+      - tapOn:
+          point: '9%,29%'
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: 'tab-wardrobe'
+    timeout: 60000
+
+- runFlow:
+    file: subflows/open-wardrobe.yaml
+    label: 'Open the Wardrobe tab'
+
+# wardrobe.onboarding.title / wardrobe.onboarding.permission_body
+- assertVisible:
+    text: 'Gardırobunu oluştur'
+    label: 'Onboarding entry card title is localized'
+
+- assertVisible:
+    text: 'CoutureCast, kıyafetlerini yakalamak için kamera veya kitaplık erişimine ihtiyaç duyar.'
+    label: 'Onboarding entry card body is localized'
+
+# wardrobe.silhouette.title, on the hub's own entry-point link.
+- assertVisible:
+    text: 'Silüet'
+    label: 'Silhouette entry-point link is localized'
+
+- tapOn:
+    id: 'wardrobe-silhouette-link'
+
+- extendedWaitUntil:
+    visible:
+      id: 'wardrobe-silhouette-screen'
+    timeout: 15000
+
+# wardrobe.silhouette.height_slider_label / build_slider_label
+- assertVisible:
+    text: 'Boy'
+    label: 'Height slider label is localized'
+
+- assertVisible:
+    text: 'Yapı'
+    label: 'Build slider label is localized'
+
+# wardrobe.silhouette.mode_default / mode_my_form
+- assertVisible:
+    text: 'Ayarlanabilir silüet'
+    label: 'Default mannequin tab label is localized'
+
+- tapOn:
+    id: 'silhouette-tab-my-form'
+
+- assertVisible:
+    text: 'Formum fotoğrafı'
+    label: 'My Form tab label is localized'
+
+# wardrobe.silhouette.my_form_guidance
+- assertVisible:
+    text: 'En temiz kaplama için düz beyaz veya siyah kıyafet giyip düz bir arka plan kullanın.'
+    label: 'My Form guidance copy is localized'
+
+- takeScreenshot:
+    path: maestro/artifacts/wardrobe-onboarding-localization-flow
