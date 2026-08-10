@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -788,34 +788,73 @@
         ]
       },
       "SignupResponse": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "minLength": 1
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "age": {
+                "type": "integer",
+                "minimum": 13
+              },
+              "accountStatus": {
+                "type": "string",
+                "enum": [
+                  "active"
+                ]
+              },
+              "guardianConsentRequired": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ]
+              }
+            },
+            "required": [
+              "userId",
+              "age",
+              "accountStatus",
+              "guardianConsentRequired"
+            ],
+            "additionalProperties": false
           },
-          "age": {
-            "type": "integer",
-            "minimum": 13
-          },
-          "accountStatus": {
-            "type": "string",
-            "enum": [
-              "active",
-              "pending_guardian_consent"
-            ]
-          },
-          "guardianConsentRequired": {
-            "type": "boolean"
+          {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "age": {
+                "type": "integer",
+                "minimum": 13
+              },
+              "accountStatus": {
+                "type": "string",
+                "enum": [
+                  "pending_guardian_consent"
+                ]
+              },
+              "guardianConsentRequired": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "required": [
+              "userId",
+              "age",
+              "accountStatus",
+              "guardianConsentRequired"
+            ],
+            "additionalProperties": false
           }
-        },
-        "required": [
-          "userId",
-          "age",
-          "accountStatus",
-          "guardianConsentRequired"
         ],
-        "description": "Cross-field invariant enforced at runtime and NOT expressible in this schema: guardianConsentRequired is true if and only if accountStatus is pending_guardian_consent. The two fields are never independent, so treat accountStatus as the source of truth and do not construct fixtures where they disagree."
+        "description": "guardianConsentRequired is a function of accountStatus, never independent of it, so each variant fixes both together. Treat accountStatus as the source of truth; a response where the two disagree is unrepresentable."
       },
       "GuardianConsentInput": {
         "type": "object",
@@ -5482,63 +5521,149 @@
         "type": "object",
         "properties": {
           "data": {
-            "type": "object",
-            "properties": {
-              "status": {
-                "type": "string",
-                "enum": [
-                  "not_started",
-                  "in_progress",
-                  "completed"
-                ]
-              },
-              "currentStep": {
-                "type": "string",
-                "enum": [
-                  "permission",
-                  "capture",
-                  "tagging",
-                  "silhouette",
-                  "complete"
-                ]
-              },
-              "usedStarterWardrobe": {
-                "type": "boolean"
-              },
-              "garmentsCapturedCount": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "startedAt": {
-                "type": [
-                  "string",
-                  "null"
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "not_started"
+                    ]
+                  },
+                  "currentStep": {
+                    "type": "string",
+                    "enum": [
+                      "permission"
+                    ]
+                  },
+                  "usedStarterWardrobe": {
+                    "type": "boolean"
+                  },
+                  "garmentsCapturedCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "startedAt": {
+                    "type": "null"
+                  },
+                  "completedAt": {
+                    "type": "null"
+                  },
+                  "revision": {
+                    "type": "number",
+                    "enum": [
+                      0
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "currentStep",
+                  "usedStarterWardrobe",
+                  "garmentsCapturedCount",
+                  "startedAt",
+                  "completedAt",
+                  "revision"
                 ],
-                "format": "date-time"
+                "additionalProperties": false
               },
-              "completedAt": {
-                "type": [
-                  "string",
-                  "null"
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "in_progress"
+                    ]
+                  },
+                  "currentStep": {
+                    "type": "string",
+                    "enum": [
+                      "permission",
+                      "capture",
+                      "tagging",
+                      "silhouette"
+                    ]
+                  },
+                  "usedStarterWardrobe": {
+                    "type": "boolean"
+                  },
+                  "garmentsCapturedCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "startedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "completedAt": {
+                    "type": "null"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "status",
+                  "currentStep",
+                  "usedStarterWardrobe",
+                  "garmentsCapturedCount",
+                  "startedAt",
+                  "completedAt",
+                  "revision"
                 ],
-                "format": "date-time"
+                "additionalProperties": false
               },
-              "revision": {
-                "type": "integer",
-                "minimum": 0
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "completed"
+                    ]
+                  },
+                  "currentStep": {
+                    "type": "string",
+                    "enum": [
+                      "complete"
+                    ]
+                  },
+                  "usedStarterWardrobe": {
+                    "type": "boolean"
+                  },
+                  "garmentsCapturedCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "startedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "completedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "status",
+                  "currentStep",
+                  "usedStarterWardrobe",
+                  "garmentsCapturedCount",
+                  "startedAt",
+                  "completedAt",
+                  "revision"
+                ],
+                "additionalProperties": false
               }
-            },
-            "required": [
-              "status",
-              "currentStep",
-              "usedStarterWardrobe",
-              "garmentsCapturedCount",
-              "startedAt",
-              "completedAt",
-              "revision"
             ],
-            "additionalProperties": false,
-            "description": "Cross-field invariants enforced at runtime and NOT expressible in this schema: (1) startedAt is null if and only if status is not_started; (2) status not_started occurs only at currentStep permission and revision 0; (3) status is completed if and only if currentStep is complete; (4) completedAt is non-null if and only if status is completed. Combinations outside these rules are never emitted by the server and are rejected when parsed, so do not construct them in fixtures or mocks."
+            "description": "One variant per lifecycle status. The correlations between status, currentStep, startedAt, completedAt and revision are expressed by the variants themselves rather than enforced by an invisible runtime check, so an invalid combination such as a completed state with a null completedAt is unrepresentable in the generated types."
           }
         },
         "required": [
@@ -5740,71 +5865,171 @@
                 "maximum": 100
               },
               "myForm": {
-                "type": [
-                  "object",
-                  "null"
-                ],
-                "properties": {
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "pending_upload",
-                      "bytes_uploaded",
-                      "processing",
-                      "ready",
-                      "failed"
-                    ]
-                  },
-                  "failureReason": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
-                    "enum": [
-                      "contrast",
-                      "privacy_violation",
-                      "timeout",
-                      "storage_error",
-                      null
-                    ]
-                  },
-                  "committedAt": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
-                    "format": "date-time"
-                  },
-                  "imageAccess": {
-                    "type": [
-                      "object",
-                      "null"
-                    ],
+                "oneOf": [
+                  {
+                    "type": "object",
                     "properties": {
-                      "url": {
+                      "status": {
                         "type": "string",
-                        "format": "uri"
+                        "enum": [
+                          "pending_upload"
+                        ]
                       },
-                      "expiresAt": {
-                        "type": "string",
-                        "format": "date-time"
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "committedAt": {
+                        "type": "null"
+                      },
+                      "imageAccess": {
+                        "type": "null"
                       }
                     },
                     "required": [
-                      "url",
-                      "expiresAt"
+                      "status",
+                      "failureReason",
+                      "committedAt",
+                      "imageAccess"
                     ],
                     "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "bytes_uploaded"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "committedAt": {
+                        "type": "null"
+                      },
+                      "imageAccess": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "committedAt",
+                      "imageAccess"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "processing"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "committedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "imageAccess": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "committedAt",
+                      "imageAccess"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ready"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "committedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "imageAccess": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "url",
+                          "expiresAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "committedAt",
+                      "imageAccess"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "failed"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "string",
+                        "enum": [
+                          "contrast",
+                          "privacy_violation",
+                          "timeout",
+                          "storage_error"
+                        ]
+                      },
+                      "committedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "imageAccess": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "committedAt",
+                      "imageAccess"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
                   }
-                },
-                "required": [
-                  "status",
-                  "failureReason",
-                  "committedAt",
-                  "imageAccess"
                 ],
-                "additionalProperties": false,
-                "description": "Cross-field invariants enforced at runtime and NOT expressible in this schema: (1) committedAt is non-null if and only if status is processing, ready, or failed; (2) failureReason is non-null if and only if status is failed; (3) imageAccess is non-null if and only if status is ready. Combinations outside these rules are never emitted by the server and are rejected when parsed, so do not construct them in fixtures or mocks."
+                "description": "One variant per photo status. committedAt is present exactly on the committed statuses, failureReason exactly on failed, and imageAccess exactly on ready. Expressing this as variants rather than an invisible runtime check means a combination such as a ready photo with a null imageAccess is unrepresentable in the generated types."
               },
               "revision": {
                 "type": "integer",

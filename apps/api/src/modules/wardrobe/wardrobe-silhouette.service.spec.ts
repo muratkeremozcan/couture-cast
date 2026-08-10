@@ -26,8 +26,28 @@ const USER_ID = 'user-1'
 const SESSION_ID = 'session-1'
 const OBJECT_PATH = `wardrobe/${USER_ID}/silhouette/${SESSION_ID}.png`
 
-/** A deliberately partial row: only the columns the service actually reads. */
+/** The committed statuses always carry a commit timestamp in a real row. */
+const COMMITTED_MY_FORM_STATUSES = new Set(['processing', 'ready', 'failed'])
+const DEFAULT_MY_FORM_COMMITTED_AT = new Date('2026-08-09T11:00:00Z')
+
+/**
+ * A deliberately partial row: only the columns the service actually reads.
+ *
+ * `my_form_committed_at` defaults to a real timestamp whenever the status is one
+ * the service only ever reaches after a commit. Leaving it null there describes
+ * a row the database never holds, and the response contract now rejects it, so
+ * defaulting keeps a caller from having to restate the invariant at every site.
+ */
 function profileRow(overrides: Record<string, unknown> = {}): SilhouetteProfile {
+  const status = overrides.my_form_status
+  if (
+    typeof status === 'string' &&
+    COMMITTED_MY_FORM_STATUSES.has(status) &&
+    !('my_form_committed_at' in overrides)
+  ) {
+    overrides = { ...overrides, my_form_committed_at: DEFAULT_MY_FORM_COMMITTED_AT }
+  }
+
   return {
     id: 'profile-1',
     user_id: USER_ID,

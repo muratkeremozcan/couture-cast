@@ -91,18 +91,62 @@ const persistedGarment: GarmentItemContract = {
   },
 }
 
+const ONBOARDING_STARTED_AT = '2026-08-04T09:00:00.000Z'
+const ONBOARDING_COMPLETED_AT = '2026-08-04T09:30:00.000Z'
+
+/**
+ * The contract is a discriminated union, so spreading arbitrary overrides over a
+ * single base can produce a state the server never emits (a `completed` status
+ * with a null `completedAt`, say). Deriving the correlated fields from `status`
+ * keeps every fixture a state that can actually occur.
+ */
 function onboardingState(
-  overrides: Partial<WardrobeOnboardingStateContract> = {}
+  overrides: {
+    status?: WardrobeOnboardingStateContract['status']
+    currentStep?: WardrobeOnboardingStateContract['currentStep']
+    usedStarterWardrobe?: boolean
+    garmentsCapturedCount?: number
+    revision?: number
+  } = {}
 ): WardrobeOnboardingStateContract {
+  const {
+    status = 'not_started',
+    currentStep,
+    usedStarterWardrobe = false,
+    garmentsCapturedCount = 0,
+    revision,
+  } = overrides
+  const shared = { usedStarterWardrobe, garmentsCapturedCount }
+
+  if (status === 'not_started') {
+    return {
+      status,
+      currentStep: 'permission',
+      ...shared,
+      startedAt: null,
+      completedAt: null,
+      revision: 0,
+    }
+  }
+
+  if (status === 'completed') {
+    return {
+      status,
+      currentStep: 'complete',
+      ...shared,
+      startedAt: ONBOARDING_STARTED_AT,
+      completedAt: ONBOARDING_COMPLETED_AT,
+      revision: revision ?? 5,
+    }
+  }
+
   return {
-    status: 'not_started',
-    currentStep: 'permission',
-    usedStarterWardrobe: false,
-    garmentsCapturedCount: 0,
-    startedAt: null,
+    status,
+    currentStep: currentStep && currentStep !== 'complete' ? currentStep : 'capture',
+    ...shared,
+    startedAt: ONBOARDING_STARTED_AT,
     completedAt: null,
-    revision: 0,
-    ...overrides,
+    revision: revision ?? 1,
   }
 }
 

@@ -643,66 +643,56 @@ export const silhouettePhotoFailureReasonEnum = z.enum([
  * successfully despite violating AC1/AC3, which independent review
  * (bmad-code-review) flagged as a real gap.
  */
-export const wardrobeOnboardingStateSchema = z
-  .object({
-    status: wardrobeOnboardingStatusEnum,
-    currentStep: wardrobeOnboardingStepEnum,
-    usedStarterWardrobe: z.boolean(),
-    garmentsCapturedCount: z.number().int().min(0),
-    startedAt: isoTimestampSchema.nullable(),
-    completedAt: isoTimestampSchema.nullable(),
-    revision: z.number().int().min(0),
-  })
-  .strict()
-  .superRefine((value, ctx) => {
-    const isVirtualDefault = value.status === 'not_started'
-    if (isVirtualDefault !== (value.startedAt === null)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['startedAt'],
-        message: 'startedAt is null only for the virtual not_started default',
-      })
-    }
-    if (isVirtualDefault && value.currentStep !== 'permission') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['currentStep'],
-        message: 'not_started only occurs at the permission step',
-      })
-    }
-    if (isVirtualDefault && value.revision !== 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['revision'],
-        message: 'not_started only occurs at revision 0',
-      })
-    }
+const wardrobeOnboardingProgressFields = {
+  usedStarterWardrobe: z.boolean(),
+  garmentsCapturedCount: z.number().int().min(0),
+}
 
-    const isComplete = value.status === 'completed'
-    if (isComplete !== (value.currentStep === 'complete')) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['currentStep'],
-        message: 'status completed requires currentStep complete, and vice versa',
+/** Every step except the terminal one, derived so it cannot drift from the enum. */
+const wardrobeOnboardingNonTerminalStepEnum = wardrobeOnboardingStepEnum.exclude([
+  'complete',
+])
+
+export const wardrobeOnboardingStateSchema = z
+  .discriminatedUnion('status', [
+    z
+      .object({
+        status: z.literal('not_started'),
+        currentStep: z.literal('permission'),
+        ...wardrobeOnboardingProgressFields,
+        startedAt: z.null(),
+        completedAt: z.null(),
+        revision: z.literal(0),
       })
-    }
-    if (isComplete !== (value.completedAt !== null)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['completedAt'],
-        message: 'completedAt is set exactly when status is completed',
+      .strict(),
+    z
+      .object({
+        status: z.literal('in_progress'),
+        currentStep: wardrobeOnboardingNonTerminalStepEnum,
+        ...wardrobeOnboardingProgressFields,
+        startedAt: isoTimestampSchema,
+        completedAt: z.null(),
+        revision: z.number().int().min(0),
       })
-    }
-  })
+      .strict(),
+    z
+      .object({
+        status: z.literal('completed'),
+        currentStep: z.literal('complete'),
+        ...wardrobeOnboardingProgressFields,
+        startedAt: isoTimestampSchema,
+        completedAt: isoTimestampSchema,
+        revision: z.number().int().min(0),
+      })
+      .strict(),
+  ])
   .openapi({
     description: [
-      'Cross-field invariants enforced at runtime and NOT expressible in this schema:',
-      '(1) startedAt is null if and only if status is not_started;',
-      '(2) status not_started occurs only at currentStep permission and revision 0;',
-      '(3) status is completed if and only if currentStep is complete;',
-      '(4) completedAt is non-null if and only if status is completed.',
-      'Combinations outside these rules are never emitted by the server and are',
-      'rejected when parsed, so do not construct them in fixtures or mocks.',
+      'One variant per lifecycle status. The correlations between status,',
+      'currentStep, startedAt, completedAt and revision are expressed by the',
+      'variants themselves rather than enforced by an invisible runtime check, so',
+      'an invalid combination such as a completed state with a null completedAt is',
+      'unrepresentable in the generated types.',
     ].join(' '),
   })
 
@@ -786,54 +776,55 @@ const silhouetteSliderInputSchema = z.number().int().min(0).max(100)
  * despite AC2 requiring "exactly one" documented reason, which independent
  * review (bmad-code-review) flagged as a real gap.
  */
+/** Before commit: nothing downstream of the upload exists yet. */
+const silhouetteMyFormUncommittedVariant = (
+  status: 'pending_upload' | 'bytes_uploaded'
+) =>
+  z
+    .object({
+      status: z.literal(status),
+      failureReason: z.null(),
+      committedAt: z.null(),
+      imageAccess: z.null(),
+    })
+    .strict()
+
 export const silhouetteMyFormSchema = z
-  .object({
-    status: silhouettePhotoStatusEnum,
-    failureReason: silhouettePhotoFailureReasonEnum.nullable(),
-    committedAt: isoTimestampSchema.nullable(),
-    imageAccess: garmentImageAccessSchema.nullable(),
-  })
-  .strict()
-  .superRefine((value, ctx) => {
-    const isCommitted =
-      value.status === 'processing' ||
-      value.status === 'ready' ||
-      value.status === 'failed'
-    if (isCommitted !== (value.committedAt !== null)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['committedAt'],
-        message:
-          'committedAt is set once committed (processing/ready/failed), never before',
+  .discriminatedUnion('status', [
+    silhouetteMyFormUncommittedVariant('pending_upload'),
+    silhouetteMyFormUncommittedVariant('bytes_uploaded'),
+    z
+      .object({
+        status: z.literal('processing'),
+        failureReason: z.null(),
+        committedAt: isoTimestampSchema,
+        imageAccess: z.null(),
       })
-    }
-
-    const isFailed = value.status === 'failed'
-    if (isFailed !== (value.failureReason !== null)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['failureReason'],
-        message: 'failureReason is set if and only if status is failed',
+      .strict(),
+    z
+      .object({
+        status: z.literal('ready'),
+        failureReason: z.null(),
+        committedAt: isoTimestampSchema,
+        imageAccess: garmentImageAccessSchema,
       })
-    }
-
-    const isReady = value.status === 'ready'
-    if (isReady !== (value.imageAccess !== null)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['imageAccess'],
-        message: 'imageAccess is set if and only if status is ready',
+      .strict(),
+    z
+      .object({
+        status: z.literal('failed'),
+        failureReason: silhouettePhotoFailureReasonEnum,
+        committedAt: isoTimestampSchema,
+        imageAccess: z.null(),
       })
-    }
-  })
+      .strict(),
+  ])
   .openapi({
     description: [
-      'Cross-field invariants enforced at runtime and NOT expressible in this schema:',
-      '(1) committedAt is non-null if and only if status is processing, ready, or failed;',
-      '(2) failureReason is non-null if and only if status is failed;',
-      '(3) imageAccess is non-null if and only if status is ready.',
-      'Combinations outside these rules are never emitted by the server and are',
-      'rejected when parsed, so do not construct them in fixtures or mocks.',
+      'One variant per photo status. committedAt is present exactly on the',
+      'committed statuses, failureReason exactly on failed, and imageAccess exactly',
+      'on ready. Expressing this as variants rather than an invisible runtime check',
+      'means a combination such as a ready photo with a null imageAccess is',
+      'unrepresentable in the generated types.',
     ].join(' '),
   })
 
