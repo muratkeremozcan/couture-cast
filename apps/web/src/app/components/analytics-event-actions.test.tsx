@@ -164,3 +164,235 @@ describe('AnalyticsEventActions', () => {
     })
   })
 })
+
+describe('AnalyticsEventActions degraded inputs', () => {
+  const eventExpectations = createAnalyticsEventExpectations(trackedEvents, expect)
+  const originalPostHogApiKey = process.env.POSTHOG_API_KEY
+
+  beforeEach(() => {
+    trackedEvents.splice(0, trackedEvents.length)
+    captureMock.mockClear()
+    initMock.mockClear()
+    distinctIdMock.mockReset()
+    distinctIdMock.mockReturnValue('web-test-user')
+    process.env.POSTHOG_API_KEY = 'phc_test'
+  })
+
+  afterEach(() => {
+    process.env.POSTHOG_API_KEY = originalPostHogApiKey
+    delete window.__enableAnalyticsTestHook
+    delete window.__analyticsBindingsReady
+    vi.restoreAllMocks()
+  })
+
+  it('skips non-alert channels entirely', async () => {
+    useMswHandlers(
+      http.get('/api/v1/events/poll', () =>
+        HttpResponse.json({
+          events: [
+            { id: 'evt-1', channel: 'daily_digest', userId: 'u-1', payload: {} },
+            {
+              id: 'evt-2',
+              channel: 'weather_alert',
+              userId: 'u-1',
+              payload: { alertType: 'storm', severity: 'critical' },
+            },
+          ],
+          nextSince: 'cursor-1',
+        })
+      )
+    )
+
+    render(<AnalyticsEventActions />)
+    const eventCursor = eventExpectations.createCursor()
+
+    await waitFor(() => {
+      eventExpectations.expectEventTracked(
+        'alert_received',
+        { alert_type: 'storm', severity: 'critical' },
+        { afterIndex: eventCursor, count: 1 }
+      )
+    })
+    // Exactly one alert event: the digest channel must not be counted as one.
+    expect(
+      trackedEvents.filter((tracked) => tracked.event === 'alert_received')
+    ).toHaveLength(1)
+  })
+
+  it('falls back to safe defaults when an alert carries no payload at all', async () => {
+    useMswHandlers(
+      http.get('/api/v1/events/poll', () =>
+        HttpResponse.json({
+          events: [{ id: 'evt-1', channel: 'alert_generic', userId: '', payload: null }],
+        })
+      )
+    )
+
+    render(<AnalyticsEventActions />)
+    const eventCursor = eventExpectations.createCursor()
+
+    // A payload-less alert must degrade to the channel name and a safe severity
+    // rather than emitting nothing or a malformed contract payload.
+    await waitFor(() => {
+      eventExpectations.expectEventTracked(
+        'alert_received',
+        {
+          alert_type: 'alert_generic',
+          severity: 'info',
+          user_id: 'web-test-user',
+        },
+        { afterIndex: eventCursor, count: 1 }
+      )
+    })
+  })
+
+  it('discards alert payload fields whose types do not match the contract', async () => {
+    useMswHandlers(
+      http.get('/api/v1/events/poll', () =>
+        HttpResponse.json({
+          events: [
+            {
+              id: 'evt-1',
+              channel: 'alert_typed',
+              userId: '',
+              payload: { alertType: 42, severity: 'chartreuse', weatherSeverity: 7 },
+            },
+          ],
+        })
+      )
+    )
+
+    render(<AnalyticsEventActions />)
+    const eventCursor = eventExpectations.createCursor()
+
+    await waitFor(() => {
+      const tracked = eventExpectations.expectEventTracked(
+        'alert_received',
+        { alert_type: 'alert_typed', severity: 'info', user_id: 'web-test-user' },
+        { afterIndex: eventCursor, count: 1 }
+      )
+      // A number would corrupt the funnel's severity dimension; it is dropped.
+      expect(tracked.properties?.weather_severity).toBeUndefined()
+    })
+  })
+
+  it('tolerates a poll response with no events array at all', async () => {
+    useMswHandlers(
+      http.get('/api/v1/events/poll', () => HttpResponse.json({ nextSince: 'cursor-1' }))
+    )
+
+    render(<AnalyticsEventActions />)
+    const primaryCta = screen.getByTestId('cta-primary')
+    const eventCursor = eventExpectations.createCursor()
+    fireEvent.click(primaryCta)
+
+    // The CTA path must still work when the feed returns an empty envelope.
+    await waitFor(() => {
+      eventExpectations.expectEventTracked(
+        'ritual_created',
+        { user_id: 'web-test-user' },
+        { afterIndex: eventCursor, count: 1 }
+      )
+    })
+  })
+
+  it('falls back to an anonymous identity when PostHog has no distinct id', async () => {
+    distinctIdMock.mockReturnValue('')
+    vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({
+      timeZone: '',
+    } as Intl.ResolvedDateTimeFormatOptions)
+
+    render(<AnalyticsEventActions />)
+    const eventCursor = eventExpectations.createCursor()
+    fireEvent.click(screen.getByTestId('cta-primary'))
+
+    // Dropping the event would leave a funnel hole; an explicit anonymous
+    // identity keeps it attributable to "unknown" instead.
+    await waitFor(() => {
+      eventExpectations.expectEventTracked(
+        'ritual_created',
+        { user_id: 'web-anonymous-user', location_id: 'unknown' },
+        { afterIndex: eventCursor, count: 1 }
+      )
+    })
+  })
+
+  it('publishes the binding-ready flag only while mounted, for the E2E hook', () => {
+    window.__enableAnalyticsTestHook = true
+
+    const { unmount } = render(<AnalyticsEventActions />)
+    expect(window.__analyticsBindingsReady).toBe(true)
+
+    unmount()
+    expect(window.__analyticsBindingsReady).toBe(false)
+  })
+
+  it('captures nothing when the file picker is dismissed', () => {
+    render(<AnalyticsEventActions />)
+
+    const uploadInput = document.getElementById(
+      'wardrobe-upload-input'
+    ) as HTMLInputElement
+    fireEvent.change(uploadInput)
+
+    expect(
+      trackedEvents.filter((tracked) => tracked.event === 'wardrobe_upload_started')
+    ).toHaveLength(0)
+  })
+
+  it('synthesizes an item id for a file with no name', async () => {
+    render(<AnalyticsEventActions />)
+
+    const uploadInput = document.getElementById(
+      'wardrobe-upload-input'
+    ) as HTMLInputElement
+    const eventCursor = eventExpectations.createCursor()
+    fireEvent.change(uploadInput, {
+      target: { files: [new File(['look'], '', { type: 'image/jpeg' })] },
+    })
+
+    await waitFor(() => {
+      const tracked = eventExpectations.expectEventTracked(
+        'wardrobe_upload_started',
+        { upload_source: 'web_file_picker' },
+        { afterIndex: eventCursor, count: 1 }
+      )
+      // A nameless file must still get a stable, non-empty identifier.
+      expect(tracked.properties?.item_id).toMatch(/^web-upload-\d+$/)
+    })
+  })
+
+  it('keeps polling on an interval so later alerts are still captured', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      let pollCount = 0
+      useMswHandlers(
+        http.get('/api/v1/events/poll', () => {
+          pollCount += 1
+          return HttpResponse.json({
+            events: [
+              {
+                id: `evt-${pollCount}`,
+                channel: 'weather_alert',
+                userId: 'alert-user',
+                payload: { alertType: 'storm', severity: 'warning' },
+              },
+            ],
+          })
+        })
+      )
+
+      render(<AnalyticsEventActions />)
+      await vi.waitFor(() => expect(pollCount).toBe(1))
+
+      await vi.advanceTimersByTimeAsync(30_000)
+
+      await vi.waitFor(() => expect(pollCount).toBe(2))
+      expect(
+        trackedEvents.filter((tracked) => tracked.event === 'alert_received').length
+      ).toBeGreaterThanOrEqual(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

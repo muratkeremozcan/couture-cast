@@ -145,3 +145,93 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
     expect(captureMock).not.toHaveBeenCalledWith('deep_link_handled', expect.anything())
   })
 })
+
+describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
+  const originalLocation = window.location
+
+  beforeEach(() => {
+    captureMock.mockClear()
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: originalLocation,
+    })
+  })
+
+  const setLocationSearch = (search: string) => {
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: {
+        ...originalLocation,
+        search,
+        href: `http://localhost${search}`,
+      },
+    })
+  }
+
+  it('hydrates a watch deep link through the same slot mapping as a widget', () => {
+    setLocationSearch('?source=watch&slot=pm')
+    render(<LookbookPrismLayout />)
+
+    expect(screen.queryByTestId('deep-link-info-banner')).not.toBeInTheDocument()
+    expect(captureMock).toHaveBeenCalledWith('deep_link_handled', {
+      source: 'watch',
+      slot: 'pm',
+      type: undefined,
+      alertId: undefined,
+      cardId: undefined,
+      surface: 'web',
+    })
+  })
+
+  it('treats a community card that no longer exists as an invalid link', () => {
+    setLocationSearch('?source=notification&type=community&cardId=look-does-not-exist')
+    render(<LookbookPrismLayout />)
+
+    // A card that was removed since the notification was sent must not silently
+    // land the user on an unrelated filter.
+    expect(screen.getByTestId('deep-link-info-banner')).toBeInTheDocument()
+    expect(captureMock).toHaveBeenCalledWith(
+      'deep_link_invalid',
+      expect.objectContaining({ reason: 'Community card target was not found' })
+    )
+  })
+
+  it('reports an unloadable weather alert target rather than focusing nothing', async () => {
+    useMswHandlers(http.get('/api/v1/events/poll', () => HttpResponse.error()))
+    setLocationSearch('?source=notification&type=severe_weather&alertId=alert-999')
+    render(<LookbookPrismLayout />)
+
+    await waitFor(() =>
+      expect(captureMock).toHaveBeenCalledWith(
+        'deep_link_invalid',
+        expect.objectContaining({ reason: 'Weather alert target could not be loaded' })
+      )
+    )
+    expect(screen.getByTestId('deep-link-info-banner')).toBeInTheDocument()
+  })
+
+  it('reports a weather alert that is no longer in the polled feed', async () => {
+    useMswHandlers(
+      http.get('/api/v1/events/poll', () =>
+        HttpResponse.json({
+          events: [createWeatherAlertPolledEvent('alert-other', 'user-1')],
+          nextSince: '2026-07-30T12:00:00.000Z',
+        })
+      )
+    )
+    setLocationSearch('?source=notification&type=severe_weather&alertId=alert-expired')
+    render(<LookbookPrismLayout />)
+
+    await waitFor(() =>
+      expect(captureMock).toHaveBeenCalledWith(
+        'deep_link_invalid',
+        expect.objectContaining({ reason: 'Weather alert target was not found' })
+      )
+    )
+    expect(screen.queryByTestId('severe-weather-alert-focused')).not.toBeInTheDocument()
+  })
+})

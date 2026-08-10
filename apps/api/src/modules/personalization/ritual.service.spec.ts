@@ -6,7 +6,9 @@ import {
   comfortNotesTranslations,
   badgeTranslations,
 } from './ritual.service.js'
-import type { PrismaClient, Prisma } from '@prisma/client'
+import { BadRequestException, InternalServerErrorException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
+import type { PrismaClient, GarmentItem } from '@prisma/client'
 import type { WeatherQueryService } from '../weather/weather-query.service.js'
 import type { LocationPreferencesService } from '../location-preferences/location-preferences.service.js'
 import type { AnalyticsClient } from '../../analytics/analytics.service.js'
@@ -892,6 +894,614 @@ describe('RitualService', () => {
         const targetKeys = Object.keys(targetBadges).sort()
         expect(targetKeys).toEqual(sourceKeys)
       })
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // Shared helpers for the degraded-dependency and fallback suites below.
+  // ---------------------------------------------------------------------------
+  const buildService = (
+    options: {
+      prisma?: PrismaClient
+      redis?: Redis
+      analytics?: AnalyticsClient
+    } = {}
+  ) =>
+    new RitualService(
+      options.prisma ?? prismaMock,
+      weatherQueryMock,
+      locationPreferencesMock,
+      (options.redis ?? new Redis()) as unknown as Redis,
+      options.analytics ?? ({ capture: vi.fn() } satisfies AnalyticsClient)
+    )
+
+  const buildGarment = (
+    id: string,
+    category: string,
+    comfortRange: string
+  ): GarmentItem =>
+    ({
+      id,
+      user_id: 'user-1',
+      category,
+      comfort_range: comfortRange,
+      upload_status: 'ready',
+      retention_status: 'active',
+      updated_at: new Date('2026-07-16T05:00:00.000Z'),
+    }) as unknown as GarmentItem
+
+  const withEnv = async (
+    values: Record<string, string | undefined>,
+    run: () => Promise<void>
+  ) => {
+    const previous = Object.fromEntries(
+      Object.keys(values).map((key) => [key, process.env[key]])
+    )
+    for (const [key, value] of Object.entries(values)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+    try {
+      await run()
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      }
+    }
+  }
+
+  const productionEnv = { TEST_ENV: undefined, VERCEL_ENV: undefined }
+
+  describe('degraded dependencies', () => {
+    it('still builds the ritual when the Redis read fails', async () => {
+      // A Redis outage may only cost a cache hit; the morning ritual must survive it.
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      const redis = new Redis()
+      vi.spyOn(redis, 'get').mockRejectedValue(new Error('connection refused'))
+
+      const result = await buildService({ redis }).getOrCreateRitual('user-1')
+
+      expect(result.outfits).toHaveLength(3)
+      expect(warn).toHaveBeenCalled()
+    })
+
+    it('still returns the ritual when the Redis write fails', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      const redis = new Redis()
+      vi.spyOn(redis, 'set').mockRejectedValue(new Error('OOM command not allowed'))
+
+      const result = await buildService({ redis }).getOrCreateRitual('user-1')
+
+      expect(result.outfits).toHaveLength(3)
+      expect(warn).toHaveBeenCalled()
+    })
+
+    it('reports a failed cache invalidation instead of throwing', async () => {
+      // Callers use the boolean to decide whether to warn; a throw would break
+      // the preference save that triggered the invalidation.
+      const redis = new Redis()
+      vi.spyOn(redis, 'scan').mockRejectedValue(new Error('connection refused'))
+
+      await expect(buildService({ redis }).invalidateUserCache('user-1')).resolves.toBe(
+        false
+      )
+    })
+
+    it('closes its Redis connection when the module shuts down', async () => {
+      const redis = new Redis()
+      const quitSpy = vi.spyOn(redis, 'quit')
+
+      await buildService({ redis }).onModuleDestroy()
+
+      expect(quitSpy).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('location resolution', () => {
+    it('rejects a location the user does not own', async () => {
+      await expect(
+        service.getOrCreateRitual('user-1', 'loc-someone-else')
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('rejects a user with no saved locations', async () => {
+      listLocationsMock.mockResolvedValue([])
+
+      await expect(service.getOrCreateRitual('user-1')).rejects.toThrow(
+        'No location preferences found for user'
+      )
+    })
+
+    it('falls back to the first location when none is marked primary', async () => {
+      listLocationsMock.mockResolvedValue([
+        { ...mockLocations[0], id: 'loc-2', isPrimary: false, locationKey: 'austin-tx' },
+      ])
+
+      await service.getOrCreateRitual('user-1')
+
+      expect(getLatestWeatherMock).toHaveBeenCalledWith('austin-tx')
+    })
+  })
+
+  describe('weather availability', () => {
+    it('surfaces the provider outage message outside test environments', async () => {
+      await withEnv(productionEnv, async () => {
+        getLatestWeatherMock.mockResolvedValue({
+          status: 'unavailable',
+          message: 'Weather provider is down',
+        })
+
+        await expect(service.getOrCreateRitual('user-1')).rejects.toThrow(
+          InternalServerErrorException
+        )
+      })
+    })
+
+    it('reuses a seeded snapshot when the provider is unavailable in a test environment', async () => {
+      // Preview and local environments have no provider budget; the ritual is
+      // still expected to render end to end there.
+      await withEnv({ TEST_ENV: 'local' }, async () => {
+        getLatestWeatherMock.mockResolvedValue({ status: 'unavailable' })
+        const weatherSnapshotFindFirst = vi.fn().mockResolvedValue(weatherSnapshot)
+        const prisma = {
+          ...prismaMock,
+          weatherSnapshot: { findFirst: weatherSnapshotFindFirst, create: vi.fn() },
+        } as unknown as PrismaClient
+
+        const result = await buildService({ prisma }).getOrCreateRitual('user-1')
+
+        expect(result.outfits).toHaveLength(3)
+        expect(weatherSnapshotFindFirst).toHaveBeenCalledWith({
+          where: { location_key: 'chicago-il' },
+          include: { segments: true },
+        })
+      })
+    })
+
+    it('seeds a snapshot when a test environment has none at all', async () => {
+      await withEnv({ TEST_ENV: 'preview' }, async () => {
+        getLatestWeatherMock.mockResolvedValue({ status: 'unavailable' })
+        const weatherSnapshotCreate = vi
+          .fn()
+          .mockImplementation(
+            ({
+              data,
+            }: {
+              data: { segments: { create: { forecast_at: Date }[] } } & Record<
+                string,
+                unknown
+              >
+            }) =>
+              Promise.resolve({
+                ...data,
+                alerts: [],
+                segments: data.segments.create,
+              })
+          )
+        const prisma = {
+          ...prismaMock,
+          weatherSnapshot: {
+            findFirst: vi.fn().mockResolvedValue(null),
+            create: weatherSnapshotCreate,
+          },
+        } as unknown as PrismaClient
+
+        const result = await buildService({ prisma }).getOrCreateRitual('user-1')
+
+        expect(result.outfits).toHaveLength(3)
+        const createArgs = weatherSnapshotCreate.mock.calls[0]?.[0] as {
+          data: { id: string; location: string; segments: { create: unknown[] } }
+        }
+        expect(createArgs.data.id).toBe('mock-wx-chicago-il')
+        expect(createArgs.data.location).toBe('Home')
+        expect(createArgs.data.segments.create).toHaveLength(48)
+      })
+    })
+  })
+
+  describe('cache freshness', () => {
+    const cacheKey = 'ritual:user-1:chicago-il:07/16/2026:en-US:any'
+    const cachedData = { weather: {}, outfits: [], badges: ['cached'] }
+
+    const seedCache = (redis: Redis, payload: unknown) => {
+      const store = (redis as unknown as { store: Record<string, string> }).store
+      store[cacheKey] = JSON.stringify(payload)
+    }
+
+    it('serves a matching cache entry without recomputing recommendations', async () => {
+      const redis = new Redis()
+      seedCache(redis, {
+        generatedAt: '2026-07-16T05:00:00.000Z',
+        weather: { fetchedAt: weatherSnapshot.fetched_at.toISOString() },
+        capsuleRevision: 0,
+        data: cachedData,
+      })
+
+      const result = await buildService({ redis }).getOrCreateRitual('user-1')
+
+      expect(result).toEqual(cachedData)
+      expect(outfitRecommendationFindFirst).not.toHaveBeenCalled()
+    })
+
+    it('ignores a cache entry written before the capsule revision moved', async () => {
+      // Serving it would show a capsule the user already edited or deleted.
+      const redis = new Redis()
+      seedCache(redis, {
+        generatedAt: '2026-07-16T05:00:00.000Z',
+        weather: { fetchedAt: weatherSnapshot.fetched_at.toISOString() },
+        capsuleRevision: 0,
+        data: cachedData,
+      })
+      const prisma = {
+        ...prismaMock,
+        userProfile: {
+          findUnique: vi.fn().mockResolvedValue({ capsule_revision: 3 }),
+        },
+      } as unknown as PrismaClient
+
+      const result = await buildService({ prisma, redis }).getOrCreateRitual('user-1')
+
+      expect(result.outfits).toHaveLength(3)
+      expect(outfitRecommendationCreate).toHaveBeenCalled()
+    })
+
+    it('recomputes when the cache entry cannot be parsed', async () => {
+      const redis = new Redis()
+      const store = (redis as unknown as { store: Record<string, string> }).store
+      store[cacheKey] = '{ not json'
+
+      const result = await buildService({ redis }).getOrCreateRitual('user-1')
+
+      expect(result.outfits).toHaveLength(3)
+    })
+
+    it('ignores a cache entry captured against an older weather fetch', async () => {
+      const redis = new Redis()
+      seedCache(redis, {
+        generatedAt: '2026-07-16T05:00:00.000Z',
+        weather: { fetchedAt: '2026-07-15T12:00:00.000Z' },
+        capsuleRevision: 0,
+        data: cachedData,
+      })
+
+      const result = await buildService({ redis }).getOrCreateRitual('user-1')
+
+      expect(result.outfits).toHaveLength(3)
+    })
+  })
+
+  describe('forecast segment fallbacks', () => {
+    it('falls back to the most recent day with full scenario coverage', async () => {
+      // Staging seeds routinely lag a day; a 500 here would block the whole app.
+      getLatestWeatherMock.mockResolvedValue({
+        status: 'fresh',
+        data: {
+          ...weatherSnapshot,
+          segments: segments.filter((segment) => segment.id.endsWith('-tomorrow')),
+        },
+      })
+
+      const result = await service.getOrCreateRitual('user-1')
+
+      expect(result.outfits).toHaveLength(3)
+      const createdSegmentIds = (
+        outfitRecommendationCreate.mock.calls as unknown as [
+          { data: { forecast_segment_id: string } },
+        ][]
+      ).map(([input]) => input.data.forecast_segment_id)
+      expect(createdSegmentIds).toEqual([
+        'seg-morning-tomorrow',
+        'seg-midday-tomorrow',
+        'seg-evening-tomorrow',
+      ])
+    })
+
+    it('fails when no day has morning, midday and evening coverage', async () => {
+      await withEnv(productionEnv, async () => {
+        getLatestWeatherMock.mockResolvedValue({
+          status: 'fresh',
+          data: { ...weatherSnapshot, segments: [segments[0]] },
+        })
+
+        await expect(service.getOrCreateRitual('user-1')).rejects.toThrow(
+          'Required daily scenario forecast segments'
+        )
+      })
+    })
+
+    it('self-heals a stale forecast window in a test environment', async () => {
+      await withEnv({ TEST_ENV: 'local' }, async () => {
+        getLatestWeatherMock.mockResolvedValue({
+          status: 'fresh',
+          data: { ...weatherSnapshot, segments: [segments[0]] },
+        })
+        const forecastSegmentUpsert = vi.fn().mockResolvedValue({})
+        const prisma = {
+          ...prismaMock,
+          forecastSegment: { upsert: forecastSegmentUpsert },
+          weatherSnapshot: {
+            findUniqueOrThrow: vi.fn().mockResolvedValue(weatherSnapshot),
+          },
+        } as unknown as PrismaClient
+
+        const result = await buildService({ prisma }).getOrCreateRitual('user-1')
+
+        expect(forecastSegmentUpsert).toHaveBeenCalledTimes(48)
+        expect(result.outfits).toHaveLength(3)
+      })
+    })
+  })
+
+  describe('garment selection', () => {
+    it('pairs a dress with shoes when the closet holds one', async () => {
+      garmentItemFindMany.mockResolvedValue([
+        buildGarment('dress-1', 'dress', 'warm'),
+        buildGarment('shoes-1', 'shoes', 'warm'),
+      ])
+
+      const result = await service.getOrCreateRitual('user-1')
+
+      const midday = result.outfits.find((outfit) => outfit.scenario === 'midday')
+      expect(midday?.garmentIds).toEqual(['dress-1', 'shoes-1'])
+    })
+
+    it('prefers an adjacent comfort range before falling back to any garment in the slot', async () => {
+      // Midday sits in the `warm` band; `mild` is the first configured neighbour
+      // and the untagged-for-this-band bottom must still fill its slot.
+      garmentItemFindMany.mockResolvedValue([
+        buildGarment('top-hot', 'top', 'hot'),
+        buildGarment('top-mild', 'top', 'mild'),
+        buildGarment('bottom-cold', 'bottom', 'cold'),
+        buildGarment('shoes-warm', 'shoes', 'warm'),
+      ])
+
+      const result = await service.getOrCreateRitual('user-1')
+
+      const midday = result.outfits.find((outfit) => outfit.scenario === 'midday')
+      expect(midday?.garmentIds).toEqual(['top-mild', 'bottom-cold', 'shoes-warm'])
+    })
+  })
+
+  describe('capsule recommendations', () => {
+    const capsuleGarments = [
+      buildGarment('top-1', 'top', 'warm'),
+      buildGarment('bottom-1', 'bottom', 'warm'),
+      buildGarment('shoes-1', 'shoes', 'warm'),
+    ]
+
+    const capsule = {
+      id: 'cap-1',
+      user_id: 'user-1',
+      name: 'Weekend',
+      occasions: ['casual'],
+      is_favorite: false,
+      updated_at: new Date('2026-07-15T00:00:00.000Z'),
+      garment_joins: capsuleGarments.slice(0, 2).map((garment, index) => ({
+        garment_id: garment.id,
+        garment_order: index,
+        garment,
+      })),
+    }
+
+    const buildPrismaWithCapsule = () =>
+      ({
+        ...prismaMock,
+        outfitCapsule: { findMany: vi.fn().mockResolvedValue([capsule]) },
+      }) as unknown as PrismaClient
+
+    beforeEach(() => {
+      garmentItemFindMany.mockResolvedValue(capsuleGarments)
+    })
+
+    it('recommends a saved capsule, auto-fills its gaps and reports it', async () => {
+      const capture = vi.fn()
+
+      const result = await buildService({
+        prisma: buildPrismaWithCapsule(),
+        analytics: { capture },
+      }).getOrCreateRitual('user-1')
+
+      const midday = result.outfits.find((outfit) => outfit.scenario === 'midday')
+      expect(midday?.capsuleId).toBe('cap-1')
+      expect(midday?.capsuleName).toBe('Weekend')
+      expect(midday?.autoFilledGarmentIds).toEqual(['shoes-1'])
+      expect(midday?.reasoningBadges).toContainEqual({
+        key: 'saved_capsule',
+        label: 'Saved capsule',
+        bullets: ['Selected from your saved capsule'],
+      })
+      expect(capture).toHaveBeenCalledWith({
+        distinctId: 'user-1',
+        event: 'wardrobe_capsule_recommended',
+        properties: {
+          capsule_id: 'cap-1',
+          scenario: 'midday',
+          completeness: 'partial',
+          auto_filled_garment_count: 1,
+          /*
+           * The ritual path recommends a capsule without an occasion filter.
+           * The analytics contract declares requested_occasion as
+           * nullable().optional(), so an absent value is emitted as undefined
+           * rather than an explicit null.
+           */
+          requested_occasion: undefined,
+        },
+      })
+    })
+
+    it('keeps the ritual when capsule telemetry fails', async () => {
+      // Analytics is a degraded dependency, never a blocker on the core ritual.
+      const capture = vi.fn().mockImplementation(() => {
+        throw new Error('posthog unreachable')
+      })
+
+      const result = await buildService({
+        prisma: buildPrismaWithCapsule(),
+        analytics: { capture },
+      }).getOrCreateRitual('user-1')
+
+      const midday = result.outfits.find((outfit) => outfit.scenario === 'midday')
+      expect(midday?.capsuleId).toBe('cap-1')
+    })
+
+    it('skips capsules that do not match the requested occasion', async () => {
+      const result = await buildService({
+        prisma: buildPrismaWithCapsule(),
+      }).getOrCreateRitual('user-1', undefined, undefined, undefined, 'work')
+
+      const midday = result.outfits.find((outfit) => outfit.scenario === 'midday')
+      expect(midday?.capsuleId).toBeNull()
+      expect(midday?.autoFilledGarmentIds).toEqual([])
+    })
+  })
+
+  describe('recommendation persistence races', () => {
+    const uniqueViolation = () =>
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'test',
+      })
+
+    it('adopts the recommendation a concurrent request already wrote', async () => {
+      // Two devices opening the ritual at once must converge on one row rather
+      // than surfacing a 500 or writing a duplicate recommendation.
+      const concurrent = {
+        id: 'rec-concurrent',
+        user_id: 'user-1',
+        scenario: 'morning',
+        garment_ids: ['default-top'],
+        reasoning_badges: [],
+        capsule_id: null,
+        capsule_revision: 0,
+        created_at: new Date('2026-07-16T05:00:00.000Z'),
+        updated_at: new Date('2026-07-16T05:00:00.000Z'),
+      }
+      let lookups = 0
+      /*
+       * The shared mock is declared as ReturnType<typeof vi.fn>, whose call
+       * signature returns void, but the Prisma findFirst it stands in for is
+       * async. Returning the promise is what the code under test awaits.
+       */
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
+      outfitRecommendationFindFirst.mockImplementation(() => {
+        lookups += 1
+        // Odd lookups are the pre-write read, even lookups the post-conflict re-read.
+        return Promise.resolve(lookups % 2 === 1 ? null : concurrent)
+      })
+      outfitRecommendationCreate.mockRejectedValue(uniqueViolation())
+
+      const result = await service.getOrCreateRitual('user-1')
+
+      expect(result.outfits).toHaveLength(3)
+      expect(result.outfits.every((outfit) => outfit.id === 'rec-concurrent')).toBe(true)
+    })
+
+    it('rethrows the conflict when the winning row cannot be read back', async () => {
+      outfitRecommendationFindFirst.mockResolvedValue(null)
+      outfitRecommendationCreate.mockRejectedValue(uniqueViolation())
+
+      await expect(service.getOrCreateRitual('user-1')).rejects.toThrow(
+        'Unique constraint failed'
+      )
+    })
+
+    it('rethrows a create failure that is not a conflict', async () => {
+      outfitRecommendationCreate.mockRejectedValue(new Error('connection reset'))
+
+      await expect(service.getOrCreateRitual('user-1')).rejects.toThrow(
+        'connection reset'
+      )
+    })
+
+    it('rethrows when refreshing a stale recommendation fails', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      outfitRecommendationFindFirst.mockResolvedValue({
+        id: 'rec-stale',
+        user_id: 'user-1',
+        scenario: 'morning',
+        garment_ids: [],
+        reasoning_badges: [],
+        capsule_id: null,
+        // A revision behind the profile marks the row stale and forces an update.
+        capsule_revision: 9,
+        created_at: new Date('2026-07-16T05:00:00.000Z'),
+        updated_at: new Date('2026-07-16T05:00:00.000Z'),
+      })
+      outfitRecommendationUpdate.mockRejectedValue(new Error('write conflict'))
+
+      await expect(service.getOrCreateRitual('user-1')).rejects.toThrow('write conflict')
+      expect(warn).toHaveBeenCalled()
+    })
+  })
+
+  describe('weather alert mapping', () => {
+    it('normalizes provider severities and timestamp shapes', async () => {
+      getLatestWeatherMock.mockResolvedValue({
+        status: 'fresh',
+        data: {
+          ...weatherSnapshot,
+          alerts: [
+            {
+              event: 'Ice storm',
+              description: 'Freezing rain expected',
+              start: new Date('2026-07-16T12:00:00.000Z'),
+              end: '2026-07-16T18:00:00.000Z',
+              severity: 'Extreme',
+            },
+            {
+              event: 'Fog',
+              description: 'Dense fog advisory',
+              start: '2026-07-16T12:00:00.000Z',
+              end: '2026-07-16T14:00:00.000Z',
+            },
+            {
+              event: 'Unknown',
+              description: 'Unrecognized severity',
+              start: '2026-07-16T12:00:00.000Z',
+              end: '2026-07-16T14:00:00.000Z',
+              severity: 'catastrophic',
+            },
+          ],
+        },
+      })
+
+      const result = await service.getOrCreateRitual('user-1')
+
+      expect(result.weather.alerts).toEqual([
+        {
+          event: 'Ice storm',
+          description: 'Freezing rain expected',
+          start: '2026-07-16T12:00:00.000Z',
+          end: '2026-07-16T18:00:00.000Z',
+          severity: 'high',
+        },
+        {
+          event: 'Fog',
+          description: 'Dense fog advisory',
+          start: '2026-07-16T12:00:00.000Z',
+          end: '2026-07-16T14:00:00.000Z',
+          severity: 'medium',
+        },
+        {
+          event: 'Unknown',
+          description: 'Unrecognized severity',
+          start: '2026-07-16T12:00:00.000Z',
+          end: '2026-07-16T14:00:00.000Z',
+          severity: 'medium',
+        },
+      ])
+    })
+
+    it('drops a non-array alerts payload', async () => {
+      getLatestWeatherMock.mockResolvedValue({
+        status: 'fresh',
+        data: { ...weatherSnapshot, alerts: null },
+      })
+
+      const result = await service.getOrCreateRitual('user-1')
+
+      expect(result.weather.alerts).toEqual([])
     })
   })
 })

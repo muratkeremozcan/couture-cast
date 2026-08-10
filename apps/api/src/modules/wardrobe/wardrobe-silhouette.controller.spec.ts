@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/unbound-method */
-import type { ExecutionContext } from '@nestjs/common'
+import { PayloadTooLargeException, type ExecutionContext } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import type { Request, Response } from 'express'
 import request from 'supertest'
@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { WardrobeUploadGuard } from './wardrobe.guard.js'
+import { MAX_SILHOUETTE_PHOTO_BYTES } from './wardrobe-silhouette-image-validation.js'
 import { WardrobeSilhouetteController } from './wardrobe-silhouette.controller.js'
 import { WardrobeSilhouetteService } from './wardrobe-silhouette.service.js'
 
@@ -273,6 +274,195 @@ describe('WardrobeSilhouetteController', () => {
     } finally {
       await app.close()
     }
+  })
+
+  /**
+   * A rejected payload must name the offending field. A bare "Bad Request" gives
+   * a client nothing to correct, and the contract publishes this message prefix.
+   */
+  it('4.4-UNIT-CTRL-05a PUT names the slider field that failed validation', async () => {
+    const service = createMockService()
+    const controller = new WardrobeSilhouetteController(service)
+    const res = createMockRes()
+
+    await expect(
+      controller.updateSliders(auth, '*', { heightSlider: 400, buildSlider: 50 }, res)
+    ).rejects.toThrow(/Invalid silhouette sliders: heightSlider/)
+    expect(service.updateSliders).not.toHaveBeenCalled()
+  })
+
+  /** A whole-body failure has no field path, so it is reported against the request. */
+  it('4.4-UNIT-CTRL-05b PUT reports a non-object body against the request itself', async () => {
+    const service = createMockService()
+    const controller = new WardrobeSilhouetteController(service)
+    const res = createMockRes()
+
+    await expect(
+      controller.updateSliders(auth, '*', 'not-an-object', res)
+    ).rejects.toThrow(/Invalid silhouette sliders: request/)
+  })
+
+  it('4.4-UNIT-CTRL-06a POST upload-url rejects a declaration outside the contract', async () => {
+    const service = createMockService()
+    const controller = new WardrobeSilhouetteController(service)
+    const res = createMockRes()
+
+    await expect(
+      controller.createMyFormUploadUrl(
+        auth,
+        '4b6b3b0a-1c8a-4a9e-8b8e-1a2b3c4d5e6f',
+        {
+          fileSizeBytes: 100,
+          mimeType: 'image/gif',
+          sha256: '0'.repeat(64),
+          widthPx: 300,
+          heightPx: 800,
+        },
+        res
+      )
+    ).rejects.toThrow(/Invalid upload declaration: mimeType/)
+    expect(service.createMyFormUploadUrl).not.toHaveBeenCalled()
+  })
+
+  it('4.4-UNIT-CTRL-08a POST commit rejects a payload outside the contract', async () => {
+    const service = createMockService()
+    const controller = new WardrobeSilhouetteController(service)
+    const res = createMockRes()
+
+    await expect(
+      controller.commitMyForm(
+        auth,
+        '4b6b3b0a-1c8a-4a9e-8b8e-1a2b3c4d5e6f',
+        { uploadSessionId: 'session-1', confirmsBasewearGuidance: false },
+        res
+      )
+    ).rejects.toThrow(/Invalid commit payload: confirmsBasewearGuidance/)
+    expect(service.commitMyForm).not.toHaveBeenCalled()
+  })
+
+  describe('4.4-UNIT-CTRL-07 PUT my-form bytes', () => {
+    it('forwards the declared length and body to the service', async () => {
+      const service = createMockService()
+      const controller = new WardrobeSilhouetteController(service)
+      const body = Buffer.from('silhouette-bytes')
+      const req = { body } as unknown as Request
+
+      await controller.uploadMyFormBytes(
+        auth,
+        'session-1',
+        'token',
+        'image/png',
+        String(body.length),
+        req
+      )
+
+      expect(service.uploadMyFormBytes).toHaveBeenCalledWith(
+        'session-1',
+        'token',
+        'user-1',
+        'teen',
+        'image/png',
+        body.length,
+        body
+      )
+    })
+
+    /**
+     * `req.body` is only a Buffer when the raw-body parser matched. Anything else
+     * must arrive as empty bytes so the declared-length check rejects it, rather
+     * than as a value the image verifier would choke on.
+     */
+    it('substitutes empty bytes when the raw body is not a Buffer', async () => {
+      const service = createMockService()
+      const controller = new WardrobeSilhouetteController(service)
+      const req = { body: { parsed: 'json' } } as unknown as Request
+
+      await controller.uploadMyFormBytes(
+        auth,
+        'session-1',
+        'token',
+        'image/jpeg',
+        '0',
+        req
+      )
+
+      const forwarded = (service.uploadMyFormBytes as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[6] as unknown
+      expect(Buffer.isBuffer(forwarded)).toBe(true)
+      expect(forwarded).toHaveLength(0)
+    })
+
+    it('forwards an absent content-length header as undefined', async () => {
+      const service = createMockService()
+      const controller = new WardrobeSilhouetteController(service)
+      const req = { body: Buffer.alloc(4) } as unknown as Request
+
+      await controller.uploadMyFormBytes(
+        auth,
+        'session-1',
+        'token',
+        'image/webp',
+        undefined,
+        req
+      )
+
+      expect(
+        (service.uploadMyFormBytes as ReturnType<typeof vi.fn>).mock.calls[0]?.[5]
+      ).toBeUndefined()
+    })
+
+    /**
+     * A non-numeric Content-Length parses to NaN. Forwarding NaN would make the
+     * service's declared-length comparison pass by accident.
+     */
+    it('drops an unparseable content-length rather than forwarding NaN', async () => {
+      const service = createMockService()
+      const controller = new WardrobeSilhouetteController(service)
+      const req = { body: Buffer.alloc(4) } as unknown as Request
+
+      await controller.uploadMyFormBytes(
+        auth,
+        'session-1',
+        'token',
+        'image/png',
+        'not-a-number',
+        req
+      )
+
+      expect(
+        (service.uploadMyFormBytes as ReturnType<typeof vi.fn>).mock.calls[0]?.[5]
+      ).toBeUndefined()
+    })
+
+    /** The ceiling is enforced before any bytes are read or stored. */
+    it('rejects a declared length above the photo ceiling', async () => {
+      const service = createMockService()
+      const controller = new WardrobeSilhouetteController(service)
+      const req = { body: Buffer.alloc(4) } as unknown as Request
+
+      await expect(
+        controller.uploadMyFormBytes(
+          auth,
+          'session-1',
+          'token',
+          'image/png',
+          String(MAX_SILHOUETTE_PHOTO_BYTES + 1),
+          req
+        )
+      ).rejects.toThrow(PayloadTooLargeException)
+      expect(service.uploadMyFormBytes).not.toHaveBeenCalled()
+    })
+
+    it('rejects an empty upload session path segment', async () => {
+      const service = createMockService()
+      const controller = new WardrobeSilhouetteController(service)
+      const req = { body: Buffer.alloc(4) } as unknown as Request
+
+      await expect(
+        controller.uploadMyFormBytes(auth, '', 'token', 'image/png', '4', req)
+      ).rejects.toThrow()
+      expect(service.uploadMyFormBytes).not.toHaveBeenCalled()
+    })
   })
 
   it('4.4-UNIT-CTRL-09 DELETE forwards If-Match and stamps a fresh ETag', async () => {

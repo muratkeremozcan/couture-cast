@@ -77,7 +77,7 @@ jobs:
           report-name: coverage-report-${{ github.event.pull_request.number || github.sha }}
           test-outcome: ${{ steps.tests.outcome }}
           workspace-dirs: ${{ steps.tests.outputs.coverage_dirs }}
-          diff-coverage-threshold: '50'
+          diff-coverage-threshold: '80'
           badge-gist-id: ${{ env.COVERAGE_GIST_ID }}
           badge-filename-prefix: couture-cast
           badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}

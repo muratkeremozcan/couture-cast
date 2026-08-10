@@ -97,7 +97,21 @@ function buildDefaultWardrobeItemFixture(): WardrobeItemFixture {
 function composeWardrobeItemFixture(
   overrides: WardrobeItemFactoryOverrides = {}
 ): WardrobeItemFixture {
-  return mergeWardrobeItemFixture(overrides)
+  const fixture = mergeWardrobeItemFixture(overrides)
+
+  /*
+   * The default objectPath is derived from the factory's own random id/userId,
+   * and overrides merge *after* the defaults are built. Passing an explicit
+   * userId or id therefore used to leave a storage path pointing at the random
+   * pair instead of the requested one. Supabase storage RLS keys on that
+   * prefix, so the fixture read as one user's garment while its object lived
+   * under another. Derive it after the merge, the way composeUserFixture does.
+   */
+  return {
+    ...fixture,
+    objectPath:
+      overrides.objectPath ?? buildGarmentObjectPath(fixture.userId, fixture.id, 'png'),
+  }
 }
 
 export function buildWardrobeItemCreateInput(

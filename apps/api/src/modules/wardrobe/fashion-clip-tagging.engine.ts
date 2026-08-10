@@ -87,7 +87,11 @@ export class FashionClipTaggingEngine implements GarmentTaggingEngine {
       const onRuntimeError = (error: Error) => {
         if (this.closing || this.worker !== worker) return
         this.initializationFailure = { error, failedAt: Date.now() }
-        void this.restartWorker(worker)
+        // A failed restart (a `terminate()` that rejects, say) must not become an
+        // unhandled rejection, which Node turns into a process exit by default.
+        // The cause is already recorded above and is rethrown by `ensureReady`,
+        // so the supervisor has nothing further to do with it here.
+        void this.restartWorker(worker).catch(() => undefined)
       }
       const onMessage = (msg: InferenceResponse) => {
         if (msg && msg.type === 'ready') {

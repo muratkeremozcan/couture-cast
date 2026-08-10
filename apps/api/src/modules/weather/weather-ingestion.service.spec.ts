@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WeatherProviderError } from './providers/weather-provider.error.js'
 import type {
@@ -412,5 +412,231 @@ describe('WeatherIngestionService', () => {
     expect(telemetryPayload).not.toContain('secret')
     expect(telemetryPayload).not.toContain('user-123')
     expect(telemetryPayload).not.toContain('raw payload')
+  })
+
+  describe('non-provider failure paths', () => {
+    it('reports an unexpected error kind when the failure is not a provider error', async () => {
+      // Persistence and alerting failures still have to be observable as failed
+      // ingestions, even though they carry no provider error kind.
+      const { service, repository, logger, meter } = createService({
+        primaryResults: [buildForecast('openweather')],
+      })
+      repository.persistForecast.mockRejectedValue(new Error('database unreachable'))
+
+      await expect(service.ingestTarget(target)).rejects.toThrow('database unreachable')
+      expect(meter.recordIngestion).toHaveBeenCalledWith('failed')
+      expect(logger.error).toHaveBeenCalledWith('weather_ingestion_failed', {
+        outcome: 'failed',
+        errorKind: 'unexpected_error',
+      })
+    })
+
+    it('persists the forecast even when alert processing throws a non-Error', async () => {
+      // Alert processing is downstream of the snapshot; it must never lose it.
+      const { service, alertProcessor, logger } = createService({
+        primaryResults: [buildForecast('openweather')],
+      })
+      alertProcessor.process.mockRejectedValue('alert engine offline')
+
+      await expect(service.ingestTarget(target)).resolves.toMatchObject({
+        outcome: 'persisted',
+      })
+      expect(logger.error).toHaveBeenCalledWith(
+        'Alert processing failed during weather ingestion',
+        expect.objectContaining({ error: 'alert engine offline' })
+      )
+    })
+
+    it('skips the snapshot-age metric when the fallback has no cached data', async () => {
+      const { service, queryService, meter } = createService({
+        primaryResults: [providerError('openweather', 'network')],
+        secondaryResults: [providerError('weatherapi', 'network')],
+      })
+      queryService.getLatestWeather.mockResolvedValue({
+        status: 'unavailable',
+        data: null,
+        message: 'No cached weather data is available.',
+      })
+
+      await expect(service.ingestTarget(target)).resolves.toMatchObject({
+        outcome: 'fallback',
+      })
+      expect(meter.recordFallbackOutcome).toHaveBeenCalledWith('unavailable')
+      expect(meter.recordSnapshotAge).not.toHaveBeenCalled()
+    })
+
+    it.each(['aborted', 'invalid_target'] as const)(
+      'rethrows a %s failure from the secondary provider instead of falling back',
+      async (kind) => {
+        // These two kinds mean retrying is pointless, so the caller must see them.
+        const { service, queryService } = createService({
+          primaryResults: [providerError('openweather', 'network')],
+          secondaryResults: [providerError('weatherapi', kind)],
+        })
+
+        await expect(service.ingestTarget(target)).rejects.toBeInstanceOf(
+          WeatherProviderError
+        )
+        expect(queryService.getLatestWeather).not.toHaveBeenCalled()
+      }
+    )
+  })
+
+  describe('error normalisation', () => {
+    it('treats a thrown non-Error from a provider as a network failure', async () => {
+      const { service, meter, primaryProvider } = createService({
+        primaryResults: [],
+        secondaryResults: [buildForecast('weatherapi')],
+      })
+      primaryProvider.fetchForecast.mockRejectedValue('provider exploded')
+
+      await expect(service.ingestTarget(target)).resolves.toMatchObject({
+        outcome: 'persisted',
+        provider: 'weatherapi',
+      })
+      expect(meter.recordProviderRequest).toHaveBeenCalledWith(
+        'openweather',
+        'network',
+        expect.any(Number),
+        undefined
+      )
+    })
+
+    it.each(['AbortError', 'AbortSignal'])(
+      'treats a thrown %s as an aborted ingestion',
+      async (errorName) => {
+        const abortError = Object.assign(new Error('aborted'), { name: errorName })
+        const { service, secondaryProvider } = createService({
+          primaryResults: [abortError],
+        })
+
+        await expect(service.ingestTarget(target)).rejects.toMatchObject({
+          kind: 'aborted',
+        })
+        // An abort must stop the failover chain rather than burn the backup quota.
+        expect(secondaryProvider.fetchForecast).not.toHaveBeenCalled()
+      }
+    )
+
+    it('treats any provider failure as aborted once the caller signal is aborted', async () => {
+      const controller = new AbortController()
+      const { service, secondaryProvider } = createService({
+        primaryResults: [new Error('socket hang up')],
+      })
+      controller.abort()
+
+      await expect(service.ingestTarget(target, controller.signal)).rejects.toMatchObject(
+        { kind: 'aborted' }
+      )
+      expect(secondaryProvider.fetchForecast).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('default collaborators', () => {
+    const createBareService = () => {
+      const primaryProvider = { fetchForecast: vi.fn() }
+      const secondaryProvider = { fetchForecast: vi.fn() }
+      const repository = {
+        persistForecast: vi.fn().mockResolvedValue({
+          id: 'persisted-weather',
+          fetched_at: new Date('2026-07-06T13:30:00.000Z'),
+        }),
+        recordProviderFailure: vi.fn().mockResolvedValue(undefined),
+        recordProviderSuccess: vi.fn().mockResolvedValue(undefined),
+      }
+      const queryService = {
+        getLatestWeather: vi.fn().mockResolvedValue({
+          status: 'unavailable',
+          data: null,
+          message: 'No cached weather data is available.',
+        }),
+      }
+
+      return {
+        primaryProvider,
+        secondaryProvider,
+        repository,
+        queryService,
+        service: new WeatherIngestionService(
+          primaryProvider,
+          secondaryProvider,
+          repository as never,
+          queryService as never
+        ),
+      }
+    }
+
+    beforeEach(() => {
+      vi.stubEnv('LOG_LEVEL', 'silent')
+    })
+
+    afterEach(() => {
+      vi.unstubAllEnvs()
+      vi.useRealTimers()
+    })
+
+    it('ingests successfully with only its required dependencies wired', async () => {
+      // Nest resolves the clock, sleeper, logger, and meter as optional; the
+      // service has to stand up without any of them.
+      const { primaryProvider, repository, service } = createBareService()
+      primaryProvider.fetchForecast.mockResolvedValue(buildForecast('openweather'))
+
+      await expect(service.ingestTarget(target)).resolves.toMatchObject({
+        outcome: 'persisted',
+        provider: 'openweather',
+      })
+      expect(repository.recordProviderSuccess).toHaveBeenCalledOnce()
+    })
+
+    it('waits out the real backoff delay between primary retries', async () => {
+      vi.useFakeTimers()
+      const { primaryProvider, secondaryProvider, service } = createBareService()
+      primaryProvider.fetchForecast.mockRejectedValue(
+        providerError('openweather', 'timeout')
+      )
+      secondaryProvider.fetchForecast.mockResolvedValue(buildForecast('weatherapi'))
+
+      const ingestion = service.ingestTarget(target)
+      // Two 5s/15s backoffs sit between the three primary attempts.
+      await vi.advanceTimersByTimeAsync(20_000)
+
+      await expect(ingestion).resolves.toMatchObject({ provider: 'weatherapi' })
+      expect(primaryProvider.fetchForecast).toHaveBeenCalledTimes(3)
+    })
+
+    it('does not start a backoff timer when the caller signal is already aborted', async () => {
+      vi.useFakeTimers()
+      const controller = new AbortController()
+      controller.abort()
+      const { primaryProvider, service } = createBareService()
+      primaryProvider.fetchForecast.mockRejectedValueOnce(
+        providerError('openweather', 'timeout')
+      )
+
+      const ingestion = service.ingestTarget(target, controller.signal)
+
+      await expect(ingestion).rejects.toBeInstanceOf(Error)
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it.each([
+      { name: 'an Error reason', reason: new Error('ingestion deadline exceeded') },
+      { name: 'a non-Error reason', reason: 'deadline' },
+    ])('aborts an in-flight backoff sleep with $name', async ({ reason }) => {
+      vi.useFakeTimers()
+      const controller = new AbortController()
+      const { primaryProvider, service } = createBareService()
+      primaryProvider.fetchForecast.mockRejectedValue(
+        providerError('openweather', 'timeout')
+      )
+
+      const ingestion = service.ingestTarget(target, controller.signal)
+      await vi.advanceTimersByTimeAsync(0)
+      controller.abort(reason)
+
+      // The sleep must reject immediately rather than holding the job for 5s.
+      await expect(ingestion).rejects.toBeInstanceOf(Error)
+      expect(primaryProvider.fetchForecast).toHaveBeenCalledTimes(1)
+    })
   })
 })

@@ -112,6 +112,19 @@ describe('accessibility utilities', () => {
       ).toBe('')
     })
 
+    it('falls back to en-US when the locale is blank', () => {
+      // Some callers pass a stored preference that has not been set yet; a
+      // blank locale must not reach Intl and throw.
+      expect(
+        formatWeatherAltText({
+          conditionLabel: 'Sunny',
+          temperature: 22,
+          unit: 'C',
+          locale: '   ',
+        })
+      ).toBe('Sunny and 22 degrees Celsius')
+    })
+
     it('uses a locale-aware fallback when Intl.ListFormat is unavailable', () => {
       const listFormat = Intl.ListFormat
       Object.defineProperty(Intl, 'ListFormat', {
@@ -159,6 +172,30 @@ describe('accessibility utilities', () => {
 
     it('does not repeat a descriptor that equals the title', () => {
       expect(formatGarmentAltText('Coat', ['coat', 'wool'])).toBe('Coat: wool')
+    })
+
+    it('joins two and three descriptors with the default English conjunction', () => {
+      // Hermes and other builds without full ICU ship no Intl.ListFormat, and
+      // an unmapped language falls through to "and".
+      const listFormat = Intl.ListFormat
+      Object.defineProperty(Intl, 'ListFormat', {
+        configurable: true,
+        value: undefined,
+      })
+
+      try {
+        expect(formatGarmentAltText('Wool coat', ['charcoal', 'lined'], 'en-US')).toBe(
+          'Wool coat: charcoal and lined'
+        )
+        expect(
+          formatGarmentAltText('Wool coat', ['charcoal', 'lined', 'knee length'], 'en-US')
+        ).toBe('Wool coat: charcoal, lined, and knee length')
+      } finally {
+        Object.defineProperty(Intl, 'ListFormat', {
+          configurable: true,
+          value: listFormat,
+        })
+      }
     })
   })
 

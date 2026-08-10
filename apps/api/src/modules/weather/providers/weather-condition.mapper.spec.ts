@@ -44,4 +44,37 @@ describe('weather condition mapping', () => {
   ] as const)('maps WeatherAPI alert severity %s to %s', (severity, expected) => {
     expect(mapWeatherApiAlertSeverity(severity)).toBe(expected)
   })
+
+  it.each([
+    [771, 'wind'],
+    [781, 'wind'],
+    [321, 'drizzle'],
+    [701, 'fog'],
+    [762, 'fog'],
+    // 771/781 are handled as wind above, so the 7xx group falls through here.
+    [799, 'unknown'],
+    [802, 'cloudy'],
+    [805, 'unknown'],
+    [900, 'unknown'],
+    [100, 'unknown'],
+  ] as const)('maps unusual OpenWeather code %i to %s', (code, expected) => {
+    expect(mapOpenWeatherCondition(code)).toBe(expected)
+  })
+
+  it.each([
+    [1153, 'drizzle'],
+    [1063, 'rain'],
+    [9999, 'unknown'],
+  ] as const)('maps unusual WeatherAPI code %i to %s', (code, expected) => {
+    expect(mapWeatherApiCondition(code)).toBe(expected)
+  })
+
+  it('returns undefined when a WeatherAPI alert carries no severity', () => {
+    // An absent severity must stay absent rather than defaulting to a level.
+    expect(mapWeatherApiAlertSeverity(undefined)).toBeUndefined()
+  })
+
+  it('normalises whitespace and casing around a severity label', () => {
+    expect(mapWeatherApiAlertSeverity('  SEVERE  ')).toBe('high')
+  })
 })

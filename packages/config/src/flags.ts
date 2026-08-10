@@ -194,13 +194,22 @@ export async function getFeatureFlag(
     // reimplement fallback logic.
   }
 
-  const fallbackValue = adapters?.readFallbackFlag
-    ? await adapters.readFallbackFlag(normalizedFlagKey)
-    : null
-  const coercedFallbackValue =
-    fallbackValue === null
-      ? undefined
-      : coerceFeatureFlagValue(normalizedFlagKey, fallbackValue)
+  let coercedFallbackValue: FeatureFlagStoredValue | undefined
+  try {
+    const fallbackValue = adapters?.readFallbackFlag
+      ? await adapters.readFallbackFlag(normalizedFlagKey)
+      : null
+    coercedFallbackValue =
+      fallbackValue === null
+        ? undefined
+        : coerceFeatureFlagValue(normalizedFlagKey, fallbackValue)
+  } catch {
+    // The cache is the second line of defence, not a hard dependency. This read
+    // sat outside any try/catch, so a database blip rejected out of
+    // getFeatureFlag entirely and took the code default down with it — the
+    // opposite of the degradation promised above and required of flag reads.
+    coercedFallbackValue = undefined
+  }
 
   // Flow ref S0.7/T8/3: database cache first, code defaults last. This order
   // preserves the last known rollout instead of snapping back to hardcoded

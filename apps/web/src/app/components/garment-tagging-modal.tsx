@@ -214,6 +214,11 @@ export function GarmentTaggingModal({
     saveRequestIdRef.current += 1
     saveAbortRef.current?.abort()
     saveAbortRef.current = null
+    // Bumping the request id makes `handleSave`'s `finally` skip its own
+    // `setIsSaving(false)`, so the abandoned request would otherwise leave this
+    // permanently mounted dialog stuck on a disabled "Saving..." button for
+    // every garment the user opens afterwards.
+    setIsSaving(false)
   }, [isOpen])
 
   const moveSelection = <T extends string>(

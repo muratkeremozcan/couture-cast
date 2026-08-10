@@ -119,6 +119,17 @@ describe('parseSilhouetteIfMatchHeader / formatSilhouetteETag', () => {
       )
     ).toBe(2)
   })
+
+  /**
+   * `Number()` returns 1e21 for a 21-digit revision. Accepting it would compare
+   * the stored revision against a value no row can hold, so the precondition has
+   * to fail loudly instead of silently never matching.
+   */
+  it('4.4-UNIT-07 rejects a revision beyond the safe integer range', () => {
+    expect(() =>
+      parseSilhouetteIfMatchHeader('"silhouette:user-1:999999999999999999999"', USER_ID)
+    ).toThrow(PreconditionFailedException)
+  })
 })
 
 describe('WardrobeSilhouetteService', () => {
@@ -814,6 +825,27 @@ describe('WardrobeSilhouetteService', () => {
       })
     })
 
+    /**
+     * The release is itself best-effort. If the compensating write also fails the
+     * caller must still see the enqueue failure that actually broke the commit,
+     * not a second error about the cleanup.
+     */
+    it('4.4-UNIT-12 surfaces the enqueue failure even when the release write fails too', async () => {
+      findUnique.mockResolvedValueOnce(
+        profileRow({
+          my_form_upload_session_id: SESSION_ID,
+          my_form_status: 'bytes_uploaded',
+        })
+      )
+      updateMany.mockResolvedValueOnce({ count: 1 })
+      enqueue.mockRejectedValueOnce(new Error('redis unavailable'))
+      updateMany.mockRejectedValueOnce(new Error('database unavailable'))
+
+      await expect(
+        service.commitMyForm(USER_ID, 'guardian', input, 'key-1')
+      ).rejects.toThrow('redis unavailable')
+    })
+
     it('4.4-UNIT-12 reports a lost commit race as a conflict', async () => {
       findUnique.mockResolvedValueOnce(
         profileRow({
@@ -877,6 +909,185 @@ describe('WardrobeSilhouetteService', () => {
           }),
         })
       )
+    })
+
+    /** Nothing was ever stored, so there is no object to hard-delete. */
+    it('4.4-UNIT-13 skips storage removal when the profile has no stored object', async () => {
+      findUnique.mockResolvedValueOnce(profileRow({ revision: 3 }))
+      update.mockResolvedValueOnce(profileRow({ revision: 4 }))
+
+      await service.deleteMyForm(USER_ID, formatSilhouetteETag(USER_ID, 3))
+
+      expect(remove).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('object path derivation', () => {
+    /**
+     * The extension is derived from the declared MIME type and the resulting path
+     * is what every later signed read resolves against. A wrong suffix makes the
+     * object unreadable by anything that trusts it.
+     */
+    it.each([
+      ['image/jpeg', 'jpg'],
+      ['image/png', 'png'],
+      ['image/webp', 'webp'],
+    ] as const)('4.4-UNIT-10 allocates %s under a .%s path', async (mimeType, ext) => {
+      findUnique.mockResolvedValueOnce(null)
+      create.mockImplementationOnce(({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve(profileRow({ ...data, my_form_status: 'pending_upload' }))
+      )
+
+      await service.createMyFormUploadUrl(
+        USER_ID,
+        'guardian',
+        {
+          fileSizeBytes: 1024,
+          mimeType,
+          sha256: '0'.repeat(64),
+          widthPx: 300,
+          heightPx: 800,
+        },
+        'a3f7c2d1-5b9e-4a86-9c31-2e7d4b8f6a05'
+      )
+
+      const [{ data }] = create.mock.calls[0] as [
+        { data: { my_form_object_path: string } },
+      ]
+      expect(data.my_form_object_path.endsWith(`.${ext}`)).toBe(true)
+    })
+
+    /**
+     * A pending row with no session id cannot produce a signable upload URL.
+     * Reporting it as expired stops the service emitting an `undefined` path.
+     */
+    it('4.4-UNIT-10 reports a replay with no session id as an expired session', async () => {
+      findUnique.mockResolvedValueOnce(
+        profileRow({
+          my_form_status: 'pending_upload',
+          my_form_upload_idempotency_key: 'a3f7c2d1-5b9e-4a86-9c31-2e7d4b8f6a05',
+          my_form_upload_session_id: null,
+          my_form_mime_type: 'image/png',
+          my_form_upload_expires_at: new Date(Date.now() + 60_000),
+        })
+      )
+
+      await expect(
+        service.createMyFormUploadUrl(
+          USER_ID,
+          'guardian',
+          {
+            fileSizeBytes: 1024,
+            mimeType: 'image/png',
+            sha256: '0'.repeat(64),
+            widthPx: 300,
+            heightPx: 800,
+          },
+          'a3f7c2d1-5b9e-4a86-9c31-2e7d4b8f6a05'
+        )
+      ).rejects.toThrow('UPLOAD_SESSION_EXPIRED')
+    })
+  })
+
+  describe('photo validation failures map to the right status', () => {
+    async function tokenFor(profile: SilhouetteProfile): Promise<string> {
+      const { generateUploadToken, requireUploadTokenSecret } = await import(
+        './wardrobe-upload-token.js'
+      )
+      return generateUploadToken(
+        SESSION_ID,
+        USER_ID,
+        (profile.my_form_upload_expires_at as Date).toISOString(),
+        requireUploadTokenSecret()
+      )
+    }
+
+    function pending(bytes: Buffer, overrides: Record<string, unknown> = {}) {
+      return profileRow({
+        my_form_status: 'pending_upload',
+        my_form_object_path: OBJECT_PATH,
+        my_form_upload_session_id: SESSION_ID,
+        my_form_upload_expires_at: new Date(Date.now() + 60_000),
+        my_form_file_size_bytes: bytes.length,
+        my_form_mime_type: 'image/png',
+        my_form_content_sha256: createHash('sha256').update(bytes).digest('hex'),
+        my_form_width_px: 300,
+        my_form_height_px: 800,
+        ...overrides,
+      })
+    }
+
+    it('4.4-UNIT-11 maps a checksum mismatch to 422', async () => {
+      const bytes = await portraitPng()
+      const profile = pending(bytes, { my_form_content_sha256: 'f'.repeat(64) })
+      findUnique.mockResolvedValueOnce(profile)
+
+      await expect(
+        service.uploadMyFormBytes(
+          SESSION_ID,
+          await tokenFor(profile),
+          USER_ID,
+          'guardian',
+          'image/png',
+          bytes.length,
+          bytes
+        )
+      ).rejects.toThrow('IMAGE_CHECKSUM_MISMATCH')
+      expect(upload).not.toHaveBeenCalled()
+    })
+
+    /** Any other validation failure degrades to a generic decode failure. */
+    it('4.4-UNIT-11 maps a size disagreement with the allocation to a decode failure', async () => {
+      const bytes = await portraitPng()
+      const profile = pending(bytes, { my_form_file_size_bytes: bytes.length + 1 })
+      findUnique.mockResolvedValueOnce(profile)
+
+      await expect(
+        service.uploadMyFormBytes(
+          SESSION_ID,
+          await tokenFor(profile),
+          USER_ID,
+          'guardian',
+          'image/png',
+          bytes.length,
+          bytes
+        )
+      ).rejects.toThrow('IMAGE_DECODE_FAILED')
+    })
+
+    it('4.4-UNIT-11 refuses a profile row with an incomplete upload declaration', async () => {
+      const bytes = await portraitPng()
+      const profile = pending(bytes, { my_form_content_sha256: null })
+      findUnique.mockResolvedValueOnce(profile)
+
+      await expect(
+        service.uploadMyFormBytes(
+          SESSION_ID,
+          await tokenFor(profile),
+          USER_ID,
+          'guardian',
+          'image/png',
+          bytes.length,
+          bytes
+        )
+      ).rejects.toThrow('INVALID_UPLOAD_DECLARATION')
+    })
+  })
+
+  /**
+   * A photo that reached the bytes-uploaded state has no commit timestamp yet.
+   * The response must report that as null rather than fail its own contract.
+   */
+  it('4.4-UNIT-08 reports an uncommitted My Form photo with a null committedAt', async () => {
+    findUnique.mockResolvedValueOnce(
+      profileRow({ my_form_status: 'bytes_uploaded', my_form_object_path: OBJECT_PATH })
+    )
+
+    const { response } = await service.getProfile(USER_ID)
+
+    expect(response.data.myForm).toMatchObject({
+      status: 'bytes_uploaded',
+      committedAt: null,
     })
   })
 })

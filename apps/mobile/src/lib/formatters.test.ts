@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { formatTemperature, formatCurrency, formatMeasurement } from './formatters'
 
 describe('Localization Formatters', () => {
@@ -75,6 +75,36 @@ describe('Localization Formatters', () => {
           currency: 'TRY',
         }).format(100)
       )
+    })
+
+    it('should format CAD for fr-CA', () => {
+      const result = formatCurrency(100, 'fr-CA')
+      expect(result).toBe(
+        new Intl.NumberFormat('fr-CA', {
+          style: 'currency',
+          currency: 'CAD',
+        }).format(100)
+      )
+    })
+
+    /** LatAm Spanish has no single currency, so the catalogue price stays USD. */
+    it('should fall back to USD for the es-419 regional locale', () => {
+      const result = formatCurrency(100, 'es-419')
+      expect(result).toBe(
+        new Intl.NumberFormat('es-419', {
+          style: 'currency',
+          currency: 'USD',
+        }).format(100)
+      )
+    })
+
+    /** Hermes builds without full ICU throw here; a price must still render. */
+    it('should fall back to a plain amount when Intl cannot format', () => {
+      vi.spyOn(Intl, 'NumberFormat').mockImplementation(() => {
+        throw new RangeError('Incorrect locale information provided')
+      })
+
+      expect(formatCurrency(100, 'de-DE')).toBe('100 EUR')
     })
   })
 

@@ -126,3 +126,145 @@ describe('SignupForm', () => {
     )
   })
 })
+
+describe('SignupForm validation and failure paths', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-04-16T12:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('rejects a submit with no usable birthdate', async () => {
+    const submitSignup = vi.fn()
+    render(<SignupForm submitSignup={submitSignup} />)
+
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'someone@example.com' },
+    })
+    fireEvent.submit(screen.getByRole('button', { name: 'Create account' }))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('signup-error-message')).toBeInTheDocument()
+    )
+    // Age gating is a legal requirement, so an unparseable birthdate must never
+    // reach the signup endpoint.
+    expect(submitSignup).not.toHaveBeenCalled()
+  })
+
+  it('blocks an under-13 signup at submit, not only inline', async () => {
+    const submitSignup = vi.fn()
+    render(<SignupForm submitSignup={submitSignup} />)
+
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'kid@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText('Birthdate'), {
+      target: { value: '2016-04-16' },
+    })
+    fireEvent.submit(screen.getByRole('button', { name: 'Create account' }))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('signup-error-message')).toHaveTextContent(
+        'You must be 13 or older'
+      )
+    )
+    expect(submitSignup).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['an Error', new Error('Email already registered'), 'Email already registered'],
+    ['a non-Error', 'socket hang up', 'Signup failed'],
+  ])('surfaces a signup rejection that is %s', async (_label, reason, expected) => {
+    const submitSignup = vi.fn().mockRejectedValue(reason)
+    render(<SignupForm submitSignup={submitSignup} />)
+
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'adult@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText('Birthdate'), {
+      target: { value: '2000-04-15' },
+    })
+    fireEvent.submit(screen.getByRole('button', { name: 'Create account' }))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('signup-error-message')).toHaveTextContent(expected)
+    )
+    // The button must come back so the user can correct and retry.
+    expect(screen.getByRole('button', { name: 'Create account' })).toBeEnabled()
+  })
+})
+
+type InviteGuardianFn = NonNullable<Parameters<typeof SignupForm>[0]['inviteGuardian']>
+
+describe('SignupForm guardian invitation failures', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-04-16T12:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  async function renderTeenSignupWithGuardianStep(inviteGuardian: InviteGuardianFn) {
+    const submitSignup = vi.fn().mockResolvedValue({
+      userId: 'teen-1',
+      age: 14,
+      accountStatus: 'pending_guardian_consent',
+      guardianConsentRequired: true,
+    })
+    render(<SignupForm submitSignup={submitSignup} inviteGuardian={inviteGuardian} />)
+
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'teen@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText('Birthdate'), {
+      target: { value: '2011-04-15' },
+    })
+    fireEvent.submit(screen.getByRole('button', { name: 'Create account' }))
+    await screen.findByText('Guardian invitation')
+  }
+
+  it('rejects a malformed guardian email before sending anything', async () => {
+    const inviteGuardian = vi.fn<InviteGuardianFn>()
+    await renderTeenSignupWithGuardianStep(inviteGuardian)
+
+    fireEvent.change(screen.getByLabelText('Guardian email'), {
+      target: { value: 'not-an-email' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Send guardian invite' }))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('signup-error-message')).toHaveTextContent(
+        'Enter a valid guardian email address.'
+      )
+    )
+    // An invitation link is a credential; it must not be minted for a typo.
+    expect(inviteGuardian).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('guardian-invite-link')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['an Error', new Error('Guardian already invited'), 'Guardian already invited'],
+    ['a non-Error', 'socket hang up', 'Guardian invitation failed'],
+  ])(
+    'surfaces a guardian invitation rejection that is %s',
+    async (_l, reason, expected) => {
+      const inviteGuardian = vi.fn<InviteGuardianFn>().mockRejectedValue(reason)
+      await renderTeenSignupWithGuardianStep(inviteGuardian)
+
+      fireEvent.change(screen.getByLabelText('Guardian email'), {
+        target: { value: 'guardian@example.com' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Send guardian invite' }))
+
+      await waitFor(() =>
+        expect(screen.getByTestId('signup-error-message')).toHaveTextContent(expected)
+      )
+      expect(screen.queryByTestId('guardian-invite-link')).not.toBeInTheDocument()
+    }
+  )
+})

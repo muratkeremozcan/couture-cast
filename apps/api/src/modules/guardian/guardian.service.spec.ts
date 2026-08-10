@@ -1,3 +1,6 @@
+import { createHmac } from 'node:crypto'
+import { ForbiddenException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -8,7 +11,7 @@ import {
 import type { AnalyticsClient } from '../../analytics/analytics.service'
 import type { GuardianConsentStateService } from '../auth/guardian-consent-state.service'
 import type { UserSessionService } from '../auth/user-session.service'
-import { GuardianService } from './guardian.service'
+import { buildGuardianInvitationEmailTemplate, GuardianService } from './guardian.service'
 
 type StoredUser = {
   id: string
@@ -526,6 +529,143 @@ const createService = (prisma = new InMemoryGuardianPrisma()) => {
   }
 }
 
+const INVITE_SECRET = 'test-guardian-secret'
+const DEVELOPMENT_INVITATION_SECRET = 'guardian-invite-development-secret'
+
+const pendingCompliancePreferences = () => ({
+  compliance: {
+    accountStatus: 'pending_guardian_consent',
+    guardianConsentRequired: true,
+  },
+})
+
+const activeCompliancePreferences = () => ({
+  compliance: {
+    accountStatus: 'active',
+    guardianConsentRequired: false,
+  },
+})
+
+type SeedUserOptions = {
+  id: string
+  email: string
+  preferences?: Record<string, unknown> | null
+  birthdate?: Date | null
+  withProfile?: boolean
+}
+
+const seedUser = (prisma: InMemoryGuardianPrisma, options: SeedUserOptions) => {
+  prisma.users.set(options.id, {
+    id: options.id,
+    email: options.email,
+    profile:
+      options.withProfile === false
+        ? null
+        : {
+            user_id: options.id,
+            birthdate: options.birthdate ?? null,
+            preferences:
+              options.preferences === undefined
+                ? pendingCompliancePreferences()
+                : options.preferences,
+          },
+  })
+
+  return options.id
+}
+
+type SeedInvitationOptions = {
+  id?: string
+  teenId: string
+  guardianEmail: string
+  consentLevel?: 'read_only' | 'full_access'
+  expiresAt?: Date
+  acceptedAt?: Date | null
+}
+
+const seedInvitation = (
+  prisma: InMemoryGuardianPrisma,
+  options: SeedInvitationOptions
+) => {
+  const id = options.id ?? 'invitation-seeded'
+  prisma.invitations.set(id, {
+    id,
+    teen_id: options.teenId,
+    guardian_email: options.guardianEmail,
+    consent_level: options.consentLevel ?? 'read_only',
+    expires_at: options.expiresAt ?? new Date(Date.now() + 60_000),
+    accepted_at: options.acceptedAt ?? null,
+    accepted_guardian_id: null,
+    created_at: new Date(),
+    updated_at: new Date(),
+  })
+
+  return id
+}
+
+/** Signs an arbitrary token body so malformed/forged tokens can be exercised. */
+const signTokenBody = (rawBody: string, secret = INVITE_SECRET) => {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString(
+    'base64url'
+  )
+  const body = Buffer.from(rawBody).toString('base64url')
+  const signature = createHmac('sha256', secret)
+    .update(`${header}.${body}`)
+    .digest('base64url')
+
+  return `${header}.${body}.${signature}`
+}
+
+const signInvitationToken = (payload: Record<string, unknown>, secret = INVITE_SECRET) =>
+  signTokenBody(JSON.stringify(payload), secret)
+
+const buildInvitationTokenPayload = (overrides: Record<string, unknown> = {}) => ({
+  sub: 'invitation-seeded',
+  teenId: 'teen-seeded',
+  guardianEmail: 'guardian.seeded@example.com',
+  consentLevel: 'read_only',
+  type: 'guardian_invitation',
+  iat: Math.floor(Date.now() / 1000),
+  exp: Math.floor((Date.now() + 60_000) / 1000),
+  ...overrides,
+})
+
+const seedRevocableConsent = (
+  prisma: InMemoryGuardianPrisma,
+  teenPreferences?: Record<string, unknown> | null
+) => {
+  const teenId = seedUser(prisma, {
+    id: 'teen-revocable',
+    email: 'teen.revocable@example.com',
+    preferences:
+      teenPreferences === undefined ? activeCompliancePreferences() : teenPreferences,
+  })
+  const guardianId = seedUser(prisma, {
+    id: 'guardian-revocable',
+    email: 'guardian.revocable@example.com',
+    withProfile: false,
+  })
+  prisma.consents.set(`${guardianId}:${teenId}`, {
+    guardian_id: guardianId,
+    teen_id: teenId,
+    consent_level: 'read_only',
+    consent_granted_at: new Date('2026-04-01T00:00:00.000Z'),
+    revoked_at: null,
+    ip_address: '198.51.100.7',
+    revoked_ip_address: null,
+    status: 'granted',
+  })
+
+  return { teenId, guardianId }
+}
+
+const buildPrismaKnownRequestError = (code: string, meta?: Record<string, unknown>) =>
+  new Prisma.PrismaClientKnownRequestError('prisma failure', {
+    code,
+    clientVersion: 'test',
+    meta,
+  })
+
 describe('GuardianService', () => {
   beforeEach(() => {
     process.env.GUARDIAN_INVITE_JWT_SECRET = 'test-guardian-secret'
@@ -536,6 +676,7 @@ describe('GuardianService', () => {
     delete process.env.GUARDIAN_INVITE_JWT_SECRET
     delete process.env.GUARDIAN_INVITE_WEB_BASE_URL
     delete process.env.GUARDIAN_EMANCIPATION_REVOKE_CONSENTS
+    vi.unstubAllEnvs()
     vi.useRealTimers()
     resetCleanupRegistry()
   })
@@ -1303,6 +1444,963 @@ describe('GuardianService', () => {
         revoked_guardian_access: false,
         revoked_guardian_count: 0,
       },
+    })
+  })
+
+  describe('guardian invitation email template', () => {
+    it('escapes HTML metacharacters so account emails cannot inject markup', () => {
+      // The invitation email is sent to an address the teen supplies, so every
+      // interpolated value is attacker-influenced and must be escaped.
+      const template = buildGuardianInvitationEmailTemplate({
+        teenEmail: '"><script>alert(1)</script>&teen@example.com',
+        guardianEmail: `o${String.fromCharCode(39)}brien@example.com`,
+        consentLevel: 'full_access',
+        invitationLink: 'https://app.test/guardian/accept?token=a&b=c',
+        expiresAt: new Date('2026-05-01T00:00:00.000Z'),
+      })
+
+      expect(template.html).not.toContain('<script>')
+      expect(template.html).toContain('&lt;script&gt;')
+      expect(template.html).toContain('&quot;')
+      expect(template.html).toContain('&#39;')
+      expect(template.html).toContain('token=a&amp;b=c')
+      expect(template.html).toContain('full access')
+      // The text part is never rendered as HTML, so it stays verbatim.
+      expect(template.text).toContain('<script>')
+      expect(template.text).toContain('https://app.test/guardian/accept?token=a&b=c')
+    })
+  })
+
+  describe('invitation link base URL resolution', () => {
+    const inviteAndReadLink = async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, { id: 'teen-base-url', email: 'teen.baseurl@example.com' })
+
+      const result = await service.inviteGuardian(
+        'teen-base-url',
+        'guardian.baseurl@example.com',
+        'read_only'
+      )
+
+      return result.invitationLink
+    }
+
+    it('falls back to NEXT_PUBLIC_APP_URL when the guardian base URL is unset', async () => {
+      vi.stubEnv('GUARDIAN_INVITE_WEB_BASE_URL', undefined)
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://next.couturecast.test')
+      vi.stubEnv('APP_URL', 'https://ignored.couturecast.test')
+
+      await expect(inviteAndReadLink()).resolves.toContain(
+        'https://next.couturecast.test/guardian/accept?token='
+      )
+    })
+
+    it('falls back to APP_URL when no web-specific base URL is configured', async () => {
+      vi.stubEnv('GUARDIAN_INVITE_WEB_BASE_URL', undefined)
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', undefined)
+      vi.stubEnv('APP_URL', 'https://app-url.couturecast.test/')
+
+      // Trailing slashes are normalised away so the link never doubles up.
+      await expect(inviteAndReadLink()).resolves.toContain(
+        'https://app-url.couturecast.test/guardian/accept?token='
+      )
+    })
+
+    it('falls back to localhost when nothing is configured', async () => {
+      vi.stubEnv('GUARDIAN_INVITE_WEB_BASE_URL', undefined)
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', undefined)
+      vi.stubEnv('APP_URL', undefined)
+
+      await expect(inviteAndReadLink()).resolves.toContain(
+        'http://localhost:3000/guardian/accept?token='
+      )
+    })
+  })
+
+  describe('invitation signing secret resolution', () => {
+    const issueTokenAndReadSignature = async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, { id: 'teen-secret', email: 'teen.secret@example.com' })
+
+      const result = await service.inviteGuardian(
+        'teen-secret',
+        'guardian.secret@example.com',
+        'read_only'
+      )
+      const token = new URL(result.invitationLink).searchParams.get('token') ?? ''
+      const [header, body, signature] = token.split('.')
+
+      return { header, body, signature }
+    }
+
+    const expectSignedWith = (
+      parts: { header?: string; body?: string; signature?: string },
+      secret: string
+    ) => {
+      const expected = createHmac('sha256', secret)
+        .update(`${parts.header}.${parts.body}`)
+        .digest('base64url')
+      expect(parts.signature).toBe(expected)
+    }
+
+    it('falls back to the development secret inside the test environment', async () => {
+      vi.stubEnv('GUARDIAN_INVITE_JWT_SECRET', undefined)
+
+      expectSignedWith(await issueTokenAndReadSignature(), DEVELOPMENT_INVITATION_SECRET)
+    })
+
+    it('treats a whitespace-only configured secret as unset', async () => {
+      // A blank env var must not be accepted as a signing key.
+      vi.stubEnv('GUARDIAN_INVITE_JWT_SECRET', '   ')
+
+      expectSignedWith(await issueTokenAndReadSignature(), DEVELOPMENT_INVITATION_SECRET)
+    })
+
+    it('allows the development secret outside tests only behind an explicit opt-in', async () => {
+      vi.stubEnv('GUARDIAN_INVITE_JWT_SECRET', undefined)
+      vi.stubEnv('NODE_ENV', 'development')
+      vi.stubEnv('ALLOW_DEV_GUARDIAN_SECRET', 'true')
+
+      expectSignedWith(await issueTokenAndReadSignature(), DEVELOPMENT_INVITATION_SECRET)
+    })
+
+    it('refuses to sign invitations when no secret is configured in production', async () => {
+      // Failing closed here is what stops production issuing forgeable tokens.
+      vi.stubEnv('GUARDIAN_INVITE_JWT_SECRET', undefined)
+      vi.stubEnv('NODE_ENV', 'production')
+      vi.stubEnv('ALLOW_DEV_GUARDIAN_SECRET', undefined)
+
+      const { prisma, service } = createService()
+      seedUser(prisma, { id: 'teen-no-secret', email: 'teen.nosecret@example.com' })
+
+      await expect(
+        service.inviteGuardian('teen-no-secret', 'guardian.nosecret@example.com')
+      ).rejects.toThrow(/GUARDIAN_INVITE_JWT_SECRET is required/)
+      // No invitation row may be created when the token cannot be signed.
+      expect(prisma.invitations.size).toBe(0)
+    })
+  })
+
+  describe('inviteGuardian refusals', () => {
+    it('rejects invitations for an unknown teen account', async () => {
+      const { prisma, service } = createService()
+
+      await expect(
+        service.inviteGuardian('teen-missing', 'guardian.missing@example.com')
+      ).rejects.toThrow(/Teen account not found/)
+      expect(prisma.invitations.size).toBe(0)
+    })
+
+    it('rejects a guardian email that matches the teen account email', async () => {
+      // Self-consent would let a minor approve their own wardrobe access.
+      const { prisma, service } = createService()
+      seedUser(prisma, { id: 'teen-self', email: 'teen.self@example.com' })
+
+      await expect(
+        service.inviteGuardian('teen-self', 'Teen.Self@Example.com')
+      ).rejects.toThrow(/must differ from the teen account email/)
+      expect(prisma.invitations.size).toBe(0)
+    })
+
+    it('rejects invitations when the profile carries no compliance block at all', async () => {
+      // Missing compliance state must fail closed rather than read as "active".
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-no-prefs',
+        email: 'teen.noprefs@example.com',
+        preferences: null,
+      })
+
+      await expect(
+        service.inviteGuardian('teen-no-prefs', 'guardian.noprefs@example.com')
+      ).rejects.toThrow(/awaiting consent/)
+    })
+
+    it('rejects invitations when compliance state is not an object', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-bad-prefs',
+        email: 'teen.badprefs@example.com',
+        preferences: { compliance: 'pending_guardian_consent' },
+      })
+
+      await expect(
+        service.inviteGuardian('teen-bad-prefs', 'guardian.badprefs@example.com')
+      ).rejects.toThrow(/awaiting consent/)
+    })
+  })
+
+  describe('acceptInvitation token verification', () => {
+    const acceptWith = (token: string) => {
+      const { service } = createService()
+      return service.acceptInvitation(token)
+    }
+
+    it('rejects a token that is not three dot-separated segments', async () => {
+      await expect(acceptWith('not-a-real-token')).rejects.toThrow(/malformed/)
+    })
+
+    it('rejects a token whose signature length has been tampered with', async () => {
+      const token = `${signInvitationToken(buildInvitationTokenPayload())}extra`
+
+      await expect(acceptWith(token)).rejects.toThrow(/invalid/)
+    })
+
+    it('rejects a token signed with a different secret', async () => {
+      // Same signature length, different bytes: this is the timing-safe compare path.
+      const token = signInvitationToken(
+        buildInvitationTokenPayload(),
+        'attacker-controlled-secret'
+      )
+
+      await expect(acceptWith(token)).rejects.toThrow(/invalid/)
+    })
+
+    it('rejects a correctly signed token whose payload is not JSON', async () => {
+      const token = signTokenBody('this-is-not-json')
+
+      await expect(acceptWith(token)).rejects.toThrow(/malformed/)
+    })
+
+    it('rejects a correctly signed token whose payload fails the schema', async () => {
+      const token = signInvitationToken({
+        ...buildInvitationTokenPayload(),
+        type: 'password_reset',
+      })
+
+      await expect(acceptWith(token)).rejects.toThrow(/invalid/)
+    })
+
+    it('rejects a token whose expiry has already passed', async () => {
+      const token = signInvitationToken(
+        buildInvitationTokenPayload({
+          exp: Math.floor((Date.now() - 60_000) / 1000),
+        })
+      )
+
+      await expect(acceptWith(token)).rejects.toThrow(/expired/)
+    })
+  })
+
+  describe('acceptInvitation refusals', () => {
+    it('rejects a token that references an invitation which no longer exists', async () => {
+      const { service } = createService()
+      const token = signInvitationToken(
+        buildInvitationTokenPayload({ sub: 'invitation-deleted' })
+      )
+
+      await expect(service.acceptInvitation(token)).rejects.toThrow(
+        /Guardian invitation not found/
+      )
+    })
+
+    it('rejects an invitation whose stored expiry has lapsed even if the token has not', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, { id: 'teen-seeded', email: 'teen.seeded@example.com' })
+      seedInvitation(prisma, {
+        teenId: 'teen-seeded',
+        guardianEmail: 'guardian.seeded@example.com',
+        expiresAt: new Date(Date.now() - 1_000),
+      })
+
+      await expect(
+        service.acceptInvitation(signInvitationToken(buildInvitationTokenPayload()))
+      ).rejects.toThrow(/Guardian invitation has expired/)
+      expect(prisma.consents.size).toBe(0)
+    })
+
+    it.each([
+      { field: 'teenId', overrides: { teenId: 'teen-other' } },
+      {
+        field: 'guardianEmail',
+        overrides: { guardianEmail: 'someone.else@example.com' },
+      },
+      { field: 'consentLevel', overrides: { consentLevel: 'full_access' } },
+    ])(
+      'rejects a token whose $field disagrees with the stored invitation',
+      async ({ overrides }) => {
+        // A token must never be able to upgrade or retarget the stored invitation.
+        const { prisma, service } = createService()
+        seedUser(prisma, { id: 'teen-seeded', email: 'teen.seeded@example.com' })
+        seedUser(prisma, { id: 'teen-other', email: 'teen.other@example.com' })
+        seedInvitation(prisma, {
+          teenId: 'teen-seeded',
+          guardianEmail: 'guardian.seeded@example.com',
+          consentLevel: 'read_only',
+        })
+
+        await expect(
+          service.acceptInvitation(
+            signInvitationToken(buildInvitationTokenPayload(overrides))
+          )
+        ).rejects.toThrow(/Guardian invitation token is invalid/)
+        expect(prisma.consents.size).toBe(0)
+      }
+    )
+
+    it('rejects an invitation whose guardian email equals the teen email', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, { id: 'teen-seeded', email: 'guardian.seeded@example.com' })
+      seedInvitation(prisma, {
+        teenId: 'teen-seeded',
+        guardianEmail: 'guardian.seeded@example.com',
+      })
+
+      await expect(
+        service.acceptInvitation(signInvitationToken(buildInvitationTokenPayload()))
+      ).rejects.toThrow(/must differ from the teen account email/)
+      expect(prisma.consents.size).toBe(0)
+    })
+
+    it('rejects an invitation when the guardian address resolves to the teen account', async () => {
+      // Defence in depth: the address differs but the account behind it is the teen.
+      const { prisma, service } = createService()
+      seedUser(prisma, { id: 'teen-seeded', email: 'teen.seeded@example.com' })
+      seedInvitation(prisma, {
+        teenId: 'teen-seeded',
+        guardianEmail: 'guardian.seeded@example.com',
+      })
+      prisma.user.findUnique.mockResolvedValueOnce({
+        id: 'teen-seeded',
+        email: 'guardian.seeded@example.com',
+      })
+
+      await expect(
+        service.acceptInvitation(signInvitationToken(buildInvitationTokenPayload()))
+      ).rejects.toThrow(/must differ from the teen account email/)
+      expect(prisma.consents.size).toBe(0)
+    })
+
+    it('rejects acceptance once the teen has reached the age of majority', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-seeded',
+        email: 'teen.seeded@example.com',
+        birthdate: new Date('2000-01-01T00:00:00.000Z'),
+      })
+      seedInvitation(prisma, {
+        teenId: 'teen-seeded',
+        guardianEmail: 'guardian.seeded@example.com',
+      })
+
+      await expect(
+        service.acceptInvitation(signInvitationToken(buildInvitationTokenPayload()))
+      ).rejects.toThrow(/no longer required for adult accounts/)
+      expect(prisma.consents.size).toBe(0)
+    })
+  })
+
+  describe('acceptInvitation edge paths', () => {
+    it('records consent for a teen that has no profile row yet', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-seeded',
+        email: 'teen.seeded@example.com',
+        withProfile: false,
+      })
+      seedInvitation(prisma, {
+        teenId: 'teen-seeded',
+        guardianEmail: 'guardian.seeded@example.com',
+      })
+
+      const accepted = await service.acceptInvitation(
+        signInvitationToken(buildInvitationTokenPayload())
+      )
+
+      expect(accepted.teenId).toBe('teen-seeded')
+      expect(prisma.consents.size).toBe(1)
+      // Nothing to update when there is no profile, so no write is attempted.
+      expect(prisma.userProfile.update).not.toHaveBeenCalled()
+      expect(prisma.auditLogs.at(-1)?.event_type).toBe('consent_granted')
+    })
+
+    it('stores a null IP rather than an empty string when the address is blank', async () => {
+      // Audit records are immutable, so a blank forwarded-for must not be persisted.
+      const { prisma, service } = createService()
+      seedUser(prisma, { id: 'teen-seeded', email: 'teen.seeded@example.com' })
+      seedInvitation(prisma, {
+        teenId: 'teen-seeded',
+        guardianEmail: 'guardian.seeded@example.com',
+      })
+
+      await service.acceptInvitation(
+        signInvitationToken(buildInvitationTokenPayload()),
+        '   '
+      )
+
+      expect(prisma.auditLogs.at(-1)).toMatchObject({
+        event_type: 'consent_granted',
+        ip_address: null,
+        event_data: { ip_address: null },
+      })
+      expect([...prisma.consents.values()][0]?.ip_address).toBeNull()
+    })
+
+    it('rebuilds compliance state when the teen profile has no preferences', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-seeded',
+        email: 'teen.seeded@example.com',
+        preferences: null,
+      })
+      seedInvitation(prisma, {
+        teenId: 'teen-seeded',
+        guardianEmail: 'guardian.seeded@example.com',
+      })
+
+      await service.acceptInvitation(signInvitationToken(buildInvitationTokenPayload()))
+
+      expect(prisma.users.get('teen-seeded')?.profile?.preferences).toMatchObject({
+        compliance: {
+          accountStatus: 'active',
+          guardianConsentRequired: false,
+          guardianConsentRevokedAt: null,
+        },
+      })
+    })
+
+    it('replaces a non-object compliance block instead of spreading it', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-seeded',
+        email: 'teen.seeded@example.com',
+        preferences: { theme: 'dark', compliance: 'corrupt' },
+      })
+      seedInvitation(prisma, {
+        teenId: 'teen-seeded',
+        guardianEmail: 'guardian.seeded@example.com',
+      })
+
+      await service.acceptInvitation(signInvitationToken(buildInvitationTokenPayload()))
+
+      const preferences = prisma.users.get('teen-seeded')?.profile?.preferences
+      expect(preferences).toMatchObject({
+        theme: 'dark',
+        compliance: { accountStatus: 'active', guardianConsentRequired: false },
+      })
+    })
+  })
+
+  describe('revokeConsent refusals and edge paths', () => {
+    it('refuses to revoke when there is no active consent to revoke', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, { id: 'teen-none', email: 'teen.none@example.com' })
+
+      await expect(
+        service.revokeConsent('guardian-none', 'teen-none', '203.0.113.5')
+      ).rejects.toThrow(/Active guardian consent not found/)
+      expect(prisma.auditLogs).toHaveLength(0)
+      expect(prisma.eventEnvelopes).toHaveLength(0)
+    })
+
+    it('stores a null revoking IP when no address is supplied', async () => {
+      const { prisma, service } = createService()
+      const { guardianId, teenId } = seedRevocableConsent(prisma)
+
+      await service.revokeConsent(guardianId, teenId)
+
+      expect(
+        prisma.consents.get(`${guardianId}:${teenId}`)?.revoked_ip_address
+      ).toBeNull()
+      expect(prisma.auditLogs.at(-1)).toMatchObject({
+        event_type: 'consent_revoked',
+        ip_address: null,
+      })
+    })
+
+    it('rebuilds compliance state on revocation when preferences are absent', async () => {
+      const { prisma, service } = createService()
+      const { guardianId, teenId } = seedRevocableConsent(prisma, null)
+
+      await service.revokeConsent(guardianId, teenId, '203.0.113.6')
+
+      expect(prisma.users.get(teenId)?.profile?.preferences).toMatchObject({
+        compliance: {
+          accountStatus: 'pending_guardian_consent',
+          guardianConsentRequired: true,
+          guardianConsentGrantedAt: null,
+        },
+      })
+    })
+  })
+
+  describe('serializable transaction retry classification', () => {
+    const runRevokeWithFailure = (error: unknown, failures: number) => {
+      const { prisma, service } = createService()
+      const { guardianId, teenId } = seedRevocableConsent(prisma)
+      const originalTransaction = prisma.$transaction
+      let attempts = 0
+
+      prisma.$transaction = vi.fn(async (callback, options) => {
+        attempts += 1
+        if (attempts <= failures) {
+          throw error
+        }
+
+        return originalTransaction(callback, options)
+      })
+
+      const promise = service.revokeConsent(guardianId, teenId, '203.0.113.7')
+
+      return { attempts: () => attempts, promise }
+    }
+
+    it.each([
+      {
+        name: 'a Prisma P2034 write conflict',
+        error: buildPrismaKnownRequestError('P2034'),
+      },
+      {
+        name: 'a Prisma error whose meta.code is SQLSTATE 40001',
+        error: buildPrismaKnownRequestError('P2010', { code: '40001' }),
+      },
+      {
+        name: 'a Prisma error whose meta.sqlstate is 40001',
+        error: buildPrismaKnownRequestError('P2010', { sqlstate: '40001' }),
+      },
+      {
+        name: 'a plain object carrying meta.code 40001',
+        error: { meta: { code: '40001' } },
+      },
+      {
+        name: 'a plain object carrying meta.sqlstate 40001',
+        error: { meta: { sqlstate: '40001' } },
+      },
+      {
+        name: 'a bare Error whose message embeds SQLSTATE 40001',
+        error: new Error('could not serialize access (40001)'),
+      },
+    ])('retries revocation after $name', async ({ error }) => {
+      const { attempts, promise } = runRevokeWithFailure(error, 1)
+
+      await expect(promise).resolves.toMatchObject({ sessionInvalidated: true })
+      expect(attempts()).toBe(2)
+    })
+
+    it.each([
+      {
+        name: 'an unrelated Prisma error code',
+        error: buildPrismaKnownRequestError('P2025'),
+      },
+      {
+        name: 'a Prisma error whose meta holds no recognisable code',
+        error: buildPrismaKnownRequestError('P2010', { hint: 'nope' }),
+      },
+      { name: 'a plain object with an empty meta', error: { meta: {} } },
+      { name: 'an object with no code, meta, or message', error: {} },
+      { name: 'an object whose message is not a string', error: { message: 42 } },
+      { name: 'a thrown string', error: 'connection reset by peer' },
+    ])('rethrows immediately after $name', async ({ error }) => {
+      const { attempts, promise } = runRevokeWithFailure(error, 1)
+
+      await expect(promise).rejects.toBeDefined()
+      expect(attempts()).toBe(1)
+    })
+
+    it('gives up after exhausting the retry budget', async () => {
+      const { attempts, promise } = runRevokeWithFailure(
+        buildPrismaKnownRequestError('P2034'),
+        3
+      )
+
+      await expect(promise).rejects.toBeInstanceOf(Prisma.PrismaClientKnownRequestError)
+      expect(attempts()).toBe(3)
+    })
+
+    it('rethrows a non-retryable failure raised during emancipation', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-emancipate-error',
+        email: 'teen.emancipate.error@example.com',
+        birthdate: new Date('2008-04-22T12:00:00.000Z'),
+      })
+      prisma.$transaction = vi.fn(() => {
+        throw buildPrismaKnownRequestError('P2025')
+      })
+
+      await expect(
+        service.emancipateEligibleTeens(new Date('2026-04-22T03:00:00.000Z'))
+      ).rejects.toBeInstanceOf(Prisma.PrismaClientKnownRequestError)
+    })
+  })
+
+  describe('emancipateEligibleTeens skip conditions', () => {
+    const TODAY = new Date('2026-04-22T03:00:00.000Z')
+    const ADULT_BIRTHDATE = new Date('2008-04-22T12:00:00.000Z')
+
+    it('skips candidates whose profile row is missing', async () => {
+      const { prisma, service } = createService()
+      prisma.user.findMany.mockResolvedValueOnce([
+        { id: 'teen-no-profile', email: 'teen.noprofile@example.com', profile: null },
+      ])
+
+      await expect(service.emancipateEligibleTeens(TODAY)).resolves.toEqual({
+        processed: 0,
+        teenIds: [],
+        revokedConsentCount: 0,
+        notificationsQueued: 0,
+      })
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('skips teens that were already aged out so the cron stays idempotent', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-already-aged-out',
+        email: 'teen.agedout@example.com',
+        birthdate: ADULT_BIRTHDATE,
+        preferences: {
+          compliance: {
+            accountStatus: 'active',
+            guardianConsentAgedOutAt: '2026-04-21T00:00:00.000Z',
+          },
+        },
+      })
+
+      await expect(service.emancipateEligibleTeens(TODAY)).resolves.toMatchObject({
+        processed: 0,
+        notificationsQueued: 0,
+      })
+      expect(prisma.auditLogs).toHaveLength(0)
+    })
+
+    it('treats a blank aged-out marker as not yet aged out', async () => {
+      // A whitespace-only timestamp is corrupt state, not a completed emancipation.
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-blank-marker',
+        email: 'teen.blank@example.com',
+        birthdate: ADULT_BIRTHDATE,
+        preferences: {
+          compliance: {
+            accountStatus: 'pending_guardian_consent',
+            guardianConsentAgedOutAt: '   ',
+          },
+        },
+      })
+
+      await expect(service.emancipateEligibleTeens(TODAY)).resolves.toMatchObject({
+        processed: 1,
+        teenIds: ['teen-blank-marker'],
+      })
+    })
+
+    it('skips adults that neither require guardian consent nor have an active link', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-unmanaged',
+        email: 'teen.unmanaged@example.com',
+        birthdate: ADULT_BIRTHDATE,
+        preferences: activeCompliancePreferences(),
+      })
+
+      await expect(service.emancipateEligibleTeens(TODAY)).resolves.toMatchObject({
+        processed: 0,
+      })
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('emancipates an adult whose only signal is an active guardian link', async () => {
+      const { prisma, service } = createService()
+      const { teenId } = seedRevocableConsent(prisma, null)
+      const teen = prisma.users.get(teenId)
+      if (teen?.profile) {
+        teen.profile.birthdate = ADULT_BIRTHDATE
+      }
+
+      await expect(service.emancipateEligibleTeens(TODAY)).resolves.toMatchObject({
+        processed: 1,
+        revokedConsentCount: 1,
+      })
+      expect(prisma.users.get(teenId)?.profile?.preferences).toMatchObject({
+        compliance: {
+          accountStatus: 'active',
+          guardianConsentRequired: false,
+          guardianConsentAgedOutAt: TODAY.toISOString(),
+          guardianConsentRevokedAt: TODAY.toISOString(),
+        },
+      })
+    })
+
+    it('replaces a non-object compliance block during emancipation', async () => {
+      const { prisma, service } = createService()
+      const { teenId } = seedRevocableConsent(prisma, { compliance: ['corrupt'] })
+      const teen = prisma.users.get(teenId)
+      if (teen?.profile) {
+        teen.profile.birthdate = ADULT_BIRTHDATE
+      }
+
+      await expect(service.emancipateEligibleTeens(TODAY)).resolves.toMatchObject({
+        processed: 1,
+      })
+      expect(prisma.users.get(teenId)?.profile?.preferences).toMatchObject({
+        compliance: { accountStatus: 'active', guardianConsentRequired: false },
+      })
+    })
+
+    it.each([
+      {
+        name: 'the teen row disappeared before the transaction opened',
+        reread: null,
+      },
+      {
+        name: 'the teen profile was deleted before the transaction opened',
+        reread: {
+          id: 'teen-race',
+          email: 'teen.race@example.com',
+          profile: null,
+          teen_roles: [],
+        },
+      },
+      {
+        name: 'the birthdate was corrected to a minor before the transaction opened',
+        reread: {
+          id: 'teen-race',
+          email: 'teen.race@example.com',
+          profile: {
+            user_id: 'teen-race',
+            birthdate: new Date('2012-04-22T12:00:00.000Z'),
+            preferences: {
+              compliance: { accountStatus: 'pending_guardian_consent' },
+            },
+          },
+          teen_roles: [],
+        },
+      },
+      {
+        name: 'a concurrent run already aged the teen out',
+        reread: {
+          id: 'teen-race',
+          email: 'teen.race@example.com',
+          profile: {
+            user_id: 'teen-race',
+            birthdate: new Date('2008-04-22T12:00:00.000Z'),
+            preferences: {
+              compliance: { guardianConsentAgedOutAt: '2026-04-22T02:00:00.000Z' },
+            },
+          },
+          teen_roles: [],
+        },
+      },
+      {
+        name: 'the last guardian link was revoked before the transaction opened',
+        reread: {
+          id: 'teen-race',
+          email: 'teen.race@example.com',
+          profile: {
+            user_id: 'teen-race',
+            birthdate: new Date('2008-04-22T12:00:00.000Z'),
+            preferences: { compliance: { accountStatus: 'active' } },
+          },
+          teen_roles: [],
+        },
+      },
+    ])('takes no action when $name', async ({ reread }) => {
+      // The candidate scan is not transactional, so the in-transaction re-check is
+      // the only thing preventing a duplicated or wrongly-issued emancipation.
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-race',
+        email: 'teen.race@example.com',
+        birthdate: ADULT_BIRTHDATE,
+      })
+      prisma.user.findUnique.mockResolvedValueOnce(reread)
+
+      await expect(service.emancipateEligibleTeens(TODAY)).resolves.toEqual({
+        processed: 0,
+        teenIds: [],
+        revokedConsentCount: 0,
+        notificationsQueued: 0,
+      })
+      expect(prisma.auditLogs).toHaveLength(0)
+      expect(prisma.eventEnvelopes).toHaveLength(0)
+    })
+  })
+
+  describe('assertWardrobeUploadAllowed', () => {
+    const AGE_REFERENCE_DATE = new Date('2026-04-22T03:00:00.000Z')
+
+    const birthdateForAge = (age: number) =>
+      new Date(
+        Date.UTC(
+          AGE_REFERENCE_DATE.getUTCFullYear() - age,
+          AGE_REFERENCE_DATE.getUTCMonth(),
+          AGE_REFERENCE_DATE.getUTCDate() - 1
+        )
+      )
+
+    beforeEach(() => {
+      vi.useFakeTimers()
+      vi.setSystemTime(AGE_REFERENCE_DATE)
+    })
+
+    it.each([undefined, 'adult', 'guardian'])(
+      'does not gate uploads for the %s role',
+      async (role) => {
+        const { prisma, service } = createService()
+
+        await expect(
+          service.assertWardrobeUploadAllowed('user-1', role)
+        ).resolves.toBeUndefined()
+        // Non-teen roles must not even touch the consent tables.
+        expect(prisma.user.findUnique).not.toHaveBeenCalled()
+      }
+    )
+
+    it('denies uploads when the teen account does not exist', async () => {
+      const { service } = createService()
+
+      await expect(service.assertWardrobeUploadAllowed('ghost', 'teen')).rejects.toThrow(
+        ForbiddenException
+      )
+    })
+
+    it('denies uploads when the teen has no profile row', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-no-profile',
+        email: 'teen.noprofile@example.com',
+        withProfile: false,
+      })
+
+      await expect(
+        service.assertWardrobeUploadAllowed('teen-no-profile', 'teen')
+      ).rejects.toThrow('GUARDIAN_CONSENT_REQUIRED')
+    })
+
+    it('denies uploads when the profile carries no birthdate', async () => {
+      // Without a birthdate the age gate cannot be evaluated, so it must fail closed.
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-no-birthdate',
+        email: 'teen.nobirthdate@example.com',
+        preferences: activeCompliancePreferences(),
+        birthdate: null,
+      })
+
+      await expect(
+        service.assertWardrobeUploadAllowed('teen-no-birthdate', 'teen')
+      ).rejects.toThrow('GUARDIAN_CONSENT_REQUIRED')
+    })
+
+    it.each(['pending_guardian_consent', 'suspended', undefined])(
+      'denies uploads while the account status is %s',
+      async (accountStatus) => {
+        const { prisma, service } = createService()
+        seedUser(prisma, {
+          id: 'teen-inactive',
+          email: 'teen.inactive@example.com',
+          birthdate: birthdateForAge(14),
+          preferences: { compliance: { accountStatus } },
+        })
+
+        await expect(
+          service.assertWardrobeUploadAllowed('teen-inactive', 'teen')
+        ).rejects.toThrow('GUARDIAN_CONSENT_REQUIRED')
+      }
+    )
+
+    it('denies uploads for under-13 accounts even with an active guardian consent', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-under-13',
+        email: 'teen.under13@example.com',
+        birthdate: birthdateForAge(12),
+        preferences: activeCompliancePreferences(),
+      })
+      prisma.consents.set('guardian-x:teen-under-13', {
+        guardian_id: 'guardian-x',
+        teen_id: 'teen-under-13',
+        consent_level: 'full_access',
+        consent_granted_at: new Date('2026-01-01T00:00:00.000Z'),
+        revoked_at: null,
+        ip_address: null,
+        revoked_ip_address: null,
+        status: 'granted',
+      })
+
+      await expect(
+        service.assertWardrobeUploadAllowed('teen-under-13', 'teen')
+      ).rejects.toThrow('GUARDIAN_CONSENT_REQUIRED')
+    })
+
+    it.each([13, 15])(
+      'denies uploads for a %s-year-old with no active guardian consent',
+      async (age) => {
+        const { prisma, service } = createService()
+        seedUser(prisma, {
+          id: 'teen-unconsented',
+          email: 'teen.unconsented@example.com',
+          birthdate: birthdateForAge(age),
+          preferences: activeCompliancePreferences(),
+        })
+
+        await expect(
+          service.assertWardrobeUploadAllowed('teen-unconsented', 'teen')
+        ).rejects.toThrow('GUARDIAN_CONSENT_REQUIRED')
+      }
+    )
+
+    it('denies uploads for a 13-15 year old whose only consent has been revoked', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-revoked',
+        email: 'teen.revoked@example.com',
+        birthdate: birthdateForAge(14),
+        preferences: activeCompliancePreferences(),
+      })
+      prisma.consents.set('guardian-y:teen-revoked', {
+        guardian_id: 'guardian-y',
+        teen_id: 'teen-revoked',
+        consent_level: 'full_access',
+        consent_granted_at: new Date('2026-01-01T00:00:00.000Z'),
+        revoked_at: new Date('2026-03-01T00:00:00.000Z'),
+        ip_address: null,
+        revoked_ip_address: null,
+        status: 'revoked',
+      })
+
+      await expect(
+        service.assertWardrobeUploadAllowed('teen-revoked', 'teen')
+      ).rejects.toThrow('GUARDIAN_CONSENT_REQUIRED')
+    })
+
+    it('allows uploads for a 13-15 year old with an active guardian consent', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-consented',
+        email: 'teen.consented@example.com',
+        birthdate: birthdateForAge(14),
+        preferences: activeCompliancePreferences(),
+      })
+      prisma.consents.set('guardian-z:teen-consented', {
+        guardian_id: 'guardian-z',
+        teen_id: 'teen-consented',
+        consent_level: 'read_only',
+        consent_granted_at: new Date('2026-01-01T00:00:00.000Z'),
+        revoked_at: null,
+        ip_address: null,
+        revoked_ip_address: null,
+        status: 'granted',
+      })
+
+      await expect(
+        service.assertWardrobeUploadAllowed('teen-consented', 'teen')
+      ).resolves.toBeUndefined()
+    })
+
+    it('allows uploads at 16 and over without any guardian consent', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, {
+        id: 'teen-16',
+        email: 'teen.16@example.com',
+        birthdate: birthdateForAge(16),
+        preferences: activeCompliancePreferences(),
+      })
+
+      await expect(
+        service.assertWardrobeUploadAllowed('teen-16', 'teen')
+      ).resolves.toBeUndefined()
     })
   })
 })

@@ -9,6 +9,14 @@
 /** A cancellable delay: resolves after `delayMs`, rejects if `signal` aborts first. */
 export function waitForPoll(delayMs: number, signal: AbortSignal): Promise<void> {
   return new Promise<void>((resolve, reject) => {
+    // An already-aborted signal never emits 'abort', so without this check a
+    // poll loop whose caller cancelled during the previous request would sit
+    // out another full interval and then issue a request it must throw away.
+    if (signal.aborted) {
+      reject(new Error('POLL_ABORTED'))
+      return
+    }
+
     const timer = setTimeout(resolve, delayMs)
     signal.addEventListener(
       'abort',

@@ -143,7 +143,20 @@ export default defineConfig({
     clearMocks: true,
     coverage: {
       reporter: ['text', 'json-summary', 'lcov'],
+      // Ratchet: set just under the measured value so a real regression
+      // fails the run. Raise these as coverage improves; never lower them
+      // to make a red build green.
+      thresholds: { statements: 90, branches: 85, functions: 90, lines: 92 },
       include: ['app/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}', 'src/**/*.{ts,tsx}'],
+      exclude: [
+        // Expo Router navigation shells: Stack/Tabs declarations plus font and
+        // splash-screen bootstrapping. There is no branch a unit test can
+        // assert; the Maestro flows exercise the real navigation graph.
+        'app/**/_layout.tsx',
+        'app/+html.tsx',
+        // MSW handlers and native-module mocks: test scaffolding.
+        'src/test-utils/**',
+      ],
     },
   },
 })

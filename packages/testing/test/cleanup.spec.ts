@@ -1,7 +1,14 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { CleanupPrismaClient } from '../src/cleanup.js'
-import { cleanup } from '../src/cleanup.js'
+import {
+  cleanup,
+  configureCleanup,
+  registerForCleanup,
+  resetCleanupConfiguration,
+  resetCleanupRegistry,
+  snapshotCleanupRegistry,
+} from '../src/cleanup.js'
 import {
   createFactoryRegistry,
   DEFAULT_FACTORY_REGISTRY_KEYS,
@@ -12,10 +19,21 @@ type CleanupCall = {
   where: unknown
 }
 
-function createCleanupPrismaStub(calls: CleanupCall[]): CleanupPrismaClient {
+type CleanupFailures = Partial<Record<keyof CleanupPrismaClient, Error>>
+
+function createCleanupPrismaStub(
+  calls: CleanupCall[],
+  failures: CleanupFailures = {}
+): CleanupPrismaClient {
   const createDelegate = (delegate: keyof CleanupPrismaClient) => ({
     deleteMany: vi.fn(({ where }: { where: unknown }) => {
       calls.push({ delegate, where })
+
+      const failure = failures[delegate]
+      if (failure) {
+        return Promise.reject(failure)
+      }
+
       return Promise.resolve({ count: 1 })
     }),
   })
@@ -50,6 +68,34 @@ function createCleanupPrismaStub(calls: CleanupCall[]): CleanupPrismaClient {
 }
 
 describe('cleanup', () => {
+  afterEach(() => {
+    resetCleanupRegistry()
+    resetCleanupConfiguration()
+  })
+
+  it('scopes the alert cooldown sweep to the current cleanup scope', async () => {
+    /*
+     * AlertCooldownReservation is keyed by a hash of (userId, locationKey,
+     * fingerprint) and has no owner column, so it used to be emptied with an
+     * unscoped deleteMany({}). That destroys reservations the run never created,
+     * which is only harmless while cleanup points at a disposable database.
+     */
+    const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
+    const calls: CleanupCall[] = []
+    const prisma = createCleanupPrismaStub(calls)
+
+    const before = new Date()
+    configureCleanup({ prisma })
+    registry.track('users', 'user-1')
+
+    await cleanup({ prisma, registry })
+
+    const cooldown = calls.find((call) => call.delegate === 'alertCooldownReservation')
+    const where = cooldown?.where as { created_at: { gte: Date } } | undefined
+    expect(where?.created_at.gte).toBeInstanceOf(Date)
+    expect(where?.created_at.gte.getTime()).toBeGreaterThanOrEqual(before.getTime())
+  })
+
   it('removes registered entities in reverse dependency order', async () => {
     const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
     const calls: CleanupCall[] = []
@@ -153,5 +199,152 @@ describe('cleanup', () => {
       silhouetteProfiles: [],
       moderationEvents: [],
     })
+  })
+
+  it('refuses to run without a Prisma client instead of skipping teardown', async () => {
+    // A cleanup that quietly no-ops leaves fixture rows behind, and the failure
+    // surfaces later as a unique-constraint error in an unrelated suite.
+    await expect(cleanup()).rejects.toThrow('cleanup requires a Prisma client')
+  })
+
+  it('uses the client registered by configureCleanup until it is reset', async () => {
+    const calls: CleanupCall[] = []
+    const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
+
+    configureCleanup({ prisma: createCleanupPrismaStub(calls) })
+    registry.track('users', 'user-configured')
+    await cleanup({ registry })
+
+    expect(calls.find((call) => call.delegate === 'user')?.where).toEqual({
+      id: { in: ['user-configured'] },
+    })
+
+    // Resetting has to restore the guard, otherwise a suite that tears down its
+    // Prisma client keeps deleting through a dead connection.
+    resetCleanupConfiguration()
+    registry.track('users', 'user-configured')
+    await expect(cleanup({ registry })).rejects.toThrow(
+      'cleanup requires a Prisma client'
+    )
+  })
+
+  it('prefers an explicitly passed client over the configured default', async () => {
+    const configuredCalls: CleanupCall[] = []
+    const explicitCalls: CleanupCall[] = []
+    const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
+
+    configureCleanup({ prisma: createCleanupPrismaStub(configuredCalls) })
+    registry.track('users', 'user-explicit')
+
+    await cleanup({ prisma: createCleanupPrismaStub(explicitCalls), registry })
+
+    expect(explicitCalls.map((call) => call.delegate)).toContain('user')
+    expect(configuredCalls).toEqual([])
+  })
+
+  it('issues no deletes at all when nothing was registered', async () => {
+    // The registry is the only thing scoping these statements. An empty
+    // registry must produce zero deletes, never an unscoped deleteMany.
+    const calls: CleanupCall[] = []
+    const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
+
+    await cleanup({ prisma: createCleanupPrismaStub(calls), registry })
+
+    expect(calls).toEqual([])
+  })
+
+  it('deletes by id alone when entities were registered without an owning user', async () => {
+    // Tests that attach fixtures to a pre-seeded user register only the child
+    // rows; those still have to be removed, and no user table may be touched.
+    const calls: CleanupCall[] = []
+    const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
+
+    registry.track('savedLocations', 'location-1')
+    registry.track('alertRules', 'rule-1')
+    registry.track('notificationPreferences', 'preference-1')
+    registry.track('wardrobeItems', 'garment-1')
+
+    await cleanup({ prisma: createCleanupPrismaStub(calls), registry })
+
+    const whereFor = (delegate: keyof CleanupPrismaClient) =>
+      calls.find((call) => call.delegate === delegate)?.where
+
+    expect(whereFor('savedLocation')).toEqual({ id: { in: ['location-1'] } })
+    expect(whereFor('alertRule')).toEqual({ id: { in: ['rule-1'] } })
+    expect(whereFor('notificationPreference')).toEqual({ id: { in: ['preference-1'] } })
+    expect(whereFor('garmentItem')).toEqual({ OR: [{ id: { in: ['garment-1'] } }] })
+    expect(whereFor('paletteInsights')).toEqual({
+      OR: [{ garment_item_id: { in: ['garment-1'] } }],
+    })
+    expect(calls.map((call) => call.delegate)).not.toContain('user')
+    expect(calls.map((call) => call.delegate)).not.toContain('userProfile')
+    expect(calls.map((call) => call.delegate)).not.toContain('comfortPreferences')
+  })
+
+  it('scopes owner-wide deletes by user when no child ids were registered', async () => {
+    // A persisted user drags rows the test never registered (push tokens, audit
+    // entries, preferences). Those are removed by owner rather than by id.
+    const calls: CleanupCall[] = []
+    const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
+
+    registry.track('users', 'user-1')
+
+    await cleanup({ prisma: createCleanupPrismaStub(calls), registry })
+
+    const whereFor = (delegate: keyof CleanupPrismaClient) =>
+      calls.find((call) => call.delegate === delegate)?.where
+
+    expect(whereFor('alertRule')).toEqual({ user_id: { in: ['user-1'] } })
+    expect(whereFor('notificationPreference')).toEqual({ user_id: { in: ['user-1'] } })
+    expect(whereFor('savedLocation')).toEqual({ user_id: { in: ['user-1'] } })
+    expect(whereFor('paletteInsights')).toEqual({ OR: [{ user_id: { in: ['user-1'] } }] })
+    // ModerationEvent has no user column, so with neither moderation nor
+    // silhouette ids registered there is nothing it could safely match.
+    expect(calls.map((call) => call.delegate)).not.toContain('moderationEvent')
+  })
+
+  it('removes moderation events attached to a silhouette profile under teardown', async () => {
+    // Story 4.4 Task 2: a profile cannot be deleted while a moderation event
+    // still references it, and the event carries no user id to match on.
+    const calls: CleanupCall[] = []
+    const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
+
+    registry.track('silhouetteProfiles', 'silhouette-1')
+
+    await cleanup({ prisma: createCleanupPrismaStub(calls), registry })
+
+    expect(calls.find((call) => call.delegate === 'moderationEvent')?.where).toEqual({
+      OR: [{ silhouette_profile_id: { in: ['silhouette-1'] } }],
+    })
+  })
+
+  it('clears the registry even when a delete fails', async () => {
+    // Without the finally, one failed teardown poisons every later suite in the
+    // same process: the ids stay tracked and get re-deleted forever.
+    const calls: CleanupCall[] = []
+    const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
+    const prisma = createCleanupPrismaStub(calls, {
+      user: new Error('deadlock detected'),
+    })
+
+    registry.track('users', 'user-1')
+
+    await expect(cleanup({ prisma, registry })).rejects.toThrow('deadlock detected')
+    expect(registry.snapshot().users).toEqual([])
+  })
+
+  it('drains the shared factory registry when the caller passes none', async () => {
+    // Factories register into the module-level registry, so `cleanup({ prisma })`
+    // with no explicit registry has to pick that one up.
+    const calls: CleanupCall[] = []
+
+    expect(registerForCleanup('users', 'user-shared')).toBe('user-shared')
+
+    await cleanup({ prisma: createCleanupPrismaStub(calls) })
+
+    expect(calls.find((call) => call.delegate === 'user')?.where).toEqual({
+      id: { in: ['user-shared'] },
+    })
+    expect(snapshotCleanupRegistry().users).toEqual([])
   })
 })

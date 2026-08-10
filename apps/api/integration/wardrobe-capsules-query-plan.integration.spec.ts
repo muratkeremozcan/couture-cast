@@ -34,7 +34,18 @@ let schemaReady = false
 async function probeSchema(): Promise<void> {
   try {
     await prisma.$queryRaw`SELECT 1 FROM "OutfitCapsule" LIMIT 1`
-    await prisma.$queryRaw`SELECT 1 FROM pg_indexes WHERE indexname = 'OutfitCapsule_name_trgm_idx'`
+    /*
+     * A missing index returns zero rows rather than throwing, so the result
+     * has to be inspected. Without this check a database that has the table
+     * but not the Story 4.3 indexes reported itself as ready and every plan
+     * assertion failed as a hard error instead of skipping.
+     */
+    const indexes = await prisma.$queryRaw<
+      { indexname: string }[]
+    >`SELECT indexname FROM pg_indexes WHERE indexname = 'OutfitCapsule_name_trgm_idx'`
+    if (indexes.length === 0) {
+      throw new Error('OutfitCapsule_name_trgm_idx is missing')
+    }
     schemaReady = true
   } catch {
     schemaReady = false
