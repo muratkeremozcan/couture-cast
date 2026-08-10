@@ -1,6 +1,6 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-08-07. Added Step 31 (Outfit capsule builder) for Story 4.3, documenting ETag concurrency control, occasion-driven modeling, web/mobile capsule builder UI, and Ritual cache invalidation. Corrected the Story 4.2 flow and strengthened the LLM writing-style guidance.
+Updated: 2026-08-10. Added Step 32 (Wardrobe onboarding and silhouette setup) for Story 4.4, documenting the forward-only onboarding state machine, slider/My-Form silhouette modeling, the "My Form" photo moderation pipeline, and the BullMQ job-id collision class of bug it surfaced. Previously: added Step 31 (Outfit capsule builder) for Story 4.3, documenting ETag concurrency control, occasion-driven modeling, web/mobile capsule builder UI, and Ritual cache invalidation. Corrected the Story 4.2 flow and strengthened the LLM writing-style guidance.
 
 ## How to use this
 
@@ -44,6 +44,7 @@ Updated: 2026-08-07. Added Step 31 (Outfit capsule builder) for Story 4.3, docum
 |   29 | Upload a garment safely and process it in the background.        |
 |   30 | Use AI to suggest garment tags. Let the user decide.             |
 |   31 | Group ready garments into outfit capsules with optimistic UI.    |
+|   32 | Guide a new user through closet setup, then model their body.    |
 
 ## Special feature: AI garment tagging
 
@@ -3006,4 +3007,230 @@ flowchart TD
   Service --> Cache["Clear Redis ritual keys\n(best effort)"]
   DB --> Engine["capsule-recommendation.engine\n(comfort, slots, tie-breaks)"]
   Engine --> Ritual["RitualService\n(capsule revision gates cache reuse)"]
+```
+
+## Step 32 - Wardrobe onboarding and silhouette setup
+
+User/business impact:
+
+Guides a first-time user through closet setup: capture (or skip to) a starter
+wardrobe, tag garments, then model their body either with two sliders (height,
+build) or by uploading a "My Form" photo processed into a moderated silhouette.
+Both a guided onboarding screen and a standalone silhouette-settings surface
+reuse the same slider/My-Form editor, since bodies and closets change after
+onboarding too. The silhouette feeds the fit/comfort logic Steps 19-21 already
+use. For the business, a completed silhouette is the single strongest signal
+that a user will return, so the flow is deliberately forgiving: every step is
+independently resumable, and the last step ("Use starter wardrobe") lets a user
+skip capture entirely without abandoning the flow.
+
+Key takeaways:
+
+1. **Advisory locks, not `SELECT ... FOR UPDATE`, for singleton-per-user rows.**
+   `WardrobeOnboardingState` and `SilhouetteProfile` are one row per user, and
+   that row does not exist yet on a user's very first PATCH/PUT. Row-level
+   locking cannot lock a row that is not there; `pg_advisory_xact_lock(hashtext(
+'wardrobe_onboarding:' || userId))` locks the _key_, present row or not, so
+   the create-or-advance branch inside the same transaction is race-free from
+   the first call. `$queryRaw` cannot deserialize the lock function's `void`
+   return (Prisma P2010); use `$executeRaw`.
+2. **A job id keyed on a stable entity, not an attempt, silently drops retries.**
+   `SilhouettePhotoProcessingQueue` originally keyed its BullMQ job on
+   `silhouetteProfileId`. `GarmentItem` gets a fresh row per upload attempt, so
+   the equivalent garment queue is safe with that pattern; `SilhouetteProfile`
+   is one row per _account_, stable for its lifetime. `Queue.add` with an
+   already-used job id is a silent no-op while the prior job sits in the
+   7-day retained completed set, so every My Form photo a user committed after
+   their first — delete-and-reupload, or a retry after a flagged photo — was
+   never enqueued, and the row sat in `processing` forever with no error
+   anywhere. The fix keys on `buildSilhouettePhotoJobId(profileId,
+uploadSessionId)` instead (BullMQ rejects `:` in a custom job id, so the
+   separator is `__` — caught by a test, not by inspection). The general
+   lesson: a BullMQ job id must be unique per _unit of work_, and "unique per
+   entity" is only the same thing when the entity is recreated per attempt.
+3. **Exactly-once telemetry needs its own guard, and the guard must be cleared
+   on failure.** Row creation alone makes "onboarding started" exactly-once
+   only on the happy path; a crash between the state-machine commit and the
+   analytics call needs an independent guard column
+   (`started_telemetry_emitted_at` / `completed_telemetry_emitted_at`,
+   mirroring `GarmentItem.completion_telemetry_emitted_at`). The guard must be
+   stamped _and_ cleared symmetrically: stamping it before the emit call and
+   never clearing it on a thrown/rejected emit makes the event unrecoverable
+   forever, which is worse than the at-least-once duplicate the guard exists
+   to prevent.
+4. **A library bug can hide inside a "correct-looking" pipeline.** Sharp
+   0.34.5's `.stats()` chained directly after `.extract()` on the same
+   pipeline reports the _pre-crop_ image's statistics, not the extracted
+   region's — confirmed by comparing raw pixel bytes against the reported
+   stats, not by trusting the API. The moderation engine's border-vs-center
+   contrast check materializes each crop to its own buffer via
+   `.raw().toBuffer()` and reopens it with a fresh `sharp()` instance (and
+   explicit `{ raw: { width, height, channels } }`) before calling `.stats()`
+   again. Documented at the call site so a later "simplification" doesn't put
+   the bug back.
+5. **The state machine is forward-only and server-authoritative, including
+   its own completion payload.** `advanceStep` accepts a `targetStep` but
+   never accepts a client-supplied garment count for the completion
+   telemetry event; it recomputes real `ready`/`awaiting_tags` `GarmentItem`
+   rows created since `started_at` at the transition into `silhouette`. An
+   optional flag that only matters on one transition (`usedStarterWardrobe`,
+   meaningful only on capture → silhouette) still needs to be _sticky_
+   (`input.usedStarterWardrobe ?? existing.used_starter_wardrobe`) rather than
+   defaulted to `false` when omitted on a later PATCH — an omitted optional
+   field is not the same as an explicit `false`, and treating it as one
+   silently overwrites a real prior answer.
+6. **A photo-session's own state changes need the same revision discipline as
+   the resource they attach to.** `createMyFormUploadUrl` and
+   `uploadMyFormBytes` mutate `SilhouetteProfile.my_form_status` without
+   incrementing `revision`, so a client's cached ETag stays valid across a
+   state transition that meaningfully changed the response body (`myForm:
+null` to `myForm.status: 'pending_upload'`). If a route's response shape
+   depends on a sub-object's status, that status is part of what the ETag
+   must cover, not just the top-level fields.
+
+Hard-won lessons from the code review of this story:
+
+- The bug above (BullMQ job-id collision) was independently found by all
+  three layers of an isolated adversarial review — a diff-only reviewer with
+  zero project context, one with project read access, and one against this
+  story's own acceptance criteria — which is a strong signal it was real,
+  not a matter of interpretation. When multiple independently-blinded
+  reviewers converge on the same finding without seeing each other's output,
+  treat it as ground truth and reproduce it before touching anything.
+- A commit-vs-replay status-code fix (`201` fresh, `200` idempotent replay,
+  matching the existing `createMyFormUploadUrl`/`commitGarment` convention)
+  shipped with _no test that ever exercised the real wire response_ — the
+  unit test asserted a spy on a hand-built mock `res` object that never
+  modeled Express's or Nest's actual status-setting behavior, and the
+  integration test called the service directly, skipping the controller
+  entirely. Both stayed green even when the controller was mutated back to
+  an unconditional `201`. A fix to HTTP-visible behavior needs one assertion
+  that actually goes over HTTP (a real Nest `TestingModule` + `supertest`),
+  not only a unit test of the function that computes the status.
+- Draining a real, shared external queue (Redis-backed BullMQ) as test
+  cleanup must run even when the test's own assertions throw, or a single
+  real failure manufactures a second, unrelated-looking failure in whichever
+  sibling test's `Worker` happens to run next and picks up the leaked job.
+  `vitest`'s `onTestFinished(...)` registered _before_ any assertion (not a
+  trailing statement after them) is the fix; a `beforeAll` that also clears
+  the queue at suite start catches the case where the run that leaked the
+  job has already ended by the time the next run starts.
+- Squash-merging a stacked branch's base breaks git ancestry for every
+  sibling branch that shared that history: a plain `git merge`/`git rebase`
+  against the new squashed history then produces one add/add conflict per
+  file that both sides touched, even for files whose content barely
+  changed. Cherry-picking only the sibling branch's own unique commits onto
+  the fresh base avoids this — a 3-way diff against the commit's real
+  parent applies cleanly far more often than a whole-branch merge against an
+  unrelated history does.
+
+Story/Task mapping:
+
+- Story 4.4
+- Task 1 (Prisma schema, migration, RLS)
+- Task 2 (Wardrobe contracts, fixtures, factories)
+- Task 3 (Onboarding-state and silhouette API)
+- Task 4 (My Form processing pipeline)
+- Task 5 (Web onboarding and silhouette experience)
+- Task 6 (Mobile onboarding and silhouette experience)
+- Task 7 (Consumer and provider contracts)
+- Task 8 (End-to-end and accessibility automation)
+- Task 9 (Verification gate)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/4-4-wardrobe-onboarding-silhouette-setup.md`
+- `_bmad-output/test-artifacts/test-reviews/wardrobe-onboarding-silhouette-pact-test-review-2026-08-10.md`
+
+Cross-links:
+
+- Step 3 provides Prisma schema modeling and migration conventions.
+- Step 4 provides Supabase environment isolation and guardian-aware RLS helpers.
+- Step 5 provides the BullMQ queue/worker conventions this story's moderation
+  pipeline reuses (and whose job-id assumptions it stress-tested).
+- Step 18 provides the durable-telemetry pattern the onboarding guard columns
+  extend.
+- Step 22 provides the localization pipeline and parity-test pattern.
+- Step 28 provides the accessibility baseline the guided-flow screens build on.
+- Step 29 provides the garment capture flow this story's onboarding checklist
+  reuses without duplicating.
+- Step 30 provides smart tagging, gating onboarding's capture → silhouette
+  transition.
+- Step 31 provides the ETag/`If-Match` concurrency pattern this story's
+  onboarding and silhouette resources both follow.
+
+Sequence to follow:
+
+1. `packages/db/prisma/schema.prisma` and
+   `packages/db/prisma/migrations/20260809090000_add_wardrobe_onboarding_silhouette/migration.sql`
+   for the `WardrobeOnboardingState`/`SilhouetteProfile` models, the five new
+   enums, and the telemetry-guard columns added in a follow-up migration.
+2. `packages/api-client/src/contracts/http/wardrobe.ts` for the onboarding
+   and silhouette Zod contracts, including the commit route's `201`
+   fresh/`200` replay pair.
+3. `apps/api/src/modules/wardrobe/wardrobe-onboarding.service.ts` for the
+   advisory-lock create-or-advance transaction and server-authoritative
+   garment counting, then `wardrobe-onboarding.controller.ts` for the HTTP
+   surface.
+4. `apps/api/src/modules/wardrobe/wardrobe-silhouette.service.ts` for slider
+   persistence and the My Form upload/commit/delete lifecycle, then
+   `wardrobe-silhouette.controller.ts`.
+5. `apps/api/src/modules/wardrobe/heuristic-silhouette-photo-moderation.engine.ts`
+   for the border-contrast and bare-skin heuristics (and the Sharp
+   `.stats()`-after-`.extract()` workaround), then
+   `silhouette-photo-processing.queue.ts` and `silhouette-photo.processor.ts`
+   for the BullMQ producer/consumer pair.
+6. `apps/web/src/app/wardrobe/onboarding/page.tsx` and
+   `apps/mobile/src/features/wardrobe/wardrobe-onboarding-screen.tsx` for the
+   two guided-flow surfaces; `silhouette-settings-panel.tsx` (web) and
+   `silhouette-editor.tsx` (mobile) for the shared slider/My-Form editor both
+   the onboarding step and the standalone settings screen reuse.
+7. `pact/http/consumer/api-contract-interactions.ts` and
+   `pact/http/provider/provider-helper.ts` for the consumer/provider contract
+   proof, once Task 3/4's real controllers exist to verify against.
+8. Tests, in order of what they prove:
+   - `apps/api/integration/wardrobe-onboarding.integration.spec.ts` and
+     `wardrobe-silhouette.integration.spec.ts` (real PostgreSQL: advisory-lock
+     serialization, revision races; real Redis: the one real-`Worker`
+     end-to-end BullMQ test in this repo before this story)
+   - `apps/api/src/modules/wardrobe/wardrobe-silhouette.controller.spec.ts`
+     plus a `supertest` round trip for the commit route's real wire status
+     code
+   - `apps/web/src/i18n/wardrobe-onboarding-silhouette-locales.spec.ts` and
+     the mobile twin
+
+Task owner map:
+
+- Story 4.4 Task 1 step 1 owner: define WardrobeOnboardingState and SilhouetteProfile models, enums, and RLS policies in packages/db/prisma/schema.prisma
+- Story 4.4 Task 2 step 1 owner: define onboarding-state and silhouette HTTP contracts and Zod schemas in packages/api-client/src/contracts/http/wardrobe.ts
+- Story 4.4 Task 3 step 1 owner: implement the advisory-lock onboarding state machine in apps/api/src/modules/wardrobe/wardrobe-onboarding.service.ts
+- Story 4.4 Task 3 step 2 owner: expose WardrobeOnboardingController REST endpoints in apps/api/src/modules/wardrobe/wardrobe-onboarding.controller.ts
+- Story 4.4 Task 3 step 3 owner: implement silhouette slider persistence and My Form lifecycle in apps/api/src/modules/wardrobe/wardrobe-silhouette.service.ts
+- Story 4.4 Task 3 step 4 owner: expose WardrobeSilhouetteController REST endpoints in apps/api/src/modules/wardrobe/wardrobe-silhouette.controller.ts
+- Story 4.4 Task 4 step 1 owner: implement the heuristic silhouette photo moderation engine in apps/api/src/modules/wardrobe/heuristic-silhouette-photo-moderation.engine.ts
+- Story 4.4 Task 4 step 2 owner: implement the BullMQ producer with per-attempt job ids in apps/api/src/modules/wardrobe/silhouette-photo-processing.queue.ts
+- Story 4.4 Task 4 step 3 owner: implement the moderation-review worker consumer in apps/api/src/modules/wardrobe/silhouette-photo.processor.ts
+- Story 4.4 Task 5 step 1 owner: implement the web guided onboarding screen in apps/web/src/app/wardrobe/onboarding/page.tsx
+- Story 4.4 Task 5 step 2 owner: implement the shared web silhouette settings panel in apps/web/src/app/components/silhouette-settings-panel.tsx
+- Story 4.4 Task 6 step 1 owner: implement the mobile guided onboarding screen in apps/mobile/src/features/wardrobe/wardrobe-onboarding-screen.tsx
+- Story 4.4 Task 6 step 2 owner: implement the shared mobile silhouette editor in apps/mobile/components/wardrobe/silhouette-editor.tsx
+- Story 4.4 Task 7 step 1 owner: wire real provider verification for onboarding and silhouette in pact/http/provider/provider-helper.ts
+- Story 4.4 Task 8 step 1 owner: real-PostgreSQL and real-Redis integration coverage in apps/api/integration/wardrobe-silhouette.integration.spec.ts
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Client["Web / Mobile\n(onboarding screen + silhouette settings panel/editor)"] --> OC["WardrobeOnboardingController\n(If-Match, forward-only targetStep)"]
+  Client --> SC["WardrobeSilhouetteController\n(sliders, My Form upload/commit/delete)"]
+  OC --> OS["WardrobeOnboardingService\n(pg_advisory_xact_lock, server-authoritative garment count)"]
+  SC --> SS["WardrobeSilhouetteService\n(advisory lock, upload-token HMAC, revision)"]
+  OS --> DB[("PostgreSQL\nWardrobeOnboardingState, telemetry guard columns")]
+  SS --> DB2[("PostgreSQL\nSilhouetteProfile, my_form_* lifecycle fields")]
+  SS -- "commitMyForm" --> Queue["SilhouettePhotoProcessingQueue\n(jobId: profileId + uploadSessionId)"]
+  Queue --> Worker["moderation-review Worker\n(SilhouettePhotoProcessor, exactly-one consumer)"]
+  Worker --> Engine["HeuristicSilhouettePhotoModerationEngine\n(border contrast, bare-skin ratio)"]
+  Worker --> DB2
+  Worker -- "on flag, teen actor" --> Guardian["Guardian outbox notification"]
+  OS -- "started/completed" --> Telemetry["Guarded telemetry emission\n(started_telemetry_emitted_at / completed_telemetry_emitted_at)"]
 ```
