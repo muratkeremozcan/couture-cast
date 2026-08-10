@@ -1,9 +1,22 @@
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+} from 'vitest'
 import { PrismaClient } from '@prisma/client'
-import { ForbiddenException, PreconditionFailedException } from '@nestjs/common'
-import { Worker } from 'bullmq'
+import {
+  ConflictException,
+  ForbiddenException,
+  PreconditionFailedException,
+} from '@nestjs/common'
+import { Queue, Worker } from 'bullmq'
 import { getRedisConfig, redisOptionsFromConfig } from '../src/config/redis.js'
 import {
   formatSilhouetteETag,
@@ -67,6 +80,34 @@ function requireSchema(context: { skip: () => void }): boolean {
 }
 
 /**
+ * Redis, unlike the database, is not scoped per test *or* per run: the
+ * `moderation-review` queue survives process exit, so a job left behind by
+ * an aborted or failed earlier run is still waiting when the next run
+ * starts, and the first `Worker` to come up consumes it -- inflating
+ * `4.4-INT-15`'s "exactly one job" assertion with a job that has nothing to
+ * do with this run. In-test draining alone cannot fix that (the run that
+ * leaked the job is already over), so every run starts from an empty queue.
+ * Only this suite touches `moderation-review`, so clearing it is safe.
+ */
+async function clearModerationQueue(): Promise<void> {
+  const queue = new Queue('moderation-review', {
+    connection: redisOptionsFromConfig(getRedisConfig()),
+  })
+  try {
+    await queue.obliterate({ force: true })
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[wardrobe-silhouette.integration] Could not clear the moderation-review queue; ' +
+        'real-Redis cases may be affected by leftover jobs.',
+      error
+    )
+  } finally {
+    await queue.close()
+  }
+}
+
+/**
  * `moderation-review` is a real, persistent Redis-backed queue, so any test
  * that enqueues a job (any successful `commitMyForm`) must drain it before
  * finishing -- an un-drained job otherwise sits in Redis and gets picked up
@@ -106,9 +147,14 @@ async function drainModerationJob(
           resolve()
         }
       })
-      worker.on('failed', (_job, err) => {
-        clearTimeout(timeout)
-        reject(err)
+      // Filter on the same profile the `completed` handler does: this Worker
+      // is a consumer on a shared queue, so a stray job's failure must not
+      // be reported as this test's failure.
+      worker.on('failed', (job, err) => {
+        if (job?.data.silhouetteProfileId === profileId) {
+          clearTimeout(timeout)
+          reject(err)
+        }
       })
     })
   } finally {
@@ -162,6 +208,7 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
   beforeAll(async () => {
     await probeSchema()
     process.env.WARDROBE_UPLOAD_TOKEN_SECRET = 'a'.repeat(32)
+    if (schemaReady) await clearModerationQueue()
   })
 
   beforeEach(async () => {
@@ -517,11 +564,22 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
       },
       commitKey
     )
-    expect(first.replayed).toBe(false)
 
     const profileId = (
       await prismaA.silhouetteProfile.findUniqueOrThrow({ where: { user_id: userId } })
     ).id
+
+    // That commit enqueued a real `moderation-review` job. Register the drain
+    // *before* asserting anything: `onTestFinished` still runs after the whole
+    // test body (so the background worker cannot advance the row's revision
+    // ahead of the replay assertion below), but unlike a trailing statement it
+    // also runs when an assertion throws. A failing assertion must not leave
+    // the job in Redis, where it would survive this run and be consumed by
+    // 4.4-INT-15's Worker on the next one, turning one real failure into a
+    // confusing second one.
+    onTestFinished(() => drainModerationJob(prismaA, storage, profileId))
+
+    expect(first.replayed).toBe(false)
 
     const replay = await serviceA.commitMyForm(
       userId,
@@ -535,8 +593,11 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
     expect(replay.replayed).toBe(true)
     expect(replay.response.data.revision).toBe(first.response.data.revision)
 
-    await expect(
-      serviceA.commitMyForm(
+    // Asserting the exception type too, not just the message: the whole point
+    // of this change is status-code fidelity, and only `ConflictException`
+    // maps to the 409 the contract registers for a reused key.
+    const reuseError = await serviceA
+      .commitMyForm(
         userId,
         'guardian',
         {
@@ -545,16 +606,11 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
         },
         randomUUID()
       )
-    ).rejects.toMatchObject({ message: 'IDEMPOTENCY_KEY_REUSED' })
-
-    // The fresh commit above enqueued a real `moderation-review` job. Drain
-    // it only now, after every assertion in this test -- draining it earlier
-    // would let the background worker advance the row's revision mid-test
-    // and break the replay-returns-the-same-revision assertion above. An
-    // un-drained job would otherwise leak into whichever other test's
-    // Worker runs next (see 4.4-INT-15's "exactly one job" assertion),
-    // since this queue is real, shared Redis state, not per-test-scoped
-    // like the database.
-    await drainModerationJob(prismaA, storage, profileId)
-  })
+      .then(
+        () => null,
+        (error: unknown) => error
+      )
+    expect(reuseError).toBeInstanceOf(ConflictException)
+    expect(reuseError).toMatchObject({ message: 'IDEMPOTENCY_KEY_REUSED' })
+  }, 15_000)
 })

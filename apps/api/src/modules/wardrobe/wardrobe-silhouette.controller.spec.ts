@@ -1,9 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/unbound-method */
+import type { ExecutionContext } from '@nestjs/common'
+import { Test, type TestingModule } from '@nestjs/testing'
 import type { Request, Response } from 'express'
+import request from 'supertest'
 import { describe, expect, it, vi } from 'vitest'
+import { RequestAuthGuard } from '../auth/security.guards.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
+import { WardrobeUploadGuard } from './wardrobe.guard.js'
 import { WardrobeSilhouetteController } from './wardrobe-silhouette.controller.js'
-import type { WardrobeSilhouetteService } from './wardrobe-silhouette.service.js'
+import { WardrobeSilhouetteService } from './wardrobe-silhouette.service.js'
 
 describe('WardrobeSilhouetteController', () => {
   const profileResponse = {
@@ -215,6 +220,59 @@ describe('WardrobeSilhouetteController', () => {
     const replayRes = createMockRes()
     await controller.commitMyForm(auth, idempotencyKey, body, replayRes)
     expect(replayRes.status).toHaveBeenCalledWith(200)
+  })
+
+  /**
+   * The mock-`res` case above only proves the controller *asks* for 200/201.
+   * Whether the wire agrees is Nest's decision, not ours: it applies the
+   * route's default status before the handler runs and then hands the
+   * adapter `undefined`, which is the only reason a `res.status()` call
+   * inside a `@Res({ passthrough: true })` handler survives instead of being
+   * overwritten back to a POST's 201. That is framework behavior this
+   * codebase now depends on but does not own, so pin it with a real HTTP
+   * round trip -- otherwise a Nest upgrade could silently turn every replay
+   * back into a 201 with all the spec-level assertions still green.
+   */
+  it('4.4-UNIT-CTRL-08 POST commit answers a real 201 fresh and a real 200 on replay', async () => {
+    const service = createMockService()
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      controllers: [WardrobeSilhouetteController],
+      providers: [{ provide: WardrobeSilhouetteService, useValue: service }],
+    })
+      .overrideGuard(RequestAuthGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          context.switchToHttp().getRequest<{ auth: RequestAuthContext }>().auth = auth
+          return true
+        },
+      })
+      .overrideGuard(WardrobeUploadGuard)
+      .useValue({ canActivate: () => true })
+      .compile()
+
+    const app = moduleFixture.createNestApplication()
+    await app.init()
+
+    try {
+      const postCommit = () =>
+        request(app.getHttpServer() as Parameters<typeof request>[0])
+          .post('/api/v1/wardrobe/silhouette/my-form/commit')
+          .set('Idempotency-Key', '4b6b3b0a-1c8a-4a9e-8b8e-1a2b3c4d5e6f')
+          .send({ uploadSessionId: 'session-1', confirmsBasewearGuidance: true })
+
+      const fresh = await postCommit()
+      expect(fresh.status).toBe(201)
+      expect(fresh.headers.etag).toBe('"silhouette:user-1:1"')
+      ;(service.commitMyForm as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        replayed: true,
+        response: profileResponse,
+      })
+      const replay = await postCommit()
+      expect(replay.status).toBe(200)
+      expect(replay.headers.etag).toBe('"silhouette:user-1:1"')
+    } finally {
+      await app.close()
+    }
   })
 
   it('4.4-UNIT-CTRL-09 DELETE forwards If-Match and stamps a fresh ETag', async () => {
