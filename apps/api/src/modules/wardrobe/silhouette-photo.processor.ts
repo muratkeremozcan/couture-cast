@@ -151,23 +151,22 @@ export class SilhouettePhotoProcessor {
       },
     })
 
-    for (const guardianEmail of context.guardianEmails) {
-      await tx.eventEnvelope.create({
-        data: {
-          channel: 'email.guardian-silhouette-flag',
-          user_id: profile.user_id,
-          payload: {
-            to: guardianEmail,
-            teenId: profile.user_id,
-            teenEmail: context.teen.email,
-            silhouetteProfileId: profile.id,
-            moderationEventId: moderationEvent.id,
-            reason: 'privacy_violation',
-            flaggedAt: new Date().toISOString(),
-          },
+    const flaggedAt = new Date().toISOString()
+    await tx.eventEnvelope.createMany({
+      data: context.guardianEmails.map((guardianEmail) => ({
+        channel: 'email.guardian-silhouette-flag',
+        user_id: profile.user_id,
+        payload: {
+          to: guardianEmail,
+          teenId: profile.user_id,
+          teenEmail: context.teen.email,
+          silhouetteProfileId: profile.id,
+          moderationEventId: moderationEvent.id,
+          reason: 'privacy_violation',
+          flaggedAt,
         },
-      })
-    }
+      })),
+    })
   }
 
   /**

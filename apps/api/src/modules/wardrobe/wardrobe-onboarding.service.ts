@@ -390,16 +390,22 @@ export class WardrobeOnboardingService {
         return
       }
 
-      const silhouette = await this.prisma.silhouetteProfile.findUnique({
-        where: { user_id: userId },
-        select: { mode: true },
-      })
-      const durationMs =
-        row.started_at && row.completed_at
-          ? Math.max(0, row.completed_at.getTime() - row.started_at.getTime())
-          : 0
-
+      // The silhouette lookup and duration calculation below run *after* the
+      // claim above already committed, so they must be inside this same
+      // release-on-failure boundary too -- not just the capture() call.
+      // A throw from the lookup previously fell through to the outer catch,
+      // which only logs: the claim would stay set forever for an event that
+      // was never actually captured, with no replay able to recover it.
       try {
+        const silhouette = await this.prisma.silhouetteProfile.findUnique({
+          where: { user_id: userId },
+          select: { mode: true },
+        })
+        const durationMs =
+          row.started_at && row.completed_at
+            ? Math.max(0, row.completed_at.getTime() - row.started_at.getTime())
+            : 0
+
         this.analyticsClient.capture(
           trackWardrobeOnboardingCompleted({
             analyticsSubjectId: userId,
@@ -429,6 +435,14 @@ export class WardrobeOnboardingService {
    * "emitted" for an event that never was, and no later replay can recover it.
    * Releasing turns an at-most-once guard into an at-most-once guard that is
    * still retryable, which is the property the columns were added for.
+   *
+   * Deliberately not covered here: if this release itself fails (both the
+   * capture and the compensating UPDATE fail), the claim stays stuck and
+   * only manual/DBA recovery clears it -- there is no durable retry queue
+   * for un-claiming a guard column anywhere in this codebase to reuse, and
+   * building one is a bigger change than this fix. That is a real, narrow
+   * gap (a double failure on an already-rare failure path), left as a known
+   * follow-up rather than silently ignored.
    */
   private async releaseTelemetryClaim(
     userId: string,
