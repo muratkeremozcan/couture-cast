@@ -35,4 +35,10 @@ regexes = [
   # Fixed idempotency-key fixtures used only in the web My Form upload transport tests
   '''^idempotency-key-1$''',
   '''^idempotency-key-reused$''',
+  # Fixed UUID used only as the valid idempotency-key fixture in
+  # wardrobe.controller.spec.ts
+  '''^b0e9bf1d-2a18-4d59-bef8-fb559cbb3272$''',
+  # Fixed UUID used only as a stored My Form upload idempotency key in a
+  # wardrobe-silhouette.service.spec.ts replay fixture
+  '''^a3f7c2d1-5b9e-4a86-9c31-2e7d4b8f6a05$''',
 ]
