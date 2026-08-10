@@ -48,6 +48,8 @@ export const analyticsEventNameSchema = z.enum([
   'wardrobe_capsule_recommended',
   'wardrobe_capsule_recommendation_viewed',
   'wardrobe_capsule_recommendation_selected',
+  'wardrobe_onboarding_started',
+  'wardrobe_onboarding_completed',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -373,6 +375,35 @@ export type WardrobeCapsuleRecommendationSelectedEvent = z.infer<
   typeof wardrobeCapsuleRecommendationSelectedEventSchema
 >
 
+// Story 4.4 Task 2: onboarding activation events, distinct from the existing
+// profile_completed/first_outfit_generated MVP activation pair. Deliberately
+// carries no photo bytes, silhouette detail, or free-form text (decision 13).
+export const wardrobeOnboardingStartedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString.max(128),
+    timestamp: isoTimestamp,
+  })
+  .strict()
+
+export type WardrobeOnboardingStartedEvent = z.infer<
+  typeof wardrobeOnboardingStartedEventSchema
+>
+
+export const wardrobeOnboardingCompletedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString.max(128),
+    durationMs: z.number().int().min(0).max(86_400_000),
+    usedStarterWardrobe: z.boolean(),
+    garmentCount: z.number().int().min(0).max(10_000),
+    silhouetteMode: z.enum(['default_mannequin', 'my_form']),
+    timestamp: isoTimestamp,
+  })
+  .strict()
+
+export type WardrobeOnboardingCompletedEvent = z.infer<
+  typeof wardrobeOnboardingCompletedEventSchema
+>
+
 export const analyticsEventSchemas = {
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
@@ -396,6 +427,8 @@ export const analyticsEventSchemas = {
   wardrobe_capsule_recommendation_viewed: wardrobeCapsuleRecommendationViewedEventSchema,
   wardrobe_capsule_recommendation_selected:
     wardrobeCapsuleRecommendationSelectedEventSchema,
+  wardrobe_onboarding_started: wardrobeOnboardingStartedEventSchema,
+  wardrobe_onboarding_completed: wardrobeOnboardingCompletedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -952,6 +985,32 @@ export type WardrobeCapsuleRecommendationSelectedProperties = z.infer<
   typeof wardrobeCapsuleRecommendationSelectedPropertiesSchema
 >
 
+export const wardrobeOnboardingStartedPropertiesSchema = z
+  .object({
+    user_id: nonEmptyString,
+    timestamp: isoTimestamp,
+  })
+  .strict()
+
+export type WardrobeOnboardingStartedProperties = z.infer<
+  typeof wardrobeOnboardingStartedPropertiesSchema
+>
+
+export const wardrobeOnboardingCompletedPropertiesSchema = z
+  .object({
+    user_id: nonEmptyString,
+    duration_ms: z.number().int().min(0).max(86_400_000),
+    used_starter_wardrobe: z.boolean(),
+    garment_count: z.number().int().min(0).max(10_000),
+    silhouette_mode: z.enum(['default_mannequin', 'my_form']),
+    timestamp: isoTimestamp,
+  })
+  .strict()
+
+export type WardrobeOnboardingCompletedProperties = z.infer<
+  typeof wardrobeOnboardingCompletedPropertiesSchema
+>
+
 export function trackWardrobeCapsuleCreated(
   event: WardrobeCapsuleCreatedEvent
 ): AnalyticsCapturePayload<'wardrobe_capsule_created', WardrobeCapsuleCreatedProperties> {
@@ -1076,6 +1135,46 @@ export function trackWardrobeCapsuleRecommendationSelected(
     properties: wardrobeCapsuleRecommendationSelectedPropertiesSchema.parse({
       capsule_id: parsed.capsuleId,
       scenario: parsed.scenario,
+    }),
+  }
+}
+
+export function trackWardrobeOnboardingStarted(
+  event: WardrobeOnboardingStartedEvent
+): AnalyticsCapturePayload<
+  'wardrobe_onboarding_started',
+  WardrobeOnboardingStartedProperties
+> {
+  const parsed = wardrobeOnboardingStartedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'wardrobe_onboarding_started',
+    properties: wardrobeOnboardingStartedPropertiesSchema.parse({
+      user_id: parsed.analyticsSubjectId,
+      timestamp: parsed.timestamp,
+    }),
+  }
+}
+
+export function trackWardrobeOnboardingCompleted(
+  event: WardrobeOnboardingCompletedEvent
+): AnalyticsCapturePayload<
+  'wardrobe_onboarding_completed',
+  WardrobeOnboardingCompletedProperties
+> {
+  const parsed = wardrobeOnboardingCompletedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'wardrobe_onboarding_completed',
+    properties: wardrobeOnboardingCompletedPropertiesSchema.parse({
+      user_id: parsed.analyticsSubjectId,
+      duration_ms: parsed.durationMs,
+      used_starter_wardrobe: parsed.usedStarterWardrobe,
+      garment_count: parsed.garmentCount,
+      silhouette_mode: parsed.silhouetteMode,
+      timestamp: parsed.timestamp,
     }),
   }
 }

@@ -1,5 +1,5 @@
 // Story 4.2 Task 5 step 1 owner: implement suggestGarmentTags and updateGarmentTags service methods in apps/api/src/modules/wardrobe/wardrobe.service.ts
-import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   BadRequestException,
   ConflictException,
@@ -26,7 +26,6 @@ import {
 } from '@couture/api-client/contracts/http'
 import { buildGarmentObjectPath } from '@couture/utils'
 
-import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import { createBaseLogger } from '../../logger/pino.config'
 import type { ApiRole } from '../auth/security.types'
 import { GuardianService } from '../guardian/guardian.service'
@@ -43,6 +42,11 @@ import {
 } from './wardrobe-image-validation'
 import { WardrobeProcessingQueue } from './wardrobe-processing.queue'
 import { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
+import {
+  generateUploadToken,
+  requireUploadTokenSecret,
+  verifyUploadToken,
+} from './wardrobe-upload-token'
 
 const UPLOAD_EXPIRY_SECONDS = 900
 const READ_URL_EXPIRY_SECONDS = 900
@@ -67,45 +71,10 @@ type CommitResult = {
   response: GarmentItemResponse
 }
 
-function requireUploadTokenSecret(): string {
-  const configuredSecret = process.env.WARDROBE_UPLOAD_TOKEN_SECRET?.trim()
-  if (configuredSecret && configuredSecret.length >= 32) {
-    return configuredSecret
-  }
-  if (allowsTestOnlySecrets()) {
-    return 'test-only-wardrobe-upload-token-secret'
-  }
-  throw new Error('WARDROBE_UPLOAD_TOKEN_SECRET must contain at least 32 characters')
-}
-
 function deriveObjectExtension(mimeType: GarmentMimeType): 'jpg' | 'png' | 'webp' {
   if (mimeType === 'image/jpeg') return 'jpg'
   if (mimeType === 'image/png') return 'png'
   return 'webp'
-}
-
-function generateUploadToken(
-  uploadSessionId: string,
-  userId: string,
-  expiresAtIso: string,
-  secret: string
-): string {
-  const data = `${uploadSessionId}.${userId}.${expiresAtIso}`
-  return createHmac('sha256', secret).update(data).digest('base64url')
-}
-
-function verifyUploadToken(
-  token: string,
-  uploadSessionId: string,
-  userId: string,
-  expiresAtIso: string,
-  secret: string
-): boolean {
-  const expected = generateUploadToken(uploadSessionId, userId, expiresAtIso, secret)
-  if (token.length !== expected.length) {
-    return false
-  }
-  return timingSafeEqual(Buffer.from(token), Buffer.from(expected))
 }
 
 function allocationMatches(

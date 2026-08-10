@@ -550,6 +550,269 @@ export type OutfitCapsuleListResponse = z.infer<typeof outfitCapsuleListResponse
 export type UpdateOutfitCapsuleInput = z.infer<typeof updateOutfitCapsuleInputSchema>
 export type FavoriteOutfitCapsuleInput = z.infer<typeof favoriteOutfitCapsuleInputSchema>
 
+// ---------------------------------------------------------------------------
+// Story 4.4: wardrobe onboarding state machine and silhouette profile
+// ---------------------------------------------------------------------------
+
+export const wardrobeOnboardingStatusEnum = z.enum([
+  'not_started',
+  'in_progress',
+  'completed',
+])
+
+export const wardrobeOnboardingStepEnum = z.enum([
+  'permission',
+  'capture',
+  'tagging',
+  'silhouette',
+  'complete',
+])
+
+export const silhouetteModeEnum = z.enum(['default_mannequin', 'my_form'])
+
+export const silhouettePhotoStatusEnum = z.enum([
+  'pending_upload',
+  'bytes_uploaded',
+  'processing',
+  'ready',
+  'failed',
+])
+
+export const silhouettePhotoFailureReasonEnum = z.enum([
+  'contrast',
+  'privacy_violation',
+  'timeout',
+  'storage_error',
+])
+
+export const wardrobeOnboardingStateSchema = z
+  .object({
+    status: wardrobeOnboardingStatusEnum,
+    currentStep: wardrobeOnboardingStepEnum,
+    usedStarterWardrobe: z.boolean(),
+    garmentsCapturedCount: z.number().int().min(0),
+    startedAt: isoTimestampSchema.nullable(),
+    completedAt: isoTimestampSchema.nullable(),
+    revision: z.number().int().min(0),
+  })
+  .strict()
+
+export const wardrobeOnboardingStateResponseSchema = z
+  .object({
+    data: wardrobeOnboardingStateSchema,
+  })
+  .strict()
+
+/**
+ * Forward-only step transition. `usedStarterWardrobe: true` is only valid
+ * paired with `targetStep: 'silhouette'` from the `capture` step (decision 2)
+ * and marks capture skipped rather than adding a distinct step value.
+ */
+export const updateWardrobeOnboardingStateInputSchema = z
+  .object({
+    targetStep: wardrobeOnboardingStepEnum,
+    usedStarterWardrobe: z.boolean().optional(),
+  })
+  .strict()
+
+const onboardingBadRequestErrorSchema = z
+  .object({
+    statusCode: z.literal(400),
+    message: z.string(),
+    error: z.literal('Bad Request'),
+  })
+  .strict()
+
+const onboardingForbiddenErrorSchema = z
+  .object({
+    statusCode: z.literal(403),
+    message: z.enum(['GUARDIAN_READ_ONLY', 'GUARDIAN_CONSENT_REQUIRED']),
+    error: z.literal('Forbidden'),
+  })
+  .strict()
+
+const onboardingConflictErrorSchema = z
+  .object({
+    statusCode: z.literal(409),
+    message: z.literal('INVALID_STEP_TRANSITION'),
+    error: z.literal('Conflict'),
+  })
+  .strict()
+
+const onboardingPreconditionFailedErrorSchema = z
+  .object({
+    statusCode: z.literal(412),
+    message: z.literal('ONBOARDING_REVISION_MISMATCH'),
+    error: z.literal('Precondition Failed'),
+  })
+  .strict()
+
+const onboardingPreconditionRequiredErrorSchema = z
+  .object({
+    statusCode: z.literal(428),
+    message: z.literal('PRECONDITION_REQUIRED'),
+    error: z.literal('Precondition Required'),
+  })
+  .strict()
+
+const silhouetteSliderInputSchema = z.number().int().min(0).max(100)
+
+export const silhouetteMyFormSchema = z
+  .object({
+    status: silhouettePhotoStatusEnum,
+    failureReason: silhouettePhotoFailureReasonEnum.nullable(),
+    committedAt: isoTimestampSchema.nullable(),
+    imageAccess: garmentImageAccessSchema.nullable(),
+  })
+  .strict()
+
+export const silhouetteProfileSchema = z
+  .object({
+    mode: silhouetteModeEnum,
+    heightSlider: z.number().int().min(0).max(100).nullable(),
+    buildSlider: z.number().int().min(0).max(100).nullable(),
+    myForm: silhouetteMyFormSchema.nullable(),
+    revision: z.number().int().min(0),
+    updatedAt: isoTimestampSchema,
+  })
+  .strict()
+
+export const silhouetteProfileResponseSchema = z
+  .object({
+    data: silhouetteProfileSchema,
+  })
+  .strict()
+
+export const updateSilhouetteSlidersInputSchema = z
+  .object({
+    heightSlider: silhouetteSliderInputSchema,
+    buildSlider: silhouetteSliderInputSchema,
+  })
+  .strict()
+
+export const createSilhouetteUploadUrlInputSchema = z
+  .object({
+    fileSizeBytes: z.number().int().min(1).max(10_485_760),
+    mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    sha256: z
+      .string()
+      .length(64)
+      .regex(/^[a-f0-9]{64}$/, {
+        message: 'sha256 must be a 64-character lowercase hex string.',
+      }),
+    widthPx: z.number().int().min(256).max(4096),
+    heightPx: z.number().int().min(256).max(4096),
+  })
+  .strict()
+
+export const silhouetteUploadSessionSchema = z
+  .object({
+    uploadSessionId: nonEmptyStringSchema,
+    uploadUrl: z.string().url(),
+    uploadToken: nonEmptyStringSchema,
+    requiredHeaders: z
+      .object({
+        'content-type': z.string(),
+      })
+      .strict(),
+    expiresAt: isoTimestampSchema,
+  })
+  .strict()
+
+export const createSilhouetteUploadUrlResponseSchema = z
+  .object({
+    data: silhouetteUploadSessionSchema,
+  })
+  .strict()
+
+export const silhouetteUploadSessionPathParamsSchema = z.object({
+  uploadSessionId: nonEmptyStringSchema.describe('Opaque upload session ID.'),
+})
+
+export const commitSilhouettePhotoInputSchema = z
+  .object({
+    uploadSessionId: nonEmptyStringSchema,
+    confirmsBasewearGuidance: z.literal(true),
+  })
+  .strict()
+
+const silhouetteBadRequestErrorSchema = z
+  .object({
+    statusCode: z.literal(400),
+    message: z.string(),
+    error: z.literal('Bad Request'),
+  })
+  .strict()
+
+const silhouetteForbiddenErrorSchema = z
+  .object({
+    statusCode: z.literal(403),
+    message: z.enum(['GUARDIAN_READ_ONLY', 'GUARDIAN_CONSENT_REQUIRED']),
+    error: z.literal('Forbidden'),
+  })
+  .strict()
+
+const silhouetteNotFoundErrorSchema = z
+  .object({
+    statusCode: z.literal(404),
+    message: z.literal('NOT_FOUND'),
+    error: z.literal('Not Found'),
+  })
+  .strict()
+
+const silhouetteConflictErrorSchema = z
+  .object({
+    statusCode: z.literal(409),
+    message: z.enum(['CONFIRM_BASEWEAR_GUIDANCE_REQUIRED', 'IDEMPOTENCY_KEY_REUSED']),
+    error: z.literal('Conflict'),
+  })
+  .strict()
+
+const silhouettePreconditionFailedErrorSchema = z
+  .object({
+    statusCode: z.literal(412),
+    message: z.literal('SILHOUETTE_REVISION_MISMATCH'),
+    error: z.literal('Precondition Failed'),
+  })
+  .strict()
+
+const silhouettePreconditionRequiredErrorSchema = z
+  .object({
+    statusCode: z.literal(428),
+    message: z.literal('PRECONDITION_REQUIRED'),
+    error: z.literal('Precondition Required'),
+  })
+  .strict()
+
+export type WardrobeOnboardingStatus = z.infer<typeof wardrobeOnboardingStatusEnum>
+export type WardrobeOnboardingStep = z.infer<typeof wardrobeOnboardingStepEnum>
+export type SilhouetteMode = z.infer<typeof silhouetteModeEnum>
+export type SilhouettePhotoStatus = z.infer<typeof silhouettePhotoStatusEnum>
+export type SilhouettePhotoFailureReason = z.infer<
+  typeof silhouettePhotoFailureReasonEnum
+>
+export type WardrobeOnboardingStateContract = z.infer<
+  typeof wardrobeOnboardingStateSchema
+>
+export type WardrobeOnboardingStateResponse = z.infer<
+  typeof wardrobeOnboardingStateResponseSchema
+>
+export type UpdateWardrobeOnboardingStateInput = z.infer<
+  typeof updateWardrobeOnboardingStateInputSchema
+>
+export type SilhouetteProfileContract = z.infer<typeof silhouetteProfileSchema>
+export type SilhouetteProfileResponse = z.infer<typeof silhouetteProfileResponseSchema>
+export type UpdateSilhouetteSlidersInput = z.infer<
+  typeof updateSilhouetteSlidersInputSchema
+>
+export type CreateSilhouetteUploadUrlInput = z.infer<
+  typeof createSilhouetteUploadUrlInputSchema
+>
+export type CreateSilhouetteUploadUrlResponse = z.infer<
+  typeof createSilhouetteUploadUrlResponseSchema
+>
+export type CommitSilhouettePhotoInput = z.infer<typeof commitSilhouettePhotoInputSchema>
+
 export function registerWardrobeContracts(
   registry: OpenAPIRegistry,
   commonSchemas: RegisteredCommonHttpSchemas
@@ -1436,6 +1699,561 @@ export function registerWardrobeContracts(
         content: {
           'application/json': {
             schema: registeredCapsulePreconditionRequiredError,
+          },
+        },
+      },
+    },
+  })
+
+  // ---------------------------------------------------------------------
+  // Story 4.4: wardrobe onboarding state machine
+  // ---------------------------------------------------------------------
+
+  const registeredWardrobeOnboardingStateResponse = registry.register(
+    'WardrobeOnboardingStateResponse',
+    wardrobeOnboardingStateResponseSchema
+  )
+  const registeredUpdateWardrobeOnboardingStateInput = registry.register(
+    'UpdateWardrobeOnboardingStateInput',
+    updateWardrobeOnboardingStateInputSchema
+  )
+  const registeredOnboardingBadRequestError = registry.register(
+    'OnboardingBadRequestError',
+    onboardingBadRequestErrorSchema
+  )
+  const registeredOnboardingForbiddenError = registry.register(
+    'OnboardingForbiddenError',
+    onboardingForbiddenErrorSchema
+  )
+  const registeredOnboardingConflictError = registry.register(
+    'OnboardingConflictError',
+    onboardingConflictErrorSchema
+  )
+  const registeredOnboardingPreconditionFailedError = registry.register(
+    'OnboardingPreconditionFailedError',
+    onboardingPreconditionFailedErrorSchema
+  )
+  const registeredOnboardingPreconditionRequiredError = registry.register(
+    'OnboardingPreconditionRequiredError',
+    onboardingPreconditionRequiredErrorSchema
+  )
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/v1/wardrobe/onboarding',
+    tags: ['wardrobe'],
+    summary:
+      'Read wardrobe onboarding progress (virtual not_started default when absent)',
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: 'Current onboarding state, real or virtual not_started default.',
+        content: {
+          'application/json': {
+            schema: registeredWardrobeOnboardingStateResponse,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian consent forbidden.',
+        content: {
+          'application/json': {
+            schema: registeredOnboardingForbiddenError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/v1/wardrobe/onboarding',
+    tags: ['wardrobe'],
+    summary: 'Advance the onboarding state machine one forward-only step',
+    security: [{ bearerAuth: [] }],
+    request: {
+      headers: z.object({
+        'if-match': z.string(),
+      }),
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: registeredUpdateWardrobeOnboardingStateInput,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Onboarding state advanced (or safe no-op replay).',
+        content: {
+          'application/json': {
+            schema: registeredWardrobeOnboardingStateResponse,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid step transition payload.',
+        content: {
+          'application/json': {
+            schema: registeredOnboardingBadRequestError,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian consent forbidden.',
+        content: {
+          'application/json': {
+            schema: registeredOnboardingForbiddenError,
+          },
+        },
+      },
+      409: {
+        description: 'Step transition is not forward-reachable from the current step.',
+        content: {
+          'application/json': {
+            schema: registeredOnboardingConflictError,
+          },
+        },
+      },
+      412: {
+        description: 'Stale ETag / onboarding revision mismatch.',
+        content: {
+          'application/json': {
+            schema: registeredOnboardingPreconditionFailedError,
+          },
+        },
+      },
+      428: {
+        description: 'If-Match header required.',
+        content: {
+          'application/json': {
+            schema: registeredOnboardingPreconditionRequiredError,
+          },
+        },
+      },
+    },
+  })
+
+  // ---------------------------------------------------------------------
+  // Story 4.4: silhouette sliders and "My Form" photo pipeline
+  // ---------------------------------------------------------------------
+
+  const registeredSilhouetteProfileResponse = registry.register(
+    'SilhouetteProfileResponse',
+    silhouetteProfileResponseSchema
+  )
+  const registeredUpdateSilhouetteSlidersInput = registry.register(
+    'UpdateSilhouetteSlidersInput',
+    updateSilhouetteSlidersInputSchema
+  )
+  const registeredCreateSilhouetteUploadUrlInput = registry.register(
+    'CreateSilhouetteUploadUrlInput',
+    createSilhouetteUploadUrlInputSchema
+  )
+  const registeredCreateSilhouetteUploadUrlResponse = registry.register(
+    'CreateSilhouetteUploadUrlResponse',
+    createSilhouetteUploadUrlResponseSchema
+  )
+  const registeredCommitSilhouettePhotoInput = registry.register(
+    'CommitSilhouettePhotoInput',
+    commitSilhouettePhotoInputSchema
+  )
+  const registeredSilhouetteBadRequestError = registry.register(
+    'SilhouetteBadRequestError',
+    silhouetteBadRequestErrorSchema
+  )
+  const registeredSilhouetteForbiddenError = registry.register(
+    'SilhouetteForbiddenError',
+    silhouetteForbiddenErrorSchema
+  )
+  const registeredSilhouetteNotFoundError = registry.register(
+    'SilhouetteNotFoundError',
+    silhouetteNotFoundErrorSchema
+  )
+  const registeredSilhouetteConflictError = registry.register(
+    'SilhouetteConflictError',
+    silhouetteConflictErrorSchema
+  )
+  const registeredSilhouettePreconditionFailedError = registry.register(
+    'SilhouettePreconditionFailedError',
+    silhouettePreconditionFailedErrorSchema
+  )
+  const registeredSilhouettePreconditionRequiredError = registry.register(
+    'SilhouettePreconditionRequiredError',
+    silhouettePreconditionRequiredErrorSchema
+  )
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/v1/wardrobe/silhouette',
+    tags: ['wardrobe'],
+    summary: 'Read the silhouette profile (sliders and/or My Form photo state)',
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: 'Current silhouette profile, real or virtual default.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteProfileResponse,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian consent forbidden (WardrobeUploadGuard).',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteForbiddenError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'put',
+    path: '/api/v1/wardrobe/silhouette',
+    tags: ['wardrobe'],
+    summary: 'Upsert mannequin slider values',
+    security: [{ bearerAuth: [] }],
+    request: {
+      headers: z.object({
+        'if-match': z.string(),
+      }),
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: registeredUpdateSilhouetteSlidersInput,
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Sliders saved (or safe no-op replay).',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteProfileResponse,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid slider values.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteBadRequestError,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian consent forbidden.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteForbiddenError,
+          },
+        },
+      },
+      412: {
+        description: 'Stale ETag / silhouette revision mismatch.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouettePreconditionFailedError,
+          },
+        },
+      },
+      428: {
+        description: 'If-Match header required.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouettePreconditionRequiredError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/wardrobe/silhouette/my-form/upload-url',
+    tags: ['wardrobe'],
+    summary: 'Allocate an upload session for a "My Form" full-body photo',
+    security: [{ bearerAuth: [] }],
+    request: {
+      headers: z.object({
+        'idempotency-key': z.string().uuid(),
+      }),
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: registeredCreateSilhouetteUploadUrlInput,
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: 'Upload session allocated.',
+        content: {
+          'application/json': {
+            schema: registeredCreateSilhouetteUploadUrlResponse,
+          },
+        },
+      },
+      200: {
+        description: 'Replayed idempotent upload session allocation.',
+        content: {
+          'application/json': {
+            schema: registeredCreateSilhouetteUploadUrlResponse,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid upload declaration.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteBadRequestError,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian consent forbidden.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteForbiddenError,
+          },
+        },
+      },
+      409: {
+        description: 'Idempotency key reused with a different payload.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteConflictError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'put',
+    path: '/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}',
+    tags: ['wardrobe'],
+    summary: 'Upload My Form photo bytes to a previously allocated session',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: silhouetteUploadSessionPathParamsSchema,
+    },
+    responses: {
+      204: {
+        description: 'Bytes accepted.',
+      },
+      400: {
+        description: 'Missing upload token or malformed request.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteBadRequestError,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian consent forbidden or upload token mismatch.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteForbiddenError,
+          },
+        },
+      },
+      404: {
+        description: 'Upload session not found or expired.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteNotFoundError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/wardrobe/silhouette/my-form/commit',
+    tags: ['wardrobe'],
+    summary: 'Commit uploaded My Form photo bytes and enqueue processing',
+    security: [{ bearerAuth: [] }],
+    request: {
+      headers: z.object({
+        'idempotency-key': z.string().uuid(),
+      }),
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: registeredCommitSilhouettePhotoInput,
+          },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: 'Photo committed and queued for processing.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteProfileResponse,
+          },
+        },
+      },
+      200: {
+        description: 'Replayed idempotent commit (already committed with this key).',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteProfileResponse,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid commit payload.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteBadRequestError,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian consent forbidden.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteForbiddenError,
+          },
+        },
+      },
+      404: {
+        description: 'Upload session not found or expired.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteNotFoundError,
+          },
+        },
+      },
+      409: {
+        description: 'Basewear guidance not confirmed, or idempotency key reused.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteConflictError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/v1/wardrobe/silhouette/my-form',
+    tags: ['wardrobe'],
+    summary:
+      'Immediately hard-delete the My Form photo and fall back to default_mannequin',
+    security: [{ bearerAuth: [] }],
+    request: {
+      headers: z.object({
+        'if-match': z.string(),
+      }),
+    },
+    responses: {
+      200: {
+        description: 'My Form photo deleted; profile reverted to default_mannequin.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteProfileResponse,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Guardian consent forbidden.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouetteForbiddenError,
+          },
+        },
+      },
+      412: {
+        description: 'Stale ETag / silhouette revision mismatch.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouettePreconditionFailedError,
+          },
+        },
+      },
+      428: {
+        description: 'If-Match header required.',
+        content: {
+          'application/json': {
+            schema: registeredSilhouettePreconditionRequiredError,
           },
         },
       },

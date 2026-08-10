@@ -3,7 +3,9 @@ import {
   type GarmentItemContract,
   type GarmentTagSuggestionSnapshot,
   type OutfitCapsuleContract,
+  type SilhouetteProfileContract,
   type SuggestGarmentTagsData,
+  type WardrobeOnboardingStateContract,
 } from '../contracts/http/wardrobe'
 
 const FIXED_CREATED_AT = '2026-08-05T10:00:00.000Z'
@@ -125,4 +127,63 @@ export function createOutfitCapsuleFixture(
     updatedAt: FIXED_COMMITTED_AT,
     ...overrides,
   }
+}
+
+export function createWardrobeOnboardingStateFixture(
+  overrides: Partial<WardrobeOnboardingStateContract> = {}
+): WardrobeOnboardingStateContract {
+  return {
+    status: 'in_progress',
+    currentStep: 'silhouette',
+    usedStarterWardrobe: false,
+    garmentsCapturedCount: 1,
+    startedAt: FIXED_CREATED_AT,
+    completedAt: null,
+    revision: 1,
+    ...overrides,
+  }
+}
+
+export function createNotStartedOnboardingStateFixture(): WardrobeOnboardingStateContract {
+  return createWardrobeOnboardingStateFixture({
+    status: 'not_started',
+    currentStep: 'permission',
+    usedStarterWardrobe: false,
+    garmentsCapturedCount: 0,
+    startedAt: null,
+    completedAt: null,
+    revision: 0,
+  })
+}
+
+export function createSilhouetteProfileFixture(
+  overrides: Partial<SilhouetteProfileContract> = {}
+): SilhouetteProfileContract {
+  return {
+    mode: 'default_mannequin',
+    heightSlider: 50,
+    buildSlider: 50,
+    myForm: null,
+    revision: 1,
+    updatedAt: FIXED_COMMITTED_AT,
+    ...overrides,
+  }
+}
+
+export function createReadyMyFormSilhouetteProfileFixture(
+  overrides: Partial<SilhouetteProfileContract> = {}
+): SilhouetteProfileContract {
+  return createSilhouetteProfileFixture({
+    mode: 'my_form',
+    myForm: {
+      status: 'ready',
+      failureReason: null,
+      committedAt: FIXED_COMMITTED_AT,
+      imageAccess: {
+        url: 'https://example.test/silhouette-my-form.png',
+        expiresAt: FIXED_IMAGE_EXPIRY,
+      },
+    },
+    ...overrides,
+  })
 }

@@ -5,8 +5,10 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   GarmentItemContract,
+  SilhouetteProfileContract,
   SuggestGarmentTagsData,
   UpdateGarmentTagsInput,
+  WardrobeOnboardingStateContract,
 } from '@couture/api-client/contracts/http'
 import type { UploadGarmentImageInput } from '../../lib/wardrobe'
 
@@ -15,6 +17,12 @@ const {
   uploadGarmentImageFromWeb,
   suggestGarmentTagsFromWeb,
   updateGarmentTagsFromWeb,
+  getOnboardingStateFromWeb,
+  resolveCurrentUserId,
+  getSilhouetteProfileFromWeb,
+  updateSilhouetteSlidersFromWeb,
+  uploadMyFormPhotoFromWeb,
+  deleteMyFormPhotoFromWeb,
 } = vi.hoisted(() => ({
   listGarmentsFromWeb: vi.fn<(signal?: AbortSignal) => Promise<GarmentItemContract[]>>(),
   uploadGarmentImageFromWeb:
@@ -29,6 +37,14 @@ const {
         signal?: AbortSignal
       ) => Promise<GarmentItemContract>
     >(),
+  getOnboardingStateFromWeb:
+    vi.fn<(signal?: AbortSignal) => Promise<WardrobeOnboardingStateContract>>(),
+  resolveCurrentUserId: vi.fn<() => Promise<string>>(),
+  getSilhouetteProfileFromWeb:
+    vi.fn<(signal?: AbortSignal) => Promise<SilhouetteProfileContract>>(),
+  updateSilhouetteSlidersFromWeb: vi.fn(),
+  uploadMyFormPhotoFromWeb: vi.fn(),
+  deleteMyFormPhotoFromWeb: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -40,6 +56,14 @@ vi.mock('../../lib/wardrobe', () => ({
   uploadGarmentImageFromWeb,
   suggestGarmentTagsFromWeb,
   updateGarmentTagsFromWeb,
+  getOnboardingStateFromWeb,
+  resolveCurrentUserId,
+  getSilhouetteProfileFromWeb,
+  updateSilhouetteSlidersFromWeb,
+  uploadMyFormPhotoFromWeb,
+  deleteMyFormPhotoFromWeb,
+  silhouetteETag: (userId: string, revision: number) =>
+    `"silhouette:${userId}:${revision}"`,
 }))
 
 import WardrobePage from './page'
@@ -62,12 +86,44 @@ const persistedGarment: GarmentItemContract = {
   },
 }
 
+function onboardingState(
+  overrides: Partial<WardrobeOnboardingStateContract> = {}
+): WardrobeOnboardingStateContract {
+  return {
+    status: 'not_started',
+    currentStep: 'permission',
+    usedStarterWardrobe: false,
+    garmentsCapturedCount: 0,
+    startedAt: null,
+    completedAt: null,
+    revision: 0,
+    ...overrides,
+  }
+}
+
+function silhouetteProfile(): SilhouetteProfileContract {
+  return {
+    mode: 'default_mannequin',
+    heightSlider: 50,
+    buildSlider: 50,
+    myForm: null,
+    revision: 0,
+    updatedAt: '2026-08-09T09:00:00.000Z',
+  }
+}
+
 describe('WardrobePage persistence', () => {
   beforeEach(() => {
     listGarmentsFromWeb.mockReset()
     uploadGarmentImageFromWeb.mockReset()
     suggestGarmentTagsFromWeb.mockReset()
     updateGarmentTagsFromWeb.mockReset()
+    getOnboardingStateFromWeb.mockReset().mockResolvedValue(onboardingState())
+    resolveCurrentUserId.mockReset().mockResolvedValue('user-hub-1')
+    getSilhouetteProfileFromWeb.mockReset().mockResolvedValue(silhouetteProfile())
+    updateSilhouetteSlidersFromWeb.mockReset()
+    uploadMyFormPhotoFromWeb.mockReset()
+    deleteMyFormPhotoFromWeb.mockReset()
   })
 
   it('reconciles a committed garment and hydrates it again after reload', async () => {
@@ -95,5 +151,68 @@ describe('WardrobePage persistence', () => {
 
     await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2))
     expect(await screen.findByText(persistedGarment.id)).toBeInTheDocument()
+  })
+})
+
+describe('WardrobePage onboarding entry card', () => {
+  beforeEach(() => {
+    listGarmentsFromWeb.mockReset().mockResolvedValue([])
+    uploadGarmentImageFromWeb.mockReset()
+    suggestGarmentTagsFromWeb.mockReset()
+    updateGarmentTagsFromWeb.mockReset()
+    getOnboardingStateFromWeb.mockReset()
+    resolveCurrentUserId.mockReset().mockResolvedValue('user-hub-1')
+    getSilhouetteProfileFromWeb.mockReset().mockResolvedValue(silhouetteProfile())
+    updateSilhouetteSlidersFromWeb.mockReset()
+    uploadMyFormPhotoFromWeb.mockReset()
+    deleteMyFormPhotoFromWeb.mockReset()
+  })
+
+  it('shows the "Set up your closet" entry card while onboarding is not completed', async () => {
+    getOnboardingStateFromWeb.mockResolvedValue(
+      onboardingState({ status: 'in_progress' })
+    )
+    render(<WardrobePage />)
+
+    const link = await screen.findByRole('link', { name: 'Set up your closet' })
+    expect(link).toHaveAttribute('href', '/wardrobe/onboarding')
+  })
+
+  it('hides the entry card once onboarding is completed', async () => {
+    getOnboardingStateFromWeb.mockResolvedValue(
+      onboardingState({ status: 'completed', currentStep: 'complete' })
+    )
+    render(<WardrobePage />)
+
+    await screen.findByText('No garments added yet')
+    expect(
+      screen.queryByRole('link', { name: 'Set up your closet' })
+    ).not.toBeInTheDocument()
+  })
+
+  it('does not break the wardrobe hub when the onboarding status fetch fails', async () => {
+    getOnboardingStateFromWeb.mockRejectedValue(new Error('network down'))
+    render(<WardrobePage />)
+
+    await screen.findByText('No garments added yet')
+    expect(
+      screen.queryByRole('link', { name: 'Set up your closet' })
+    ).not.toBeInTheDocument()
+  })
+
+  it('opens the silhouette settings in an accessible modal and restores focus on close', async () => {
+    const user = userEvent.setup()
+    getOnboardingStateFromWeb.mockResolvedValue(onboardingState({ status: 'completed' }))
+    render(<WardrobePage />)
+
+    const silhouetteButton = await screen.findByRole('button', { name: 'Silhouette' })
+    await user.click(silhouetteButton)
+
+    await screen.findByRole('dialog')
+    await screen.findByLabelText('Height')
+
+    await user.click(screen.getByLabelText('Close modal'))
+
+    await waitFor(() => expect(silhouetteButton).toHaveFocus())
   })
 })

@@ -100,11 +100,51 @@ enum GarmentRetentionStatus {
   legal_hold
 }
 
+/// Story 4.4: server-authoritative wardrobe onboarding progress.
+enum WardrobeOnboardingStatus {
+  not_started
+  in_progress
+  completed
+}
+
+/// Forward-only step order. The starter-wardrobe skip path moves
+/// capture -> silhouette directly; used_starter_wardrobe records that it
+/// bypassed tagging rather than adding a distinct step value for it.
+enum WardrobeOnboardingStep {
+  permission
+  capture
+  tagging
+  silhouette
+  complete
+}
+
+enum SilhouetteMode {
+  default_mannequin
+  my_form
+}
+
+/// Mirrors GarmentUploadStatus for the "My Form" photo lifecycle specifically
+/// (a SilhouetteProfile also holds slider state that has no upload lifecycle).
+enum SilhouettePhotoStatus {
+  pending_upload
+  bytes_uploaded
+  processing
+  ready
+  failed
+}
+
+enum SilhouettePhotoFailureReason {
+  contrast
+  privacy_violation
+  timeout
+  storage_error
+}
+
 model User {
-  id                            String                  @id @default(cuid())
-  email                         String                  @unique
-  created_at                    DateTime                @default(now())
-  updated_at                    DateTime                @updatedAt
+  id                            String                   @id @default(cuid())
+  email                         String                   @unique
+  created_at                    DateTime                 @default(now())
+  updated_at                    DateTime                 @updatedAt
   profile                       UserProfile?
   comfort_profile               ComfortPreferences?
   garments                      GarmentItem[]
@@ -113,12 +153,12 @@ model User {
   lookbook_posts                LookbookPost[]
   engagement                    EngagementEvent[]
   audit_logs                    AuditLog[]
-  guardian_roles                GuardianConsent[]       @relation("GuardianRole")
-  teen_roles                    GuardianConsent[]       @relation("TeenRole")
-  sent_guardian_invitations     GuardianInvitation[]    @relation("TeenGuardianInvitations")
-  accepted_guardian_invitations GuardianInvitation[]    @relation("AcceptedGuardianInvitations")
-  moderation_flags              ModerationEvent[]       @relation("FlaggedByRelation")
-  moderation_reviews            ModerationEvent[]       @relation("ReviewedByRelation")
+  guardian_roles                GuardianConsent[]        @relation("GuardianRole")
+  teen_roles                    GuardianConsent[]        @relation("TeenRole")
+  sent_guardian_invitations     GuardianInvitation[]     @relation("TeenGuardianInvitations")
+  accepted_guardian_invitations GuardianInvitation[]     @relation("AcceptedGuardianInvitations")
+  moderation_flags              ModerationEvent[]        @relation("FlaggedByRelation")
+  moderation_reviews            ModerationEvent[]        @relation("ReviewedByRelation")
   push_tokens                   PushToken[]
   saved_locations               SavedLocation[]
   alert_rules                   AlertRule[]
@@ -128,6 +168,8 @@ model User {
   capsules                      OutfitCapsule[]
   capsule_garments              OutfitCapsuleGarment[]
   capsule_telemetry_claims      CapsuleTelemetryClaim[]
+  wardrobe_onboarding_state     WardrobeOnboardingState?
+  silhouette_profile            SilhouetteProfile?
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -496,19 +538,86 @@ model JobFailure {
   @@index([job_id, queue_name])
 }
 
+/// RLS: one row per user recording server-authoritative onboarding progress
+/// (decision 3). Absent or `not_started` means the client renders the virtual
+/// default; a row is created only once the flow actually starts.
+model WardrobeOnboardingState {
+  id                             String                   @id @default(cuid())
+  user                           User                     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                        String                   @unique
+  status                         WardrobeOnboardingStatus @default(not_started)
+  current_step                   WardrobeOnboardingStep   @default(permission)
+  used_starter_wardrobe          Boolean                  @default(false)
+  garments_captured_count        Int                      @default(0)
+  started_at                     DateTime?
+  completed_at                   DateTime?
+  /// Exactly-once guards for the two onboarding telemetry events (Task 3).
+  /// Row creation alone would make "started" exactly-once, but a crash
+  /// between commit and emission followed by an identical-payload replay
+  /// must not re-emit either event, so both get the same
+  /// emitted-at-guarded-updateMany pattern GarmentItem already uses for
+  /// completion_telemetry_emitted_at.
+  started_telemetry_emitted_at   DateTime?
+  completed_telemetry_emitted_at DateTime?
+  revision                       Int                      @default(0)
+  created_at                     DateTime                 @default(now())
+  updated_at                     DateTime                 @updatedAt
+
+  @@index([user_id])
+}
+
+/// RLS: one row per user holding the silhouette (mannequin sliders, or a
+/// "My Form" photo). The my_form_* columns mirror GarmentItem's upload
+/// lifecycle exactly (decision 5); slider and photo state coexist so a user
+/// can switch back to sliders after a ready photo without losing either.
+model SilhouetteProfile {
+  id                             String                        @id @default(cuid())
+  user                           User                          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                        String                        @unique
+  mode                           SilhouetteMode                @default(default_mannequin)
+  height_slider                  Int?
+  build_slider                   Int?
+  my_form_object_path            String?                       @unique
+  my_form_upload_session_id      String?                       @unique
+  my_form_upload_idempotency_key String?
+  my_form_commit_idempotency_key String?
+  my_form_commit_payload_hash    String?
+  my_form_file_size_bytes        Int?
+  my_form_mime_type              String?
+  my_form_content_sha256         String?
+  my_form_width_px               Int?
+  my_form_height_px              Int?
+  my_form_upload_expires_at      DateTime?
+  my_form_committed_at           DateTime?
+  my_form_consent_checked_at     DateTime?
+  my_form_status                 SilhouettePhotoStatus?
+  my_form_failure_reason         SilhouettePhotoFailureReason?
+  my_form_moderation_flagged_at  DateTime?
+  my_form_retention_status       GarmentRetentionStatus        @default(active)
+  revision                       Int                           @default(0)
+  created_at                     DateTime                      @default(now())
+  updated_at                     DateTime                      @updatedAt
+  moderation_events              ModerationEvent[]
+
+  @@index([user_id])
+  @@index([user_id, my_form_status, my_form_upload_expires_at])
+}
+
 model ModerationEvent {
-  id              String        @id @default(cuid())
-  post            LookbookPost? @relation(fields: [post_id], references: [id])
-  post_id         String?
-  garment         GarmentItem?  @relation(fields: [garment_item_id], references: [id])
-  garment_item_id String?
-  flagged_by      User?         @relation("FlaggedByRelation", fields: [flagged_by_id], references: [id])
-  flagged_by_id   String?
-  reviewed_by     User?         @relation("ReviewedByRelation", fields: [reviewed_by_id], references: [id])
-  reviewed_by_id  String?
-  action          String?
-  reason          String?
-  created_at      DateTime      @default(now())
+  id                    String             @id @default(cuid())
+  post                  LookbookPost?      @relation(fields: [post_id], references: [id])
+  post_id               String?
+  garment               GarmentItem?       @relation(fields: [garment_item_id], references: [id])
+  garment_item_id       String?
+  silhouette_profile    SilhouetteProfile? @relation(fields: [silhouette_profile_id], references: [id])
+  silhouette_profile_id String?
+  flagged_by            User?              @relation("FlaggedByRelation", fields: [flagged_by_id], references: [id])
+  flagged_by_id         String?
+  reviewed_by           User?              @relation("ReviewedByRelation", fields: [reviewed_by_id], references: [id])
+  reviewed_by_id        String?
+  action                String?
+  reason                String?
+  created_at            DateTime           @default(now())
 }
 
 /// RLS: immutable audit trail entries scoped by user_id
@@ -552,20 +661,20 @@ model TelemetryEvent {
 
 /// RLS: outfit capsules are scoped to user_id
 model OutfitCapsule {
-  id                      String                 @id @default(cuid())
-  user                    User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  user_id                 String
-  name                    String
-  description             String?
-  occasions               CapsuleOccasion[]
-  is_favorite             Boolean                @default(false)
-  revision                Int                    @default(0)
-  idempotency_key         String?
+  id                       String                 @id @default(cuid())
+  user                     User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                  String
+  name                     String
+  description              String?
+  occasions                CapsuleOccasion[]
+  is_favorite              Boolean                @default(false)
+  revision                 Int                    @default(0)
+  idempotency_key          String?
   idempotency_payload_hash String?
-  created_at              DateTime               @default(now())
-  updated_at              DateTime               @updatedAt
-  garment_joins           OutfitCapsuleGarment[]
-  recommendations         OutfitRecommendation[]
+  created_at               DateTime               @default(now())
+  updated_at               DateTime               @updatedAt
+  garment_joins            OutfitCapsuleGarment[]
+  recommendations          OutfitRecommendation[]
 
   @@unique([id, user_id])
   @@unique([user_id, idempotency_key])
@@ -623,4 +732,3 @@ model OutfitCapsuleGarment {
   @@index([capsule_id, garment_order])
   @@map("OutfitCapsuleGarment")
 }
-

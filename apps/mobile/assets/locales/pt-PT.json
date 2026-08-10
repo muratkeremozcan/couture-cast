@@ -260,6 +260,46 @@
         "outdoor": "Ar livre",
         "home": "Casa"
       }
+    },
+    "onboarding": {
+      "title": "Configure o seu roupeiro",
+      "permission_title": "Permitir acesso à câmara e às fotos",
+      "permission_body": "A CoutureCast precisa de acesso à câmara ou à fototeca para captar as suas peças.",
+      "permission_denied": "Não conseguimos aceder à sua câmara nem às suas fotos. Ainda pode importar ficheiros ou usar o roupeiro inicial.",
+      "use_starter_wardrobe": "Usar roupeiro inicial",
+      "add_another": "Adicionar outra peça",
+      "continue": "Continuar",
+      "back": "Voltar",
+      "checklist_tagged": "{{garment}}: etiquetas confirmadas",
+      "checklist_pending": "{{garment}}: precisa de etiquetas",
+      "complete": "O seu roupeiro está pronto",
+      "resumed": "A continuar de onde parou",
+      "errors": {
+        "load_failed": "Não foi possível carregar o seu progresso de configuração.",
+        "save_failed": "Não foi possível guardar esta etapa. Tente novamente.",
+        "stale": "Esta etapa foi alterada noutro local. Reveja a versão mais recente e tente novamente."
+      }
+    },
+    "silhouette": {
+      "title": "Silhueta",
+      "mode_default": "Silhueta ajustável",
+      "mode_my_form": "Foto My Form",
+      "height_slider_label": "Altura",
+      "build_slider_label": "Compleição",
+      "my_form_upload": "Enviar uma fotografia de corpo inteiro",
+      "my_form_guidance": "Vista roupa lisa branca ou preta contra um fundo liso para a sobreposição mais nítida.",
+      "my_form_confirm": "Estou a vestir roupa lisa branca ou preta",
+      "my_form_retry": "Tentar envio novamente",
+      "my_form_remove": "Remover fotografia My Form",
+      "processing": "A processar a sua fotografia...",
+      "ready": "Fotografia My Form pronta",
+      "errors": {
+        "contrast": "Não conseguimos separá-lo claramente do fundo. Tire a fotografia novamente com roupa ou um fundo mais liso.",
+        "privacy_violation": "Esta fotografia não pode ser utilizada. Escolha outra fotografia.",
+        "timeout": "O processamento demorou demasiado tempo. Tente novamente.",
+        "storage_error": "Não foi possível guardar esta fotografia. Tente novamente.",
+        "confirm_required": "Confirme a indicação sobre a roupa base antes de enviar."
+      }
     }
   }
 }

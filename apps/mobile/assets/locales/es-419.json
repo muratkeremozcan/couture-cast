@@ -260,6 +260,46 @@
         "outdoor": "Aire libre",
         "home": "Casa"
       }
+    },
+    "onboarding": {
+      "title": "Configura tu clóset",
+      "permission_title": "Permite el acceso a la cámara y las fotos",
+      "permission_body": "CoutureCast necesita acceso a la cámara o a la galería para capturar tus prendas.",
+      "permission_denied": "No pudimos acceder a tu cámara ni a tus fotos. Aún puedes importar archivos o usar el clóset inicial.",
+      "use_starter_wardrobe": "Usar clóset inicial",
+      "add_another": "Agregar otra prenda",
+      "continue": "Continuar",
+      "back": "Atrás",
+      "checklist_tagged": "{{garment}}: etiquetas confirmadas",
+      "checklist_pending": "{{garment}}: necesita etiquetas",
+      "complete": "Tu clóset está listo",
+      "resumed": "Retomando donde lo dejaste",
+      "errors": {
+        "load_failed": "No se pudo cargar tu progreso de configuración.",
+        "save_failed": "No se pudo guardar este paso. Inténtalo de nuevo.",
+        "stale": "Este paso cambió en otro lugar. Revisa la versión más reciente e inténtalo de nuevo."
+      }
+    },
+    "silhouette": {
+      "title": "Silueta",
+      "mode_default": "Silueta ajustable",
+      "mode_my_form": "Foto Mi Forma",
+      "height_slider_label": "Altura",
+      "build_slider_label": "Contextura",
+      "my_form_upload": "Sube una foto de cuerpo completo",
+      "my_form_guidance": "Usa ropa lisa blanca o negra frente a un fondo liso para la mejor superposición.",
+      "my_form_confirm": "Estoy usando ropa lisa blanca o negra",
+      "my_form_retry": "Reintentar carga",
+      "my_form_remove": "Quitar foto Mi Forma",
+      "processing": "Procesando tu foto...",
+      "ready": "Foto Mi Forma lista",
+      "errors": {
+        "contrast": "No pudimos separarte con claridad del fondo. Vuelve a tomar la foto con ropa o un fondo más liso.",
+        "privacy_violation": "Esta foto no se puede usar. Elige otra foto.",
+        "timeout": "El procesamiento tardó demasiado. Inténtalo de nuevo.",
+        "storage_error": "No pudimos guardar esta foto. Inténtalo de nuevo.",
+        "confirm_required": "Confirma la indicación sobre la ropa base antes de subir la foto."
+      }
     }
   }
 }

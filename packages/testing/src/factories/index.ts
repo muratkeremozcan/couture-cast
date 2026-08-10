@@ -48,6 +48,15 @@ export {
   persistOutfitCapsule,
 } from './outfit-capsule.factory.js'
 export {
+  createWardrobeOnboardingState,
+  persistWardrobeOnboardingState,
+} from './wardrobe-onboarding.factory.js'
+export {
+  buildReadyMyFormOverrides,
+  createSilhouetteProfile,
+  persistSilhouetteProfile,
+} from './silhouette-profile.factory.js'
+export {
   DEFAULT_FACTORY_REGISTRY_KEYS,
   createFactoryRegistry,
   factoryRegistry,
@@ -117,3 +126,15 @@ export type {
   OutfitCapsuleGarmentFixture,
   PersistedOutfitCapsuleFixture,
 } from './outfit-capsule.factory.js'
+export type {
+  CreatePersistedWardrobeOnboardingStateOptions,
+  PersistedWardrobeOnboardingStateFixture,
+  WardrobeOnboardingStateFactoryOverrides,
+  WardrobeOnboardingStateFixture,
+} from './wardrobe-onboarding.factory.js'
+export type {
+  CreatePersistedSilhouetteProfileOptions,
+  PersistedSilhouetteProfileFixture,
+  SilhouetteProfileFactoryOverrides,
+  SilhouetteProfileFixture,
+} from './silhouette-profile.factory.js'

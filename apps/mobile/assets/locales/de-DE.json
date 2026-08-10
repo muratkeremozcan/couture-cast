@@ -260,6 +260,46 @@
         "outdoor": "Draußen",
         "home": "Zuhause"
       }
+    },
+    "onboarding": {
+      "title": "Richte deinen Kleiderschrank ein",
+      "permission_title": "Kamera- und Fotozugriff erlauben",
+      "permission_body": "CoutureCast benötigt Kamera- oder Mediathekzugriff, um deine Kleidungsstücke zu erfassen.",
+      "permission_denied": "Wir konnten nicht auf deine Kamera oder Fotos zugreifen. Du kannst weiterhin Dateien importieren oder den Starter-Kleiderschrank verwenden.",
+      "use_starter_wardrobe": "Starter-Kleiderschrank verwenden",
+      "add_another": "Weiteres Kleidungsstück hinzufügen",
+      "continue": "Weiter",
+      "back": "Zurück",
+      "checklist_tagged": "{{garment}}: Tags bestätigt",
+      "checklist_pending": "{{garment}}: Tags erforderlich",
+      "complete": "Dein Kleiderschrank ist bereit",
+      "resumed": "Weiter geht's, wo du aufgehört hast",
+      "errors": {
+        "load_failed": "Dein Einrichtungsfortschritt konnte nicht geladen werden.",
+        "save_failed": "Dieser Schritt konnte nicht gespeichert werden. Versuche es erneut.",
+        "stale": "Dieser Schritt wurde anderswo geändert. Prüfe die neueste Version und versuche es erneut."
+      }
+    },
+    "silhouette": {
+      "title": "Silhouette",
+      "mode_default": "Anpassbare Silhouette",
+      "mode_my_form": "Meine-Form-Foto",
+      "height_slider_label": "Größe",
+      "build_slider_label": "Statur",
+      "my_form_upload": "Ganzkörperfoto hochladen",
+      "my_form_guidance": "Trage schlichte weiße oder schwarze Kleidung vor einem schlichten Hintergrund für die beste Überlagerung.",
+      "my_form_confirm": "Ich trage schlichte weiße oder schwarze Kleidung",
+      "my_form_retry": "Upload wiederholen",
+      "my_form_remove": "Meine-Form-Foto entfernen",
+      "processing": "Dein Foto wird verarbeitet...",
+      "ready": "Meine-Form-Foto bereit",
+      "errors": {
+        "contrast": "Wir konnten dich nicht klar vom Hintergrund trennen. Mach das Foto erneut mit schlichterer Kleidung oder einem schlichteren Hintergrund.",
+        "privacy_violation": "Dieses Foto kann nicht verwendet werden. Wähle ein anderes Foto.",
+        "timeout": "Die Verarbeitung hat zu lange gedauert. Versuche es erneut.",
+        "storage_error": "Dieses Foto konnte nicht gespeichert werden. Versuche es erneut.",
+        "confirm_required": "Bestätige den Hinweis zur Grundkleidung, bevor du hochlädst."
+      }
     }
   }
 }

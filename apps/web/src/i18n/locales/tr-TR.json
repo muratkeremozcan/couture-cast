@@ -54,6 +54,46 @@
         "outdoor": "Açık hava",
         "home": "Ev"
       }
+    },
+    "onboarding": {
+      "title": "Gardırobunu oluştur",
+      "permissionTitle": "Kamera ve fotoğraf erişimine izin ver",
+      "permissionBody": "CoutureCast, parçalarını çekebilmek için kamera veya kitaplık erişimine ihtiyaç duyar.",
+      "permissionDenied": "Kameranıza veya fotoğraflarınıza erişemedik. Yine de dosya içe aktarabilir veya başlangıç gardırobunu kullanabilirsiniz.",
+      "useStarterWardrobe": "Başlangıç gardırobunu kullan",
+      "addAnother": "Başka bir parça ekle",
+      "continue": "Devam et",
+      "back": "Geri",
+      "checklistTagged": "{{garment}}: etiketler onaylandı",
+      "checklistPending": "{{garment}}: etiket gerekiyor",
+      "complete": "Gardırobun hazır",
+      "resumed": "Kaldığın yerden devam ediliyor",
+      "errors": {
+        "loadFailed": "Kurulum ilerlemen yüklenemiyor.",
+        "saveFailed": "Bu adım kaydedilemiyor. Tekrar dene.",
+        "stale": "Bu adım başka bir yerde değişti. En son sürümü gözden geçirip tekrar dene."
+      }
+    },
+    "silhouette": {
+      "title": "Silüet",
+      "modeDefault": "Ayarlanabilir silüet",
+      "modeMyForm": "Formum fotoğrafı",
+      "heightSliderLabel": "Boy",
+      "buildSliderLabel": "Vücut yapısı",
+      "myFormUpload": "Tam boy bir fotoğraf yükle",
+      "myFormGuidance": "En temiz kaplama için düz beyaz veya siyah kıyafetler giy ve düz bir arka plan kullan.",
+      "myFormConfirm": "Düz beyaz veya siyah kıyafet giyiyorum",
+      "myFormRetry": "Yüklemeyi yeniden dene",
+      "myFormRemove": "Formum fotoğrafını kaldır",
+      "processing": "Fotoğrafın işleniyor…",
+      "ready": "Formum fotoğrafı hazır",
+      "errors": {
+        "contrast": "Seni arka plandan net şekilde ayıramadık. Daha sade kıyafetle veya daha sade bir arka planla fotoğrafı yeniden çek.",
+        "privacyViolation": "Bu fotoğraf kullanılamaz. Başka bir fotoğraf seç.",
+        "timeout": "İşleme çok uzun sürdü. Tekrar dene.",
+        "storageError": "Bu fotoğrafı kaydedemedik. Tekrar dene.",
+        "confirmRequired": "Yüklemeden önce temel kıyafet yönergesini onayla."
+      }
     }
   }
 }

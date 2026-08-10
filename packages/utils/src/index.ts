@@ -40,5 +40,5 @@ export {
 } from './accessibility'
 export type { WeatherAltTextInput, AccessibilityAnnouncementEvent } from './accessibility'
 
-export { buildGarmentObjectPath } from './wardrobe-object-path'
+export { buildGarmentObjectPath, buildSilhouetteObjectPath } from './wardrobe-object-path'
 export type { GarmentObjectExtension } from './wardrobe-object-path'

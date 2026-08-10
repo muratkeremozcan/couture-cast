@@ -5450,6 +5450,663 @@
           "error"
         ],
         "additionalProperties": false
+      },
+      "WardrobeOnboardingStateResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "not_started",
+                  "in_progress",
+                  "completed"
+                ]
+              },
+              "currentStep": {
+                "type": "string",
+                "enum": [
+                  "permission",
+                  "capture",
+                  "tagging",
+                  "silhouette",
+                  "complete"
+                ]
+              },
+              "usedStarterWardrobe": {
+                "type": "boolean"
+              },
+              "garmentsCapturedCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "startedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "completedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "status",
+              "currentStep",
+              "usedStarterWardrobe",
+              "garmentsCapturedCount",
+              "startedAt",
+              "completedAt",
+              "revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateWardrobeOnboardingStateInput": {
+        "type": "object",
+        "properties": {
+          "targetStep": {
+            "type": "string",
+            "enum": [
+              "permission",
+              "capture",
+              "tagging",
+              "silhouette",
+              "complete"
+            ]
+          },
+          "usedStarterWardrobe": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "targetStep"
+        ],
+        "additionalProperties": false
+      },
+      "OnboardingBadRequestError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              400
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Bad Request"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "OnboardingForbiddenError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              403
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "GUARDIAN_READ_ONLY",
+              "GUARDIAN_CONSENT_REQUIRED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Forbidden"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "OnboardingConflictError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              409
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "INVALID_STEP_TRANSITION"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Conflict"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "OnboardingPreconditionFailedError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              412
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "ONBOARDING_REVISION_MISMATCH"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Precondition Failed"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "OnboardingPreconditionRequiredError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              428
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "PRECONDITION_REQUIRED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Precondition Required"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "SilhouetteProfileResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "default_mannequin",
+                  "my_form"
+                ]
+              },
+              "heightSlider": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 100
+              },
+              "buildSlider": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 100
+              },
+              "myForm": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending_upload",
+                      "bytes_uploaded",
+                      "processing",
+                      "ready",
+                      "failed"
+                    ]
+                  },
+                  "failureReason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "contrast",
+                      "privacy_violation",
+                      "timeout",
+                      "storage_error",
+                      null
+                    ]
+                  },
+                  "committedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "imageAccess": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "expiresAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "url",
+                      "expiresAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "status",
+                  "failureReason",
+                  "committedAt",
+                  "imageAccess"
+                ],
+                "additionalProperties": false
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "mode",
+              "heightSlider",
+              "buildSlider",
+              "myForm",
+              "revision",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateSilhouetteSlidersInput": {
+        "type": "object",
+        "properties": {
+          "heightSlider": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "buildSlider": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "heightSlider",
+          "buildSlider"
+        ],
+        "additionalProperties": false
+      },
+      "CreateSilhouetteUploadUrlInput": {
+        "type": "object",
+        "properties": {
+          "fileSizeBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10485760
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64,
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "widthPx": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 4096
+          },
+          "heightPx": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 4096
+          }
+        },
+        "required": [
+          "fileSizeBytes",
+          "mimeType",
+          "sha256",
+          "widthPx",
+          "heightPx"
+        ],
+        "additionalProperties": false
+      },
+      "CreateSilhouetteUploadUrlResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "uploadSessionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uploadUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "uploadToken": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requiredHeaders": {
+                "type": "object",
+                "properties": {
+                  "content-type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "content-type"
+                ],
+                "additionalProperties": false
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "uploadSessionId",
+              "uploadUrl",
+              "uploadToken",
+              "requiredHeaders",
+              "expiresAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "CommitSilhouettePhotoInput": {
+        "type": "object",
+        "properties": {
+          "uploadSessionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confirmsBasewearGuidance": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "uploadSessionId",
+          "confirmsBasewearGuidance"
+        ],
+        "additionalProperties": false
+      },
+      "SilhouetteBadRequestError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              400
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Bad Request"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "SilhouetteForbiddenError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              403
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "GUARDIAN_READ_ONLY",
+              "GUARDIAN_CONSENT_REQUIRED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Forbidden"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "SilhouetteNotFoundError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              404
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "NOT_FOUND"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Not Found"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "SilhouetteConflictError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              409
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "CONFIRM_BASEWEAR_GUIDANCE_REQUIRED",
+              "IDEMPOTENCY_KEY_REUSED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Conflict"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "SilhouettePreconditionFailedError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              412
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "SILHOUETTE_REVISION_MISMATCH"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Precondition Failed"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "SilhouettePreconditionRequiredError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              428
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "PRECONDITION_REQUIRED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Precondition Required"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -8170,6 +8827,640 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CapsulePreconditionRequiredError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/onboarding": {
+      "get": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Read wardrobe onboarding progress (virtual not_started default when absent)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current onboarding state, real or virtual not_started default.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WardrobeOnboardingStateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingForbiddenError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Advance the onboarding state machine one forward-only step",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "if-match",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWardrobeOnboardingStateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Onboarding state advanced (or safe no-op replay).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WardrobeOnboardingStateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid step transition payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingForbiddenError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Step transition is not forward-reachable from the current step.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingConflictError"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale ETag / onboarding revision mismatch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingPreconditionFailedError"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match header required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingPreconditionRequiredError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/silhouette": {
+      "get": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Read the silhouette profile (sliders and/or My Form photo state)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current silhouette profile, real or virtual default.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent forbidden (WardrobeUploadGuard).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteForbiddenError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Upsert mannequin slider values",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "if-match",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSilhouetteSlidersInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sliders saved (or safe no-op replay).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteProfileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid slider values.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteForbiddenError"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale ETag / silhouette revision mismatch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouettePreconditionFailedError"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match header required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouettePreconditionRequiredError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/silhouette/my-form/upload-url": {
+      "post": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Allocate an upload session for a \"My Form\" full-body photo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "idempotency-key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSilhouetteUploadUrlInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replayed idempotent upload session allocation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSilhouetteUploadUrlResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Upload session allocated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSilhouetteUploadUrlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid upload declaration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteForbiddenError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency key reused with a different payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteConflictError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}": {
+      "put": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Upload My Form photo bytes to a previously allocated session",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque upload session ID."
+            },
+            "required": true,
+            "description": "Opaque upload session ID.",
+            "name": "uploadSessionId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Bytes accepted."
+          },
+          "400": {
+            "description": "Missing upload token or malformed request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent forbidden or upload token mismatch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteForbiddenError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Upload session not found or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteNotFoundError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/silhouette/my-form/commit": {
+      "post": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Commit uploaded My Form photo bytes and enqueue processing",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "idempotency-key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitSilhouettePhotoInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replayed idempotent commit (already committed with this key).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteProfileResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Photo committed and queued for processing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteProfileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid commit payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteForbiddenError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Upload session not found or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteNotFoundError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Basewear guidance not confirmed, or idempotency key reused.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteConflictError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/silhouette/my-form": {
+      "delete": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Immediately hard-delete the My Form photo and fall back to default_mannequin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "if-match",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "My Form photo deleted; profile reverted to default_mannequin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouetteForbiddenError"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale ETag / silhouette revision mismatch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouettePreconditionFailedError"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match header required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SilhouettePreconditionRequiredError"
                 }
               }
             }

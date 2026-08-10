@@ -54,6 +54,46 @@
         "outdoor": "Draußen",
         "home": "Zuhause"
       }
+    },
+    "onboarding": {
+      "title": "Richte deinen Kleiderschrank ein",
+      "permissionTitle": "Kamera- und Fotozugriff erlauben",
+      "permissionBody": "CoutureCast benötigt Kamera- oder Mediathekzugriff, um deine Kleidungsstücke zu erfassen.",
+      "permissionDenied": "Wir konnten nicht auf deine Kamera oder Fotos zugreifen. Du kannst weiterhin Dateien importieren oder den Starter-Kleiderschrank verwenden.",
+      "useStarterWardrobe": "Starter-Kleiderschrank verwenden",
+      "addAnother": "Weiteres Kleidungsstück hinzufügen",
+      "continue": "Weiter",
+      "back": "Zurück",
+      "checklistTagged": "{{garment}}: Tags bestätigt",
+      "checklistPending": "{{garment}}: Tags erforderlich",
+      "complete": "Dein Kleiderschrank ist bereit",
+      "resumed": "Weiter geht's, wo du aufgehört hast",
+      "errors": {
+        "loadFailed": "Dein Onboarding-Fortschritt kann nicht geladen werden.",
+        "saveFailed": "Dieser Schritt kann nicht gespeichert werden. Versuche es erneut.",
+        "stale": "Dieser Schritt wurde anderswo geändert. Prüfe die neueste Version und versuche es erneut."
+      }
+    },
+    "silhouette": {
+      "title": "Silhouette",
+      "modeDefault": "Anpassbare Silhouette",
+      "modeMyForm": "Mein-Form-Foto",
+      "heightSliderLabel": "Größe",
+      "buildSliderLabel": "Statur",
+      "myFormUpload": "Ganzkörperfoto hochladen",
+      "myFormGuidance": "Trage schlicht weiße oder schwarze Kleidung vor einem einfarbigen Hintergrund für die beste Überlagerung.",
+      "myFormConfirm": "Ich trage schlicht weiße oder schwarze Kleidung",
+      "myFormRetry": "Upload wiederholen",
+      "myFormRemove": "Mein-Form-Foto entfernen",
+      "processing": "Dein Foto wird verarbeitet…",
+      "ready": "Mein-Form-Foto bereit",
+      "errors": {
+        "contrast": "Wir konnten dich nicht klar vom Hintergrund trennen. Mache das Foto mit schlichterer Kleidung oder einem schlichteren Hintergrund neu.",
+        "privacyViolation": "Dieses Foto kann nicht verwendet werden. Wähle ein anderes Foto.",
+        "timeout": "Die Verarbeitung hat zu lange gedauert. Versuche es erneut.",
+        "storageError": "Wir konnten dieses Foto nicht speichern. Versuche es erneut.",
+        "confirmRequired": "Bestätige die Basiskleidungs-Hinweise vor dem Hochladen."
+      }
     }
   }
 }
