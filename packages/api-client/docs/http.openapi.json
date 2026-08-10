@@ -3502,6 +3502,8 @@
                     "comfortNotes"
                   ]
                 },
+                "minItems": 3,
+                "maxItems": 3,
                 "description": "Collection invariant enforced at runtime and NOT expressible in this schema: the three outfits always cover three distinct scenarios (morning, midday, evening), one each. The server never emits a repeated scenario, so consumers may key on scenario without deduplicating, and fixtures must not repeat one."
               },
               "badges": {

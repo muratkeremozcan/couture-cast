@@ -106,9 +106,26 @@ function childrenOf(schema: z.ZodTypeAny): [string, z.ZodTypeAny][] {
   )
 }
 
-function findUndocumentedRefinements(): string[] {
+function findUndocumentedRefinements(
+  roots: [string, unknown][] = Object.entries(httpContracts)
+): string[] {
   const undocumented: string[] = []
-  const seen = new WeakSet<object>()
+
+  /**
+   * Keyed by `(schema, covered)` rather than by schema alone. A schema shared
+   * between a documented `.refine().refine().openapi({...})` chain and a plain
+   * property reference is reachable in both states, and collapsing them would
+   * let the covered visit mark the node seen and silently suppress the
+   * uncovered one.
+   */
+  const seen = new WeakMap<object, Set<boolean>>()
+  const alreadyWalked = (schema: z.ZodTypeAny, covered: boolean): boolean => {
+    const states = seen.get(schema)
+    if (states?.has(covered)) return true
+    if (states) states.add(covered)
+    else seen.set(schema, new Set([covered]))
+    return false
+  }
 
   /**
    * `covered` propagates only through consecutive ZodEffects nodes, so a single
@@ -116,8 +133,7 @@ function findUndocumentedRefinements(): string[] {
    * refinement nested inside an object property still has to document itself.
    */
   const walk = (schema: z.ZodTypeAny, path: string, covered: boolean) => {
-    if (seen.has(schema)) return
-    seen.add(schema)
+    if (alreadyWalked(schema, covered)) return
 
     let coveredForChildren = false
 
@@ -139,10 +155,9 @@ function findUndocumentedRefinements(): string[] {
     }
   }
 
-  for (const [name, exported] of Object.entries(httpContracts)) {
-    if (!exported || typeof exported !== 'object') continue
-    if (!('_def' in (exported as object))) continue
-    walk(exported as z.ZodTypeAny, name, false)
+  for (const [name, exported] of roots) {
+    if (!isSchema(exported)) continue
+    walk(exported, name, false)
   }
 
   return [...new Set(undocumented)].sort()
@@ -184,4 +199,31 @@ test('the walker actually detects an undocumented refinement', () => {
   walk(undocumented, 'fixture')
 
   expect(seen).toEqual(['fixture.nested.value'])
+})
+
+test('a shared refinement is still reported when only one path documents it', () => {
+  // `shared` is undocumented. `documented` wraps it in a described chain, which
+  // reaches it with covered=true; `viaProperty` reaches the same node with
+  // covered=false. Keying traversal state on the schema alone would let the
+  // first visit suppress the second and hide a genuinely undocumented rule.
+  const shared = z.object({ value: z.string() }).refine(() => true)
+  const documented = shared
+    .refine(() => true)
+    .openapi({ description: 'covers the chain' })
+  const viaProperty = z.object({ nested: shared })
+
+  expect(
+    findUndocumentedRefinements([
+      ['documented', documented],
+      ['viaProperty', viaProperty],
+    ])
+  ).toEqual(['viaProperty.nested'])
+
+  // Order must not matter: the uncovered path is reported either way.
+  expect(
+    findUndocumentedRefinements([
+      ['viaProperty', viaProperty],
+      ['documented', documented],
+    ])
+  ).toEqual(['viaProperty.nested'])
 })
