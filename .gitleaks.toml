@@ -20,4 +20,7 @@ regexes = [
   '''^wardrobe-test-secret-at-least-32-bytes$''',
   # Fixed UUID used only as the capsule idempotency-key fixture in Pact contracts
   '''^3f1e8c2a-9b47-4d21-8f6e-5a0c7d3b1e94$''',
+  # Fixed UUID used only as the My Form commit idempotency-key fixture in
+  # wardrobe-silhouette.controller.spec.ts
+  '''^4b6b3b0a-1c8a-4a9e-8b8e-1a2b3c4d5e6f$''',
 ]
