@@ -1,0 +1,128 @@
+# Story 4.4 Task 8: guided wardrobe onboarding flow (permission, the
+# starter-wardrobe skip path, silhouette sliders, and the completion screen).
+# Scope note: real garment capture-and-tag through this same onboarding
+# screen is already covered end to end by
+# playwright/tests/wardrobe-onboarding-flow.spec.ts, and the underlying
+# capture/tagging modals are already covered on-device by
+# garment-smart-tagging-flow.yaml. This flow instead exercises the onboarding
+# state machine's other AC1 path -- the starter-wardrobe skip, which no other
+# Maestro flow reaches -- keeping this flow focused on one independent
+# journey per this repo's testing standards.
+appId: ${MAESTRO_APP_ID}
+name: 'Wardrobe onboarding guided flow'
+tags:
+  - e2e
+  - wardrobe
+  - onboarding
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+# iOS can preserve an Authentication Services sheet across Expo Go app-data
+# resets; dismiss it before opening the test deep link, matching the other
+# wardrobe flows' convention.
+- runFlow:
+    when:
+      visible: 'Sign in with Google'
+    commands:
+      - tapOn:
+          text: 'close'
+          optional: true
+      - tapOn:
+          point: '9%,29%'
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: 'tab-wardrobe'
+    timeout: 60000
+
+- runFlow:
+    file: subflows/open-wardrobe.yaml
+    label: 'Open the Wardrobe tab'
+
+- extendedWaitUntil:
+    visible:
+      id: 'wardrobe-onboarding-card'
+    timeout: 15000
+
+- tapOn:
+    id: 'wardrobe-onboarding-card'
+
+- extendedWaitUntil:
+    visible:
+      id: 'wardrobe-onboarding-screen'
+    timeout: 15000
+
+- assertVisible:
+    id: 'onboarding-permission-step'
+
+- tapOn:
+    id: 'onboarding-request-permission'
+
+- extendedWaitUntil:
+    visible:
+      id: 'onboarding-capture-step'
+    timeout: 15000
+
+- assertVisible:
+    id: 'onboarding-use-starter'
+
+- tapOn:
+    id: 'onboarding-use-starter'
+
+- extendedWaitUntil:
+    visible:
+      id: 'onboarding-silhouette-step'
+    timeout: 15000
+
+- assertVisible:
+    id: 'silhouette-editor'
+
+- assertVisible:
+    id: 'silhouette-height-increment'
+
+- tapOn:
+    id: 'silhouette-height-increment'
+
+- tapOn:
+    id: 'silhouette-height-increment'
+
+- tapOn:
+    id: 'onboarding-finish'
+
+- extendedWaitUntil:
+    visible:
+      id: 'onboarding-complete-step'
+    timeout: 15000
+
+- tapOn:
+    id: 'onboarding-done'
+
+- extendedWaitUntil:
+    visible:
+      id: 'wardrobe-screen'
+    timeout: 15000
+
+# The onboarding card is no longer offered once status is `completed`.
+- assertNotVisible:
+    id: 'wardrobe-onboarding-card'
+
+# No in-app action reverts a completed WardrobeOnboardingState (decision 3
+# never adds one -- the automatic first-run entry point fires at most once by
+# design). Unlike the capsule-create flow this journey has nothing left to
+# delete through the UI; cleanup instead relies on
+# scripts/run-maestro.mjs's post-run `cleanupMobileE2EIdentity`, which
+# deletes the whole ephemeral signed-up user through the real public API and
+# a scoped local-database transaction after every flow completes.
+
+- takeScreenshot:
+    path: maestro/artifacts/wardrobe-onboarding-flow
