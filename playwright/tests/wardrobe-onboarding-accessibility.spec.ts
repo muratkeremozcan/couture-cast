@@ -226,8 +226,10 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
 
       for (let index = 0; index < count; index += 1) {
         const box = await targets.nth(index).boundingBox()
-        if (!box) continue
-        expect(box.height, `target ${index} height`).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+        expect(box, `target ${index} must have a layout box`).not.toBeNull()
+        expect(box!.height, `target ${index} height`).toBeGreaterThanOrEqual(
+          MIN_TARGET_PX
+        )
       }
     }
   )
