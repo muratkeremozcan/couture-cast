@@ -116,6 +116,7 @@ vi.mock('../../../lib/wardrobe', () => ({
 }))
 
 import WardrobeOnboardingPage from './page'
+import { WardrobeOnboardingFlow as WardrobeOnboardingPageForTests } from '../../components/wardrobe-onboarding-flow'
 
 const SIGNED_IN_USER = 'user-onboarding-1'
 
@@ -622,7 +623,7 @@ describe('WardrobeOnboardingPage', () => {
     const processingGarment = { ...committedGarment, status: 'processing' as const }
     uploadGarmentImageFromWeb.mockResolvedValueOnce(processingGarment)
     // Long enough that no poll attempt fires during this test.
-    render(<WardrobeOnboardingPage garmentPollIntervalsMs={[60_000]} />)
+    render(<WardrobeOnboardingPageForTests garmentPollIntervalsMs={[60_000]} />)
 
     await captureAndCommitGarment(user)
     await user.click(await screen.findByRole('button', { name: 'Done' }))
@@ -644,7 +645,7 @@ describe('WardrobeOnboardingPage', () => {
       { ...committedGarment, status: 'awaiting_tags' },
     ])
 
-    render(<WardrobeOnboardingPage garmentPollIntervalsMs={[5]} />)
+    render(<WardrobeOnboardingPageForTests garmentPollIntervalsMs={[5]} />)
 
     await captureAndCommitGarment(user)
     await user.click(await screen.findByRole('button', { name: 'Done' }))
@@ -661,7 +662,7 @@ describe('WardrobeOnboardingPage', () => {
     uploadGarmentImageFromWeb.mockResolvedValueOnce(processingGarment)
     listGarmentsFromWeb.mockResolvedValue([processingGarment])
 
-    render(<WardrobeOnboardingPage garmentPollIntervalsMs={[5, 5]} />)
+    render(<WardrobeOnboardingPageForTests garmentPollIntervalsMs={[5, 5]} />)
 
     await captureAndCommitGarment(user)
     await user.click(await screen.findByRole('button', { name: 'Done' }))
