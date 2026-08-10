@@ -32,8 +32,11 @@ jobs:
       - name: Generate OpenAPI spec from code
         run: npm run generate:http-openapi
 
-      - name: Fetch main branch for Optic (Begin schema validation)
-        run: git fetch --depth=1 origin main:main
-
+      # `optic:diff` fetches origin/main itself and diffs against the
+      # remote-tracking ref, so no separate fetch step is needed here. Keeping
+      # the fetch inside the npm script means a local run gates against the
+      # same commit CI does; the previous `--base main` compared against
+      # whatever the local `main` ref happened to point at, which silently
+      # reported false breaking changes in worktrees with a stale `main`.
       - name: Optic diff (OpenAPI diff vs snapshot on main)
         run: npm run optic:diff

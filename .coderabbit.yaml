@@ -69,6 +69,13 @@ reviews:
     - "README.md"
     - "app.json"
     - "docker-compose.yml"
+    - "tools/**"
+    # Tooling config that gates or generates published artifacts. These change
+    # what CI enforces and what ships in the SDK, so they need review even
+    # though they are not application code.
+    - "optic.dev.yml"
+    - "openapitools.json"
+    - "lighthouserc.cjs"
     - "package.json"
     - "playwright.config.ts"
     - "tsconfig.json"

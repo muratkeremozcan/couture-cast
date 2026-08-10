@@ -1,6 +1,15 @@
-import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
+import {
+  extendZodWithOpenApi,
+  type OpenAPIRegistry,
+} from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import type { RegisteredCommonHttpSchemas } from './common'
+
+// This module imports only a *type* from './common', and a type-only import is
+// erased at compile time, so './common' never executes and never applies the
+// extension here. Applying it directly (the call is idempotent) is what makes
+// `.openapi()` available in this file at module-evaluation time.
+extendZodWithOpenApi(z)
 
 const quietHoursTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 
@@ -25,6 +34,13 @@ export const notificationTimezoneSchema = z
   .min(1)
   .max(120)
   .refine(isValidTimezone, 'Timezone must be a valid IANA timezone name.')
+  .openapi({
+    description: [
+      'Invariant enforced at runtime and NOT expressible in this schema: the value',
+      'must be a valid IANA timezone name as resolved by the host Intl database',
+      '(for example America/New_York). Any other bounded string is rejected.',
+    ].join(' '),
+  })
 
 const alertRuleFields = {
   enabled: z.boolean(),
@@ -75,6 +91,14 @@ export const alertPreferencesSchema = z
       })
     }
   })
+  .openapi({
+    description: [
+      'Cross-field invariant enforced at runtime and NOT expressible in this schema:',
+      'when quietHoursEnabled is true, quietHoursStart and quietHoursEnd must differ.',
+      'JSON Schema has no operator comparing two sibling properties, so this rule is',
+      'only visible here and in the 400 returned when it is violated.',
+    ].join(' '),
+  })
 
 const alertRulesSchema = z.array(alertRuleSchema).max(3)
 
@@ -97,6 +121,14 @@ export const updateAlertRulesInputSchema = z
 
       seenRuleTypes.add(rule.ruleType)
     })
+  })
+  .openapi({
+    description: [
+      'Collection invariant enforced at runtime and NOT expressible in this schema:',
+      'ruleType must be unique across rules. JSON Schema uniqueItems compares whole',
+      'items, so two rules sharing a ruleType but differing elsewhere would pass it',
+      'while being rejected here.',
+    ].join(' '),
   })
 
 export const updateNotificationPreferencesInputSchema = alertPreferencesSchema

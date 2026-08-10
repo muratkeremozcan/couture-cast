@@ -62,7 +62,15 @@ export const ritualResponseSchema = z.object({
           message:
             'Outfits must cover three distinct scenarios (morning, midday, and evening).',
         }
-      ),
+      )
+      .openapi({
+        description: [
+          'Collection invariant enforced at runtime and NOT expressible in this schema:',
+          'the three outfits always cover three distinct scenarios (morning, midday,',
+          'evening), one each. The server never emits a repeated scenario, so consumers',
+          'may key on scenario without deduplicating, and fixtures must not repeat one.',
+        ].join(' '),
+      }),
     badges: z.array(z.string()),
   }),
 })
