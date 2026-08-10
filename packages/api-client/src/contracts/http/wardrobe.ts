@@ -585,6 +585,19 @@ export const silhouettePhotoFailureReasonEnum = z.enum([
   'storage_error',
 ])
 
+/**
+ * Cross-field lifecycle invariants, grounded directly in
+ * `wardrobe-onboarding.service.ts`'s `VIRTUAL_STATE` constant and its
+ * `createFirstState`/`advanceExistingState` transitions rather than
+ * guessed: `not_started` only ever describes the virtual, never-persisted
+ * default (`currentStep: 'permission'`, `startedAt`/`completedAt: null`,
+ * `revision: 0`), and `completed` is the state machine's one terminal step
+ * (`currentStep: 'complete'`, `completedAt` set exactly once, never
+ * cleared). Without this, `{status: 'completed', completedAt: null}` or
+ * `{status: 'not_started', currentStep: 'silhouette'}` both parse
+ * successfully despite violating AC1/AC3, which independent review
+ * (bmad-code-review) flagged as a real gap.
+ */
 export const wardrobeOnboardingStateSchema = z
   .object({
     status: wardrobeOnboardingStatusEnum,
@@ -596,6 +609,46 @@ export const wardrobeOnboardingStateSchema = z
     revision: z.number().int().min(0),
   })
   .strict()
+  .superRefine((value, ctx) => {
+    const isVirtualDefault = value.status === 'not_started'
+    if (isVirtualDefault !== (value.startedAt === null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['startedAt'],
+        message: 'startedAt is null only for the virtual not_started default',
+      })
+    }
+    if (isVirtualDefault && value.currentStep !== 'permission') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['currentStep'],
+        message: 'not_started only occurs at the permission step',
+      })
+    }
+    if (isVirtualDefault && value.revision !== 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['revision'],
+        message: 'not_started only occurs at revision 0',
+      })
+    }
+
+    const isComplete = value.status === 'completed'
+    if (isComplete !== (value.currentStep === 'complete')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['currentStep'],
+        message: 'status completed requires currentStep complete, and vice versa',
+      })
+    }
+    if (isComplete !== (value.completedAt !== null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['completedAt'],
+        message: 'completedAt is set exactly when status is completed',
+      })
+    }
+  })
 
 export const wardrobeOnboardingStateResponseSchema = z
   .object({
@@ -647,16 +700,36 @@ const onboardingPreconditionFailedErrorSchema = z
   })
   .strict()
 
+/**
+ * `error` is optional, not absent: `parseOnboardingIfMatchHeader` raises a
+ * bare `HttpException('PRECONDITION_REQUIRED', 428)`, which Nest serializes
+ * with no `error` reason phrase at all (confirmed against the real
+ * provider), unlike every other error schema in this file, whose Nest
+ * exception classes (`ConflictException`, etc.) always add one.
+ */
 const onboardingPreconditionRequiredErrorSchema = z
   .object({
     statusCode: z.literal(428),
     message: z.literal('PRECONDITION_REQUIRED'),
-    error: z.literal('Precondition Required'),
+    error: z.literal('Precondition Required').optional(),
   })
   .strict()
 
 const silhouetteSliderInputSchema = z.number().int().min(0).max(100)
 
+/**
+ * Cross-field lifecycle invariants, grounded directly in
+ * `wardrobe-silhouette.service.ts`/`silhouette-photo.processor.ts` rather
+ * than guessed: `committedAt` is set once, at commit
+ * (`my_form_committed_at: new Date()` in `commitMyForm`), and is never
+ * cleared on a later processing failure — only a full `DELETE` clears it.
+ * `failureReason` is set only by the processor's terminal `failed` branch;
+ * `imageAccess` is only ever populated for `ready`. Without this,
+ * `{status: 'ready', failureReason: 'contrast'}` or
+ * `{status: 'failed', failureReason: null}` both parsed successfully
+ * despite AC2 requiring "exactly one" documented reason, which independent
+ * review (bmad-code-review) flagged as a real gap.
+ */
 export const silhouetteMyFormSchema = z
   .object({
     status: silhouettePhotoStatusEnum,
@@ -665,6 +738,38 @@ export const silhouetteMyFormSchema = z
     imageAccess: garmentImageAccessSchema.nullable(),
   })
   .strict()
+  .superRefine((value, ctx) => {
+    const isCommitted =
+      value.status === 'processing' ||
+      value.status === 'ready' ||
+      value.status === 'failed'
+    if (isCommitted !== (value.committedAt !== null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['committedAt'],
+        message:
+          'committedAt is set once committed (processing/ready/failed), never before',
+      })
+    }
+
+    const isFailed = value.status === 'failed'
+    if (isFailed !== (value.failureReason !== null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['failureReason'],
+        message: 'failureReason is set if and only if status is failed',
+      })
+    }
+
+    const isReady = value.status === 'ready'
+    if (isReady !== (value.imageAccess !== null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['imageAccess'],
+        message: 'imageAccess is set if and only if status is ready',
+      })
+    }
+  })
 
 export const silhouetteProfileSchema = z
   .object({
@@ -776,11 +881,16 @@ const silhouettePreconditionFailedErrorSchema = z
   })
   .strict()
 
+/**
+ * `error` is optional, not absent: `parseSilhouetteIfMatchHeader` raises the
+ * same bare `HttpException('PRECONDITION_REQUIRED', 428)` as its onboarding
+ * sibling (see `onboardingPreconditionRequiredErrorSchema`'s identical note).
+ */
 const silhouettePreconditionRequiredErrorSchema = z
   .object({
     statusCode: z.literal(428),
     message: z.literal('PRECONDITION_REQUIRED'),
-    error: z.literal('Precondition Required'),
+    error: z.literal('Precondition Required').optional(),
   })
   .strict()
 
@@ -1776,6 +1886,11 @@ export function registerWardrobeContracts(
   registry.registerPath({
     method: 'patch',
     path: '/api/v1/wardrobe/onboarding',
+    // Story 4.4 is still landing across several stacked branches at once;
+    // marked draft so Optic's breaking-changes gate doesn't hard-block a
+    // still-settling contract mid-story (see optic.dev.yml). Remove once
+    // Story 4.4 ships and this operation is stable.
+    'x-draft': true,
     tags: ['wardrobe'],
     summary: 'Advance the onboarding state machine one forward-only step',
     security: [{ bearerAuth: [] }],
@@ -1938,6 +2053,8 @@ export function registerWardrobeContracts(
   registry.registerPath({
     method: 'put',
     path: '/api/v1/wardrobe/silhouette',
+    // See the PATCH /wardrobe/onboarding comment above -- same reason.
+    'x-draft': true,
     tags: ['wardrobe'],
     summary: 'Upsert mannequin slider values',
     security: [{ bearerAuth: [] }],
@@ -2080,11 +2197,38 @@ export function registerWardrobeContracts(
   registry.registerPath({
     method: 'put',
     path: '/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}',
+    // See the PATCH /wardrobe/onboarding comment above -- same reason.
+    'x-draft': true,
     tags: ['wardrobe'],
     summary: 'Upload My Form photo bytes to a previously allocated session',
     security: [{ bearerAuth: [] }],
     request: {
       params: silhouetteUploadSessionPathParamsSchema,
+      // Mirrors the sibling garment bytes-PUT endpoint
+      // (`/api/v1/wardrobe/uploads/{uploadSessionId}`) exactly: without a
+      // declared header/body contract, the generated SDK method for this
+      // operation has no way to actually send the upload token or the
+      // image bytes, and provider drift on token validation or MIME
+      // handling has no contract to catch it — a gap independent review
+      // (bmad-code-review) flagged and this registration closes.
+      headers: z.object({
+        'x-upload-token': z.string().min(1),
+        'content-type': z.enum(['image/jpeg', 'image/png', 'image/webp']),
+      }),
+      body: {
+        required: true,
+        content: {
+          'image/jpeg': {
+            schema: z.string().openapi({ format: 'binary' }),
+          },
+          'image/png': {
+            schema: z.string().openapi({ format: 'binary' }),
+          },
+          'image/webp': {
+            schema: z.string().openapi({ format: 'binary' }),
+          },
+        },
+      },
     },
     responses: {
       204: {
@@ -2145,6 +2289,11 @@ export function registerWardrobeContracts(
       },
     },
     responses: {
+      // Real provider verification confirmed `POST /my-form/commit` returns
+      // 201 for a first commit and 200 for an idempotent replay, via the
+      // controller's `res.status(result.replayed ? 200 : 201)`, matching the
+      // garment-commit sibling this endpoint is documented to mirror
+      // (`POST /api/v1/wardrobe/garments` also registers 201-first/200-replay).
       201: {
         description: 'Photo committed and queued for processing.',
         content: {
@@ -2207,6 +2356,8 @@ export function registerWardrobeContracts(
   registry.registerPath({
     method: 'delete',
     path: '/api/v1/wardrobe/silhouette/my-form',
+    // See the PATCH /wardrobe/onboarding comment above -- same reason.
+    'x-draft': true,
     tags: ['wardrobe'],
     summary:
       'Immediately hard-delete the My Form photo and fall back to default_mannequin',

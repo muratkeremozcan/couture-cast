@@ -14,10 +14,18 @@ import {
   updateGarmentTagsResponseSchema,
   outfitCapsuleResponseSchema,
   outfitCapsuleListResponseSchema,
+  wardrobeOnboardingStateResponseSchema,
+  silhouetteProfileResponseSchema,
+  createSilhouetteUploadUrlResponseSchema,
+  type WardrobeOnboardingStatus,
+  type WardrobeOnboardingStep,
+  type SilhouetteMode,
+  type SilhouettePhotoStatus,
+  type SilhouettePhotoFailureReason,
 } from '@couture/api-client/contracts/http'
 import { expect } from 'vitest'
 
-const { decimal, eachLike, like, nullValue, regex, string } = MatchersV3
+const { decimal, eachLike, equal, like, nullValue, regex, string } = MatchersV3
 
 export const pactEventAuth = {
   accessToken: 'pact-event-token',
@@ -27,6 +35,24 @@ export const pactEventAuth = {
 
 const pactEventHeaders = {
   Authorization: `Bearer ${pactEventAuth.accessToken}`,
+}
+
+/**
+ * A second identity for the Story 4.4 guardian-consent-gate and
+ * guardian-notification interactions, which need an actor whose `role` is
+ * `'teen'` (`WardrobeUploadGuard`/`assertWardrobeUploadAllowed` only ever
+ * forbids a `'teen'` actor, decision 7). `provider-helper.ts`'s
+ * `accessTokenIdentityService` mock resolves this token to `{ userId:
+ * 'teen-1', role: 'teen' }` alongside the existing guardian identity.
+ */
+export const pactTeenAuth = {
+  accessToken: 'pact-teen-token',
+  userId: 'teen-1',
+  role: 'teen',
+} as const
+
+const pactTeenHeaders = {
+  Authorization: `Bearer ${pactTeenAuth.accessToken}`,
 }
 
 type ContractApiClient = Pick<
@@ -45,6 +71,13 @@ type ContractApiClient = Pick<
   | 'apiV1WardrobeOwnerUserIdCapsulesCapsuleIdPatch'
   | 'apiV1WardrobeOwnerUserIdCapsulesCapsuleIdFavoritePatch'
   | 'apiV1WardrobeOwnerUserIdCapsulesCapsuleIdDelete'
+  | 'apiV1WardrobeOnboardingGet'
+  | 'apiV1WardrobeOnboardingPatch'
+  | 'apiV1WardrobeSilhouetteGet'
+  | 'apiV1WardrobeSilhouettePut'
+  | 'apiV1WardrobeSilhouetteMyFormUploadUrlPost'
+  | 'apiV1WardrobeSilhouetteMyFormCommitPost'
+  | 'apiV1WardrobeSilhouetteMyFormDelete'
 >
 type CreateClient = (mockServer: V3MockServer) => ContractApiClient
 
@@ -613,7 +646,19 @@ type SmartTagErrorInteraction = {
   responseMatcher?: Record<string, unknown>
 }
 
-async function verifySmartTagErrorInteraction(
+/**
+ * Exported (rather than the single grouped-call shape this replaced) so each
+ * pacttest file can drive one `it.each(...)` row per interaction instead of
+ * looping over a table inside one `it()` -- PactV4's Rust FFI
+ * non-deterministically drops an interaction when more than one
+ * `addInteraction()...executeTest()` chain is awaited inside one test body.
+ * Found by a dedicated bmad-tea test-architecture review of Task 7: this
+ * exact pattern had already been fixed for the newer
+ * `onboardingErrorInteractions`/`silhouetteGuardianErrorInteractions` tables
+ * but not yet applied to this pre-existing (Story 4.2) pair, which is the
+ * "worth the same it.each treatment in a follow-up" item that review noted.
+ */
+export async function verifySmartTagErrorInteraction(
   pact: PactV4,
   interaction: SmartTagErrorInteraction
 ) {
@@ -656,17 +701,20 @@ async function verifySmartTagErrorInteraction(
     })
 }
 
-export async function verifySuggestGarmentTagsErrorInteractions(pact: PactV4) {
-  const garmentId = '00000000-0000-4000-8000-000000000001'
-  const userId = 'guardian-1'
-  const invalidGarmentId = 'g'.repeat(129)
+const SMART_TAG_ERROR_GARMENT_ID = '00000000-0000-4000-8000-000000000001'
+const SMART_TAG_ERROR_USER_ID = 'guardian-1'
+const SMART_TAG_INVALID_GARMENT_ID = 'g'.repeat(129)
 
-  await verifySmartTagErrorInteraction(pact, {
+export const suggestGarmentTagsErrorInteractions: SmartTagErrorInteraction[] = [
+  {
     description: 'a request to suggest tags with an invalid garment id',
     method: 'POST',
-    path: `/api/v1/wardrobe/garments/${invalidGarmentId}/suggest-tags`,
+    path: `/api/v1/wardrobe/garments/${SMART_TAG_INVALID_GARMENT_ID}/suggest-tags`,
     state: 'A garment in awaiting_tags status with tag suggestions exists for user',
-    stateParams: { garmentId: invalidGarmentId, userId },
+    stateParams: {
+      garmentId: SMART_TAG_INVALID_GARMENT_ID,
+      userId: SMART_TAG_ERROR_USER_ID,
+    },
     responseStatus: 400,
     responseBody: {
       statusCode: 400,
@@ -682,14 +730,16 @@ export async function verifySuggestGarmentTagsErrorInteractions(pact: PactV4) {
       ),
       error: 'Bad Request',
     },
-  })
-
-  await verifySmartTagErrorInteraction(pact, {
+  },
+  {
     description: 'an unauthenticated request to suggest garment tags',
     method: 'POST',
-    path: `/api/v1/wardrobe/garments/${garmentId}/suggest-tags`,
+    path: `/api/v1/wardrobe/garments/${SMART_TAG_ERROR_GARMENT_ID}/suggest-tags`,
     state: 'A garment in awaiting_tags status with tag suggestions exists for user',
-    stateParams: { garmentId, userId },
+    stateParams: {
+      garmentId: SMART_TAG_ERROR_GARMENT_ID,
+      userId: SMART_TAG_ERROR_USER_ID,
+    },
     includeAuthorization: false,
     responseStatus: 401,
     responseBody: {
@@ -697,76 +747,77 @@ export async function verifySuggestGarmentTagsErrorInteractions(pact: PactV4) {
       message: 'Missing or invalid bearer token',
       error: 'Unauthorized',
     },
-  })
-
-  await verifySmartTagErrorInteraction(pact, {
+  },
+  {
     description: 'a request while garment analysis is pending',
     method: 'POST',
-    path: `/api/v1/wardrobe/garments/${garmentId}/suggest-tags`,
+    path: `/api/v1/wardrobe/garments/${SMART_TAG_ERROR_GARMENT_ID}/suggest-tags`,
     state: 'Garment analysis is pending for user',
-    stateParams: { garmentId, userId },
+    stateParams: {
+      garmentId: SMART_TAG_ERROR_GARMENT_ID,
+      userId: SMART_TAG_ERROR_USER_ID,
+    },
     responseStatus: 409,
     responseBody: {
       statusCode: 409,
       message: 'GARMENT_ANALYSIS_PENDING',
       error: 'Conflict',
     },
-  })
-
-  await verifySmartTagErrorInteraction(pact, {
+  },
+  {
     description: 'a request while garment tag inference is unavailable',
     method: 'POST',
-    path: `/api/v1/wardrobe/garments/${garmentId}/suggest-tags`,
+    path: `/api/v1/wardrobe/garments/${SMART_TAG_ERROR_GARMENT_ID}/suggest-tags`,
     state: 'Garment tagging inference is unavailable for user',
-    stateParams: { garmentId, userId },
+    stateParams: {
+      garmentId: SMART_TAG_ERROR_GARMENT_ID,
+      userId: SMART_TAG_ERROR_USER_ID,
+    },
     responseStatus: 503,
     responseBody: {
       statusCode: 503,
       message: 'TAGGING_INFERENCE_UNAVAILABLE',
       error: 'Service Unavailable',
     },
-  })
-}
+  },
+]
 
-export async function verifyUpdateGarmentTagsErrorInteractions(pact: PactV4) {
-  const garmentId = '00000000-0000-4000-8000-000000000001'
-  const userId = 'guardian-1'
-  const requestBody = {
-    category: 'top',
-    material: 'cotton',
-    comfortRange: 'mild',
-  }
-
-  await verifySmartTagErrorInteraction(pact, {
+export const updateGarmentTagsErrorInteractions: SmartTagErrorInteraction[] = [
+  {
     description: 'a forbidden request to update garment tags',
     method: 'PATCH',
-    path: `/api/v1/wardrobe/garments/${garmentId}/tags`,
+    path: `/api/v1/wardrobe/garments/${SMART_TAG_ERROR_GARMENT_ID}/tags`,
     state: 'Wardrobe tagging is forbidden for user',
-    stateParams: { garmentId, userId },
-    requestBody,
+    stateParams: {
+      garmentId: SMART_TAG_ERROR_GARMENT_ID,
+      userId: SMART_TAG_ERROR_USER_ID,
+    },
+    requestBody: { category: 'top', material: 'cotton', comfortRange: 'mild' },
     responseStatus: 403,
     responseBody: {
       statusCode: 403,
       message: 'GUARDIAN_CONSENT_REQUIRED',
       error: 'Forbidden',
     },
-  })
-
-  await verifySmartTagErrorInteraction(pact, {
+  },
+  {
     description: 'a request to update tags for a missing garment',
     method: 'PATCH',
-    path: `/api/v1/wardrobe/garments/${garmentId}/tags`,
+    path: `/api/v1/wardrobe/garments/${SMART_TAG_ERROR_GARMENT_ID}/tags`,
     state: 'Garment does not exist for user',
-    stateParams: { garmentId, userId },
-    requestBody,
+    stateParams: {
+      garmentId: SMART_TAG_ERROR_GARMENT_ID,
+      userId: SMART_TAG_ERROR_USER_ID,
+    },
+    requestBody: { category: 'top', material: 'cotton', comfortRange: 'mild' },
     responseStatus: 404,
     responseBody: {
       statusCode: 404,
       message: 'GARMENT_NOT_FOUND',
       error: 'Not Found',
     },
-  })
-}
+  },
+]
 
 export async function verifyUpdateGarmentTagsNullMaterialInteraction(
   pact: PactV4,
@@ -1241,8 +1292,17 @@ export async function verifyDeleteCapsuleInteraction(
  * Documented capsule error envelopes. These pin the status and error shape the
  * clients branch on: stale and missing preconditions, ineligible garments,
  * idempotency-key reuse, and the masked 404 for an unauthorized owner.
+ *
+ * Exported alongside a single-interaction `verifyCapsuleErrorInteraction` (in
+ * place of the earlier grouped `verifyCapsuleErrorInteractions` that looped
+ * `addInteraction()...executeTest()` inside one `it()`) so each pacttest file
+ * drives one `it.each(...)` row per interaction -- PactV4's Rust FFI
+ * non-deterministically drops an interaction when more than one such chain
+ * is awaited inside a single test body. See the identical fix and rationale
+ * on `suggestGarmentTagsErrorInteractions`/`updateGarmentTagsErrorInteractions`
+ * above, from the same dedicated bmad-tea test-architecture review pass.
  */
-type CapsuleErrorInteraction = {
+export type CapsuleErrorInteraction = {
   description: string
   method: 'POST' | 'PATCH' | 'DELETE' | 'GET'
   path: string
@@ -1255,7 +1315,7 @@ type CapsuleErrorInteraction = {
   reason: string | null
 }
 
-const capsuleErrorInteractions: CapsuleErrorInteraction[] = [
+export const capsuleErrorInteractions: CapsuleErrorInteraction[] = [
   {
     description: 'rejects a stale precondition with 412',
     method: 'PATCH',
@@ -1327,70 +1387,1246 @@ const capsuleErrorInteractions: CapsuleErrorInteraction[] = [
   },
 ]
 
-export async function verifyCapsuleErrorInteractions(pact: PactV4) {
-  for (const interaction of capsuleErrorInteractions) {
-    await pact
-      .addInteraction()
-      .given(
-        ...createProviderState({
-          name: interaction.state,
-          params: { userId: CAPSULE_OWNER_ID, capsuleId: CAPSULE_ID },
-        })
-      )
-      .uponReceiving(`a capsule request that ${interaction.description}`)
-      .withRequest(
-        interaction.method,
-        interaction.path,
-        setJsonContent({
-          headers: interaction.headers,
-          ...(interaction.body ? { body: interaction.body } : {}),
-        })
-      )
-      /**
-       * The canonical envelope is Nest's default shape from
-       * `packages/api-client/src/contracts/http/common.ts`: `error` is the
-       * reason phrase string and the machine-readable code travels in
-       * `message`. An earlier version of this contract declared a nested
-       * `{ error: { code, message } }` object, which no endpoint in this API
-       * emits, so provider verification could never have passed.
-       */
-      .willRespondWith(
-        interaction.status,
-        setJsonContent({
-          headers: { 'Cache-Control': string('private, no-store') },
-          body: {
-            statusCode: like(interaction.status),
-            message: string(interaction.code),
-            ...(interaction.reason ? { error: string(interaction.reason) } : {}),
-          },
-        })
-      )
-      .executeTest(async (mockServer: V3MockServer) => {
-        // The interaction must actually be issued. An empty callback leaves the
-        // declared request unsent, and Pact fails the whole test with
-        // "expected but not received" rather than recording the contract.
-        //
-        // The generated SDK throws on these statuses, so the request goes out
-        // directly: the point is to pin the status and error envelope the
-        // clients branch on, not the SDK's error-handling.
-        const response = await fetch(`${mockServer.url}${interaction.path}`, {
-          method: interaction.method,
-          headers: interaction.body
-            ? { ...interaction.headers, 'Content-Type': 'application/json' }
-            : interaction.headers,
-          ...(interaction.body ? { body: JSON.stringify(interaction.body) } : {}),
-        })
-
-        expect(response.status).toBe(interaction.status)
-
-        const payload = (await response.json()) as {
-          statusCode?: number
-          message?: string
-          error?: string
-        }
-        expect(payload.statusCode).toBe(interaction.status)
-        expect(payload.message).toBe(interaction.code)
-        expect(payload.error).toBe(interaction.reason ?? undefined)
+export async function verifyCapsuleErrorInteraction(
+  pact: PactV4,
+  interaction: CapsuleErrorInteraction
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: interaction.state,
+        params: { userId: CAPSULE_OWNER_ID, capsuleId: CAPSULE_ID },
       })
+    )
+    .uponReceiving(`a capsule request that ${interaction.description}`)
+    .withRequest(
+      interaction.method,
+      interaction.path,
+      setJsonContent({
+        headers: interaction.headers,
+        ...(interaction.body ? { body: interaction.body } : {}),
+      })
+    )
+    /**
+     * The canonical envelope is Nest's default shape from
+     * `packages/api-client/src/contracts/http/common.ts`: `error` is the
+     * reason phrase string and the machine-readable code travels in
+     * `message`. An earlier version of this contract declared a nested
+     * `{ error: { code, message } }` object, which no endpoint in this API
+     * emits, so provider verification could never have passed.
+     */
+    .willRespondWith(
+      interaction.status,
+      setJsonContent({
+        headers: { 'Cache-Control': string('private, no-store') },
+        body: {
+          statusCode: like(interaction.status),
+          message: string(interaction.code),
+          ...(interaction.reason ? { error: string(interaction.reason) } : {}),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      // The interaction must actually be issued. An empty callback leaves the
+      // declared request unsent, and Pact fails the whole test with
+      // "expected but not received" rather than recording the contract.
+      //
+      // The generated SDK throws on these statuses, so the request goes out
+      // directly: the point is to pin the status and error envelope the
+      // clients branch on, not the SDK's error-handling.
+      const response = await fetch(`${mockServer.url}${interaction.path}`, {
+        method: interaction.method,
+        headers: interaction.body
+          ? { ...interaction.headers, 'Content-Type': 'application/json' }
+          : interaction.headers,
+        ...(interaction.body ? { body: JSON.stringify(interaction.body) } : {}),
+      })
+
+      expect(response.status).toBe(interaction.status)
+
+      const payload = (await response.json()) as {
+        statusCode?: number
+        message?: string
+        error?: string
+      }
+      expect(payload.statusCode).toBe(interaction.status)
+      expect(payload.message).toBe(interaction.code)
+      expect(payload.error).toBe(interaction.reason ?? undefined)
+    })
+}
+
+/* ------------------------------------------------------------------------- *
+ * Story 4.4 wardrobe onboarding and silhouette setup
+ *
+ * Pact covers request and response shapes, status codes, headers, and error
+ * envelopes for the onboarding state machine and the silhouette/My Form
+ * pipeline. The forward-only state machine, revision/If-Match races, RLS,
+ * and the moderation pipeline itself stay in the API and PostgreSQL
+ * integration suites. One `addInteraction()`/`executeTest()` cycle per case.
+ *
+ * Decision 11 gives guardians no dedicated HTTP route for onboarding or
+ * silhouette (both are self-scoped to `auth.userId`, unlike capsules'
+ * `:ownerUserId` path): a guardian's read/write access is proven at the RLS
+ * layer in `packages/db/test/rls-policies.spec.ts`, not here. "Guardian
+ * access" at this HTTP layer is the `WardrobeUploadGuard` consent gate
+ * decision 7 requires on every silhouette route, exercised below for both a
+ * read and a write by a teen actor without active guardian consent.
+ *
+ * The My Form bytes-PUT endpoint
+ * (`PUT /api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}`) has
+ * no Pact interaction here, matching the existing precedent: the sibling
+ * garment bytes-PUT endpoint (`PUT /api/v1/wardrobe/uploads/{uploadSessionId}`)
+ * has never had one either, since Web/Mobile upload raw bytes with the
+ * shared `uploadGarmentBytes()` fetch helper straight to the signed
+ * `uploadUrl`, not through a generated-SDK call this file can pin cleanly.
+ * ------------------------------------------------------------------------- */
+
+const ONBOARDING_OWNER_ID = CAPSULE_OWNER_ID
+const SILHOUETTE_TEEN_ID = 'teen-1'
+const SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY = '6eae27b8-8335-476e-a3bf-371e9fa5fd26'
+const SILHOUETTE_COMMIT_IDEMPOTENCY_KEY = '760490a0-5049-4cdd-afcf-ac8e7ba0b436'
+const SILHOUETTE_UPLOAD_SESSION_ID = '85b4dde2-3df2-4e81-8c18-d51ae3408ca0'
+const SILHOUETTE_SHA256 =
+  'ba9d325931fa708929de6fdc7d90728bf50bffbc1cbfcaa7e2e2275c175dc0b3'
+
+const ONBOARDING_STARTED_AT = '2026-08-09T09:00:00.000Z'
+const SILHOUETTE_UPDATED_AT = '2026-08-09T09:05:00.000Z'
+const SILHOUETTE_COMMITTED_AT = '2026-08-09T09:10:00.000Z'
+const SILHOUETTE_UPLOAD_EXPIRY = '2026-08-09T09:15:00.000Z'
+const SILHOUETTE_IMAGE_EXPIRY = '2026-08-09T09:25:00.000Z'
+
+/** Mirrors Task 3's documented virtual-default ETag shape: `"onboarding:<userId>:<revision>"`. */
+const onboardingETagFor = (revision: number) =>
+  `"onboarding:${ONBOARDING_OWNER_ID}:${revision}"`
+/** Silhouette is a one-row-per-user singleton, so its ETag follows the same user-scoped shape. */
+const silhouetteETagFor = (revision: number) =>
+  `"silhouette:${ONBOARDING_OWNER_ID}:${revision}"`
+
+function onboardingStateBody(
+  revision: number,
+  fields: {
+    status: WardrobeOnboardingStatus
+    currentStep: WardrobeOnboardingStep
+    usedStarterWardrobe: boolean
+    garmentsCapturedCount: number
+    startedAt: string | null
+    completedAt: string | null
   }
+) {
+  return {
+    status: string(fields.status),
+    currentStep: string(fields.currentStep),
+    usedStarterWardrobe: like(fields.usedStarterWardrobe),
+    garmentsCapturedCount: like(fields.garmentsCapturedCount),
+    startedAt: fields.startedAt === null ? nullValue() : isoTimestamp(fields.startedAt),
+    completedAt:
+      fields.completedAt === null ? nullValue() : isoTimestamp(fields.completedAt),
+    revision: like(revision),
+  }
+}
+
+type SilhouetteMyFormFields = {
+  status: SilhouettePhotoStatus
+  failureReason: SilhouettePhotoFailureReason | null
+  committedAt: string | null
+  imageAccess: null | { url: string; expiresAt: string }
+}
+
+function silhouetteProfileBody(
+  revision: number,
+  fields: {
+    mode: SilhouetteMode
+    heightSlider: number | null
+    buildSlider: number | null
+    myForm: null | SilhouetteMyFormFields
+  }
+) {
+  return {
+    mode: string(fields.mode),
+    heightSlider: fields.heightSlider === null ? nullValue() : like(fields.heightSlider),
+    buildSlider: fields.buildSlider === null ? nullValue() : like(fields.buildSlider),
+    myForm:
+      fields.myForm === null
+        ? nullValue()
+        : {
+            status: string(fields.myForm.status),
+            // `equal`, not `string`: this field distinguishes one documented
+            // failure reason from another (`verifyMyFormFailureInteraction`
+            // drives 4 interactions off this same helper, one per reason), so
+            // a type-only matcher would let a provider bug that returns the
+            // wrong reason for a given named state still pass verification.
+            failureReason:
+              fields.myForm.failureReason === null
+                ? nullValue()
+                : equal(fields.myForm.failureReason),
+            committedAt:
+              fields.myForm.committedAt === null
+                ? nullValue()
+                : isoTimestamp(fields.myForm.committedAt),
+            imageAccess:
+              fields.myForm.imageAccess === null
+                ? nullValue()
+                : {
+                    url: string(fields.myForm.imageAccess.url),
+                    expiresAt: isoTimestamp(fields.myForm.imageAccess.expiresAt),
+                  },
+          },
+    revision: like(revision),
+    updatedAt: isoTimestamp(SILHOUETTE_UPDATED_AT),
+  }
+}
+
+// --- Onboarding state machine (ownership: owner reading/writing own state) -
+
+export async function verifyOnboardingStateInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Wardrobe onboarding state exists for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a request to read existing wardrobe onboarding progress')
+    .withRequest(
+      'GET',
+      '/api/v1/wardrobe/onboarding',
+      setJsonContent({ headers: pactEventHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(onboardingETagFor(1)) },
+        body: {
+          data: onboardingStateBody(1, {
+            status: 'in_progress',
+            currentStep: 'capture',
+            usedStarterWardrobe: false,
+            garmentsCapturedCount: 1,
+            startedAt: ONBOARDING_STARTED_AT,
+            completedAt: null,
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeOnboardingGet()
+
+      expect(wardrobeOnboardingStateResponseSchema.parse(response)).toMatchObject({
+        data: { status: 'in_progress', currentStep: 'capture' },
+      })
+    })
+}
+
+export async function verifyOnboardingVirtualDefaultInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'No wardrobe onboarding state exists for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a request to read onboarding progress before any row exists')
+    .withRequest(
+      'GET',
+      '/api/v1/wardrobe/onboarding',
+      setJsonContent({ headers: pactEventHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(onboardingETagFor(0)) },
+        body: {
+          data: onboardingStateBody(0, {
+            status: 'not_started',
+            currentStep: 'permission',
+            usedStarterWardrobe: false,
+            garmentsCapturedCount: 0,
+            startedAt: null,
+            completedAt: null,
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeOnboardingGet()
+
+      expect(wardrobeOnboardingStateResponseSchema.parse(response)).toEqual({
+        data: {
+          status: 'not_started',
+          currentStep: 'permission',
+          usedStarterWardrobe: false,
+          garmentsCapturedCount: 0,
+          startedAt: null,
+          completedAt: null,
+          revision: 0,
+        },
+      })
+    })
+}
+
+export async function verifyPatchOnboardingStateInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Wardrobe onboarding state exists for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a request to advance the onboarding state machine one step')
+    .withRequest(
+      'PATCH',
+      '/api/v1/wardrobe/onboarding',
+      setJsonContent({
+        headers: { ...pactEventHeaders, 'If-Match': onboardingETagFor(1) },
+        body: { targetStep: 'tagging' },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(onboardingETagFor(2)) },
+        body: {
+          data: onboardingStateBody(2, {
+            status: 'in_progress',
+            currentStep: 'tagging',
+            usedStarterWardrobe: false,
+            garmentsCapturedCount: 1,
+            startedAt: ONBOARDING_STARTED_AT,
+            completedAt: null,
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeOnboardingPatch({
+        ifMatch: onboardingETagFor(1),
+        updateWardrobeOnboardingStateInput: { targetStep: 'tagging' },
+      })
+
+      expect(wardrobeOnboardingStateResponseSchema.parse(response).data.currentStep).toBe(
+        'tagging'
+      )
+    })
+}
+
+/**
+ * AC4: "a repeated identical mutation is a safe no-op that changes no
+ * revision or telemetry." Grounded in
+ * `wardrobe-onboarding.service.ts`'s `advanceExistingState`: a PATCH whose
+ * `targetStep`/`usedStarterWardrobe` exactly match the current row is an
+ * `isIdenticalReplay`, returned unchanged (same revision, same ETag) rather
+ * than incrementing. `verifyPatchOnboardingStateInteraction`'s "Wardrobe
+ * onboarding state exists for user" fixture implies `currentStep: 'capture'`
+ * at revision 1 (that interaction advances it to `'tagging'`); replaying
+ * with `targetStep: 'capture'` (the *current* step, not the next one) is
+ * exactly the identical-replay condition.
+ */
+export async function verifyOnboardingReplayInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Wardrobe onboarding state exists for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a repeated identical onboarding step transition')
+    .withRequest(
+      'PATCH',
+      '/api/v1/wardrobe/onboarding',
+      setJsonContent({
+        headers: { ...pactEventHeaders, 'If-Match': onboardingETagFor(1) },
+        body: { targetStep: 'capture' },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(onboardingETagFor(1)) },
+        body: {
+          data: onboardingStateBody(1, {
+            status: 'in_progress',
+            currentStep: 'capture',
+            usedStarterWardrobe: false,
+            garmentsCapturedCount: 1,
+            startedAt: ONBOARDING_STARTED_AT,
+            completedAt: null,
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeOnboardingPatch({
+        ifMatch: onboardingETagFor(1),
+        updateWardrobeOnboardingStateInput: { targetStep: 'capture' },
+      })
+
+      const parsed = wardrobeOnboardingStateResponseSchema.parse(response).data
+      expect(parsed.currentStep).toBe('capture')
+      expect(parsed.revision).toBe(1)
+    })
+}
+
+/**
+ * Shared documented-error-envelope interaction for the Story 4.4 routes.
+ * Mirrors `verifySmartTagErrorInteraction`/`capsuleErrorInteractions`, but
+ * generalized over both new tables' state params in one place instead of
+ * duplicating the helper a third time.
+ *
+ * Exported, along with the interaction tables below, so each pacttest file
+ * can drive one `it.each(...)` row per interaction rather than looping over
+ * the table inside a single `it()` — PactV4's Rust FFI non-deterministically
+ * drops an interaction when more than one `addInteraction()...executeTest()`
+ * chain is awaited inside one test body, so "one interaction per test" (the
+ * task's own wording) means one per `it()`, not one per exported function.
+ */
+export type WardrobeErrorInteraction = {
+  description: string
+  method: 'GET' | 'PATCH' | 'PUT' | 'POST' | 'DELETE'
+  path: string
+  state: string
+  stateParams: Record<string, unknown>
+  headers: Record<string, string>
+  body?: Record<string, unknown>
+  status: number
+  code: string
+  /**
+   * Nest's reason phrase, carried in `error`. `null` for the 428 case: real
+   * provider verification confirmed `parseOnboardingIfMatchHeader`/
+   * `parseSilhouetteIfMatchHeader` raise a bare `HttpException` for a
+   * missing `If-Match`, which carries no `error` field at all — mirroring
+   * `CapsuleErrorInteraction`'s identical, already-documented 428 case.
+   */
+  reason: string | null
+}
+
+export async function verifyWardrobeErrorInteraction(
+  pact: PactV4,
+  interaction: WardrobeErrorInteraction
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({ name: interaction.state, params: interaction.stateParams })
+    )
+    .uponReceiving(interaction.description)
+    .withRequest(
+      interaction.method,
+      interaction.path,
+      setJsonContent({
+        headers: interaction.headers,
+        ...(interaction.body ? { body: interaction.body } : {}),
+      })
+    )
+    .willRespondWith(
+      interaction.status,
+      setJsonContent({
+        headers: { 'Cache-Control': string('private, no-store') },
+        body: {
+          statusCode: like(interaction.status),
+          message: string(interaction.code),
+          ...(interaction.reason ? { error: string(interaction.reason) } : {}),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await fetch(`${mockServer.url}${interaction.path}`, {
+        method: interaction.method,
+        headers: interaction.body
+          ? { ...interaction.headers, 'Content-Type': 'application/json' }
+          : interaction.headers,
+        ...(interaction.body ? { body: JSON.stringify(interaction.body) } : {}),
+      })
+
+      expect(response.status).toBe(interaction.status)
+      const payload = (await response.json()) as {
+        statusCode?: number
+        message?: string
+        error?: string
+      }
+      expect(payload.statusCode).toBe(interaction.status)
+      expect(payload.message).toBe(interaction.code)
+      expect(payload.error).toBe(interaction.reason ?? undefined)
+    })
+}
+
+export const onboardingErrorInteractions: WardrobeErrorInteraction[] = [
+  {
+    description: 'a request that skips ahead to an unreachable onboarding step',
+    method: 'PATCH',
+    path: '/api/v1/wardrobe/onboarding',
+    state: 'Wardrobe onboarding state exists for user',
+    stateParams: { userId: ONBOARDING_OWNER_ID },
+    headers: { ...pactEventHeaders, 'If-Match': onboardingETagFor(1) },
+    body: { targetStep: 'complete' },
+    status: 409,
+    code: 'INVALID_STEP_TRANSITION',
+    reason: 'Conflict',
+  },
+  {
+    description: 'a request with a stale onboarding revision precondition',
+    method: 'PATCH',
+    path: '/api/v1/wardrobe/onboarding',
+    state: 'Wardrobe onboarding state exists for user at a newer revision',
+    stateParams: { userId: ONBOARDING_OWNER_ID },
+    headers: { ...pactEventHeaders, 'If-Match': onboardingETagFor(1) },
+    body: { targetStep: 'tagging' },
+    status: 412,
+    code: 'ONBOARDING_REVISION_MISMATCH',
+    reason: 'Precondition Failed',
+  },
+  {
+    description: 'a request to advance onboarding without an If-Match precondition',
+    method: 'PATCH',
+    path: '/api/v1/wardrobe/onboarding',
+    state: 'Wardrobe onboarding state exists for user',
+    stateParams: { userId: ONBOARDING_OWNER_ID },
+    headers: pactEventHeaders,
+    body: { targetStep: 'tagging' },
+    status: 428,
+    code: 'PRECONDITION_REQUIRED',
+    // 428 is raised as a bare HttpException, not a named Nest exception, so
+    // the response carries no `error` reason phrase — confirmed against the
+    // real provider (see the capsule 428 case's identical, pre-existing note).
+    reason: null,
+  },
+]
+
+// --- Silhouette sliders (ownership: owner reading/writing own profile) -----
+
+export async function verifySilhouetteProfileInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Silhouette profile exists for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a request to read the silhouette profile')
+    .withRequest(
+      'GET',
+      '/api/v1/wardrobe/silhouette',
+      setJsonContent({ headers: pactEventHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(silhouetteETagFor(1)) },
+        body: {
+          data: silhouetteProfileBody(1, {
+            mode: 'default_mannequin',
+            heightSlider: 50,
+            buildSlider: 50,
+            myForm: null,
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeSilhouetteGet()
+
+      expect(silhouetteProfileResponseSchema.parse(response)).toMatchObject({
+        data: { mode: 'default_mannequin', heightSlider: 50, buildSlider: 50 },
+      })
+    })
+}
+
+export async function verifyUpdateSilhouetteSlidersInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Silhouette profile exists for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a request to save silhouette slider values')
+    .withRequest(
+      'PUT',
+      '/api/v1/wardrobe/silhouette',
+      setJsonContent({
+        headers: { ...pactEventHeaders, 'If-Match': silhouetteETagFor(1) },
+        body: { heightSlider: 62, buildSlider: 40 },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(silhouetteETagFor(2)) },
+        body: {
+          data: silhouetteProfileBody(2, {
+            mode: 'default_mannequin',
+            heightSlider: 62,
+            buildSlider: 40,
+            myForm: null,
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeSilhouettePut({
+        ifMatch: silhouetteETagFor(1),
+        updateSilhouetteSlidersInput: { heightSlider: 62, buildSlider: 40 },
+      })
+
+      expect(silhouetteProfileResponseSchema.parse(response).data).toMatchObject({
+        heightSlider: 62,
+        buildSlider: 40,
+      })
+    })
+}
+
+/**
+ * AC4's safe-no-op replay requirement, for silhouette sliders. Grounded in
+ * `wardrobe-silhouette.service.ts`'s `updateSliders`: a PUT whose slider
+ * values (and implicit `mode: 'default_mannequin'`) exactly match the
+ * existing row is an `isIdenticalReplay`, returned unchanged rather than
+ * incrementing. "Silhouette profile exists for user" implies
+ * `heightSlider: 50, buildSlider: 50` at revision 1
+ * (`verifySilhouetteProfileInteraction`'s fixture); resending those same
+ * values is exactly the identical-replay condition.
+ */
+export async function verifyUpdateSilhouetteSlidersReplayInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Silhouette profile exists for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a repeated identical silhouette slider save')
+    .withRequest(
+      'PUT',
+      '/api/v1/wardrobe/silhouette',
+      setJsonContent({
+        headers: { ...pactEventHeaders, 'If-Match': silhouetteETagFor(1) },
+        body: { heightSlider: 50, buildSlider: 50 },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(silhouetteETagFor(1)) },
+        body: {
+          data: silhouetteProfileBody(1, {
+            mode: 'default_mannequin',
+            heightSlider: 50,
+            buildSlider: 50,
+            myForm: null,
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeSilhouettePut({
+        ifMatch: silhouetteETagFor(1),
+        updateSilhouetteSlidersInput: { heightSlider: 50, buildSlider: 50 },
+      })
+
+      const parsed = silhouetteProfileResponseSchema.parse(response).data
+      expect(parsed).toMatchObject({ heightSlider: 50, buildSlider: 50 })
+      expect(parsed.revision).toBe(1)
+    })
+}
+
+/**
+ * "Guardian access" for onboarding/silhouette (decision 11) is the
+ * `WardrobeUploadGuard` consent gate, not a guardian dashboard route:
+ * proven here for both a read and a write by a teen actor.
+ */
+export const silhouetteGuardianErrorInteractions: WardrobeErrorInteraction[] = [
+  {
+    description:
+      'a request from a teen without active guardian consent to read the silhouette profile',
+    method: 'GET',
+    path: '/api/v1/wardrobe/silhouette',
+    state: 'Guardian consent is not active for teen silhouette access',
+    stateParams: { userId: SILHOUETTE_TEEN_ID },
+    headers: pactTeenHeaders,
+    status: 403,
+    code: 'GUARDIAN_CONSENT_REQUIRED',
+    reason: 'Forbidden',
+  },
+  {
+    description:
+      'a request from a teen without active guardian consent to save silhouette sliders',
+    method: 'PUT',
+    path: '/api/v1/wardrobe/silhouette',
+    state: 'Guardian consent is not active for teen silhouette access',
+    stateParams: { userId: SILHOUETTE_TEEN_ID },
+    headers: { ...pactTeenHeaders, 'If-Match': silhouetteETagFor(0) },
+    body: { heightSlider: 50, buildSlider: 50 },
+    status: 403,
+    code: 'GUARDIAN_CONSENT_REQUIRED',
+    reason: 'Forbidden',
+  },
+]
+
+export async function verifySilhouetteStalePreconditionInteraction(pact: PactV4) {
+  await verifyWardrobeErrorInteraction(pact, {
+    description:
+      'a request to save silhouette sliders with a stale revision precondition',
+    method: 'PUT',
+    path: '/api/v1/wardrobe/silhouette',
+    state: 'Silhouette profile exists for user at a newer revision',
+    stateParams: { userId: ONBOARDING_OWNER_ID },
+    headers: { ...pactEventHeaders, 'If-Match': silhouetteETagFor(1) },
+    body: { heightSlider: 62, buildSlider: 40 },
+    status: 412,
+    code: 'SILHOUETTE_REVISION_MISMATCH',
+    reason: 'Precondition Failed',
+  })
+}
+
+// --- "My Form" photo pipeline -----------------------------------------------
+
+export async function verifyMyFormUploadUrlInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Silhouette profile exists for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a request to allocate a My Form upload session')
+    .withRequest(
+      'POST',
+      '/api/v1/wardrobe/silhouette/my-form/upload-url',
+      setJsonContent({
+        headers: {
+          ...pactEventHeaders,
+          'Idempotency-Key': SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
+        },
+        body: {
+          fileSizeBytes: 2048576,
+          mimeType: 'image/png',
+          sha256: SILHOUETTE_SHA256,
+          widthPx: 1024,
+          heightPx: 1536,
+        },
+      })
+    )
+    .willRespondWith(
+      201,
+      setJsonContent({
+        body: {
+          data: {
+            uploadSessionId: string(SILHOUETTE_UPLOAD_SESSION_ID),
+            uploadUrl: string(
+              `https://api.example/wardrobe/silhouette/uploads/${SILHOUETTE_UPLOAD_SESSION_ID}`
+            ),
+            uploadToken: string('token_my_form_upload'),
+            requiredHeaders: { 'content-type': string('image/png') },
+            expiresAt: isoTimestamp(SILHOUETTE_UPLOAD_EXPIRY),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(
+        mockServer
+      ).apiV1WardrobeSilhouetteMyFormUploadUrlPost({
+        idempotencyKey: SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
+        createSilhouetteUploadUrlInput: {
+          fileSizeBytes: 2048576,
+          mimeType: 'image/png',
+          sha256: SILHOUETTE_SHA256,
+          widthPx: 1024,
+          heightPx: 1536,
+        },
+      })
+
+      expect(
+        createSilhouetteUploadUrlResponseSchema.parse(response).data.uploadSessionId
+      ).toBe(SILHOUETTE_UPLOAD_SESSION_ID)
+    })
+}
+
+/**
+ * Idempotent-replay coverage for My Form upload-url allocation, grounded in
+ * `WardrobeSilhouetteService.createMyFormUploadUrl`'s real
+ * `existing.my_form_upload_idempotency_key === idempotencyKey` branch: a
+ * repeated request with the same idempotency key returns the same session
+ * unchanged, and the controller's `res.status(result.replayed ? 200 : 201)`
+ * branches to 200.
+ */
+export async function verifyMyFormUploadUrlReplayInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A My Form upload session was already allocated for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving(
+      'a repeated My Form upload session allocation with the same idempotency key'
+    )
+    .withRequest(
+      'POST',
+      '/api/v1/wardrobe/silhouette/my-form/upload-url',
+      setJsonContent({
+        headers: {
+          ...pactEventHeaders,
+          'Idempotency-Key': SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
+        },
+        body: {
+          fileSizeBytes: 2048576,
+          mimeType: 'image/png',
+          sha256: SILHOUETTE_SHA256,
+          widthPx: 1024,
+          heightPx: 1536,
+        },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: {
+            uploadSessionId: string(SILHOUETTE_UPLOAD_SESSION_ID),
+            uploadUrl: string(
+              `https://api.example/wardrobe/silhouette/uploads/${SILHOUETTE_UPLOAD_SESSION_ID}`
+            ),
+            uploadToken: string('token_my_form_upload'),
+            requiredHeaders: { 'content-type': string('image/png') },
+            expiresAt: isoTimestamp(SILHOUETTE_UPLOAD_EXPIRY),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(
+        mockServer
+      ).apiV1WardrobeSilhouetteMyFormUploadUrlPost({
+        idempotencyKey: SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
+        createSilhouetteUploadUrlInput: {
+          fileSizeBytes: 2048576,
+          mimeType: 'image/png',
+          sha256: SILHOUETTE_SHA256,
+          widthPx: 1024,
+          heightPx: 1536,
+        },
+      })
+
+      expect(
+        createSilhouetteUploadUrlResponseSchema.parse(response).data.uploadSessionId
+      ).toBe(SILHOUETTE_UPLOAD_SESSION_ID)
+    })
+}
+
+export async function verifyMyFormCommitInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'My Form photo bytes are uploaded and awaiting commit for user',
+        params: {
+          userId: ONBOARDING_OWNER_ID,
+          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
+        },
+      })
+    )
+    .uponReceiving('a request to commit the uploaded My Form photo for processing')
+    .withRequest(
+      'POST',
+      '/api/v1/wardrobe/silhouette/my-form/commit',
+      setJsonContent({
+        headers: {
+          ...pactEventHeaders,
+          'Idempotency-Key': SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
+        },
+        body: {
+          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
+          confirmsBasewearGuidance: true,
+        },
+      })
+    )
+    .willRespondWith(
+      // A first commit: the controller's
+      // `res.status(result.replayed ? 200 : 201)` answers 201 here.
+      201,
+      setJsonContent({
+        headers: { ETag: string(silhouetteETagFor(2)) },
+        body: {
+          // `mode` stays `default_mannequin` while the photo is still
+          // `processing`: AC2/decision 5 say a *ready* photo becomes the
+          // active silhouette mode, and a failed attempt never switches it
+          // either (see the failure-reason interactions below) — so an
+          // in-flight commit can't jump ahead of that rule and switch mode
+          // before the pipeline has produced a `ready` result.
+          data: silhouetteProfileBody(2, {
+            mode: 'default_mannequin',
+            heightSlider: 50,
+            buildSlider: 50,
+            myForm: {
+              status: 'processing',
+              failureReason: null,
+              committedAt: SILHOUETTE_COMMITTED_AT,
+              imageAccess: null,
+            },
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(
+        mockServer
+      ).apiV1WardrobeSilhouetteMyFormCommitPost({
+        idempotencyKey: SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
+        commitSilhouettePhotoInput: {
+          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
+          confirmsBasewearGuidance: true,
+        },
+      })
+
+      const parsed = silhouetteProfileResponseSchema.parse(response).data
+      expect(parsed.myForm?.status).toBe('processing')
+      expect(parsed.mode).toBe('default_mannequin')
+    })
+}
+
+/**
+ * Idempotent-replay coverage for My Form commit, grounded in
+ * `WardrobeSilhouetteService.commitMyForm`'s real
+ * `profile.my_form_commit_idempotency_key === idempotencyKey` branch: a
+ * repeated commit with the same idempotency key returns the existing row
+ * unchanged (same revision, same `committedAt`), no re-processing. Expects
+ * 200, not 201: like upload-url, `commitMyForm` returns
+ * `CommitResult['replayed']` and the controller applies
+ * `res.status(result.replayed ? 200 : 201)`, so a replay answers 200 while
+ * a first commit answers 201. Both statuses are registered on the contract.
+ */
+export async function verifyMyFormCommitReplayInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A My Form photo commit was already processed for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a repeated My Form commit with the same idempotency key')
+    .withRequest(
+      'POST',
+      '/api/v1/wardrobe/silhouette/my-form/commit',
+      setJsonContent({
+        headers: {
+          ...pactEventHeaders,
+          'Idempotency-Key': SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
+        },
+        body: {
+          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
+          confirmsBasewearGuidance: true,
+        },
+      })
+    )
+    .willRespondWith(
+      // A replay: the controller's `res.status(result.replayed ? 200 : 201)`
+      // answers 200 here, where a first commit answers 201.
+      200,
+      setJsonContent({
+        headers: { ETag: string(silhouetteETagFor(2)) },
+        body: {
+          data: silhouetteProfileBody(2, {
+            mode: 'default_mannequin',
+            heightSlider: 50,
+            buildSlider: 50,
+            myForm: {
+              status: 'processing',
+              failureReason: null,
+              committedAt: SILHOUETTE_COMMITTED_AT,
+              imageAccess: null,
+            },
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(
+        mockServer
+      ).apiV1WardrobeSilhouetteMyFormCommitPost({
+        idempotencyKey: SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
+        commitSilhouettePhotoInput: {
+          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
+          confirmsBasewearGuidance: true,
+        },
+      })
+
+      const parsed = silhouetteProfileResponseSchema.parse(response).data
+      expect(parsed.myForm?.status).toBe('processing')
+      expect(parsed.revision).toBe(2)
+    })
+}
+
+export async function verifyMyFormReadyInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A My Form photo is ready for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving('a request to read a ready My Form photo')
+    .withRequest(
+      'GET',
+      '/api/v1/wardrobe/silhouette',
+      setJsonContent({ headers: pactEventHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(silhouetteETagFor(3)) },
+        body: {
+          data: silhouetteProfileBody(3, {
+            mode: 'my_form',
+            heightSlider: 50,
+            buildSlider: 50,
+            myForm: {
+              status: 'ready',
+              failureReason: null,
+              committedAt: SILHOUETTE_COMMITTED_AT,
+              imageAccess: {
+                url: 'https://example.test/silhouette-my-form.png',
+                expiresAt: SILHOUETTE_IMAGE_EXPIRY,
+              },
+            },
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeSilhouetteGet()
+
+      expect(silhouetteProfileResponseSchema.parse(response).data.myForm).toMatchObject({
+        status: 'ready',
+        failureReason: null,
+      })
+    })
+}
+
+export const myFormFailureReasons = [
+  'contrast',
+  'privacy_violation',
+  'timeout',
+  'storage_error',
+] as const satisfies readonly SilhouettePhotoFailureReason[]
+
+/**
+ * Covers one documented "My Form" failure reason (decision 5/9). Exported as
+ * a single-interaction function, driven by `it.each(myFormFailureReasons)`
+ * in each pacttest file, rather than looping over all four reasons inside
+ * one exported function/`it()` — PactV4's FFI non-deterministically drops an
+ * interaction when more than one `addInteraction()...executeTest()` chain is
+ * awaited inside a single test body (see `verifyWardrobeErrorInteraction`'s
+ * doc comment above).
+ */
+export async function verifyMyFormFailureInteraction(
+  pact: PactV4,
+  createClient: CreateClient,
+  failureReason: SilhouettePhotoFailureReason
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A My Form photo failed for user',
+        params: { userId: ONBOARDING_OWNER_ID, reason: failureReason },
+      })
+    )
+    .uponReceiving(`a request to read a My Form photo that failed with ${failureReason}`)
+    .withRequest(
+      'GET',
+      '/api/v1/wardrobe/silhouette',
+      setJsonContent({ headers: pactEventHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(silhouetteETagFor(2)) },
+        body: {
+          // A failed My Form attempt never switches the active mode; the
+          // previous mannequin sliders remain in effect (AC2/decision 5).
+          // `committedAt` stays set: silhouette-photo.processor.ts's failure
+          // branch never clears `my_form_committed_at` (only a full DELETE
+          // does) because the record was already committed before
+          // processing failed.
+          data: silhouetteProfileBody(2, {
+            mode: 'default_mannequin',
+            heightSlider: 50,
+            buildSlider: 50,
+            myForm: {
+              status: 'failed',
+              failureReason,
+              committedAt: SILHOUETTE_COMMITTED_AT,
+              imageAccess: null,
+            },
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeSilhouetteGet()
+
+      expect(silhouetteProfileResponseSchema.parse(response).data.myForm).toMatchObject({
+        status: 'failed',
+        failureReason,
+        committedAt: SILHOUETTE_COMMITTED_AT,
+      })
+    })
+}
+
+/**
+ * Decision 6: a `privacy_violation` verdict on a teen's photo additionally
+ * writes a `ModerationEvent` and queues a guardian notification through the
+ * durable `EventEnvelope` outbox. That side effect is invisible to the HTTP
+ * response by design (decision 8/the 4.4-UNIT-001 analytics fixtures prove
+ * the same "never leaks photo/moderation detail" rule) — the teen sees the
+ * identical `failed`/`privacy_violation` shape any other actor would. This
+ * interaction exists as its own case, with its own provider state, so a
+ * wired provider can additionally assert the outbox row once Task 3/4 land;
+ * the response-shape assertion here only proves no leakage.
+ */
+export async function verifyMyFormGuardianNotificationInteraction(
+  pact: PactV4,
+  createTeenClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A My Form photo failed privacy_violation for a teen and queued a guardian notification',
+        params: { userId: SILHOUETTE_TEEN_ID },
+      })
+    )
+    .uponReceiving(
+      'a request from a teen to read a My Form photo that failed privacy_violation and notified their guardian'
+    )
+    .withRequest(
+      'GET',
+      '/api/v1/wardrobe/silhouette',
+      setJsonContent({ headers: pactTeenHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(silhouetteETagFor(2)) },
+        body: {
+          data: silhouetteProfileBody(2, {
+            mode: 'default_mannequin',
+            heightSlider: 50,
+            buildSlider: 50,
+            myForm: {
+              status: 'failed',
+              failureReason: 'privacy_violation',
+              committedAt: SILHOUETTE_COMMITTED_AT,
+              imageAccess: null,
+            },
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createTeenClient(mockServer).apiV1WardrobeSilhouetteGet()
+
+      expect(silhouetteProfileResponseSchema.parse(response).data.myForm).toMatchObject({
+        status: 'failed',
+        failureReason: 'privacy_violation',
+        committedAt: SILHOUETTE_COMMITTED_AT,
+      })
+    })
+}
+
+export async function verifyMyFormDeleteInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A My Form photo exists for user',
+        params: { userId: ONBOARDING_OWNER_ID },
+      })
+    )
+    .uponReceiving(
+      'a request to delete the My Form photo and revert to the default mannequin'
+    )
+    .withRequest(
+      'DELETE',
+      '/api/v1/wardrobe/silhouette/my-form',
+      setJsonContent({
+        headers: { ...pactEventHeaders, 'If-Match': silhouetteETagFor(3) },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { ETag: string(silhouetteETagFor(4)) },
+        body: {
+          data: silhouetteProfileBody(4, {
+            mode: 'default_mannequin',
+            heightSlider: 50,
+            buildSlider: 50,
+            myForm: null,
+          }),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeSilhouetteMyFormDelete(
+        {
+          ifMatch: silhouetteETagFor(3),
+        }
+      )
+
+      expect(silhouetteProfileResponseSchema.parse(response).data).toMatchObject({
+        mode: 'default_mannequin',
+        myForm: null,
+      })
+    })
 }

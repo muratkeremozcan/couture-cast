@@ -5,6 +5,7 @@ import { describe, it } from 'vitest'
 import { createMobileApiClient } from '../../../apps/mobile/src/lib/api-client'
 import {
   pactEventAuth,
+  pactTeenAuth,
   verifyApiHealthInteraction,
   verifyEventsPollInteraction,
   verifyInvalidCursorInteraction,
@@ -22,7 +23,28 @@ import {
   verifyUpdateCapsuleInteraction,
   verifyFavoriteCapsuleInteraction,
   verifyDeleteCapsuleInteraction,
-  verifyCapsuleErrorInteractions,
+  verifyCapsuleErrorInteraction,
+  capsuleErrorInteractions,
+  verifyOnboardingStateInteraction,
+  verifyOnboardingVirtualDefaultInteraction,
+  verifyPatchOnboardingStateInteraction,
+  verifyOnboardingReplayInteraction,
+  verifyWardrobeErrorInteraction,
+  onboardingErrorInteractions,
+  verifySilhouetteProfileInteraction,
+  verifyUpdateSilhouetteSlidersInteraction,
+  verifyUpdateSilhouetteSlidersReplayInteraction,
+  silhouetteGuardianErrorInteractions,
+  verifySilhouetteStalePreconditionInteraction,
+  verifyMyFormUploadUrlInteraction,
+  verifyMyFormUploadUrlReplayInteraction,
+  verifyMyFormCommitInteraction,
+  verifyMyFormCommitReplayInteraction,
+  verifyMyFormReadyInteraction,
+  verifyMyFormFailureInteraction,
+  myFormFailureReasons,
+  verifyMyFormGuardianNotificationInteraction,
+  verifyMyFormDeleteInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -36,6 +58,13 @@ function createMobileClientForMockServer(mockServer: V3MockServer) {
   return createMobileApiClient({
     baseUrl: mockServer.url,
     accessToken: pactEventAuth.accessToken,
+  })
+}
+
+function createMobileTeenClientForMockServer(mockServer: V3MockServer) {
+  return createMobileApiClient({
+    baseUrl: mockServer.url,
+    accessToken: pactTeenAuth.accessToken,
   })
 }
 
@@ -108,7 +137,101 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
     await verifyDeleteCapsuleInteraction(pact, createMobileClientForMockServer)
   })
 
-  it('preserves documented capsule error envelopes', async () => {
-    await verifyCapsuleErrorInteractions(pact)
+  it.each(capsuleErrorInteractions)(
+    'preserves the documented capsule error envelope that $description',
+    async (interaction) => {
+      await verifyCapsuleErrorInteraction(pact, interaction)
+    }
+  )
+
+  it('reads existing wardrobe onboarding progress', async () => {
+    await verifyOnboardingStateInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('reads the virtual not_started onboarding default', async () => {
+    await verifyOnboardingVirtualDefaultInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('advances the onboarding state machine one step', async () => {
+    await verifyPatchOnboardingStateInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('replays a repeated identical onboarding step transition as a no-op', async () => {
+    await verifyOnboardingReplayInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it.each(onboardingErrorInteractions)(
+    'preserves the documented onboarding error envelope: $description',
+    async (interaction) => {
+      await verifyWardrobeErrorInteraction(pact, interaction)
+    }
+  )
+
+  it('reads the silhouette profile', async () => {
+    await verifySilhouetteProfileInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('saves silhouette slider values', async () => {
+    await verifyUpdateSilhouetteSlidersInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('replays a repeated identical silhouette slider save as a no-op', async () => {
+    await verifyUpdateSilhouetteSlidersReplayInteraction(
+      pact,
+      createMobileClientForMockServer
+    )
+  })
+
+  it.each(silhouetteGuardianErrorInteractions)(
+    'enforces guardian consent on silhouette access: $description',
+    async (interaction) => {
+      await verifyWardrobeErrorInteraction(pact, interaction)
+    }
+  )
+
+  it('rejects a stale silhouette revision precondition', async () => {
+    await verifySilhouetteStalePreconditionInteraction(pact)
+  })
+
+  it('allocates a My Form upload session', async () => {
+    await verifyMyFormUploadUrlInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('replays a repeated My Form upload session allocation', async () => {
+    await verifyMyFormUploadUrlReplayInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('commits the My Form photo for processing', async () => {
+    await verifyMyFormCommitInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('replays a repeated My Form commit', async () => {
+    await verifyMyFormCommitReplayInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('reads a ready My Form photo', async () => {
+    await verifyMyFormReadyInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it.each(myFormFailureReasons)(
+    'preserves the documented My Form failure reason: %s',
+    async (failureReason) => {
+      await verifyMyFormFailureInteraction(
+        pact,
+        createMobileClientForMockServer,
+        failureReason
+      )
+    }
+  )
+
+  it('queues a guardian notification for a teen privacy_violation verdict', async () => {
+    await verifyMyFormGuardianNotificationInteraction(
+      pact,
+      createMobileTeenClientForMockServer
+    )
+  })
+
+  it('deletes the My Form photo and reverts to the default mannequin', async () => {
+    await verifyMyFormDeleteInteraction(pact, createMobileClientForMockServer)
   })
 })

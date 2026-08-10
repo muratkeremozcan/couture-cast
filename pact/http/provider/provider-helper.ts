@@ -9,6 +9,34 @@ const PACT_CAPSULE_OWNER_ID = 'guardian-1'
 const PACT_CAPSULE_ID = '00000000-0000-4000-8000-0000000000c1'
 const PACT_CAPSULE_GARMENT_A = '00000000-0000-4000-8000-0000000000a1'
 const PACT_CAPSULE_TIMESTAMP = '2026-08-07T10:00:00.000Z'
+const PACT_SILHOUETTE_TEEN_ID = 'teen-1'
+const PACT_ONBOARDING_STARTED_AT = '2026-08-09T09:00:00.000Z'
+const PACT_SILHOUETTE_UPDATED_AT = '2026-08-09T09:05:00.000Z'
+const PACT_SILHOUETTE_COMMITTED_AT = '2026-08-09T09:10:00.000Z'
+const PACT_SILHOUETTE_IMAGE_EXPIRY = '2026-08-09T09:25:00.000Z'
+const PACT_SILHOUETTE_UPLOAD_SESSION_ID = '85b4dde2-3df2-4e81-8c18-d51ae3408ca0'
+const PACT_SILHOUETTE_UPLOAD_EXPIRY = '2026-08-09T09:15:00.000Z'
+/**
+ * Mirrors `SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY`/`SILHOUETTE_COMMIT_IDEMPOTENCY_KEY`
+ * in the consumer file exactly: the replay interactions send these same
+ * header values, and the doubles below compare the incoming header against
+ * them to decide `replayed`/unchanged-row behavior, mirroring
+ * `WardrobeSilhouetteService`'s real `*_idempotency_key === idempotencyKey`
+ * checks.
+ */
+const PACT_SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY = '6eae27b8-8335-476e-a3bf-371e9fa5fd26'
+const PACT_SILHOUETTE_COMMIT_IDEMPOTENCY_KEY = '760490a0-5049-4cdd-afcf-ac8e7ba0b436'
+/**
+ * Fixed stand-in for the onboarding-complete double's `completedAt`, kept
+ * deterministic like every other timestamp in this file rather than reading
+ * the wall clock. Currently unreachable: `requireOnboardingScenario()` only
+ * ever returns `currentStep: 'permission'` or `'capture'`, and
+ * `ONBOARDING_FORWARD_TRANSITIONS` never allows `'complete'` from either, so
+ * no interaction exercises this branch today. Kept fixed anyway so this
+ * double stays fully deterministic the moment a completion-success
+ * interaction is added.
+ */
+const PACT_ONBOARDING_COMPLETED_AT = '2026-08-09T09:20:00.000Z'
 import {
   ConflictException,
   ForbiddenException,
@@ -49,12 +77,36 @@ import { WardrobeCapsuleController } from '../../../apps/api/src/modules/wardrob
 // controller's injection token then never matches this provider.
 import { WardrobeCapsuleService } from '../../../apps/api/src/modules/wardrobe/wardrobe-capsule.service.js'
 import { CapsuleCacheHeadersMiddleware } from '../../../apps/api/src/modules/wardrobe/wardrobe-capsule.cache-headers.middleware'
+import { WardrobeOnboardingController } from '../../../apps/api/src/modules/wardrobe/wardrobe-onboarding.controller'
+import {
+  formatOnboardingETag,
+  parseOnboardingIfMatchHeader,
+  WardrobeOnboardingService,
+} from '../../../apps/api/src/modules/wardrobe/wardrobe-onboarding.service'
+import { WardrobeSilhouetteController } from '../../../apps/api/src/modules/wardrobe/wardrobe-silhouette.controller'
+import {
+  formatSilhouetteETag,
+  parseSilhouetteIfMatchHeader,
+  WardrobeSilhouetteService,
+} from '../../../apps/api/src/modules/wardrobe/wardrobe-silhouette.service'
 import {
   GARMENT_TAGGING_ANALYSIS_VERSION,
   type GarmentCategory,
   type GarmentMaterial,
   type GarmentComfortRange,
 } from '@couture/api-client'
+// `SilhouettePhotoFailureReason` is not part of the curated top-level
+// @couture/api-client barrel (packages/api-client/src/index.ts); the
+// contracts/http subpath re-exports everything from wardrobe.ts instead.
+import type {
+  SilhouetteMode,
+  SilhouettePhotoFailureReason,
+  SilhouettePhotoStatus,
+  UpdateWardrobeOnboardingStateInput,
+  UpdateSilhouetteSlidersInput,
+  WardrobeOnboardingStep,
+  WardrobeOnboardingStateResponse,
+} from '@couture/api-client/contracts/http'
 import type { ApiRole } from '../../../apps/api/src/modules/auth/security.types'
 
 export type PactEvent = {
@@ -108,6 +160,9 @@ export function resetProviderState() {
     outcome: 'not_found',
     guardianAllowed: true,
   }
+  resetProviderOnboardingState()
+  resetProviderSilhouetteState()
+  resetProviderCapsuleState()
 }
 
 export function configureProviderWardrobeState(
@@ -194,9 +249,18 @@ export async function startLocalPactProvider({
   } as unknown as GuardianConsentStateService
   const accessTokenIdentityService = {
     resolveIdentity(token: string) {
-      return token === 'pact-event-token'
-        ? Promise.resolve({ userId: 'guardian-1', role: 'guardian' as const })
-        : Promise.reject(new Error('Unknown Pact access token'))
+      if (token === 'pact-event-token') {
+        return Promise.resolve({ userId: 'guardian-1', role: 'guardian' as const })
+      }
+      // Story 4.4 wardrobe onboarding/silhouette: a second identity whose
+      // role is 'teen', needed by the guardian-consent-gate and
+      // guardian-notification consumer interactions in
+      // pact/http/consumer/api-contract-interactions.ts
+      // (pactTeenAuth/verifyMyFormGuardianNotificationInteraction).
+      if (token === 'pact-teen-token') {
+        return Promise.resolve({ userId: 'teen-1', role: 'teen' as const })
+      }
+      return Promise.reject(new Error('Unknown Pact access token'))
     },
   } as unknown as AccessTokenIdentityService
 
@@ -524,8 +588,364 @@ export async function startLocalPactProvider({
     },
   } as unknown as WardrobeCapsuleService
 
+  /**
+   * Story 4.4 onboarding provider double, wired against the real
+   * `WardrobeOnboardingController` (unlike Task 7's earlier state-setup-only
+   * scaffolding, which had no controller to wire against yet). Mirrors
+   * `mockWardrobeCapsuleService`'s level of fidelity: canned responses per
+   * named provider state plus the documented error paths, not a full
+   * re-simulation of `wardrobe-onboarding.service.ts`'s business logic --
+   * that is proven separately against a real database by
+   * `apps/api/integration/wardrobe-onboarding.integration.spec.ts`. Reuses
+   * the real `formatOnboardingETag`/`parseOnboardingIfMatchHeader` (pure,
+   * side-effect-free) so header parsing and the 428/malformed-412 paths
+   * match the real service exactly instead of a hand-duplicated copy.
+   */
+  const ONBOARDING_FORWARD_TRANSITIONS: Record<
+    WardrobeOnboardingStep,
+    WardrobeOnboardingStep[]
+  > = {
+    permission: ['capture'],
+    capture: ['tagging', 'silhouette'],
+    tagging: ['silhouette'],
+    silhouette: ['complete'],
+    complete: [],
+  }
+
+  type OnboardingRow = WardrobeOnboardingStateResponse['data']
+
+  const toOnboardingResponse = (row: OnboardingRow): WardrobeOnboardingStateResponse => ({
+    data: row,
+  })
+
+  const requireOnboardingScenario = (): { row: OnboardingRow } => {
+    const state = getProviderOnboardingState()
+    if (!state) {
+      throw new NotFoundException('ONBOARDING_STATE_NOT_CONFIGURED')
+    }
+    if (state.scenario === 'not-started') {
+      return {
+        row: {
+          status: 'not_started',
+          currentStep: 'permission',
+          usedStarterWardrobe: false,
+          garmentsCapturedCount: 0,
+          startedAt: null,
+          completedAt: null,
+          revision: 0,
+        },
+      }
+    }
+    return {
+      row: {
+        status: 'in_progress',
+        currentStep: 'capture',
+        usedStarterWardrobe: false,
+        garmentsCapturedCount: 1,
+        startedAt: PACT_ONBOARDING_STARTED_AT,
+        completedAt: null,
+        revision: state.scenario === 'stale-precondition' ? 2 : 1,
+      },
+    }
+  }
+
+  const mockWardrobeOnboardingService = {
+    getState: (userId: string) => {
+      const { row } = requireOnboardingScenario()
+      return Promise.resolve({
+        response: toOnboardingResponse(row),
+        etag: formatOnboardingETag(userId, row.revision),
+      })
+    },
+    advanceStep: (
+      userId: string,
+      ifMatchHeader: string | undefined,
+      input: UpdateWardrobeOnboardingStateInput
+    ) => {
+      // Parsed first, exactly like the real service: a missing/malformed
+      // If-Match throws 428/412 before any provider-state scenario lookup.
+      const expectedRevision = parseOnboardingIfMatchHeader(ifMatchHeader, userId)
+      const { row } = requireOnboardingScenario()
+      if (expectedRevision !== null && expectedRevision !== row.revision) {
+        throw new PreconditionFailedException('ONBOARDING_REVISION_MISMATCH')
+      }
+
+      const usedStarterWardrobe = input.usedStarterWardrobe ?? false
+      const isIdenticalReplay =
+        row.currentStep === input.targetStep &&
+        row.usedStarterWardrobe === usedStarterWardrobe
+      if (isIdenticalReplay) {
+        return Promise.resolve({ response: toOnboardingResponse(row), isNoOp: true })
+      }
+
+      const allowed = ONBOARDING_FORWARD_TRANSITIONS[row.currentStep]
+      if (!allowed.includes(input.targetStep)) {
+        throw new ConflictException('INVALID_STEP_TRANSITION')
+      }
+
+      const advanced: OnboardingRow = {
+        status: input.targetStep === 'complete' ? 'completed' : 'in_progress',
+        currentStep: input.targetStep,
+        usedStarterWardrobe,
+        garmentsCapturedCount: row.garmentsCapturedCount,
+        startedAt: row.startedAt ?? PACT_ONBOARDING_STARTED_AT,
+        completedAt:
+          input.targetStep === 'complete'
+            ? PACT_ONBOARDING_COMPLETED_AT
+            : row.completedAt,
+        revision: row.revision + 1,
+      }
+      return Promise.resolve({ response: toOnboardingResponse(advanced), isNoOp: false })
+    },
+  } as unknown as WardrobeOnboardingService
+
+  /**
+   * Story 4.4 silhouette/My Form provider double, wired against the real
+   * `WardrobeSilhouetteController`. Same fidelity level as the onboarding
+   * double above: canned rows per named provider state (including every
+   * documented My Form failure reason and the ready/processing/deleted
+   * shapes), reusing the real `formatSilhouetteETag`/
+   * `parseSilhouetteIfMatchHeader` for header handling. The guardian-consent
+   * gate itself is `mockGuardianService.assertWardrobeUploadAllowed` above
+   * (the class-level `WardrobeUploadGuard`), not this double.
+   */
+  type SilhouetteRow = {
+    mode: SilhouetteMode
+    heightSlider: number | null
+    buildSlider: number | null
+    myForm: {
+      status: SilhouettePhotoStatus
+      failureReason: SilhouettePhotoFailureReason | null
+      committedAt: string | null
+      imageAccess: { url: string; expiresAt: string } | null
+    } | null
+    revision: number
+  }
+
+  const toSilhouetteResponse = (row: SilhouetteRow) => ({
+    data: {
+      mode: row.mode,
+      heightSlider: row.heightSlider,
+      buildSlider: row.buildSlider,
+      myForm: row.myForm,
+      revision: row.revision,
+      updatedAt: PACT_SILHOUETTE_UPDATED_AT,
+    },
+  })
+
+  const requireSilhouetteScenario = (): SilhouetteRow => {
+    const state = getProviderSilhouetteState()
+    if (!state) {
+      throw new NotFoundException('SILHOUETTE_STATE_NOT_CONFIGURED')
+    }
+    switch (state.scenario) {
+      case 'profile-exists':
+      case 'guardian-forbidden':
+      case 'my-form-awaiting-commit':
+      case 'my-form-upload-already-allocated':
+        return {
+          mode: 'default_mannequin',
+          heightSlider: 50,
+          buildSlider: 50,
+          myForm: null,
+          revision: 1,
+        }
+      case 'stale-precondition':
+        return {
+          mode: 'default_mannequin',
+          heightSlider: 50,
+          buildSlider: 50,
+          myForm: null,
+          revision: 2,
+        }
+      case 'my-form-ready':
+      case 'my-form-exists':
+        return {
+          mode: 'my_form',
+          heightSlider: 50,
+          buildSlider: 50,
+          myForm: {
+            status: 'ready',
+            failureReason: null,
+            committedAt: PACT_SILHOUETTE_COMMITTED_AT,
+            imageAccess: {
+              url: 'https://example.test/silhouette-my-form.png',
+              expiresAt: PACT_SILHOUETTE_IMAGE_EXPIRY,
+            },
+          },
+          revision: 3,
+        }
+      case 'my-form-failed':
+      case 'my-form-privacy-violation-teen-notified':
+        return {
+          mode: 'default_mannequin',
+          heightSlider: 50,
+          buildSlider: 50,
+          myForm: {
+            status: 'failed',
+            failureReason: state.failureReason ?? 'privacy_violation',
+            committedAt: PACT_SILHOUETTE_COMMITTED_AT,
+            imageAccess: null,
+          },
+          revision: 2,
+        }
+      case 'my-form-commit-already-processed':
+        // Identical to a fresh commit's resulting row (see `commitMyForm`
+        // below): the replay interaction asserts this exact shape stays
+        // unchanged rather than being re-derived, proving no re-processing.
+        return {
+          mode: 'default_mannequin',
+          heightSlider: 50,
+          buildSlider: 50,
+          myForm: {
+            status: 'processing',
+            failureReason: null,
+            committedAt: PACT_SILHOUETTE_COMMITTED_AT,
+            imageAccess: null,
+          },
+          revision: 2,
+        }
+    }
+  }
+
+  const mockWardrobeSilhouetteService = {
+    getProfile: (userId: string) => {
+      const row = requireSilhouetteScenario()
+      return Promise.resolve({
+        response: toSilhouetteResponse(row),
+        etag: formatSilhouetteETag(userId, row.revision),
+      })
+    },
+    updateSliders: (
+      userId: string,
+      ifMatchHeader: string | undefined,
+      input: UpdateSilhouetteSlidersInput
+    ) => {
+      const expectedRevision = parseSilhouetteIfMatchHeader(ifMatchHeader, userId)
+      const row = requireSilhouetteScenario()
+      if (expectedRevision !== null && expectedRevision !== row.revision) {
+        throw new PreconditionFailedException('SILHOUETTE_REVISION_MISMATCH')
+      }
+
+      const isIdenticalReplay =
+        row.mode === 'default_mannequin' &&
+        row.heightSlider === input.heightSlider &&
+        row.buildSlider === input.buildSlider
+      if (isIdenticalReplay) {
+        return Promise.resolve({ response: toSilhouetteResponse(row), isNoOp: true })
+      }
+
+      const updated: SilhouetteRow = {
+        mode: 'default_mannequin',
+        heightSlider: input.heightSlider,
+        buildSlider: input.buildSlider,
+        myForm: row.myForm,
+        revision: row.revision + 1,
+      }
+      return Promise.resolve({ response: toSilhouetteResponse(updated), isNoOp: false })
+    },
+    createMyFormUploadUrl: (
+      _userId: string,
+      _role: unknown,
+      _input: unknown,
+      idempotencyKey: string
+    ) => {
+      const state = getProviderSilhouetteState()
+      requireSilhouetteScenario()
+      // Mirrors `createMyFormUploadUrl`'s real
+      // `existing.my_form_upload_idempotency_key === idempotencyKey` branch:
+      // a repeated call with the same key replays the same session instead
+      // of allocating a new one, and the controller's
+      // `res.status(result.replayed ? 200 : 201)` reads this flag.
+      const replayed =
+        state?.scenario === 'my-form-upload-already-allocated' &&
+        idempotencyKey === PACT_SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY
+      return Promise.resolve({
+        replayed,
+        response: {
+          data: {
+            uploadSessionId: PACT_SILHOUETTE_UPLOAD_SESSION_ID,
+            uploadUrl: `https://api.example/wardrobe/silhouette/uploads/${PACT_SILHOUETTE_UPLOAD_SESSION_ID}`,
+            uploadToken: 'token_my_form_upload',
+            requiredHeaders: { 'content-type': 'image/png' as const },
+            expiresAt: PACT_SILHOUETTE_UPLOAD_EXPIRY,
+          },
+        },
+      })
+    },
+    commitMyForm: (
+      _userId: string,
+      _role: unknown,
+      _input: unknown,
+      idempotencyKey: string
+    ) => {
+      const state = getProviderSilhouetteState()
+      const row = requireSilhouetteScenario()
+      // Mirrors `commitMyForm`'s real
+      // `profile.my_form_commit_idempotency_key === idempotencyKey` branch: a
+      // repeated commit with the same key returns the existing row
+      // unchanged (no re-processing, no revision increment, no re-enqueue).
+      // Like upload-url, the real service returns `CommitResult['replayed']`
+      // and the controller's `res.status(result.replayed ? 200 : 201)` reads
+      // it, so a replay answers 200 where a first commit answers 201. The
+      // flag must be set here: this stub is cast to the service type, so an
+      // omitted `replayed` reads as `undefined` and silently pins 201.
+      if (
+        state?.scenario === 'my-form-commit-already-processed' &&
+        idempotencyKey === PACT_SILHOUETTE_COMMIT_IDEMPOTENCY_KEY
+      ) {
+        return Promise.resolve({
+          replayed: true,
+          response: toSilhouetteResponse(row),
+        })
+      }
+      const committed: SilhouetteRow = {
+        mode: 'default_mannequin',
+        heightSlider: row.heightSlider,
+        buildSlider: row.buildSlider,
+        myForm: {
+          status: 'processing',
+          failureReason: null,
+          committedAt: PACT_SILHOUETTE_COMMITTED_AT,
+          imageAccess: null,
+        },
+        revision: row.revision + 1,
+      }
+      return Promise.resolve({
+        replayed: false,
+        response: toSilhouetteResponse(committed),
+      })
+    },
+    deleteMyForm: (userId: string, ifMatchHeader: string | undefined) => {
+      const expectedRevision = parseSilhouetteIfMatchHeader(ifMatchHeader, userId)
+      const row = requireSilhouetteScenario()
+      if (expectedRevision !== null && expectedRevision !== row.revision) {
+        throw new PreconditionFailedException('SILHOUETTE_REVISION_MISMATCH')
+      }
+      const deleted: SilhouetteRow = {
+        mode: 'default_mannequin',
+        heightSlider: row.heightSlider,
+        buildSlider: row.buildSlider,
+        myForm: null,
+        revision: row.revision + 1,
+      }
+      return Promise.resolve({ response: toSilhouetteResponse(deleted) })
+    },
+  } as unknown as WardrobeSilhouetteService
+
   const mockGuardianService = {
     assertWardrobeUploadAllowed: (userId: string) => {
+      // Story 4.4: `WardrobeUploadGuard` applies class-level to
+      // WardrobeSilhouetteController (decision 7), so the consent-revoked-teen
+      // Pact scenario must be honored here too, independent of the pre-existing
+      // garment/capsule providerWardrobeState check below.
+      const silhouetteState = getProviderSilhouetteState()
+      if (
+        silhouetteState?.scenario === 'guardian-forbidden' &&
+        userId === (silhouetteState.userId ?? PACT_SILHOUETTE_TEEN_ID)
+      ) {
+        throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+      }
       if (
         !providerWardrobeState.guardianAllowed ||
         (providerWardrobeState.userId !== null && providerWardrobeState.userId !== userId)
@@ -546,6 +966,8 @@ export async function startLocalPactProvider({
       UserController,
       WardrobeController,
       WardrobeCapsuleController,
+      WardrobeOnboardingController,
+      WardrobeSilhouetteController,
     ],
     providers: [
       EventsService,
@@ -593,6 +1015,14 @@ export async function startLocalPactProvider({
         provide: WardrobeCapsuleService,
         useValue: mockWardrobeCapsuleService,
       },
+      {
+        provide: WardrobeOnboardingService,
+        useValue: mockWardrobeOnboardingService,
+      },
+      {
+        provide: WardrobeSilhouetteService,
+        useValue: mockWardrobeSilhouetteService,
+      },
     ],
   })
     .overrideGuard(RequestAuthGuard)
@@ -606,9 +1036,17 @@ export async function startLocalPactProvider({
   // WardrobeModule applies this through `configure`, which a bare testing module
   // never calls. Without it every capsule response, including errors, would be
   // missing the `Cache-Control: private, no-store` the contract pins.
+  // Story 4.4: `wardrobe.module.ts`'s real `configure()` applies this same
+  // middleware to `/api/v1/wardrobe/onboarding{/*path}` and
+  // `/api/v1/wardrobe/silhouette{/*path}` too (not just capsules), for the
+  // identical reason -- reused as-is here rather than reimplemented.
   const capsuleCacheHeaders = new CapsuleCacheHeadersMiddleware()
   localApp.use('/api/v1/wardrobe', (req: Request, res: Response, next: NextFunction) => {
-    if (/^\/[^/]+\/capsules(\/|$|\?)/.test(req.url)) {
+    if (
+      /^\/[^/]+\/capsules(\/|$|\?)/.test(req.url) ||
+      /^\/onboarding(\/|$|\?)/.test(req.url) ||
+      /^\/silhouette(\/|$|\?)/.test(req.url)
+    ) {
       capsuleCacheHeaders.use(req, res, next)
       return
     }
@@ -668,4 +1106,85 @@ export function getProviderCapsuleState(): ProviderCapsuleState | null {
 
 export function resetProviderCapsuleState() {
   providerCapsuleState = null
+}
+
+/**
+ * Story 4.4 wardrobe onboarding and silhouette setup — provider state
+ * storage, mirroring the capsule state above exactly.
+ *
+ * `pact/http/provider/state-handlers.ts` configures a named, deterministic
+ * scenario per interaction exactly like every other state handler here, and
+ * that state is consumed by the real `mockWardrobeOnboardingService`/
+ * `mockWardrobeSilhouetteService` doubles below (wired against the real
+ * `WardrobeOnboardingController`/`WardrobeSilhouetteController` -- see the
+ * doc comments on those doubles for their fidelity level). `npm run
+ * test:pact:provider` verifies all onboarding/silhouette interactions
+ * genuinely green through this wiring, not just the state-setup half.
+ */
+export type ProviderOnboardingScenario = 'existing' | 'not-started' | 'stale-precondition'
+
+export type ProviderOnboardingState = {
+  userId: string | null
+  scenario: ProviderOnboardingScenario
+}
+
+let providerOnboardingState: ProviderOnboardingState | null = null
+
+export function configureProviderOnboardingState(state: {
+  userId?: string
+  scenario: ProviderOnboardingScenario
+}) {
+  providerOnboardingState = {
+    userId: state.userId ?? null,
+    scenario: state.scenario,
+  }
+}
+
+export function getProviderOnboardingState(): ProviderOnboardingState | null {
+  return providerOnboardingState
+}
+
+export function resetProviderOnboardingState() {
+  providerOnboardingState = null
+}
+
+export type ProviderSilhouetteScenario =
+  | 'profile-exists'
+  | 'guardian-forbidden'
+  | 'stale-precondition'
+  | 'my-form-awaiting-commit'
+  | 'my-form-ready'
+  | 'my-form-failed'
+  | 'my-form-privacy-violation-teen-notified'
+  | 'my-form-exists'
+  | 'my-form-upload-already-allocated'
+  | 'my-form-commit-already-processed'
+
+export type ProviderSilhouetteState = {
+  userId: string | null
+  scenario: ProviderSilhouetteScenario
+  /** Only set for the `my-form-failed` scenario, which the state handler parameterizes by reason. */
+  failureReason: SilhouettePhotoFailureReason | null
+}
+
+let providerSilhouetteState: ProviderSilhouetteState | null = null
+
+export function configureProviderSilhouetteState(state: {
+  userId?: string
+  scenario: ProviderSilhouetteScenario
+  failureReason?: SilhouettePhotoFailureReason
+}) {
+  providerSilhouetteState = {
+    userId: state.userId ?? null,
+    scenario: state.scenario,
+    failureReason: state.failureReason ?? null,
+  }
+}
+
+export function getProviderSilhouetteState(): ProviderSilhouetteState | null {
+  return providerSilhouetteState
+}
+
+export function resetProviderSilhouetteState() {
+  providerSilhouetteState = null
 }

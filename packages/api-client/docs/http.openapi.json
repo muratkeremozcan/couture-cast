@@ -5678,8 +5678,7 @@
         },
         "required": [
           "statusCode",
-          "message",
-          "error"
+          "message"
         ],
         "additionalProperties": false
       },
@@ -6103,8 +6102,7 @@
         },
         "required": [
           "statusCode",
-          "message",
-          "error"
+          "message"
         ],
         "additionalProperties": false
       }
@@ -8879,6 +8877,7 @@
         }
       },
       "patch": {
+        "x-draft": true,
         "tags": [
           "wardrobe"
         ],
@@ -9027,6 +9026,7 @@
         }
       },
       "put": {
+        "x-draft": true,
         "tags": [
           "wardrobe"
         ],
@@ -9218,6 +9218,7 @@
     },
     "/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}": {
       "put": {
+        "x-draft": true,
         "tags": [
           "wardrobe"
         ],
@@ -9238,8 +9239,53 @@
             "description": "Opaque upload session ID.",
             "name": "uploadSessionId",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "x-upload-token",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "image/jpeg",
+                "image/png",
+                "image/webp"
+              ]
+            },
+            "required": true,
+            "name": "content-type",
+            "in": "header"
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
         "responses": {
           "204": {
             "description": "Bytes accepted."
@@ -9395,6 +9441,7 @@
     },
     "/api/v1/wardrobe/silhouette/my-form": {
       "delete": {
+        "x-draft": true,
         "tags": [
           "wardrobe"
         ],

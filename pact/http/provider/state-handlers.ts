@@ -1,8 +1,11 @@
 import type { VerifierOptions } from '@pact-foundation/pact'
+import type { SilhouettePhotoFailureReason } from '@couture/api-client/contracts/http'
 import {
   configureProviderEvent,
   configureProviderWardrobeState,
   configureProviderCapsuleState,
+  configureProviderOnboardingState,
+  configureProviderSilhouetteState,
   parsePactEvent,
   type PactEvent,
 } from './provider-helper'
@@ -17,6 +20,19 @@ export type WarningAlertStateParams = {
 type GarmentStateParams = {
   garmentId: string
   userId: string
+}
+
+type OnboardingStateParams = {
+  userId: string
+}
+
+type SilhouetteStateParams = {
+  userId: string
+}
+
+type SilhouetteFailureStateParams = {
+  userId: string
+  reason: SilhouettePhotoFailureReason
 }
 
 export const stateHandlers: StateHandlers = {
@@ -143,5 +159,116 @@ export const stateHandlers: StateHandlers = {
       guardianAllowed: false,
     })
     return Promise.resolve({ description: 'Configured forbidden wardrobe access' })
+  },
+
+  /* ----------------------------------------------------------------------- *
+   * Story 4.4 wardrobe onboarding and silhouette setup.
+   *
+   * These configure a named, deterministic scenario before each interaction,
+   * following the exact pattern above. The state is consumed by the real
+   * `mockWardrobeOnboardingService`/`mockWardrobeSilhouetteService` doubles
+   * in provider-helper.ts, wired against the real
+   * `WardrobeOnboardingController`/`WardrobeSilhouetteController` -- see
+   * provider-helper.ts for the doubles' fidelity level. `test:pact:provider`
+   * verifies every onboarding/silhouette interaction through this wiring.
+   * ----------------------------------------------------------------------- */
+  'Wardrobe onboarding state exists for user': (parameters?: unknown) => {
+    const { userId } = parameters as OnboardingStateParams
+    configureProviderOnboardingState({ userId, scenario: 'existing' })
+    return Promise.resolve({ description: 'Configured existing onboarding state' })
+  },
+  'No wardrobe onboarding state exists for user': (parameters?: unknown) => {
+    const { userId } = parameters as OnboardingStateParams
+    configureProviderOnboardingState({ userId, scenario: 'not-started' })
+    return Promise.resolve({ description: 'Configured absent onboarding state' })
+  },
+  'Wardrobe onboarding state exists for user at a newer revision': (
+    parameters?: unknown
+  ) => {
+    const { userId } = parameters as OnboardingStateParams
+    configureProviderOnboardingState({ userId, scenario: 'stale-precondition' })
+    return Promise.resolve({
+      description: 'Configured onboarding state ahead of client revision',
+    })
+  },
+  'Silhouette profile exists for user': (parameters?: unknown) => {
+    const { userId } = parameters as SilhouetteStateParams
+    configureProviderSilhouetteState({ userId, scenario: 'profile-exists' })
+    return Promise.resolve({ description: 'Configured existing silhouette profile' })
+  },
+  'Guardian consent is not active for teen silhouette access': (parameters?: unknown) => {
+    const { userId } = parameters as SilhouetteStateParams
+    configureProviderSilhouetteState({ userId, scenario: 'guardian-forbidden' })
+    return Promise.resolve({
+      description: 'Configured consent-revoked teen silhouette access',
+    })
+  },
+  'Silhouette profile exists for user at a newer revision': (parameters?: unknown) => {
+    const { userId } = parameters as SilhouetteStateParams
+    configureProviderSilhouetteState({ userId, scenario: 'stale-precondition' })
+    return Promise.resolve({
+      description: 'Configured silhouette profile ahead of client revision',
+    })
+  },
+  'My Form photo bytes are uploaded and awaiting commit for user': (
+    parameters?: unknown
+  ) => {
+    const { userId } = parameters as SilhouetteStateParams
+    configureProviderSilhouetteState({ userId, scenario: 'my-form-awaiting-commit' })
+    return Promise.resolve({ description: 'Configured My Form bytes awaiting commit' })
+  },
+  'A My Form photo is ready for user': (parameters?: unknown) => {
+    const { userId } = parameters as SilhouetteStateParams
+    configureProviderSilhouetteState({ userId, scenario: 'my-form-ready' })
+    return Promise.resolve({ description: 'Configured a ready My Form photo' })
+  },
+  'A My Form photo failed for user': (parameters?: unknown) => {
+    const { userId, reason } = parameters as SilhouetteFailureStateParams
+    configureProviderSilhouetteState({
+      userId,
+      scenario: 'my-form-failed',
+      failureReason: reason,
+    })
+    return Promise.resolve({
+      description: `Configured a My Form photo that failed with ${reason}`,
+    })
+  },
+  'A My Form photo failed privacy_violation for a teen and queued a guardian notification':
+    (parameters?: unknown) => {
+      const { userId } = parameters as SilhouetteStateParams
+      configureProviderSilhouetteState({
+        userId,
+        scenario: 'my-form-privacy-violation-teen-notified',
+        failureReason: 'privacy_violation',
+      })
+      return Promise.resolve({
+        description:
+          'Configured a privacy_violation My Form photo for a teen with guardian notification queued',
+      })
+    },
+  'A My Form photo exists for user': (parameters?: unknown) => {
+    const { userId } = parameters as SilhouetteStateParams
+    configureProviderSilhouetteState({ userId, scenario: 'my-form-exists' })
+    return Promise.resolve({ description: 'Configured an existing My Form photo' })
+  },
+  'A My Form upload session was already allocated for user': (parameters?: unknown) => {
+    const { userId } = parameters as SilhouetteStateParams
+    configureProviderSilhouetteState({
+      userId,
+      scenario: 'my-form-upload-already-allocated',
+    })
+    return Promise.resolve({
+      description: 'Configured an already-allocated My Form upload session',
+    })
+  },
+  'A My Form photo commit was already processed for user': (parameters?: unknown) => {
+    const { userId } = parameters as SilhouetteStateParams
+    configureProviderSilhouetteState({
+      userId,
+      scenario: 'my-form-commit-already-processed',
+    })
+    return Promise.resolve({
+      description: 'Configured an already-processed My Form commit',
+    })
   },
 }
