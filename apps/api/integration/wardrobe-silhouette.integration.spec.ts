@@ -516,11 +516,16 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
             resolve()
           }
         })
+        // Also wait for the final attempt, matching drainModerationJob's
+        // gate: defaultJobOptions configures attempts: 3 with backoff, and
+        // 'failed' fires per attempt, so rejecting on attempt 1 would fail
+        // this test even when the job goes on to succeed on a later retry.
         worker.on('failed', (job, err) => {
-          if (job?.id === expectedJobId) {
-            clearTimeout(timeout)
-            reject(err)
-          }
+          if (job?.id !== expectedJobId) return
+          const attempts = job.opts.attempts ?? 1
+          if (job.attemptsMade < attempts) return
+          clearTimeout(timeout)
+          reject(err)
         })
       })
     } finally {

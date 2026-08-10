@@ -776,13 +776,20 @@ describe('WardrobeSilhouetteService', () => {
 
       // Without the release the row stays `processing` with no job behind it:
       // a replay returns the cached processing response and a new key is
-      // rejected as reused, so the photo could never be recovered.
+      // rejected as reused, so the photo could never be recovered. The
+      // upload session identity is cleared too -- a retry against the same
+      // session would recompute the same BullMQ job id, and if the failed
+      // `enqueue` actually did create that job in Redis (an ambiguous
+      // network failure, not a guaranteed no-op), a retry would silently
+      // hit the exact collision this job-id scheme exists to prevent.
       expect(updateMany).toHaveBeenLastCalledWith({
         where: { id: 'profile-1', my_form_status: 'processing' },
         data: {
           my_form_status: 'bytes_uploaded',
           my_form_committed_at: null,
           my_form_commit_idempotency_key: null,
+          my_form_upload_session_id: null,
+          my_form_upload_idempotency_key: null,
         },
       })
     })
