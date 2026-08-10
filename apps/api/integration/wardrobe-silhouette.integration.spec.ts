@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   afterAll,
   afterEach,
@@ -14,6 +14,7 @@ import { PrismaClient } from '@prisma/client'
 import {
   ConflictException,
   ForbiddenException,
+  HttpException,
   PreconditionFailedException,
 } from '@nestjs/common'
 import { Queue, Worker } from 'bullmq'
@@ -239,6 +240,16 @@ async function removeModerationJob(jobId: string): Promise<void> {
 
 describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
   const namespace = `silhouette-it-${randomUUID().slice(0, 8)}`
+  // Captured so `afterAll` can restore it: `process.env` is a real Node
+  // global, not something vitest's per-file isolation resets on its own for
+  // a plain assignment (unlike `vi.stubEnv`, which this repo's other
+  // `WARDROBE_UPLOAD_TOKEN_SECRET`-mutating specs -- `wardrobe-upload-
+  // token.spec.ts`, `wardrobe.service.regression.spec.ts`,
+  // `wardrobe.service.failure-paths.spec.ts` -- all use for exactly this
+  // reason). Leaving this set would otherwise let this suite's secret leak
+  // into whichever spec file the test runner happens to execute next in the
+  // same worker.
+  const originalUploadTokenSecret = process.env.WARDROBE_UPLOAD_TOKEN_SECRET
   let userId: string
   let guardian: StubGuardianService
   let storage: MemoryWardrobeStorage
@@ -278,6 +289,15 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
   })
 
   afterAll(async () => {
+    // Direct assignment, not `= undefined`: that would coerce to the
+    // *string* `"undefined"` rather than deleting the key, leaving a
+    // truthy-but-bogus value behind for whichever spec runs next.
+    if (originalUploadTokenSecret === undefined) {
+      delete process.env.WARDROBE_UPLOAD_TOKEN_SECRET
+    } else {
+      process.env.WARDROBE_UPLOAD_TOKEN_SECRET = originalUploadTokenSecret
+    }
+
     if (!schemaReady) {
       await prismaA.$disconnect()
       await prismaB.$disconnect()
@@ -309,7 +329,12 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
     await prismaA.user.deleteMany({ where: { email: { contains: namespace } } })
   })
 
-  it('4.4-INT-10 returns the virtual default profile with no persisted row', async (context) => {
+  // Numbered 19, not 10: the onboarding suite's `4.4-INT-10` (crash-replay
+  // telemetry) already owns that id, and both suites share the same
+  // `4.4-INT-*` id space referenced from the story's dev agent record and
+  // any test-ID-based traceability tooling -- two different tests claiming
+  // the same id is a real collision, not just a cosmetic clash.
+  it('4.4-INT-19 returns the virtual default profile with no persisted row', async (context) => {
     if (!requireSchema(context)) return
 
     const { response, etag } = await serviceA.getProfile(userId)
@@ -322,6 +347,12 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
       updatedAt: new Date(0).toISOString(),
     })
     expect(etag).toBe(formatSilhouetteETag(userId, 0))
+
+    // Proves the "no persisted row" half of this test's own name against the
+    // real database, not just the service's virtual-default return value --
+    // mirrors the onboarding suite's `4.4-INT-01` sibling assertion.
+    const row = await prismaA.silhouetteProfile.findUnique({ where: { user_id: userId } })
+    expect(row).toBeNull()
   })
 
   it('4.4-INT-11 saves sliders, always reverting mode to default_mannequin', async (context) => {
@@ -353,9 +384,14 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
   it('4.4-INT-12 rejects a stale slider write and requires If-Match', async (context) => {
     if (!requireSchema(context)) return
 
+    // `toBeInstanceOf(HttpException)`, not the generic `Error`: `HttpException`
+    // is a subclass of `Error`, so the looser assertion would still pass if a
+    // regression changed `parseSilhouetteIfMatchHeader` to throw an unrelated
+    // error instead of the documented 428. Mirrors the onboarding suite's
+    // equivalent `4.4-INT-05` assertion exactly.
     await expect(
       serviceA.updateSliders(userId, undefined, { heightSlider: 10, buildSlider: 10 })
-    ).rejects.toBeInstanceOf(Error)
+    ).rejects.toBeInstanceOf(HttpException)
 
     await serviceA.updateSliders(userId, formatSilhouetteETag(userId, 0), {
       heightSlider: 10,
@@ -427,7 +463,6 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
     if (!requireSchema(context)) return
 
     const image = buildFixtureSilhouettePhoto('ready')
-    const { createHash } = await import('node:crypto')
     const sha256 = createHash('sha256').update(image).digest('hex')
 
     const uploadUrlResult = await serviceA.createMyFormUploadUrl(
@@ -566,7 +601,6 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
     try {
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const image = buildFixtureSilhouettePhoto('ready')
-        const { createHash } = await import('node:crypto')
         const uploadUrlResult = await serviceA.createMyFormUploadUrl(
           userId,
           'guardian',
@@ -671,7 +705,6 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
     if (!requireSchema(context)) return
 
     const image = buildFixtureSilhouettePhoto('ready')
-    const { createHash } = await import('node:crypto')
     const sha256 = createHash('sha256').update(image).digest('hex')
 
     const uploadUrlResult = await serviceA.createMyFormUploadUrl(
