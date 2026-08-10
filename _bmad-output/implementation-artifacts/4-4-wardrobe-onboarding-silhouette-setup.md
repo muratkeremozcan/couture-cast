@@ -1259,6 +1259,64 @@ Story 4.3, untouched by this branch) were a pre-existing Postgres
 planner-statistics flake confirmed by running that file alone twice — not
 caused by this change.
 
+**Review pass over the three integrator-only commits (`bmad-code-review`
+plus a `bmad-tea` test-architecture pass), scoped to
+`89b6cf8..HEAD` — the merged Task 3+4 / 5 / 6 work was reviewed
+separately.** The 200-vs-201 behavior itself audited clean: Nest applies a
+route's default status _before_ the handler runs and then passes `undefined`
+to the adapter afterwards, so a `res.status()` call inside a
+`@Res({ passthrough: true })` handler genuinely survives (confirmed against
+`@nestjs/core`'s `router-execution-context`); Task 7's Pact interaction pins
+`201` for a _fresh_ commit and so stays consistent; `409` was already
+registered on the operation; and neither the web nor the mobile client
+branches on the status code, so a replay returning `200` breaks no consumer.
+The reused `4.4-UNIT-CTRL-08` id is this file's established per-route
+grouping (`-06` upload-url, `-07` PUT bytes, `-08` commit), not a collision.
+Four real issues were found and fixed:
+
+1. _(test isolation, the same bug class as above)_ `4.4-INT-17` called
+   `drainModerationJob` as its last statement, so **any failing assertion
+   skipped the drain entirely** and leaked the job right back into Redis for
+   the next run's `4.4-INT-15` — one genuine failure would have produced a
+   second, unrelated-looking one. Now registered via vitest's
+   `onTestFinished`, which still runs after the whole test body (preserving
+   the revision-ordering constraint that motivated the trailing call) but
+   also runs on failure. Verified by forcing an INT-17 assertion failure and
+   confirming the queue still drains.
+2. In-test draining cannot help when the run that leaked the job is already
+   over, and the suite never verified it _started_ from a clean queue. A
+   single stale job reproducibly breaks `4.4-INT-15` (reproduced directly:
+   `expected [ 'leaked-orphan-probe', …(1) ] to have a length of 1 but got
+2`) — which is exactly the failure mode this branch already hit once, and
+   the local Redis obliterate noted above was a manual workaround for it.
+   `beforeAll` now clears `moderation-review` so every run starts empty.
+   Only this suite uses that queue.
+3. `4.4-INT-17` declared no test timeout while starting a real BullMQ
+   `Worker`, so it inherited vitest's 5s default and `drainModerationJob`'s
+   own 10s timeout could never fire — a slow CI Redis would have produced a
+   bare vitest timeout instead of the diagnostic, and skipped
+   `worker.close()`. Now declares the same `15_000` `4.4-INT-15` uses.
+   `drainModerationJob`'s `failed` handler also now filters on the same
+   profile its `completed` handler does, so a stray job's failure is not
+   attributed to this test.
+4. _(coverage gap for the very bug class being fixed)_ **Nothing asserted
+   the real wire status code.** `4.4-UNIT-CTRL-08` asserts a spy on a mock
+   `res`, and `4.4-INT-17` calls the service directly, never the controller —
+   so both stay green even if Nest were to stop honoring the handler's
+   `res.status()`, which is framework behavior this code now depends on but
+   does not own. Added a supertest round trip through a real Nest app
+   asserting a real `201` fresh and a real `200` on replay (plus the ETag on
+   both), confirmed to fail when the controller is mutated back to an
+   unconditional `201`. `4.4-INT-17` now also asserts `ConflictException` on
+   the reused-key path rather than only the message string, since only that
+   maps to the contract's registered `409`.
+
+No production-code changes were needed. `packages/api-client/src/contracts/**`
+was untouched, so no SDK regeneration was required. Full `api` suite green
+(671 passed, 5 skipped), `test:integration` green (68 passed, 5 skipped,
+including the Story 4.3 planner flake), silhouette suite green on two
+back-to-back runs (cross-run isolation), `lint` and `typecheck` clean.
+
 ### File list
 
 **Task 1 (branch `feat/epic4-story4-t1-db`):**
