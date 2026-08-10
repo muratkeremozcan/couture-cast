@@ -3884,6 +3884,7 @@
                   "ready",
                   "failed"
                 ],
+                "description": "Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch.",
                 "x-optic-exemptions": "request and response property enums"
               },
               "category": {
@@ -3959,6 +3960,7 @@
                   "image/webp",
                   null
                 ],
+                "description": "Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error.",
                 "x-optic-exemptions": "request and response property enums"
               },
               "retentionStatus": {
@@ -4046,6 +4048,7 @@
                     "ready",
                     "failed"
                   ],
+                  "description": "Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch.",
                   "x-optic-exemptions": "request and response property enums"
                 },
                 "category": {
@@ -4121,6 +4124,7 @@
                     "image/webp",
                     null
                   ],
+                  "description": "Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error.",
                   "x-optic-exemptions": "request and response property enums"
                 },
                 "retentionStatus": {
@@ -4395,6 +4399,7 @@
                   "ready",
                   "failed"
                 ],
+                "description": "Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch.",
                 "x-optic-exemptions": "request and response property enums"
               },
               "category": {
@@ -4470,6 +4475,7 @@
                   "image/webp",
                   null
                 ],
+                "description": "Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error.",
                 "x-optic-exemptions": "request and response property enums"
               },
               "retentionStatus": {

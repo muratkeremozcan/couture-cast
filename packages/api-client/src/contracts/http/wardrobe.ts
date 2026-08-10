@@ -136,7 +136,23 @@ export const garmentItemSchema = z
         'ready',
         'failed',
       ])
-      .openapi({ 'x-optic-exemptions': 'request and response property enums' }),
+      // Exempt from `request and response property enums` and from that rule
+      // only; every other breaking-change rule still gates this property. The
+      // garment lifecycle is deliberately an open set, because the tagging and
+      // moderation pipeline is expected to gain states, and gating that would
+      // put routine additions behind a breaking-change override. The price is
+      // that consumers must tolerate values they do not recognize, so that
+      // expectation is published below instead of living as folklore.
+      .openapi({
+        'x-optic-exemptions': 'request and response property enums',
+        description: [
+          'Open set. New lifecycle states are added as the tagging and moderation',
+          'pipeline evolves, and this property is intentionally exempt from',
+          'breaking-change enforcement for enum values. Treat an unrecognized status',
+          'as pass-through rather than an error, and do not exhaustively switch on it',
+          'without a default branch.',
+        ].join(' '),
+      }),
     category: garmentCategoryEnum.nullable(),
     material: garmentMaterialEnum.nullable(),
     comfortRange: garmentComfortRangeEnum.nullable(),
@@ -145,7 +161,18 @@ export const garmentItemSchema = z
     mimeType: z
       .enum(['image/jpeg', 'image/png', 'image/webp'])
       .nullable()
-      .openapi({ 'x-optic-exemptions': 'request and response property enums' }),
+      // Same single-rule exemption as `status` above. The accepted image
+      // formats track what the upload and moderation pipeline can decode, which
+      // changes independently of this contract.
+      .openapi({
+        'x-optic-exemptions': 'request and response property enums',
+        description: [
+          'Open set. Supported image formats track what the upload pipeline can',
+          'decode and may gain values, so this property is intentionally exempt from',
+          'breaking-change enforcement for enum values. Treat an unrecognized MIME',
+          'type as pass-through rather than an error.',
+        ].join(' '),
+      }),
     retentionStatus: z.enum(['active', 'deletion_pending', 'legal_hold']),
     createdAt: isoTimestampSchema,
     committedAt: isoTimestampSchema.nullable(),
