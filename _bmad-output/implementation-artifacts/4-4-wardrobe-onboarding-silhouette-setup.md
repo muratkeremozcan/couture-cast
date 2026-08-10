@@ -1206,6 +1206,75 @@ inherited capture-modal restoration and the wardrobe hub's own silhouette
 modal), live announcements, and resume-after-reload. Full `apps/web` suite:
 25/25 test files, 138/138 tests passing; `npm run lint --workspace web` and
 `npm run typecheck --workspace web` both clean; no `.only` or skipped tests.
+
+**Task 5 review-driven fixes.** Three independent reviews ran against the
+Task 5 diff: Murat (test-architect, `bmad-testarch-test-review`), a peer
+Claude session running `bmad-code-review`'s three-layer adversarial pass, and
+a peer Codex session running the same skill manually. All findings judged
+legitimate were fixed with regression coverage; the suite grew from 138 to
+177 tests (25 files unchanged). Highlights:
+
+- `uploadMyFormPhotoFromWeb` no longer hardcodes `confirmsBasewearGuidance:
+true`; it is a required caller-supplied field, and both the initial upload
+  and Retry now revalidate the live checkbox state (a user could uncheck it
+  between a failed attempt and clicking Retry).
+- Added `isStaleRevisionError` and wired the `wardrobe.onboarding.errors.stale`
+  key everywhere a revision-mismatch can occur (onboarding step advance,
+  slider save, My Form delete), and added a capsule-modal-style "Reload the
+  latest version" affordance so a stale client actually converges instead of
+  repeating the same rejected mutation forever (decision 3).
+- Fixed a slider edit silently lost if the panel unmounted mid-debounce (now
+  flushed on unmount), and extended `onBusyChange` to cover the debounce
+  window, an in-flight slider save, and My Form removal, not only upload/poll
+  — both the onboarding page's silhouette-step Continue button and the
+  wardrobe hub's standalone modal close now block on all of them.
+- Split the slider-save and My Form-removal mutations onto separate abort
+  controllers: they used to share one, so starting either could silently
+  cancel the other's in-flight request with no error surfaced.
+- Fixed My Form's processing poll loop exiting early when an unrelated
+  mutation (e.g. a slider save) bumped the profile's revision while the photo
+  was still `processing`; it now continues on status alone.
+- `contrast`/`privacy_violation` failures no longer offer "Retry upload"
+  (decision 8 makes them terminal outcomes about the specific photo, not
+  transient faults) — only `timeout`/`storage_error` and a network-level
+  rejection are retried, and a Zod-validated schema now backs the My Form
+  upload-allocation and commit responses like every other wrapper already did.
+- Ported the wardrobe hub's `pollCommittedGarment` live-status polling into
+  the onboarding checklist (a captured garment could go stale showing "needs
+  tags" while still actually processing) and gave the checklist distinct
+  processing/failed states so neither is mislabeled as taggable.
+- "Use starter wardrobe" is now hidden once any garment has been captured
+  (AC1 defines capture-and-tag vs. skip-with-starter as mutually exclusive
+  paths); a `failed` garment is excluded from the "all tagged" gate so it can
+  never permanently block Continue (there is still no retry/removal action
+  for a failed garment anywhere in this codebase — tracked as a follow-up,
+  not solved here).
+- Added a rendered black mannequin (SVG, `MannequinPreview`) that the height
+  and build sliders continuously reshape — decision 4 requires this and the
+  original pass had only the two range inputs with no visual body
+  representation.
+- Filled the remaining AC5 gaps: live announcements now fire for permission
+  request/grant/deny, each step transition, and a garment being tagged (not
+  only resume-on-load), and focus now moves to the new step's region on every
+  transition. Translated the last of the genuinely-fixable hardcoded strings
+  (the "Garment N" fallback label, both loading states, the My Form file
+  input/image alt text, the file-read error, and the generic failed-photo
+  fallback) across all 10 locales.
+- The onboarding hub's own onboarding-status-card fetch failure now shows a
+  visible, retryable error instead of silently hiding the user's only route
+  back into an incomplete setup flow, matching the same treatment already
+  given the user-id-resolution failure gating the Silhouette button.
+
+Two findings were deliberately left as-is rather than "fixed": the
+unsupported-browser message in `generateIdempotencyKey` and the raw
+server/exception messages shown at several catch sites are both consistent
+with this file's own pre-existing convention (every wrapper's fallback
+message and every `WardrobeRequestError` are already raw, untranslated
+English shown as-is) — translating only the new call sites would be
+inconsistent with the rest of the file, and fully solving it means either
+server-side localized messages or an exhaustive client-side error-code
+catalog, which is a real but separate piece of work, not a Task 5 regression.
+
 **Task 6 (branch `feat/epic4-story4-t6-mobile`).** Required first step:
 extracted the garment-capture flow inline in `apps/mobile/app/(tabs)/wardrobe.tsx`
 (ImagePicker calls, crop/upload state machine, inline `<Modal>`) into
@@ -1668,7 +1737,9 @@ clean; no `.only`/`.skip`.
 - `apps/web/src/i18n/locales/pt-PT.json` (modified)
 - `apps/web/src/i18n/locales/tr-TR.json` (modified)
 - `apps/web/src/i18n/wardrobe-onboarding-locales.spec.ts` (new)
-  **Task 6 (branch `feat/epic4-story4-t6-mobile`):**
+- `_bmad-output/test-artifacts/story-4.4-t5-web-test-review.md` (new, Murat's test-architect review)
+
+**Task 6 (branch `feat/epic4-story4-t6-mobile`):**
 
 - `apps/mobile/components/wardrobe/garment-capture-modal.tsx` (new — extracted
   from `apps/mobile/app/(tabs)/wardrobe.tsx`)

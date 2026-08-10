@@ -57,6 +57,7 @@
     },
     "onboarding": {
       "title": "Gardırobunu oluştur",
+      "garmentFallback": "Kıyafet {{position}}",
       "permissionTitle": "Kamera ve fotoğraf erişimine izin ver",
       "permissionBody": "CoutureCast, parçalarını çekebilmek için kamera veya kitaplık erişimine ihtiyaç duyar.",
       "permissionDenied": "Kameranıza veya fotoğraflarınıza erişemedik. Yine de dosya içe aktarabilir veya başlangıç gardırobunu kullanabilirsiniz.",
@@ -66,8 +67,18 @@
       "back": "Geri",
       "checklistTagged": "{{garment}}: etiketler onaylandı",
       "checklistPending": "{{garment}}: etiket gerekiyor",
+      "checklistProcessing": "{{garment}}: işleniyor",
+      "checklistFailed": "{{garment}}: işleme başarısız oldu",
       "complete": "Gardırobun hazır",
       "resumed": "Kaldığın yerden devam ediliyor",
+      "announcements": {
+        "permissionRequesting": "Kamera erişimi isteniyor…",
+        "permissionGranted": "Kamera erişimi verildi. Kıyafetlerini yakala.",
+        "permissionDenied": "Kamera erişimi kullanılamıyor. Fotoğraf içe aktar veya başlangıç gardırobunu kullan.",
+        "tagging": "Tüm kıyafetler yakalandı. Devam etmek için etiketleri onayla.",
+        "silhouette": "Silüetini ayarla.",
+        "garmentTagged": "{{garment}} etiketlendi."
+      },
       "errors": {
         "loadFailed": "Kurulum ilerlemen yüklenemiyor.",
         "saveFailed": "Bu adım kaydedilemiyor. Tekrar dene.",
@@ -87,12 +98,17 @@
       "myFormRemove": "Formum fotoğrafını kaldır",
       "processing": "Fotoğrafın işleniyor…",
       "ready": "Formum fotoğrafı hazır",
+      "loading": "Silüetin yükleniyor…",
+      "myFormFileLabel": "Formum fotoğraf dosyası",
+      "myFormImageAlt": "Formum",
       "errors": {
         "contrast": "Seni arka plandan net şekilde ayıramadık. Daha sade kıyafetle veya daha sade bir arka planla fotoğrafı yeniden çek.",
         "privacyViolation": "Bu fotoğraf kullanılamaz. Başka bir fotoğraf seç.",
         "timeout": "İşleme çok uzun sürdü. Tekrar dene.",
         "storageError": "Bu fotoğrafı kaydedemedik. Tekrar dene.",
-        "confirmRequired": "Yüklemeden önce temel kıyafet yönergesini onayla."
+        "confirmRequired": "Yüklemeden önce temel kıyafet yönergesini onayla.",
+        "fileReadFailed": "Seçilen fotoğraf okunamadı.",
+        "unknown": "Bu fotoğrafla ilgili bir sorun oluştu. Tekrar dene."
       }
     }
   }

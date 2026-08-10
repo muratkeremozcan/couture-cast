@@ -57,6 +57,7 @@
     },
     "onboarding": {
       "title": "Richte deinen Kleiderschrank ein",
+      "garmentFallback": "Kleidungsstück {{position}}",
       "permissionTitle": "Kamera- und Fotozugriff erlauben",
       "permissionBody": "CoutureCast benötigt Kamera- oder Mediathekzugriff, um deine Kleidungsstücke zu erfassen.",
       "permissionDenied": "Wir konnten nicht auf deine Kamera oder Fotos zugreifen. Du kannst weiterhin Dateien importieren oder den Starter-Kleiderschrank verwenden.",
@@ -66,8 +67,18 @@
       "back": "Zurück",
       "checklistTagged": "{{garment}}: Tags bestätigt",
       "checklistPending": "{{garment}}: Tags erforderlich",
+      "checklistProcessing": "{{garment}}: wird verarbeitet",
+      "checklistFailed": "{{garment}}: Verarbeitung fehlgeschlagen",
       "complete": "Dein Kleiderschrank ist bereit",
       "resumed": "Weiter geht's, wo du aufgehört hast",
+      "announcements": {
+        "permissionRequesting": "Kamerazugriff wird angefordert…",
+        "permissionGranted": "Kamerazugriff gewährt. Erfasse deine Kleidungsstücke.",
+        "permissionDenied": "Kamerazugriff nicht verfügbar. Importiere Fotos oder nutze die Starter-Garderobe.",
+        "tagging": "Alle Kleidungsstücke erfasst. Bestätige die Tags, um fortzufahren.",
+        "silhouette": "Richte deine Silhouette ein.",
+        "garmentTagged": "{{garment}} getaggt."
+      },
       "errors": {
         "loadFailed": "Dein Onboarding-Fortschritt kann nicht geladen werden.",
         "saveFailed": "Dieser Schritt kann nicht gespeichert werden. Versuche es erneut.",
@@ -87,12 +98,17 @@
       "myFormRemove": "Mein-Form-Foto entfernen",
       "processing": "Dein Foto wird verarbeitet…",
       "ready": "Mein-Form-Foto bereit",
+      "loading": "Deine Silhouette wird geladen…",
+      "myFormFileLabel": "Mein-Form-Fotodatei",
+      "myFormImageAlt": "Mein Form",
       "errors": {
         "contrast": "Wir konnten dich nicht klar vom Hintergrund trennen. Mache das Foto mit schlichterer Kleidung oder einem schlichteren Hintergrund neu.",
         "privacyViolation": "Dieses Foto kann nicht verwendet werden. Wähle ein anderes Foto.",
         "timeout": "Die Verarbeitung hat zu lange gedauert. Versuche es erneut.",
         "storageError": "Wir konnten dieses Foto nicht speichern. Versuche es erneut.",
-        "confirmRequired": "Bestätige die Basiskleidungs-Hinweise vor dem Hochladen."
+        "confirmRequired": "Bestätige die Basiskleidungs-Hinweise vor dem Hochladen.",
+        "fileReadFailed": "Das ausgewählte Foto konnte nicht gelesen werden.",
+        "unknown": "Bei diesem Foto ist ein Fehler aufgetreten. Versuche es erneut."
       }
     }
   }
