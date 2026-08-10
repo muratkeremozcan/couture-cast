@@ -16,6 +16,17 @@ const PACT_SILHOUETTE_COMMITTED_AT = '2026-08-09T09:10:00.000Z'
 const PACT_SILHOUETTE_IMAGE_EXPIRY = '2026-08-09T09:25:00.000Z'
 const PACT_SILHOUETTE_UPLOAD_SESSION_ID = '85b4dde2-3df2-4e81-8c18-d51ae3408ca0'
 const PACT_SILHOUETTE_UPLOAD_EXPIRY = '2026-08-09T09:15:00.000Z'
+/**
+ * Fixed stand-in for the onboarding-complete double's `completedAt`, kept
+ * deterministic like every other timestamp in this file rather than reading
+ * the wall clock. Currently unreachable: `requireOnboardingScenario()` only
+ * ever returns `currentStep: 'permission'` or `'capture'`, and
+ * `ONBOARDING_FORWARD_TRANSITIONS` never allows `'complete'` from either, so
+ * no interaction exercises this branch today. Kept fixed anyway so this
+ * double stays fully deterministic the moment a completion-success
+ * interaction is added.
+ */
+const PACT_ONBOARDING_COMPLETED_AT = '2026-08-09T09:20:00.000Z'
 import {
   ConflictException,
   ForbiddenException,
@@ -78,7 +89,9 @@ import {
 // @couture/api-client barrel (packages/api-client/src/index.ts); the
 // contracts/http subpath re-exports everything from wardrobe.ts instead.
 import type {
+  SilhouetteMode,
   SilhouettePhotoFailureReason,
+  SilhouettePhotoStatus,
   UpdateWardrobeOnboardingStateInput,
   UpdateSilhouetteSlidersInput,
   WardrobeOnboardingStep,
@@ -139,6 +152,7 @@ export function resetProviderState() {
   }
   resetProviderOnboardingState()
   resetProviderSilhouetteState()
+  resetProviderCapsuleState()
 }
 
 export function configureProviderWardrobeState(
@@ -666,7 +680,9 @@ export async function startLocalPactProvider({
         garmentsCapturedCount: row.garmentsCapturedCount,
         startedAt: row.startedAt ?? PACT_ONBOARDING_STARTED_AT,
         completedAt:
-          input.targetStep === 'complete' ? new Date().toISOString() : row.completedAt,
+          input.targetStep === 'complete'
+            ? PACT_ONBOARDING_COMPLETED_AT
+            : row.completedAt,
         revision: row.revision + 1,
       }
       return Promise.resolve({ response: toOnboardingResponse(advanced), isNoOp: false })
@@ -684,11 +700,11 @@ export async function startLocalPactProvider({
    * (the class-level `WardrobeUploadGuard`), not this double.
    */
   type SilhouetteRow = {
-    mode: 'default_mannequin' | 'my_form'
+    mode: SilhouetteMode
     heightSlider: number | null
     buildSlider: number | null
     myForm: {
-      status: 'pending_upload' | 'bytes_uploaded' | 'processing' | 'ready' | 'failed'
+      status: SilhouettePhotoStatus
       failureReason: SilhouettePhotoFailureReason | null
       committedAt: string | null
       imageAccess: { url: string; expiresAt: string } | null
@@ -1028,17 +1044,14 @@ export function resetProviderCapsuleState() {
  * Story 4.4 wardrobe onboarding and silhouette setup — provider state
  * storage, mirroring the capsule state above exactly.
  *
- * Task 3/4's real `wardrobe-onboarding.controller.ts` and
- * `wardrobe-silhouette.controller.ts` are being built concurrently on
- * `feat/epic4-story4-t3t4-api` and are not present in this worktree, so
- * `startLocalPactProvider`'s `moduleFixture` above cannot yet register them
- * or a service double that reads this state. This is state-setup scaffolding
- * only: it lets `pact/http/provider/state-handlers.ts` configure a named,
- * deterministic scenario per interaction exactly like every other state
- * handler here, ready for a service double to consume once those
- * controllers land. Until then, `test:pact:provider`/`npm run test:pact`
- * legitimately fails on the new onboarding/silhouette interactions with 404s
- * (no matching route), not a bug in this state-setup code.
+ * `pact/http/provider/state-handlers.ts` configures a named, deterministic
+ * scenario per interaction exactly like every other state handler here, and
+ * that state is consumed by the real `mockWardrobeOnboardingService`/
+ * `mockWardrobeSilhouetteService` doubles below (wired against the real
+ * `WardrobeOnboardingController`/`WardrobeSilhouetteController` -- see the
+ * doc comments on those doubles for their fidelity level). `npm run
+ * test:pact:provider` verifies all onboarding/silhouette interactions
+ * genuinely green through this wiring, not just the state-setup half.
  */
 export type ProviderOnboardingScenario = 'existing' | 'not-started' | 'stale-precondition'
 

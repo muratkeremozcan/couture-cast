@@ -646,7 +646,19 @@ type SmartTagErrorInteraction = {
   responseMatcher?: Record<string, unknown>
 }
 
-async function verifySmartTagErrorInteraction(
+/**
+ * Exported (rather than the single grouped-call shape this replaced) so each
+ * pacttest file can drive one `it.each(...)` row per interaction instead of
+ * looping over a table inside one `it()` -- PactV4's Rust FFI
+ * non-deterministically drops an interaction when more than one
+ * `addInteraction()...executeTest()` chain is awaited inside one test body.
+ * Found by a dedicated bmad-tea test-architecture review of Task 7: this
+ * exact pattern had already been fixed for the newer
+ * `onboardingErrorInteractions`/`silhouetteGuardianErrorInteractions` tables
+ * but not yet applied to this pre-existing (Story 4.2) pair, which is the
+ * "worth the same it.each treatment in a follow-up" item that review noted.
+ */
+export async function verifySmartTagErrorInteraction(
   pact: PactV4,
   interaction: SmartTagErrorInteraction
 ) {
@@ -689,17 +701,20 @@ async function verifySmartTagErrorInteraction(
     })
 }
 
-export async function verifySuggestGarmentTagsErrorInteractions(pact: PactV4) {
-  const garmentId = '00000000-0000-4000-8000-000000000001'
-  const userId = 'guardian-1'
-  const invalidGarmentId = 'g'.repeat(129)
+const SMART_TAG_ERROR_GARMENT_ID = '00000000-0000-4000-8000-000000000001'
+const SMART_TAG_ERROR_USER_ID = 'guardian-1'
+const SMART_TAG_INVALID_GARMENT_ID = 'g'.repeat(129)
 
-  await verifySmartTagErrorInteraction(pact, {
+export const suggestGarmentTagsErrorInteractions: SmartTagErrorInteraction[] = [
+  {
     description: 'a request to suggest tags with an invalid garment id',
     method: 'POST',
-    path: `/api/v1/wardrobe/garments/${invalidGarmentId}/suggest-tags`,
+    path: `/api/v1/wardrobe/garments/${SMART_TAG_INVALID_GARMENT_ID}/suggest-tags`,
     state: 'A garment in awaiting_tags status with tag suggestions exists for user',
-    stateParams: { garmentId: invalidGarmentId, userId },
+    stateParams: {
+      garmentId: SMART_TAG_INVALID_GARMENT_ID,
+      userId: SMART_TAG_ERROR_USER_ID,
+    },
     responseStatus: 400,
     responseBody: {
       statusCode: 400,
@@ -715,14 +730,16 @@ export async function verifySuggestGarmentTagsErrorInteractions(pact: PactV4) {
       ),
       error: 'Bad Request',
     },
-  })
-
-  await verifySmartTagErrorInteraction(pact, {
+  },
+  {
     description: 'an unauthenticated request to suggest garment tags',
     method: 'POST',
-    path: `/api/v1/wardrobe/garments/${garmentId}/suggest-tags`,
+    path: `/api/v1/wardrobe/garments/${SMART_TAG_ERROR_GARMENT_ID}/suggest-tags`,
     state: 'A garment in awaiting_tags status with tag suggestions exists for user',
-    stateParams: { garmentId, userId },
+    stateParams: {
+      garmentId: SMART_TAG_ERROR_GARMENT_ID,
+      userId: SMART_TAG_ERROR_USER_ID,
+    },
     includeAuthorization: false,
     responseStatus: 401,
     responseBody: {
@@ -730,76 +747,77 @@ export async function verifySuggestGarmentTagsErrorInteractions(pact: PactV4) {
       message: 'Missing or invalid bearer token',
       error: 'Unauthorized',
     },
-  })
-
-  await verifySmartTagErrorInteraction(pact, {
+  },
+  {
     description: 'a request while garment analysis is pending',
     method: 'POST',
-    path: `/api/v1/wardrobe/garments/${garmentId}/suggest-tags`,
+    path: `/api/v1/wardrobe/garments/${SMART_TAG_ERROR_GARMENT_ID}/suggest-tags`,
     state: 'Garment analysis is pending for user',
-    stateParams: { garmentId, userId },
+    stateParams: {
+      garmentId: SMART_TAG_ERROR_GARMENT_ID,
+      userId: SMART_TAG_ERROR_USER_ID,
+    },
     responseStatus: 409,
     responseBody: {
       statusCode: 409,
       message: 'GARMENT_ANALYSIS_PENDING',
       error: 'Conflict',
     },
-  })
-
-  await verifySmartTagErrorInteraction(pact, {
+  },
+  {
     description: 'a request while garment tag inference is unavailable',
     method: 'POST',
-    path: `/api/v1/wardrobe/garments/${garmentId}/suggest-tags`,
+    path: `/api/v1/wardrobe/garments/${SMART_TAG_ERROR_GARMENT_ID}/suggest-tags`,
     state: 'Garment tagging inference is unavailable for user',
-    stateParams: { garmentId, userId },
+    stateParams: {
+      garmentId: SMART_TAG_ERROR_GARMENT_ID,
+      userId: SMART_TAG_ERROR_USER_ID,
+    },
     responseStatus: 503,
     responseBody: {
       statusCode: 503,
       message: 'TAGGING_INFERENCE_UNAVAILABLE',
       error: 'Service Unavailable',
     },
-  })
-}
+  },
+]
 
-export async function verifyUpdateGarmentTagsErrorInteractions(pact: PactV4) {
-  const garmentId = '00000000-0000-4000-8000-000000000001'
-  const userId = 'guardian-1'
-  const requestBody = {
-    category: 'top',
-    material: 'cotton',
-    comfortRange: 'mild',
-  }
-
-  await verifySmartTagErrorInteraction(pact, {
+export const updateGarmentTagsErrorInteractions: SmartTagErrorInteraction[] = [
+  {
     description: 'a forbidden request to update garment tags',
     method: 'PATCH',
-    path: `/api/v1/wardrobe/garments/${garmentId}/tags`,
+    path: `/api/v1/wardrobe/garments/${SMART_TAG_ERROR_GARMENT_ID}/tags`,
     state: 'Wardrobe tagging is forbidden for user',
-    stateParams: { garmentId, userId },
-    requestBody,
+    stateParams: {
+      garmentId: SMART_TAG_ERROR_GARMENT_ID,
+      userId: SMART_TAG_ERROR_USER_ID,
+    },
+    requestBody: { category: 'top', material: 'cotton', comfortRange: 'mild' },
     responseStatus: 403,
     responseBody: {
       statusCode: 403,
       message: 'GUARDIAN_CONSENT_REQUIRED',
       error: 'Forbidden',
     },
-  })
-
-  await verifySmartTagErrorInteraction(pact, {
+  },
+  {
     description: 'a request to update tags for a missing garment',
     method: 'PATCH',
-    path: `/api/v1/wardrobe/garments/${garmentId}/tags`,
+    path: `/api/v1/wardrobe/garments/${SMART_TAG_ERROR_GARMENT_ID}/tags`,
     state: 'Garment does not exist for user',
-    stateParams: { garmentId, userId },
-    requestBody,
+    stateParams: {
+      garmentId: SMART_TAG_ERROR_GARMENT_ID,
+      userId: SMART_TAG_ERROR_USER_ID,
+    },
+    requestBody: { category: 'top', material: 'cotton', comfortRange: 'mild' },
     responseStatus: 404,
     responseBody: {
       statusCode: 404,
       message: 'GARMENT_NOT_FOUND',
       error: 'Not Found',
     },
-  })
-}
+  },
+]
 
 export async function verifyUpdateGarmentTagsNullMaterialInteraction(
   pact: PactV4,
@@ -1274,8 +1292,17 @@ export async function verifyDeleteCapsuleInteraction(
  * Documented capsule error envelopes. These pin the status and error shape the
  * clients branch on: stale and missing preconditions, ineligible garments,
  * idempotency-key reuse, and the masked 404 for an unauthorized owner.
+ *
+ * Exported alongside a single-interaction `verifyCapsuleErrorInteraction` (in
+ * place of the earlier grouped `verifyCapsuleErrorInteractions` that looped
+ * `addInteraction()...executeTest()` inside one `it()`) so each pacttest file
+ * drives one `it.each(...)` row per interaction -- PactV4's Rust FFI
+ * non-deterministically drops an interaction when more than one such chain
+ * is awaited inside a single test body. See the identical fix and rationale
+ * on `suggestGarmentTagsErrorInteractions`/`updateGarmentTagsErrorInteractions`
+ * above, from the same dedicated bmad-tea test-architecture review pass.
  */
-type CapsuleErrorInteraction = {
+export type CapsuleErrorInteraction = {
   description: string
   method: 'POST' | 'PATCH' | 'DELETE' | 'GET'
   path: string
@@ -1288,7 +1315,7 @@ type CapsuleErrorInteraction = {
   reason: string | null
 }
 
-const capsuleErrorInteractions: CapsuleErrorInteraction[] = [
+export const capsuleErrorInteractions: CapsuleErrorInteraction[] = [
   {
     description: 'rejects a stale precondition with 412',
     method: 'PATCH',
@@ -1360,72 +1387,73 @@ const capsuleErrorInteractions: CapsuleErrorInteraction[] = [
   },
 ]
 
-export async function verifyCapsuleErrorInteractions(pact: PactV4) {
-  for (const interaction of capsuleErrorInteractions) {
-    await pact
-      .addInteraction()
-      .given(
-        ...createProviderState({
-          name: interaction.state,
-          params: { userId: CAPSULE_OWNER_ID, capsuleId: CAPSULE_ID },
-        })
-      )
-      .uponReceiving(`a capsule request that ${interaction.description}`)
-      .withRequest(
-        interaction.method,
-        interaction.path,
-        setJsonContent({
-          headers: interaction.headers,
-          ...(interaction.body ? { body: interaction.body } : {}),
-        })
-      )
-      /**
-       * The canonical envelope is Nest's default shape from
-       * `packages/api-client/src/contracts/http/common.ts`: `error` is the
-       * reason phrase string and the machine-readable code travels in
-       * `message`. An earlier version of this contract declared a nested
-       * `{ error: { code, message } }` object, which no endpoint in this API
-       * emits, so provider verification could never have passed.
-       */
-      .willRespondWith(
-        interaction.status,
-        setJsonContent({
-          headers: { 'Cache-Control': string('private, no-store') },
-          body: {
-            statusCode: like(interaction.status),
-            message: string(interaction.code),
-            ...(interaction.reason ? { error: string(interaction.reason) } : {}),
-          },
-        })
-      )
-      .executeTest(async (mockServer: V3MockServer) => {
-        // The interaction must actually be issued. An empty callback leaves the
-        // declared request unsent, and Pact fails the whole test with
-        // "expected but not received" rather than recording the contract.
-        //
-        // The generated SDK throws on these statuses, so the request goes out
-        // directly: the point is to pin the status and error envelope the
-        // clients branch on, not the SDK's error-handling.
-        const response = await fetch(`${mockServer.url}${interaction.path}`, {
-          method: interaction.method,
-          headers: interaction.body
-            ? { ...interaction.headers, 'Content-Type': 'application/json' }
-            : interaction.headers,
-          ...(interaction.body ? { body: JSON.stringify(interaction.body) } : {}),
-        })
-
-        expect(response.status).toBe(interaction.status)
-
-        const payload = (await response.json()) as {
-          statusCode?: number
-          message?: string
-          error?: string
-        }
-        expect(payload.statusCode).toBe(interaction.status)
-        expect(payload.message).toBe(interaction.code)
-        expect(payload.error).toBe(interaction.reason ?? undefined)
+export async function verifyCapsuleErrorInteraction(
+  pact: PactV4,
+  interaction: CapsuleErrorInteraction
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: interaction.state,
+        params: { userId: CAPSULE_OWNER_ID, capsuleId: CAPSULE_ID },
       })
-  }
+    )
+    .uponReceiving(`a capsule request that ${interaction.description}`)
+    .withRequest(
+      interaction.method,
+      interaction.path,
+      setJsonContent({
+        headers: interaction.headers,
+        ...(interaction.body ? { body: interaction.body } : {}),
+      })
+    )
+    /**
+     * The canonical envelope is Nest's default shape from
+     * `packages/api-client/src/contracts/http/common.ts`: `error` is the
+     * reason phrase string and the machine-readable code travels in
+     * `message`. An earlier version of this contract declared a nested
+     * `{ error: { code, message } }` object, which no endpoint in this API
+     * emits, so provider verification could never have passed.
+     */
+    .willRespondWith(
+      interaction.status,
+      setJsonContent({
+        headers: { 'Cache-Control': string('private, no-store') },
+        body: {
+          statusCode: like(interaction.status),
+          message: string(interaction.code),
+          ...(interaction.reason ? { error: string(interaction.reason) } : {}),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      // The interaction must actually be issued. An empty callback leaves the
+      // declared request unsent, and Pact fails the whole test with
+      // "expected but not received" rather than recording the contract.
+      //
+      // The generated SDK throws on these statuses, so the request goes out
+      // directly: the point is to pin the status and error envelope the
+      // clients branch on, not the SDK's error-handling.
+      const response = await fetch(`${mockServer.url}${interaction.path}`, {
+        method: interaction.method,
+        headers: interaction.body
+          ? { ...interaction.headers, 'Content-Type': 'application/json' }
+          : interaction.headers,
+        ...(interaction.body ? { body: JSON.stringify(interaction.body) } : {}),
+      })
+
+      expect(response.status).toBe(interaction.status)
+
+      const payload = (await response.json()) as {
+        statusCode?: number
+        message?: string
+        error?: string
+      }
+      expect(payload.statusCode).toBe(interaction.status)
+      expect(payload.message).toBe(interaction.code)
+      expect(payload.error).toBe(interaction.reason ?? undefined)
+    })
 }
 
 /* ------------------------------------------------------------------------- *
