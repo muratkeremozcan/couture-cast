@@ -175,6 +175,36 @@ describe('WardrobeSilhouetteService', () => {
     service = new WardrobeSilhouetteService(prisma, guardian, storage, queue)
   })
 
+  /** A row whose upload session is pending bytes for the given content. */
+  function pending(bytes: Buffer, overrides: Record<string, unknown> = {}) {
+    return profileRow({
+      my_form_status: 'pending_upload',
+      my_form_object_path: OBJECT_PATH,
+      my_form_upload_session_id: SESSION_ID,
+      my_form_upload_expires_at: new Date(Date.now() + 60_000),
+      my_form_file_size_bytes: bytes.length,
+      my_form_mime_type: 'image/png',
+      my_form_content_sha256: createHash('sha256').update(bytes).digest('hex'),
+      my_form_width_px: 300,
+      my_form_height_px: 800,
+      ...overrides,
+    })
+  }
+
+  /** Mirrors the token the service itself issues, so the happy path is not
+   * asserting against a hand-copied constant that can silently drift. */
+  async function tokenFor(profile: SilhouetteProfile): Promise<string> {
+    const { generateUploadToken, requireUploadTokenSecret } = await import(
+      './wardrobe-upload-token.js'
+    )
+    return generateUploadToken(
+      SESSION_ID,
+      USER_ID,
+      (profile.my_form_upload_expires_at as Date).toISOString(),
+      requireUploadTokenSecret()
+    )
+  }
+
   describe('getProfile', () => {
     it('4.4-UNIT-08 returns the virtual default profile when no row exists', async () => {
       findUnique.mockResolvedValueOnce(null)
@@ -444,34 +474,6 @@ describe('WardrobeSilhouetteService', () => {
   })
 
   describe('uploadMyFormBytes', () => {
-    function pendingSession(bytes: Buffer) {
-      return profileRow({
-        my_form_status: 'pending_upload',
-        my_form_object_path: OBJECT_PATH,
-        my_form_upload_session_id: SESSION_ID,
-        my_form_upload_expires_at: new Date(Date.now() + 60_000),
-        my_form_file_size_bytes: bytes.length,
-        my_form_mime_type: 'image/png',
-        my_form_content_sha256: createHash('sha256').update(bytes).digest('hex'),
-        my_form_width_px: 300,
-        my_form_height_px: 800,
-      })
-    }
-
-    /** Mirrors the token the service itself issues, so the happy path is not
-     * asserting against a hand-copied constant that can silently drift. */
-    async function tokenFor(profile: SilhouetteProfile): Promise<string> {
-      const { generateUploadToken, requireUploadTokenSecret } = await import(
-        './wardrobe-upload-token.js'
-      )
-      return generateUploadToken(
-        SESSION_ID,
-        USER_ID,
-        (profile.my_form_upload_expires_at as Date).toISOString(),
-        requireUploadTokenSecret()
-      )
-    }
-
     it('4.4-UNIT-11 rejects an unknown upload session with 404', async () => {
       findUnique.mockResolvedValueOnce(null)
 
@@ -492,7 +494,7 @@ describe('WardrobeSilhouetteService', () => {
       const bytes = await portraitPng()
       findUnique.mockResolvedValueOnce(
         profileRow({
-          ...pendingSession(bytes),
+          ...pending(bytes),
           user_id: 'someone-else',
         })
       )
@@ -549,7 +551,7 @@ describe('WardrobeSilhouetteService', () => {
 
     it('4.4-UNIT-11 refuses a forged upload token', async () => {
       const bytes = await portraitPng()
-      findUnique.mockResolvedValueOnce(pendingSession(bytes))
+      findUnique.mockResolvedValueOnce(pending(bytes))
 
       await expect(
         service.uploadMyFormBytes(
@@ -566,7 +568,7 @@ describe('WardrobeSilhouetteService', () => {
 
     it('4.4-UNIT-11 rejects a Content-Length that disagrees with the body', async () => {
       const bytes = await portraitPng()
-      const profile = pendingSession(bytes)
+      const profile = pending(bytes)
       findUnique.mockResolvedValueOnce(profile)
 
       await expect(
@@ -584,7 +586,7 @@ describe('WardrobeSilhouetteService', () => {
 
     it('4.4-UNIT-11 rejects a content type that contradicts the declaration', async () => {
       const bytes = await portraitPng()
-      const profile = pendingSession(bytes)
+      const profile = pending(bytes)
       findUnique.mockResolvedValueOnce(profile)
 
       await expect(
@@ -613,7 +615,7 @@ describe('WardrobeSilhouetteService', () => {
         .jpeg()
         .toBuffer()
       const profile = profileRow({
-        ...pendingSession(bytes),
+        ...pending(bytes),
         my_form_file_size_bytes: jpegBytes.length,
         my_form_content_sha256: createHash('sha256').update(jpegBytes).digest('hex'),
       })
@@ -635,7 +637,7 @@ describe('WardrobeSilhouetteService', () => {
     it('4.4-UNIT-11 maps a landscape photo to 422 IMAGE_NOT_PORTRAIT_FRAMED', async () => {
       const bytes = await portraitPng(800, 300)
       const profile = profileRow({
-        ...pendingSession(bytes),
+        ...pending(bytes),
         my_form_width_px: 800,
         my_form_height_px: 300,
       })
@@ -656,7 +658,7 @@ describe('WardrobeSilhouetteService', () => {
 
     it('4.4-UNIT-11 stores the bytes and claims the session on the happy path', async () => {
       const bytes = await portraitPng()
-      const profile = pendingSession(bytes)
+      const profile = pending(bytes)
       findUnique.mockResolvedValueOnce(profile)
       updateMany.mockResolvedValueOnce({ count: 1 })
 
@@ -688,7 +690,7 @@ describe('WardrobeSilhouetteService', () => {
 
     it('4.4-UNIT-11 removes the stored object when a concurrent caller won the session', async () => {
       const bytes = await portraitPng()
-      const profile = pendingSession(bytes)
+      const profile = pending(bytes)
       findUnique.mockResolvedValueOnce(profile)
       updateMany.mockResolvedValueOnce({ count: 0 })
 
@@ -990,33 +992,6 @@ describe('WardrobeSilhouetteService', () => {
   })
 
   describe('photo validation failures map to the right status', () => {
-    async function tokenFor(profile: SilhouetteProfile): Promise<string> {
-      const { generateUploadToken, requireUploadTokenSecret } = await import(
-        './wardrobe-upload-token.js'
-      )
-      return generateUploadToken(
-        SESSION_ID,
-        USER_ID,
-        (profile.my_form_upload_expires_at as Date).toISOString(),
-        requireUploadTokenSecret()
-      )
-    }
-
-    function pending(bytes: Buffer, overrides: Record<string, unknown> = {}) {
-      return profileRow({
-        my_form_status: 'pending_upload',
-        my_form_object_path: OBJECT_PATH,
-        my_form_upload_session_id: SESSION_ID,
-        my_form_upload_expires_at: new Date(Date.now() + 60_000),
-        my_form_file_size_bytes: bytes.length,
-        my_form_mime_type: 'image/png',
-        my_form_content_sha256: createHash('sha256').update(bytes).digest('hex'),
-        my_form_width_px: 300,
-        my_form_height_px: 800,
-        ...overrides,
-      })
-    }
-
     it('4.4-UNIT-11 maps a checksum mismatch to 422', async () => {
       const bytes = await portraitPng()
       const profile = pending(bytes, { my_form_content_sha256: 'f'.repeat(64) })

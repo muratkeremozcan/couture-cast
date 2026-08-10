@@ -107,12 +107,18 @@ describe('FixtureSilhouettePhotoModerationEngine', () => {
   })
 
   afterEach(() => {
-    process.env.SILHOUETTE_MODERATION_ENGINE = originalEngine
-    process.env.NODE_ENV = originalNodeEnv
+    // Direct assignment is not a safe restore: `process.env.X = undefined`
+    // coerces to the *string* `"undefined"` rather than deleting the key, so
+    // a test that starts from an unset variable must delete it explicitly to
+    // avoid leaking a truthy-but-bogus value into later tests/files.
+    if (originalEngine === undefined) delete process.env.SILHOUETTE_MODERATION_ENGINE
+    else process.env.SILHOUETTE_MODERATION_ENGINE = originalEngine
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = originalNodeEnv
   })
 
   it('4.4-UNIT-04 refuses to construct outside an allowed test environment', () => {
-    process.env.SILHOUETTE_MODERATION_ENGINE = undefined
+    delete process.env.SILHOUETTE_MODERATION_ENGINE
     expect(() => new FixtureSilhouettePhotoModerationEngine()).toThrow()
   })
 

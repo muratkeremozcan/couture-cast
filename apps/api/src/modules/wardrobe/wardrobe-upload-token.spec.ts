@@ -28,8 +28,14 @@ describe('wardrobe upload token', () => {
   const originalNodeEnv = process.env.NODE_ENV
 
   afterEach(() => {
-    process.env.WARDROBE_UPLOAD_TOKEN_SECRET = originalSecret
-    process.env.NODE_ENV = originalNodeEnv
+    // Direct assignment is not a safe restore: `process.env.X = undefined`
+    // coerces to the *string* `"undefined"` rather than deleting the key, so
+    // a test that starts from an unset variable must delete it explicitly to
+    // avoid leaking a truthy-but-bogus value into later tests/files.
+    if (originalSecret === undefined) delete process.env.WARDROBE_UPLOAD_TOKEN_SECRET
+    else process.env.WARDROBE_UPLOAD_TOKEN_SECRET = originalSecret
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = originalNodeEnv
   })
 
   it('generates a token that verifies for its exact inputs and rejects any single changed input', () => {
@@ -71,13 +77,13 @@ describe('wardrobe upload token', () => {
     })
 
     it('falls back to the test-only secret in an allowed test environment', () => {
-      process.env.WARDROBE_UPLOAD_TOKEN_SECRET = undefined
+      delete process.env.WARDROBE_UPLOAD_TOKEN_SECRET
       process.env.NODE_ENV = 'test'
       expect(requireUploadTokenSecret()).toBe('test-only-wardrobe-upload-token-secret')
     })
 
     it('throws outside a test environment with no configured secret', () => {
-      process.env.WARDROBE_UPLOAD_TOKEN_SECRET = undefined
+      delete process.env.WARDROBE_UPLOAD_TOKEN_SECRET
       process.env.NODE_ENV = 'production'
       expect(() => requireUploadTokenSecret()).toThrow(
         'WARDROBE_UPLOAD_TOKEN_SECRET must contain at least 32 characters'
