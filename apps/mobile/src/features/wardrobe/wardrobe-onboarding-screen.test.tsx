@@ -1,5 +1,6 @@
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
+import type * as NativeUtilsModule from '@/src/lib/native-utils'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
@@ -57,11 +58,27 @@ vi.mock('react-native', async (importOriginal) => {
   }
 })
 
+vi.mock('@/src/lib/native-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof NativeUtilsModule>()
+  return {
+    ...actual,
+    // Unlike WardrobeHubScreen (which takes an injectable `pollOffsetsMs`
+    // prop), WardrobeOnboardingScreen's garment poll has no override, so
+    // 4.4-MOB-ONB-14 would otherwise pay the real production 1s/2s/4s/8s
+    // schedule -- the same class of real-wall-clock wait already fixed once
+    // for silhouette-editor.test.tsx's 4.4-MOB-SIL-07 via an injectable prop.
+    // Delegating to the real implementation with a near-zero delay keeps the
+    // abort-signal contract faithful while making the test fast.
+    waitForPoll: (_delayMs: number, signal: AbortSignal) => actual.waitForPoll(5, signal),
+  }
+})
+
 import { createSuggestGarmentTagsDataFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
+import { press } from '@/src/test-utils/press'
 import { WardrobeOnboardingScreen } from './wardrobe-onboarding-screen'
 
 /**
@@ -108,6 +125,18 @@ const completedState = {
   revision: 3,
 }
 
+// The default-mannequin silhouette profile MSW returns whenever a test
+// advances to the silhouette step. Shared so the three call sites that need
+// it can't drift from one another the way the fixed poller-offset bug did.
+const defaultSilhouetteProfile = {
+  mode: 'default_mannequin' as const,
+  heightSlider: 50,
+  buildSlider: 50,
+  myForm: null,
+  revision: 0,
+  updatedAt: '2026-08-09T00:00:00.000Z',
+}
+
 const readyGarment = {
   id: 'garment-1',
   status: 'ready' as const,
@@ -131,20 +160,9 @@ function renderScreen() {
   )
 }
 
-/**
- * Presses a react-native-web Touchable the way a real tap does. `TouchableOpacity`
- * refreshes its `disabled`/`onPress` config in a passive effect, and `waitFor`
- * resolves off the DOM mutation that enables a button one task earlier, so a
- * bare `fireEvent.click` on a just-enabled Touchable is silently dropped.
- */
-function press(element: HTMLElement) {
-  fireEvent.pointerDown(element)
-  fireEvent.pointerUp(element)
-  fireEvent.click(element)
-}
-
 describe('WardrobeOnboardingScreen', () => {
   let restoreAccessTokenResolver: () => void
+  const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
 
   beforeAll(async () => {
     await initI18n()
@@ -159,6 +177,7 @@ describe('WardrobeOnboardingScreen', () => {
   })
 
   afterEach(() => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
     restoreAccessTokenResolver()
     routerMock.replace.mockClear()
     routerMock.push.mockClear()
@@ -253,16 +272,7 @@ describe('WardrobeOnboardingScreen', () => {
       ),
       http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [] })),
       http.get('*/api/v1/wardrobe/silhouette', () =>
-        HttpResponse.json({
-          data: {
-            mode: 'default_mannequin',
-            heightSlider: 50,
-            buildSlider: 50,
-            myForm: null,
-            revision: 0,
-            updatedAt: '2026-08-09T00:00:00.000Z',
-          },
-        })
+        HttpResponse.json({ data: defaultSilhouetteProfile })
       ),
       http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
         expect(await request.json()).toEqual({
@@ -319,16 +329,7 @@ describe('WardrobeOnboardingScreen', () => {
         HttpResponse.json({ data: [readyGarment] })
       ),
       http.get('*/api/v1/wardrobe/silhouette', () =>
-        HttpResponse.json({
-          data: {
-            mode: 'default_mannequin',
-            heightSlider: 50,
-            buildSlider: 50,
-            myForm: null,
-            revision: 0,
-            updatedAt: '2026-08-09T00:00:00.000Z',
-          },
-        })
+        HttpResponse.json({ data: defaultSilhouetteProfile })
       ),
       http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
         expect(await request.json()).toEqual({ targetStep: 'silhouette' })
@@ -467,16 +468,7 @@ describe('WardrobeOnboardingScreen', () => {
         })
       ),
       http.get('*/api/v1/wardrobe/silhouette', () =>
-        HttpResponse.json({
-          data: {
-            mode: 'default_mannequin',
-            heightSlider: 50,
-            buildSlider: 50,
-            myForm: null,
-            revision: 0,
-            updatedAt: '2026-08-09T00:00:00.000Z',
-          },
-        })
+        HttpResponse.json({ data: defaultSilhouetteProfile })
       ),
       http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
         expect(await request.json()).toEqual({ targetStep: 'complete' })
@@ -655,15 +647,13 @@ describe('WardrobeOnboardingScreen', () => {
     await waitFor(() => screen.getByTestId('garment-capture-complete'))
     fireEvent.click(screen.getByTestId('garment-capture-done'))
 
-    // The onboarding poll runs on the production 1s/2s/4s/8s schedule, so the
-    // first refresh lands a second after the commit.
-    await waitFor(
-      () => {
-        expect(
-          screen.getByTestId('onboarding-checklist-garment-processing')
-        ).toHaveTextContent('tags confirmed')
-      },
-      { timeout: 4_000 }
-    )
+    // The `native-utils` mock above collapses the production 1s/2s/4s/8s
+    // poll schedule to a few ms, so this resolves almost immediately; the
+    // generous timeout is just a safety margin, not an expected wait.
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('onboarding-checklist-garment-processing')
+      ).toHaveTextContent('tags confirmed')
+    })
   })
 })

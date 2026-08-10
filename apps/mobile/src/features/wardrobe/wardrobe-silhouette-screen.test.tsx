@@ -1,6 +1,6 @@
 import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 
 vi.mock('expo-localization', () => ({
@@ -64,18 +64,33 @@ const defaultProfile = {
 }
 
 describe('WardrobeSilhouetteScreen', () => {
+  // Declared once and restored in `afterEach` (not inline at the end of each
+  // test body) so a failing assertion mid-test still releases the resolver
+  // instead of leaking it into whichever test runs next -- the `restore()`
+  // call this replaces sat after the only `await waitFor`/`expect` in each
+  // test, so it would never have run had that assertion thrown.
+  let restoreAccessTokenResolver: () => void
+  const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
+
   beforeAll(async () => {
     await initI18n()
     await i18n.changeLanguage('en-US')
   })
 
+  beforeEach(() => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
+  })
+
   afterEach(() => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
+    restoreAccessTokenResolver()
     vi.restoreAllMocks()
   })
 
-  it('4.4-MOB-SIL-SCREEN-01 renders the silhouette editor once a session token resolves', async () => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
-    const restore = setMobileAccessTokenResolver(() => fakeAccessToken('user-1'))
+  it('4.4-MOB-SIL-SCREEN-01 shows an accessible loading state, then renders the silhouette editor once a session token resolves', async () => {
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() =>
+      fakeAccessToken('user-1')
+    )
     server.use(
       http.get('*/api/v1/wardrobe/silhouette', () =>
         HttpResponse.json({ data: defaultProfile })
@@ -84,20 +99,24 @@ describe('WardrobeSilhouetteScreen', () => {
 
     render(<WardrobeSilhouetteScreen />)
 
+    // Token resolution is always asynchronous (`resolveMobileAccessToken` is
+    // declared `async` even though the resolver here is synchronous), so the
+    // very first paint must show an accessible loading state rather than
+    // nothing -- this branch had no coverage at all before this test.
+    expect(screen.getByLabelText('Silhouette')).toBeInTheDocument()
+
     await waitFor(() => {
       expect(screen.getByTestId('silhouette-editor')).toBeInTheDocument()
     })
-    restore()
   })
 
   it('4.4-MOB-SIL-SCREEN-02 prompts sign-in when no session token is available', async () => {
-    const restore = setMobileAccessTokenResolver(() => undefined)
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
 
     render(<WardrobeSilhouetteScreen />)
 
     await waitFor(() => {
       expect(screen.getByText('Sign in to edit your silhouette.')).toBeInTheDocument()
     })
-    restore()
   })
 })
