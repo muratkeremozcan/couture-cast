@@ -22,7 +22,12 @@ import {
 
 const TIMESTAMP = '2026-08-09T12:00:00.000Z'
 
-const validTaggingEvent = {
+/*
+ * Typed from the function's own parameter rather than `as const`: the const
+ * assertion made `overrideFields` a readonly tuple, which is not assignable
+ * to the mutable array the event builder accepts.
+ */
+const validTaggingEvent: Parameters<typeof trackGarmentTaggingCompleted>[0] = {
   analyticsSubjectId: 'owner-1',
   garmentId: 'garment-1',
   suggestedCategory: 'top',
@@ -35,7 +40,7 @@ const validTaggingEvent = {
   analysisVersion: 'fashion-clip:prompts-v1',
   wasOverridden: true,
   overrideFields: ['material', 'comfort_range'],
-} as const
+}
 
 describe('analytics event registry', () => {
   // The name enum and the schema map are two hand-maintained lists. Drift
