@@ -1586,6 +1586,108 @@ Full suite after all fixes: `npm run test --workspace mobile` → 36 files,
 207 tests (up from 198 before this pass), all green; lint and typecheck both
 clean; no `.only`/`.skip`.
 
+**Task 7 (branch `feat/epic4-story4-t7-pact`).** Implemented the
+consumer-side and provider-state-setup half of Task 7 in a worktree that
+does not (and per the orchestration plan, could not yet) contain
+`wardrobe-onboarding.controller.ts` / `wardrobe-silhouette.controller.ts`
+from `feat/epic4-story4-t3t4-api`. Everything that does not require a live
+API is fully implemented and green; real provider verification is the one
+item explicitly left for after `t3t4-api` lands, per the task's own
+sequencing note — not faked, mocked around, or claimed as done.
+
+- **Contract specs** (subtask 1): added
+  `packages/api-client/testing/wardrobe-onboarding-contract.spec.ts` and
+  `wardrobe-silhouette-contract.spec.ts` (24 new tests), mirroring
+  `wardrobe-contract.spec.ts`'s Schema Validation / Security & Boundary
+  Rejection / OpenAPI Registration structure. Placed under
+  `packages/api-client/testing/`, this repo's actual convention for these
+  specs (confirmed against `wardrobe-contract.spec.ts`,
+  `alerts-contract.spec.ts`, etc., and `vitest.config.ts`'s
+  `include: ['testing/**/*.{spec,test}.ts']`) rather than the
+  `packages/api-client/src/contracts/http/__tests__` path named in the task
+  text, which does not exist anywhere in this repo. Cover: every documented
+  onboarding status/step value, the virtual `not_started` default shape, the
+  forward-only PATCH input, every "My Form" failure reason, the
+  `confirmsBasewearGuidance: true` literal requirement, slider 0-100 integer
+  bounds, upload-declaration bounds (sha256/mimeType/size/dimensions),
+  `.strict()` rejection of client-injected fields on every input schema, and
+  `OpenAPIRegistry` status-code/security/header coverage for all 8 new
+  routes. `@couture/api-client` full suite: 216/216 (was 192 before this
+  task), lint and typecheck clean.
+- **OpenAPIRegistry coverage** (subtask 2): re-verified `npm run optic:lint`
+  (clean) and `npm run build:packages` (clean) after `npm run db:generate`
+  (fresh worktree needed a Prisma client generated before `@couture/testing`
+  would typecheck/build; this is environment setup, not a Task 7 code
+  change). Confirms Task 2's OpenAPI registration is still clean from this
+  branch's point of view.
+- **Consumer Pact interactions** (subtask 3, consumer half): added 20 new
+  interactions to `pact/http/consumer/api-contract-interactions.ts`
+  (exported as 15 `verify*` functions, several covering multiple documented
+  scenarios in one array-driven loop, mirroring the existing
+  `capsuleErrorInteractions` pattern) and wired them into both
+  `web-api-client.pacttest.ts` and `mobile-api-client.pacttest.ts`: ownership
+  (owner GET/PATCH onboarding state, GET/PUT silhouette sliders, including
+  the virtual `not_started`/revision-0 default), the onboarding 409/412/428
+  error envelopes, the silhouette 412 stale-revision envelope, the full "My
+  Form" lifecycle (upload-url allocation, commit, a ready read, and one
+  interaction per documented failure reason: `contrast`, `privacy_violation`,
+  `timeout`, `storage_error`), the hard-delete-to-`default_mannequin` DELETE,
+  and the guardian-notification interaction for a teen's `privacy_violation`
+  verdict. Added a second Pact identity (`pactTeenAuth`, resolving to
+  `{ userId: 'teen-1', role: 'teen' }`) since the guardian-consent-gate and
+  guardian-notification interactions need an actor whose `role` is `'teen'`
+  (decision 7's `WardrobeUploadGuard`/`assertWardrobeUploadAllowed` only ever
+  forbids that role), plus matching `createWebTeenClientForMockServer` /
+  `createMobileTeenClientForMockServer` factories in each pacttest file.
+  "Guardian access" for these two tables is decision 11's
+  `WardrobeUploadGuard` consent gate, not a guardian dashboard route:
+  decision 11 explicitly gives onboarding/silhouette no `:ownerUserId`-style
+  guardian route the way capsules have one, so unlike the capsule Pact
+  section there is no owner-vs-guardian-role HTTP interaction pair here — a
+  guardian's read/write access is proven at the RLS layer
+  (`packages/db/test/rls-policies.spec.ts`, Task 1), not through HTTP. The
+  guardian-access coverage here is instead the consent gate exercised for
+  both a read and a write by a consent-revoked teen. The My Form
+  bytes-PUT endpoint (`PUT .../uploads/{uploadSessionId}`) has no Pact
+  interaction, matching the pre-existing precedent that the sibling garment
+  bytes-PUT endpoint never had one either (Web/Mobile upload raw bytes with
+  the shared `uploadGarmentBytes()` fetch helper straight to the signed
+  `uploadUrl`, not through a generated-SDK call). Ran
+  `npm run test:pact:consumer` (the determinism-checking wrapper, 3 runs):
+  both `CoutureCastWeb-CoutureCastApi.json` (47 interactions) and
+  `CoutureCastMobile-CoutureCastApi.json` (42 interactions) are stable across
+  all 3 runs. `npx tsc -p pact/tsconfig.json --noEmit` and
+  `npx eslint --max-warnings=0 --ext .ts,.tsx,.mts pact` both clean, no
+  `.only`.
+- **Provider state-setup** (subtask 3, provider half): added
+  `configureProviderOnboardingState`/`configureProviderSilhouetteState` (plus
+  matching `get`/`reset` functions) to `pact/http/provider/provider-helper.ts`,
+  mirroring `configureProviderCapsuleState` exactly, and 11 new entries to
+  `pact/http/provider/state-handlers.ts`'s `stateHandlers` map (one per named
+  provider state the new consumer interactions reference; the 4 failure-reason
+  interactions and the teen-privacy_violation interaction share single
+  param-driven handlers rather than 5 near-duplicate ones, matching the
+  existing `configureProviderWardrobeState`/`outcome` precedent). Also added
+  a second resolvable identity (`'pact-teen-token'` → `{ userId: 'teen-1',
+role: 'teen' }`) to the mock `accessTokenIdentityService` in
+  `startLocalPactProvider`, alongside the existing guardian identity. What
+  this branch could **not** do, and does not claim to have done: wire a real
+  or double `WardrobeOnboardingController`/`WardrobeSilhouetteController`
+  into `startLocalPactProvider`'s `moduleFixture`, because those controllers
+  do not exist in this worktree (`feat/epic4-story4-t3t4-api`, building them
+  concurrently, was explicitly out of scope per the orchestration plan). Did
+  **not** run `npm run test:pact:provider` (nor the combined
+  `npm run test:pact`) as a pass/fail gate for this reason — running it now
+  would fail on the new onboarding/silhouette interactions with legitimate
+  404s (no matching route registered), which is not a defect in this
+  branch's code, exactly as the task's sequencing note anticipated. **This is
+  the one remaining piece of Task 7**: once `feat/epic4-story4-t3t4-api`
+  lands with the real controllers, `startLocalPactProvider` needs a service
+  double (or the real services) wired in for the two new controllers so
+  `getProviderOnboardingState()`/`getProviderSilhouetteState()` actually
+  drive responses, and then `npm run test:pact:provider` needs to run clean
+  before Task 7's top-level checkbox can be marked done.
+
 **Task 7 test-architect review (Murat, `bmad-tea`).** Reviewed the above
 against this repo's Pact/TEA knowledge base and found two real defects in
 the newly-added consumer interactions, both fixed in place (interaction
@@ -1638,8 +1740,245 @@ are the only option available; not a gap to fix. Provider verifier
 assembly (`buildVerifierOptions`, `pool: 'forks'` + `singleFork: true`) was
 already compliant and untouched. Dispatched a second, independent review
 (`$bmad-code-review` via a Codex peer session in this same worktree) in
-parallel; its findings, if any beyond the above, will be triaged and
-remediated as a follow-up note.
+parallel; its findings, triaged and remediated below.
+
+**Task 7 remediation pass (`bmad-code-review` via Codex + `bmad-tea`).**
+Mid-review, `feat/epic4-story4-t3t4-api` (the real onboarding-state and
+silhouette API, previously blocked) landed and was pushed. Merged it into
+this branch (`git merge origin/feat/epic4-story4-t3t4-api`, one conflict in
+this story file's own completion notes, resolved by concatenating both
+sides in task order) and used the merged real controllers/services to
+ground-truth every finding below and unblock real provider verification, no
+longer relying on assumptions about not-yet-written code.
+
+Codex's `bmad-code-review` (reviewing commit `d4e9546`, before the
+`bmad-tea` batching/mode fixes above had landed) reported 6 High and 2
+Medium findings. Triage:
+
+- **HIGH 1 (provider verification absent, `test:pact:provider` 404s) and
+  the guardian-double-never-rejects sub-point**: correctly diagnosed at the
+  time, and exactly the constraint I was explicitly briefed on and had
+  documented as blocked. `t3t4-api` landing during this review resolved the
+  root blocker. Remediated: wired the real `WardrobeOnboardingController`/
+  `WardrobeSilhouetteController` into `provider-helper.ts`'s
+  `moduleFixture` with deterministic service doubles
+  (`mockWardrobeOnboardingService`/`mockWardrobeSilhouetteService`, same
+  fidelity level as the existing `mockWardrobeCapsuleService`: canned rows
+  per named provider state plus the documented error paths, not a
+  re-simulation of the real business logic, which is proven separately by
+  `apps/api/integration/wardrobe-onboarding.integration.spec.ts` /
+  `wardrobe-silhouette.integration.spec.ts` against a real database).
+  Reused the real, pure, side-effect-free
+  `formatOnboardingETag`/`parseOnboardingIfMatchHeader`/
+  `formatSilhouetteETag`/`parseSilhouetteIfMatchHeader` exports rather than
+  hand-duplicating header logic. Fixed `mockGuardianService` to check the
+  new `providerSilhouetteState`'s `guardian-forbidden` scenario for the
+  teen actor (the guard-level check codex's sub-point correctly flagged as
+  missing). Extended the manual `Cache-Control` middleware wiring to also
+  cover `/onboarding` and `/silhouette` paths, matching what the real,
+  merged-in `wardrobe.module.ts`'s `configure()` actually does. Result:
+  `npm run test:pact:provider` now genuinely passes, 93/93 interactions (49
+  Web + 44 Mobile), confirmed by running it for real, not asserted.
+- **HIGH 2 (batched interactions)**: already fixed in the prior commit
+  before this review ran (codex reviewed the pre-fix commit); no further
+  change needed. Confirmed still correct post-merge.
+- **HIGH 3 (My Form lifecycle schema permits impossible states; commit
+  Pact pinned the wrong mode)**: the mode bug was already fixed. The schema
+  gap was real and unfixed: `silhouetteMyFormSchema` modeled `status`/
+  `failureReason`/`committedAt`/`imageAccess` as independent nullable
+  fields with no cross-field enforcement. Fixed with a `.superRefine()` on
+  `silhouetteMyFormSchema` (and the analogous
+  `wardrobeOnboardingStateSchema` for MEDIUM 1), grounded directly in
+  reading `wardrobe-silhouette.service.ts`/`silhouette-photo.processor.ts`
+  once they existed, not guessed: `committedAt` set iff status is
+  processing/ready/failed (processor never clears it on failure -- only a
+  full DELETE does), `failureReason` set iff failed, `imageAccess` set iff
+  ready. This is additive/tightening only (no TS type-shape change, so it
+  can't break Task 5/6's in-flight code reading these fields) and caught a
+  real bug in my own Pact fixtures and contract-spec test data along the
+  way: the My Form failure-reason interactions and one contract-spec test
+  had `committedAt: null` for a `failed` result, which the real processor
+  never produces (fixed in both places, plus the guardian-notification
+  interaction). Added negative-fixture tests for every invalid combination
+  in both `wardrobe-silhouette-contract.spec.ts` and
+  `wardrobe-onboarding-contract.spec.ts`, and fixed the pre-existing
+  "validates every documented status/step" test, which had been
+  independently overriding one field at a time and no longer produced
+  valid fixtures once the invariant existed.
+- **HIGH 4 (My Form raw-bytes PUT has no header/body contract)**:
+  confirmed real and fixed. The OpenAPI registration for
+  `PUT .../my-form/uploads/{uploadSessionId}` declared only the path
+  param; the generated SDK method genuinely had no `xUploadToken`/
+  `contentType`/`body` fields to send them with. Added the identical
+  `headers`/`body` declaration the sibling garment bytes-PUT endpoint
+  already has, regenerated (`generate:api-client`, `optic:lint`,
+  `build:packages` all clean), and added contract-spec assertions proving
+  the header/body registration. Did not add a Pact interaction for this
+  endpoint or chase the wider set of undocumented error codes this
+  discovery surfaced (`UPLOAD_TOKEN_CONSUMED`, `UPLOAD_SESSION_EXPIRED`,
+  `UPLOAD_ALREADY_CLAIMED`, `WARDROBE_UPLOAD_FORBIDDEN`,
+  `INVALID_UPLOAD_TOKEN`, and others thrown by
+  `wardrobe-silhouette.service.ts` but absent from
+  `silhouetteConflictErrorSchema`/`silhouetteForbiddenErrorSchema`'s
+  message enums) -- flagging that as a distinct, real, deferred contract-
+  completeness gap rather than patching it piecemeal under review pressure;
+  matches the sibling garment bytes-PUT endpoint's own precedent of no
+  Pact coverage (Web/Mobile upload raw bytes via the `uploadGarmentBytes()`
+  fetch helper straight to the signed URL, not the generated SDK method).
+- **HIGH 5 (guardian-notification interaction doesn't trigger/verify the
+  outbox side effect)**: acknowledged as an accurate limitation of
+  consumer-side Pact testing generally (a GET response cannot observe a
+  server-side `ModerationEvent`/`EventEnvelope` write), and the interaction's
+  own doc comment already scoped it honestly ("the response-shape
+  assertion here only proves no leakage"). No further remediation attempted
+  here: asserting the outbox row requires either a real-Redis/Postgres
+  integration test (which `apps/api/integration/wardrobe-silhouette.
+integration.spec.ts` already provides on `t3t4-api`) or a provider-side
+  state-teardown assertion wired to the real database, both out of a
+  consumer Pact interaction's job and out of this branch's scope.
+- **HIGH 6 (missing Cache-Control/ETag OpenAPI header registration;
+  incomplete header-parameter contract-spec assertions)**: the
+  Cache-Control/ETag gap in OpenAPI response registration is real but is a
+  pre-existing, repo-wide convention -- the capsule/garment routes from
+  Stories 4.1-4.3 have the identical gap, already reviewed and shipped.
+  Retrofitting it here would mean changing routes well outside this
+  story's or Task 7's scope for a convention nothing in this review flagged
+  as broken in practice (Pact interactions independently assert these
+  headers where the story requires them). Not fixed; flagged as a
+  repo-wide architecture note for a future story rather than patched
+  piecemeal. The narrower, concrete part -- missing header-parameter
+  assertions in my own new contract specs -- was fixed: added assertions
+  for the silhouette slider PUT's `if-match`, and the upload-url/commit
+  POSTs' `idempotency-key`, alongside the HIGH 4 header/body assertions.
+- **MEDIUM 1 (onboarding response invariants unenforced)**: same category
+  and same fix as HIGH 3's silhouette schema, applied to
+  `wardrobeOnboardingStateSchema`: `not_started` only pairs with
+  `currentStep: 'permission'`/null timestamps/`revision: 0`, `completed`
+  only pairs with `currentStep: 'complete'`/a set `completedAt`, grounded
+  in `wardrobe-onboarding.service.ts`'s `VIRTUAL_STATE` and
+  `createFirstState`/`advanceExistingState` rather than guessed.
+- **MEDIUM 2 (no idempotent-replay Pact coverage for onboarding/
+  silhouette)**: added `verifyOnboardingReplayInteraction` and
+  `verifyUpdateSilhouetteSlidersReplayInteraction`, grounded in
+  `advanceExistingState`'s and `updateSliders`'s real `isIdenticalReplay`
+  checks once those existed to read. Did not add upload-url/commit replay
+  coverage in this pass (capsule/garment idempotent-creation replay is
+  already covered elsewhere as the established pattern for that shape;
+  My-Form-specific replay was not part of codex's literal ask and adding
+  it would have meant modeling the real service's replay branches for two
+  more endpoints under review-remediation time pressure) -- noting this as
+  a real, small, deferred gap rather than silently claiming full coverage.
+
+**Ground-truth cross-check surfaced one genuine apps/api behavior finding,
+flagged rather than fixed per this session's scope** (packages/api-client
+contract changes are mine to make; apps/api behavior changes are not):
+`WardrobeSilhouetteService.commitMyForm` has no `@HttpCode` override and no
+`res.status()` call distinguishing a first commit from an idempotent
+replay, so `POST /my-form/commit` always returns 201 -- even confirmed by
+real provider verification. This is inconsistent with its own sibling in
+the same controller (`createMyFormUploadUrl` does branch
+`res.status(result.replayed ? 200 : 201)`) and with the garment-commit
+endpoint this story's Task 3 text says to mirror (`POST
+/api/v1/wardrobe/garments` correctly returns 201 first-commit / 200
+replay). Registered both 201 (matching real, confirmed behavior) and 200
+(matching the garment precedent and this story's own stated intent) in the
+OpenAPI contract for `/my-form/commit`, and fixed the one Pact interaction
+that exercises it to expect 201 (the only scenario currently exercised).
+Did not add a replay-specific Pact interaction asserting 200, since the
+real service does not currently produce that response for any input --
+doing so would assert a contract-verified claim about behavior that isn't
+there. Whoever owns `apps/api`/`t3t4-api` should decide whether to add the
+replay branch (making the endpoint consistent with its sibling and the
+garment precedent) or intentionally leave commit non-idempotent-status-
+aware; either way the OpenAPI contract linked above should be trimmed back
+to whichever one status code is actually correct once decided.
+
+Full re-verification after all fixes: `@couture/api-client` 220/220 (was
+216 before this pass), `optic:lint` clean, `build:packages` clean,
+`npm run test:pact` (the complete db:generate -> build:packages ->
+generate:http-openapi -> optic:lint -> consumer determinism -> real
+provider verification chain) green end to end, `pact/` typecheck and lint
+clean, `apps/api` full suite 668/668 unit + 92/97 integration (5
+pre-existing unrelated skips, matching the `t3t4-api` completion notes'
+own count) all still green after the shared-contract changes, `apps/web`
+and `apps/mobile` lint clean.
+
+**Task 7 dedicated test-architecture review (Murat, `bmad-tea`, 2026-08-10).**
+PR #106's own description noted it had "own review + independent
+bmad-code-review" but no dedicated Murat/bmad-tea pass had ever run against
+this diff's actual, final, current state: the first `bmad-tea` pass above ran
+once on an interim commit before `t3t4-api` merged in, and the remediation
+pass above was driven mostly by a general-purpose `bmad-code-review`, not
+`bmad-tea`. Ran the `RV` ("Review Tests") workflow (`bmad-testarch-test-review`,
+Create mode) against exactly PR #106's 12-file diff, using its own step
+sequence: context load, test discovery, four parallel quality-dimension
+subagents (determinism, isolation, maintainability, performance), score
+aggregation, report generation. Full report:
+`_bmad-output/test-artifacts/test-reviews/wardrobe-onboarding-silhouette-pact-test-review-2026-08-10.md`.
+
+Found and fixed 6 real findings (1 more, LOW-severity, deliberately left
+open; see the report's Findings section), all in `pact/` or
+`packages/api-client/testing/`, none in `apps/api` (out of this session's
+scope):
+
+- **Determinism, HIGH x2 + LOW x1.** The pre-existing (Stories 4.2/4.3)
+  `verifySuggestGarmentTagsErrorInteractions`/
+  `verifyUpdateGarmentTagsErrorInteractions`/`verifyCapsuleErrorInteractions`
+  grouped functions still awaited multiple `addInteraction()...executeTest()`
+  chains inside a single `it()`, the identical PactV4 Rust-FFI
+  interaction-dropping risk the first `bmad-tea` pass above fixed for the
+  newer onboarding/silhouette tables and explicitly flagged these three as
+  "worth the same it.each treatment in a follow-up." This review is that
+  follow-up: exported `verifySmartTagErrorInteraction`/
+  `verifyCapsuleErrorInteraction` as single-interaction primitives plus their
+  interaction-table arrays, and drove all three with `it.each(...)` in
+  `web-api-client.pacttest.ts`/`mobile-api-client.pacttest.ts`. Also replaced
+  a dead-code `new Date().toISOString()` in the onboarding provider double's
+  `completedAt` field with a fixed constant, matching every other timestamp
+  in that file.
+- **Isolation, MEDIUM x1.** `resetProviderState()` cascaded into
+  `resetProviderOnboardingState()`/`resetProviderSilhouetteState()` but not
+  the pre-existing `resetProviderCapsuleState()`, leaving capsule state the
+  one fixture not guaranteed to reset before each interaction (dormant today
+  because every capsule state handler fully overwrites its fixture, but a
+  real structural inconsistency). Added the missing call.
+- **Maintainability, HIGH x2 + MEDIUM x1.** Two comment blocks
+  (`state-handlers.ts`, `provider-helper.ts`) still described the
+  onboarding/silhouette provider doubles as unwired scaffolding whose
+  `test:pact:provider` 404s were "legitimate," left over from before
+  `t3t4-api` merged; `provider-helper.ts` even carries a second, correct
+  comment 460 lines below the stale one that directly contradicts it.
+  Rewrote both. Also had `provider-helper.ts`'s `SilhouetteRow` type import
+  the canonical `SilhouetteMode`/`SilhouettePhotoStatus` types instead of
+  hand-duplicating their literal unions, matching how the sibling
+  `OnboardingRow` already derives from `WardrobeOnboardingStateResponse['data']`.
+- **Performance, MEDIUM x1.** `wardrobe-silhouette-contract.spec.ts` called
+  the registry-rebuilding `generateHttpOpenApiDocument()` three times across
+  one describe block instead of once; hoisted into a shared `beforeAll`,
+  matching the convention every other contract-spec file in this package
+  already follows.
+- **Deferred (LOW, not fixed).** Three near-identical error-envelope
+  verification implementations
+  (`verifySmartTagErrorInteraction`/`verifyCapsuleErrorInteraction`/
+  `verifyWardrobeErrorInteraction`) remain unconsolidated. Real, but already
+  on record twice as a conscious choice (`WardrobeErrorInteraction`'s own doc
+  comment, and this file's completion notes above); a future pass can fold
+  them into one generic helper.
+
+Verification after all fixes: `npx tsc -p pact/tsconfig.json --noEmit`
+clean; `npx eslint --max-warnings=0 --ext .ts,.tsx,.mts pact` clean (5
+prettier-only errors auto-fixed, re-verified); `npm run test --workspace
+@couture/api-client` 220/220; `npm run test:pact` (full
+db:generate -> build:packages -> generate:http-openapi -> optic:lint ->
+consumer determinism (3 runs) -> real provider verification chain) green:
+consumer determinism stable at 49 Web + 44 Mobile = 93 interactions across
+all 3 runs, identical to the count before this review's `it.each` refactor,
+confirming no interaction was gained or dropped by reorganizing which
+`it()` owns it; real provider verification 1/1 passed, all 93 interactions
+satisfied. No `.only` in any touched file. No changes to
+`packages/api-client/src/contracts/http/wardrobe.ts`, generated artifacts,
+or `apps/api`; this pass was contained entirely to Pact consumer/provider
+code and the two contract-spec test files.
 
 ### File list
 
@@ -1761,3 +2100,63 @@ remediated as a follow-up note.
 - `apps/mobile/assets/locales/pt-BR.json` (modified)
 - `apps/mobile/assets/locales/pt-PT.json` (modified)
 - `apps/mobile/assets/locales/tr-TR.json` (modified)
+  **Task 7 (branch `feat/epic4-story4-t7-pact`):**
+
+- `packages/api-client/testing/wardrobe-onboarding-contract.spec.ts` (new)
+- `packages/api-client/testing/wardrobe-silhouette-contract.spec.ts` (new)
+- `pact/http/consumer/api-contract-interactions.ts` (modified)
+- `pact/http/consumer/web-api-client.pacttest.ts` (modified)
+- `pact/http/consumer/mobile-api-client.pacttest.ts` (modified)
+- `pact/http/provider/provider-helper.ts` (modified)
+- `pact/http/provider/state-handlers.ts` (modified)
+
+**Task 7 remediation pass (`bmad-code-review` + `bmad-tea`):**
+
+- `packages/api-client/src/contracts/http/wardrobe.ts` (modified —
+  `silhouetteMyFormSchema`/`wardrobeOnboardingStateSchema` cross-field
+  invariants, My Form uploads PUT header/body registration, My Form commit
+  201/200 registration)
+- `packages/api-client/docs/http.openapi.json` (generated, modified)
+- `packages/api-client/src/generated/**` (generated, modified)
+- `packages/api-client/testing/wardrobe-onboarding-contract.spec.ts`
+  (modified — negative-invariant tests, fixed the status/step fixture test)
+- `packages/api-client/testing/wardrobe-silhouette-contract.spec.ts`
+  (modified — negative-invariant tests, header/body/parameter registration
+  assertions, fixed the `committedAt` fixture bug)
+- `pact/http/consumer/api-contract-interactions.ts` (modified — nullable
+  `reason` on `WardrobeErrorInteraction`, fixed the onboarding 428 case's
+  missing `error` field, fixed `committedAt` on My Form failure
+  interactions, fixed the commit interaction's 201 status and its
+  `mode`/`isCommitted` consistency, added the two replay interactions)
+- `pact/http/consumer/web-api-client.pacttest.ts` (modified — wired the
+  two new replay interactions)
+- `pact/http/consumer/mobile-api-client.pacttest.ts` (modified — same)
+- `pact/http/provider/provider-helper.ts` (modified — wired the real
+  `WardrobeOnboardingController`/`WardrobeSilhouetteController` with
+  deterministic service doubles, extended the guardian double and the
+  Cache-Control middleware routing)
+
+**Task 7 dedicated test-architecture review (`bmad-tea`, 2026-08-10):**
+
+- `pact/http/consumer/api-contract-interactions.ts` (modified: exported
+  `verifySmartTagErrorInteraction`/`verifyCapsuleErrorInteraction` as
+  single-interaction primitives, exported
+  `suggestGarmentTagsErrorInteractions`/`updateGarmentTagsErrorInteractions`/
+  `capsuleErrorInteractions` tables, removed the grouped multi-interaction
+  wrapper functions)
+- `pact/http/consumer/web-api-client.pacttest.ts` (modified: `it.each` for
+  the smart-tag suggest/update and capsule error tables)
+- `pact/http/consumer/mobile-api-client.pacttest.ts` (modified: `it.each`
+  for the capsule error table)
+- `pact/http/provider/provider-helper.ts` (modified: fixed constant instead
+  of `new Date()` in the onboarding double, added `resetProviderCapsuleState()`
+  to the reset cascade, rewrote the stale "not wired yet" comment, imported
+  `SilhouetteMode`/`SilhouettePhotoStatus` for `SilhouetteRow` instead of
+  hand-duplicated unions)
+- `pact/http/provider/state-handlers.ts` (modified: rewrote the stale "not
+  wired yet" comment)
+- `packages/api-client/testing/wardrobe-silhouette-contract.spec.ts`
+  (modified: shared `beforeAll` for `generateHttpOpenApiDocument()` across
+  the three OpenAPI Registration tests)
+- `_bmad-output/test-artifacts/test-reviews/wardrobe-onboarding-silhouette-pact-test-review-2026-08-10.md`
+  (new: the review report)
