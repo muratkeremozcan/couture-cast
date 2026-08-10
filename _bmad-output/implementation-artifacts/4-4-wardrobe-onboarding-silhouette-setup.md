@@ -1451,7 +1451,7 @@ that filtered run), `lint` and `typecheck` clean.
 - `apps/web/src/i18n/locales/pt-PT.json` (modified)
 - `apps/web/src/i18n/locales/tr-TR.json` (modified)
 - `apps/web/src/i18n/wardrobe-onboarding-locales.spec.ts` (new)
-  **Task 6 (branch `feat/epic4-story4-t6-mobile`):**
+**Task 6 (branch `feat/epic4-story4-t6-mobile`):**
 
 - `apps/mobile/components/wardrobe/garment-capture-modal.tsx` (new — extracted
   from `apps/mobile/app/(tabs)/wardrobe.tsx`)
