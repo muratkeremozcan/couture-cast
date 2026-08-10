@@ -10,6 +10,7 @@ import {
   userProfileResponseSchema,
   wardrobeOnboardingStateResponseSchema,
   silhouetteProfileResponseSchema,
+  createSilhouetteUploadUrlResponseSchema,
   type GarmentCategory,
   type GarmentMaterial,
   type GarmentComfortRange,
@@ -689,9 +690,40 @@ export interface UploadMyFormPhotoInput {
    * bill) a second upload session instead of safely replaying the first.
    */
   idempotencyKey: string
+  /**
+   * The literal `true` the server's commit contract requires. Required here
+   * (not defaulted) so the safety confirmation decision 8 of the story
+   * describes is actually plumbed through from whatever UI checkbox state
+   * gated this call, rather than this exported wrapper silently asserting
+   * confirmation on every caller's behalf.
+   */
+  confirmsBasewearGuidance: true
   signal?: AbortSignal
   onStateChange?: (state: GarmentUploadState) => void
   onProgress?: (percentage: number) => void
+}
+
+/** True when `error` is the server's revision/If-Match precondition failure. */
+export function isStaleRevisionError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.message.includes('ONBOARDING_REVISION_MISMATCH') ||
+      error.message.includes('SILHOUETTE_REVISION_MISMATCH'))
+  )
+}
+
+/**
+ * `crypto.randomUUID()` requires a secure context and a reasonably modern
+ * browser; guard it so an unsupported environment surfaces the same
+ * actionable-error path as any other failure instead of a raw `TypeError`.
+ */
+export function generateIdempotencyKey(): string {
+  if (typeof crypto === 'undefined' || typeof crypto.randomUUID !== 'function') {
+    throw new Error(
+      'Unable to start this upload in this browser. Try a different browser.'
+    )
+  }
+  return crypto.randomUUID()
 }
 
 /**
@@ -703,6 +735,7 @@ export interface UploadMyFormPhotoInput {
 export async function uploadMyFormPhotoFromWeb({
   imagePreview,
   idempotencyKey,
+  confirmsBasewearGuidance,
   signal,
   onStateChange,
   onProgress,
@@ -717,7 +750,7 @@ export async function uploadMyFormPhotoFromWeb({
   const api = createWebApiClient({ accessToken })
   let allocation
   try {
-    allocation = (
+    allocation = createSilhouetteUploadUrlResponseSchema.parse(
       await api.apiV1WardrobeSilhouetteMyFormUploadUrlPost(
         {
           idempotencyKey,
@@ -738,28 +771,32 @@ export async function uploadMyFormPhotoFromWeb({
 
   onStateChange?.('uploading')
   onProgress?.(35)
-  await uploadGarmentBytes({
-    uploadUrl: allocation.uploadUrl,
-    uploadToken: allocation.uploadToken,
-    bearerToken: accessToken,
-    mimeType: image.mimeType,
-    body: image.blob,
-    signal,
-    timeoutMs: 30_000,
-    onProgress: () => onProgress?.(80),
-  })
+  try {
+    await uploadGarmentBytes({
+      uploadUrl: allocation.uploadUrl,
+      uploadToken: allocation.uploadToken,
+      bearerToken: accessToken,
+      mimeType: image.mimeType,
+      body: image.blob,
+      signal,
+      timeoutMs: 30_000,
+      onProgress: () => onProgress?.(80),
+    })
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to upload the photo. Try again.')
+  }
 
   onStateChange?.('verifying')
   onProgress?.(90)
   let profile
   try {
-    profile = (
+    profile = silhouetteProfileResponseSchema.parse(
       await api.apiV1WardrobeSilhouetteMyFormCommitPost(
         {
           idempotencyKey,
           commitSilhouettePhotoInput: {
             uploadSessionId: allocation.uploadSessionId,
-            confirmsBasewearGuidance: true,
+            confirmsBasewearGuidance,
           },
         },
         { signal }

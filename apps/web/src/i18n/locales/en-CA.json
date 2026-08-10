@@ -57,6 +57,7 @@
     },
     "onboarding": {
       "title": "Set up your closet",
+      "garmentFallback": "Garment {{position}}",
       "permissionTitle": "Allow camera and photo access",
       "permissionBody": "CoutureCast needs camera or library access to capture your garments.",
       "permissionDenied": "We couldn't access your camera or photos. You can still import files or use the starter wardrobe.",
@@ -66,8 +67,18 @@
       "back": "Back",
       "checklistTagged": "{{garment}}: tags confirmed",
       "checklistPending": "{{garment}}: needs tags",
+      "checklistProcessing": "{{garment}}: processing",
+      "checklistFailed": "{{garment}}: processing failed",
       "complete": "Your closet is ready",
       "resumed": "Picking up where you left off",
+      "announcements": {
+        "permissionRequesting": "Requesting camera access…",
+        "permissionGranted": "Camera access granted. Capture your garments.",
+        "permissionDenied": "Camera access unavailable. Import photos or use the starter wardrobe.",
+        "tagging": "All garments captured. Confirm tags to continue.",
+        "silhouette": "Set up your silhouette.",
+        "garmentTagged": "{{garment}} tagged."
+      },
       "errors": {
         "loadFailed": "Unable to load your onboarding progress.",
         "saveFailed": "Unable to save this step. Try again.",
@@ -87,12 +98,17 @@
       "myFormRemove": "Remove My Form photo",
       "processing": "Processing your photo…",
       "ready": "My Form photo ready",
+      "loading": "Loading your silhouette…",
+      "myFormFileLabel": "My Form photo file",
+      "myFormImageAlt": "My Form",
       "errors": {
         "contrast": "We couldn't separate you from the background clearly. Retake the photo with plainer clothing or a plainer background.",
         "privacyViolation": "This photo can't be used. Choose a different photo.",
         "timeout": "Processing took too long. Try again.",
         "storageError": "We couldn't save this photo. Try again.",
-        "confirmRequired": "Confirm the basewear guidance before uploading."
+        "confirmRequired": "Confirm the basewear guidance before uploading.",
+        "fileReadFailed": "The selected photo could not be read.",
+        "unknown": "Something went wrong with this photo. Try again."
       }
     }
   }

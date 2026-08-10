@@ -57,6 +57,7 @@
     },
     "onboarding": {
       "title": "Configurez votre garde-robe",
+      "garmentFallback": "Vêtement {{position}}",
       "permissionTitle": "Autoriser l'accès à l'appareil photo et aux photos",
       "permissionBody": "CoutureCast a besoin d'accéder à votre appareil photo ou à votre photothèque pour capturer vos vêtements.",
       "permissionDenied": "Nous n'avons pas pu accéder à votre appareil photo ni à vos photos. Vous pouvez toujours importer des fichiers ou utiliser la garde-robe de départ.",
@@ -66,8 +67,18 @@
       "back": "Retour",
       "checklistTagged": "{{garment}} : étiquettes confirmées",
       "checklistPending": "{{garment}} : étiquettes requises",
+      "checklistProcessing": "{{garment}} : traitement en cours",
+      "checklistFailed": "{{garment}} : échec du traitement",
       "complete": "Votre garde-robe est prête",
       "resumed": "Reprise là où vous aviez arrêté",
+      "announcements": {
+        "permissionRequesting": "Demande d'accès à la caméra…",
+        "permissionGranted": "Accès à la caméra accordé. Capturez vos vêtements.",
+        "permissionDenied": "Accès à la caméra indisponible. Importez des photos ou utilisez la garde-robe de démarrage.",
+        "tagging": "Tous les vêtements sont capturés. Confirmez les étiquettes pour continuer.",
+        "silhouette": "Configurez votre silhouette.",
+        "garmentTagged": "{{garment}} étiqueté."
+      },
       "errors": {
         "loadFailed": "Impossible de charger votre progression de configuration.",
         "saveFailed": "Impossible d'enregistrer cette étape. Réessayez.",
@@ -87,12 +98,17 @@
       "myFormRemove": "Supprimer la photo Ma silhouette",
       "processing": "Traitement de votre photo en cours…",
       "ready": "Photo Ma silhouette prête",
+      "loading": "Chargement de votre silhouette…",
+      "myFormFileLabel": "Fichier photo Ma silhouette",
+      "myFormImageAlt": "Ma silhouette",
       "errors": {
         "contrast": "Nous n'avons pas pu vous distinguer clairement de l'arrière-plan. Reprenez la photo avec des vêtements ou un arrière-plan plus unis.",
         "privacyViolation": "Cette photo ne peut pas être utilisée. Choisissez une autre photo.",
         "timeout": "Le traitement a pris trop de temps. Réessayez.",
         "storageError": "Nous n'avons pas pu enregistrer cette photo. Réessayez.",
-        "confirmRequired": "Confirmez la consigne de tenue de base avant de téléverser."
+        "confirmRequired": "Confirmez la consigne de tenue de base avant de téléverser.",
+        "fileReadFailed": "La photo sélectionnée n'a pas pu être lue.",
+        "unknown": "Un problème est survenu avec cette photo. Réessayez."
       }
     }
   }

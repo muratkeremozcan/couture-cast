@@ -64,6 +64,11 @@ vi.mock('../../lib/wardrobe', () => ({
   deleteMyFormPhotoFromWeb,
   silhouetteETag: (userId: string, revision: number) =>
     `"silhouette:${userId}:${revision}"`,
+  isStaleRevisionError: (error: unknown) =>
+    error instanceof Error &&
+    (error.message.includes('ONBOARDING_REVISION_MISMATCH') ||
+      error.message.includes('SILHOUETTE_REVISION_MISMATCH')),
+  generateIdempotencyKey: () => 'test-idempotency-key',
 }))
 
 import WardrobePage from './page'
@@ -200,6 +205,23 @@ describe('WardrobePage onboarding entry card', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('surfaces a visible, retryable error instead of silently hiding the onboarding entry point', async () => {
+    const user = userEvent.setup()
+    getOnboardingStateFromWeb.mockRejectedValueOnce(new Error('network down'))
+    render(<WardrobePage />)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Unable to check your closet setup progress.')
+
+    getOnboardingStateFromWeb.mockResolvedValueOnce(
+      onboardingState({ status: 'in_progress' })
+    )
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    await screen.findByRole('link', { name: 'Set up your closet' })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('opens the silhouette settings in an accessible modal and restores focus on close', async () => {
     const user = userEvent.setup()
     getOnboardingStateFromWeb.mockResolvedValue(onboardingState({ status: 'completed' }))
@@ -214,5 +236,60 @@ describe('WardrobePage onboarding entry card', () => {
     await user.click(screen.getByLabelText('Close modal'))
 
     await waitFor(() => expect(silhouetteButton).toHaveFocus())
+  })
+
+  it('disables the Silhouette button until the signed-in user id has resolved', async () => {
+    getOnboardingStateFromWeb.mockResolvedValue(onboardingState({ status: 'completed' }))
+    let resolveUserId: (id: string) => void = () => undefined
+    resolveCurrentUserId.mockReset().mockReturnValue(
+      new Promise((resolve) => {
+        resolveUserId = resolve
+      })
+    )
+    render(<WardrobePage />)
+
+    const silhouetteButton = await screen.findByRole('button', { name: 'Silhouette' })
+    expect(silhouetteButton).toBeDisabled()
+
+    resolveUserId('user-hub-1')
+
+    await waitFor(() => expect(silhouetteButton).toBeEnabled())
+  })
+
+  it('surfaces an error and keeps the Silhouette button disabled when resolving the user id fails', async () => {
+    getOnboardingStateFromWeb.mockResolvedValue(onboardingState({ status: 'completed' }))
+    resolveCurrentUserId.mockReset().mockRejectedValue(new Error('unauthorized'))
+    render(<WardrobePage />)
+
+    const silhouetteButton = await screen.findByRole('button', { name: 'Silhouette' })
+    await waitFor(() => expect(silhouetteButton).toBeDisabled())
+    await screen.findByRole('alert')
+  })
+
+  it('keeps the silhouette modal open while a My Form upload is still in flight', async () => {
+    const user = userEvent.setup()
+    getOnboardingStateFromWeb.mockResolvedValue(onboardingState({ status: 'completed' }))
+    uploadMyFormPhotoFromWeb.mockReturnValue(new Promise(() => undefined))
+    render(<WardrobePage />)
+
+    const silhouetteButton = await screen.findByRole('button', { name: 'Silhouette' })
+    await waitFor(() => expect(silhouetteButton).toBeEnabled())
+    await user.click(silhouetteButton)
+    await screen.findByRole('dialog')
+    await screen.findByLabelText('Height')
+
+    await user.click(screen.getByLabelText(/I'm wearing plain white or black clothing/))
+    await user.click(screen.getByRole('button', { name: 'Upload a full-body photo' }))
+    await user.upload(
+      screen.getByLabelText('My Form photo file', { selector: 'input' }),
+      new File(['x'.repeat(20)], 'photo.png', { type: 'image/png' })
+    )
+    await screen.findByText('Processing your photo…')
+
+    await user.click(screen.getByLabelText('Close modal'))
+
+    // Escape and the close button both funnel through the same busy-guarded
+    // handler; the dialog must still be here after either close attempt.
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 })

@@ -22,26 +22,75 @@ import {
   advanceOnboardingStepFromWeb,
   listGarmentsFromWeb,
   onboardingETag,
+  isStaleRevisionError,
 } from '../../../lib/wardrobe'
 
-export default function WardrobeOnboardingPage() {
+/**
+ * `garmentPollIntervalsMs` exists only so tests can replace the real
+ * 1s/2s/4s/8s cadence with a near-zero one; Next's App Router never supplies
+ * it, so production always gets the real default.
+ */
+export default function WardrobeOnboardingPage({
+  garmentPollIntervalsMs,
+}: {
+  garmentPollIntervalsMs?: readonly number[]
+} = {}) {
   return (
     <I18nextProvider i18n={getI18n()}>
-      <OnboardingFlow />
+      <OnboardingFlow garmentPollIntervalsMs={garmentPollIntervalsMs} />
     </I18nextProvider>
   )
 }
 
 /** Every captured garment needs tags; a label distinguishes rows before a category exists. */
-function describeGarment(garment: GarmentItemContract, position: number): string {
-  return garment.category ? garment.category : `Garment ${position}`
+function describeGarment(
+  garment: GarmentItemContract,
+  position: number,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  return garment.category
+    ? garment.category
+    : t('wardrobe.onboarding.garmentFallback', { position })
 }
 
 function isTagged(garment: GarmentItemContract): boolean {
   return garment.tagsConfirmedAt !== null
 }
 
-function OnboardingFlow() {
+/**
+ * A `failed` garment can never reach `tagsConfirmedAt`: there is no retry or
+ * removal action for it anywhere in this codebase yet (the wardrobe hub
+ * itself only ever shows a static "failed" badge for one), so requiring it
+ * to be tagged before Continue would be a permanent onboarding dead-end.
+ * Excluded from the "all tagged" gate rather than pretending this story can
+ * build that recovery flow; tracked as a follow-up, not solved here.
+ */
+function isTaggable(garment: GarmentItemContract): boolean {
+  return garment.status !== 'failed'
+}
+
+const GARMENT_POLL_INTERVALS_MS = [1_000, 2_000, 4_000, 8_000] as const
+
+/** Mirrors the wardrobe hub's own `waitForPoll`: an abortable delay between poll attempts. */
+function waitForPoll(delayMs: number, signal: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const timer = window.setTimeout(resolve, delayMs)
+    signal.addEventListener(
+      'abort',
+      () => {
+        window.clearTimeout(timer)
+        reject(new DOMException('Polling aborted', 'AbortError'))
+      },
+      { once: true }
+    )
+  })
+}
+
+function OnboardingFlow({
+  garmentPollIntervalsMs = GARMENT_POLL_INTERVALS_MS,
+}: {
+  garmentPollIntervalsMs?: readonly number[]
+}) {
   const { t } = useTranslation()
   const router = useRouter()
 
@@ -57,15 +106,47 @@ function OnboardingFlow() {
 
   const [advanceError, setAdvanceError] = useState<string | null>(null)
   const [isAdvancing, setIsAdvancing] = useState(false)
+  const [isSilhouetteBusy, setIsSilhouetteBusy] = useState(false)
 
   const [garments, setGarments] = useState<GarmentItemContract[]>([])
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false)
   const [taggingGarmentId, setTaggingGarmentId] = useState<string | null>(null)
+  /** A garment still `processing` after every scheduled poll attempt; offered as a manual recheck. */
+  const [timedOutGarmentIds, setTimedOutGarmentIds] = useState<Set<string>>(
+    () => new Set()
+  )
 
   const revisionRef = useRef(0)
   const addAnotherButtonRef = useRef<HTMLButtonElement | null>(null)
   const taggingButtonRefs = useRef(new Map<string, HTMLButtonElement>())
+  const taggingInvokerRef = useRef<HTMLElement | null>(null)
   const pendingTaggingGarmentIdRef = useRef<string | null>(null)
+  const advanceControllerRef = useRef<AbortController | null>(null)
+  const isCaptureOpenRef = useRef(false)
+  const garmentPollControllerRef = useRef<AbortController | null>(null)
+  /**
+   * Stable per-garment checklist position, assigned the first time a garment
+   * id is seen (resume load or a fresh capture) and never reassigned.
+   * Prevents an already-shown "Garment N" label from silently renumbering
+   * (and, for a screen-reader user, silently starting to refer to a
+   * different item) when another garment is captured or the array is
+   * reordered for newest-first display.
+   */
+  const garmentPositionsRef = useRef(new Map<string, number>())
+  const nextGarmentPositionRef = useRef(1)
+
+  const assignGarmentPositions = useCallback((items: readonly GarmentItemContract[]) => {
+    for (const item of items) {
+      if (!garmentPositionsRef.current.has(item.id)) {
+        garmentPositionsRef.current.set(item.id, nextGarmentPositionRef.current)
+        nextGarmentPositionRef.current += 1
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    isCaptureOpenRef.current = isCaptureModalOpen
+  }, [isCaptureModalOpen])
 
   useEffect(() => {
     let cancelled = false
@@ -88,7 +169,10 @@ function OnboardingFlow() {
         }
         if (loaded.currentStep === 'capture' || loaded.currentStep === 'tagging') {
           const persisted = await listGarmentsFromWeb()
-          if (!cancelled) setGarments(persisted)
+          if (!cancelled) {
+            assignGarmentPositions(persisted)
+            setGarments(persisted)
+          }
         }
       } catch (error) {
         if (!cancelled) {
@@ -105,8 +189,15 @@ function OnboardingFlow() {
     return () => {
       cancelled = true
     }
-    // Runs once on mount; `t`/`router` are stable in practice.
+    // Runs once on mount; `t`/`router`/`assignGarmentPositions` are stable in practice.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      advanceControllerRef.current?.abort()
+      garmentPollControllerRef.current?.abort()
+    }
   }, [])
 
   const advanceStep = useCallback(
@@ -115,6 +206,7 @@ function OnboardingFlow() {
       setIsAdvancing(true)
       setAdvanceError(null)
       const controller = new AbortController()
+      advanceControllerRef.current = controller
       try {
         const next = await advanceOnboardingStepFromWeb(
           usedStarterWardrobe === undefined
@@ -123,18 +215,22 @@ function OnboardingFlow() {
           onboardingETag(userId, revisionRef.current),
           controller.signal
         )
+        if (controller.signal.aborted) return null
         revisionRef.current = next.revision
         setOnboardingState(next)
         return next
       } catch (error) {
+        if (controller.signal.aborted) return null
         setAdvanceError(
-          error instanceof Error
-            ? error.message
-            : t('wardrobe.onboarding.errors.saveFailed')
+          isStaleRevisionError(error)
+            ? t('wardrobe.onboarding.errors.stale')
+            : error instanceof Error
+              ? error.message
+              : t('wardrobe.onboarding.errors.saveFailed')
         )
         return null
       } finally {
-        setIsAdvancing(false)
+        if (!controller.signal.aborted) setIsAdvancing(false)
       }
     },
     [userId, t]
@@ -143,30 +239,111 @@ function OnboardingFlow() {
   const handleAllowPermission = async () => {
     setIsRequestingPermission(true)
     setPermissionDenied(false)
+    setLiveAnnouncement(t('wardrobe.onboarding.announcements.permissionRequesting'))
+    let denied = false
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
+        denied = true
         setPermissionDenied(true)
       } else {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true })
         stream.getTracks().forEach((track) => track.stop())
       }
     } catch {
+      denied = true
       setPermissionDenied(true)
     } finally {
       setIsRequestingPermission(false)
     }
-    await advanceStep('capture')
+    const next = await advanceStep('capture')
+    if (next) {
+      setLiveAnnouncement(
+        t(
+          denied
+            ? 'wardrobe.onboarding.announcements.permissionDenied'
+            : 'wardrobe.onboarding.announcements.permissionGranted'
+        )
+      )
+    }
   }
 
   const openCapture = () => setIsCaptureModalOpen(true)
 
+  /**
+   * Resolves the actual invoking element (a specific checklist row, when
+   * that's what was clicked) so focus returns there on close, matching the
+   * contract this page's own focus-restoration test verifies for the
+   * "Add another garment" path. Falls back to that button when no specific
+   * row invoked this (e.g. the capture-modal auto-chain).
+   */
+  const openTagging = (garmentId: string) => {
+    taggingInvokerRef.current =
+      taggingButtonRefs.current.get(garmentId) ?? addAnotherButtonRef.current
+    setTaggingGarmentId(garmentId)
+  }
+
+  /**
+   * Mirrors the wardrobe hub's own `pollCommittedGarment`: a just-committed
+   * garment can still be `processing` (smart-tagging inference running), and
+   * without this the checklist row would show a live status once and then
+   * go stale until a reload. Exhausting every scheduled attempt without the
+   * garment leaving `processing` falls back to the same manual recheck the
+   * hub offers rather than leaving the row silently stuck forever.
+   */
+  const pollCommittedGarment = (garmentId: string) => {
+    garmentPollControllerRef.current?.abort()
+    const controller = new AbortController()
+    garmentPollControllerRef.current = controller
+
+    void (async () => {
+      try {
+        const startedAt = Date.now()
+        for (const offsetMs of garmentPollIntervalsMs) {
+          await waitForPoll(
+            Math.max(0, startedAt + offsetMs - Date.now()),
+            controller.signal
+          )
+          const persisted = await listGarmentsFromWeb(controller.signal)
+          if (controller.signal.aborted) return
+          assignGarmentPositions(persisted)
+          setGarments(persisted)
+          const current = persisted.find((garment) => garment.id === garmentId)
+          if (!current || current.status === 'processing') continue
+          setTimedOutGarmentIds((ids) => {
+            const next = new Set(ids)
+            next.delete(garmentId)
+            return next
+          })
+          if (current.status === 'awaiting_tags') {
+            if (isCaptureOpenRef.current) {
+              pendingTaggingGarmentIdRef.current = current.id
+            } else {
+              openTagging(current.id)
+            }
+          }
+          return
+        }
+        if (!controller.signal.aborted) {
+          setTimedOutGarmentIds((ids) => new Set(ids).add(garmentId))
+        }
+      } catch {
+        // Aborted (a newer poll superseded this one) or a transient refresh
+        // failure; either way the row just keeps showing "Processing" until
+        // the next successful refresh, matching the hub's own handling.
+      }
+    })()
+  }
+
   const handleGarmentCommitted = (garment: GarmentItemContract) => {
+    assignGarmentPositions([garment])
     setGarments((current) => [
       garment,
       ...current.filter((item) => item.id !== garment.id),
     ])
     if (garment.status === 'awaiting_tags') {
       pendingTaggingGarmentIdRef.current = garment.id
+    } else if (garment.status === 'processing') {
+      pollCommittedGarment(garment.id)
     }
   }
 
@@ -175,7 +352,7 @@ function OnboardingFlow() {
     const pendingGarmentId = pendingTaggingGarmentIdRef.current
     pendingTaggingGarmentIdRef.current = null
     if (pendingGarmentId) {
-      window.requestAnimationFrame(() => setTaggingGarmentId(pendingGarmentId))
+      window.requestAnimationFrame(() => openTagging(pendingGarmentId))
     }
   }
 
@@ -184,21 +361,33 @@ function OnboardingFlow() {
       current.map((item) => (item.id === updatedGarment.id ? updatedGarment : item))
     )
     setTaggingGarmentId(null)
+    const position = garmentPositionsRef.current.get(updatedGarment.id) ?? 0
+    setLiveAnnouncement(
+      t('wardrobe.onboarding.announcements.garmentTagged', {
+        garment: describeGarment(updatedGarment, position, t),
+      })
+    )
   }
 
-  const handleUseStarterWardrobe = () => {
-    void advanceStep('silhouette', true)
+  const handleUseStarterWardrobe = async () => {
+    const next = await advanceStep('silhouette', true)
+    if (next) setLiveAnnouncement(t('wardrobe.onboarding.announcements.silhouette'))
   }
 
-  const handleContinueFromCapture = () => {
-    void advanceStep('tagging')
+  const handleContinueFromCapture = async () => {
+    const next = await advanceStep('tagging')
+    if (next) setLiveAnnouncement(t('wardrobe.onboarding.announcements.tagging'))
   }
 
-  const handleContinueFromTagging = () => {
-    void advanceStep('silhouette')
+  const handleContinueFromTagging = async () => {
+    const next = await advanceStep('silhouette')
+    if (next) setLiveAnnouncement(t('wardrobe.onboarding.announcements.silhouette'))
   }
 
   const handleFinishOnboarding = () => {
+    // The completion screen's own `role="status"` message is itself an
+    // implicit live region (ARIA `status` implies `aria-live="polite"`), so
+    // no separate announcement is needed for reaching it.
     void advanceStep('complete')
   }
 
@@ -206,7 +395,7 @@ function OnboardingFlow() {
     return (
       <main className="mx-auto max-w-2xl p-6">
         <p role="status" className="text-sm text-zinc-500">
-          Loading…
+          {t('wardrobe.onboarding.loading')}
         </p>
       </main>
     )
@@ -227,7 +416,11 @@ function OnboardingFlow() {
   }
 
   const currentStep = onboardingState.currentStep
-  const allTagged = garments.length > 0 && garments.every(isTagged)
+  // At least one garment must exist to advance, but a garment that failed
+  // processing (see `isTaggable`) is excluded from the "every one is tagged"
+  // check itself, so it can never be the thing standing between a user and
+  // Continue.
+  const allTagged = garments.length > 0 && garments.filter(isTaggable).every(isTagged)
 
   return (
     <>
@@ -271,16 +464,26 @@ function OnboardingFlow() {
               void handleAllowPermission()
             }}
             garments={garments}
+            garmentPositions={garmentPositionsRef.current}
+            timedOutGarmentIds={timedOutGarmentIds}
             allTagged={allTagged}
             isAdvancing={isAdvancing}
+            isSilhouetteBusy={isSilhouetteBusy}
             addAnotherButtonRef={addAnotherButtonRef}
             taggingButtonRefs={taggingButtonRefs}
             onAddAnother={openCapture}
-            onOpenTagging={(id) => setTaggingGarmentId(id)}
-            onUseStarterWardrobe={handleUseStarterWardrobe}
-            onContinueFromCapture={handleContinueFromCapture}
-            onContinueFromTagging={handleContinueFromTagging}
+            onOpenTagging={openTagging}
+            onUseStarterWardrobe={() => {
+              void handleUseStarterWardrobe()
+            }}
+            onContinueFromCapture={() => {
+              void handleContinueFromCapture()
+            }}
+            onContinueFromTagging={() => {
+              void handleContinueFromTagging()
+            }}
             onFinishOnboarding={handleFinishOnboarding}
+            onSilhouetteBusyChange={setIsSilhouetteBusy}
             onGoToWardrobe={() => router.push('/wardrobe')}
             userId={userId}
           />
@@ -299,7 +502,7 @@ function OnboardingFlow() {
         onClose={() => setTaggingGarmentId(null)}
         garmentId={taggingGarmentId}
         onTagsConfirmed={handleTagsConfirmed}
-        invokingElementRef={addAnotherButtonRef}
+        invokingElementRef={taggingInvokerRef}
       />
     </>
   )
@@ -312,8 +515,11 @@ interface OnboardingStepContentProps {
   isRequestingPermission: boolean
   onAllowPermission: () => void
   garments: GarmentItemContract[]
+  garmentPositions: Map<string, number>
+  timedOutGarmentIds: Set<string>
   allTagged: boolean
   isAdvancing: boolean
+  isSilhouetteBusy: boolean
   addAnotherButtonRef: React.RefObject<HTMLButtonElement | null>
   taggingButtonRefs: React.MutableRefObject<Map<string, HTMLButtonElement>>
   onAddAnother: () => void
@@ -322,6 +528,7 @@ interface OnboardingStepContentProps {
   onContinueFromCapture: () => void
   onContinueFromTagging: () => void
   onFinishOnboarding: () => void
+  onSilhouetteBusyChange: (busy: boolean) => void
   onGoToWardrobe: () => void
   userId: string
 }
@@ -338,8 +545,11 @@ function OnboardingStepContent({
   isRequestingPermission,
   onAllowPermission,
   garments,
+  garmentPositions,
+  timedOutGarmentIds,
   allTagged,
   isAdvancing,
+  isSilhouetteBusy,
   addAnotherButtonRef,
   taggingButtonRefs,
   onAddAnother,
@@ -348,14 +558,29 @@ function OnboardingStepContent({
   onContinueFromCapture,
   onContinueFromTagging,
   onFinishOnboarding,
+  onSilhouetteBusyChange,
   onGoToWardrobe,
   userId,
 }: OnboardingStepContentProps) {
   const showPermissionDeniedBanner =
     permissionDenied && (currentStep === 'permission' || currentStep === 'capture')
 
+  const stepRegionRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    // AC 5 requires moving focus to the new step, not only announcing it:
+    // the prior step's focused control (a button that was just clicked) is
+    // gone from this region entirely once the server confirms the
+    // transition, so focus would otherwise silently fall back to <body>.
+    stepRegionRef.current?.focus()
+  }, [currentStep])
+
   return (
-    <>
+    <div
+      ref={stepRegionRef}
+      tabIndex={-1}
+      data-testid="onboarding-step-region"
+      className="outline-none"
+    >
       {/*
         Denial happens on the permission step but the client advances past it
         immediately afterward (permission has no server-persisted screen of
@@ -371,7 +596,7 @@ function OnboardingStepContent({
       {currentStep === 'permission' && (
         <PermissionStep
           t={t}
-          isRequesting={isRequestingPermission}
+          isRequesting={isRequestingPermission || isAdvancing}
           onAllow={onAllowPermission}
         />
       )}
@@ -380,6 +605,8 @@ function OnboardingStepContent({
         <CaptureAndTaggingStep
           t={t}
           garments={garments}
+          garmentPositions={garmentPositions}
+          timedOutGarmentIds={timedOutGarmentIds}
           allTagged={allTagged}
           isAdvancing={isAdvancing}
           phase={currentStep}
@@ -396,10 +623,13 @@ function OnboardingStepContent({
 
       {currentStep === 'silhouette' && (
         <div className="mt-6 flex flex-col gap-6">
-          <SilhouetteSettingsPanel userId={userId} />
+          <SilhouetteSettingsPanel
+            userId={userId}
+            onBusyChange={onSilhouetteBusyChange}
+          />
           <button
             type="button"
-            disabled={isAdvancing}
+            disabled={isAdvancing || isSilhouetteBusy}
             onClick={onFinishOnboarding}
             className="min-h-[44px] self-start rounded-lg bg-zinc-900 px-6 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
           >
@@ -425,7 +655,7 @@ function OnboardingStepContent({
           </button>
         </div>
       )}
-    </>
+    </div>
   )
 }
 
@@ -459,6 +689,8 @@ function PermissionStep({ t, isRequesting, onAllow }: PermissionStepProps) {
 interface CaptureAndTaggingStepProps {
   t: (key: string, options?: Record<string, unknown>) => string
   garments: GarmentItemContract[]
+  garmentPositions: Map<string, number>
+  timedOutGarmentIds: Set<string>
   allTagged: boolean
   isAdvancing: boolean
   phase: 'capture' | 'tagging'
@@ -473,6 +705,8 @@ interface CaptureAndTaggingStepProps {
 function CaptureAndTaggingStep({
   t,
   garments,
+  garmentPositions,
+  timedOutGarmentIds,
   allTagged,
   isAdvancing,
   phase,
@@ -490,9 +724,23 @@ function CaptureAndTaggingStep({
     <div className="mt-6 flex flex-col gap-4">
       {garments.length > 0 && (
         <ul className="flex flex-col gap-2" data-testid="onboarding-garment-checklist">
-          {garments.map((garment, index) => {
-            const label = describeGarment(garment, index + 1)
+          {garments.map((garment) => {
+            const label = describeGarment(
+              garment,
+              garmentPositions.get(garment.id) ?? 0,
+              t
+            )
             const tagged = isTagged(garment)
+            const isRecheckable =
+              garment.status === 'awaiting_tags' || timedOutGarmentIds.has(garment.id)
+            const isFailed = garment.status === 'failed'
+            /**
+             * Neither state has a tagging action to offer yet: a still-processing
+             * garment isn't `awaiting_tags` until smart-tagging inference
+             * finishes (live-polled by `pollCommittedGarment`), and a failed one
+             * never will be. Rendering a "needs tags" button for either would
+             * let a user open tagging for a garment with no image ready to tag.
+             */
             return (
               <li
                 key={garment.id}
@@ -502,7 +750,14 @@ function CaptureAndTaggingStep({
                   <span className="px-2 py-2 text-emerald-700 dark:text-emerald-300">
                     {t('wardrobe.onboarding.checklistTagged', { garment: label })}
                   </span>
-                ) : (
+                ) : isFailed ? (
+                  <span
+                    data-testid={`garment-status-${garment.id}`}
+                    className="px-2 py-2 text-red-700 dark:text-red-300"
+                  >
+                    {t('wardrobe.onboarding.checklistFailed', { garment: label })}
+                  </span>
+                ) : isRecheckable ? (
                   <button
                     type="button"
                     ref={(element) => {
@@ -514,6 +769,13 @@ function CaptureAndTaggingStep({
                   >
                     {t('wardrobe.onboarding.checklistPending', { garment: label })}
                   </button>
+                ) : (
+                  <span
+                    data-testid={`garment-status-${garment.id}`}
+                    className="px-2 py-2 text-zinc-500 dark:text-zinc-400"
+                  >
+                    {t('wardrobe.onboarding.checklistProcessing', { garment: label })}
+                  </span>
                 )}
               </li>
             )
@@ -530,7 +792,13 @@ function CaptureAndTaggingStep({
         >
           {t('wardrobe.onboarding.addAnother')}
         </button>
-        {phase === 'capture' && (
+        {/*
+          Only offered before any garment is captured: AC 1 defines "capture real
+          garments" and "skip with the starter wardrobe" as mutually exclusive
+          paths, so a captured-but-not-yet-tagged garment must not be skippable
+          via this action once it exists.
+         */}
+        {phase === 'capture' && garments.length === 0 && (
           <button
             type="button"
             onClick={onUseStarterWardrobe}
