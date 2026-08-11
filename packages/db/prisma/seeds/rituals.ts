@@ -123,23 +123,29 @@ export async function seedRituals(
     })
   }
 
-  await Promise.all(
-    teens.map((user, idx) =>
-      prisma.auditLog.upsert({
-        where: { id: `audit-${idx + 1}` },
-        update: {
-          event_type: 'seed_ran',
-          event_data: { seed: 'prisma', iteration: idx + 1 },
-          ip_address: `10.0.0.${idx + 10}`,
-        },
-        create: {
-          id: `audit-${idx + 1}`,
-          user_id: user.id,
-          event_type: 'seed_ran',
-          event_data: { seed: 'prisma', iteration: idx + 1 },
-          ip_address: `10.0.0.${idx + 10}`,
-        },
-      })
-    )
-  )
+  /*
+   * Insert-only, unlike every other write in this file.
+   *
+   * `AuditLog` is append-only at the database level: the
+   * `20260420160000_harden_audit_log_immutability` migration installs BEFORE
+   * UPDATE, DELETE, and TRUNCATE triggers that raise SQLSTATE 42501. An
+   * `upsert` therefore succeeds exactly once and fails on every later run,
+   * because its conflict branch is an UPDATE against a table that forbids one.
+   * That made `db:seed` non-repeatable, which only showed up once something ran
+   * it against an already-seeded database.
+   *
+   * `createMany` with `skipDuplicates` compiles to INSERT ... ON CONFLICT DO
+   * NOTHING, which never issues an UPDATE, so the seed is re-runnable and the
+   * immutability guarantee stays intact.
+   */
+  await prisma.auditLog.createMany({
+    data: teens.map((user, idx) => ({
+      id: `audit-${idx + 1}`,
+      user_id: user.id,
+      event_type: 'seed_ran',
+      event_data: { seed: 'prisma', iteration: idx + 1 },
+      ip_address: `10.0.0.${idx + 10}`,
+    })),
+    skipDuplicates: true,
+  })
 }
