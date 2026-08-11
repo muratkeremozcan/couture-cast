@@ -22,6 +22,28 @@ env:
 jobs:
   quality-gate:
     runs-on: ubuntu-latest
+    # Overrides the workflow-level DATABASE_URL, which is
+    # `secrets.DATABASE_URL_PREVIEW` and resolves to an EMPTY STRING when that
+    # secret is not present. Empty is worse than unset here: every database
+    # helper in the repo resolves its URL with `process.env.DATABASE_URL ?? default`,
+    # and `??` does not treat '' as absent, so the empty value wins and `pg`
+    # falls back to its own libpq default of localhost:5432. That is where the
+    # `ECONNREFUSED 127.0.0.1:5432` in this job came from.
+    #
+    # Pointing at the local Supabase instance started below makes the value real,
+    # and is what lets `packages/db` and the `apps/api` integration suites run
+    # here at all. Mirrors `k6-smoke-prs.yml`, which already does exactly this.
+    #
+    # `TEST_ENV` is deliberately NOT set here. It is scoped to the seed step
+    # instead, because three api specs assert behaviour OUTSIDE a test
+    # environment ("throws outside a test environment with no configured
+    # secret", the `.env` precedence spec, and the tagging-engine gate). A
+    # job-wide `TEST_ENV=local` makes `allowsTestOnlySecrets()` return true even
+    # after those tests set `NODE_ENV=production`, so they fail. Vitest already
+    # sets `NODE_ENV=test`, which is the other half of that predicate, so the
+    # suites that need a test-only secret still get one.
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -63,6 +85,30 @@ jobs:
         with:
           name: lighthouse-accessibility-${{ github.event.pull_request.number || github.sha }}
           path: playwright/artifacts/lighthouse/
+
+      # Story 5.1 Task 1 added `test:coverage` to packages/db so its schema and
+      # RLS suites would "actually run on a PR". `run-workspace-test-coverage.mjs`
+      # auto-discovers any workspace with that script, so from that moment this
+      # job began running suites that need PostgreSQL without providing one, and
+      # `packages/db/test/wardrobe-onboarding-schema.spec.ts` deliberately throws
+      # rather than skipping when the schema is unreachable. The workspace then
+      # wrote no lcov and the coverage merge below failed the whole job.
+      #
+      # Providing the database is the fix that matches the intent. It also means
+      # the `apps/api` integration suites now execute here instead of skipping,
+      # which closes the "no workflow runs test:integration" gap the commerce
+      # stories have been carrying.
+      - name: Start local Supabase services
+        uses: ./.github/actions/start-local-supabase
+
+      # `TEST_ENV=local` is scoped to this step only. The commerce seed and the
+      # feature-flag seed are both self-guarded on it (`allowsCommerceSeeding`),
+      # so without it the decision-14 catalog and `commerce_affiliate_enabled`
+      # would not be seeded and the affiliate paths would be unreachable.
+      - name: Reset local database
+        run: npm run db:reset
+        env:
+          TEST_ENV: local
 
       - name: Run tests with coverage
         id: tests
