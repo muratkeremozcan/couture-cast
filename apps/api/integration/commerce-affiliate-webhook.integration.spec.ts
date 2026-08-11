@@ -470,10 +470,20 @@ describe('Story 5.1 affiliate conversion webhook against real PostgreSQL', () =>
       const eventId = `evt-${randomUUID()}`
       const payload = { ...VALID_PAYLOAD, eventId, clickToken: 'unmatched' }
       const valid = sign(partner.secret, partner.slug, payload)
-      const nowSeconds = Math.floor(Date.now() / 1000)
       const inactivePartner = await createPartner({ status: 'inactive' })
 
-      const cases: { name: string; signed: SignedRequest }[] = [
+      // `signed` may be a thunk. The two timestamp-boundary cases MUST be, and
+      // this is not a style choice: every entry below was previously built up
+      // front from a single `nowSeconds` reading, then dispatched sequentially
+      // after a database round-trip and eight other HTTP requests. The future
+      // case signs `now + tolerance + 1`, so its skew at the moment the server
+      // evaluates it is `tolerance + 1 - elapsed`. One second of elapsed wall
+      // clock is enough to land it back inside the window, and the endpoint
+      // then correctly answers 200 while the assertion expects 401. The past
+      // case drifts the other way and is safe, which is why only the future one
+      // ever went red. Reading the clock at dispatch bounds the drift to a
+      // single request's own latency.
+      const cases: { name: string; signed: SignedRequest | (() => SignedRequest) }[] = [
         {
           name: 'a missing partner header',
           signed: withoutHeader(valid, 'x-couture-partner-id'),
@@ -516,15 +526,19 @@ describe('Story 5.1 affiliate conversion webhook against real PostgreSQL', () =>
         },
         {
           name: 'a timestamp one second beyond the past tolerance',
-          signed: sign(partner.secret, partner.slug, payload, {
-            timestampSeconds: nowSeconds - (WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS + 1),
-          }),
+          signed: () =>
+            sign(partner.secret, partner.slug, payload, {
+              timestampSeconds:
+                Math.floor(Date.now() / 1000) - (WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS + 1),
+            }),
         },
         {
           name: 'a timestamp one second beyond the future tolerance',
-          signed: sign(partner.secret, partner.slug, payload, {
-            timestampSeconds: nowSeconds + WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS + 1,
-          }),
+          signed: () =>
+            sign(partner.secret, partner.slug, payload, {
+              timestampSeconds:
+                Math.floor(Date.now() / 1000) + WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS + 1,
+            }),
         },
         {
           name: 'a signature over different bytes',
@@ -551,7 +565,7 @@ describe('Story 5.1 affiliate conversion webhook against real PostgreSQL', () =>
       ]
 
       for (const { name, signed } of cases) {
-        const response = await post(signed)
+        const response = await post(typeof signed === 'function' ? signed() : signed)
 
         expect(response.status, name).toBe(401)
         // One message for every failure mode, so the endpoint cannot be used to
