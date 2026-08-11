@@ -22,6 +22,21 @@ env:
 jobs:
   quality-gate:
     runs-on: ubuntu-latest
+    # Redis is required now that the `apps/api` integration suites actually
+    # execute here (see the database steps below). Several of them exercise the
+    # alert fan-out and ritual cache paths, which connect to 6379 and fail with
+    # ECONNREFUSED without it. Definition copied verbatim from
+    # `pr-pw-e2e-local.yml`, which has needed the same thing all along.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     # Overrides the workflow-level DATABASE_URL, which is
     # `secrets.DATABASE_URL_PREVIEW` and resolves to an EMPTY STRING when that
     # secret is not present. Empty is worse than unset here: every database
