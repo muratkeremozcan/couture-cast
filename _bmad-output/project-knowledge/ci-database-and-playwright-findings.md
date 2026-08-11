@@ -58,10 +58,45 @@ claim about the bootstrap SQL, not a property you get for free:
   set equal what the migrations declare", which is what `5.1-DB-020` asserts. If
   that test passes on the ephemeral container, the bootstrap is correct.
 
-**Second, unrelated reason `db:reset` was needed.**
-`commerce-affiliate-offers.integration.spec.ts` reads the seeded
-`sample-partner` catalog and restores it afterwards, so the catalog has to
-exist. `db:reset` seeds; `migrate deploy` does not.
+**Withdrawn: the quality gate does not need a seeded catalog.** An earlier
+version of this note claimed `commerce-affiliate-offers.integration.spec.ts`
+reads and restores the seeded `sample-partner` catalog, so the job had to seed.
+That was true before `4407498` and is not true now. That commit replaced the
+parking with isolation by garment category and deleted the shared-state access
+outright; the file's own comment now opens "NO SHARED STATE IS TOUCHED HERE, and
+that is the point", and the global-publication cases create their own `'*'` rows
+in `accessory` rather than reading seeded ones. Checked across the whole
+directory: no file under `apps/api/integration/` references `SAMPLE_PARTNER` or
+`'sample-partner'` at all, and `packages/db/test/commerce-seed.spec.ts` snapshots
+whether the catalog existed on entry and restores that exact state, so it is
+correct either way. A quality gate that migrates without seeding is right, and
+seeding it would add shared state the RLS matrix's exact policy-name and row
+count assertions do not want.
+
+Playwright is the surface that genuinely needs the seed, and
+`pr-pw-e2e-local.yml` already runs `db:reset`.
+
+**Resolution of the bootstrap question above.** Mobile measured it on an
+ephemeral `postgres:16-alpine` (`8f292f3` on `feat/epic5-story1-ci-review`) and
+the narrowed grant is the answer:
+
+```sql
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+```
+
+Four DML verbs only, and to `authenticated` only. `GRANT ALL` reproduces the
+artefact above and fails 8 tests; including `anon` fails 6, because the suites
+require `anon` to hold zero grants everywhere. `5.1-DB-020` passes under the
+narrowed form, which is the settling test.
+
+They also found the sharper problem underneath, which is worth more than the
+artefact: on a container with nothing to revoke, the migrations'
+`REVOKE ALL ON TABLE ... FROM authenticated, anon` statements are no-ops, so the
+RLS suite's negative assertions were **vacuous**. Deleting all three REVOKEs left
+the suite 49/49 green. Under the narrowed bootstrap that mutant correctly fails
+two tests. A clean container is not automatically a faithful one: it can make a
+control unfalsifiable rather than merely untested.
 
 ---
 
