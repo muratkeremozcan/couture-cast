@@ -1,4 +1,23 @@
 {
+  "commerce": {
+    "shopThisLook": {
+      "cta": "Acheter ce look",
+      "disclosure": "Partenariat rémunéré. CoutureCast peut percevoir une commission.",
+      "partnerLabel": "Présenté par {{partner}}",
+      "opensInBrowser": "Ouverture dans un navigateur intégré",
+      "loading": "Ouverture du site partenaire",
+      "error": "Impossible d’ouvrir le site partenaire. Veuillez réessayer."
+    },
+    "settings": {
+      "sectionTitle": "Achats et partenaires",
+      "disclosure": "Lorsque les suggestions d’affiliation sont activées, appuyer sur l’une d’elles ouvre le site d’un partenaire et indique à ce partenaire que la visite vient de CoutureCast. CoutureCast peut percevoir une commission. Aucune photo de garde-robe ni donnée personnelle n’est partagée.",
+      "optOutLabel": "Afficher les suggestions « Acheter ce look »",
+      "optOutHelp": "Désactivez cette option pour masquer toutes les suggestions de partenaires et d’affiliation.",
+      "saved": "Préférences d’achat mises à jour",
+      "error": "Impossible de mettre à jour les préférences d’achat.",
+      "signedOutHint": "Connectez-vous pour modifier ce réglage"
+    }
+  },
   "wardrobe": {
     "capsules": {
       "title": "Capsules de tenue",

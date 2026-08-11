@@ -1,4 +1,23 @@
 {
+  "commerce": {
+    "shopThisLook": {
+      "cta": "Diesen Look shoppen",
+      "disclosure": "Bezahlte Partnerschaft. CoutureCast erhält möglicherweise eine Provision.",
+      "partnerLabel": "Präsentiert von {{partner}}",
+      "opensInBrowser": "Wird im In-App-Browser geöffnet",
+      "loading": "Partnerseite wird geöffnet",
+      "error": "Die Partnerseite konnte nicht geöffnet werden. Bitte erneut versuchen."
+    },
+    "settings": {
+      "sectionTitle": "Shopping und Partner",
+      "disclosure": "Wenn Affiliate-Vorschläge aktiviert sind, öffnet ein Tippen darauf eine Partnerseite und teilt diesem Partner mit, dass der Besuch von CoutureCast kam. CoutureCast erhält möglicherweise eine Provision. Es werden keine Kleiderschrank-Fotos und keine persönlichen Daten weitergegeben.",
+      "optOutLabel": "Vorschläge „Diesen Look shoppen“ anzeigen",
+      "optOutHelp": "Deaktiviere dies, um alle Partner- und Affiliate-Vorschläge auszublenden.",
+      "saved": "Shopping-Einstellungen aktualisiert",
+      "error": "Shopping-Einstellungen konnten nicht aktualisiert werden.",
+      "signedOutHint": "Melde dich an, um dies zu ändern"
+    }
+  },
   "wardrobe": {
     "capsules": {
       "title": "Outfit-Kapseln",

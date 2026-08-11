@@ -1,4 +1,23 @@
 {
+  "commerce": {
+    "shopThisLook": {
+      "cta": "Acquista questo look",
+      "disclosure": "Partnership retribuita. CoutureCast può ricevere una commissione.",
+      "partnerLabel": "Presentato da {{partner}}",
+      "opensInBrowser": "Si apre in un browser interno all’app",
+      "loading": "Apertura del sito del partner",
+      "error": "Impossibile aprire il sito del partner. Riprova."
+    },
+    "settings": {
+      "sectionTitle": "Acquisti e partner",
+      "disclosure": "Quando i suggerimenti di affiliazione sono attivi, toccandone uno si apre il sito di un partner e a quel partner viene comunicato che la visita proviene da CoutureCast. CoutureCast può ricevere una commissione. Non vengono condivise foto del guardaroba né dati personali.",
+      "optOutLabel": "Mostra i suggerimenti «Acquista questo look»",
+      "optOutHelp": "Disattiva questa opzione per nascondere tutti i suggerimenti di partner e affiliazione.",
+      "saved": "Preferenze di acquisto aggiornate",
+      "error": "Impossibile aggiornare le preferenze di acquisto.",
+      "signedOutHint": "Accedi per modificare questa impostazione"
+    }
+  },
   "wardrobe": {
     "capsules": {
       "title": "Capsule di outfit",
