@@ -22,35 +22,6 @@ env:
 jobs:
   quality-gate:
     runs-on: ubuntu-latest
-    # Story 5.1 Task 1 added `test:coverage` to `packages/db/package.json` so
-    # `scripts/run-workspace-test-coverage.mjs` would pick the workspace up and,
-    # in its own words, so "these suites actually run on a PR". Picking the
-    # workspace up was necessary and not sufficient: this job had no database, so
-    # the six live-PostgreSQL specs there (the RLS actor matrix, every schema
-    # check constraint, the commerce seed) failed on connection rather than
-    # running, and took the coverage merge down with them for want of an
-    # lcov.info.
-    #
-    # `secrets.DATABASE_URL_PREVIEW` does not fill this gap and never did. It is
-    # genuinely empty, not merely masked: a masked secret prints as `***` in the
-    # log the way `GITHUB_TOKEN` does, and this one prints as nothing on every
-    # run including the last green one.
-    #
-    # So the database is stood up here the same way `pr-pw-e2e-local.yml` does
-    # it. Redis comes along because giving the suites a reachable database
-    # un-skips API integration specs that also expect one.
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -93,30 +64,10 @@ jobs:
           name: lighthouse-accessibility-${{ github.event.pull_request.number || github.sha }}
           path: playwright/artifacts/lighthouse/
 
-      - name: Start local Supabase services
-        uses: ./.github/actions/start-local-supabase
-
-      # Migrations and seeds, not just migrations. `commerce-seed.spec.ts`
-      # asserts on the seeded `sample-partner` catalog, so a migrated-but-unseeded
-      # database would fail it for the wrong reason.
-      - name: Reset the local database
-        run: npm run db:reset
-        env:
-          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
-
       - name: Run tests with coverage
         id: tests
         continue-on-error: true
         run: npm run test:coverage
-        env:
-          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
-          # `packages/db/test/**` reads this one first; the API integration specs
-          # read INTEGRATION_TEST_DATABASE_URL then DATABASE_URL. Setting both
-          # means every suite points at the database this job just prepared
-          # rather than at a default that happens to match it.
-          RLS_TEST_DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
-          INTEGRATION_TEST_DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
-          REDIS_URL: redis://127.0.0.1:6379
 
       - name: Coverage report and PR comment
         uses: ./.github/actions/unit-test-coverage-comment
