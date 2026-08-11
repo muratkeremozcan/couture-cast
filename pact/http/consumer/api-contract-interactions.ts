@@ -2714,6 +2714,12 @@ const affiliateClickRequestBody = {
  * branch: five fields, one partner, and NO URL. The deep link is built
  * server-side on click and never reaches a client, which is what makes the
  * outbound host validation meaningful.
+ *
+ * This does NOT subsume `verifyRitualInteraction`. That one pins three positional
+ * outfits and so carries the "exactly one card per scenario" invariant; this one
+ * uses `eachLike` because what it is here to record is the block's shape, not the
+ * array's arity. Deleting the sibling would silently drop that invariant from the
+ * contract.
  */
 export async function verifyRitualEligibleShopThisLookInteraction(
   pact: PactV4,

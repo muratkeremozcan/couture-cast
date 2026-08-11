@@ -25,6 +25,7 @@ import {
   COMMERCE_OPTED_OUT_MESSAGE,
   WEBHOOK_SIGNATURE_INVALID_MESSAGE,
 } from '../src/contracts/http'
+import * as commerceContractExports from '../src/contracts/http/commerce'
 import {
   affiliateConversionRecordedPropertiesSchema,
   affiliateCtaClickedPropertiesSchema,
@@ -151,21 +152,37 @@ describe('commerce preferences', () => {
    * The request and response bodies are the same shape on purpose: an unchanged
    * PUT still answers 200 with the current state, so a client has exactly one
    * body to handle whether or not its write moved anything.
+   *
+   * Asserted behaviourally rather than by object identity. The two being the
+   * same reference today is an implementation detail; the contract property is
+   * that they accept and reject the same values, and a structurally identical
+   * redefinition should not fail this test while a drifting one must.
    */
-  it('uses one shape for the write and its echo', () => {
-    expect(updateCommercePreferenceInputSchema).toBe(commercePreferenceSchema)
-  })
-
   it.each([
-    { name: 'a missing field', body: {} },
-    { name: 'a non-boolean value', body: { affiliateCtasEnabled: 'yes' } },
-    { name: 'a stringly-typed false', body: { affiliateCtasEnabled: 'false' } },
+    { name: 'an enabled write', body: { affiliateCtasEnabled: true }, accepted: true },
+    { name: 'a disabled write', body: { affiliateCtasEnabled: false }, accepted: true },
+    { name: 'a missing field', body: {}, accepted: false },
+    {
+      name: 'a non-boolean value',
+      body: { affiliateCtasEnabled: 'yes' },
+      accepted: false,
+    },
+    {
+      name: 'a stringly-typed false',
+      body: { affiliateCtasEnabled: 'false' },
+      accepted: false,
+    },
     {
       name: 'an unknown sibling key',
       body: { affiliateCtasEnabled: true, partnerId: 'x' },
+      accepted: false,
     },
-  ])('rejects $name', ({ body }) => {
-    expect(() => updateCommercePreferenceInputSchema.parse(body)).toThrow()
+  ])('treats $name identically on the write and its echo', ({ body, accepted }) => {
+    const writeResult = updateCommercePreferenceInputSchema.safeParse(body)
+    const echoResult = commercePreferenceSchema.safeParse(body)
+
+    expect(writeResult.success).toBe(accepted)
+    expect(echoResult.success).toBe(accepted)
   })
 })
 
@@ -228,19 +245,35 @@ describe('attributed click request', () => {
 
 describe('attributed click response', () => {
   /**
-   * 201 on a fresh mint and 200 on a deduped replay share one body. The status
-   * is the only thing that distinguishes them, which is why the API suite
-   * asserts it over real HTTP rather than through a mocked response object.
+   * 201 on a fresh mint and 200 on a deduped replay share one body, so the
+   * STATUS is the only thing that distinguishes them.
+   *
+   * That distinction cannot be asserted here: a schema has no status. It is
+   * asserted over real HTTP in `affiliate-click.controller.spec.ts` and in
+   * `commerce-affiliate-clicks.integration.spec.ts`, and pinned per status in
+   * both Pact consumer suites. What this asserts is the premise those rest on,
+   * which is that the two bodies are genuinely one shape: a client that branched
+   * on a body difference instead of the status would be reading a difference
+   * that does not exist.
    */
-  it.each([
-    { status: 201, name: 'a fresh mint' },
-    { status: 200, name: 'a deduped replay' },
-  ])('uses the same body for $name ($status)', () => {
-    const parsed = affiliateClickResponseSchema.parse({
-      data: { redirectUrl: 'https://partner.couturecast.test/shop?cc=tok-1' },
-    })
+  it('publishes one body shape for both success codes', () => {
+    const mintBody = { data: { redirectUrl: 'https://partner.couturecast.test/a?cc=t1' } }
+    const dedupeBody = {
+      data: { redirectUrl: 'https://partner.couturecast.test/a?cc=t1' },
+    }
 
-    expect(parsed.data.redirectUrl).toBe('https://partner.couturecast.test/shop?cc=tok-1')
+    expect(affiliateClickResponseSchema.parse(mintBody)).toEqual(
+      affiliateClickResponseSchema.parse(dedupeBody)
+    )
+    /**
+     * Read off the SCHEMA, not off a parsed instance. An optional `created` or
+     * `deduped` discriminator would be absent from a parsed body that never sent
+     * it, so an instance-level key check passes while the contract has already
+     * grown the field a client could branch on.
+     */
+    expect(Object.keys(affiliateClickResponseSchema.shape.data.shape)).toEqual([
+      'redirectUrl',
+    ])
   })
 
   it.each([
@@ -342,36 +375,59 @@ describe('conversion webhook', () => {
   })
 
   /**
-   * Every rejection path returns the SAME status and the SAME message so the
-   * endpoint cannot be used to enumerate which partner slugs exist or which
-   * secrets are configured. An unknown partner and a forged signature must be
-   * indistinguishable from outside.
+   * The endpoint must not be a partner-enumeration oracle: a missing header, an
+   * unknown or inactive partner, an unresolvable secret, a stale timestamp, and
+   * a forged HMAC all answer with one identical 401.
+   *
+   * WHICH CAUSES PRODUCE A 401 IS NOT TESTABLE HERE. Causes need a request, a
+   * clock, and a secret, none of which exist at the contract layer;
+   * `affiliate-webhook.service.spec.ts` and the webhook integration spec own
+   * that. What IS testable here, and what an enumeration oracle would break, is
+   * that the published contract offers exactly ONE 401 message to say them all.
+   * A future draft that adds a second, more specific webhook 401 constant fails
+   * this test, which is the regression worth catching at this level.
    */
-  it.each([
-    'a missing header',
-    'an unknown or inactive partner',
-    'an unresolvable or too-short secret',
-    'a timestamp outside the 300-second window',
-    'a mismatched HMAC over the raw body',
-  ])('answers 401 with one identical message for %s', (cause) => {
+  it('publishes exactly one webhook rejection message', () => {
+    const webhookErrorMessages = Object.entries(commerceContractExports)
+      .filter(([name]) => name.startsWith('WEBHOOK_') && name.endsWith('_MESSAGE'))
+      .map(([, value]) => value)
+
+    expect(webhookErrorMessages).toEqual([WEBHOOK_SIGNATURE_INVALID_MESSAGE])
+  })
+
+  it('names no cause in the 401 body, so the message cannot leak which check failed', () => {
     const envelope = unauthorizedHttpErrorSchema.parse({
       statusCode: 401,
       message: WEBHOOK_SIGNATURE_INVALID_MESSAGE,
       error: 'Unauthorized',
     })
 
-    expect(envelope.message).toBe('Invalid webhook signature.')
-    expect(cause).toBeTruthy()
+    for (const leak of ['partner', 'secret', 'timestamp', 'expired', 'unknown', 'hmac']) {
+      expect(envelope.message.toLowerCase()).not.toContain(leak)
+    }
   })
 
-  it('answers 400 only after every signature check has passed', () => {
-    const envelope = badRequestHttpErrorSchema.parse({
-      statusCode: 400,
-      message: 'Validation failed',
-      error: 'Bad Request',
-    })
+  it('rejects a 401 envelope that describes the specific failure', () => {
+    // The shape below is what a well-meaning future change looks like, and it is
+    // exactly the oracle this design forbids.
+    expect(() =>
+      unauthorizedHttpErrorSchema.parse({
+        statusCode: 401,
+        message: WEBHOOK_SIGNATURE_INVALID_MESSAGE,
+        error: 'Unauthorized',
+        failedCheck: 'timestamp_out_of_window',
+      })
+    ).toThrow()
+  })
 
-    expect(envelope.statusCode).toBe(400)
+  it('carries the standard validation envelope on a schema rejection', () => {
+    expect(
+      badRequestHttpErrorSchema.parse({
+        statusCode: 400,
+        message: 'Invalid affiliate webhook payload',
+        error: 'Bad Request',
+      })
+    ).toMatchObject({ statusCode: 400, error: 'Bad Request' })
   })
 })
 
