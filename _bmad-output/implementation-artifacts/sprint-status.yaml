@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-08-10
+last_updated: 2026-08-11
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -88,7 +88,7 @@ development_status:
 
   # Epic 5: Commerce & Premium Enhancements (Phase 2)
   epic-5: in-progress
-  5-1-affiliate-shop-this-look-cta: ready-for-dev
+  5-1-affiliate-shop-this-look-cta: in-progress
   5-2-premium-subscription-lifecycle: backlog
   5-3-premium-theme-switcher: backlog
   5-4-color-palette-beauty-accessory-advisor: backlog

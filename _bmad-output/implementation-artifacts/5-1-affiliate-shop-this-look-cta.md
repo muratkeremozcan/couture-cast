@@ -1023,28 +1023,28 @@ change this" hint, so the axe scan passes with no session.
 
 ## Tasks and subtasks
 
-- [ ] Task 1: Prisma schema, migration, RLS, and reachable seed (AC: 1 to 6)
-  - [ ] Add the three enums and five models from decision 10 to
+- [x] Task 1: Prisma schema, migration, RLS, and reachable seed (AC: 1 to 6)
+  - [x] Add the three enums and five models from decision 10 to
         `packages/db/prisma/schema.prisma`, with the `User` back-relations, the
         offer lookup index, the partial unique dedupe index, both cascade rules,
         and all four check constraints including the `webhook_secret_ref`
         pattern.
-  - [ ] Generate the migration. Apply `private.can_manage_self_row` policies to
+  - [x] Generate the migration. Apply `private.can_manage_self_row` policies to
         `CommercePreference` and `AffiliateClick` using exactly the four
         `authenticated_read|insert|update|delete_own_user_data` names; enable
         RLS with no `authenticated` grant on the three catalog and conversion
         tables, modelled on `rls-policies.spec.ts:631`.
-  - [ ] Add `CommercePreference` and `AffiliateClick` to the `selfOnlyTables`
+  - [x] Add `CommercePreference` and `AffiliateClick` to the `selfOnlyTables`
         array at `packages/db/test/rls-policies.spec.ts:10-31` and extend the
         actor matrix per AC 5, asserting guardians are denied.
-  - [ ] Add `packages/db/test/commerce-schema.spec.ts` proving defaults,
+  - [x] Add `packages/db/test/commerce-schema.spec.ts` proving defaults,
         cascades, `SetNull`, both unique constraints, the partial unique index,
         every check constraint, the offer lookup index, policies, and grants.
-  - [ ] Add `packages/db/prisma/seeds/commerce.ts` per decision 14 and wire it
+  - [x] Add `packages/db/prisma/seeds/commerce.ts` per decision 14 and wire it
         into `seeds/index.ts`; seed `commerce_affiliate_enabled: true` in
         non-production through `seeds/feature-flags.ts`. Guard both with
         `allowsTestOnlySecrets()`.
-  - [ ] Add `test:coverage` to `packages/db/package.json` so
+  - [x] Add `test:coverage` to `packages/db/package.json` so
         `scripts/run-workspace-test-coverage.mjs` (lines 29-35) picks the
         workspace up and these suites actually run on a PR.
 

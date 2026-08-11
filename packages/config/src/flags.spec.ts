@@ -14,7 +14,15 @@ describe('feature flag registry', () => {
       'community_feed_enabled',
       'color_analysis_enabled',
       'weather_alerts_enabled',
+      'commerce_affiliate_enabled',
     ])
+  })
+
+  it('defaults the commerce kill switch to off', () => {
+    // Story 5.1 decision 13: the fallback order is remote answer, then the
+    // FeatureFlag cache row, then this default. Defaulting to false is what
+    // stops a degraded PostHog from switching commerce on by accident.
+    expect(getDefaultFeatureFlagValue('commerce_affiliate_enabled')).toBe(false)
   })
 
   it('returns registry defaults for known keys', () => {

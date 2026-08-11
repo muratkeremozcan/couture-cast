@@ -140,6 +140,25 @@ enum SilhouettePhotoFailureReason {
   storage_error
 }
 
+/// Story 5.1 decision 10: lowercase members matching their JSON representation
+/// one-to-one, so no mapping layer sits between the wire contract and the
+/// database.
+enum CommercePartnerStatus {
+  active
+  inactive
+}
+
+enum AffiliateOfferStatus {
+  active
+  inactive
+}
+
+enum AffiliateConversionStatus {
+  pending
+  confirmed
+  reversed
+}
+
 model User {
   id                            String                   @id @default(cuid())
   email                         String                   @unique
@@ -170,6 +189,8 @@ model User {
   capsule_telemetry_claims      CapsuleTelemetryClaim[]
   wardrobe_onboarding_state     WardrobeOnboardingState?
   silhouette_profile            SilhouetteProfile?
+  commerce_preference           CommercePreference?
+  affiliate_clicks              AffiliateClick[]
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -731,4 +752,136 @@ model OutfitCapsuleGarment {
   @@index([garment_id])
   @@index([capsule_id, garment_order])
   @@map("OutfitCapsuleGarment")
+}
+
+/// Story 5.1: an operator-managed affiliate partner. No admin console exists;
+/// rows arrive by seed or migration. Carries no user_id, so RLS is enabled with
+/// no grant to the `authenticated` role.
+model CommercePartner {
+  id                 String                @id @default(cuid())
+  slug               String                @unique
+  display_name       String
+  /// Registrable host the outbound deep link must equal, or be a dot-suffix of,
+  /// after IDN normalization. `shop.example.com` matches `example.com`;
+  /// `notexample.com` does not.
+  allowed_host       String
+  status             CommercePartnerStatus @default(inactive)
+  /// The NAME of the environment variable holding this partner's webhook
+  /// signing secret, never the secret itself. A check constraint pins it to
+  /// ^COMMERCE_PARTNER_[A-Z0-9_]{1,40}_WEBHOOK_SECRET$ so a database row can
+  /// never address an arbitrary environment variable.
+  webhook_secret_ref String
+  created_at         DateTime              @default(now())
+  updated_at         DateTime              @updatedAt
+  offers             AffiliateOffer[]
+  clicks             AffiliateClick[]
+  conversions        AffiliateConversion[]
+
+  @@index([status, slug])
+  @@map("CommercePartner")
+}
+
+/// Story 5.1: one publication row per (partner, garment slot, region) window.
+/// `comfort_range` NULL is the wildcard. An exact comfort_range match outranks a
+/// wildcard regardless of `priority`, and `id ASC` is the total tie-break, which
+/// is what keeps attribution comparable and end-to-end assertions stable.
+model AffiliateOffer {
+  id                 String               @id @default(cuid())
+  partner            CommercePartner      @relation(fields: [partner_id], references: [id], onDelete: Restrict)
+  partner_id         String
+  garment_category   GarmentCategory
+  comfort_range      GarmentComfortRange?
+  /// The uppercased region subtag of the UI language, or the '*' sentinel
+  /// meaning "published globally". This is NOT a commerce jurisdiction: a user
+  /// in the US reading the app in fr-FR resolves to FR and sees FR offers.
+  locale_region      String
+  title              String
+  /// Contains the literal {clickToken} placeholder. A template without it is
+  /// rejected at click time as operator misconfiguration.
+  deep_link_template String
+  priority           Int                  @default(0)
+  status             AffiliateOfferStatus @default(inactive)
+  /// Inclusive lower bound of the publication window.
+  effective_from     DateTime
+  /// Exclusive upper bound; NULL means open-ended.
+  effective_to       DateTime?
+  created_at         DateTime             @default(now())
+  updated_at         DateTime             @updatedAt
+  clicks             AffiliateClick[]
+
+  @@index([status, locale_region, garment_category, priority(sort: Desc)])
+  @@index([partner_id])
+  @@map("AffiliateOffer")
+}
+
+/// RLS: owner-only, deliberately NOT guardian-shared. A purchase-intent signal
+/// is not something story 5.1 has a mandate to expose to a guardian.
+model CommercePreference {
+  id                     String   @id @default(cuid())
+  user                   User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                String   @unique
+  affiliate_ctas_enabled Boolean  @default(true)
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  @@map("CommercePreference")
+}
+
+/// RLS: owner-only. A durable commercial record minted on an explicit tap.
+/// Retained 24 months by the commerce pruner in `CommerceRetentionService`, and
+/// deliberately out of reach of the hourly telemetry pruner beside it.
+model AffiliateClick {
+  id                String                @id @default(cuid())
+  /// base64url HMAC-SHA256 over `id`, keyed by COMMERCE_CLICK_TOKEN_SECRET.
+  /// This, never `id`, is what reaches a partner URL and what the webhook joins
+  /// on: a raw cuid in a third-party URL would let any holder of a partner
+  /// secret attribute revenue to guessed identifiers.
+  token             String                @unique
+  user              User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id           String
+  offer             AffiliateOffer        @relation(fields: [offer_id], references: [id], onDelete: Restrict)
+  offer_id          String
+  partner           CommercePartner       @relation(fields: [partner_id], references: [id], onDelete: Restrict)
+  partner_id        String
+  /// The ScenarioOutfit.id the CTA was rendered on. Joins impression to click
+  /// and gives the PRD's click-through metric its denominator.
+  recommendation_id String
+  scenario          String
+  surface           String
+  locale_region     String
+  created_at        DateTime              @default(now())
+  conversions       AffiliateConversion[]
+
+  @@index([user_id])
+  @@index([created_at])
+  @@index([user_id, offer_id, recommendation_id, created_at(sort: Desc)])
+  @@map("AffiliateClick")
+}
+
+/// Story 5.1: append-only. One row per (partner, partner-side event id), never
+/// updated. That removes the ordering problem entirely: there is no
+/// last-write-wins rule and no forbidden-transition table, because nothing
+/// mutates. A click's current attribution state is the row with the greatest
+/// `occurred_at`, computed at read time by whoever reports on it.
+model AffiliateConversion {
+  id                      String                    @id @default(cuid())
+  partner                 CommercePartner           @relation(fields: [partner_id], references: [id], onDelete: Restrict)
+  partner_id              String
+  external_event_id       String
+  /// NULL when the posted click token matched nothing, and set NULL when the
+  /// clicking user is erased: the financial fact survives as an unattributed
+  /// record while the personal link is destroyed.
+  affiliate_click         AffiliateClick?           @relation(fields: [affiliate_click_id], references: [id], onDelete: SetNull)
+  affiliate_click_id      String?
+  status                  AffiliateConversionStatus
+  /// Integer minor units. Floating-point money is prohibited.
+  order_value_minor_units Int
+  currency                String
+  occurred_at             DateTime
+  received_at             DateTime                  @default(now())
+
+  @@unique([partner_id, external_event_id])
+  @@index([affiliate_click_id, occurred_at(sort: Desc)])
+  @@index([received_at])
+  @@map("AffiliateConversion")
 }
