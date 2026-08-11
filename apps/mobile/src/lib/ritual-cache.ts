@@ -111,6 +111,33 @@ function parseCacheEntry(value: string | null): RitualCacheEntry | null {
   }
 }
 
+/**
+ * Story 5.1 decision 6: the affiliate block never enters the device cache.
+ *
+ * The screen serves this cache for fifteen minutes before it will touch the
+ * network, and with no age bound at all when the network fails, so a persisted
+ * `shopThisLook` would keep a CTA alive long after the user opted out. Every
+ * caller of {@link saveRitualCache} runs its payload through here first, and
+ * `saveRitualCache` applies it again so a future writer cannot reintroduce the
+ * leak by forgetting.
+ *
+ * The key is set to `null` rather than deleted: `scenarioOutfitSchema` makes it
+ * required-and-nullable, so deleting it would make the entry unparseable on
+ * read and silently discard the whole cache.
+ */
+export function withoutShopThisLook(response: RitualResponse): RitualResponse {
+  return {
+    ...response,
+    data: {
+      ...response.data,
+      outfits: response.data.outfits.map((outfit) => ({
+        ...outfit,
+        shopThisLook: null,
+      })),
+    },
+  }
+}
+
 export async function readLatestRitualCache(
   userId: string,
   locale: SupportedLocale
@@ -148,8 +175,15 @@ export async function readLatestRitualCache(
 export async function saveRitualCache(
   userId: string,
   locale: SupportedLocale,
-  entry: RitualCacheEntry
+  rawEntry: RitualCacheEntry
 ) {
+  // Applied here as well as at every call site: this is the chokepoint every
+  // cache writer passes through, so the commerce block cannot reach storage
+  // even if a future caller forgets.
+  const entry: RitualCacheEntry = {
+    ...rawEntry,
+    data: withoutShopThisLook(rawEntry.data),
+  }
   const locationKey = entry.data.data.weather.locationKey
   const key = ritualCacheKey(userId, locale, locationKey)
   const localeKey = userLocaleKey(userId, locale)

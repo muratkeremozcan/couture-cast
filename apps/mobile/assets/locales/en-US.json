@@ -301,5 +301,23 @@
         "confirm_required": "Confirm the basewear guidance before uploading."
       }
     }
+  },
+  "commerce": {
+    "shopThisLook": {
+      "cta": "Shop this look",
+      "disclosure": "Paid partnership. CoutureCast may earn a commission.",
+      "partnerLabel": "Presented by {{partner}}",
+      "opensInBrowser": "Opens in an in-app browser",
+      "loading": "Opening partner site",
+      "error": "Unable to open the partner site. Please try again."
+    },
+    "settings": {
+      "sectionTitle": "Shopping and partners",
+      "disclosure": "When affiliate suggestions are on, tapping one opens a partner site and tells that partner the visit came from CoutureCast. CoutureCast may earn a commission. No wardrobe photos or personal details are shared.",
+      "optOutLabel": "Show \"Shop this look\" suggestions",
+      "optOutHelp": "Turn this off to hide all partner and affiliate suggestions.",
+      "saved": "Shopping preferences updated",
+      "error": "Unable to update shopping preferences."
+    }
   }
 }

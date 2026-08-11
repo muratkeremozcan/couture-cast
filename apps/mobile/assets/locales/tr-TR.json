@@ -301,5 +301,23 @@
         "confirm_required": "Yüklemeden önce temel giysi yönergesini onaylayın."
       }
     }
+  },
+  "commerce": {
+    "shopThisLook": {
+      "cta": "Bu kombini satın al",
+      "disclosure": "Ücretli iş birliği. CoutureCast komisyon kazanabilir.",
+      "partnerLabel": "{{partner}} sunar",
+      "opensInBrowser": "Uygulama içi tarayıcıda açılır",
+      "loading": "İş ortağının sitesi açılıyor",
+      "error": "İş ortağının sitesi açılamadı. Lütfen tekrar deneyin."
+    },
+    "settings": {
+      "sectionTitle": "Alışveriş ve iş ortakları",
+      "disclosure": "Bağlı kuruluş önerileri açıkken bir öneriye dokunmak iş ortağının sitesini açar ve ziyaretin CoutureCast üzerinden geldiğini bu iş ortağına bildirir. CoutureCast komisyon kazanabilir. Gardırop fotoğrafları veya kişisel bilgiler paylaşılmaz.",
+      "optOutLabel": "\"Bu kombini satın al\" önerilerini göster",
+      "optOutHelp": "Tüm iş ortağı ve bağlı kuruluş önerilerini gizlemek için bunu kapatın.",
+      "saved": "Alışveriş tercihleri güncellendi",
+      "error": "Alışveriş tercihleri güncellenemedi."
+    }
   }
 }

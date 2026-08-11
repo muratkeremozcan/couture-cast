@@ -19,6 +19,10 @@ import {
   trackMobileLocaleSwitched,
 } from '@/src/analytics/track-events'
 import { loadMobileApiHealth } from '@/src/lib/api-health'
+import {
+  getCommercePreferenceFromMobile,
+  updateCommercePreferenceFromMobile,
+} from '@/src/lib/commerce'
 import { getSavedSettings, saveSettings } from '@/src/lib/settings-storage'
 import { updatePreferredLocaleFromMobile } from '@/src/lib/user'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
@@ -50,12 +54,68 @@ export default function SettingsScreen() {
   const [isChangingLocale, setIsChangingLocale] = useState(false)
   const [localeError, setLocaleError] = useState<string | null>(null)
   const localeChangeInFlight = useRef(false)
+  // `null` means "not known yet", which is not the same as "off". The toggle
+  // stays inert until the server has told us what the stored value is, so a
+  // failed read can never be mistaken for an opt-out the user did not make.
+  const [affiliateCtasEnabled, setAffiliateCtasEnabled] = useState<boolean | null>(null)
+  const [commerceStatus, setCommerceStatus] = useState<string | null>(null)
+  const [commerceError, setCommerceError] = useState<string | null>(null)
+  const commerceChangeInFlight = useRef(false)
 
   useEffect(() => {
     if (localeError) {
       announce('error', localeError)
     }
   }, [announce, localeError])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    void getCommercePreferenceFromMobile(controller.signal)
+      .then((preference) => {
+        if (!controller.signal.aborted) {
+          setAffiliateCtasEnabled(preference.affiliateCtasEnabled)
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setCommerceError(
+            // The catalog always carries this key: `commerce-locales.spec.ts`
+            // asserts an exact key tree across all ten locales, which is a
+            // stronger guarantee than an inline fallback that can drift.
+            t('commerce.settings.error')
+          )
+        }
+      })
+
+    return () => controller.abort()
+  }, [t])
+
+  const handleAffiliateCtasToggle = async () => {
+    if (commerceChangeInFlight.current || affiliateCtasEnabled === null) {
+      return
+    }
+
+    const previous = affiliateCtasEnabled
+    const next = !previous
+    commerceChangeInFlight.current = true
+    // Optimistic, then reverted on failure. The alternative leaves the switch
+    // visually stuck under the user's finger for a whole round trip.
+    setAffiliateCtasEnabled(next)
+    setCommerceStatus(null)
+    setCommerceError(null)
+
+    try {
+      const preference = await updateCommercePreferenceFromMobile(next)
+      setAffiliateCtasEnabled(preference.affiliateCtasEnabled)
+      setCommerceStatus(t('commerce.settings.saved'))
+    } catch {
+      setAffiliateCtasEnabled(previous)
+      setCommerceError(t('commerce.settings.error'))
+    } finally {
+      commerceChangeInFlight.current = false
+    }
+  }
 
   useEffect(() => {
     analytics.capture('tab_two_viewed')
@@ -259,6 +319,65 @@ export default function SettingsScreen() {
               {localeError}
             </Text>
           ) : null}
+          {/* Shopping and partners. PRD NFR Security 4 requires an explicit
+              third-party disclosure alongside the toggle, so the paragraph sits
+              above the control and is never collapsed behind it. These
+              endpoints are not gated by commerce_affiliate_enabled: a user must
+              always be able to read and set their own preference. */}
+          <View style={styles.settingsSection} testID="commerce-settings-section">
+            <Text style={styles.sectionTitle}>{t('commerce.settings.sectionTitle')}</Text>
+            <Text style={styles.disclosureText} testID="commerce-settings-disclosure">
+              {t('commerce.settings.disclosure')}
+            </Text>
+            <Pressable
+              style={[
+                styles.commerceToggle,
+                affiliateCtasEnabled ? styles.commerceToggleOn : null,
+              ]}
+              disabled={affiliateCtasEnabled === null}
+              onPress={() => {
+                void handleAffiliateCtasToggle()
+              }}
+              testID="commerce-opt-out-toggle"
+              accessibilityRole="switch"
+              accessibilityState={{
+                checked: affiliateCtasEnabled ?? false,
+                disabled: affiliateCtasEnabled === null,
+              }}
+              // react-native-web does not project `accessibilityState` onto the
+              // DOM, so the aria pair rides alongside it exactly as
+              // `components/chip-navigation.tsx` does.
+              aria-checked={affiliateCtasEnabled ?? false}
+              aria-disabled={affiliateCtasEnabled === null}
+              accessibilityLabel={t('commerce.settings.optOutLabel')}
+              accessibilityHint={t('commerce.settings.optOutHelp')}
+            >
+              <Text style={styles.commerceToggleLabel}>
+                {t('commerce.settings.optOutLabel')}
+              </Text>
+            </Pressable>
+            <Text style={styles.helpText}>{t('commerce.settings.optOutHelp')}</Text>
+            {commerceStatus ? (
+              <Text
+                style={styles.statusText}
+                testID="commerce-settings-status"
+                accessibilityLiveRegion="polite"
+              >
+                {commerceStatus}
+              </Text>
+            ) : null}
+            {commerceError ? (
+              <Text
+                style={styles.errorText}
+                testID="commerce-settings-error"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+              >
+                {commerceError}
+              </Text>
+            ) : null}
+          </View>
+
           <Text style={styles.infoText}>{apiHealthMessage}</Text>
           <Text style={styles.infoText}>
             {t('settings.diagnostic_info', {
@@ -345,6 +464,44 @@ const styles = StyleSheet.create({
   selectedLocaleText: {
     color: '#8A691F',
     fontWeight: 'bold',
+  },
+  disclosureText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#5C5C66',
+    marginBottom: 12,
+  },
+  commerceToggle: {
+    // Decision 17: at least 44 by 44 device-independent pixels.
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#e6e6ed',
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  commerceToggleOn: {
+    borderColor: '#C9A14A',
+    backgroundColor: 'rgba(201, 161, 74, 0.1)',
+  },
+  commerceToggleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  helpText: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#5C5C66',
+  },
+  statusText: {
+    marginTop: 8,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#276749',
   },
   errorText: {
     marginTop: 12,

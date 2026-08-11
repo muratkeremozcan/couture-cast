@@ -20,6 +20,23 @@ const generateMockHourly = () => {
   return hourly
 }
 
+/**
+ * Story 5.1: the affiliate block the morning card is eligible for. Only the
+ * morning outfit carries one, so the same default fixture exercises both the
+ * eligible render and the `shopThisLook: null` render, and a scenario toggle
+ * moves between them.
+ */
+export const mockShopThisLook = {
+  partnerId: 'sample-partner',
+  partnerDisplayName: 'Sample Partner',
+  offerId: 'offer-morning-outerwear',
+  offerTitle: 'Rain-ready trench coats',
+  garmentCategory: 'outerwear' as const,
+}
+
+export const mockAffiliateRedirectUrl =
+  'https://partner.couturecast.test/go?token=mock-click-token'
+
 export const mockRitualResponse = {
   data: {
     weather: {
@@ -53,7 +70,7 @@ export const mockRitualResponse = {
           },
         ],
         comfortNotes: 'Mild morning with gentle winds. Trench coat recommended.',
-        shopThisLook: null,
+        shopThisLook: mockShopThisLook,
       },
       {
         id: 'midday-outfit-id',
@@ -93,7 +110,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
         },
       ],
       comfortNotes: 'Hafif rüzgarlı serin sabah. Trençkot önerilir.',
-      shopThisLook: null,
+      shopThisLook: mockShopThisLook,
     },
     {
       id: 'midday-outfit-id',
@@ -128,7 +145,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
         },
       ],
       comfortNotes: 'Mañana templada con vientos suaves. Gabardina recomendada.',
-      shopThisLook: null,
+      shopThisLook: mockShopThisLook,
     },
     {
       id: 'midday-outfit-id',
@@ -163,7 +180,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
         },
       ],
       comfortNotes: 'Matinée douce avec vent léger. Imperméable recommandé.',
-      shopThisLook: null,
+      shopThisLook: mockShopThisLook,
     },
     {
       id: 'midday-outfit-id',
@@ -198,7 +215,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
         },
       ],
       comfortNotes: 'Milder Morgen mit leichtem Wind. Trenchcoat empfohlen.',
-      shopThisLook: null,
+      shopThisLook: mockShopThisLook,
     },
     {
       id: 'midday-outfit-id',
@@ -233,7 +250,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
         },
       ],
       comfortNotes: 'Mattina mite con vento leggero. Consigliato trench.',
-      shopThisLook: null,
+      shopThisLook: mockShopThisLook,
     },
     {
       id: 'midday-outfit-id',
@@ -276,6 +293,23 @@ export const handlers = [
       },
     })
   }),
+  http.get('*/api/v1/commerce/preferences', () =>
+    HttpResponse.json({ data: { affiliateCtasEnabled: true } })
+  ),
+  http.put('*/api/v1/commerce/preferences', async ({ request }) => {
+    const body = (await request.json()) as { affiliateCtasEnabled?: boolean }
+    // Echoes the stored state back, matching the real endpoint: an unchanged
+    // value still returns 200 with the current value so the response is uniform.
+    return HttpResponse.json({
+      data: { affiliateCtasEnabled: body.affiliateCtasEnabled ?? true },
+    })
+  }),
+  http.post('*/api/v1/commerce/affiliate/clicks', () =>
+    HttpResponse.json(
+      { data: { redirectUrl: mockAffiliateRedirectUrl } },
+      { status: 201 }
+    )
+  ),
   http.get('*/api/v1/alerts/preferences', () =>
     HttpResponse.json({
       data: {

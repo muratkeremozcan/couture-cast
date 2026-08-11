@@ -301,5 +301,23 @@
         "confirm_required": "Confirmez la consigne sur les vêtements de base avant de charger la photo."
       }
     }
+  },
+  "commerce": {
+    "shopThisLook": {
+      "cta": "Acheter ce look",
+      "disclosure": "Partenariat rémunéré. CoutureCast peut percevoir une commission.",
+      "partnerLabel": "Proposé par {{partner}}",
+      "opensInBrowser": "S’ouvre dans un navigateur intégré à l’application",
+      "loading": "Ouverture du site partenaire",
+      "error": "Impossible d’ouvrir le site partenaire. Veuillez réessayer."
+    },
+    "settings": {
+      "sectionTitle": "Achats et partenaires",
+      "disclosure": "Lorsque les suggestions d’affiliation sont activées, appuyer sur l’une d’elles ouvre le site d’un partenaire et lui indique que la visite provient de CoutureCast. CoutureCast peut percevoir une commission. Aucune photo de garde-robe ni aucune donnée personnelle n’est partagée.",
+      "optOutLabel": "Afficher les suggestions « Acheter ce look »",
+      "optOutHelp": "Désactivez cette option pour masquer toutes les suggestions de partenaires et d’affiliation.",
+      "saved": "Préférences d’achat mises à jour",
+      "error": "Impossible de mettre à jour les préférences d’achat."
+    }
   }
 }

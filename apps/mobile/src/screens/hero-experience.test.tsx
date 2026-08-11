@@ -115,8 +115,10 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     expect(screen.getByText('Cool evening ahead. Sweater recommended.')).toBeTruthy()
     expect(screen.getByText('Crewneck Sweater')).toBeTruthy()
 
-    // Verify telemetry interaction captured
-    expect(mockCapture).toHaveBeenLastCalledWith('hero_interaction', {
+    // Verify telemetry interaction captured. Not "last called": the morning
+    // card's affiliate impression is emitted from a passive effect, which can
+    // flush after this click, and ordering between the two is not a contract.
+    expect(mockCapture).toHaveBeenCalledWith('hero_interaction', {
       interactionType: 'scenario_toggle',
       scenario: 'evening',
     })
