@@ -301,5 +301,23 @@
         "confirm_required": "Confirme a orientação sobre a roupa base antes de enviar."
       }
     }
+  },
+  "commerce": {
+    "shopThisLook": {
+      "cta": "Comprar este look",
+      "disclosure": "Parceria paga. A CoutureCast pode receber uma comissão.",
+      "partnerLabel": "Apresentado por {{partner}}",
+      "opensInBrowser": "Abre em um navegador dentro do app",
+      "loading": "Abrindo o site do parceiro",
+      "error": "Não foi possível abrir o site do parceiro. Tente novamente."
+    },
+    "settings": {
+      "sectionTitle": "Compras e parceiros",
+      "disclosure": "Quando as sugestões de afiliados estão ativadas, tocar em uma delas abre o site de um parceiro e informa a esse parceiro que a visita veio da CoutureCast. A CoutureCast pode receber uma comissão. Nenhuma foto do guarda-roupa e nenhum dado pessoal é compartilhado.",
+      "optOutLabel": "Mostrar sugestões de \"Comprar este look\"",
+      "optOutHelp": "Desative para ocultar todas as sugestões de parceiros e afiliados.",
+      "saved": "Preferências de compra atualizadas",
+      "error": "Não foi possível atualizar as preferências de compra."
+    }
   }
 }

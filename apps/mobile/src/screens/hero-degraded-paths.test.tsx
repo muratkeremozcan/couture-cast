@@ -4,6 +4,7 @@
 // iOS accessibility-focus routes the web renderer never takes.
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
+import type * as RitualCacheModule from '@/src/lib/ritual-cache'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -57,11 +58,18 @@ const { readLatestRitualCacheMock, saveRitualCacheMock } = vi.hoisted(() => ({
 
 // The durable cache is a storage boundary. Owning it here is what makes a
 // failing write reproducible without corrupting real storage.
-vi.mock('@/src/lib/ritual-cache', () => ({
-  readLatestRitualCache: readLatestRitualCacheMock,
-  saveRitualCache: saveRitualCacheMock,
-  clearRitualMemoryCache: () => undefined,
-}))
+vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
+  const actual = await importOriginal<typeof RitualCacheModule>()
+  return {
+    // `withoutShopThisLook` is a pure transform, not a storage boundary, so the
+    // real one is kept: mocking it would hide the very stripping the screen is
+    // supposed to perform before it writes.
+    withoutShopThisLook: actual.withoutShopThisLook,
+    readLatestRitualCache: readLatestRitualCacheMock,
+    saveRitualCache: saveRitualCacheMock,
+    clearRitualMemoryCache: () => undefined,
+  }
+})
 
 import TabOneScreen from '@/app/(tabs)/index'
 import { server } from '@/src/test-utils/msw/server'

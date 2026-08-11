@@ -1,10 +1,12 @@
 // Step 8 app reuse owner: searchable owner anchor
 import {
+  trackAffiliateCtaShown,
   trackAlertReceived,
   trackLocaleSwitched,
   trackRitualCreated,
   trackWardrobeUploadStarted,
 } from '@couture/api-client'
+import type { AffiliateCtaShownEvent } from '@couture/api-client'
 import type { MobileAnalyticsClient } from './mobile-analytics'
 
 /** Story 0.7 support file: mobile analytics wrapper layer.
@@ -82,6 +84,23 @@ export function trackMobileAlertReceived(
     weatherSeverity: input.weatherSeverity,
     timestamp: new Date().toISOString(),
   })
+
+  client.capture(payload.event, payload.properties)
+}
+
+/**
+ * Story 5.1: the affiliate impression is the one commerce event with no server
+ * subject. It rides the mobile analytics client's own `distinctId`, exactly like
+ * {@link trackMobileRitualCreated}, and deliberately does not travel through
+ * `TelemetryService`, so it writes no `TelemetryEvent` row: a mobile client can
+ * neither compute the server-side HMAC subject nor write that table.
+ */
+export function trackMobileAffiliateCtaShown(
+  client: MobileAnalyticsCaptureClient,
+  distinctId: string,
+  input: AffiliateCtaShownEvent
+) {
+  const payload = trackAffiliateCtaShown(input, distinctId)
 
   client.capture(payload.event, payload.properties)
 }

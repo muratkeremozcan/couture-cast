@@ -15,7 +15,15 @@ import { Text, View } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { createMobileApiClient } from '@/src/lib/api-client'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
-import { readLatestRitualCache, saveRitualCache } from '@/src/lib/ritual-cache'
+import {
+  readLatestRitualCache,
+  saveRitualCache,
+  withoutShopThisLook,
+} from '@/src/lib/ritual-cache'
+import {
+  resolveAffiliateLocaleRegion,
+  resolveRenderableShopThisLook,
+} from '@/src/lib/commerce'
 import { loadWidgetAlertPreferences } from '@/src/lib/widget-alert-preferences'
 import { resolveWidgetScenario, type WidgetSlot } from '@/src/lib/widget-share'
 import {
@@ -26,7 +34,10 @@ import {
   type AlertPreferences,
 } from '@couture/api-client/contracts/http'
 import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
-import { trackMobileRitualCreated } from '@/src/analytics/track-events'
+import {
+  trackMobileAffiliateCtaShown,
+  trackMobileRitualCreated,
+} from '@/src/analytics/track-events'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import { processMobileDeepLink } from '@/src/lib/mobile-deep-link-handler'
@@ -139,6 +150,10 @@ export default function TabOneScreen() {
   const reduceMotion = useReducedMotion()
   const latestLoadId = useRef(0)
   const hasTrackedTabView = useRef(false)
+  // Keyed on recommendation id, not on mount: the impression effect re-runs
+  // whenever the locale or the analytics identity changes, and a scenario
+  // toggle away and back re-renders the same card. One card is one impression.
+  const trackedCtaImpressions = useRef(new Set<string>())
   const scrollViewRef = useRef<ScrollView>(null)
   const focusedAlertRef = useRef<NativeView>(null)
   const focusedAlertY = useRef(0)
@@ -153,6 +168,10 @@ export default function TabOneScreen() {
   const [activeChipCategory, setActiveChipCategory] = useState<ChipCategory>('Personal')
   const [pendingWidgetSlot, setPendingWidgetSlot] = useState<WidgetSlot | null>(null)
   const [isStale, setIsStale] = useState(false)
+  // Distinct from `isStale`, which only covers the offline fallback. This also
+  // covers the under-15-minute cache hit, which is a perfectly fresh read for
+  // weather and still an unacceptable source for an affiliate CTA.
+  const [isCacheServed, setIsCacheServed] = useState(false)
   const [alertPreferences, setAlertPreferences] = useState<AlertPreferences | undefined>(
     undefined
   )
@@ -201,6 +220,7 @@ export default function TabOneScreen() {
       if (loadId === latestLoadId.current) {
         setRitual(cached.data)
         setAlertPreferences(cached.alertPreferences)
+        setIsCacheServed(true)
         setIsLoading(false)
       }
       return
@@ -214,8 +234,12 @@ export default function TabOneScreen() {
 
       setRitual(data)
       setAlertPreferences(fetchedPreferences)
+      setIsCacheServed(false)
       void saveRitualCache(analyticsUserId, activeLocale, {
-        data,
+        // Decision 6: the commerce block never enters the device cache, or the
+        // CTA outlives an opt-out by fifteen minutes online and indefinitely
+        // offline.
+        data: withoutShopThisLook(data),
         timestamp: now,
         alertPreferences: fetchedPreferences,
       }).catch(() => undefined)
@@ -244,6 +268,7 @@ export default function TabOneScreen() {
         setRitual(cached.data)
         setAlertPreferences(cached.alertPreferences)
         setIsStale(true)
+        setIsCacheServed(true)
       } else {
         setError(
           t('hero.load_error', {
@@ -507,7 +532,9 @@ export default function TabOneScreen() {
     setRitual(updatedRitual)
 
     void saveRitualCache(analyticsUserId, activeLocale, {
-      data: updatedRitual,
+      // A swap rewrites a network payload, so this write can carry a commerce
+      // block too. Decision 6 applies to every cache write, not just the fetch.
+      data: withoutShopThisLook(updatedRitual),
       timestamp: Date.now(),
       alertPreferences,
     }).catch(() => undefined)
@@ -525,6 +552,25 @@ export default function TabOneScreen() {
   }
 
   const activeOutfit = ritual?.data.outfits.find((o) => o.scenario === activeScenario)
+  const activeShopThisLook = resolveRenderableShopThisLook(activeOutfit, isCacheServed)
+
+  useEffect(() => {
+    if (!activeOutfit || !activeShopThisLook) {
+      return
+    }
+    if (trackedCtaImpressions.current.has(activeOutfit.id)) {
+      return
+    }
+
+    trackedCtaImpressions.current.add(activeOutfit.id)
+    trackMobileAffiliateCtaShown(analytics, analyticsUserId, {
+      partnerId: activeShopThisLook.partnerId,
+      scenario: activeOutfit.scenario,
+      surface: 'mobile_hero',
+      localeRegion: resolveAffiliateLocaleRegion(activeLocale),
+      recommendationId: activeOutfit.id,
+    })
+  }, [activeOutfit, activeShopThisLook, activeLocale, analyticsUserId, analytics])
 
   const handleRetry = () => {
     void loadData(true)
@@ -652,6 +698,7 @@ export default function TabOneScreen() {
                 garmentRefs.current.set(garmentId, element)
               }}
               isLoading={isLoading}
+              isCacheServed={isCacheServed}
             />
           </>
         )}

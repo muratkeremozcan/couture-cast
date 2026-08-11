@@ -26,6 +26,7 @@ import {
   clearRitualMemoryCache,
   readLatestRitualCache,
   saveRitualCache,
+  withoutShopThisLook,
 } from './ritual-cache'
 import { getSavedSettings, saveSettings } from './settings-storage'
 
@@ -41,17 +42,21 @@ describe('native file storage', () => {
 
   it('persists and restores the ritual cache through the SDK 54 legacy module', async () => {
     const entry = { data: mockRitualResponse, timestamp: 100 }
+    // Story 5.1 decision 6: the affiliate block is dropped on the way in, so
+    // what comes back out is the payload minus every `shopThisLook`.
+    const persisted = { data: withoutShopThisLook(mockRitualResponse), timestamp: 100 }
 
     await saveRitualCache('user-1', 'en-US', entry)
     clearRitualMemoryCache()
 
-    await expect(readLatestRitualCache('user-1', 'en-US')).resolves.toEqual(entry)
+    await expect(readLatestRitualCache('user-1', 'en-US')).resolves.toEqual(persisted)
     expect(nativeStorage.fileSystem.writeAsStringAsync).toHaveBeenCalledTimes(2)
     expect(nativeStorage.shareWidgetData).toHaveBeenCalledOnce()
   })
 
   it('keeps the durable cache when widget publication fails and reports the failure', async () => {
     const entry = { data: mockRitualResponse, timestamp: 100 }
+    const persisted = { data: withoutShopThisLook(mockRitualResponse), timestamp: 100 }
     const publicationError = new Error('native bridge unavailable')
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     nativeStorage.shareWidgetData.mockRejectedValueOnce(publicationError)
@@ -59,7 +64,7 @@ describe('native file storage', () => {
     await expect(saveRitualCache('user-1', 'en-US', entry)).rejects.toBe(publicationError)
     clearRitualMemoryCache()
 
-    await expect(readLatestRitualCache('user-1', 'en-US')).resolves.toEqual(entry)
+    await expect(readLatestRitualCache('user-1', 'en-US')).resolves.toEqual(persisted)
     expect(warning).toHaveBeenCalledWith(
       '[RitualCache] Durable cache saved, but widget publication failed',
       publicationError
