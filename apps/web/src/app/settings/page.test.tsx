@@ -205,11 +205,19 @@ describe('Web settings page', () => {
 
     fireEvent.click(toggle())
 
-    // Optimistic: the new value shows before the request has answered, and a
-    // second activation cannot race the first.
+    // Optimistic: the new value shows before the request has answered.
     expect(toggle()).not.toBeChecked()
-    expect(toggle()).toBeDisabled()
+    // Busy, not disabled. Disabling mid-save drops the element out of the focus
+    // order and the browser moves focus to `<body>`, which loses a keyboard
+    // user's place in the page. The end-to-end keyboard journey caught that, so
+    // this pins the shape of the fix.
+    expect(toggle()).toBeEnabled()
     expect(toggle()).toHaveAttribute('aria-busy', 'true')
+
+    // Re-entrancy is still refused: a second activation while the first is in
+    // flight must not produce a second request.
+    fireEvent.click(toggle())
+    expect(toggle()).not.toBeChecked()
 
     gate.resolve()
 
