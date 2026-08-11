@@ -93,6 +93,8 @@ describe('5.1 affiliate offer query plans', () => {
   let matchPartnerId: string
   let repository: CommerceRepository
   const captured: CapturedStatement[] = []
+  /** Armed by `captureOfferLookup`, settled by the Prisma query handler. */
+  let resolveCapture: ((statement: CapturedStatement) => void) | undefined
 
   /**
    * A region no other suite queries for, so this file's rows can never be
@@ -140,7 +142,17 @@ describe('5.1 affiliate offer query plans', () => {
     })
   }
 
-  /** Runs the real repository call and returns the statement it produced. */
+  /**
+   * Runs the real repository call and returns the statement it produced.
+   *
+   * Prisma emits the query event asynchronously, after the awaited call has
+   * already resolved, so the statement has to be waited for. That wait is
+   * EVENT-DRIVEN rather than a poll: `pendingCapture` is armed before the call
+   * and settled by the `$on('query')` handler. An earlier version spun on
+   * `while (!captured.length) await sleep(10)`, which is a timing-dependent wait
+   * and the kind of thing that passes on a quiet machine and fails on a loaded
+   * one. The timeout below is a failure guard, not the mechanism.
+   */
   async function captureOfferLookup(
     slots: readonly {
       category: 'top' | 'bottom' | 'shoes'
@@ -149,19 +161,27 @@ describe('5.1 affiliate offer query plans', () => {
     region: string
   ): Promise<{ statement: CapturedStatement; matched: boolean }> {
     captured.length = 0
+    const arrived = new Promise<CapturedStatement>((resolve) => {
+      resolveCapture = resolve
+    })
+
     const match = await repository.findBestOffer(slots, region)
 
-    // Prisma's query event is emitted asynchronously after the await resolves.
-    const deadline = Date.now() + 2000
-    while (captured.length === 0 && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 10))
-    }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('The offer lookup emitted no query event to explain')),
+        5000
+      )
+    })
 
-    const statement = captured[0]
-    if (!statement) {
-      throw new Error('The offer lookup emitted no query event to explain')
+    try {
+      const statement = await Promise.race([arrived, timedOut])
+      return { statement, matched: match !== null }
+    } finally {
+      clearTimeout(timer)
+      resolveCapture = undefined
     }
-    return { statement, matched: match !== null }
   }
 
   beforeAll(async () => {
@@ -170,10 +190,14 @@ describe('5.1 affiliate offer query plans', () => {
 
     prisma.$on('query', (event) => {
       if (!event.query.includes('"AffiliateOffer"')) return
-      captured.push({
+      const statement = {
         sql: event.query,
         params: JSON.parse(event.params) as unknown[],
-      })
+      }
+      captured.push(statement)
+      // Settles the promise `captureOfferLookup` armed, so the wait is driven by
+      // the event rather than by elapsed time.
+      resolveCapture?.(statement)
     })
 
     repository = new CommerceRepository(prisma)
@@ -373,6 +397,15 @@ describe('5.1 affiliate offer query plans', () => {
       totalPages,
       'the fixture must be large enough for this to mean anything'
     ).toBeGreaterThan(50)
+    /*
+     * A buffer count was actually read. Without this, a plan carrying no
+     * `shared hit=` line at all -- BUFFERS dropped from the EXPLAIN options, or a
+     * PostgreSQL release changing the wording -- yields 0 from `peakBuffers`, and
+     * both bounds below hold trivially. The test would then be green having
+     * measured nothing, which is the precise failure mode 5.1-PLAN-06 exists to
+     * rule out, and it would be silly to reintroduce it one test later.
+     */
+    expect(buffers, `no buffer counters found in plan:\n${plan}`).toBeGreaterThan(0)
     expect(buffers, `plan was:\n${plan}`).toBeLessThan(totalPages)
     // An absolute cap as well as a relative one. `relpages` counts the physical
     // file, which stays large after rows are deleted without a VACUUM, so a
@@ -398,15 +431,16 @@ describe('5.1 affiliate offer query plans', () => {
       targetRegion
     )
     const forcedPlan = await explainWithoutIndexes(statement)
+    const indexedPlan = await explainCaptured(statement)
 
     expect(forcedPlan, `forced plan was:\n${forcedPlan}`).toMatch(
       /Seq Scan on "?AffiliateOffer"?/
     )
     expect(forcedPlan).not.toContain(OFFER_LOOKUP_INDEX)
-    // And the forced scan really is the expensive shape the index avoids.
-    expect(peakBuffers(forcedPlan)).toBeGreaterThan(
-      peakBuffers(await explainCaptured(statement))
-    )
+    // And the forced scan really is the expensive shape the index avoids. Both
+    // plans are resolved above rather than inside the assertion, so the values
+    // being compared are visible in the test body.
+    expect(peakBuffers(forcedPlan)).toBeGreaterThan(peakBuffers(indexedPlan))
   })
 })
 

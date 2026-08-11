@@ -209,11 +209,16 @@ and the comment in `config.ts` says so. Tighten it once a real run exists.
    the value. The parking logic itself is untouched and remains load-bearing for the
    offers suite.
 
-   Verified with 5 consecutive green full-suite runs after the change (and 11 of 11
-   green across the two fixes). **The underlying sharp edge remains:** a fixture
-   published at `'*'` is a globally published catalog row that matches every request
-   region in every concurrent suite. New commerce fixtures must pin a region unless
-   global publication is the thing under test.
+   Verified with 5 consecutive green full-suite runs after the clicks-suite fix. To
+   be precise about the evidence rather than rounding it up: the webhook fix alone
+   left the clicks suite still failing intermittently (1 of 3 runs red), and only
+   after both fixes did the suite go green 5 for 5. Earlier runs are not evidence
+   for the final state and are not counted as such.
+
+   **The underlying sharp edge remains:** a fixture published at `'*'` is a globally
+   published catalog row that matches every request region in every concurrent
+   suite. New commerce fixtures must pin a region unless global publication is the
+   thing under test.
 
 4. **One unexplained intermittent, 400 where 401 was expected**, in
    `5.1-INT-13`, once in roughly ten full-suite runs and never in isolation. 400

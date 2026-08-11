@@ -695,13 +695,13 @@ export function testRitualCommerceEligible() {
     }
     expect(eligible.length, 'at least one outfit is affiliate eligible').to.be.at.least(1)
 
+    // Asserted unconditionally. Wrapping these in `if (block)` meant a response
+    // that stopped carrying the block skipped the assertions instead of failing
+    // them, which is the conditional-flow trap that makes a suite look green
+    // while it quietly stops checking anything.
     const block = eligible[0]?.shopThisLook
-    if (block) {
-      // The block is the whole point of the added cost; a null-shaped response
-      // would mean the chain ran and produced nothing measurable.
-      expect(block.partnerId.length, 'block names a partner').to.be.at.least(1)
-      expect(block.offerId.length, 'block names an offer').to.be.at.least(1)
-    }
+    expect((block?.partnerId ?? '').length, 'block names a partner').to.be.at.least(1)
+    expect((block?.offerId ?? '').length, 'block names an offer').to.be.at.least(1)
   })
 
   sleep(0.2)
