@@ -64,6 +64,11 @@ function createCleanupPrismaStub(
     eventEnvelope: createDelegate('eventEnvelope'),
     alertDeliveryOutbox: createDelegate('alertDeliveryOutbox'),
     alertCooldownReservation: createDelegate('alertCooldownReservation'),
+    commercePartner: createDelegate('commercePartner'),
+    affiliateOffer: createDelegate('affiliateOffer'),
+    commercePreference: createDelegate('commercePreference'),
+    affiliateClick: createDelegate('affiliateClick'),
+    affiliateConversion: createDelegate('affiliateConversion'),
   }
 }
 
@@ -117,6 +122,13 @@ describe('cleanup', () => {
     await cleanup({ prisma, registry })
 
     expect(calls.map((call) => call.delegate)).toEqual([
+      // Story 5.1: commerce first, and in reverse dependency order.
+      // AffiliateClick holds RESTRICT foreign keys onto AffiliateOffer and
+      // CommercePartner, so a catalog row cannot go before the clicks that
+      // reference it. Clicks and preferences are reachable here through the
+      // tracked user id even with no commerce ids registered.
+      'affiliateClick',
+      'commercePreference',
       'eventEnvelope',
       'alertCooldownReservation',
       'engagementEvent',
@@ -198,6 +210,11 @@ describe('cleanup', () => {
       wardrobeOnboardingStates: [],
       silhouetteProfiles: [],
       moderationEvents: [],
+      commercePartners: [],
+      affiliateOffers: [],
+      commercePreferences: [],
+      affiliateClicks: [],
+      affiliateConversions: [],
     })
   })
 

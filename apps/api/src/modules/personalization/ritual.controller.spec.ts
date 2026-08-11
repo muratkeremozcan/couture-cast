@@ -9,6 +9,7 @@ import { GuardianConsentStateService } from '../auth/guardian-consent-state.serv
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import { RitualController } from './ritual.controller.js'
 import { RitualService, RITUAL_REDIS_CLIENT } from './ritual.service.js'
+import { AffiliateOfferService } from '../commerce/affiliate-offer.service.js'
 import { PrismaClient, type OutfitRecommendation, type Prisma } from '@prisma/client'
 import { WeatherQueryService } from '../weather/weather-query.service.js'
 import { LocationPreferencesService } from '../location-preferences/location-preferences.service.js'
@@ -254,6 +255,13 @@ describe('RitualController', () => {
           provide: ANALYTICS_CLIENT,
           useValue: { capture: vi.fn() },
         },
+        // Story 5.1: RitualController now assembles the commerce block, so this
+        // module has to supply the service. The real one is registered rather
+        // than a mock: it is the seam these tests should exercise, and its
+        // current behaviour (null for every outfit) is exactly what the
+        // eligibility chain produces while commerce_affiliate_enabled is off,
+        // which is its default in this environment.
+        AffiliateOfferService,
       ],
     })
       .overrideGuard(RequestAuthGuard)

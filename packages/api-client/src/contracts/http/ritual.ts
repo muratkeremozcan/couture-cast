@@ -4,6 +4,7 @@ import { nonEmptyStringSchema, type RegisteredCommonHttpSchemas } from './common
 import { supportedLocaleSchema } from './localization'
 import { weatherSnapshotSchema } from './weather'
 import { capsuleOccasionEnum } from './wardrobe'
+import { shopThisLookSchema } from './commerce'
 
 export const scenarioNameSchema = z.enum(['morning', 'midday', 'evening'])
 
@@ -45,6 +46,15 @@ export const scenarioOutfitSchema = z.object({
     .array(z.string())
     .optional()
     .describe('Optional list of garment IDs auto-filled into a partial capsule.'),
+  // Story 5.1. Nullable, NOT optional: the API always serializes this key, so a
+  // client never has to distinguish "absent" from "null". An earlier draft used
+  // `.nullable().optional()`, which recreates exactly the ambiguity this design
+  // exists to remove.
+  shopThisLook: shopThisLookSchema
+    .nullable()
+    .describe(
+      'Always present. Null means the acting user is not eligible for an affiliate CTA on this card, for any reason: the feature flag is off, the user opted out, or no active in-window offer matched a slot. Never populated from a cached payload.'
+    ),
 })
 
 export const ritualResponseSchema = z.object({

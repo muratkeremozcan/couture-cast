@@ -38,6 +38,11 @@ export interface CleanupPrismaClient {
   eventEnvelope: CleanupDelegate
   alertDeliveryOutbox: CleanupDelegate
   alertCooldownReservation: CleanupDelegate
+  commercePartner: CleanupDelegate
+  affiliateOffer: CleanupDelegate
+  commercePreference: CleanupDelegate
+  affiliateClick: CleanupDelegate
+  affiliateConversion: CleanupDelegate
 }
 
 export interface CleanupConfiguration {
@@ -235,6 +240,14 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const wardrobeOnboardingStateIds = uniqueValues(tracked.wardrobeOnboardingStates)
   const silhouetteProfileIds = uniqueValues(tracked.silhouetteProfiles)
   const moderationEventIds = uniqueValues(tracked.moderationEvents)
+  const commercePartnerIds = uniqueValues(tracked.commercePartners)
+  const affiliateOfferIds = uniqueValues(tracked.affiliateOffers)
+  const commercePreferenceIds = uniqueValues(tracked.commercePreferences)
+  const affiliateClickIds = uniqueValues(tracked.affiliateClicks)
+  const affiliateConversionIds = uniqueValues(tracked.affiliateConversions)
+
+  const commercePreferenceWhere = buildDeleteWhere(commercePreferenceIds, userIds)
+  const affiliateClickWhere = buildDeleteWhere(affiliateClickIds, userIds)
 
   const outfitRecommendationWhere = buildDeleteWhere(ritualIds, userIds)
   const outfitCapsuleGarmentWhere = buildDeleteWhere(outfitCapsuleGarmentIds, userIds)
@@ -252,6 +265,44 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   )
 
   try {
+    // Story 5.1 commerce, deleted first and in reverse dependency order:
+    // conversions -> clicks -> preferences -> offers -> partners. AffiliateClick
+    // holds RESTRICT foreign keys onto AffiliateOffer and CommercePartner, so a
+    // catalog row cannot be removed while any click still points at it.
+    //
+    // CommercePartner, AffiliateOffer, and AffiliateConversion carry no user_id,
+    // so buildUserFilter cannot reach them the way it reaches every other table
+    // here. Unlike AlertCooldownReservation, though, they do NOT need the
+    // cleanupScopeStartedAt time anchor: the commerce factories register every
+    // row they create, so tracked ids are a complete and exact record of what
+    // this run made. Sweeping by timestamp instead would delete catalog rows
+    // that a concurrent run, or the commerce seed itself, legitimately owns.
+    if (affiliateConversionIds.length > 0) {
+      await prisma.affiliateConversion.deleteMany({
+        where: buildIdFilter(affiliateConversionIds),
+      })
+    }
+
+    if (affiliateClickWhere) {
+      await prisma.affiliateClick.deleteMany({ where: affiliateClickWhere })
+    }
+
+    if (commercePreferenceWhere) {
+      await prisma.commercePreference.deleteMany({ where: commercePreferenceWhere })
+    }
+
+    if (affiliateOfferIds.length > 0) {
+      await prisma.affiliateOffer.deleteMany({
+        where: buildIdFilter(affiliateOfferIds),
+      })
+    }
+
+    if (commercePartnerIds.length > 0) {
+      await prisma.commercePartner.deleteMany({
+        where: buildIdFilter(commercePartnerIds),
+      })
+    }
+
     await deleteByUserIds(userIds, [
       () =>
         prisma.eventEnvelope.deleteMany({

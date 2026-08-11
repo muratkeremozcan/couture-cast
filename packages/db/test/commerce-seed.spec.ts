@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it, onTestFinished } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 
 import {
@@ -17,6 +17,15 @@ import {
  * feature-flags.ts) flips `commerce_affiliate_enabled` to true. That makes its
  * production guard a security property, not a convenience, so it is tested here
  * rather than assumed.
+ *
+ * SHARED STATE. This suite operates on the ONE real seeded row, `sample-partner`,
+ * because that row is the subject under test. That row also normally exists,
+ * having been written by `db:seed` during `db:reset`, and Playwright and Maestro
+ * setup depend on it. So the suite snapshots whether it was present on entry and
+ * restores that exact state on exit. An earlier version simply deleted it in
+ * cleanup and asserted it was globally absent, which failed on the first run
+ * after a reset and passed on the second: it had destroyed the seeded catalog
+ * that made its own first run fail.
  */
 
 const databaseUrl =
@@ -40,16 +49,31 @@ const removeSeededCatalog = async () => {
   await prisma.commercePartner.delete({ where: { id: partner.id } })
 }
 
+let seededCatalogExistedOnEntry = false
+
+beforeAll(async () => {
+  seededCatalogExistedOnEntry =
+    (await prisma.commercePartner.count({ where: { slug: SAMPLE_PARTNER_SLUG } })) > 0
+})
+
+// Each test starts from a known-empty catalog rather than from whatever the
+// previous test or a prior `db:reset` left behind, so no assertion here depends
+// on execution order.
+beforeEach(removeSeededCatalog)
+
 afterAll(async () => {
+  if (seededCatalogExistedOnEntry) {
+    // The seed is idempotent, so re-running it restores the row exactly.
+    await seedCommerceCatalog(prisma, { NODE_ENV: 'test' })
+  } else {
+    await removeSeededCatalog()
+  }
+
   await prisma.$disconnect()
 })
 
 describe('commerce catalog seed', () => {
   it('5.1-DB-030 refuses to seed anything outside a test or local environment', async () => {
-    // Registered before the assertions so a failure below cannot leave a live
-    // partner behind for a sibling test to trip over.
-    onTestFinished(removeSeededCatalog)
-
     const productionEnvironments = [
       { NODE_ENV: 'production' },
       { NODE_ENV: 'production', TEST_ENV: 'preview' },
@@ -77,8 +101,6 @@ describe('commerce catalog seed', () => {
   })
 
   it('5.1-DB-032 publishes one active partner and wildcard offers for four slots', async () => {
-    onTestFinished(removeSeededCatalog)
-
     const result = await seedCommerceCatalog(prisma, { NODE_ENV: 'test' })
 
     expect(result).not.toBeNull()
@@ -125,8 +147,6 @@ describe('commerce catalog seed', () => {
   })
 
   it('5.1-DB-033 is idempotent across repeated runs', async () => {
-    onTestFinished(removeSeededCatalog)
-
     const first = await seedCommerceCatalog(prisma, { NODE_ENV: 'test' })
     const second = await seedCommerceCatalog(prisma, { NODE_ENV: 'test' })
 

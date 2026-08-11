@@ -53,6 +53,7 @@ export const mockRitualResponse = {
           },
         ],
         comfortNotes: 'Mild morning with gentle winds. Trench coat recommended.',
+        shopThisLook: null,
       },
       {
         id: 'midday-outfit-id',
@@ -60,6 +61,7 @@ export const mockRitualResponse = {
         garmentIds: ['casual-tee', 'navy-chinos'],
         reasoningBadges: [],
         comfortNotes: 'Warm and sunny midday. Light tee is perfect.',
+        shopThisLook: null,
       },
       {
         id: 'evening-outfit-id',
@@ -67,6 +69,7 @@ export const mockRitualResponse = {
         garmentIds: ['crewneck-sweater', 'navy-chinos'],
         reasoningBadges: [],
         comfortNotes: 'Cool evening ahead. Sweater recommended.',
+        shopThisLook: null,
       },
     ],
     badges: ['breeze-guard'],
@@ -90,6 +93,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
         },
       ],
       comfortNotes: 'Hafif rüzgarlı serin sabah. Trençkot önerilir.',
+      shopThisLook: null,
     },
     {
       id: 'midday-outfit-id',
@@ -97,6 +101,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
       garmentIds: ['casual-tee', 'navy-chinos'],
       reasoningBadges: [],
       comfortNotes: 'Sıcak ve güneşli öğle vakti. Hafif tişört mükemmeldir.',
+      shopThisLook: null,
     },
     {
       id: 'evening-outfit-id',
@@ -104,6 +109,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
       garmentIds: ['crewneck-sweater', 'navy-chinos'],
       reasoningBadges: [],
       comfortNotes: 'Serin akşam. Kazak önerilir.',
+      shopThisLook: null,
     },
   ],
   'es-419': [
@@ -122,6 +128,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
         },
       ],
       comfortNotes: 'Mañana templada con vientos suaves. Gabardina recomendada.',
+      shopThisLook: null,
     },
     {
       id: 'midday-outfit-id',
@@ -129,6 +136,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
       garmentIds: ['casual-tee', 'navy-chinos'],
       reasoningBadges: [],
       comfortNotes: 'Mediodía cálido y soleado. Camiseta ligera es perfecta.',
+      shopThisLook: null,
     },
     {
       id: 'evening-outfit-id',
@@ -136,6 +144,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
       garmentIds: ['crewneck-sweater', 'navy-chinos'],
       reasoningBadges: [],
       comfortNotes: 'Noche fresca por delante. Suéter recomendado.',
+      shopThisLook: null,
     },
   ],
   'fr-CA': [
@@ -154,6 +163,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
         },
       ],
       comfortNotes: 'Matinée douce avec vent léger. Imperméable recommandé.',
+      shopThisLook: null,
     },
     {
       id: 'midday-outfit-id',
@@ -161,6 +171,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
       garmentIds: ['casual-tee', 'navy-chinos'],
       reasoningBadges: [],
       comfortNotes: 'Midi chaud et ensoleillé. Un T-shirt léger est parfait.',
+      shopThisLook: null,
     },
     {
       id: 'evening-outfit-id',
@@ -168,6 +179,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
       garmentIds: ['crewneck-sweater', 'navy-chinos'],
       reasoningBadges: [],
       comfortNotes: 'Soirée fraîche à venir. Chandail recommandé.',
+      shopThisLook: null,
     },
   ],
   'de-DE': [
@@ -186,6 +198,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
         },
       ],
       comfortNotes: 'Milder Morgen mit leichtem Wind. Trenchcoat empfohlen.',
+      shopThisLook: null,
     },
     {
       id: 'midday-outfit-id',
@@ -193,6 +206,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
       garmentIds: ['casual-tee', 'navy-chinos'],
       reasoningBadges: [],
       comfortNotes: 'Warmer und sonniger Mittag. Ein leichtes T-Shirt ist perfekt.',
+      shopThisLook: null,
     },
     {
       id: 'evening-outfit-id',
@@ -200,6 +214,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
       garmentIds: ['crewneck-sweater', 'navy-chinos'],
       reasoningBadges: [],
       comfortNotes: 'Kühler Abend steht bevor. Pullover empfohlen.',
+      shopThisLook: null,
     },
   ],
   'it-IT': [
@@ -218,6 +233,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
         },
       ],
       comfortNotes: 'Mattina mite con vento leggero. Consigliato trench.',
+      shopThisLook: null,
     },
     {
       id: 'midday-outfit-id',
@@ -225,6 +241,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
       garmentIds: ['casual-tee', 'navy-chinos'],
       reasoningBadges: [],
       comfortNotes: 'Mezzogiorno caldo e soleggiato. T-shirt leggera ideale.',
+      shopThisLook: null,
     },
     {
       id: 'evening-outfit-id',
@@ -232,6 +249,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
       garmentIds: ['crewneck-sweater', 'navy-chinos'],
       reasoningBadges: [],
       comfortNotes: 'Serata fresca in arrivo. Consigliato maglione.',
+      shopThisLook: null,
     },
   ],
 }

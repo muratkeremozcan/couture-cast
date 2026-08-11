@@ -1048,33 +1048,33 @@ change this" hint, so the axe scan passes with no session.
         `scripts/run-workspace-test-coverage.mjs` (lines 29-35) picks the
         workspace up and these suites actually run on a PR.
 
-- [ ] Task 2: Contracts, analytics registries, fixtures, factories (AC: 1 to 6)
-  - [ ] Create `packages/api-client/src/contracts/http/commerce.ts` with
+- [x] Task 2: Contracts, analytics registries, fixtures, factories (AC: 1 to 6)
+  - [x] Create `packages/api-client/src/contracts/http/commerce.ts` with
         `shopThisLookSchema`, `affiliateSurfaceSchema`, the preferences pair, the
         click request and response, the webhook payload and header schemas, and
         the six exported message constants from decision 9. Export from
         `contracts/http/index.ts`.
-  - [ ] Add `shopThisLook: shopThisLookSchema.nullable()` to
+  - [x] Add `shopThisLook: shopThisLookSchema.nullable()` to
         `scenarioOutfitSchema`, with an `.openapi()` description stating the key
         is always present and `null` means not eligible.
-  - [ ] Extend the hand-maintained re-export block at
+  - [x] Extend the hand-maintained re-export block at
         `apps/api/src/contracts/http.ts:7-105`.
-  - [ ] Register every operation, header, status, and error in `openapi.ts` via
+  - [x] Register every operation, header, status, and error in `openapi.ts` via
         `registerCommerceContracts`; bump `info.version` to `1.1.0`.
-  - [ ] Add the three event names to `analyticsEventNameSchema`,
+  - [x] Add the three event names to `analyticsEventNameSchema`,
         `analyticsEventSchemas` (`analytics-events.ts:407-433`), and
         `analyticsPropertySchemas`
         (`src/testing/analytics-event-assertions.ts:40`), plus strict property
         allowlists, `track*` wrappers, and negative fixtures rejecting URLs,
         titles, garment ids, and raw user ids.
-  - [ ] Add commerce fixtures and
+  - [x] Add commerce fixtures and
         `packages/testing/src/factories/commerce.factory.ts`; extend
         `factories/registry.ts:1-16` and `cleanup.ts:15-40`. The three
         non-user-scoped tables cannot use `buildUserFilter` (`cleanup.ts:118-124`)
         — reuse the `cleanupScopeStartedAt` anchor (`cleanup.ts:53-64`) as
         `AlertCooldownReservation` does. Delete order: conversions → clicks →
         offers → partners → users.
-  - [ ] Run `npm run generate:api-client` and `npm run optic:lint`; commit the
+  - [x] Run `npm run generate:api-client` and `npm run optic:lint`; commit the
         generated diff with no hand edits.
 
 - [ ] Task 3: Commerce module, preferences, eligibility (AC: 1, 3, 4, 6)

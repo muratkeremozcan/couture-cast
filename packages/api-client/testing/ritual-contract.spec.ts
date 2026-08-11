@@ -37,6 +37,7 @@ function buildOutfit(scenario: ScenarioName) {
       { key: 'rain_ready', label: 'Rain ready', bullets: ['Rain is likely at 8am.'] },
     ],
     comfortNotes: 'Layer up; it will feel cooler than it reads.',
+    shopThisLook: null,
   }
 }
 

@@ -8,6 +8,180 @@ export type FixedLengthArray<
 /**
  *
  * @export
+ * @interface AffiliateClickRequest
+ */
+export interface AffiliateClickRequest {
+  /**
+   * The offerId returned in the ritual response shopThisLook block.
+   * @type {string}
+   * @memberof AffiliateClickRequest
+   */
+  offerId: string
+  /**
+   * The ScenarioOutfit.id the CTA was rendered on.
+   * @type {string}
+   * @memberof AffiliateClickRequest
+   */
+  recommendationId: string
+  /**
+   * Where the CTA was activated.
+   * @type {AffiliateClickRequestSurfaceEnum}
+   * @memberof AffiliateClickRequest
+   */
+  surface: AffiliateClickRequestSurfaceEnum
+}
+
+/**
+ * @export
+ */
+export const AffiliateClickRequestSurfaceEnum = {
+  mobile_hero: 'mobile_hero',
+} as const
+export type AffiliateClickRequestSurfaceEnum =
+  (typeof AffiliateClickRequestSurfaceEnum)[keyof typeof AffiliateClickRequestSurfaceEnum]
+
+/**
+ *
+ * @export
+ * @interface AffiliateClickResponse
+ */
+export interface AffiliateClickResponse {
+  /**
+   *
+   * @type {AffiliateClickResponseData}
+   * @memberof AffiliateClickResponse
+   */
+  data: AffiliateClickResponseData
+}
+/**
+ *
+ * @export
+ * @interface AffiliateClickResponseData
+ */
+export interface AffiliateClickResponseData {
+  /**
+   * Absolute https URL on the partner host, with the click token substituted. Built server-side; never cached by the client.
+   * @type {string}
+   * @memberof AffiliateClickResponseData
+   */
+  redirectUrl: string
+}
+
+/**
+ *
+ * @export
+ */
+export const AffiliateConversionStatus = {
+  pending: 'pending',
+  confirmed: 'confirmed',
+  reversed: 'reversed',
+} as const
+export type AffiliateConversionStatus =
+  (typeof AffiliateConversionStatus)[keyof typeof AffiliateConversionStatus]
+
+/**
+ *
+ * @export
+ */
+export const AffiliateSurface = {
+  mobile_hero: 'mobile_hero',
+} as const
+export type AffiliateSurface = (typeof AffiliateSurface)[keyof typeof AffiliateSurface]
+
+/**
+ *
+ * @export
+ * @interface AffiliateWebhookPayload
+ */
+export interface AffiliateWebhookPayload {
+  /**
+   * Partner-side unique event id. Replays of the same id write nothing.
+   * @type {string}
+   * @memberof AffiliateWebhookPayload
+   */
+  eventId: string
+  /**
+   * The token issued at click time. An unknown token is still recorded, unattributed.
+   * @type {string}
+   * @memberof AffiliateWebhookPayload
+   */
+  clickToken: string
+  /**
+   * ISO 8601 UTC instant the conversion happened partner-side.
+   * @type {string}
+   * @memberof AffiliateWebhookPayload
+   */
+  occurredAt: string
+  /**
+   *
+   * @type {AffiliateWebhookPayloadStatusEnum}
+   * @memberof AffiliateWebhookPayload
+   */
+  status: AffiliateWebhookPayloadStatusEnum
+  /**
+   * Integer minor units. Floating-point money is prohibited.
+   * @type {number}
+   * @memberof AffiliateWebhookPayload
+   */
+  orderValueMinorUnits: number
+  /**
+   * ISO 4217 alpha-3, uppercase.
+   * @type {string}
+   * @memberof AffiliateWebhookPayload
+   */
+  currency: string
+}
+
+/**
+ * @export
+ */
+export const AffiliateWebhookPayloadStatusEnum = {
+  pending: 'pending',
+  confirmed: 'confirmed',
+  reversed: 'reversed',
+} as const
+export type AffiliateWebhookPayloadStatusEnum =
+  (typeof AffiliateWebhookPayloadStatusEnum)[keyof typeof AffiliateWebhookPayloadStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface AffiliateWebhookResponse
+ */
+export interface AffiliateWebhookResponse {
+  /**
+   *
+   * @type {AffiliateWebhookResponseData}
+   * @memberof AffiliateWebhookResponse
+   */
+  data: AffiliateWebhookResponseData
+}
+/**
+ *
+ * @export
+ * @interface AffiliateWebhookResponseData
+ */
+export interface AffiliateWebhookResponseData {
+  /**
+   *
+   * @type {AffiliateWebhookResponseDataReceivedEnum}
+   * @memberof AffiliateWebhookResponseData
+   */
+  received: AffiliateWebhookResponseDataReceivedEnum
+}
+
+/**
+ * @export
+ */
+export const AffiliateWebhookResponseDataReceivedEnum = {
+  true: true,
+} as const
+export type AffiliateWebhookResponseDataReceivedEnum =
+  (typeof AffiliateWebhookResponseDataReceivedEnum)[keyof typeof AffiliateWebhookResponseDataReceivedEnum]
+
+/**
+ * Cross-field invariant enforced at runtime and NOT expressible in this schema: when quietHoursEnabled is true, quietHoursStart and quietHoursEnd must differ. JSON Schema has no operator comparing two sibling properties, so this rule is only visible here and in the 400 returned when it is violated.
+ * @export
  * @interface AlertPreferences
  */
 export interface AlertPreferences {
@@ -36,7 +210,7 @@ export interface AlertPreferences {
    */
   quietHoursEnd: string
   /**
-   *
+   * Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected.
    * @type {string}
    * @memberof AlertPreferences
    */
@@ -891,6 +1065,45 @@ export type ComfortRun = (typeof ComfortRun)[keyof typeof ComfortRun]
 /**
  *
  * @export
+ * @interface CommercePreference
+ */
+export interface CommercePreference {
+  /**
+   * False hides every affiliate CTA. Defaults true; a user with no stored row reads as true.
+   * @type {boolean}
+   * @memberof CommercePreference
+   */
+  affiliateCtasEnabled: boolean
+}
+/**
+ *
+ * @export
+ * @interface CommercePreferenceResponse
+ */
+export interface CommercePreferenceResponse {
+  /**
+   *
+   * @type {CommercePreferenceResponseData}
+   * @memberof CommercePreferenceResponse
+   */
+  data: CommercePreferenceResponseData
+}
+/**
+ *
+ * @export
+ * @interface CommercePreferenceResponseData
+ */
+export interface CommercePreferenceResponseData {
+  /**
+   * False hides every affiliate CTA. Defaults true; a user with no stored row reads as true.
+   * @type {boolean}
+   * @memberof CommercePreferenceResponseData
+   */
+  affiliateCtasEnabled: boolean
+}
+/**
+ *
+ * @export
  * @interface CommitSilhouettePhotoInput
  */
 export interface CommitSilhouettePhotoInput {
@@ -1018,7 +1231,7 @@ export interface CreateGarmentItemResponseData {
    */
   id: string
   /**
-   *
+   * Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch.
    * @type {CreateGarmentItemResponseDataStatusEnum}
    * @memberof CreateGarmentItemResponseData
    */
@@ -1054,7 +1267,7 @@ export interface CreateGarmentItemResponseData {
    */
   fileSizeBytes: number | null
   /**
-   *
+   * Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error.
    * @type {CreateGarmentItemResponseDataMimeTypeEnum}
    * @memberof CreateGarmentItemResponseData
    */
@@ -1309,13 +1522,13 @@ export interface CreateGarmentUploadUrlResponseDataRequiredHeaders {
  */
 export interface CreateOutfitCapsuleInput {
   /**
-   *
+   * Trimmed and NFC-normalized before validation, then bounded to 1-60 extended grapheme clusters (user-perceived characters), not UTF-16 code units. A JSON Schema maxLength cannot express this: an emoji with a skin-tone modifier counts as one here and as four code units there. null bytes are rejected because PostgreSQL text cannot store them.
    * @type {string}
    * @memberof CreateOutfitCapsuleInput
    */
   name: string
   /**
-   *
+   * Trimmed and NFC-normalized before validation, then bounded to 0-280 extended grapheme clusters (user-perceived characters), not UTF-16 code units. A JSON Schema maxLength cannot express this: an emoji with a skin-tone modifier counts as one here and as four code units there. null bytes are rejected because PostgreSQL text cannot store them.
    * @type {string}
    * @memberof CreateOutfitCapsuleInput
    */
@@ -1327,7 +1540,7 @@ export interface CreateOutfitCapsuleInput {
    */
   occasions: Array<CreateOutfitCapsuleInputOccasionsEnum>
   /**
-   *
+   * Collection invariant enforced at runtime and NOT expressible in this schema: garmentIds must contain no duplicates. JSON Schema uniqueItems would express this for a plain string array, but it is not emitted here, so the rule is only visible in this description and in the 400 returned when it is violated.
    * @type {Array<string>}
    * @memberof CreateOutfitCapsuleInput
    */
@@ -2162,7 +2375,7 @@ export interface GetAlertPreferencesResponseData {
   rules: Array<UpdateAlertRulesInputRulesInner>
 }
 /**
- *
+ * Cross-field invariant enforced at runtime and NOT expressible in this schema: when quietHoursEnabled is true, quietHoursStart and quietHoursEnd must differ. JSON Schema has no operator comparing two sibling properties, so this rule is only visible here and in the 400 returned when it is violated.
  * @export
  * @interface GetAlertPreferencesResponseDataPreferences
  */
@@ -2192,7 +2405,7 @@ export interface GetAlertPreferencesResponseDataPreferences {
    */
   quietHoursEnd: string
   /**
-   *
+   * Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected.
    * @type {string}
    * @memberof GetAlertPreferencesResponseDataPreferences
    */
@@ -3758,7 +3971,7 @@ export interface RitualResponseData {
    */
   weather: LatestWeatherResponseDataOneOfWeather
   /**
-   *
+   * Collection invariant enforced at runtime and NOT expressible in this schema: the three outfits always cover three distinct scenarios (morning, midday, evening), one each. The server never emits a repeated scenario, so consumers may key on scenario without deduplicating, and fixtures must not repeat one.
    * @type {Array<RitualResponseDataOutfitsInner>}
    * @memberof RitualResponseData
    */
@@ -3824,6 +4037,12 @@ export interface RitualResponseDataOutfitsInner {
    * @memberof RitualResponseDataOutfitsInner
    */
   autoFilledGarmentIds?: Array<string>
+  /**
+   *
+   * @type {ScenarioOutfitShopThisLook}
+   * @memberof RitualResponseDataOutfitsInner
+   */
+  shopThisLook: ScenarioOutfitShopThisLook
 }
 
 /**
@@ -4001,6 +4220,12 @@ export interface ScenarioOutfit {
    * @memberof ScenarioOutfit
    */
   autoFilledGarmentIds?: Array<string>
+  /**
+   *
+   * @type {ScenarioOutfitShopThisLook}
+   * @memberof ScenarioOutfit
+   */
+  shopThisLook: ScenarioOutfitShopThisLook
 }
 
 /**
@@ -4039,6 +4264,58 @@ export interface ScenarioOutfitReasoningBadgesInner {
    */
   bullets: Array<string>
 }
+/**
+ * Always present. null means the acting user is not eligible for an affiliate CTA on this card, for any reason: the feature flag is off, the user opted out, or no active in-window offer matched a slot. Never populated from a cached payload.
+ * @export
+ * @interface ScenarioOutfitShopThisLook
+ */
+export interface ScenarioOutfitShopThisLook {
+  /**
+   * CommercePartner.slug. Stable, safe to log.
+   * @type {string}
+   * @memberof ScenarioOutfitShopThisLook
+   */
+  partnerId: string
+  /**
+   * Rendered next to the CTA.
+   * @type {string}
+   * @memberof ScenarioOutfitShopThisLook
+   */
+  partnerDisplayName: string
+  /**
+   * Pass back to POST /api/v1/commerce/affiliate/clicks.
+   * @type {string}
+   * @memberof ScenarioOutfitShopThisLook
+   */
+  offerId: string
+  /**
+   * Partner-authored, already localized by the catalog row.
+   * @type {string}
+   * @memberof ScenarioOutfitShopThisLook
+   */
+  offerTitle: string
+  /**
+   * The outfit slot this offer matched.
+   * @type {ScenarioOutfitShopThisLookGarmentCategoryEnum}
+   * @memberof ScenarioOutfitShopThisLook
+   */
+  garmentCategory: ScenarioOutfitShopThisLookGarmentCategoryEnum | null
+}
+
+/**
+ * @export
+ */
+export const ScenarioOutfitShopThisLookGarmentCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type ScenarioOutfitShopThisLookGarmentCategoryEnum =
+  (typeof ScenarioOutfitShopThisLookGarmentCategoryEnum)[keyof typeof ScenarioOutfitShopThisLookGarmentCategoryEnum]
+
 /**
  *
  * @export
@@ -4099,6 +4376,58 @@ export interface SetPrimarySavedLocationResponse {
 /**
  *
  * @export
+ * @interface ShopThisLook
+ */
+export interface ShopThisLook {
+  /**
+   * CommercePartner.slug. Stable, safe to log.
+   * @type {string}
+   * @memberof ShopThisLook
+   */
+  partnerId: string
+  /**
+   * Rendered next to the CTA.
+   * @type {string}
+   * @memberof ShopThisLook
+   */
+  partnerDisplayName: string
+  /**
+   * Pass back to POST /api/v1/commerce/affiliate/clicks.
+   * @type {string}
+   * @memberof ShopThisLook
+   */
+  offerId: string
+  /**
+   * Partner-authored, already localized by the catalog row.
+   * @type {string}
+   * @memberof ShopThisLook
+   */
+  offerTitle: string
+  /**
+   * The outfit slot this offer matched.
+   * @type {ShopThisLookGarmentCategoryEnum}
+   * @memberof ShopThisLook
+   */
+  garmentCategory: ShopThisLookGarmentCategoryEnum | null
+}
+
+/**
+ * @export
+ */
+export const ShopThisLookGarmentCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type ShopThisLookGarmentCategoryEnum =
+  (typeof ShopThisLookGarmentCategoryEnum)[keyof typeof ShopThisLookGarmentCategoryEnum]
+
+/**
+ *
+ * @export
  * @interface SignupInput
  */
 export interface SignupInput {
@@ -4109,53 +4438,117 @@ export interface SignupInput {
    */
   email: string
   /**
-   *
+   * Invariant enforced at runtime and NOT expressible in this schema: beyond the YYYY-MM-DD pattern, the value must be a real calendar date. The pattern alone accepts 2026-02-31 and 2026-13-01; both are rejected here.
    * @type {string}
    * @memberof SignupInput
    */
   birthdate: string
 }
 /**
+ * @type SignupResponse
+ * guardianConsentRequired is a function of accountStatus, never independent of it, so each variant fixes both together. Treat accountStatus as the source of truth; a response where the two disagree is unrepresentable.
+ * @export
+ */
+export type SignupResponse = SignupResponseOneOf | SignupResponseOneOf1
+/**
  *
  * @export
- * @interface SignupResponse
+ * @interface SignupResponseOneOf
  */
-export interface SignupResponse {
+export interface SignupResponseOneOf {
   /**
    *
    * @type {string}
-   * @memberof SignupResponse
+   * @memberof SignupResponseOneOf
    */
   userId: string
   /**
    *
    * @type {number}
-   * @memberof SignupResponse
+   * @memberof SignupResponseOneOf
    */
   age: number
   /**
    *
-   * @type {SignupResponseAccountStatusEnum}
-   * @memberof SignupResponse
+   * @type {SignupResponseOneOfAccountStatusEnum}
+   * @memberof SignupResponseOneOf
    */
-  accountStatus: SignupResponseAccountStatusEnum
+  accountStatus: SignupResponseOneOfAccountStatusEnum
   /**
    *
-   * @type {boolean}
-   * @memberof SignupResponse
+   * @type {SignupResponseOneOfGuardianConsentRequiredEnum}
+   * @memberof SignupResponseOneOf
    */
-  guardianConsentRequired: boolean
+  guardianConsentRequired: SignupResponseOneOfGuardianConsentRequiredEnum
 }
 
 /**
  * @export
  */
-export const SignupResponseAccountStatusEnum = {
+export const SignupResponseOneOfAccountStatusEnum = {
   active: 'active',
+} as const
+export type SignupResponseOneOfAccountStatusEnum =
+  (typeof SignupResponseOneOfAccountStatusEnum)[keyof typeof SignupResponseOneOfAccountStatusEnum]
+
+/**
+ * @export
+ */
+export const SignupResponseOneOfGuardianConsentRequiredEnum = {
+  false: false,
+} as const
+export type SignupResponseOneOfGuardianConsentRequiredEnum =
+  (typeof SignupResponseOneOfGuardianConsentRequiredEnum)[keyof typeof SignupResponseOneOfGuardianConsentRequiredEnum]
+
+/**
+ *
+ * @export
+ * @interface SignupResponseOneOf1
+ */
+export interface SignupResponseOneOf1 {
+  /**
+   *
+   * @type {string}
+   * @memberof SignupResponseOneOf1
+   */
+  userId: string
+  /**
+   *
+   * @type {number}
+   * @memberof SignupResponseOneOf1
+   */
+  age: number
+  /**
+   *
+   * @type {SignupResponseOneOf1AccountStatusEnum}
+   * @memberof SignupResponseOneOf1
+   */
+  accountStatus: SignupResponseOneOf1AccountStatusEnum
+  /**
+   *
+   * @type {SignupResponseOneOf1GuardianConsentRequiredEnum}
+   * @memberof SignupResponseOneOf1
+   */
+  guardianConsentRequired: SignupResponseOneOf1GuardianConsentRequiredEnum
+}
+
+/**
+ * @export
+ */
+export const SignupResponseOneOf1AccountStatusEnum = {
   pending_guardian_consent: 'pending_guardian_consent',
 } as const
-export type SignupResponseAccountStatusEnum =
-  (typeof SignupResponseAccountStatusEnum)[keyof typeof SignupResponseAccountStatusEnum]
+export type SignupResponseOneOf1AccountStatusEnum =
+  (typeof SignupResponseOneOf1AccountStatusEnum)[keyof typeof SignupResponseOneOf1AccountStatusEnum]
+
+/**
+ * @export
+ */
+export const SignupResponseOneOf1GuardianConsentRequiredEnum = {
+  true: true,
+} as const
+export type SignupResponseOneOf1GuardianConsentRequiredEnum =
+  (typeof SignupResponseOneOf1GuardianConsentRequiredEnum)[keyof typeof SignupResponseOneOf1GuardianConsentRequiredEnum]
 
 /**
  *
@@ -4510,7 +4903,7 @@ export interface SilhouetteProfileResponseData {
    * @type {SilhouetteProfileResponseDataMyForm}
    * @memberof SilhouetteProfileResponseData
    */
-  myForm: SilhouetteProfileResponseDataMyForm
+  myForm: SilhouetteProfileResponseDataMyForm | null
   /**
    *
    * @type {number}
@@ -4536,33 +4929,167 @@ export type SilhouetteProfileResponseDataModeEnum =
   (typeof SilhouetteProfileResponseDataModeEnum)[keyof typeof SilhouetteProfileResponseDataModeEnum]
 
 /**
+ * @type SilhouetteProfileResponseDataMyForm
+ * One variant per photo status. committedAt is present exactly on the committed statuses, failureReason exactly on failed, and imageAccess exactly on ready. Expressing this as variants rather than an invisible runtime check means a combination such as a ready photo with a null imageAccess is unrepresentable in the generated types.
+ * @export
+ */
+export type SilhouetteProfileResponseDataMyForm =
+  | SilhouetteProfileResponseDataMyFormOneOf
+  | SilhouetteProfileResponseDataMyFormOneOf1
+  | SilhouetteProfileResponseDataMyFormOneOf2
+  | SilhouetteProfileResponseDataMyFormOneOf3
+  | SilhouetteProfileResponseDataMyFormOneOf4
+/**
  *
  * @export
- * @interface SilhouetteProfileResponseDataMyForm
+ * @interface SilhouetteProfileResponseDataMyFormOneOf
  */
-export interface SilhouetteProfileResponseDataMyForm {
+export interface SilhouetteProfileResponseDataMyFormOneOf {
   /**
    *
-   * @type {SilhouetteProfileResponseDataMyFormStatusEnum}
-   * @memberof SilhouetteProfileResponseDataMyForm
+   * @type {SilhouetteProfileResponseDataMyFormOneOfStatusEnum}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf
    */
-  status: SilhouetteProfileResponseDataMyFormStatusEnum
+  status: SilhouetteProfileResponseDataMyFormOneOfStatusEnum
   /**
    *
-   * @type {SilhouetteProfileResponseDataMyFormFailureReasonEnum}
-   * @memberof SilhouetteProfileResponseDataMyForm
+   * @type {null}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf
    */
-  failureReason: SilhouetteProfileResponseDataMyFormFailureReasonEnum | null
+  failureReason: null
+  /**
+   *
+   * @type {null}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf
+   */
+  committedAt: null
+  /**
+   *
+   * @type {null}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf
+   */
+  imageAccess: null
+}
+
+/**
+ * @export
+ */
+export const SilhouetteProfileResponseDataMyFormOneOfStatusEnum = {
+  pending_upload: 'pending_upload',
+} as const
+export type SilhouetteProfileResponseDataMyFormOneOfStatusEnum =
+  (typeof SilhouetteProfileResponseDataMyFormOneOfStatusEnum)[keyof typeof SilhouetteProfileResponseDataMyFormOneOfStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface SilhouetteProfileResponseDataMyFormOneOf1
+ */
+export interface SilhouetteProfileResponseDataMyFormOneOf1 {
+  /**
+   *
+   * @type {SilhouetteProfileResponseDataMyFormOneOf1StatusEnum}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf1
+   */
+  status: SilhouetteProfileResponseDataMyFormOneOf1StatusEnum
+  /**
+   *
+   * @type {null}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf1
+   */
+  failureReason: null
+  /**
+   *
+   * @type {null}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf1
+   */
+  committedAt: null
+  /**
+   *
+   * @type {null}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf1
+   */
+  imageAccess: null
+}
+
+/**
+ * @export
+ */
+export const SilhouetteProfileResponseDataMyFormOneOf1StatusEnum = {
+  bytes_uploaded: 'bytes_uploaded',
+} as const
+export type SilhouetteProfileResponseDataMyFormOneOf1StatusEnum =
+  (typeof SilhouetteProfileResponseDataMyFormOneOf1StatusEnum)[keyof typeof SilhouetteProfileResponseDataMyFormOneOf1StatusEnum]
+
+/**
+ *
+ * @export
+ * @interface SilhouetteProfileResponseDataMyFormOneOf2
+ */
+export interface SilhouetteProfileResponseDataMyFormOneOf2 {
+  /**
+   *
+   * @type {SilhouetteProfileResponseDataMyFormOneOf2StatusEnum}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf2
+   */
+  status: SilhouetteProfileResponseDataMyFormOneOf2StatusEnum
+  /**
+   *
+   * @type {null}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf2
+   */
+  failureReason: null
   /**
    *
    * @type {string}
-   * @memberof SilhouetteProfileResponseDataMyForm
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf2
    */
-  committedAt: string | null
+  committedAt: string
+  /**
+   *
+   * @type {null}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf2
+   */
+  imageAccess: null
+}
+
+/**
+ * @export
+ */
+export const SilhouetteProfileResponseDataMyFormOneOf2StatusEnum = {
+  processing: 'processing',
+} as const
+export type SilhouetteProfileResponseDataMyFormOneOf2StatusEnum =
+  (typeof SilhouetteProfileResponseDataMyFormOneOf2StatusEnum)[keyof typeof SilhouetteProfileResponseDataMyFormOneOf2StatusEnum]
+
+/**
+ *
+ * @export
+ * @interface SilhouetteProfileResponseDataMyFormOneOf3
+ */
+export interface SilhouetteProfileResponseDataMyFormOneOf3 {
+  /**
+   *
+   * @type {SilhouetteProfileResponseDataMyFormOneOf3StatusEnum}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf3
+   */
+  status: SilhouetteProfileResponseDataMyFormOneOf3StatusEnum
+  /**
+   *
+   * @type {null}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf3
+   */
+  failureReason: null
+  /**
+   *
+   * @type {string}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf3
+   */
+  committedAt: string
   /**
    *
    * @type {CreateGarmentItemResponseDataImageAccess}
-   * @memberof SilhouetteProfileResponseDataMyForm
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf3
    */
   imageAccess: CreateGarmentItemResponseDataImageAccess
 }
@@ -4570,27 +5097,64 @@ export interface SilhouetteProfileResponseDataMyForm {
 /**
  * @export
  */
-export const SilhouetteProfileResponseDataMyFormStatusEnum = {
-  pending_upload: 'pending_upload',
-  bytes_uploaded: 'bytes_uploaded',
-  processing: 'processing',
+export const SilhouetteProfileResponseDataMyFormOneOf3StatusEnum = {
   ready: 'ready',
-  failed: 'failed',
 } as const
-export type SilhouetteProfileResponseDataMyFormStatusEnum =
-  (typeof SilhouetteProfileResponseDataMyFormStatusEnum)[keyof typeof SilhouetteProfileResponseDataMyFormStatusEnum]
+export type SilhouetteProfileResponseDataMyFormOneOf3StatusEnum =
+  (typeof SilhouetteProfileResponseDataMyFormOneOf3StatusEnum)[keyof typeof SilhouetteProfileResponseDataMyFormOneOf3StatusEnum]
+
+/**
+ *
+ * @export
+ * @interface SilhouetteProfileResponseDataMyFormOneOf4
+ */
+export interface SilhouetteProfileResponseDataMyFormOneOf4 {
+  /**
+   *
+   * @type {SilhouetteProfileResponseDataMyFormOneOf4StatusEnum}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf4
+   */
+  status: SilhouetteProfileResponseDataMyFormOneOf4StatusEnum
+  /**
+   *
+   * @type {SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf4
+   */
+  failureReason: SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum
+  /**
+   *
+   * @type {string}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf4
+   */
+  committedAt: string
+  /**
+   *
+   * @type {null}
+   * @memberof SilhouetteProfileResponseDataMyFormOneOf4
+   */
+  imageAccess: null
+}
 
 /**
  * @export
  */
-export const SilhouetteProfileResponseDataMyFormFailureReasonEnum = {
+export const SilhouetteProfileResponseDataMyFormOneOf4StatusEnum = {
+  failed: 'failed',
+} as const
+export type SilhouetteProfileResponseDataMyFormOneOf4StatusEnum =
+  (typeof SilhouetteProfileResponseDataMyFormOneOf4StatusEnum)[keyof typeof SilhouetteProfileResponseDataMyFormOneOf4StatusEnum]
+
+/**
+ * @export
+ */
+export const SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum = {
   contrast: 'contrast',
   privacy_violation: 'privacy_violation',
   timeout: 'timeout',
   storage_error: 'storage_error',
 } as const
-export type SilhouetteProfileResponseDataMyFormFailureReasonEnum =
-  (typeof SilhouetteProfileResponseDataMyFormFailureReasonEnum)[keyof typeof SilhouetteProfileResponseDataMyFormFailureReasonEnum]
+export type SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum =
+  (typeof SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum)[keyof typeof SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum]
 
 /**
  *
@@ -4856,7 +5420,7 @@ export type UnauthorizedHttpErrorErrorEnum =
   (typeof UnauthorizedHttpErrorErrorEnum)[keyof typeof UnauthorizedHttpErrorErrorEnum]
 
 /**
- *
+ * Collection invariant enforced at runtime and NOT expressible in this schema: ruleType must be unique across rules. JSON Schema uniqueItems compares whole items, so two rules sharing a ruleType but differing elsewhere would pass it while being rejected here.
  * @export
  * @interface UpdateAlertRulesInput
  */
@@ -4978,6 +5542,32 @@ export interface UpdateComfortPreferencesResponse {
 /**
  *
  * @export
+ * @interface UpdateCommercePreferenceInput
+ */
+export interface UpdateCommercePreferenceInput {
+  /**
+   * False hides every affiliate CTA. Defaults true; a user with no stored row reads as true.
+   * @type {boolean}
+   * @memberof UpdateCommercePreferenceInput
+   */
+  affiliateCtasEnabled: boolean
+}
+/**
+ *
+ * @export
+ * @interface UpdateCommercePreferenceResponse
+ */
+export interface UpdateCommercePreferenceResponse {
+  /**
+   *
+   * @type {CommercePreferenceResponseData}
+   * @memberof UpdateCommercePreferenceResponse
+   */
+  data: CommercePreferenceResponseData
+}
+/**
+ *
+ * @export
  * @interface UpdateGarmentTagsInput
  */
 export interface UpdateGarmentTagsInput {
@@ -5059,7 +5649,7 @@ export interface UpdateGarmentTagsResponse {
   data: CreateGarmentItemResponseData
 }
 /**
- *
+ * Cross-field invariant enforced at runtime and NOT expressible in this schema: when quietHoursEnabled is true, quietHoursStart and quietHoursEnd must differ. JSON Schema has no operator comparing two sibling properties, so this rule is only visible here and in the 400 returned when it is violated.
  * @export
  * @interface UpdateNotificationPreferencesInput
  */
@@ -5089,7 +5679,7 @@ export interface UpdateNotificationPreferencesInput {
    */
   quietHoursEnd: string
   /**
-   *
+   * Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected.
    * @type {string}
    * @memberof UpdateNotificationPreferencesInput
    */
@@ -5128,13 +5718,13 @@ export interface UpdateNotificationPreferencesResponseData {
  */
 export interface UpdateOutfitCapsuleInput {
   /**
-   *
+   * Trimmed and NFC-normalized before validation, then bounded to 1-60 extended grapheme clusters (user-perceived characters), not UTF-16 code units. A JSON Schema maxLength cannot express this: an emoji with a skin-tone modifier counts as one here and as four code units there. null bytes are rejected because PostgreSQL text cannot store them.
    * @type {string}
    * @memberof UpdateOutfitCapsuleInput
    */
   name?: string
   /**
-   *
+   * Trimmed and NFC-normalized before validation, then bounded to 0-280 extended grapheme clusters (user-perceived characters), not UTF-16 code units. A JSON Schema maxLength cannot express this: an emoji with a skin-tone modifier counts as one here and as four code units there. null bytes are rejected because PostgreSQL text cannot store them.
    * @type {string}
    * @memberof UpdateOutfitCapsuleInput
    */
@@ -5146,7 +5736,7 @@ export interface UpdateOutfitCapsuleInput {
    */
   occasions?: Array<UpdateOutfitCapsuleInputOccasionsEnum>
   /**
-   *
+   * Collection invariant enforced at runtime and NOT expressible in this schema: garmentIds must contain no duplicates. JSON Schema uniqueItems would express this for a plain string array, but it is not emitted here, so the rule is only visible in this description and in the 400 returned when it is violated.
    * @type {Array<string>}
    * @memberof UpdateOutfitCapsuleInput
    */
@@ -5176,7 +5766,7 @@ export type UpdateOutfitCapsuleInputOccasionsEnum =
   (typeof UpdateOutfitCapsuleInputOccasionsEnum)[keyof typeof UpdateOutfitCapsuleInputOccasionsEnum]
 
 /**
- *
+ * Cross-field invariants enforced at runtime and NOT expressible in this schema: (1) at least one property must be present, so an empty patch body is rejected rather than treated as a no-op; (2) locationKey, latitude, longitude, and timezone form one identity group and must be sent all together or not at all, because updating a coordinate without its key would leave the row internally inconsistent.
  * @export
  * @interface UpdateSavedLocationInput
  */
@@ -5519,51 +6109,137 @@ export interface WardrobeOnboardingStateResponse {
   data: WardrobeOnboardingStateResponseData
 }
 /**
+ * @type WardrobeOnboardingStateResponseData
+ * One variant per lifecycle status. The correlations between status, currentStep, startedAt, completedAt and revision are expressed by the variants themselves rather than enforced by an invisible runtime check, so an invalid combination such as a completed state with a null completedAt is unrepresentable in the generated types.
+ * @export
+ */
+export type WardrobeOnboardingStateResponseData =
+  | WardrobeOnboardingStateResponseDataOneOf
+  | WardrobeOnboardingStateResponseDataOneOf1
+  | WardrobeOnboardingStateResponseDataOneOf2
+/**
  *
  * @export
- * @interface WardrobeOnboardingStateResponseData
+ * @interface WardrobeOnboardingStateResponseDataOneOf
  */
-export interface WardrobeOnboardingStateResponseData {
+export interface WardrobeOnboardingStateResponseDataOneOf {
   /**
    *
-   * @type {WardrobeOnboardingStateResponseDataStatusEnum}
-   * @memberof WardrobeOnboardingStateResponseData
+   * @type {WardrobeOnboardingStateResponseDataOneOfStatusEnum}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf
    */
-  status: WardrobeOnboardingStateResponseDataStatusEnum
+  status: WardrobeOnboardingStateResponseDataOneOfStatusEnum
   /**
    *
-   * @type {WardrobeOnboardingStateResponseDataCurrentStepEnum}
-   * @memberof WardrobeOnboardingStateResponseData
+   * @type {WardrobeOnboardingStateResponseDataOneOfCurrentStepEnum}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf
    */
-  currentStep: WardrobeOnboardingStateResponseDataCurrentStepEnum
+  currentStep: WardrobeOnboardingStateResponseDataOneOfCurrentStepEnum
   /**
    *
    * @type {boolean}
-   * @memberof WardrobeOnboardingStateResponseData
+   * @memberof WardrobeOnboardingStateResponseDataOneOf
    */
   usedStarterWardrobe: boolean
   /**
    *
    * @type {number}
-   * @memberof WardrobeOnboardingStateResponseData
+   * @memberof WardrobeOnboardingStateResponseDataOneOf
+   */
+  garmentsCapturedCount: number
+  /**
+   *
+   * @type {null}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf
+   */
+  startedAt: null
+  /**
+   *
+   * @type {null}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf
+   */
+  completedAt: null
+  /**
+   *
+   * @type {WardrobeOnboardingStateResponseDataOneOfRevisionEnum}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf
+   */
+  revision: WardrobeOnboardingStateResponseDataOneOfRevisionEnum
+}
+
+/**
+ * @export
+ */
+export const WardrobeOnboardingStateResponseDataOneOfStatusEnum = {
+  not_started: 'not_started',
+} as const
+export type WardrobeOnboardingStateResponseDataOneOfStatusEnum =
+  (typeof WardrobeOnboardingStateResponseDataOneOfStatusEnum)[keyof typeof WardrobeOnboardingStateResponseDataOneOfStatusEnum]
+
+/**
+ * @export
+ */
+export const WardrobeOnboardingStateResponseDataOneOfCurrentStepEnum = {
+  permission: 'permission',
+} as const
+export type WardrobeOnboardingStateResponseDataOneOfCurrentStepEnum =
+  (typeof WardrobeOnboardingStateResponseDataOneOfCurrentStepEnum)[keyof typeof WardrobeOnboardingStateResponseDataOneOfCurrentStepEnum]
+
+/**
+ * @export
+ */
+export const WardrobeOnboardingStateResponseDataOneOfRevisionEnum = {
+  NUMBER_0: 0,
+} as const
+export type WardrobeOnboardingStateResponseDataOneOfRevisionEnum =
+  (typeof WardrobeOnboardingStateResponseDataOneOfRevisionEnum)[keyof typeof WardrobeOnboardingStateResponseDataOneOfRevisionEnum]
+
+/**
+ *
+ * @export
+ * @interface WardrobeOnboardingStateResponseDataOneOf1
+ */
+export interface WardrobeOnboardingStateResponseDataOneOf1 {
+  /**
+   *
+   * @type {WardrobeOnboardingStateResponseDataOneOf1StatusEnum}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf1
+   */
+  status: WardrobeOnboardingStateResponseDataOneOf1StatusEnum
+  /**
+   *
+   * @type {WardrobeOnboardingStateResponseDataOneOf1CurrentStepEnum}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf1
+   */
+  currentStep: WardrobeOnboardingStateResponseDataOneOf1CurrentStepEnum
+  /**
+   *
+   * @type {boolean}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf1
+   */
+  usedStarterWardrobe: boolean
+  /**
+   *
+   * @type {number}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf1
    */
   garmentsCapturedCount: number
   /**
    *
    * @type {string}
-   * @memberof WardrobeOnboardingStateResponseData
+   * @memberof WardrobeOnboardingStateResponseDataOneOf1
    */
-  startedAt: string | null
+  startedAt: string
   /**
    *
-   * @type {string}
-   * @memberof WardrobeOnboardingStateResponseData
+   * @type {null}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf1
    */
-  completedAt: string | null
+  completedAt: null
   /**
    *
    * @type {number}
-   * @memberof WardrobeOnboardingStateResponseData
+   * @memberof WardrobeOnboardingStateResponseDataOneOf1
    */
   revision: number
 }
@@ -5571,26 +6247,91 @@ export interface WardrobeOnboardingStateResponseData {
 /**
  * @export
  */
-export const WardrobeOnboardingStateResponseDataStatusEnum = {
-  not_started: 'not_started',
+export const WardrobeOnboardingStateResponseDataOneOf1StatusEnum = {
   in_progress: 'in_progress',
-  completed: 'completed',
 } as const
-export type WardrobeOnboardingStateResponseDataStatusEnum =
-  (typeof WardrobeOnboardingStateResponseDataStatusEnum)[keyof typeof WardrobeOnboardingStateResponseDataStatusEnum]
+export type WardrobeOnboardingStateResponseDataOneOf1StatusEnum =
+  (typeof WardrobeOnboardingStateResponseDataOneOf1StatusEnum)[keyof typeof WardrobeOnboardingStateResponseDataOneOf1StatusEnum]
 
 /**
  * @export
  */
-export const WardrobeOnboardingStateResponseDataCurrentStepEnum = {
+export const WardrobeOnboardingStateResponseDataOneOf1CurrentStepEnum = {
   permission: 'permission',
   capture: 'capture',
   tagging: 'tagging',
   silhouette: 'silhouette',
+} as const
+export type WardrobeOnboardingStateResponseDataOneOf1CurrentStepEnum =
+  (typeof WardrobeOnboardingStateResponseDataOneOf1CurrentStepEnum)[keyof typeof WardrobeOnboardingStateResponseDataOneOf1CurrentStepEnum]
+
+/**
+ *
+ * @export
+ * @interface WardrobeOnboardingStateResponseDataOneOf2
+ */
+export interface WardrobeOnboardingStateResponseDataOneOf2 {
+  /**
+   *
+   * @type {WardrobeOnboardingStateResponseDataOneOf2StatusEnum}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf2
+   */
+  status: WardrobeOnboardingStateResponseDataOneOf2StatusEnum
+  /**
+   *
+   * @type {WardrobeOnboardingStateResponseDataOneOf2CurrentStepEnum}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf2
+   */
+  currentStep: WardrobeOnboardingStateResponseDataOneOf2CurrentStepEnum
+  /**
+   *
+   * @type {boolean}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf2
+   */
+  usedStarterWardrobe: boolean
+  /**
+   *
+   * @type {number}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf2
+   */
+  garmentsCapturedCount: number
+  /**
+   *
+   * @type {string}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf2
+   */
+  startedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf2
+   */
+  completedAt: string
+  /**
+   *
+   * @type {number}
+   * @memberof WardrobeOnboardingStateResponseDataOneOf2
+   */
+  revision: number
+}
+
+/**
+ * @export
+ */
+export const WardrobeOnboardingStateResponseDataOneOf2StatusEnum = {
+  completed: 'completed',
+} as const
+export type WardrobeOnboardingStateResponseDataOneOf2StatusEnum =
+  (typeof WardrobeOnboardingStateResponseDataOneOf2StatusEnum)[keyof typeof WardrobeOnboardingStateResponseDataOneOf2StatusEnum]
+
+/**
+ * @export
+ */
+export const WardrobeOnboardingStateResponseDataOneOf2CurrentStepEnum = {
   complete: 'complete',
 } as const
-export type WardrobeOnboardingStateResponseDataCurrentStepEnum =
-  (typeof WardrobeOnboardingStateResponseDataCurrentStepEnum)[keyof typeof WardrobeOnboardingStateResponseDataCurrentStepEnum]
+export type WardrobeOnboardingStateResponseDataOneOf2CurrentStepEnum =
+  (typeof WardrobeOnboardingStateResponseDataOneOf2CurrentStepEnum)[keyof typeof WardrobeOnboardingStateResponseDataOneOf2CurrentStepEnum]
 
 /**
  *

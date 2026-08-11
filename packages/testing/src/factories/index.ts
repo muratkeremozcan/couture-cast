@@ -57,6 +57,19 @@ export {
   persistSilhouetteProfile,
 } from './silhouette-profile.factory.js'
 export {
+  createAffiliateClick,
+  createAffiliateConversion,
+  createAffiliateOffer,
+  createCommercePartner,
+  createCommercePreference,
+  persistAffiliateClick,
+  persistAffiliateConversion,
+  persistAffiliateOffer,
+  persistCommerceCatalog,
+  persistCommercePartner,
+  persistCommercePreference,
+} from './commerce.factory.js'
+export {
   DEFAULT_FACTORY_REGISTRY_KEYS,
   createFactoryRegistry,
   factoryRegistry,
@@ -138,3 +151,16 @@ export type {
   SilhouetteProfileFactoryOverrides,
   SilhouetteProfileFixture,
 } from './silhouette-profile.factory.js'
+export type {
+  AffiliateClickFactoryOverrides,
+  AffiliateClickFixture,
+  AffiliateConversionFactoryOverrides,
+  AffiliateConversionFixture,
+  AffiliateOfferFactoryOverrides,
+  AffiliateOfferFixture,
+  CommercePartnerFactoryOverrides,
+  CommercePartnerFixture,
+  CommercePreferenceFactoryOverrides,
+  CommercePreferenceFixture,
+  PersistedCommerceCatalog,
+} from './commerce.factory.js'

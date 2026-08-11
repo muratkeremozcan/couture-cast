@@ -2,6 +2,7 @@
 export * from './AlertsApi'
 export * from './AuthApi'
 export * from './ComfortApi'
+export * from './CommerceApi'
 export * from './EventsApi'
 export * from './GuardianApi'
 export * from './HealthApi'

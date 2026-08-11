@@ -243,6 +243,7 @@ export async function verifyRitualInteraction(pact: PactV4, createClient: Create
       { key: 'wind_layer', label: 'Wind layer', bullets: ['Wind is high'] },
     ],
     comfortNotes: 'Chilly morning',
+    shopThisLook: null,
   }
   const outfitMidday = {
     id: 'rec-midday-1',
@@ -252,6 +253,7 @@ export async function verifyRitualInteraction(pact: PactV4, createClient: Create
       { key: 'light_layers', label: 'Light layers', bullets: ['Mild day'] },
     ],
     comfortNotes: 'Pleasant midday',
+    shopThisLook: null,
   }
   const outfitEvening = {
     id: 'rec-evening-1',
@@ -261,6 +263,7 @@ export async function verifyRitualInteraction(pact: PactV4, createClient: Create
       { key: 'evening_chill', label: 'Evening chill', bullets: ['Cool evening'] },
     ],
     comfortNotes: 'Cool evening',
+    shopThisLook: null,
   }
 
   await pact
@@ -508,6 +511,7 @@ export async function verifyRitualLocalizationInteraction(
       },
     ],
     comfortNotes: 'Hafif rüzgarlı serin sabah. Trençkot önerilir.',
+    shopThisLook: null,
   }
   const outfitMiddayTurkish = {
     id: 'rec-midday-1',
@@ -517,6 +521,7 @@ export async function verifyRitualLocalizationInteraction(
       { key: 'light_layers', label: 'Hafif Katmanlar', bullets: ['Ilık gün'] },
     ],
     comfortNotes: 'Ilık ve keyifli bir öğleden sonra.',
+    shopThisLook: null,
   }
   const outfitEveningTurkish = {
     id: 'rec-evening-1',
@@ -526,6 +531,7 @@ export async function verifyRitualLocalizationInteraction(
       { key: 'evening_chill', label: 'Akşam Serinliği', bullets: ['Serin akşam'] },
     ],
     comfortNotes: 'Serin akşam.',
+    shopThisLook: null,
   }
 
   await pact

@@ -288,6 +288,7 @@ export async function startLocalPactProvider({
                 },
               ],
               comfortNotes: 'Hafif rüzgarlı serin sabah. Trençkot önerilir.',
+              shopThisLook: null,
             },
             {
               id: 'rec-midday-1',
@@ -297,6 +298,7 @@ export async function startLocalPactProvider({
                 { key: 'light_layers', label: 'Hafif Katmanlar', bullets: ['Ilık gün'] },
               ],
               comfortNotes: 'Ilık ve keyifli bir öğleden sonra.',
+              shopThisLook: null,
             },
             {
               id: 'rec-evening-1',
@@ -310,6 +312,7 @@ export async function startLocalPactProvider({
                 },
               ],
               comfortNotes: 'Serin akşam.',
+              shopThisLook: null,
             },
           ]
         : [
@@ -321,6 +324,7 @@ export async function startLocalPactProvider({
                 { key: 'wind_layer', label: 'Wind layer', bullets: ['Wind is high'] },
               ],
               comfortNotes: 'Chilly morning',
+              shopThisLook: null,
             },
             {
               id: 'rec-midday-1',
@@ -330,6 +334,7 @@ export async function startLocalPactProvider({
                 { key: 'light_layers', label: 'Light layers', bullets: ['Mild day'] },
               ],
               comfortNotes: 'Pleasant midday',
+              shopThisLook: null,
             },
             {
               id: 'rec-evening-1',
@@ -343,6 +348,7 @@ export async function startLocalPactProvider({
                 },
               ],
               comfortNotes: 'Cool evening',
+              shopThisLook: null,
             },
           ]
 

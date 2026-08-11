@@ -11,6 +11,14 @@ export const DEFAULT_FACTORY_REGISTRY_KEYS = [
   'wardrobeOnboardingStates',
   'silhouetteProfiles',
   'moderationEvents',
+  // Story 5.1. The first three carry no user_id, so cleanup cannot filter them
+  // by tracked user ids the way every other key here is filtered; see the
+  // cleanupScopeStartedAt anchor in cleanup.ts.
+  'commercePartners',
+  'affiliateOffers',
+  'commercePreferences',
+  'affiliateClicks',
+  'affiliateConversions',
 ] as const
 
 export type FactoryRegistryKey = (typeof DEFAULT_FACTORY_REGISTRY_KEYS)[number]
