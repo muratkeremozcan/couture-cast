@@ -149,7 +149,11 @@ describe('MobileGarmentCaptureModal', () => {
   })
 
   afterEach(() => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
+    if (originalBaseUrl === undefined) {
+      delete process.env.EXPO_PUBLIC_API_BASE_URL
+    } else {
+      process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
+    }
     restoreAccessTokenResolver()
     Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
     vi.useRealTimers()

@@ -388,10 +388,20 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
     // is a subclass of `Error`, so the looser assertion would still pass if a
     // regression changed `parseSilhouetteIfMatchHeader` to throw an unrelated
     // error instead of the documented 428. Mirrors the onboarding suite's
-    // equivalent `4.4-INT-05` assertion exactly.
-    await expect(
-      serviceA.updateSliders(userId, undefined, { heightSlider: 10, buildSlider: 10 })
-    ).rejects.toBeInstanceOf(HttpException)
+    // equivalent `4.4-INT-05` assertion exactly. Also pin the status code
+    // itself: an `HttpException` subclass check alone would still pass if a
+    // regression changed the thrown status away from the documented 428.
+    let missingIfMatchError: unknown
+    try {
+      await serviceA.updateSliders(userId, undefined, {
+        heightSlider: 10,
+        buildSlider: 10,
+      })
+    } catch (error) {
+      missingIfMatchError = error
+    }
+    expect(missingIfMatchError).toBeInstanceOf(HttpException)
+    expect((missingIfMatchError as HttpException).getStatus()).toBe(428)
 
     await serviceA.updateSliders(userId, formatSilhouetteETag(userId, 0), {
       heightSlider: 10,

@@ -74,7 +74,11 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
+  if (originalBaseUrl === undefined) {
+    delete process.env.EXPO_PUBLIC_API_BASE_URL
+  } else {
+    process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
+  }
 })
 
 describe('mobile wardrobe onboarding + silhouette API wrappers', () => {
