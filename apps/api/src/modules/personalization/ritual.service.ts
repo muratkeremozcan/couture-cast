@@ -47,6 +47,22 @@ import {
   type WindTolerance,
 } from '../../contracts/http.js'
 
+/**
+ * Story 5.1 decision 5: this service produces outfits WITHOUT the commerce
+ * block, and `RitualController` adds `shopThisLook` after it returns.
+ *
+ * The distinction is load-bearing rather than cosmetic. If the field were part
+ * of what this service builds, it would land in the Redis payload written at
+ * step 8 and in the `OutfitRecommendation` rows, and a user who toggled the
+ * opt-out would keep seeing a CTA for the fifteen minutes the cache lives. The
+ * types say so explicitly so that a future edit cannot reintroduce it quietly.
+ */
+export type ScenarioOutfitWithoutCommerce = Omit<ScenarioOutfit, 'shopThisLook'>
+
+export type RitualDataWithoutCommerce = Omit<RitualResponse['data'], 'outfits'> & {
+  outfits: ScenarioOutfitWithoutCommerce[]
+}
+
 const formattersMap = new Map<string, Intl.DateTimeFormat>()
 
 function getHourInTimezone(date: Date, timezone: string): number {
@@ -873,7 +889,7 @@ export class RitualService implements OnModuleDestroy {
     acceptLanguage?: string,
     localeOverride?: SupportedLocale,
     occasion?: CapsuleOccasion
-  ): Promise<RitualResponse['data']> {
+  ): Promise<RitualDataWithoutCommerce> {
     // 1. Resolve Location
     const locations = await this.locationPreferencesService.listLocations(userId)
     let selectedLocation = locations.find((l) => l.id === locationId)
@@ -1035,7 +1051,7 @@ export class RitualService implements OnModuleDestroy {
           weather: { fetchedAt: string }
           generatedAt: string
           capsuleRevision?: unknown
-          data: RitualResponse['data']
+          data: RitualDataWithoutCommerce
         }
         const cachedFetchedAt = cachedPayload.weather.fetchedAt
         const cachedGeneratedAt = new Date(cachedPayload.generatedAt)
@@ -1180,7 +1196,7 @@ export class RitualService implements OnModuleDestroy {
     ])
 
     // 6. Build or retrieve outfit recommendations
-    const outfits: ScenarioOutfit[] = []
+    const outfits: ScenarioOutfitWithoutCommerce[] = []
     for (const { scenario, segment } of targetScenarios) {
       let recommendation: OutfitRecommendation | null =
         await this.prisma.outfitRecommendation.findFirst({

@@ -18,15 +18,8 @@ import {
 import { AuthContext, Roles } from '../auth/security.decorators'
 import { RequestAuthGuard, RolesGuard } from '../auth/security.guards'
 import type { RequestAuthContext } from '../auth/security.types'
+import { getClientIp } from '../../controllers/client-ip'
 import { GuardianService } from './guardian.service'
-
-function getClientIp(request: Request): string | undefined {
-  const forwardedFor = request.headers['x-forwarded-for']
-  const rawForwardedFor = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor
-  const clientIp = rawForwardedFor?.split(',')[0]?.trim()
-
-  return clientIp || request.ip
-}
 
 @Controller('/api/v1/guardian')
 export class GuardianController {

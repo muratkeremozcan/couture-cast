@@ -10,6 +10,8 @@ import { RequestAuthGuard } from '../auth/security.guards.js'
 import { RitualController } from './ritual.controller.js'
 import { RitualService, RITUAL_REDIS_CLIENT } from './ritual.service.js'
 import { AffiliateOfferService } from '../commerce/affiliate-offer.service.js'
+import { CommerceRepository } from '../commerce/commerce.repository.js'
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import { PrismaClient, type OutfitRecommendation, type Prisma } from '@prisma/client'
 import { WeatherQueryService } from '../weather/weather-query.service.js'
 import { LocationPreferencesService } from '../location-preferences/location-preferences.service.js'
@@ -110,9 +112,35 @@ describe('RitualController', () => {
 
   let persistedRecommendations: OutfitRecommendation[] = []
 
+  /**
+   * Story 5.1: the commerce dependencies are held here rather than inline in the
+   * module so an individual test can switch the feature on. With the flag off,
+   * `shopThisLook` is null on every card, which proves the default path but
+   * cannot prove the thing decision 5 actually cares about: that a populated
+   * block never reaches the Redis payload or the persisted recommendation rows.
+   */
+  const featureFlagsMock = { getFeatureFlag: vi.fn() }
+  const commerceRepositoryMock = {
+    findAffiliateCtasEnabled: vi.fn(),
+    findUserCommerceContext: vi.fn(),
+    findGarmentSlots: vi.fn(),
+    findBestOffer: vi.fn(),
+  }
+
   beforeEach(async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-16T06:00:00.000Z'))
+
+    // Reset explicitly: `vi.restoreAllMocks()` in `afterEach` only restores
+    // spies created with `vi.spyOn`, so a bare `vi.fn()` would carry its call
+    // history from the previous test into a "was never called" assertion.
+    featureFlagsMock.getFeatureFlag.mockReset().mockResolvedValue(false)
+    commerceRepositoryMock.findAffiliateCtasEnabled.mockReset().mockResolvedValue(null)
+    commerceRepositoryMock.findUserCommerceContext
+      .mockReset()
+      .mockResolvedValue({ birthdate: null, locale: undefined })
+    commerceRepositoryMock.findGarmentSlots.mockReset().mockResolvedValue([])
+    commerceRepositoryMock.findBestOffer.mockReset().mockResolvedValue(null)
 
     persistedRecommendations = []
     for (const key of Object.keys(redisStore)) {
@@ -258,10 +286,12 @@ describe('RitualController', () => {
         // Story 5.1: RitualController now assembles the commerce block, so this
         // module has to supply the service. The real one is registered rather
         // than a mock: it is the seam these tests should exercise, and its
-        // current behaviour (null for every outfit) is exactly what the
-        // eligibility chain produces while commerce_affiliate_enabled is off,
-        // which is its default in this environment.
+        // behaviour with the flag off (null for every outfit) is exactly what
+        // the eligibility chain produces in this environment, where
+        // commerce_affiliate_enabled defaults to false.
         AffiliateOfferService,
+        { provide: CommerceRepository, useValue: commerceRepositoryMock },
+        { provide: FeatureFlagsService, useValue: featureFlagsMock },
       ],
     })
       .overrideGuard(RequestAuthGuard)
@@ -331,6 +361,68 @@ describe('RitualController', () => {
 
     expect(cachedResponse.status).toBe(200)
     expect(outfitRecommendationCreateMock).not.toHaveBeenCalled()
+  })
+
+  it('serves shopThisLook without ever writing it into the ritual cache', async () => {
+    featureFlagsMock.getFeatureFlag.mockResolvedValue(true)
+    commerceRepositoryMock.findBestOffer.mockResolvedValue({
+      offer_id: 'offer-1',
+      offer_title: 'Merino base layer',
+      garment_category: 'top',
+      partner_slug: 'sample-partner',
+      partner_display_name: 'Sample Partner',
+    })
+
+    const response = await request(getHttpServer())
+      .get('/api/v1/ritual')
+      .set({ authorization: 'Bearer ritual-token' })
+
+    expect(response.status).toBe(200)
+    const parsed: RitualResponse = ritualResponseSchema.parse(response.body)
+    expect(parsed.data.outfits.map((outfit) => outfit.shopThisLook?.offerId)).toEqual([
+      'offer-1',
+      'offer-1',
+      'offer-1',
+    ])
+
+    /**
+     * Decision 5's whole point. The block is assembled in the controller after
+     * `RitualService` has already written its cache, so a later opt-out takes
+     * effect on the very next request even while the cached recommendation is
+     * still being served. If `shopThisLook` ever appears in either sink, that
+     * property is gone and the opt-out silently lags by the cache TTL.
+     */
+    for (const entry of Object.values(redisStore)) {
+      expect(entry.val).not.toContain('shopThisLook')
+    }
+    for (const call of outfitRecommendationCreateMock.mock.calls) {
+      expect(JSON.stringify(call)).not.toContain('shopThisLook')
+    }
+  })
+
+  it('returns shopThisLook null for every outfit once the user opts out', async () => {
+    featureFlagsMock.getFeatureFlag.mockResolvedValue(true)
+    commerceRepositoryMock.findAffiliateCtasEnabled.mockResolvedValue(false)
+    commerceRepositoryMock.findBestOffer.mockResolvedValue({
+      offer_id: 'offer-1',
+      offer_title: 'Merino base layer',
+      garment_category: 'top',
+      partner_slug: 'sample-partner',
+      partner_display_name: 'Sample Partner',
+    })
+
+    const response = await request(getHttpServer())
+      .get('/api/v1/ritual')
+      .set({ authorization: 'Bearer ritual-token' })
+
+    expect(response.status).toBe(200)
+    const parsed: RitualResponse = ritualResponseSchema.parse(response.body)
+    expect(parsed.data.outfits.map((outfit) => outfit.shopThisLook)).toEqual([
+      null,
+      null,
+      null,
+    ])
+    expect(commerceRepositoryMock.findBestOffer).not.toHaveBeenCalled()
   })
 
   it('uses an explicit locale query and isolates the localized cache entry', async () => {
