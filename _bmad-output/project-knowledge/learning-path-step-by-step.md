@@ -3360,6 +3360,32 @@ created_at))`, which guarantees exactly one row survives a race. It is
     both consent levels are denied rather than leaving the exception implicit in
     a policy name.
 
+11. **A test that cannot fail is worse than one that fails loudly.** The commerce
+    migration revokes the client roles' access to the three catalog tables, and
+    the RLS suite asserts they cannot reach them. Adding an ephemeral
+    `postgres:16-alpine` to CI so those suites could run at all quietly made
+    those assertions vacuous: stock PostgreSQL grants client roles nothing by
+    default, so on that container there was nothing for the REVOKEs to revoke and
+    they became no-ops. Deleting all three from the migration left the suite
+    49/49 green. The same blindness covered the equivalent negative assertions in
+    Steps 31 and 32, so three stories carried a control that could not fail.
+    Fixed by giving the container Supabase's default-privilege behaviour, scoped
+    by measurement in both directions: `GRANT ALL` reintroduces the
+    `REFERENCES`/`TRIGGER`/`TRUNCATE` artefact and fails 8 tests, and including
+    `anon` breaks the zero-grant requirement and fails 6. The general lesson is
+    that a negative assertion needs its own mutation test. Coverage reports an
+    untested control as untested; nothing reports an unfalsifiable one, because
+    it looks green forever.
+
+12. **Two free-tier limits pulled this work in opposite directions.** CodeRabbit
+    declined to review the implementation pull request because 142 files exceed
+    its 100-file cap, which argues for splitting work into smaller pull
+    requests. Vercel's build rate limit was reached by the pushes that splitting
+    across four branches generated, which argues for fewer. Neither constraint is
+    visible when planning the work, both surface only at integration time, and
+    they cannot both be satisfied by the same shape. Worth deciding up front
+    which one a given story is more willing to pay.
+
 ```mermaid
 flowchart TD
   Ritual["GET /api/v1/ritual"] --> Svc["RitualService\n(caches payload, no commerce)"]
