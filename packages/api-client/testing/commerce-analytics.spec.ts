@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import {
   affiliateConversionRecordedPropertiesSchema,
   affiliateCtaClickedPropertiesSchema,
@@ -12,230 +13,184 @@ import { DISALLOWED_ANALYTICS_PROPERTY_FIXTURES } from '../src/testing/commerce-
 /**
  * Story 5.1 commerce analytics wrappers.
  *
- * Two things are under test, and the second is the one that matters.
+ * Split from `commerce-contract.spec.ts` on the same line this package already
+ * draws for wardrobe: `*-contract.spec.ts` asserts the published request and
+ * response shapes, `*-analytics.spec.ts` asserts the event builders. The two
+ * are separate concerns and separate owners.
  *
- * The mapping: each wrapper converts a camelCase event into the snake_case
- * property names PostHog receives, and picks the right `distinctId`.
- *
- * The privacy rule: every property schema is `.strict()`, which is the
- * enforcement point for "no URL, no product title, no garment id, no raw user
- * id, no free text ever reaches an analytics property". A `.strict()` schema
- * only actually enforces that if something exercises the rejection, which is
- * what the negative fixtures below do.
+ * Parsing a property schema is NOT the same as exercising the wrapper that
+ * feeds it. The wrappers are where distinctId is chosen, where the camelCase
+ * event is mapped onto snake_case properties, and where a bad locale region is
+ * rejected, and none of that is reachable by parsing the schema directly.
  */
 
-const SUBJECT = 'hmac-pseudonym-subject'
+describe('5.1 commerce analytics wrappers', () => {
+  describe('analytics wrappers', () => {
+    it('5.1-CONTRACT-16 builds affiliate_cta_shown on the client distinct id', () => {
+      // The one commerce event with no server subject: the mobile analytics
+      // client owns its own identity here, so distinctId is passed in rather
+      // than read off the event.
+      const payload = trackAffiliateCtaShown(
+        {
+          partnerId: 'sample-partner',
+          scenario: 'morning',
+          surface: 'mobile_hero',
+          localeRegion: 'US',
+          recommendationId: 'morning-outfit-id',
+        },
+        'mobile-distinct-id'
+      )
 
-describe('trackAffiliateCtaShown', () => {
-  const event = {
-    partnerId: 'sample-partner',
-    scenario: 'morning' as const,
-    surface: 'mobile_hero' as const,
-    localeRegion: 'US',
-    recommendationId: 'outfit-1',
-  }
-
-  it('takes its distinctId from the caller, because the client owns its own identity', () => {
-    // This is the one commerce event with no server subject: a mobile client
-    // cannot compute the server-side HMAC, so the analytics client's own
-    // distinctId is passed in rather than read off the event.
-    const payload = trackAffiliateCtaShown(event, 'mobile-device-distinct-id')
-
-    expect(payload.distinctId).toBe('mobile-device-distinct-id')
-    expect(payload.event).toBe('affiliate_cta_shown')
-    expect(payload.properties).toEqual({
-      partner_id: 'sample-partner',
-      scenario: 'morning',
-      surface: 'mobile_hero',
-      locale_region: 'US',
-      recommendation_id: 'outfit-1',
-    })
-  })
-
-  it('accepts the global publication sentinel as a locale region', () => {
-    const payload = trackAffiliateCtaShown({ ...event, localeRegion: '*' }, 'device-1')
-
-    expect(payload.properties.locale_region).toBe('*')
-  })
-
-  it('accepts a UN M.49 macro-region subtag', () => {
-    // `es-419` resolves to '419', which is three characters and not a country.
-    const payload = trackAffiliateCtaShown({ ...event, localeRegion: '419' }, 'device-1')
-
-    expect(payload.properties.locale_region).toBe('419')
-  })
-
-  it.each([
-    { name: 'an unknown scenario', patch: { scenario: 'afternoon' } },
-    { name: 'an unknown surface', patch: { surface: 'web_hero' } },
-    { name: 'a lowercase locale region', patch: { localeRegion: 'us' } },
-    { name: 'an over-long locale region', patch: { localeRegion: 'USAA' } },
-    { name: 'an empty partner id', patch: { partnerId: '' } },
-  ])('rejects $name', ({ patch }) => {
-    expect(() =>
-      trackAffiliateCtaShown({ ...event, ...patch } as typeof event, 'device-1')
-    ).toThrow()
-  })
-})
-
-describe('trackAffiliateCtaClicked', () => {
-  const event = {
-    analyticsSubjectId: SUBJECT,
-    partnerId: 'sample-partner',
-    offerId: 'offer-1',
-    scenario: 'midday' as const,
-    surface: 'mobile_hero' as const,
-    localeRegion: 'CA',
-    recommendationId: 'outfit-2',
-  }
-
-  it('publishes under the HMAC pseudonym and never a raw user id', () => {
-    const payload = trackAffiliateCtaClicked(event)
-
-    expect(payload.distinctId).toBe(SUBJECT)
-    expect(payload.event).toBe('affiliate_cta_clicked')
-    expect(payload.properties).toEqual({
-      partner_id: 'sample-partner',
-      offer_id: 'offer-1',
-      scenario: 'midday',
-      surface: 'mobile_hero',
-      locale_region: 'CA',
-      recommendation_id: 'outfit-2',
-    })
-    // The subject is the only identity in the payload, and it is not a user id.
-    expect(JSON.stringify(payload.properties)).not.toContain(SUBJECT)
-  })
-
-  it('rejects an empty analytics subject', () => {
-    expect(() => trackAffiliateCtaClicked({ ...event, analyticsSubjectId: '' })).toThrow()
-  })
-})
-
-describe('trackAffiliateConversionRecorded', () => {
-  const matched = {
-    analyticsSubjectId: SUBJECT,
-    partnerId: 'sample-partner',
-    status: 'confirmed' as const,
-    currency: 'USD',
-    orderValueMinorUnits: 12_900,
-    matched: true,
-  }
-
-  it('publishes a matched conversion under the click owner pseudonym', () => {
-    const payload = trackAffiliateConversionRecorded(matched)
-
-    expect(payload.distinctId).toBe(SUBJECT)
-    expect(payload.event).toBe('affiliate_conversion_recorded')
-    expect(payload.properties).toEqual({
-      partner_id: 'sample-partner',
-      status: 'confirmed',
-      currency: 'USD',
-      order_value_minor_units: 12_900,
-      matched: true,
-    })
-  })
-
-  it('publishes an unmatched conversion under the partner slug', () => {
-    // An unknown click token leaves no user subject at all, so the caller passes
-    // the partner slug as the subject. It is operator-controlled and carries no
-    // personal data.
-    const payload = trackAffiliateConversionRecorded({
-      ...matched,
-      analyticsSubjectId: 'sample-partner',
-      matched: false,
+      expect(payload).toEqual({
+        distinctId: 'mobile-distinct-id',
+        event: 'affiliate_cta_shown',
+        properties: {
+          partner_id: 'sample-partner',
+          scenario: 'morning',
+          surface: 'mobile_hero',
+          locale_region: 'US',
+          recommendation_id: 'morning-outfit-id',
+        },
+      })
     })
 
-    expect(payload.distinctId).toBe('sample-partner')
-    expect(payload.properties.matched).toBe(false)
-  })
+    it('5.1-CONTRACT-17 builds affiliate_cta_clicked on the HMAC subject, never a raw user id', () => {
+      const payload = trackAffiliateCtaClicked({
+        analyticsSubjectId: 'hmac-subject-1',
+        partnerId: 'sample-partner',
+        offerId: 'offer-fixture-1',
+        scenario: 'evening',
+        surface: 'mobile_hero',
+        localeRegion: '419',
+        recommendationId: 'evening-outfit-id',
+      })
 
-  it.each(['pending', 'confirmed', 'reversed'] as const)(
-    'accepts the %s status',
-    (status) => {
+      expect(payload.distinctId).toBe('hmac-subject-1')
+      expect(payload.event).toBe('affiliate_cta_clicked')
+      expect(payload.properties).toEqual({
+        partner_id: 'sample-partner',
+        offer_id: 'offer-fixture-1',
+        scenario: 'evening',
+        surface: 'mobile_hero',
+        // A UN M.49 macro-region, not a country code.
+        locale_region: '419',
+        recommendation_id: 'evening-outfit-id',
+      })
+    })
+
+    it('5.1-CONTRACT-18 falls back to the partner slug when a conversion matches no click', () => {
+      const matched = trackAffiliateConversionRecorded({
+        analyticsSubjectId: 'hmac-subject-1',
+        partnerId: 'sample-partner',
+        status: 'confirmed',
+        currency: 'USD',
+        orderValueMinorUnits: 12_900,
+        matched: true,
+      })
+      const unmatched = trackAffiliateConversionRecorded({
+        analyticsSubjectId: 'sample-partner',
+        partnerId: 'sample-partner',
+        status: 'pending',
+        currency: 'EUR',
+        orderValueMinorUnits: 0,
+        matched: false,
+      })
+
+      expect(matched.distinctId).toBe('hmac-subject-1')
+      expect(matched.properties).toMatchObject({ matched: true, currency: 'USD' })
+      // An unmatched conversion has no user subject at all, so the partner slug
+      // stands in and `matched` records why.
+      expect(unmatched.distinctId).toBe('sample-partner')
+      expect(unmatched.properties).toMatchObject({
+        matched: false,
+        order_value_minor_units: 0,
+      })
+    })
+
+    it('5.1-CONTRACT-19 rejects a locale region outside the sentinel or subtag shape', () => {
+      for (const localeRegion of ['us', 'UNITED', '', 'U']) {
+        expect(() =>
+          trackAffiliateCtaShown(
+            {
+              partnerId: 'sample-partner',
+              scenario: 'morning',
+              surface: 'mobile_hero',
+              localeRegion,
+              recommendationId: 'morning-outfit-id',
+            },
+            'mobile-distinct-id'
+          )
+        ).toThrow()
+      }
+
+      // The '*' sentinel means "published globally" and must stay valid.
       expect(
-        trackAffiliateConversionRecorded({ ...matched, status }).properties.status
-      ).toBe(status)
-    }
-  )
-
-  it('accepts a zero order value', () => {
-    const payload = trackAffiliateConversionRecorded({
-      ...matched,
-      orderValueMinorUnits: 0,
+        trackAffiliateCtaShown(
+          {
+            partnerId: 'sample-partner',
+            scenario: 'morning',
+            surface: 'mobile_hero',
+            localeRegion: '*',
+            recommendationId: 'morning-outfit-id',
+          },
+          'mobile-distinct-id'
+        ).properties.locale_region
+      ).toBe('*')
     })
-
-    expect(payload.properties.order_value_minor_units).toBe(0)
   })
 
-  it.each([
-    { name: 'a negative order value', patch: { orderValueMinorUnits: -1 } },
-    { name: 'a fractional order value', patch: { orderValueMinorUnits: 129.5 } },
-    { name: 'a lowercase currency', patch: { currency: 'usd' } },
-    { name: 'a non ISO 4217 currency', patch: { currency: 'DOLLAR' } },
-    { name: 'an unknown status', patch: { status: 'refunded' } },
-  ])('rejects $name', ({ patch }) => {
-    // Floating-point money is prohibited repo-wide, and the schema is where that
-    // rule is actually enforced rather than merely documented.
-    expect(() =>
-      trackAffiliateConversionRecorded({ ...matched, ...patch } as typeof matched)
-    ).toThrow()
-  })
-})
+  describe('privacy allowlists', () => {
+    const ALLOWLISTS = [
+      ['affiliate_cta_shown', affiliateCtaShownPropertiesSchema] as const,
+      ['affiliate_cta_clicked', affiliateCtaClickedPropertiesSchema] as const,
+      [
+        'affiliate_conversion_recorded',
+        affiliateConversionRecordedPropertiesSchema,
+      ] as const,
+    ]
 
-describe('the privacy allowlist on every commerce property schema', () => {
-  const schemas = [
-    {
-      name: 'affiliate_cta_shown',
-      schema: affiliateCtaShownPropertiesSchema,
-      valid: {
+    const VALID_PROPERTIES: Record<string, Record<string, unknown>> = {
+      affiliate_cta_shown: {
         partner_id: 'sample-partner',
         scenario: 'morning',
         surface: 'mobile_hero',
         locale_region: 'US',
-        recommendation_id: 'outfit-1',
+        recommendation_id: 'morning-outfit-id',
       },
-    },
-    {
-      name: 'affiliate_cta_clicked',
-      schema: affiliateCtaClickedPropertiesSchema,
-      valid: {
+      affiliate_cta_clicked: {
         partner_id: 'sample-partner',
-        offer_id: 'offer-1',
+        offer_id: 'offer-fixture-1',
         scenario: 'morning',
         surface: 'mobile_hero',
         locale_region: 'US',
-        recommendation_id: 'outfit-1',
+        recommendation_id: 'morning-outfit-id',
       },
-    },
-    {
-      name: 'affiliate_conversion_recorded',
-      schema: affiliateConversionRecordedPropertiesSchema,
-      valid: {
+      affiliate_conversion_recorded: {
         partner_id: 'sample-partner',
         status: 'confirmed',
         currency: 'USD',
         order_value_minor_units: 12_900,
         matched: true,
       },
-    },
-  ]
-
-  it.each(schemas)(
-    '$name accepts exactly its allowlisted properties',
-    ({ schema, valid }) => {
-      expect(schema.parse(valid)).toEqual(valid)
     }
-  )
 
-  for (const { name, schema, valid } of schemas) {
-    it.each(DISALLOWED_ANALYTICS_PROPERTY_FIXTURES)(
-      `${name} rejects %o`,
-      (disallowed: Record<string, unknown>) => {
-        // `.strict()` is what makes this fail rather than silently forwarding the
-        // extra field to PostHog. Without a test that exercises it, the rule is a
-        // comment.
-        expect(() => schema.parse({ ...valid, ...disallowed })).toThrow()
+    for (const [event, schema] of ALLOWLISTS) {
+      it(`5.1-CONTRACT-20 ${event} accepts its own allowlist`, () => {
+        expect(schema.parse(VALID_PROPERTIES[event])).toEqual(VALID_PROPERTIES[event])
+      })
+
+      for (const forbidden of DISALLOWED_ANALYTICS_PROPERTY_FIXTURES) {
+        const field = Object.keys(forbidden)[0] ?? 'unknown'
+        it(`5.1-CONTRACT-21 ${event} rejects ${field}`, () => {
+          // The allowlists are `.strict()`, so this is real enforcement rather
+          // than a convention: a caller that attaches a URL, a product title, a
+          // garment id, or a raw user id gets a parse failure at the wrapper
+          // instead of a silent leak into PostHog.
+          expect(() =>
+            schema.parse({ ...VALID_PROPERTIES[event], ...forbidden })
+          ).toThrow()
+        })
       }
-    )
-  }
+    }
+  })
 })

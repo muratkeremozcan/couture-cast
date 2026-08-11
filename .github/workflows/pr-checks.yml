@@ -16,18 +16,47 @@ permissions:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW }}
+  # The ephemeral service container declared on `quality-gate`, not a shared
+  # environment. `RLS_TEST_DATABASE_URL` falls back to this, so one URL serves
+  # both the schema suites and the RLS actor matrix.
+  DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
   COVERAGE_GIST_ID: 64348ebdc6e662b93ade9f40bdc03442
 
 jobs:
   quality-gate:
     runs-on: ubuntu-latest
-    # Redis is required now that the `apps/api` integration suites actually
-    # execute here (see the database steps below). Several of them exercise the
-    # alert fan-out and ritual cache paths, which connect to 6379 and fail with
-    # ECONNREFUSED without it. Definition copied verbatim from
-    # `pr-pw-e2e-local.yml`, which has needed the same thing all along.
+    # `packages/db/test/**` holds the RLS actor matrix and every schema
+    # constraint assertion, and it talks to a real PostgreSQL. It only started
+    # running here when story 5.1 added `test:coverage` to that workspace, at
+    # which point it failed with ECONNREFUSED: the job-level DATABASE_URL points
+    # at `secrets.DATABASE_URL_PREVIEW`, which is not a secret this repository
+    # has, so it resolved to an empty string.
+    #
+    # An ephemeral container rather than a shared environment is deliberate.
+    # These suites create and drop policies and switch roles; pointing them at
+    # the dev database would violate the environment-separation rule and would
+    # make two concurrent runs corrupt each other.
     services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      # Redis comes with the database, not separately. Several
+      # `apps/api/integration` suites probe for the schema and take a
+      # Redis-backed path only when they find it, so a job with PostgreSQL and
+      # no Redis is the one combination that hangs: `wardrobe-silhouette`
+      # reaches `clearModerationQueue()` and its `beforeAll` dies on the 10s
+      # timeout. Verified locally against this exact pair, where that suite's
+      # nine tests pass.
       redis:
         image: redis:7-alpine
         ports:
@@ -37,28 +66,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    # Overrides the workflow-level DATABASE_URL, which is
-    # `secrets.DATABASE_URL_PREVIEW` and resolves to an EMPTY STRING when that
-    # secret is not present. Empty is worse than unset here: every database
-    # helper in the repo resolves its URL with `process.env.DATABASE_URL ?? default`,
-    # and `??` does not treat '' as absent, so the empty value wins and `pg`
-    # falls back to its own libpq default of localhost:5432. That is where the
-    # `ECONNREFUSED 127.0.0.1:5432` in this job came from.
-    #
-    # Pointing at the local Supabase instance started below makes the value real,
-    # and is what lets `packages/db` and the `apps/api` integration suites run
-    # here at all. Mirrors `k6-smoke-prs.yml`, which already does exactly this.
-    #
-    # `TEST_ENV` is deliberately NOT set here. It is scoped to the seed step
-    # instead, because three api specs assert behaviour OUTSIDE a test
-    # environment ("throws outside a test environment with no configured
-    # secret", the `.env` precedence spec, and the tagging-engine gate). A
-    # job-wide `TEST_ENV=local` makes `allowsTestOnlySecrets()` return true even
-    # after those tests set `NODE_ENV=production`, so they fail. Vitest already
-    # sets `NODE_ENV=test`, which is the other half of that predicate, so the
-    # suites that need a test-only secret still get one.
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -76,6 +83,47 @@ jobs:
 
       - name: Generate Prisma Client
         run: npm run db:generate
+
+      # The migrations assume a Supabase database. A stock PostgreSQL image
+      # provides neither the three roles (91 GRANT statements name
+      # `authenticated` alone) nor `auth.jwt()`, which eight policies call, so
+      # `migrate deploy` fails on the first grant without this.
+      #
+      # This must run BEFORE any migration attempt: a half-applied migration
+      # leaves a failed row in `_prisma_migrations` and every later deploy stops
+      # with P3009.
+      #
+      # `auth.jwt()` is Supabase's own definition, not an approximation. The RLS
+      # suite drives it by setting `request.jwt.claims` with `set_config`, which
+      # is exactly the path this reads.
+      - name: Provision Supabase-compatible roles and auth schema
+        run: |
+          psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
+              CREATE ROLE anon NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
+              CREATE ROLE authenticated NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN
+              CREATE ROLE service_role NOLOGIN BYPASSRLS;
+            END IF;
+          END
+          $$;
+          CREATE SCHEMA IF NOT EXISTS auth;
+          CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $fn$
+            SELECT coalesce(
+              nullif(current_setting('request.jwt.claim', true), ''),
+              nullif(current_setting('request.jwt.claims', true), '')
+            )::jsonb
+          $fn$;
+          GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+          SQL
+
+      - name: Apply migrations to the test database
+        run: node scripts/prisma-migrate-deploy.mjs
 
       - name: Typecheck workspaces
         run: npm run typecheck
@@ -100,30 +148,6 @@ jobs:
         with:
           name: lighthouse-accessibility-${{ github.event.pull_request.number || github.sha }}
           path: playwright/artifacts/lighthouse/
-
-      # Story 5.1 Task 1 added `test:coverage` to packages/db so its schema and
-      # RLS suites would "actually run on a PR". `run-workspace-test-coverage.mjs`
-      # auto-discovers any workspace with that script, so from that moment this
-      # job began running suites that need PostgreSQL without providing one, and
-      # `packages/db/test/wardrobe-onboarding-schema.spec.ts` deliberately throws
-      # rather than skipping when the schema is unreachable. The workspace then
-      # wrote no lcov and the coverage merge below failed the whole job.
-      #
-      # Providing the database is the fix that matches the intent. It also means
-      # the `apps/api` integration suites now execute here instead of skipping,
-      # which closes the "no workflow runs test:integration" gap the commerce
-      # stories have been carrying.
-      - name: Start local Supabase services
-        uses: ./.github/actions/start-local-supabase
-
-      # `TEST_ENV=local` is scoped to this step only. The commerce seed and the
-      # feature-flag seed are both self-guarded on it (`allowsCommerceSeeding`),
-      # so without it the decision-14 catalog and `commerce_affiliate_enabled`
-      # would not be seeded and the affiliate paths would be unreachable.
-      - name: Reset local database
-        run: npm run db:reset
-        env:
-          TEST_ENV: local
 
       - name: Run tests with coverage
         id: tests

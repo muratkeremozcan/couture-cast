@@ -11,11 +11,38 @@ export default defineConfig({
     include: [/\.[jt]sx?$/, /node_modules\/expo-router\/.*\.js$/],
   },
   optimizeDeps: {
+    // Vite discovers dependencies by crawling the entry document, so a bare
+    // import that appears only inside a test file is found late. In browser
+    // mode that triggers a re-optimization mid-run, which invalidates modules
+    // other workers already loaded and fails them with "does not provide an
+    // export named 'default'". That is the exact signature behind the
+    // intermittent CI failure in `wardrobe-hub-screen.test.tsx`, and locally,
+    // against a cold `node_modules/.vite`, naming `expo-router` here removed
+    // ten such failures on its own.
+    //
+    // This list is deliberately short, and two kinds of package must NEVER
+    // join it. `msw` makes esbuild fail outright ("The entry point msw cannot
+    // be marked as external") because the resolve alias below swaps `msw/node`
+    // for a browser shim. Native-only Expo modules (expo-web-browser,
+    // expo-image-picker, expo-crypto) wedge the optimizer entirely: they pull
+    // in `expo-modules-core`, which cannot be evaluated in a browser bundle at
+    // all. That is why `src/lib/commerce.ts` imports `expo-web-browser`
+    // lazily, and force-prebundling it reintroduces exactly the hazard the
+    // lazy import exists to avoid.
+    //
+    // `posthog-react-native` was measured and left out: it neither wedged the
+    // optimizer nor changed the cold-run failure count, so it is cost without
+    // benefit.
     include: [
+      '@testing-library/react',
       'expo-background-fetch',
+      'expo-localization',
+      'expo-router',
       'expo-task-manager',
+      'i18next',
       'react',
       'react-dom',
+      'react-i18next',
       'react/jsx-dev-runtime',
       'vitest-browser-react',
     ],
