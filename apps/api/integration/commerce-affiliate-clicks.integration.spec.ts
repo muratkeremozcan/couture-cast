@@ -61,6 +61,13 @@ const prismaB = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
 
 const CLICK_TOKEN_SECRET = 'test-only-commerce-click-token-secret'
 const ALLOWED_HOST = 'partner.couturecast.test'
+/**
+ * A file-private publication region for this suite's catalog rows, chosen so
+ * they are invisible to every other integration file sharing this database. See
+ * the comment on `seedOffer` for why '*' was actively harmful here. Legal under
+ * the migration's check constraint, which allows '*' or `^[A-Z0-9]{2,3}$`.
+ */
+const CLICK_OFFER_LOCALE_REGION = 'ZZ'
 const VALID_TEMPLATE = `https://${ALLOWED_HOST}/shop?cc={clickToken}`
 
 let schemaReady = false
@@ -124,7 +131,26 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
         partner_id: partnerId,
         garment_category: 'top',
         comfort_range: null,
-        locale_region: '*',
+        /*
+         * Deliberately NOT the '*' sentinel, and this is load-bearing across
+         * files rather than a style choice.
+         *
+         * `vitest` runs integration files in parallel against one database. A
+         * catalog row at '*' matches EVERY request region, so publishing these
+         * offers globally made them visible to
+         * `commerce-affiliate-offers.integration.spec.ts`, whose whole point is
+         * to assert that a query returns no offer; its `expect(match).toBeNull()`
+         * cases saw these instead. Worse in the other direction: that file parks
+         * every active '*' offer belonging to another partner for its duration,
+         * so it switched these off mid-run and the mint here answered 404
+         * instead of 201.
+         *
+         * The click endpoint never filters on `locale_region` -- see
+         * `findActiveClickOffer`, which matches on id, status, and window only --
+         * so a file-private region costs this suite nothing and makes the
+         * interference impossible in both directions.
+         */
+        locale_region: CLICK_OFFER_LOCALE_REGION,
         title: `Offer ${id}`,
         deep_link_template: overrides.deepLinkTemplate ?? VALID_TEMPLATE,
         priority: 0,
@@ -323,22 +349,41 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
   })
 
   describe('the 60-second dedupe boundary', () => {
+    /**
+     * `created_at` is computed by the DATABASE at insert time, not from a
+     * JavaScript clock read, and that is the difference between a boundary test
+     * and a coin flip.
+     *
+     * The 59-second case has exactly one second of margin: the endpoint dedupes
+     * on `created_at > now() - interval '60 seconds'`, so any wall clock that
+     * elapses between fixing this timestamp and the endpoint evaluating it eats
+     * directly into that second. Reading the clock in JavaScript first spent a
+     * round trip on the read and another on the insert before the POST even
+     * started, on a contended two-core runner that is not obviously under a
+     * second, and when it is not the row ages past the window, the endpoint
+     * correctly mints a fresh click, and the test fails claiming the dedupe
+     * broke.
+     *
+     * Computing the age inside the INSERT bounds the drift to the POST's own
+     * latency. `commerce-affiliate-webhook.integration.spec.ts` 5.1-INT-07 was
+     * the same defect with a bigger gap: its future-tolerance case signed a
+     * timestamp up front and dispatched it after eight other requests.
+     */
     async function seedClickAgedBy(seconds: number): Promise<string> {
-      const now = await databaseNow()
-      const click = await prismaA.affiliateClick.create({
-        data: {
-          token: `${namespace}-preexisting-${seconds}`,
-          user_id: userId,
-          offer_id: activeOfferId,
-          partner_id: partnerId,
-          recommendation_id: recommendationId,
-          scenario: 'midday',
-          surface: 'mobile_hero',
-          locale_region: '*',
-          created_at: new Date(now.getTime() - seconds * 1000),
-        },
-      })
-      return click.token
+      const token = `${namespace}-preexisting-${seconds}`
+
+      await prismaA.$executeRaw`
+        INSERT INTO "AffiliateClick"
+          ("id", "token", "user_id", "offer_id", "partner_id", "recommendation_id",
+           "scenario", "surface", "locale_region", "created_at")
+        VALUES (
+          ${randomUUID()}, ${token}, ${userId}, ${activeOfferId}, ${partnerId},
+          ${recommendationId}, 'midday', 'mobile_hero', '*',
+          (now() AT TIME ZONE 'UTC') - (${seconds}::int * interval '1 second')
+        )
+      `
+
+      return token
     }
 
     it('dedupes an activation at 59 seconds', async (context) => {

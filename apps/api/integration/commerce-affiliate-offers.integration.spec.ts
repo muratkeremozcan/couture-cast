@@ -71,8 +71,6 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
   let service: AffiliateOfferService
   let userId: string
   let partnerId: string
-  /** Ids of globally published seed offers switched off for this file only. */
-  let parkedOfferIds: string[] = []
 
   const featureFlags = { getFeatureFlag: vi.fn().mockResolvedValue(true) }
 
@@ -90,7 +88,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
 
   async function seedOffer(overrides: {
     id: string
-    garmentCategory?: 'top' | 'bottom' | 'shoes'
+    garmentCategory?: 'accessory' | 'outerwear'
     comfortRange?: 'cold' | 'mild' | null
     localeRegion?: string
     priority?: number
@@ -102,7 +100,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       data: {
         id: `${namespace}-${overrides.id}`,
         partner_id: partnerId,
-        garment_category: overrides.garmentCategory ?? 'top',
+        garment_category: overrides.garmentCategory ?? 'accessory',
         comfort_range: overrides.comfortRange ?? null,
         locale_region: overrides.localeRegion ?? 'US',
         title: `Offer ${overrides.id}`,
@@ -171,31 +169,31 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
     partnerId = partner.id
 
     /*
-     * Park the globally published catalog for the duration of this file.
+     * NO SHARED STATE IS TOUCHED HERE, and that is the point.
      *
-     * Decision 14 seeds `sample-partner` with offers at `locale_region: '*'`,
-     * and decision 4 makes '*' on a catalog row match EVERY request region.
-     * Both are correct and together they mean this database always has an offer
-     * that matches any query, so "no offer was selected" is not a statement this
-     * suite could otherwise make, and the seed's priority of 30 also outranks
-     * every fixture here.
+     * An earlier version parked the seeded catalog, switching every active
+     * `locale_region: '*'` offer inactive for the duration of this file and
+     * restoring it afterwards. It had to: decision 4 makes '*' on a catalog row
+     * match EVERY request region, so the seed satisfied every query and
+     * "no offer was selected" was not a statement this suite could make.
      *
-     * Parking rather than deleting, and recording the exact ids rather than
-     * re-activating everything at the end, because Playwright and Maestro setup
-     * depend on that catalog being present and active. Restored in `afterAll`.
+     * That approach could not be made correct. `vitest` runs integration files
+     * in parallel against one database, so the snapshot had to reach forward to
+     * catch rows created after it ran, and reaching forward switched off catalog
+     * rows a sibling file needed live. Bounding it by `created_at` fixed the
+     * sibling and reopened the original hole, because
+     * `commerce-affiliate-webhook.integration.spec.ts` creates fresh '*' offers
+     * throughout its run through `persistCommerceCatalog`, whose factory default
+     * `localeRegion` is '*'. Both settings flaked, in opposite directions.
+     *
+     * Isolation is by GARMENT CATEGORY instead, which no amount of concurrency
+     * can perturb. Decision 14 seeds `top`, `bottom`, `dress`, and `shoes`; this
+     * file publishes and queries only `accessory` and `outerwear`, and the
+     * selection SQL filters on `garment_category`, so no row this file did not
+     * create can satisfy its queries whatever else is running. If a future seed
+     * publishes an `accessory` offer, move this file to another free category
+     * rather than reintroducing parking.
      */
-    const globallyPublished = await prisma.affiliateOffer.findMany({
-      where: { locale_region: '*', status: 'active', partner_id: { not: partnerId } },
-      select: { id: true },
-    })
-    parkedOfferIds = globallyPublished.map((offer) => offer.id)
-
-    if (parkedOfferIds.length > 0) {
-      await prisma.affiliateOffer.updateMany({
-        where: { id: { in: parkedOfferIds } },
-        data: { status: 'inactive' },
-      })
-    }
   })
 
   beforeEach(() => {
@@ -204,15 +202,6 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
 
   afterAll(async () => {
     if (schemaReady) {
-      // Un-park the globally published catalog first, so a failure in the
-      // deletes below cannot leave the shared seed switched off for Playwright.
-      if (parkedOfferIds.length > 0) {
-        await prisma.affiliateOffer.updateMany({
-          where: { id: { in: parkedOfferIds } },
-          data: { status: 'active' },
-        })
-      }
-
       // Reverse dependency order: clicks and offers before partners and users.
       await prisma.affiliateClick.deleteMany({ where: { user_id: userId } })
       await prisma.affiliateOffer.deleteMany({ where: { partner_id: partnerId } })
@@ -233,7 +222,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       cleanupOffers([wildcard, exact])
 
       const match = await repository.findBestOffer(
-        [{ category: 'top', comfortRange: 'cold' }],
+        [{ category: 'accessory', comfortRange: 'cold' }],
         'US'
       )
 
@@ -248,7 +237,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       cleanupOffers([low, high])
 
       const match = await repository.findBestOffer(
-        [{ category: 'top', comfortRange: null }],
+        [{ category: 'accessory', comfortRange: null }],
         'US'
       )
 
@@ -265,11 +254,11 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       cleanupOffers([later, earlier])
 
       const first = await repository.findBestOffer(
-        [{ category: 'top', comfortRange: null }],
+        [{ category: 'accessory', comfortRange: null }],
         'US'
       )
       const second = await repository.findBestOffer(
-        [{ category: 'top', comfortRange: null }],
+        [{ category: 'accessory', comfortRange: null }],
         'US'
       )
 
@@ -290,7 +279,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       cleanupOffers([future])
 
       const match = await repository.findBestOffer(
-        [{ category: 'top', comfortRange: null }],
+        [{ category: 'accessory', comfortRange: null }],
         'US'
       )
 
@@ -310,7 +299,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       cleanupOffers([started])
 
       const match = await repository.findBestOffer(
-        [{ category: 'top', comfortRange: null }],
+        [{ category: 'accessory', comfortRange: null }],
         'US'
       )
 
@@ -324,7 +313,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       cleanupOffers([ended])
 
       const match = await repository.findBestOffer(
-        [{ category: 'top', comfortRange: null }],
+        [{ category: 'accessory', comfortRange: null }],
         'US'
       )
 
@@ -338,7 +327,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       cleanupOffers([open])
 
       const match = await repository.findBestOffer(
-        [{ category: 'top', comfortRange: null }],
+        [{ category: 'accessory', comfortRange: null }],
         'US'
       )
 
@@ -354,7 +343,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       cleanupOffers([inactive])
 
       const match = await repository.findBestOffer(
-        [{ category: 'top', comfortRange: null }],
+        [{ category: 'accessory', comfortRange: null }],
         'US'
       )
 
@@ -368,11 +357,18 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       cleanupOffers([canadian])
 
       expect(
-        await repository.findBestOffer([{ category: 'top', comfortRange: null }], 'US')
+        await repository.findBestOffer(
+          [{ category: 'accessory', comfortRange: null }],
+          'US'
+        )
       ).toBeNull()
       expect(
-        (await repository.findBestOffer([{ category: 'top', comfortRange: null }], 'CA'))
-          ?.offer_id
+        (
+          await repository.findBestOffer(
+            [{ category: 'accessory', comfortRange: null }],
+            'CA'
+          )
+        )?.offer_id
       ).toBe(canadian)
     })
 
@@ -397,7 +393,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       })
 
       const match = await repository.findBestOffer(
-        [{ category: 'top', comfortRange: null }],
+        [{ category: 'accessory', comfortRange: null }],
         'US'
       )
       expect(match).toBeNull()
@@ -420,7 +416,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
 
       for (const region of ['US', 'CA', '419']) {
         const match = await repository.findBestOffer(
-          [{ category: 'top', comfortRange: null }],
+          [{ category: 'accessory', comfortRange: null }],
           region
         )
         expect(match?.offer_id).toBe(global)
@@ -437,7 +433,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       cleanupOffers([global, regional])
 
       const match = await repository.findBestOffer(
-        [{ category: 'top', comfortRange: null }],
+        [{ category: 'accessory', comfortRange: null }],
         '*'
       )
 
@@ -458,18 +454,27 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       // `comfort_range = NULL` is never true, so an exact row cannot match it
       // however high its priority.
       expect(
-        await repository.findBestOffer([{ category: 'top', comfortRange: null }], 'US')
+        await repository.findBestOffer(
+          [{ category: 'accessory', comfortRange: null }],
+          'US'
+        )
       ).toBeNull()
     })
 
     it('excludes an offer for a garment category the outfit has no slot for', async (context) => {
       if (!requireSchema(context)) return
 
-      const shoes = await seedOffer({ id: 'shoes', garmentCategory: 'shoes' })
-      cleanupOffers([shoes])
+      const wrongCategory = await seedOffer({
+        id: 'wrong-category',
+        garmentCategory: 'outerwear',
+      })
+      cleanupOffers([wrongCategory])
 
       expect(
-        await repository.findBestOffer([{ category: 'top', comfortRange: null }], 'US')
+        await repository.findBestOffer(
+          [{ category: 'accessory', comfortRange: null }],
+          'US'
+        )
       ).toBeNull()
     })
   })
@@ -482,7 +487,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
         data: {
           user_id: userId,
           object_path: `${namespace}/${randomUUID()}.png`,
-          category: 'bottom',
+          category: 'outerwear',
           material: 'denim',
           comfort_range: 'cold',
           upload_status: 'ready',
@@ -493,8 +498,8 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
         await prisma.garmentItem.deleteMany({ where: { id: garment.id } })
       })
       const offerId = await seedOffer({
-        id: 'bottom-cold',
-        garmentCategory: 'bottom',
+        id: 'outerwear-cold',
+        garmentCategory: 'outerwear',
         comfortRange: 'cold',
       })
       cleanupOffers([offerId])
@@ -507,7 +512,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
 
       expect(resolved.get('outfit-morning')).toMatchObject({
         offerId,
-        garmentCategory: 'bottom',
+        garmentCategory: 'outerwear',
         partnerId: `${namespace}-partner`,
       })
     })
