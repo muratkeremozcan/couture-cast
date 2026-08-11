@@ -16,12 +16,40 @@ permissions:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW }}
+  # The ephemeral service container declared on `quality-gate`, not a shared
+  # environment. `RLS_TEST_DATABASE_URL` falls back to this, so one URL serves
+  # both the schema suites and the RLS actor matrix.
+  DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
   COVERAGE_GIST_ID: 64348ebdc6e662b93ade9f40bdc03442
 
 jobs:
   quality-gate:
     runs-on: ubuntu-latest
+    # `packages/db/test/**` holds the RLS actor matrix and every schema
+    # constraint assertion, and it talks to a real PostgreSQL. It only started
+    # running here when story 5.1 added `test:coverage` to that workspace, at
+    # which point it failed with ECONNREFUSED: the job-level DATABASE_URL points
+    # at `secrets.DATABASE_URL_PREVIEW`, which is not a secret this repository
+    # has, so it resolved to an empty string.
+    #
+    # An ephemeral container rather than a shared environment is deliberate.
+    # These suites create and drop policies and switch roles; pointing them at
+    # the dev database would violate the environment-separation rule and would
+    # make two concurrent runs corrupt each other.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,6 +67,47 @@ jobs:
 
       - name: Generate Prisma Client
         run: npm run db:generate
+
+      # The migrations assume a Supabase database. A stock PostgreSQL image
+      # provides neither the three roles (91 GRANT statements name
+      # `authenticated` alone) nor `auth.jwt()`, which eight policies call, so
+      # `migrate deploy` fails on the first grant without this.
+      #
+      # This must run BEFORE any migration attempt: a half-applied migration
+      # leaves a failed row in `_prisma_migrations` and every later deploy stops
+      # with P3009.
+      #
+      # `auth.jwt()` is Supabase's own definition, not an approximation. The RLS
+      # suite drives it by setting `request.jwt.claims` with `set_config`, which
+      # is exactly the path this reads.
+      - name: Provision Supabase-compatible roles and auth schema
+        run: |
+          psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
+              CREATE ROLE anon NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
+              CREATE ROLE authenticated NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN
+              CREATE ROLE service_role NOLOGIN BYPASSRLS;
+            END IF;
+          END
+          $$;
+          CREATE SCHEMA IF NOT EXISTS auth;
+          CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $fn$
+            SELECT coalesce(
+              nullif(current_setting('request.jwt.claim', true), ''),
+              nullif(current_setting('request.jwt.claims', true), '')
+            )::jsonb
+          $fn$;
+          GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+          SQL
+
+      - name: Apply migrations to the test database
+        run: node scripts/prisma-migrate-deploy.mjs
 
       - name: Typecheck workspaces
         run: npm run typecheck
