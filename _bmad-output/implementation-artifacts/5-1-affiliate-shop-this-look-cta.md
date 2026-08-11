@@ -8,8 +8,9 @@ baseline_commit: 2ad7fdc5ca837a093ebcae22fafc3f2f8a8c12d5
 
 Status: ready-for-dev
 
-Blocked on one product sign-off before Task 3 lands: see **Open decision 1**
-(minors and affiliate content). Every other decision is settled.
+All decisions settled. **Decision 1** (minors and affiliate content) was
+resolved 2026-08-11 by product: affiliate CTAs are shown to users under 18,
+not suppressed by age.
 
 This draft was reviewed by three independent blinded reviewers before any
 implementation work. Their findings and the disposition of each, including the
@@ -62,53 +63,54 @@ commit; the status update is a separate unpushed commit. Treat 4.4 as complete.
 
 ---
 
-## Open decision, needs product sign-off
+## Decisions requiring product sign-off
 
-### Open decision 1: minors and affiliate content
+### Decision 1 (resolved 2026-08-11): minors and affiliate content
 
-**This is a product and legal decision, not an engineering one. It is recorded
-here for a decision, not locked.** An earlier draft of this story locked a
-suppression rule unilaterally; that was wrong, and its stated technical basis
-was also factually wrong (see below).
+**This was a product and legal decision, not an engineering one.** An earlier
+draft of this story locked a suppression rule unilaterally; that was wrong,
+and its stated technical basis was also factually wrong (see below). It was
+reframed as an open question and put to product directly.
 
-**The question.** CoutureCast is a 13+ product. The PRD's Executive Summary
-names "teen students" as the first persona. Neither `epics.md` nor `prd.md`
-restricts commerce by age. Should users under 18 see affiliate CTAs?
+**The question was:** CoutureCast is a 13+ product. The PRD's Executive
+Summary names "teen students" as the first persona. Neither `epics.md` nor
+`prd.md` restricts commerce by age. Should users under 18 see affiliate CTAs?
 
-**What the PRD does require regardless of the answer:** clear disclosure, no
+**Resolution: yes.** Affiliate CTAs are shown to users under 18 on the same
+terms as adults. No age-based eligibility gate is implemented. This was a
+deliberate choice, made with the regulatory consideration below on record,
+not an oversight.
+
+**What the PRD requires regardless of this decision:** clear disclosure, no
 dark patterns around conversion prompts, and granular opt-out
-([Source: prd.md#Success Criteria]). All are implemented below and are not
+([Source: prd.md#Success Criteria]). All are implemented below and were never
 contingent on this decision.
 
-**Default if no decision arrives before Task 3:** suppress. Ship the suppression
-path, flag it in the PR description, and make reversing it a one-line change to
-a single predicate. Rationale for the default: advertising to identified minors
-carries regulatory exposure the PRD does not analyze, and shipping the
-permissive behaviour is the harder thing to walk back.
+**Regulatory consideration on record.** Advertising to identified minors
+carries regulatory exposure the PRD does not analyze. Product accepted this
+knowingly rather than defaulting to suppression.
 
-**Correct technical basis if suppression is chosen.** Do **not** key on
+**If this policy needs to reverse later:** do **not** key on
 `apiRole === 'teen'`. That role is read verbatim from Supabase
 `app_metadata.app_role` in
 `apps/api/src/modules/auth/access-token-identity.service.ts:221-227` and is
 never derived from age. The emancipation sweep in
 `apps/api/src/modules/guardian/guardian.service.ts:908-1050` revokes
-`GuardianConsent` rows and writes `UserProfile.preferences` markers; it does not
-change the Supabase role. A user who signs up at 15 still has `apiRole: 'teen'`
-at 25, so a role-keyed rule would silently disable commerce for emancipated
-adults forever.
+`GuardianConsent` rows and writes `UserProfile.preferences` markers; it does
+not change the Supabase role. A user who signs up at 15 still has
+`apiRole: 'teen'` at 25, so a role-keyed rule would silently disable commerce
+for emancipated adults forever. Key on age instead:
+`guardian.service.ts:257` already has `hasReachedAgeOfMajority(birthdate,
+today)`. A `UserProfile.birthdate` that is null (the column is nullable,
+`schema.prisma:181`) must **not** suppress — suppressing on unknown age would
+disable commerce for every legacy account; record the count of null-birthdate
+users who saw a CTA as an operational metric instead.
 
-Key on age instead. `guardian.service.ts:257` already has
-`hasReachedAgeOfMajority(birthdate, today)`; export it and reuse it. Define:
-
-- `UserProfile.birthdate` is non-null and `!hasReachedAgeOfMajority(birthdate)`
-  → suppress.
-- `UserProfile.birthdate` is null (the column is nullable,
-  `schema.prisma:181`) → **do not** suppress, and record the count of
-  null-birthdate users who saw a CTA as an operational metric. Suppressing on
-  unknown age would disable commerce for every legacy account.
-
-Implement it as one exported predicate, `isAffiliateAudienceEligible(profile)`,
-with the decision recorded in its doc comment so reversing it is a single edit.
+Task 3 exports a stub predicate, `isAffiliateAudienceEligible(profile)`, that
+currently always returns `true`, with this decision recorded in its doc
+comment. It is **not** wired into decision 4's eligibility chain, so reversing
+this policy later is: implement the age check inside the existing stub, then
+add it back as a step in decision 4. No call site changes.
 
 ---
 
@@ -193,14 +195,16 @@ narrowing in `deferred-work.md`.
 
 ### 4. Eligibility, evaluated server-side in this exact order
 
-Short-circuit on the first failure.
+Short-circuit on the first failure. (`isAffiliateAudienceEligible(profile)`,
+Decision 1, is not a step here — it always returns `true` today, so it is
+called nowhere in this chain. See Decision 1 for how to wire it back in if
+the policy reverses.)
 
-1. `isAffiliateAudienceEligible(profile)` (Open decision 1).
-2. `commerce_affiliate_enabled` resolves truthy for the acting user through
+1. `commerce_affiliate_enabled` resolves truthy for the acting user through
    `FeatureFlagsService.getFeatureFlag`.
-3. `CommercePreference.affiliate_ctas_enabled` is `true`. A missing row means
+2. `CommercePreference.affiliate_ctas_enabled` is `true`. A missing row means
    the default `true`.
-4. Exactly one active offer resolves for the outfit (below).
+3. Exactly one active offer resolves for the outfit (below).
 
 Any failure emits `shopThisLook: null`.
 
@@ -1085,9 +1089,12 @@ change this" hint, so the axe scan passes with no session.
         `personalization.module.ts` (never the reverse). `CommerceModule`
         imports `FeatureFlagsModule`, `TelemetryModule`, and `AuthStateModule`;
         `PersonalizationModule` currently imports none of them.
-  - [ ] Export `hasReachedAgeOfMajority` from `guardian.service.ts:257` and
-        implement `isAffiliateAudienceEligible(profile)` per Open decision 1,
-        recording the decision in its doc comment.
+  - [ ] Implement `isAffiliateAudienceEligible(profile)` as a stub that always
+        returns `true`, with Decision 1's resolution (2026-08-11, no
+        age-based suppression) recorded in its doc comment, plus the
+        reversal steps. Do **not** call it from decision 4's eligibility
+        chain. Do not export `hasReachedAgeOfMajority` for this purpose --
+        it is unused unless the policy reverses.
   - [ ] Implement `GET` and `PUT /api/v1/commerce/preferences`, ungated by the
         flag, with the audit row in the same transaction and no row on an
         unchanged value.
