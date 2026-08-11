@@ -1,4 +1,23 @@
 {
+  "commerce": {
+    "shopThisLook": {
+      "cta": "Bu görünümü satın al",
+      "disclosure": "Ücretli iş birliği. CoutureCast komisyon kazanabilir.",
+      "partnerLabel": "{{partner}} sunar",
+      "opensInBrowser": "Uygulama içi tarayıcıda açılır",
+      "loading": "İş ortağının sitesi açılıyor",
+      "error": "İş ortağının sitesi açılamadı. Lütfen tekrar deneyin."
+    },
+    "settings": {
+      "sectionTitle": "Alışveriş ve iş ortakları",
+      "disclosure": "Bağlı kuruluş önerileri açıkken bir öneriye dokunmak bir iş ortağının sitesini açar ve ziyaretin CoutureCast üzerinden geldiğini o iş ortağına bildirir. CoutureCast komisyon kazanabilir. Gardırop fotoğrafları veya kişisel bilgiler paylaşılmaz.",
+      "optOutLabel": "“Bu görünümü satın al” önerilerini göster",
+      "optOutHelp": "Tüm iş ortağı ve bağlı kuruluş önerilerini gizlemek için bunu kapatın.",
+      "saved": "Alışveriş tercihleri güncellendi",
+      "error": "Alışveriş tercihleri güncellenemedi.",
+      "signedOutHint": "Bunu değiştirmek için oturum açın"
+    }
+  },
   "wardrobe": {
     "capsules": {
       "title": "Kombin kapsülleri",
