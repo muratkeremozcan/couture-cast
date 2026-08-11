@@ -37,8 +37,12 @@ const SECRET_REF_PATTERN = /^COMMERCE_PARTNER_[A-Z0-9_]{1,40}_WEBHOOK_SECRET$/
  * Each factory persists through exactly one delegate, so the stub models only
  * the delegate under test and is cast to the client type the factory expects.
  */
-function createDelegateStub<T extends { id: string }>(row: T) {
-  const create = vi.fn<(args: { data: Record<string, unknown> }) => Promise<T>>()
+function createDelegateStub(row: { id: string }) {
+  // Not generic: `mockResolvedValue` takes `Awaited<T>`, and a bare
+  // `T extends { id: string }` is not provably non-thenable, so the generic
+  // version failed to typecheck even though every caller passes a plain row.
+  const create =
+    vi.fn<(args: { data: Record<string, unknown> }) => Promise<{ id: string }>>()
   create.mockResolvedValue(row)
   return create
 }
