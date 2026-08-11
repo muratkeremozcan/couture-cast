@@ -64,17 +64,24 @@ const silhouetteProfile = {
   updatedAt: '2026-08-09T00:00:00.000Z',
 }
 
-describe('mobile wardrobe onboarding + silhouette API wrappers', () => {
-  const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
+// Every `describe` block below exercises a wrapper that resolves the API
+// base URL from this env var, so it is set up and restored once here rather
+// than duplicating the same `beforeEach`/`afterEach` pair in each block.
+const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
 
-  beforeEach(() => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
-  })
+beforeEach(() => {
+  process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
+})
 
-  afterEach(() => {
+afterEach(() => {
+  if (originalBaseUrl === undefined) {
+    delete process.env.EXPO_PUBLIC_API_BASE_URL
+  } else {
     process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
-  })
+  }
+})
 
+describe('mobile wardrobe onboarding + silhouette API wrappers', () => {
   it('4.4-MOB-LIB-01 builds the documented onboarding ETag format', () => {
     expect(onboardingETag('user-1', 0)).toBe('"onboarding:user-1:0"')
   })
@@ -236,16 +243,6 @@ describe('mobile wardrobe onboarding + silhouette API wrappers', () => {
 })
 
 describe('pollGarmentUntilSettled', () => {
-  const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
-
-  beforeEach(() => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
-  })
-
-  afterEach(() => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
-  })
-
   it('4.4-MOB-LIB-11 resolves once the garment leaves processing, reporting every tick', async () => {
     let call = 0
     server.use(
@@ -334,14 +331,7 @@ describe('resolveOwnerUserId', () => {
 })
 
 describe('wardrobe request error handling', () => {
-  const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
-
-  beforeEach(() => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
-  })
-
   afterEach(() => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
     vi.useRealTimers()
   })
 

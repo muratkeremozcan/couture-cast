@@ -61,6 +61,7 @@ import { createSuggestGarmentTagsDataFixture } from '@couture/api-client/testing
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+import { press } from '@/src/test-utils/press'
 import { WardrobeHubScreen } from './wardrobe-hub-screen'
 
 /**
@@ -146,25 +147,9 @@ function captureUploadHandlers(garmentId: string, status: string) {
   ]
 }
 
-/**
- * Presses a react-native-web Touchable the way a real tap does.
- *
- * `TouchableOpacity` reads `disabled`/`onPress` from a config object that
- * `usePressEvents` refreshes in a *passive* effect. `waitFor` resolves off the
- * DOM mutation that enables the button, and that mutation lands a task before
- * React flushes the effect, so a bare `fireEvent.click` on a just-enabled
- * Touchable is silently dropped -- the press responder still believes it is
- * disabled. Dispatching the pointer sequence first forces the pending effect to
- * flush, which is both faithful to a real tap and deterministic.
- */
-function press(element: HTMLElement) {
-  fireEvent.pointerDown(element)
-  fireEvent.pointerUp(element)
-  fireEvent.click(element)
-}
-
 describe('WardrobeHubScreen', () => {
   let restoreAccessTokenResolver: () => void
+  const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
 
   beforeAll(async () => {
     await initI18n()
@@ -185,6 +170,11 @@ describe('WardrobeHubScreen', () => {
   })
 
   afterEach(() => {
+    if (originalBaseUrl === undefined) {
+      delete process.env.EXPO_PUBLIC_API_BASE_URL
+    } else {
+      process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
+    }
     restoreAccessTokenResolver()
     routerMock.replace.mockClear()
     routerMock.push.mockClear()
@@ -212,52 +202,10 @@ describe('WardrobeHubScreen', () => {
   })
 
   it('4.4-MOB-HUB-03 captures a garment end to end and opens tagging once it needs tags (regression)', async () => {
-    const committedGarment = {
-      id: 'garment-1',
-      status: 'awaiting_tags',
-      category: null,
-      material: null,
-      comfortRange: null,
-      tagsConfirmedAt: null,
-      fileSizeBytes: 1024,
-      mimeType: 'image/png',
-      retentionStatus: 'active',
-      createdAt: '2026-08-09T00:00:00.000Z',
-      committedAt: '2026-08-09T00:00:01.000Z',
-      imageAccess: null,
-    }
-    imagePicker.launchImageLibraryAsync.mockResolvedValue({
-      canceled: false,
-      assets: [{ uri: 'file:///library-shot.png', width: 900, height: 900 }],
-    })
-    server.use(
-      http.post('*/api/v1/wardrobe/upload-url', () =>
-        HttpResponse.json({
-          data: {
-            garmentId: 'garment-1',
-            uploadSessionId: 'session-1',
-            uploadUrl: `${window.location.origin}/mock-storage/session-1`,
-            uploadToken: 'upload-token-1',
-            requiredHeaders: { 'content-type': 'image/png' },
-            expiresAt: '2026-08-09T01:00:00.000Z',
-          },
-        })
-      ),
-      http.put('*/mock-storage/session-1', () => new HttpResponse(null, { status: 204 })),
-      http.post('*/api/v1/wardrobe/garments', () =>
-        HttpResponse.json({ data: committedGarment })
-      )
-    )
+    server.use(...captureUploadHandlers('garment-1', 'awaiting_tags'))
 
     renderScreen()
-    await waitFor(() => screen.getByTestId('garment-capture-open'))
-    fireEvent.click(screen.getByTestId('garment-capture-open'))
-    await waitFor(() => screen.getByTestId('garment-source-library'))
-    fireEvent.click(screen.getByTestId('garment-source-library'))
-    await waitFor(() => screen.getByTestId('garment-crop-preview'))
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
-    await waitFor(() => screen.getByTestId('garment-capture-complete'))
-
+    await captureOneGarment()
     fireEvent.click(screen.getByTestId('garment-capture-done'))
 
     await waitFor(() => {
@@ -271,51 +219,10 @@ describe('WardrobeHubScreen', () => {
     // (owns pollCommittedGarment) -- exactly the seam a regression could
     // silently break with no test noticing, since every other capture test
     // here only exercises the immediate 'awaiting_tags' commit result.
-    const processingGarment = {
-      id: 'garment-2',
-      status: 'processing',
-      category: null,
-      material: null,
-      comfortRange: null,
-      tagsConfirmedAt: null,
-      fileSizeBytes: 1024,
-      mimeType: 'image/png',
-      retentionStatus: 'active',
-      createdAt: '2026-08-09T00:00:00.000Z',
-      committedAt: '2026-08-09T00:00:01.000Z',
-      imageAccess: null,
-    }
-    imagePicker.launchImageLibraryAsync.mockResolvedValue({
-      canceled: false,
-      assets: [{ uri: 'file:///library-shot.png', width: 900, height: 900 }],
-    })
-    server.use(
-      http.post('*/api/v1/wardrobe/upload-url', () =>
-        HttpResponse.json({
-          data: {
-            garmentId: 'garment-2',
-            uploadSessionId: 'session-2',
-            uploadUrl: `${window.location.origin}/mock-storage/session-2`,
-            uploadToken: 'upload-token-2',
-            requiredHeaders: { 'content-type': 'image/png' },
-            expiresAt: '2026-08-09T01:00:00.000Z',
-          },
-        })
-      ),
-      http.put('*/mock-storage/session-2', () => new HttpResponse(null, { status: 204 })),
-      http.post('*/api/v1/wardrobe/garments', () =>
-        HttpResponse.json({ data: processingGarment })
-      )
-    )
+    server.use(...captureUploadHandlers('garment-2', 'processing'))
 
     renderScreen()
-    await waitFor(() => screen.getByTestId('garment-capture-open'))
-    fireEvent.click(screen.getByTestId('garment-capture-open'))
-    await waitFor(() => screen.getByTestId('garment-source-library'))
-    fireEvent.click(screen.getByTestId('garment-source-library'))
-    await waitFor(() => screen.getByTestId('garment-crop-preview'))
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
-    await waitFor(() => screen.getByTestId('garment-capture-complete'))
+    await captureOneGarment()
     fireEvent.click(screen.getByTestId('garment-capture-done'))
 
     // Still processing: no tagging modal yet, and the grid reflects it.
@@ -326,7 +233,9 @@ describe('WardrobeHubScreen', () => {
 
     server.use(
       http.get('*/api/v1/wardrobe/garments', () =>
-        HttpResponse.json({ data: [{ ...processingGarment, status: 'awaiting_tags' }] })
+        HttpResponse.json({
+          data: [garmentFixture({ id: 'garment-2', status: 'awaiting_tags' })],
+        })
       )
     )
 

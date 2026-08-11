@@ -2376,6 +2376,127 @@ quality-gate job cover overlapping but not identical ground (CI also runs
 Lighthouse and the repo-wide coverage/diff-coverage gate this local pass does
 not reproduce).
 
+**Full-suite test-architecture review (Murat, `bmad-tea`, 2026-08-10, branch
+`feat/epic4-story4-murat-test-review`).** Ran the `RV` ("Review Tests")
+workflow against the complete, already-merged Tasks 1-7 test suite (backend
+API unit + integration specs, DB/RLS specs, Web, Mobile, Pact/api-client
+contracts, and `@couture/testing` factories), read the full Dev Agent Record
+above first so nothing already found and fixed in a prior round (CodeRabbit,
+the adversarial `bmad-code-review` passes, and the two prior dedicated
+`bmad-tea` reports for Task 5 Web and Task 7 Pact) was re-flagged. Full
+report: `_bmad-output/test-artifacts/test-reviews/wardrobe-onboarding-silhouette-api-db-mobile-test-review-2026-08-10.md`.
+
+Web (Task 5) and Pact/`api-client` testing (Task 7) already had dedicated,
+dated reports recording real fixes with full verification; re-reviewing them
+from scratch would have been redundant, so this pass instead spot-checked
+that those fixes are still present in the current code (confirmed, no
+regressions) and re-ran their full suites (Web 30 files/427 tests, `@couture/api-client`
+18 files/365 tests, both green). `packages/testing`'s two new factories and
+`wardrobe-onboarding-analytics.spec.ts` were read in full and found clean, no
+changes needed. The genuinely unreviewed surface — backend API unit specs,
+backend API integration specs, DB/RLS specs, and Mobile specs, none of which
+had a dedicated report before this pass — got four parallel deep reviews,
+each grounded in this repo's own `testing-standards.md` and a four-dimension
+rubric (determinism, isolation, maintainability, performance), and surfaced
+**25 real findings**, all fixed directly in test files with real
+verification, not just reported:
+
+- **Backend unit specs (7 fixed).** Two HIGH-severity isolation bugs:
+  `wardrobe-upload-token.spec.ts` and `silhouette-photo-moderation.engine.spec.ts`
+  both restored `process.env` via direct assignment (`process.env.X =
+originalValue`) instead of delete-if-undefined; when the original value is
+  `undefined` (the common case), Node coerces that assignment to the
+  _literal string_ `"undefined"` instead of unsetting the variable, silently
+  corrupting global state for later tests in the same process — exactly the
+  bug class `wardrobe.bootstrap.spec.ts` (same story) already modeled the
+  correct fix for. Both fixed to match. Plus 5 maintainability fixes
+  (duplicate helper functions consolidated, a 478-line flat controller spec
+  restructured into per-route `describe` groups, a repeated UUID literal
+  extracted to a constant, a flat 14-test service spec given logical
+  sub-groups) — no test IDs, assertions, or bodies changed. Verified: 10
+  files/139 tests targeted, full `api` unit workspace 117 files (1 skipped,
+  pre-existing)/1271 tests (5 pre-existing skips), lint/typecheck clean.
+- **Backend integration specs (5 fixed).** Confirmed every previously-fixed
+  issue from prior rounds (real-BullMQ job draining, `onTestFinished`
+  cleanup ordering, `PreconditionFailedException` assertions, `beforeAll`
+  queue clearing, explicit timeouts, `worker.on('error')` capture,
+  `queue.onModuleDestroy()`) is still intact — no regressions. New: a
+  duplicate `4.4-INT-10` test ID reused across both files (renumbered to
+  `4.4-INT-19`), a weak `toBeInstanceOf(Error)` assertion tightened to the
+  documented `HttpException`, an un-restored `WARDROBE_UPLOAD_TOKEN_SECRET`
+  env leak (fixed to match three sibling files' established save/restore
+  pattern), a test named "...with no persisted row" that never actually
+  queried the database (added the real assertion), and three redundant
+  dynamic `import('node:crypto')` calls hoisted to the existing static
+  import. Verified: 4 consecutive full runs against real local PostgreSQL
+  and Redis, 19/19 passing every time; the canonical `test:integration`
+  sweep of the whole `integration/` folder: 71 passed, 5 pre-existing
+  unrelated skips.
+- **DB/RLS specs (4 fixed).** The single most important check — that
+  `wardrobe-onboarding-schema.spec.ts` proves real applied-schema behavior
+  rather than string-grepping the migration, the exact anti-pattern Story
+  4.3's review caught — passed, confirmed empirically by contrast against a
+  genuinely string-grepping pre-existing sibling file. New: a test whose
+  name claimed to cover `upload_session_id` uniqueness but didn't (fixed
+  with a real duplicate-insert-rejection assertion); the `4.4-DB-003` RLS
+  block only ever exercised SELECT/UPDATE, never the declared INSERT/DELETE
+  policies despite decision 10's explicit claim about guardian write access
+  (fixed with real DELETE-then-INSERT assertions for the right actors, and
+  blocked-DELETE/refused-INSERT for the wrong ones); the "pending consent"
+  and Postgres `service_role` legs of the actor matrix — both named
+  explicitly in Task 1's own checklist — were absent (both added, the
+  `service_role` boundary confirmed real via direct `docker exec` against
+  local Supabase Postgres before writing the assertion). No schema or
+  migration changes needed. Verified: full `@couture/db` suite, 8 files/74
+  tests, run twice for stability against real local Postgres; zero residual
+  test rows confirmed post-run.
+- **Mobile specs (9 fixed).** Confirmed every fix from the Task 6 review
+  pass is still intact — no regressions. New: a real ~1s+ wall-clock wait in
+  `wardrobe-onboarding-screen.test.tsx` (the same bug class already fixed
+  once for `silhouette-editor.test.tsx`, worked around at the test level
+  since, unlike the hub screen, the onboarding screen has no injectable
+  poll-offsets prop — flagged as a production-code follow-up below rather
+  than added here); an access-token-resolver restore that ran as a trailing
+  statement instead of in `afterEach` (so a failing assertion would skip
+  cleanup and leak into the next test); an un-restored env var in four
+  files; and five maintainability duplication fixes (~90 lines of
+  hand-inlined capture-flow boilerplate replaced with existing helpers, a
+  `press()` helper deduplicated into a new shared
+  `apps/mobile/src/test-utils/press.ts`, a 9×-repeated upload sequence
+  extracted to two helpers, a duplicated env-restore pair hoisted to one
+  `beforeEach`/`afterEach`). Also one real AC5 coverage gap: the silhouette
+  screen's loading-state `accessibilityLabel` was never asserted despite the
+  screen having three render branches and only two being tested — fixed.
+  Verified: 6 files/107 tests targeted, full mobile workspace 52 files/463
+  tests, lint/typecheck clean.
+
+Three production-code observations surfaced while reading source to judge
+whether test assertions were meaningful — none acted on, each flagged for a
+deliberate decision rather than a guess made under review-time pressure: (1)
+`SilhouetteProfile.revision` does not increment on `createMyFormUploadUrl`
+or `uploadMyFormBytes`, only on commit/slider-update/delete, so the ETag can
+stay stable across a `myForm.status` transition — traced end-to-end and
+found not to currently break Web/Mobile polling (both read `status` from the
+fresh response body, not the ETag, and there is no conditional-GET path
+anywhere in this controller), but undocumented as an intentional choice
+anywhere in the story; (2) `WardrobeOnboardingScreen` (mobile) has no
+injectable poll-offsets prop the way `WardrobeHubScreen` does; (3) mobile
+onboarding's `allGarmentsTagged` gate has no retry/removal affordance for a
+`failed` garment, mirroring a gap Web already found and explicitly
+documented as a follow-up, but Mobile's own dev record has no equivalent
+entry.
+
+Full aggregate verification after all 25 fixes, all real: `npm run lint
+--workspace api` clean, `npm run typecheck --workspace api` clean, `npm run
+test --workspace api` 117 files/1271 passed (5 pre-existing skips); `npm run
+lint --workspace @couture/db` clean, `npm run typecheck --workspace
+@couture/db` clean, `npm run test --workspace @couture/db` 8 files/74
+passed; `npm run lint --workspace mobile` clean, `npm run typecheck
+--workspace mobile` clean, `npm run test --workspace mobile` 52 files/463
+passed; wardrobe integration specs against real local PostgreSQL+Redis, 4
+consecutive runs, 19/19 each time. No production code was modified by this
+review.
+
 ### File list
 
 **Task 1 (branch `feat/epic4-story4-t1-db`):**
@@ -2580,3 +2701,47 @@ not reproduce).
   own `userId`)
 - `pact/http/provider/state-handlers.ts` (modified: two new state-handler
   entries for the replay scenarios)
+
+**Full-suite test-architecture review (`bmad-tea`, 2026-08-10, branch
+`feat/epic4-story4-murat-test-review`):**
+
+- `apps/api/src/modules/wardrobe/wardrobe-upload-token.spec.ts` (modified:
+  delete-if-undefined env restoration)
+- `apps/api/src/modules/wardrobe/silhouette-photo-moderation.engine.spec.ts`
+  (modified: same env-restoration fix)
+- `apps/api/src/modules/wardrobe/wardrobe-silhouette.service.spec.ts`
+  (modified: consolidated duplicate `tokenFor`/row-builder helpers)
+- `apps/api/src/modules/wardrobe/wardrobe-silhouette.controller.spec.ts`
+  (modified: restructured into per-route `describe` groups, extracted
+  repeated idempotency-key literal)
+- `apps/api/src/modules/wardrobe/wardrobe-onboarding.service.spec.ts`
+  (modified: added logical sub-`describe` groups)
+- `apps/api/integration/wardrobe-silhouette.integration.spec.ts` (modified:
+  renumbered duplicate `4.4-INT-10` id, tightened a weak exception-type
+  assertion, restored a leaked env var, added a real DB-state assertion,
+  hoisted redundant dynamic imports)
+- `packages/db/test/wardrobe-onboarding-schema.spec.ts` (modified: added a
+  real duplicate-insert-rejection assertion for `my_form_upload_session_id`
+  uniqueness)
+- `packages/db/test/rls-policies.spec.ts` (modified: `4.4-DB-003` block
+  extended with real INSERT/DELETE policy assertions, a pending-consent
+  scenario, and a Postgres `service_role`-denial scenario, for both new
+  tables)
+- `apps/mobile/src/features/wardrobe/wardrobe-onboarding-screen.test.tsx`
+  (modified: removed a real wall-clock wait, restored a leaked env var,
+  extracted a duplicated fixture constant)
+- `apps/mobile/src/features/wardrobe/wardrobe-silhouette-screen.test.tsx`
+  (modified: fixed a trailing-statement cleanup bug, restored a leaked env
+  var, added the missing loading-state accessibility assertion)
+- `apps/mobile/src/features/wardrobe/wardrobe-hub-screen.test.tsx`
+  (modified: replaced ~90 lines of hand-inlined boilerplate with existing
+  helpers, restored a leaked env var)
+- `apps/mobile/components/wardrobe/garment-capture-modal.test.tsx`
+  (modified: extracted two repeated-sequence helpers, restored a leaked env
+  var)
+- `apps/mobile/src/lib/wardrobe.test.ts` (modified: hoisted a duplicated
+  env-restore pair to one `beforeEach`/`afterEach`)
+- `apps/mobile/src/test-utils/press.ts` (new: shared test-only helper,
+  deduplicating an identical implementation from two screen test files)
+- `_bmad-output/test-artifacts/test-reviews/wardrobe-onboarding-silhouette-api-db-mobile-test-review-2026-08-10.md`
+  (new: the review report)

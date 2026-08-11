@@ -126,224 +126,240 @@ describe('WardrobeOnboardingService.advanceStep', () => {
     service = new WardrobeOnboardingService(prisma, analytics)
   })
 
-  it('4.4-UNIT-14 creates the first row and emits the started event once', async () => {
-    findUnique.mockResolvedValueOnce(null)
-    create.mockResolvedValueOnce(stateRow({ revision: 1 }))
-    updateMany.mockResolvedValueOnce({ count: 1 })
+  describe('first row creation', () => {
+    it('4.4-UNIT-14 creates the first row and emits the started event once', async () => {
+      findUnique.mockResolvedValueOnce(null)
+      create.mockResolvedValueOnce(stateRow({ revision: 1 }))
+      updateMany.mockResolvedValueOnce({ count: 1 })
 
-    const result = await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 0), {
-      targetStep: 'capture',
+      const result = await service.advanceStep(
+        USER_ID,
+        formatOnboardingETag(USER_ID, 0),
+        { targetStep: 'capture' }
+      )
+
+      expect(result.isNoOp).toBe(false)
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            user_id: USER_ID,
+            current_step: 'capture',
+            status: 'in_progress',
+            revision: 1,
+          }),
+        })
+      )
+      expect(capture).toHaveBeenCalledTimes(1)
     })
 
-    expect(result.isNoOp).toBe(false)
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          user_id: USER_ID,
-          current_step: 'capture',
-          status: 'in_progress',
-          revision: 1,
-        }),
-      })
-    )
-    expect(capture).toHaveBeenCalledTimes(1)
+    it('4.4-UNIT-14 rejects a first transition that is not forward-reachable', async () => {
+      findUnique.mockResolvedValueOnce(null)
+
+      await expect(
+        service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 0), {
+          targetStep: 'silhouette',
+        })
+      ).rejects.toBeInstanceOf(ConflictException)
+      expect(create).not.toHaveBeenCalled()
+    })
   })
 
-  it('4.4-UNIT-14 rejects a first transition that is not forward-reachable', async () => {
-    findUnique.mockResolvedValueOnce(null)
+  describe('revision preconditions', () => {
+    it('4.4-UNIT-14 rejects a non-zero expected revision before any row exists', async () => {
+      findUnique.mockResolvedValueOnce(null)
 
-    await expect(
-      service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 0), {
+      await expect(
+        service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 2), {
+          targetStep: 'capture',
+        })
+      ).rejects.toBeInstanceOf(PreconditionFailedException)
+    })
+
+    it('4.4-UNIT-14 rejects a stale revision against an existing row', async () => {
+      findUnique.mockResolvedValueOnce(stateRow({ revision: 5 }))
+
+      await expect(
+        service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
+          targetStep: 'tagging',
+        })
+      ).rejects.toBeInstanceOf(PreconditionFailedException)
+      expect(update).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('forward-only transition rules', () => {
+    it('4.4-UNIT-14 rejects a backwards transition', async () => {
+      findUnique.mockResolvedValueOnce(stateRow({ current_step: 'silhouette' }))
+
+      await expect(
+        service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
+          targetStep: 'capture',
+        })
+      ).rejects.toBeInstanceOf(ConflictException)
+    })
+
+    it('4.4-UNIT-14 rejects skipping tagging without the starter wardrobe', async () => {
+      findUnique.mockResolvedValueOnce(stateRow({ current_step: 'capture' }))
+
+      await expect(
+        service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
+          targetStep: 'silhouette',
+        })
+      ).rejects.toBeInstanceOf(ConflictException)
+    })
+
+    it('4.4-UNIT-14 rejects entering tagging on the starter-wardrobe path', async () => {
+      findUnique.mockResolvedValueOnce(stateRow({ current_step: 'capture' }))
+
+      await expect(
+        service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
+          targetStep: 'tagging',
+          usedStarterWardrobe: true,
+        })
+      ).rejects.toBeInstanceOf(ConflictException)
+    })
+  })
+
+  describe('server-authoritative fields', () => {
+    it('4.4-UNIT-14 recomputes the garment count server-side at the silhouette step', async () => {
+      findUnique.mockResolvedValueOnce(stateRow({ current_step: 'tagging' }))
+      garmentCount.mockResolvedValueOnce(7)
+      update.mockResolvedValueOnce(stateRow({ current_step: 'silhouette', revision: 2 }))
+
+      await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
         targetStep: 'silhouette',
       })
-    ).rejects.toBeInstanceOf(ConflictException)
-    expect(create).not.toHaveBeenCalled()
+
+      expect(garmentCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            user_id: USER_ID,
+            upload_status: { in: ['awaiting_tags', 'ready'] },
+            retention_status: 'active',
+          }),
+        })
+      )
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ garments_captured_count: 7 }),
+        })
+      )
+    })
+
+    it('4.4-UNIT-14 keeps a recorded starter-wardrobe flag when a later step omits it', async () => {
+      findUnique.mockResolvedValueOnce(
+        stateRow({ current_step: 'silhouette', used_starter_wardrobe: true })
+      )
+      update.mockResolvedValueOnce(
+        stateRow({ current_step: 'complete', used_starter_wardrobe: true, revision: 2 })
+      )
+
+      await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
+        targetStep: 'complete',
+      })
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ used_starter_wardrobe: true }),
+        })
+      )
+    })
   })
 
-  it('4.4-UNIT-14 rejects a non-zero expected revision before any row exists', async () => {
-    findUnique.mockResolvedValueOnce(null)
+  describe('no-op replay and telemetry', () => {
+    it('4.4-UNIT-14 treats an identical transition as a no-op replay', async () => {
+      findUnique.mockResolvedValueOnce(stateRow({ current_step: 'capture' }))
 
-    await expect(
-      service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 2), {
+      const result = await service.advanceStep(
+        USER_ID,
+        formatOnboardingETag(USER_ID, 1),
+        { targetStep: 'capture' }
+      )
+
+      expect(result.isNoOp).toBe(true)
+      expect(update).not.toHaveBeenCalled()
+    })
+
+    it('4.4-UNIT-14 still runs the telemetry claim on a no-op replay', async () => {
+      findUnique.mockResolvedValueOnce(stateRow({ current_step: 'capture' }))
+      updateMany.mockResolvedValueOnce({ count: 1 })
+
+      await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
         targetStep: 'capture',
       })
-    ).rejects.toBeInstanceOf(PreconditionFailedException)
-  })
 
-  it('4.4-UNIT-14 rejects a stale revision against an existing row', async () => {
-    findUnique.mockResolvedValueOnce(stateRow({ revision: 5 }))
+      // The claim is what recovers an event lost to a crash between commit and
+      // emission; skipping it on replay dropped that event permanently.
+      expect(updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { user_id: USER_ID, started_telemetry_emitted_at: null },
+        })
+      )
+      expect(capture).toHaveBeenCalledTimes(1)
+    })
 
-    await expect(
-      service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
-        targetStep: 'tagging',
+    it('4.4-UNIT-14 emits the completed event with the persisted silhouette mode', async () => {
+      findUnique.mockResolvedValueOnce(stateRow({ current_step: 'silhouette' }))
+      update.mockResolvedValueOnce(
+        stateRow({
+          current_step: 'complete',
+          status: 'completed',
+          completed_at: new Date('2026-08-09T10:05:00Z'),
+          garments_captured_count: 3,
+          revision: 2,
+        })
+      )
+      updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 })
+      silhouetteFindUnique.mockResolvedValueOnce({ mode: 'my_form' })
+
+      await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
+        targetStep: 'complete',
       })
-    ).rejects.toBeInstanceOf(PreconditionFailedException)
-    expect(update).not.toHaveBeenCalled()
-  })
 
-  it('4.4-UNIT-14 rejects a backwards transition', async () => {
-    findUnique.mockResolvedValueOnce(stateRow({ current_step: 'silhouette' }))
+      expect(capture).toHaveBeenCalledTimes(1)
+      const event = capture.mock.calls[0]?.[0] as {
+        properties: Record<string, unknown>
+      }
+      expect(event.properties).toMatchObject({
+        silhouette_mode: 'my_form',
+        garment_count: 3,
+        duration_ms: 300_000,
+      })
+    })
 
-    await expect(
-      service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
+    it('4.4-UNIT-14 releases the telemetry claim when the analytics handoff throws', async () => {
+      findUnique.mockResolvedValueOnce(stateRow({ current_step: 'capture' }))
+      updateMany.mockResolvedValueOnce({ count: 1 })
+      capture.mockImplementationOnce(() => {
+        throw new Error('analytics down')
+      })
+
+      await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
         targetStep: 'capture',
       })
-    ).rejects.toBeInstanceOf(ConflictException)
-  })
 
-  it('4.4-UNIT-14 rejects skipping tagging without the starter wardrobe', async () => {
-    findUnique.mockResolvedValueOnce(stateRow({ current_step: 'capture' }))
-
-    await expect(
-      service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
-        targetStep: 'silhouette',
+      // Leaving the guard stamped would claim an event that was never emitted
+      // and make it unrecoverable on any later replay.
+      expect(updateMany).toHaveBeenLastCalledWith({
+        where: { user_id: USER_ID },
+        data: { started_telemetry_emitted_at: null },
       })
-    ).rejects.toBeInstanceOf(ConflictException)
-  })
-
-  it('4.4-UNIT-14 rejects entering tagging on the starter-wardrobe path', async () => {
-    findUnique.mockResolvedValueOnce(stateRow({ current_step: 'capture' }))
-
-    await expect(
-      service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
-        targetStep: 'tagging',
-        usedStarterWardrobe: true,
-      })
-    ).rejects.toBeInstanceOf(ConflictException)
-  })
-
-  it('4.4-UNIT-14 recomputes the garment count server-side at the silhouette step', async () => {
-    findUnique.mockResolvedValueOnce(stateRow({ current_step: 'tagging' }))
-    garmentCount.mockResolvedValueOnce(7)
-    update.mockResolvedValueOnce(stateRow({ current_step: 'silhouette', revision: 2 }))
-
-    await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
-      targetStep: 'silhouette',
     })
 
-    expect(garmentCount).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          user_id: USER_ID,
-          upload_status: { in: ['awaiting_tags', 'ready'] },
-          retention_status: 'active',
-        }),
-      })
-    )
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ garments_captured_count: 7 }),
-      })
-    )
-  })
+    it('4.4-UNIT-14 does not let a telemetry failure fail the transition', async () => {
+      findUnique.mockResolvedValueOnce(stateRow({ current_step: 'capture' }))
+      update.mockResolvedValueOnce(stateRow({ current_step: 'tagging', revision: 2 }))
+      updateMany.mockRejectedValue(new Error('db blip'))
 
-  it('4.4-UNIT-14 keeps a recorded starter-wardrobe flag when a later step omits it', async () => {
-    findUnique.mockResolvedValueOnce(
-      stateRow({ current_step: 'silhouette', used_starter_wardrobe: true })
-    )
-    update.mockResolvedValueOnce(
-      stateRow({ current_step: 'complete', used_starter_wardrobe: true, revision: 2 })
-    )
+      const result = await service.advanceStep(
+        USER_ID,
+        formatOnboardingETag(USER_ID, 1),
+        { targetStep: 'tagging' }
+      )
 
-    await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
-      targetStep: 'complete',
+      // Telemetry is best-effort; the state transition is the contract.
+      expect(result.response.data.currentStep).toBe('tagging')
+      expect(result.response.data.revision).toBe(2)
     })
-
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ used_starter_wardrobe: true }),
-      })
-    )
-  })
-
-  it('4.4-UNIT-14 treats an identical transition as a no-op replay', async () => {
-    findUnique.mockResolvedValueOnce(stateRow({ current_step: 'capture' }))
-
-    const result = await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
-      targetStep: 'capture',
-    })
-
-    expect(result.isNoOp).toBe(true)
-    expect(update).not.toHaveBeenCalled()
-  })
-
-  it('4.4-UNIT-14 still runs the telemetry claim on a no-op replay', async () => {
-    findUnique.mockResolvedValueOnce(stateRow({ current_step: 'capture' }))
-    updateMany.mockResolvedValueOnce({ count: 1 })
-
-    await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
-      targetStep: 'capture',
-    })
-
-    // The claim is what recovers an event lost to a crash between commit and
-    // emission; skipping it on replay dropped that event permanently.
-    expect(updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { user_id: USER_ID, started_telemetry_emitted_at: null },
-      })
-    )
-    expect(capture).toHaveBeenCalledTimes(1)
-  })
-
-  it('4.4-UNIT-14 emits the completed event with the persisted silhouette mode', async () => {
-    findUnique.mockResolvedValueOnce(stateRow({ current_step: 'silhouette' }))
-    update.mockResolvedValueOnce(
-      stateRow({
-        current_step: 'complete',
-        status: 'completed',
-        completed_at: new Date('2026-08-09T10:05:00Z'),
-        garments_captured_count: 3,
-        revision: 2,
-      })
-    )
-    updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 })
-    silhouetteFindUnique.mockResolvedValueOnce({ mode: 'my_form' })
-
-    await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
-      targetStep: 'complete',
-    })
-
-    expect(capture).toHaveBeenCalledTimes(1)
-    const event = capture.mock.calls[0]?.[0] as {
-      properties: Record<string, unknown>
-    }
-    expect(event.properties).toMatchObject({
-      silhouette_mode: 'my_form',
-      garment_count: 3,
-      duration_ms: 300_000,
-    })
-  })
-
-  it('4.4-UNIT-14 releases the telemetry claim when the analytics handoff throws', async () => {
-    findUnique.mockResolvedValueOnce(stateRow({ current_step: 'capture' }))
-    updateMany.mockResolvedValueOnce({ count: 1 })
-    capture.mockImplementationOnce(() => {
-      throw new Error('analytics down')
-    })
-
-    await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
-      targetStep: 'capture',
-    })
-
-    // Leaving the guard stamped would claim an event that was never emitted
-    // and make it unrecoverable on any later replay.
-    expect(updateMany).toHaveBeenLastCalledWith({
-      where: { user_id: USER_ID },
-      data: { started_telemetry_emitted_at: null },
-    })
-  })
-
-  it('4.4-UNIT-14 does not let a telemetry failure fail the transition', async () => {
-    findUnique.mockResolvedValueOnce(stateRow({ current_step: 'capture' }))
-    update.mockResolvedValueOnce(stateRow({ current_step: 'tagging', revision: 2 }))
-    updateMany.mockRejectedValue(new Error('db blip'))
-
-    const result = await service.advanceStep(USER_ID, formatOnboardingETag(USER_ID, 1), {
-      targetStep: 'tagging',
-    })
-
-    // Telemetry is best-effort; the state transition is the contract.
-    expect(result.response.data.currentStep).toBe('tagging')
-    expect(result.response.data.revision).toBe(2)
   })
 })

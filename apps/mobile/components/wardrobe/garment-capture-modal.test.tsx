@@ -108,8 +108,21 @@ function renderModal(
   return { onClose, onGarmentCommitted }
 }
 
+/** Picks a library photo and waits for the crop step to render. */
+async function pickLibraryPhoto() {
+  fireEvent.click(screen.getByTestId('garment-source-library'))
+  await waitFor(() => screen.getByTestId('garment-crop-preview'))
+}
+
+/** Picks a library photo, then confirms the crop to start the upload. */
+async function pickLibraryPhotoAndConfirm() {
+  await pickLibraryPhoto()
+  fireEvent.click(screen.getByTestId('garment-confirm-image'))
+}
+
 describe('MobileGarmentCaptureModal', () => {
   let restoreAccessTokenResolver: () => void
+  const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
 
   beforeEach(() => {
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
@@ -136,6 +149,11 @@ describe('MobileGarmentCaptureModal', () => {
   })
 
   afterEach(() => {
+    if (originalBaseUrl === undefined) {
+      delete process.env.EXPO_PUBLIC_API_BASE_URL
+    } else {
+      process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
+    }
     restoreAccessTokenResolver()
     Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
     vi.useRealTimers()
@@ -167,11 +185,9 @@ describe('MobileGarmentCaptureModal', () => {
   it('4.4-MOB-CAP-04 moves to the crop step after picking a library photo', async () => {
     renderModal()
 
-    fireEvent.click(screen.getByTestId('garment-source-library'))
+    await pickLibraryPhoto()
 
-    await waitFor(() => {
-      expect(screen.getByTestId('garment-crop-preview')).toBeInTheDocument()
-    })
+    expect(screen.getByTestId('garment-crop-preview')).toBeInTheDocument()
   })
 
   it('4.4-MOB-CAP-05 shows a blocked-permission error with a settings link', async () => {
@@ -193,8 +209,7 @@ describe('MobileGarmentCaptureModal', () => {
 
   it('4.4-MOB-CAP-06 toggles aspect ratio and background cleanup in the crop step', async () => {
     renderModal()
-    fireEvent.click(screen.getByTestId('garment-source-library'))
-    await waitFor(() => screen.getByTestId('garment-crop-preview'))
+    await pickLibraryPhoto()
 
     const cleanupToggle = screen.getByRole('switch')
     expect(cleanupToggle).toBeChecked()
@@ -241,10 +256,7 @@ describe('MobileGarmentCaptureModal', () => {
     )
 
     const { onGarmentCommitted } = renderModal()
-    fireEvent.click(screen.getByTestId('garment-source-library'))
-    await waitFor(() => screen.getByTestId('garment-crop-preview'))
-
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await pickLibraryPhotoAndConfirm()
 
     await waitFor(() => {
       expect(screen.getByTestId('garment-capture-complete')).toBeInTheDocument()
@@ -278,9 +290,7 @@ describe('MobileGarmentCaptureModal', () => {
     )
 
     renderModal()
-    fireEvent.click(screen.getByTestId('garment-source-library'))
-    await waitFor(() => screen.getByTestId('garment-crop-preview'))
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await pickLibraryPhotoAndConfirm()
 
     await waitFor(() => {
       expect(screen.getByText('Storage rejected the upload.')).toBeInTheDocument()
@@ -405,8 +415,7 @@ describe('MobileGarmentCaptureModal', () => {
       )
     )
     renderModal()
-    fireEvent.click(screen.getByTestId('garment-source-library'))
-    await waitFor(() => screen.getByTestId('garment-crop-preview'))
+    await pickLibraryPhoto()
 
     fireEvent.click(screen.getByTestId('garment-aspect-portrait'))
     fireEvent.click(screen.getByTestId('garment-confirm-image'))
@@ -432,10 +441,7 @@ describe('MobileGarmentCaptureModal', () => {
       )
     )
     renderModal()
-    fireEvent.click(screen.getByTestId('garment-source-library'))
-    await waitFor(() => screen.getByTestId('garment-crop-preview'))
-
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await pickLibraryPhotoAndConfirm()
 
     await waitFor(() => {
       expect(screen.getByText('Wardrobe request failed with 503')).toBeInTheDocument()
@@ -446,10 +452,7 @@ describe('MobileGarmentCaptureModal', () => {
     restoreAccessTokenResolver()
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
     renderModal()
-    fireEvent.click(screen.getByTestId('garment-source-library'))
-    await waitFor(() => screen.getByTestId('garment-crop-preview'))
-
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await pickLibraryPhotoAndConfirm()
 
     await waitFor(() => {
       expect(screen.getByText('AUTHENTICATION_REQUIRED')).toBeInTheDocument()
@@ -460,10 +463,7 @@ describe('MobileGarmentCaptureModal', () => {
   it('4.4-MOB-CAP-20 rejects re-encoded bytes that exceed the 10 MiB ceiling', async () => {
     fileSystem.state.bytes = new Uint8Array(10 * 1024 * 1024 + 1)
     renderModal()
-    fireEvent.click(screen.getByTestId('garment-source-library'))
-    await waitFor(() => screen.getByTestId('garment-crop-preview'))
-
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await pickLibraryPhotoAndConfirm()
 
     await waitFor(() => {
       expect(screen.getByText('wardrobe.error.image_too_large')).toBeInTheDocument()
@@ -477,10 +477,7 @@ describe('MobileGarmentCaptureModal', () => {
       http.post('*/api/v1/wardrobe/upload-url', () => new Promise<never>(() => undefined))
     )
     renderModal()
-    fireEvent.click(screen.getByTestId('garment-source-library'))
-    await waitFor(() => screen.getByTestId('garment-crop-preview'))
-
-    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await pickLibraryPhotoAndConfirm()
     await waitFor(() => screen.getByTestId('garment-upload-progress'))
 
     fireEvent.click(screen.getByTestId('garment-upload-cancel'))

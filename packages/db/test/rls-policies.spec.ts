@@ -1179,7 +1179,7 @@ describe.concurrent('guardian-aware RLS policies', () => {
   )
 
   scenarioTest(
-    '4.4-DB-003 lets the onboarding-state and silhouette-profile owner read and mutate both rows',
+    '4.4-DB-003 lets the onboarding-state and silhouette-profile owner read, mutate, delete, and reinsert both rows',
     async ({ scenario: seeded }) => {
       await withRole(
         'authenticated',
@@ -1218,6 +1218,37 @@ describe.concurrent('guardian-aware RLS policies', () => {
             [seeded.silhouetteProfileId]
           )
           expect(slid.rows).toEqual([{ height_slider: 70, revision: 1 }])
+
+          // The declared INSERT/DELETE policies are exercised here too, not
+          // just SELECT/UPDATE, since a singleton one-row-per-user table
+          // never naturally hits INSERT once the fixture seeds a row.
+          const deletedOnboarding = await client.query(
+            'DELETE FROM public."WardrobeOnboardingState" WHERE "id" = $1 RETURNING "id"',
+            [seeded.onboardingStateId]
+          )
+          expect(deletedOnboarding.rows).toEqual([{ id: seeded.onboardingStateId }])
+
+          const reinsertedOnboarding = await client.query(
+            `INSERT INTO public."WardrobeOnboardingState" ("id", "user_id", "updated_at")
+             VALUES ($1, $2, NOW())
+             RETURNING "id"`,
+            [`owner-onboarding-${randomUUID()}`, seeded.teenId]
+          )
+          expect(reinsertedOnboarding.rows).toHaveLength(1)
+
+          const deletedSilhouette = await client.query(
+            'DELETE FROM public."SilhouetteProfile" WHERE "id" = $1 RETURNING "id"',
+            [seeded.silhouetteProfileId]
+          )
+          expect(deletedSilhouette.rows).toEqual([{ id: seeded.silhouetteProfileId }])
+
+          const reinsertedSilhouette = await client.query(
+            `INSERT INTO public."SilhouetteProfile" ("id", "user_id", "updated_at")
+             VALUES ($1, $2, NOW())
+             RETURNING "id"`,
+            [`owner-silhouette-${randomUUID()}`, seeded.teenId]
+          )
+          expect(reinsertedSilhouette.rows).toHaveLength(1)
         }
       )
     }
@@ -1259,13 +1290,73 @@ describe.concurrent('guardian-aware RLS policies', () => {
             [seeded.silhouetteProfileId]
           )
           expect(blockedSilhouetteUpdate.rows).toHaveLength(0)
+
+          // DELETE is filtered to zero visible rows, same as UPDATE.
+          const blockedOnboardingDelete = await client.query(
+            'DELETE FROM public."WardrobeOnboardingState" WHERE "id" = $1 RETURNING "id"',
+            [seeded.onboardingStateId]
+          )
+          expect(blockedOnboardingDelete.rows).toHaveLength(0)
+
+          const blockedSilhouetteDelete = await client.query(
+            'DELETE FROM public."SilhouetteProfile" WHERE "id" = $1 RETURNING "id"',
+            [seeded.silhouetteProfileId]
+          )
+          expect(blockedSilhouetteDelete.rows).toHaveLength(0)
+        }
+      )
+
+      // INSERT is refused by the WITH CHECK clause rather than filtered, and a
+      // refused statement aborts its transaction, so it needs its own
+      // session. The pre-seeded row is removed first so the failure is
+      // unambiguously the RLS check rather than the one-row-per-user unique
+      // constraint.
+      const adminClient = await adminPool.connect()
+      try {
+        await adminClient.query(
+          'DELETE FROM public."WardrobeOnboardingState" WHERE "id" = $1',
+          [seeded.onboardingStateId]
+        )
+        await adminClient.query(
+          'DELETE FROM public."SilhouetteProfile" WHERE "id" = $1',
+          [seeded.silhouetteProfileId]
+        )
+      } finally {
+        adminClient.release()
+      }
+
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
+        async (client) => {
+          await expect(
+            client.query(
+              `INSERT INTO public."WardrobeOnboardingState" ("id", "user_id", "updated_at")
+               VALUES ($1, $2, NOW())`,
+              [`blocked-onboarding-${randomUUID()}`, seeded.teenId]
+            )
+          ).rejects.toMatchObject({ code: '42501' })
+        }
+      )
+
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
+        async (client) => {
+          await expect(
+            client.query(
+              `INSERT INTO public."SilhouetteProfile" ("id", "user_id", "updated_at")
+               VALUES ($1, $2, NOW())`,
+              [`blocked-silhouette-${randomUUID()}`, seeded.teenId]
+            )
+          ).rejects.toMatchObject({ code: '42501' })
         }
       )
     }
   )
 
   scenarioTest(
-    '4.4-DB-003 lets full-access guardians mutate linked teen onboarding and silhouette rows',
+    '4.4-DB-003 lets full-access guardians mutate, delete, and recreate linked teen onboarding and silhouette rows',
     async ({ scenario: seeded }) => {
       await withRole(
         'authenticated',
@@ -1288,6 +1379,38 @@ describe.concurrent('guardian-aware RLS policies', () => {
             [seeded.silhouetteProfileId]
           )
           expect(slid.rows).toEqual([{ build_slider: 20 }])
+
+          // Decision 10 grants a full-access guardian raw DB-level write
+          // capability over both tables (an accepted asymmetry with the
+          // app routes, which stay self-scoped) — prove DELETE and INSERT
+          // on behalf of the linked teen, not only UPDATE.
+          const deletedOnboarding = await client.query(
+            'DELETE FROM public."WardrobeOnboardingState" WHERE "id" = $1 RETURNING "id"',
+            [seeded.onboardingStateId]
+          )
+          expect(deletedOnboarding.rows).toEqual([{ id: seeded.onboardingStateId }])
+
+          const reinsertedOnboarding = await client.query(
+            `INSERT INTO public."WardrobeOnboardingState" ("id", "user_id", "updated_at")
+             VALUES ($1, $2, NOW())
+             RETURNING "id"`,
+            [`guardian-onboarding-${randomUUID()}`, seeded.teenId]
+          )
+          expect(reinsertedOnboarding.rows).toHaveLength(1)
+
+          const deletedSilhouette = await client.query(
+            'DELETE FROM public."SilhouetteProfile" WHERE "id" = $1 RETURNING "id"',
+            [seeded.silhouetteProfileId]
+          )
+          expect(deletedSilhouette.rows).toEqual([{ id: seeded.silhouetteProfileId }])
+
+          const reinsertedSilhouette = await client.query(
+            `INSERT INTO public."SilhouetteProfile" ("id", "user_id", "updated_at")
+             VALUES ($1, $2, NOW())
+             RETURNING "id"`,
+            [`guardian-silhouette-${randomUUID()}`, seeded.teenId]
+          )
+          expect(reinsertedSilhouette.rows).toHaveLength(1)
         }
       )
     }
@@ -1362,6 +1485,55 @@ describe.concurrent('guardian-aware RLS policies', () => {
   )
 
   scenarioTest(
+    '4.4-DB-003 blocks onboarding and silhouette access while a guardian consent is still pending',
+    async ({ scenario: seeded }) => {
+      const pendingConsentId = `consent-pending-${randomUUID()}`
+      const adminClient = await adminPool.connect()
+
+      try {
+        await adminClient.query(
+          `INSERT INTO public."GuardianConsent"
+            ("id", "guardian_id", "teen_id", "consent_level", "status", "ip_address")
+           VALUES ($1, $2, $3, 'full_access', 'pending', '127.0.0.1')`,
+          [pendingConsentId, seeded.outsiderGuardianId, seeded.teenId]
+        )
+      } finally {
+        adminClient.release()
+      }
+
+      try {
+        await withRole(
+          'authenticated',
+          buildClaims(seeded.outsiderGuardianEmail, 'guardian'),
+          async (client) => {
+            const onboarding = await client.query(
+              'SELECT "id" FROM public."WardrobeOnboardingState" WHERE "user_id" = $1',
+              [seeded.teenId]
+            )
+            expect(onboarding.rows).toHaveLength(0)
+
+            const silhouette = await client.query(
+              'SELECT "id" FROM public."SilhouetteProfile" WHERE "user_id" = $1',
+              [seeded.teenId]
+            )
+            expect(silhouette.rows).toHaveLength(0)
+          }
+        )
+      } finally {
+        const cleanupClient = await adminPool.connect()
+        try {
+          await cleanupClient.query(
+            'DELETE FROM public."GuardianConsent" WHERE "id" = $1',
+            [pendingConsentId]
+          )
+        } finally {
+          cleanupClient.release()
+        }
+      }
+    }
+  )
+
+  scenarioTest(
     '4.4-DB-003 blocks unrelated, unverified, spoofed, and anonymous onboarding/silhouette access',
     async ({ scenario: seeded }) => {
       await withRole(
@@ -1426,6 +1598,34 @@ describe.concurrent('guardian-aware RLS policies', () => {
       })
 
       await withRole('anon', null, async (client) => {
+        await expect(
+          client.query(
+            'SELECT "id" FROM public."SilhouetteProfile" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
+        ).rejects.toMatchObject({ code: '42501' })
+      })
+    }
+  )
+
+  scenarioTest(
+    '4.4-DB-003 denies the Postgres service_role table access, matching GarmentItem',
+    async ({ scenario: seeded }) => {
+      // Guardian-shared tables are only granted to `authenticated`
+      // (private/rls-policies.spec.ts's guardianSharedTables convention);
+      // service_role has BYPASSRLS but no table grant here, so a backend
+      // process must act through an `authenticated` session with an
+      // elevated app-role claim, never the raw Postgres service role.
+      await withRole('service_role', null, async (client) => {
+        await expect(
+          client.query(
+            'SELECT "id" FROM public."WardrobeOnboardingState" WHERE "user_id" = $1',
+            [seeded.teenId]
+          )
+        ).rejects.toMatchObject({ code: '42501' })
+      })
+
+      await withRole('service_role', null, async (client) => {
         await expect(
           client.query(
             'SELECT "id" FROM public."SilhouetteProfile" WHERE "user_id" = $1',
