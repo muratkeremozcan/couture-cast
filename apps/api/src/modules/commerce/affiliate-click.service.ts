@@ -68,7 +68,7 @@ const UNRESOLVED_SCENARIO = 'unknown'
 @Injectable()
 export class AffiliateClickService {
   private readonly logger = createBaseLogger().child({ feature: 'commerce-clicks' })
-  private readonly clickTokenSecret: string
+  private cachedClickTokenSecret: string | undefined
 
   constructor(
     @Inject(FeatureFlagsService)
@@ -77,10 +77,26 @@ export class AffiliateClickService {
     private readonly repository: CommerceRepository,
     @Inject(AffiliateClickTelemetry)
     private readonly telemetry: AffiliateClickTelemetry
-  ) {
-    // Resolved once at construction, exactly as the upload-token path does, so a
-    // missing production secret fails at boot rather than on the first click.
-    this.clickTokenSecret = requireClickTokenSecret()
+  ) {}
+
+  /**
+   * Resolved on first use and memoised, NOT in the constructor.
+   *
+   * An earlier version resolved it at construction, reasoning that a missing
+   * production secret should fail at boot rather than on the first click. That
+   * is the right instinct for a mandatory secret and the wrong one here. Nest
+   * instantiates every provider while the application bootstraps, so a throw in
+   * this constructor takes down the ENTIRE API: health, ritual, wardrobe, and
+   * everything else, with `FUNCTION_INVOCATION_FAILED` on every route. It did
+   * exactly that on the first preview deployment of this story.
+   *
+   * Affiliate commerce sits behind a kill switch that defaults to false, so an
+   * environment that has not configured it is a normal, expected environment.
+   * The blast radius of a missing secret has to be the click endpoint alone.
+   */
+  private getClickTokenSecret(): string {
+    this.cachedClickTokenSecret ??= requireClickTokenSecret()
+    return this.cachedClickTokenSecret
   }
 
   async recordClick(
@@ -146,7 +162,7 @@ export class AffiliateClickService {
     )
 
     const clickId = randomUUID()
-    const token = mintClickToken(clickId, this.clickTokenSecret)
+    const token = mintClickToken(clickId, this.getClickTokenSecret())
     // Built and validated BEFORE the insert. An offer whose resolved URL fails
     // validation must create no click row at all, so the check cannot come after
     // the write.

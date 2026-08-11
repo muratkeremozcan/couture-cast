@@ -75,6 +75,56 @@ describe('AffiliateClickService', () => {
     )
   })
 
+  describe('construction', () => {
+    it('constructs without COMMERCE_CLICK_TOKEN_SECRET, even outside a test environment', () => {
+      /*
+       * REGRESSION. This constructor used to call `requireClickTokenSecret()`,
+       * on the reasoning that a missing production secret should fail at boot
+       * rather than on the first click. Nest instantiates every provider while
+       * the application bootstraps, so that throw took down the ENTIRE API and
+       * the first preview deployment of this story answered
+       * FUNCTION_INVOCATION_FAILED on every route, health included.
+       *
+       * Affiliate commerce is behind a kill switch that defaults to false, so an
+       * environment with no secret configured is normal. The blast radius has to
+       * be the click endpoint alone.
+       *
+       * NODE_ENV and TEST_ENV are cleared because `requireClickTokenSecret`
+       * falls back to a test-only value through `allowsTestOnlySecrets()`; with
+       * them set this test would pass without proving anything.
+       */
+      const previousNodeEnv = process.env.NODE_ENV
+      const previousTestEnv = process.env.TEST_ENV
+      const previousSecret = process.env.COMMERCE_CLICK_TOKEN_SECRET
+      process.env.NODE_ENV = 'production'
+      delete process.env.TEST_ENV
+      delete process.env.COMMERCE_CLICK_TOKEN_SECRET
+
+      try {
+        expect(
+          () =>
+            new AffiliateClickService(
+              featureFlags as unknown as FeatureFlagsService,
+              repository as unknown as CommerceRepository,
+              telemetry as unknown as AffiliateClickTelemetry
+            )
+        ).not.toThrow()
+      } finally {
+        process.env.NODE_ENV = previousNodeEnv
+        if (previousTestEnv === undefined) {
+          delete process.env.TEST_ENV
+        } else {
+          process.env.TEST_ENV = previousTestEnv
+        }
+        if (previousSecret === undefined) {
+          delete process.env.COMMERCE_CLICK_TOKEN_SECRET
+        } else {
+          process.env.COMMERCE_CLICK_TOKEN_SECRET = previousSecret
+        }
+      }
+    })
+  })
+
   describe('decision 9 status precedence', () => {
     it('returns 503 when the flag is off, ahead of every other check', async () => {
       featureFlags.getFeatureFlag.mockResolvedValue(false)
