@@ -152,6 +152,13 @@ jobs:
           # Align health check SHA with the build produced in this workflow; use HEAD, not the PR merge ref
           EXPECTED_SHA: ${{ steps.git-sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.git-sha.outputs.sha }}
+          # Deliberately step-scoped, not hoisted to the job or workflow `env`.
+          # `TEST_ENV=local` is what `allowsTestOnlySecrets()` keys on, so
+          # hoisting it would switch on test-only secret fallbacks for every
+          # step in this job, and three api specs assert the
+          # NON-test-environment behaviour of exactly that helper. Least
+          # privilege here is not a style preference: widening the scope makes
+          # those three specs assert the wrong branch.
           TEST_ENV: local
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}

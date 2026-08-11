@@ -193,6 +193,17 @@ jobs:
           badge-filename-prefix: couture-cast
           badge-gist-auth: ${{ secrets.COVERAGE_GIST_TOKEN }}
 
+      # `always()` so this runs even when the coverage-comment step above has
+      # already failed. `continue-on-error` on the test step is deliberate and
+      # should stay: it is what lets the coverage comment post on a red run,
+      # which is when it is most useful. But it means a failing test run reaches
+      # the comment step, which then dies on the missing lcov and takes the job
+      # down with an error about a missing file rather than about the tests.
+      # The gate held either way; the reported cause was wrong. This step now
+      # always runs and names the real one. It still exits 0 when the tests
+      # passed, so a comment step that fails for its own reasons is not masked.
       - name: Fail if tests failed
-        if: steps.tests.outcome == 'failure' || steps.lighthouse.outcome == 'failure'
-        run: exit 1
+        if: always() && (steps.tests.outcome == 'failure' || steps.lighthouse.outcome == 'failure')
+        run: |
+          echo "::error::Quality gate failed: tests=${{ steps.tests.outcome }} lighthouse=${{ steps.lighthouse.outcome }}"
+          exit 1
