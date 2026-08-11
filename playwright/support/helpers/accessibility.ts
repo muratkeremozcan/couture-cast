@@ -58,3 +58,40 @@ export async function checkA11y(page: Page, options?: CheckA11yOptions): Promise
     `Accessibility violations found:\n${JSON.stringify(violations, null, 2)}`
   ).toEqual([])
 }
+
+function parseRgb(value: string): [number, number, number] {
+  const channels = value
+    .match(/[\d.]+/g)
+    ?.slice(0, 3)
+    .map(Number)
+  if (!channels || channels.length !== 3) {
+    throw new Error(`Expected an RGB color, received ${value}`)
+  }
+  return channels as [number, number, number]
+}
+
+/**
+ * WCAG relative-contrast ratio between two computed `rgb()` colors.
+ *
+ * Focus indicators are a non-text contrast requirement, which axe does not
+ * evaluate, so a focus ring can vanish against its surface with a clean axe
+ * report. Specs that care assert the ratio directly.
+ *
+ * `accessibility-hardening.spec.ts` carries its own inline copy that predates
+ * this helper. It is the gate for every primary route, so it is deliberately
+ * left alone here rather than refactored in a change that cannot run it.
+ */
+export function contrastRatio(left: string, right: string): number {
+  const luminance = (color: string) => {
+    const channels = parseRgb(color).map((channel) => {
+      const normalized = channel / 255
+      return normalized <= 0.04045
+        ? normalized / 12.92
+        : ((normalized + 0.055) / 1.055) ** 2.4
+    })
+    return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722
+  }
+  const a = luminance(left)
+  const b = luminance(right)
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+}
