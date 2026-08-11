@@ -349,22 +349,41 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
   })
 
   describe('the 60-second dedupe boundary', () => {
+    /**
+     * `created_at` is computed by the DATABASE at insert time, not from a
+     * JavaScript clock read, and that is the difference between a boundary test
+     * and a coin flip.
+     *
+     * The 59-second case has exactly one second of margin: the endpoint dedupes
+     * on `created_at > now() - interval '60 seconds'`, so any wall clock that
+     * elapses between fixing this timestamp and the endpoint evaluating it eats
+     * directly into that second. Reading the clock in JavaScript first spent a
+     * round trip on the read and another on the insert before the POST even
+     * started, on a contended two-core runner that is not obviously under a
+     * second, and when it is not the row ages past the window, the endpoint
+     * correctly mints a fresh click, and the test fails claiming the dedupe
+     * broke.
+     *
+     * Computing the age inside the INSERT bounds the drift to the POST's own
+     * latency. `commerce-affiliate-webhook.integration.spec.ts` 5.1-INT-07 was
+     * the same defect with a bigger gap: its future-tolerance case signed a
+     * timestamp up front and dispatched it after eight other requests.
+     */
     async function seedClickAgedBy(seconds: number): Promise<string> {
-      const now = await databaseNow()
-      const click = await prismaA.affiliateClick.create({
-        data: {
-          token: `${namespace}-preexisting-${seconds}`,
-          user_id: userId,
-          offer_id: activeOfferId,
-          partner_id: partnerId,
-          recommendation_id: recommendationId,
-          scenario: 'midday',
-          surface: 'mobile_hero',
-          locale_region: '*',
-          created_at: new Date(now.getTime() - seconds * 1000),
-        },
-      })
-      return click.token
+      const token = `${namespace}-preexisting-${seconds}`
+
+      await prismaA.$executeRaw`
+        INSERT INTO "AffiliateClick"
+          ("id", "token", "user_id", "offer_id", "partner_id", "recommendation_id",
+           "scenario", "surface", "locale_region", "created_at")
+        VALUES (
+          ${randomUUID()}, ${token}, ${userId}, ${activeOfferId}, ${partnerId},
+          ${recommendationId}, 'midday', 'mobile_hero', '*',
+          (now() AT TIME ZONE 'UTC') - (${seconds}::int * interval '1 second')
+        )
+      `
+
+      return token
     }
 
     it('dedupes an activation at 59 seconds', async (context) => {
