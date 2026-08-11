@@ -3234,3 +3234,147 @@ flowchart TD
   Worker -- "on flag, teen actor" --> Guardian["Guardian outbox notification"]
   OS -- "started/completed" --> Telemetry["Guarded telemetry emission\n(started_telemetry_emitted_at / completed_telemetry_emitted_at)"]
 ```
+
+## Step 33 - Affiliate "Shop this look" CTA
+
+User/business impact:
+
+Turns an outfit card into qualified traffic for a brand partner. An eligible
+card carries a disclosed "Shop this look" control naming the partner; tapping it
+mints one attributed click, hands off to an in-app browser, and the partner
+reports the resulting purchase back over a signed webhook. A single settings
+toggle on Mobile and Web hides every affiliate suggestion, enforced on the
+server so it takes effect on the next request rather than the next cache
+expiry. This is the first revenue surface in the product, so the guardrails
+carry as much weight as the feature: disclosure renders before the control in
+reading order, the click and conversion records are durable commercial facts
+retained for two years, and no URL, product title, garment id, or raw user id
+ever reaches an analytics property.
+
+Key takeaways:
+
+1. **A green test suite does not mean the code compiles.** Making
+   `shopThisLook` a required field on `scenarioOutfitSchema` broke
+   `RitualService`, which declares a return type it no longer satisfied. All
+   1271 API tests still passed, because Vitest transpiles through esbuild
+   without type checking, and lint says nothing about assignability. `npm run
+typecheck` is a separate gate and belongs in the same breath as the test run
+   for any change that touches a shared contract type. This one shipped to a
+   branch four other sessions then built on.
+
+2. **`timestamp without time zone` compared against `now()` silently shifts by
+   the session time zone.** Prisma writes `DateTime` columns as UTC instants
+   into `timestamp(3)`, which carries no zone. PostgreSQL's `now()` returns
+   `timestamptz`. Comparing the two makes PostgreSQL read the naive side in the
+   session's `TimeZone`, so on a container set to `America/Chicago` every
+   affiliate publication window moved five hours and the sixty-second click
+   dedupe window could not match at all. The correct comparison is `now() AT
+TIME ZONE 'UTC'`, which yields a naive timestamp whose wall-clock reading is
+   the UTC instant, matching the frame the column was written in. What exposed
+   it was a pair of boundary tests that failed roughly half the time depending
+   on whether `now()`'s sub-millisecond remainder rounded up on write. A test
+   that is flaky at a boundary is often reporting a real frame mismatch rather
+   than a timing nuisance.
+
+3. **Parallel branches can each fix the same break correctly and merge into a
+   defect.** Two sessions independently repaired the compile error above, one by
+   widening the service's return type to exclude the commerce field and one by
+   writing `shopThisLook: null` in the service. Git auto-merged both without a
+   conflict, because they touched different lines. The combination compiles and
+   is wrong: writing the key inside the service puts it into the Redis payload
+   and the persisted `OutfitRecommendation` rows, which is exactly the cache
+   poisoning the whole assembly-point design exists to prevent. When branches
+   are worked in parallel, a clean merge of a shared file is a prompt to read
+   the result rather than evidence that nothing collided.
+
+4. **A wildcard sentinel is only a wildcard if the query says so.** The offer
+   catalog publishes globally with `locale_region = '*'`, and the seed exists
+   precisely so the feature is demonstrable end to end. The first implementation
+   compared `locale_region` for exact equality, so every seeded row matched
+   nothing, because a real user always resolves to a country subtag. The feature
+   looked correct in unit tests, which asserted the SQL text, and would have
+   failed the first end-to-end run. A sentinel value needs a test that exercises
+   it from both directions: a global row reaching a regional request, and a
+   request with no resolvable region reaching a global row.
+
+5. **A shared seed and an integration test that asserts emptiness cannot both be
+   right.** Once the sentinel worked, the seeded global catalog matched every
+   query, and eight offer-selection tests that asserted "no offer was selected"
+   started failing for a correct reason. On a database that carries a globally
+   published catalog, emptiness is not a statement a test can make. The suite now
+   parks the seeded rows for its own duration and restores them in `afterAll`,
+   rather than deleting state that Playwright and Maestro setup depend on. The
+   earlier version of a different spec did delete it, which made that spec pass
+   only on its second run and quietly broke its own first run.
+
+6. **Reading `process.env[<value from a database row>]` is an unbounded
+   environment read.** Each affiliate partner names its own webhook signing
+   secret through `CommercePartner.webhook_secret_ref`. Left unconstrained,
+   whoever can write a catalog row can read any variable in the process,
+   including `DATABASE_URL` and the Supabase service-role key. It is bounded
+   twice on purpose: a database check constraint pinning the name to
+   `^COMMERCE_PARTNER_[A-Z0-9_]{1,40}_WEBHOOK_SECRET$`, and a runtime guard
+   re-checking the same pattern before the lookup. Secret values never enter the
+   database; only the variable name does.
+
+7. **`NestFactory.create` is called in three places and the deployed one is not
+   `src/main.ts`.** `apps/api/vercel.json` maps the function to
+   `apps/api/api/index.ts` and rewrites every path to it, so preview and
+   production never execute the bootstrap that local development does. Signature
+   verification needs `rawBody: true` in all three, including each test's own
+   `moduleFixture.createNestApplication(...)`, or the proof test passes against a
+   `rawBody === undefined` path for the wrong reason. Auditing that difference
+   also surfaced something much larger and older: the deployed bootstrap installs
+   no `ApiExceptionFilter`, so `api_error_occurred` telemetry has never been
+   emitted outside local development, on any route, since Step 4. Dashboards
+   built on that event have been showing local traffic only.
+
+8. **Put the request-scoped decision after the cache, not inside the thing that
+   caches.** `RitualService` returns its cached payload hundreds of lines before
+   response assembly and has no single post-cache point, so the commerce block is
+   assembled in `RitualController` between the service call and the schema parse.
+   Every path, cold generate and both warm-cache reads, passes through that line,
+   which is what makes the opt-out take effect immediately while a cached
+   recommendation is still being served. The rejected alternative, a commerce
+   revision in the cache key, multiplies entries by preference state and makes
+   one catalog edit evict every user's personalization cache. The client cache
+   needed the same treatment: the block is stripped before `saveRitualCache`,
+   because a device cache served for fifteen minutes online and indefinitely
+   offline would otherwise read as a broken opt-out.
+
+9. **A uniqueness index that enforces concurrency is not the same rule as the
+   product's window.** Click dedupe is a sixty-second sliding window, enforced by
+   a read-then-insert that two simultaneous taps both pass. The backstop is a
+   unique index on `(user_id, offer_id, recommendation_id, date_trunc('minute',
+created_at))`, which guarantees exactly one row survives a race. It is
+   deliberately not the product rule: two taps at 10:00:59 and 10:01:01 fall in
+   different buckets and both insert, and the service's own window check is what
+   catches those. Both facts are asserted, so the gap between them is visible in
+   the suite rather than rediscovered as a bug.
+
+10. **Owner-only is a deliberate exception in a guardian-shared schema.** Every
+    other wardrobe-adjacent table here is readable by a consenting guardian.
+    `CommercePreference` and `AffiliateClick` are not, because a purchase-intent
+    trail is not something this story has a mandate to expose. Since the default
+    assumption a reader brings is the opposite, the actor matrix asserts that
+    both consent levels are denied rather than leaving the exception implicit in
+    a policy name.
+
+```mermaid
+flowchart TD
+  Ritual["GET /api/v1/ritual"] --> Svc["RitualService\n(caches payload, no commerce)"]
+  Svc --> Ctrl["RitualController\nassembly point"]
+  Ctrl --> Elig{"Eligibility, short-circuit\n1 flag, 2 preference, 3 one offer"}
+  Elig -- "any failure" --> Null["shopThisLook: null"]
+  Elig -- "all pass" --> Block["shopThisLook block\n(no URL)"]
+  Block --> Card["Mobile card\ndisclosure before control"]
+  Card -- "strip before saveRitualCache" --> Cache["Device cache\nnever renders a CTA"]
+  Card --> Click["POST /commerce/affiliate/clicks"]
+  Click --> Mint["Mint AffiliateClick\nHMAC token over row id"]
+  Mint --> Redirect["redirectUrl on allowed_host"]
+  Redirect --> Browser["WebBrowser.openBrowserAsync"]
+  Partner["Affiliate partner"] -- "signed over raw bytes" --> Hook["POST /commerce/affiliate/webhook\nno guard, HMAC only"]
+  Hook --> Conv["AffiliateConversion\nappend-only, per (partner, eventId)"]
+  Toggle["Settings toggle\nMobile + Web"] --> Pref["CommercePreference\n+ AuditLog in one transaction"]
+  Pref --> Elig
+```

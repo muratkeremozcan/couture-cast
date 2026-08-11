@@ -1077,115 +1077,115 @@ change this" hint, so the axe scan passes with no session.
   - [x] Run `npm run generate:api-client` and `npm run optic:lint`; commit the
         generated diff with no hand edits.
 
-- [ ] Task 3: Commerce module, preferences, eligibility (AC: 1, 3, 4, 6)
-  - [ ] Create `apps/api/src/modules/commerce/` with `commerce.module.ts`,
+- [x] Task 3: Commerce module, preferences, eligibility (AC: 1, 3, 4, 6)
+  - [x] Create `apps/api/src/modules/commerce/` with `commerce.module.ts`,
         `commerce-cache-headers.middleware.ts`,
         `commerce-preferences.controller.ts`, `commerce-preferences.service.ts`,
         `commerce.repository.ts`, `affiliate-offer.service.ts`, and
         `commerce-retention.service.ts`. Apply the middleware over
         `/api/v1/commerce{/*path}` in `configure(...)`. Use `.js` on relative
         imports, matching the surrounding `src/modules/` convention.
-  - [ ] Register `CommerceModule` in `app.module.ts` and import it from
+  - [x] Register `CommerceModule` in `app.module.ts` and import it from
         `personalization.module.ts` (never the reverse). `CommerceModule`
         imports `FeatureFlagsModule`, `TelemetryModule`, and `AuthStateModule`;
         `PersonalizationModule` currently imports none of them.
-  - [ ] Implement `isAffiliateAudienceEligible(profile)` as a stub that always
+  - [x] Implement `isAffiliateAudienceEligible(profile)` as a stub that always
         returns `true`, with Decision 1's resolution (2026-08-11, no
         age-based suppression) recorded in its doc comment, plus the
         reversal steps. Do **not** call it from decision 4's eligibility
         chain. Do not export `hasReachedAgeOfMajority` for this purpose --
         it is unused unless the policy reverses.
-  - [ ] Implement `GET` and `PUT /api/v1/commerce/preferences`, ungated by the
+  - [x] Implement `GET` and `PUT /api/v1/commerce/preferences`, ungated by the
         flag, with the audit row in the same transaction and no row on an
         unchanged value.
-  - [ ] Implement `AffiliateOfferService.resolveShopThisLook(...)` with the
+  - [x] Implement `AffiliateOfferService.resolveShopThisLook(...)` with the
         decision-4 short-circuit order, both slot derivations, the single-offer
         `ORDER BY`, database-clock window boundaries, and `locale_region`
         resolution including the `'*'` sentinel.
-  - [ ] Assemble the block in `RitualController.getOrCreateRitual` between the
+  - [x] Assemble the block in `RitualController.getOrCreateRitual` between the
         service call and `ritualResponseSchema.parse` at line 55. Do not touch
         `RitualService`'s constructor.
-  - [ ] Implement the monthly 24-month commerce pruner.
-  - [ ] Unit tests: every short-circuit, both slot derivations, exact-beats-
+  - [x] Implement the monthly 24-month commerce pruner.
+  - [x] Unit tests: every short-circuit, both slot derivations, exact-beats-
         wildcard, priority, `id ASC` tie-break, both window boundaries, region
         resolution for `en-US` / `fr-CA` / `es-419` / no-locale, a null-category
         garment, and a no-match outfit. Assert no cache write contains a
         `shopThisLook` key.
 
-- [ ] Task 4: Attributed click endpoint (AC: 2, 3, 6)
-  - [ ] Add `affiliate-click.controller.ts` and `affiliate-click.service.ts`
+- [x] Task 4: Attributed click endpoint (AC: 2, 3, 6)
+  - [x] Add `affiliate-click.controller.ts` and `affiliate-click.service.ts`
         under `RequestAuthGuard`. Re-verify eligibility conditions 1 to 3 plus
         offer active-and-in-window; do not re-derive the outfit, since the
         recommendation may have rotated behind the cache.
-  - [ ] Implement token minting (HMAC over the row id keyed by
+  - [x] Implement token minting (HMAC over the row id keyed by
         `COMMERCE_CLICK_TOKEN_SECRET`, resolved through the
         `requireUploadTokenSecret` shape), the 60-second dedupe with the partial
         unique index and conflict-retry, and `201` versus `200`.
-  - [ ] Implement URL construction and the full host validation from decision 7.
-  - [ ] Implement the decision-9 status precedence and use the exported message
+  - [x] Implement URL construction and the full host validation from decision 7.
+  - [x] Implement the decision-9 status precedence and use the exported message
         constants.
-  - [ ] Emit `affiliate_cta_clicked` after commit, fail-open.
-  - [ ] Add `apps/api/integration/commerce-affiliate-clicks.integration.spec.ts`
+  - [x] Emit `affiliate_cta_clicked` after commit, fail-open.
+  - [x] Add `apps/api/integration/commerce-affiliate-clicks.integration.spec.ts`
         covering both dedupe boundaries, two concurrent activations on separate
         connections yielding one row, every error path, and a `supertest`
         assertion of `201` versus `200` over real HTTP.
-  - [ ] Add unit tests for every error branch, because the integration suite
+  - [x] Add unit tests for every error branch, because the integration suite
         does not run in CI (Task 10).
 
-- [ ] Task 5: Conversion webhook (AC: 2, 4, 6)
-  - [ ] Set `rawBody: true` in **all three** bootstraps: `apps/api/src/main.ts:55`,
+- [x] Task 5: Conversion webhook (AC: 2, 4, 6)
+  - [x] Set `rawBody: true` in **all three** bootstraps: `apps/api/src/main.ts:55`,
         `apps/api/api/index.ts:12-14`, and the webhook spec's
         `createNestApplication({ rawBody: true })`. Confirm no existing route
         regresses, and note in the PR whether the `api/index.ts` bootstrap's
         missing `ApiExceptionFilter`/CORS/request-context wiring affects any AC.
-  - [ ] Add `affiliate-webhook.controller.ts` and `affiliate-webhook.service.ts`
+  - [x] Add `affiliate-webhook.controller.ts` and `affiliate-webhook.service.ts`
         with no `@UseGuards`. Assert by supertest that the route is reachable
         with no `Authorization` header.
-  - [ ] Implement the five-step verification in order, reusing the
+  - [x] Implement the five-step verification in order, reusing the
         `wardrobe-upload-token.ts:8-46` structure, with the constrained
         `webhook_secret_ref` resolution and one identical `401` message.
-  - [ ] Implement append-only persistence: `(partner_id, external_event_id)`
+  - [x] Implement append-only persistence: `(partner_id, external_event_id)`
         idempotency, unmatched-token rows, always `200`, no kill switch.
-  - [ ] Emit `affiliate_conversion_recorded` once per newly persisted row, with
+  - [x] Emit `affiliate_conversion_recorded` once per newly persisted row, with
         the matched and unmatched subject rules.
-  - [ ] Generalize `TelemetryService` per decision 12 (set plus builder table,
+  - [x] Generalize `TelemetryService` per decision 12 (set plus builder table,
         export `buildAnalyticsSubjectId`) and exclude the webhook route from
         `api_error_occurred` in `ApiExceptionFilter`.
-  - [ ] Add `apps/api/integration/commerce-affiliate-webhook.integration.spec.ts`
+  - [x] Add `apps/api/integration/commerce-affiliate-webhook.integration.spec.ts`
         covering the full signature matrix, both timestamp edges, replay,
         unknown token, missing and malformed headers, an unresolvable secret,
         the raw-body reordered-keys proof, and that conversions still record
         with the flag off.
-  - [ ] Add the retention regression test: `pruneOldTelemetryEvents` leaves aged
+  - [x] Add the retention regression test: `pruneOldTelemetryEvents` leaves aged
         commerce rows intact; the commerce pruner removes them past 24 months.
 
-- [ ] Task 6: Mobile CTA and settings (AC: 1 to 3, 6, 7)
-  - [ ] Extend `apps/mobile/components/hero/outfit-recommendation-card.tsx` with
+- [x] Task 6: Mobile CTA and settings (AC: 1 to 3, 6, 7)
+  - [x] Extend `apps/mobile/components/hero/outfit-recommendation-card.tsx` with
         a block rendering disclosure, partner label, CTA, and the visible
         `opensInBrowser` line, shown only when `outfit.shopThisLook` is non-null
         **and** the payload came from the network. Preserve the skeleton branch
         (29-41), the `if (!outfit) return null` guard (43-45), badge state, and
         `onGarmentRef`.
-  - [ ] Add `apps/mobile/src/lib/commerce.ts` on `@couture/api-client/contracts/http`
+  - [x] Add `apps/mobile/src/lib/commerce.ts` on `@couture/api-client/contracts/http`
         wrappers. Add the click call, the pending state, the
         `WebBrowser.openBrowserAsync` handoff following
         `components/external-link.tsx:20-27`, and the localized failure that does
         not navigate.
-  - [ ] Strip `shopThisLook` before `saveRitualCache` at
+  - [x] Strip `shopThisLook` before `saveRitualCache` at
         `apps/mobile/app/(tabs)/index.tsx:216-220`, and ensure the cache-read
         paths (196-206, 243-246) never render a CTA.
-  - [ ] Emit `affiliate_cta_shown` once per `recommendation_id` using a `useRef`
+  - [x] Emit `affiliate_cta_shown` once per `recommendation_id` using a `useRef`
         guard, following the precedent at `index.tsx:141,261-268`. The effect
         re-runs on `activeLocale` and `analyticsUserId` change, so the guard must
         key on `recommendation_id`, not on mount. There is no StrictMode in this
         app; do not add a guard for it.
-  - [ ] Add the "Shopping and partners" section with disclosure and switch to
+  - [x] Add the "Shopping and partners" section with disclosure and switch to
         `apps/mobile/app/(tabs)/settings.tsx`, preserving the existing locale
         flow, `localeChangeInFlight` guard, persistence, and alert semantics.
-  - [ ] Add the `commerce.*` tree to all ten catalogs plus
+  - [x] Add the `commerce.*` tree to all ten catalogs plus
         `apps/mobile/src/i18n/commerce-locales.spec.ts`, handling
         `APPROVED_COGNATES` collisions.
-  - [ ] Tests live under `apps/mobile/src/screens/` and
+  - [x] Tests live under `apps/mobile/src/screens/` and
         `apps/mobile/components/`; `app/**` is not in
         `apps/mobile/vitest.config.ts:141`. Follow the
         `tab-two-screen.test.tsx:45` precedent of importing
@@ -1194,27 +1194,27 @@ change this" hint, so the axe scan passes with no session.
         double-tap, once-per-`recommendation_id`, the toggle round-trip, and the
         CTA disappearing after opt-out. Extend the all-locales overflow assertion
         at `tab-two-screen.test.tsx:248-282` to the new section.
-  - [ ] Extend `apps/mobile/src/test-utils/msw/handlers.ts:239-274` and
+  - [x] Extend `apps/mobile/src/test-utils/msw/handlers.ts:239-274` and
         `mockRitualResponse` (line 23) with `shopThisLook`, or no render test can
         pass.
 
-- [ ] Task 7: Web settings surface (AC: 3, 7)
-  - [ ] Replace the `apps/web/src/app/settings/page.tsx` stub with a real page
+- [x] Task 7: Web settings surface (AC: 3, 7)
+  - [x] Replace the `apps/web/src/app/settings/page.tsx` stub with a real page
         preserving `<main id="main-content">`, `tabIndex={-1}`,
         `data-focus-surface="dark"`, and `<StickyBottomNav />`. It must render
         cleanly signed out.
-  - [ ] Add `apps/web/src/lib/commerce.ts` using `createWebApiClient` and the
+  - [x] Add `apps/web/src/lib/commerce.ts` using `createWebApiClient` and the
         `sessionStorage` bearer token, mirroring `apps/web/src/lib/wardrobe.ts`.
-  - [ ] Implement the disclosure paragraph plus a native labeled checkbox with
+  - [x] Implement the disclosure paragraph plus a native labeled checkbox with
         the gold focus ring, `role="status"` confirmation, error path, optimistic
         update that reverts on failure, and the signed-out disabled state.
-  - [ ] Add the `commerce.*` tree to all ten catalogs plus
+  - [x] Add the `commerce.*` tree to all ten catalogs plus
         `apps/web/src/i18n/commerce-locales.spec.ts`. `commerce` is the first
         sibling of `wardrobe` in `en-US.json`.
-  - [ ] Add handlers to `apps/web/src/test-utils/msw/handlers.ts` or inject via
+  - [x] Add handlers to `apps/web/src/test-utils/msw/handlers.ts` or inject via
         `useMswHandlers`; `apps/web/vitest.setup.ts:15-22` throws on any
         unhandled `/api/` request.
-  - [ ] Component and integration tests for load, toggle on, toggle off, server
+  - [x] Component and integration tests for load, toggle on, toggle off, server
         error recovery, signed-out state, and request-shape assertions.
 
 - [ ] Task 8: Consumer and provider contracts (AC: 1 to 6)
