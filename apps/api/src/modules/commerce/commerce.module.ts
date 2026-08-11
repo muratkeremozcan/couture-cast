@@ -4,6 +4,8 @@ import { AuthStateModule } from '../auth/auth-state.module.js'
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module.js'
 import { TelemetryModule } from '../telemetry/telemetry.module.js'
 import { AffiliateOfferService } from './affiliate-offer.service.js'
+import { AffiliateWebhookController } from './affiliate-webhook.controller.js'
+import { AffiliateWebhookService } from './affiliate-webhook.service.js'
 
 /**
  * Story 5.1: affiliate commerce.
@@ -28,13 +30,14 @@ import { AffiliateOfferService } from './affiliate-offer.service.js'
   // Story 5.1 Task 3 adds CommercePreferencesController here.
   // Story 5.1 Task 4 adds AffiliateClickController here.
   // Story 5.1 Task 5 adds AffiliateWebhookController here.
-  controllers: [],
+  controllers: [AffiliateWebhookController],
   providers: [
     AffiliateOfferService,
     // Story 5.1 Task 3 adds CommercePreferencesService, CommerceRepository,
     // and CommerceRetentionService here.
     // Story 5.1 Task 4 adds AffiliateClickService here.
     // Story 5.1 Task 5 adds AffiliateWebhookService here.
+    AffiliateWebhookService,
   ],
   exports: [AffiliateOfferService],
 })

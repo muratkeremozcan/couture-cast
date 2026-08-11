@@ -1572,6 +1572,14 @@ export class RitualService implements OnModuleDestroy {
       outfits.push({
         id: rec.id,
         scenario: rec.scenario as ScenarioName,
+        // Story 5.1: the contract makes `shopThisLook` required and nullable, so
+        // every outfit has to carry the key. `null` is the only correct value
+        // here. Eligibility is resolved in `RitualController` between the service
+        // call and `ritualResponseSchema.parse`, because this service has no
+        // single post-cache point and its constructor is instantiated
+        // positionally at twelve sites in its spec. The controller overwrites
+        // this placeholder; nothing about commerce is decided in this file.
+        shopThisLook: null,
         garmentIds: recGarmentIds,
         capsuleId: recCapsule?.id ?? null,
         capsuleName: recCapsule?.name ?? null,
