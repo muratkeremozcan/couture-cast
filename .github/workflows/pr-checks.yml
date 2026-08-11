@@ -90,8 +90,24 @@ jobs:
       - name: Start local Supabase services
         uses: ./.github/actions/start-local-supabase
 
-      - name: Apply migrations to the coverage database
-        run: node scripts/prisma-migrate-deploy.mjs
+      # `db:reset`, not `migrate deploy`, and for two concrete reasons found by
+      # running it the other way first.
+      #
+      # Grants: `supabase start` hands `authenticated` and `anon` broad default
+      # privileges on `public`. Applying migrations on top leaves those in
+      # place, so `5.1-DB-020` and the capsule and RLS suites saw REFERENCES,
+      # TRIGGER, and TRUNCATE alongside the four DML grants they assert. A reset
+      # drops and recreates, so the grant set is exactly what the migrations
+      # say it is.
+      #
+      # Fixtures: `commerce-affiliate-offers.integration.spec.ts` parks the
+      # seeded catalog and restores it, so it needs that catalog to exist.
+      # `db:reset` seeds; `migrate deploy` does not.
+      #
+      # This is the same command `pr-pw-e2e-local.yml` runs against the same
+      # throwaway container.
+      - name: Reset and seed the coverage database
+        run: npm run db:reset
         env:
           DATABASE_URL: ${{ env.LOCAL_COVERAGE_DATABASE_URL }}
 
