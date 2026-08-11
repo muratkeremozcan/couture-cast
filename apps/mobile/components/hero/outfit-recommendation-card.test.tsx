@@ -109,6 +109,27 @@ describe('OutfitRecommendationCard affiliate CTA', () => {
     )
   })
 
+  it('5.1-MOB-CTA-02b never hides the disclosure from assistive technology', () => {
+    const { container } = renderCard({})
+
+    // Decision 17 forbids the disclosure existing only as an accessibility
+    // label, and equally forbids the reverse: a visible paragraph that screen
+    // readers skip. `accessibilityElementsHidden`,
+    // `importantForAccessibility="no-hide-descendants"` and a bare `aria-hidden`
+    // all land on the DOM as aria-hidden, so walking the ancestor chain catches
+    // every form of it. Asserting only on the node itself would miss a wrapper.
+    for (const testId of ['shop-this-look-disclosure', 'shop-this-look-partner']) {
+      let node: HTMLElement | null = screen.getByTestId(testId)
+      while (node && node !== container) {
+        expect(
+          node.getAttribute('aria-hidden'),
+          `${testId} ancestor aria-hidden`
+        ).not.toBe('true')
+        node = node.parentElement
+      }
+    }
+  })
+
   it('5.1-MOB-CTA-03 renders no block when the card carries no offer', () => {
     renderCard({ outfit: ineligibleOutfit })
 

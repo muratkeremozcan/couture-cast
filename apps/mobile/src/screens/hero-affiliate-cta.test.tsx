@@ -46,7 +46,7 @@ vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
 
 import TabOneScreen from '@/app/(tabs)/index'
 import { server } from '@/src/test-utils/msw/server'
-import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
+import { mockRitualResponse, mockShopThisLook } from '@/src/test-utils/msw/handlers'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { clearRitualMemoryCache } from '@/src/lib/ritual-cache'
 import i18n, { initI18n } from '@/src/lib/i18n'
@@ -148,6 +148,63 @@ describe('TabOneScreen affiliate CTA', () => {
     // count a fresh impression every time the user flicked between scenarios
     // and the PRD's click-through denominator would be meaningless.
     expect(affiliateImpressions()).toHaveLength(1)
+  })
+
+  it('5.1-MOB-HERO-02b counts a separate impression for each eligible recommendation', async () => {
+    // The companion to HERO-02, and the one that pins the guard's shape. HERO-02
+    // alone is satisfied by a plain "have I ever emitted" boolean, which would
+    // silently drop the impression for every card after the first and quietly
+    // deflate the PRD's click-through denominator. Two eligible cards is the
+    // only arrangement that tells a Set from a boolean.
+    server.use(
+      http.get('*/api/v1/ritual', () =>
+        HttpResponse.json({
+          data: {
+            ...eligibleRitual.data,
+            outfits: eligibleRitual.data.outfits.map((outfit) =>
+              outfit.scenario === 'evening'
+                ? {
+                    ...outfit,
+                    shopThisLook: {
+                      ...mockShopThisLook,
+                      partnerId: 'second-partner',
+                      partnerDisplayName: 'Second Partner',
+                      offerId: 'offer-evening-outerwear',
+                    },
+                  }
+                : outfit
+            ),
+          },
+        })
+      )
+    )
+
+    await render(<TabOneScreen />)
+    await screen.findByTestId('shop-this-look-block')
+    await waitFor(() => {
+      expect(affiliateImpressions()).toHaveLength(1)
+    })
+
+    fireEvent.click(screen.getByTestId('scenario-toggle-evening'))
+
+    await waitFor(() => {
+      expect(affiliateImpressions()).toHaveLength(2)
+    })
+    expect(
+      affiliateImpressions().map(
+        ([, properties]) =>
+          (properties as { recommendation_id: string }).recommendation_id
+      )
+    ).toEqual(['morning-outfit-id', 'evening-outfit-id'])
+    expect(affiliateImpressions()[1]?.[1]).toMatchObject({
+      partner_id: 'second-partner',
+      scenario: 'evening',
+    })
+
+    // Going back to the first card still adds nothing: per recommendation, once.
+    fireEvent.click(screen.getByTestId('scenario-toggle-morning'))
+    await screen.findByTestId('shop-this-look-block')
+    expect(affiliateImpressions()).toHaveLength(2)
   })
 
   it('5.1-MOB-HERO-03 renders no CTA and emits no impression on a scenario with no offer', async () => {
