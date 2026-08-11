@@ -102,3 +102,36 @@ later story does not have to rediscover the reasoning.
   is `workflow_dispatch` only. The click-endpoint and webhook integration specs
   and the Maestro flow therefore ran locally but do not gate a pull request.
   Adding an integration job is its own piece of work.
+
+### Added during story 5.1 integration (2026-08-11)
+
+- **`api/index.ts` installs no `ApiExceptionFilter`, so `api_error_occurred`
+  telemetry has never been emitted in preview or production.** `NestFactory.create`
+  is called in three places and the deployed one is `apps/api/api/index.ts`, which
+  installs none of the filter, CORS, or request-context middleware that
+  `src/main.ts:64-73` installs. Error response bodies are unaffected, because
+  Nest's built-in filter produces the same `{ statusCode, message, error }`
+  envelope. The consequence is that every dashboard built on `api_error_occurred`
+  since story 1.4 has seen local traffic only, on every route. This predates
+  story 5.1 and is much wider than it; it is recorded here because story 5.1's
+  webhook work is what surfaced it.
+
+- **Mobile reuses `commerce.settings.error` for a failed preference READ.** The
+  string reads "Unable to update shopping preferences.", which is slightly wrong
+  when the failure was a load rather than a save. Decision 16 locks the key tree
+  and web shares it, so adding a `settings.loadError` key is a cross-surface
+  change across twenty catalog files. Cosmetic, deferred deliberately.
+
+- **Web carries one commerce key mobile does not.** `commerce.settings.signedOutHint`
+  ("Sign in to change this") exists because decision 17 requires a localized
+  signed-out hint on the web settings section and decision 16's tree has no key
+  for it. Web has 13 commerce keys, mobile has 12. This is deliberate: mobile
+  settings is never reachable without a session, so an unused key there would be
+  dead weight added only to satisfy symmetry.
+
+- **The mobile vitest browser run is flaky on a cold `node_modules/.vite`.**
+  Roughly 23 suites fail with "does not provide an export named 'default'" while
+  the Vite dependency optimizer rebundles; the second run is always green. This
+  reproduces on commits that predate story 5.1. The likely fix is widening
+  `optimizeDeps.include` in `apps/mobile/vitest.config.ts`, which every surface
+  inherits, so it was not changed inside a commerce story.

@@ -266,6 +266,16 @@ export class CommerceRepository {
       FROM "AffiliateOffer" o
       JOIN "CommercePartner" p ON p."id" = o."partner_id"
       WHERE o."status" = 'active'::"AffiliateOfferStatus"
+        -- The PARTNER must be active too, not only the offer.
+        --
+        -- Decision 4 enumerates the offer-level predicate and says nothing about
+        -- partner status, but leaving it out makes CommercePartner.status
+        -- mean one thing on the webhook (decision 8 rejects an inactive partner
+        -- outright) and nothing at all on the CTA path. The operator runbook
+        -- deactivates a partner by setting exactly this column, so without this
+        -- line pausing a partner keeps serving its CTAs until someone remembers
+        -- to deactivate every offer row by hand.
+        AND p."status" = 'active'::"CommercePartnerStatus"
         -- Story 5.1 decision 4: '*' on a CATALOG ROW means "published globally"
         -- and matches every request region. Matching only exactly would make the
         -- entire seeded catalog from decision 14 unreachable, because it is
@@ -309,6 +319,9 @@ export class CommerceRepository {
       JOIN "CommercePartner" p ON p."id" = o."partner_id"
       WHERE o."id" = ${offerId}
         AND o."status" = 'active'::"AffiliateOfferStatus"
+        -- Same rule as offer selection: a deactivated partner cannot be clicked
+        -- through to, even via an offer id a client is still holding.
+        AND p."status" = 'active'::"CommercePartnerStatus"
         AND o."effective_from" <= (now() AT TIME ZONE 'UTC')
         AND (o."effective_to" IS NULL OR (now() AT TIME ZONE 'UTC') < o."effective_to")
       LIMIT 1

@@ -376,6 +376,37 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       ).toBe(canadian)
     })
 
+    it('excludes an active offer whose partner has been deactivated', async (context) => {
+      if (!requireSchema(context)) return
+
+      // The operator runbook pauses a partner by setting exactly this column.
+      // Without a partner-status predicate that pause is silent: the offers stay
+      // active and keep serving CTAs for a partner the operator believes is off.
+      const offer = await seedOffer({ id: 'orphaned' })
+      cleanupOffers([offer])
+
+      await prisma.commercePartner.update({
+        where: { id: partnerId },
+        data: { status: 'inactive' },
+      })
+      onTestFinished(async () => {
+        await prisma.commercePartner.update({
+          where: { id: partnerId },
+          data: { status: 'active' },
+        })
+      })
+
+      const match = await repository.findBestOffer(
+        [{ category: 'top', comfortRange: null }],
+        'US'
+      )
+      expect(match).toBeNull()
+
+      // And the same offer cannot be clicked through either, even by an id a
+      // client is still holding from a payload rendered before the pause.
+      await expect(repository.findActiveClickOffer(offer)).resolves.toBeNull()
+    })
+
     it('publishes a globally published offer to every request region', async (context) => {
       if (!requireSchema(context)) return
 
