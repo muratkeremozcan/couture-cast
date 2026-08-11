@@ -6,7 +6,7 @@ baseline_commit: 45d584c2f90debccef9bc6f89f008069ab612a48
 
 # Story 4.4: Wardrobe onboarding and silhouette setup
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -445,12 +445,12 @@ user's body and closet change over time.
   - [x] Add component and screen tests mirroring the Web matrix in Task 5, plus
         offline handling and screen-reader announcement coverage.
 
-- [ ] Task 7: Consumer and provider contracts (AC: 1 to 4)
-  - [ ] Add onboarding-state and silhouette contract specs under
+- [x] Task 7: Consumer and provider contracts (AC: 1 to 4)
+  - [x] Add onboarding-state and silhouette contract specs under
         `packages/api-client/src/contracts/http/__tests__`.
-  - [ ] Prove `OpenAPIRegistry` coverage through `npm run optic:lint` and
+  - [x] Prove `OpenAPIRegistry` coverage through `npm run optic:lint` and
         `npm run build:packages`.
-  - [ ] Add Web and Mobile consumer Pact interactions and deterministic provider
+  - [x] Add Web and Mobile consumer Pact interactions and deterministic provider
         states for ownership, guardian access, stale ETag, each "My Form" failure
         reason, and guardian-notification enqueue, keeping one interaction per test
         and the existing single-fork FFI configuration.
@@ -857,15 +857,35 @@ lint` clean, `build:packages` clean. `@couture/api-client` 192/192,
       this), and unguarded `findNodeHandle` calls that throw on
       `react-native-web`. Mobile suite 36 files, 198 tests, lint and
       typecheck clean.
-- [ ] `feat/epic4-story4-t7-pact` — in progress, peer session "pact" in
-      `~/.herdr/worktrees/couture-cast/feat-epic4-story4-t7-pact`; ran its
-      own adversarial self-review after an initial pass, found real gaps,
-      fixing them now with provider verification unblocked against the
-      pushed `t3t4-api`
-- [ ] `feat/epic4-story4-t8-e2e` — in progress, this session, merging
-      `t3t4-api` + `t5-web` + `t6-mobile` (not `t7-pact`, which only needs
-      Web/Mobile at the code level and lands on `main` independently)
-- [ ] `feat/epic4-story4-t9-verify` — not started
+- [x] `feat/epic4-story4-t7-pact` — done: consumer/provider Pact contracts,
+      found real gaps in its own adversarial self-review pass and fixed them
+      before provider verification against `t3t4-api`. Merged via PR #112
+      (`cc4096d`).
+- [x] `feat/epic4-story4-t8-e2e` — superseded, not merged: this branch went
+      stale before it ever contained Task 8's actual deliverables (its last
+      commit predated PR #110's fix to the silhouette-queue job-id
+      collision, which this branch still carried in the older, buggy form).
+      Confirmed via `git diff main feat/epic4-story4-t8-e2e --stat`
+      (994 insertions / 33,614 deletions — entirely negative, `main` had
+      already absorbed everything real on it) and `git merge-base
+--is-ancestor` (diverged, not an ancestor of `main`). Deleted, local
+      and `origin`, rather than merged.
+- [x] Task 8 and Task 9 — done: real work landed on a fresh branch,
+      `feat/epic4-story4-t8t9-verification` (three Playwright specs, three
+      Maestro flows, the accessibility evidence doc, and the full Task 9
+      verification gate run for real against local Postgres/Redis). Along
+      the way it found and fixed a real, pre-existing Next.js route-export
+      defect in `wardrobe/onboarding/page.tsx` (latent since Task 5/PR #107).
+      Reviewed by CodeRabbit and both `@claude`/`@codex` TEA passes; all
+      actionable findings addressed (the one Claude-TEA High — `page.test.tsx`
+      over the 1000-line ceiling — fixed by splitting along its existing
+      `describe` boundaries). Merged via PR #120 (squash commit `2ad7fdc`).
+      Native iOS Maestro execution is `BLOCKED` on a pre-existing, unrelated
+      Hermes `Intl.Segmenter` incompatibility (confirmed via a control run
+      against an already-merged flow); Android is `EXEMPT` (no `adb` in this
+      environment); manual VoiceOver/TalkBack evidence is honestly left
+      unchecked, no physical device or real screen reader available here —
+      see `_bmad-output/test-artifacts/accessibility/4-4-release-evidence.md`.
 
 All three peers were spawned via `herdr worktree create` (one worktree per
 branch, based on `origin/feat/epic4-story4-t2-contracts`) and
