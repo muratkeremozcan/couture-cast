@@ -135,3 +135,14 @@ later story does not have to rediscover the reasoning.
   reproduces on commits that predate story 5.1. The likely fix is widening
   `optimizeDeps.include` in `apps/mobile/vitest.config.ts`, which every surface
   inherits, so it was not changed inside a commerce story.
+
+- **Pact provider verification has a pre-existing Linux flake at roughly 3 runs
+  in 42.** Signature: "request was expected but not received" on any Story 4.2
+  smart-tag interaction (observed on both `PATCH /api/v1/wardrobe/garments/.../tags`
+  and `POST .../suggest-tags`). First seen on run 31414118678 on 2026-08-10,
+  before story 5.1's second round existed, and the commits since the last green
+  run touch only `apps/api/integration/*.spec.ts`, which that workflow never
+  executes. Re-dispatching is the correct response to a red run with this
+  signature; reverting story work is not. The proposed remedy is bumping
+  `@pact-foundation/pact` from the pinned 16.4.0 to 17.1.2, which is a dependency
+  change with its own blast radius and does not belong inside a commerce story.

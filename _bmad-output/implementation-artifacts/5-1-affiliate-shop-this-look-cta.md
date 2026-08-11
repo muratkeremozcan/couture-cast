@@ -1391,6 +1391,44 @@ change this" hint, so the axe scan passes with no session.
    Retries must not duplicate a click, a conversion, a notification, or an audit
    record.
 
+### Integration-suite isolation: a finding from implementation
+
+Recorded here because it contradicts a reasonable reading of decision 4 and
+would otherwise be rediscovered.
+
+Decision 4 makes `locale_region = '*'` on a catalog row match **every** request
+region. Vitest runs integration files in parallel against one database. Together
+those two facts mean the commerce integration suites interfere through the
+shared catalog, in both directions at once:
+
+- `commerce-affiliate-offers.integration.spec.ts` needs "no offer was selected"
+  to be a statement it can make, which the globally published seed makes false.
+- `commerce-affiliate-clicks.integration.spec.ts` and
+  `commerce-affiliate-webhook.integration.spec.ts` create their own `'*'` rows,
+  the latter continuously through `persistCommerceCatalog`, whose factory
+  default `localeRegion` is `'*'`.
+
+The first attempt parked the seeded rows for the offers file's duration and
+restored them afterwards. That cannot be made correct. It is a one-shot snapshot
+racing files that create rows throughout their run, so it has to reach forward to
+stay accurate, and reaching forward switches off rows a sibling file needs live.
+Bounding the snapshot by `created_at` fixed the sibling and reopened the original
+hole. Both settings flake, in opposite directions, at roughly one full-suite run
+in three.
+
+**Isolation is by garment category instead, which concurrency cannot perturb.**
+Decision 14 seeds only `top`, `bottom`, `dress`, and `shoes`; the offers suite
+publishes and queries only `accessory` and `outerwear`, and the selection SQL
+filters on `garment_category`, so no row that suite did not create can satisfy
+its queries whatever else is running. The clicks suite pins a file-private
+`locale_region`, which costs it nothing because the click lookup resolves an
+offer by id and never filters on region. Neither suite mutates the seeded
+catalog any more, which also protects the Playwright and Maestro setup that
+depends on it.
+
+If a future seed publishes an `accessory` offer, move that file to another free
+category rather than reintroducing parking.
+
 ### Lessons carried forward from Story 4.4's review
 
 - **HTTP-visible behavior needs an assertion that goes over HTTP.** 4.4 shipped
