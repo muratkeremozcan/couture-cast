@@ -52,7 +52,17 @@ async function bootstrap() {
   ])
 
   // 2) NestFactory.create(AppModule) builds the route graph from that metadata.
-  const app = await NestFactory.create(AppModule)
+  //
+  // `rawBody: true` makes Nest keep the unparsed request bytes on
+  // `request.rawBody` alongside the parsed body. The affiliate conversion webhook
+  // signs `${timestamp}.${rawBody}`, and a re-serialized body differs from the
+  // bytes that arrived in JSON key order and whitespace without differing in
+  // meaning, so verifying against anything else rejects honest partners.
+  //
+  // This option must be set on EVERY bootstrap, not just this one. `api/index.ts`
+  // is the deployed entry and the test suites create their own applications; a
+  // bootstrap without it 401s every signed webhook it serves.
+  const app = await NestFactory.create(AppModule, { rawBody: true })
   const httpCorsOrigins = (
     process.env.HTTP_CORS_ORIGIN ??
     process.env.GUARDIAN_INVITE_WEB_BASE_URL ??

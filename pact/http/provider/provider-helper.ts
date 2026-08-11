@@ -37,7 +37,22 @@ const PACT_SILHOUETTE_COMMIT_IDEMPOTENCY_KEY = '760490a0-5049-4cdd-afcf-ac8e7ba0
  * interaction is added.
  */
 const PACT_ONBOARDING_COMPLETED_AT = '2026-08-09T09:20:00.000Z'
+/**
+ * Story 5.1 affiliate commerce. Mirrors the identifiers the consumer pins in
+ * `pact/http/consumer/api-contract-interactions.ts`; both sides must agree or
+ * the `string()` matchers fail verification.
+ *
+ * The host is under `.test`, reserved by RFC 2606, so a redirect recorded in a
+ * pact file can never resolve on the public internet.
+ */
+const PACT_COMMERCE_PARTNER_SLUG = 'sample-partner'
+const PACT_COMMERCE_PARTNER_NAME = 'Sample Partner'
+const PACT_COMMERCE_OFFER_ID = 'offer-pact-1'
+const PACT_COMMERCE_OFFER_TITLE = 'Everyday Layering Tee'
+const PACT_COMMERCE_REDIRECT_URL =
+  'https://partner.couturecast.test/shop?cc=pact-click-token'
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -45,6 +60,7 @@ import {
   HttpException,
   HttpStatus,
   ServiceUnavailableException,
+  UnauthorizedException,
   type INestApplication,
 } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
@@ -84,6 +100,14 @@ import {
   WardrobeOnboardingService,
 } from '../../../apps/api/src/modules/wardrobe/wardrobe-onboarding.service'
 import { WardrobeSilhouetteController } from '../../../apps/api/src/modules/wardrobe/wardrobe-silhouette.controller'
+import { AffiliateClickController } from '../../../apps/api/src/modules/commerce/affiliate-click.controller'
+import { AffiliateClickService } from '../../../apps/api/src/modules/commerce/affiliate-click.service'
+import { AffiliateOfferService } from '../../../apps/api/src/modules/commerce/affiliate-offer.service'
+import { AffiliateWebhookController } from '../../../apps/api/src/modules/commerce/affiliate-webhook.controller'
+import { AffiliateWebhookService } from '../../../apps/api/src/modules/commerce/affiliate-webhook.service'
+import { CommerceCacheHeadersMiddleware } from '../../../apps/api/src/modules/commerce/commerce-cache-headers.middleware'
+import { CommercePreferencesController } from '../../../apps/api/src/modules/commerce/commerce-preferences.controller'
+import { CommercePreferencesService } from '../../../apps/api/src/modules/commerce/commerce-preferences.service'
 import {
   formatSilhouetteETag,
   parseSilhouetteIfMatchHeader,
@@ -98,6 +122,14 @@ import {
 // `SilhouettePhotoFailureReason` is not part of the curated top-level
 // @couture/api-client barrel (packages/api-client/src/index.ts); the
 // contracts/http subpath re-exports everything from wardrobe.ts instead.
+import {
+  affiliateWebhookPayloadSchema,
+  COMMERCE_AUDIENCE_INELIGIBLE_MESSAGE,
+  COMMERCE_DISABLED_MESSAGE,
+  COMMERCE_OFFER_NOT_FOUND_MESSAGE,
+  COMMERCE_OPTED_OUT_MESSAGE,
+  WEBHOOK_SIGNATURE_INVALID_MESSAGE,
+} from '@couture/api-client/contracts/http'
 import type {
   SilhouetteMode,
   SilhouettePhotoFailureReason,
@@ -163,6 +195,7 @@ export function resetProviderState() {
   resetProviderOnboardingState()
   resetProviderSilhouetteState()
   resetProviderCapsuleState()
+  resetProviderCommerceState()
 }
 
 export function configureProviderWardrobeState(
@@ -288,6 +321,7 @@ export async function startLocalPactProvider({
                 },
               ],
               comfortNotes: 'Hafif rüzgarlı serin sabah. Trençkot önerilir.',
+              shopThisLook: null,
             },
             {
               id: 'rec-midday-1',
@@ -297,6 +331,7 @@ export async function startLocalPactProvider({
                 { key: 'light_layers', label: 'Hafif Katmanlar', bullets: ['Ilık gün'] },
               ],
               comfortNotes: 'Ilık ve keyifli bir öğleden sonra.',
+              shopThisLook: null,
             },
             {
               id: 'rec-evening-1',
@@ -310,6 +345,7 @@ export async function startLocalPactProvider({
                 },
               ],
               comfortNotes: 'Serin akşam.',
+              shopThisLook: null,
             },
           ]
         : [
@@ -321,6 +357,7 @@ export async function startLocalPactProvider({
                 { key: 'wind_layer', label: 'Wind layer', bullets: ['Wind is high'] },
               ],
               comfortNotes: 'Chilly morning',
+              shopThisLook: null,
             },
             {
               id: 'rec-midday-1',
@@ -330,6 +367,7 @@ export async function startLocalPactProvider({
                 { key: 'light_layers', label: 'Light layers', bullets: ['Mild day'] },
               ],
               comfortNotes: 'Pleasant midday',
+              shopThisLook: null,
             },
             {
               id: 'rec-evening-1',
@@ -343,6 +381,7 @@ export async function startLocalPactProvider({
                 },
               ],
               comfortNotes: 'Cool evening',
+              shopThisLook: null,
             },
           ]
 
@@ -967,6 +1006,104 @@ export async function startLocalPactProvider({
     },
   } as unknown as GuardianService
 
+  /**
+   * Story 5.1: `RitualController` injects this, so the fixture cannot build
+   * without it even for the interactions that have nothing to do with commerce.
+   *
+   * It answers a populated block only under the `eligible` scenario. Every other
+   * scenario returns an empty map, and the controller writes `null` for each
+   * outfit, which is what the pre-existing ritual interactions pin.
+   */
+  const mockAffiliateOfferService = {
+    resolveShopThisLook: (input: { outfits: readonly { id: string }[] }) => {
+      const state = getProviderCommerceState()
+      if (state?.scenario !== 'eligible') {
+        return Promise.resolve(new Map<string, null>())
+      }
+      return Promise.resolve(
+        new Map(
+          input.outfits.map((outfit) => [
+            outfit.id,
+            {
+              partnerId: PACT_COMMERCE_PARTNER_SLUG,
+              partnerDisplayName: PACT_COMMERCE_PARTNER_NAME,
+              offerId: PACT_COMMERCE_OFFER_ID,
+              offerTitle: PACT_COMMERCE_OFFER_TITLE,
+              garmentCategory: 'top' as const,
+            },
+          ])
+        )
+      )
+    },
+  } as unknown as AffiliateOfferService
+
+  /**
+   * The preference endpoints are ungated by the commerce kill switch, so this
+   * double answers under every scenario. Only `opted-out` reads as disabled.
+   */
+  const mockCommercePreferencesService = {
+    getPreference: () =>
+      Promise.resolve({
+        affiliateCtasEnabled: getProviderCommerceState()?.scenario !== 'opted-out',
+      }),
+    setPreference: (_userId: string, affiliateCtasEnabled: boolean) =>
+      Promise.resolve({ affiliateCtasEnabled }),
+  } as unknown as CommercePreferencesService
+
+  /**
+   * Decision 9's status precedence, expressed as scenarios rather than as
+   * re-derived rules. The consumer pins one status per interaction; which
+   * condition wins when several hold at once is asserted in
+   * `apps/api/src/modules/commerce/affiliate-click.service.spec.ts`.
+   */
+  const mockAffiliateClickService = {
+    recordClick: () => {
+      const scenario = getProviderCommerceState()?.scenario
+      if (scenario === 'flag-disabled') {
+        throw new ServiceUnavailableException(COMMERCE_DISABLED_MESSAGE)
+      }
+      if (scenario === 'audience-ineligible') {
+        throw new ForbiddenException(COMMERCE_AUDIENCE_INELIGIBLE_MESSAGE)
+      }
+      if (scenario === 'opted-out') {
+        throw new ForbiddenException(COMMERCE_OPTED_OUT_MESSAGE)
+      }
+      if (scenario === 'unknown-offer') {
+        throw new NotFoundException(COMMERCE_OFFER_NOT_FOUND_MESSAGE)
+      }
+      return Promise.resolve({
+        redirectUrl: PACT_COMMERCE_REDIRECT_URL,
+        // A replay inside the dedupe window returns the SAME URL with a 200.
+        created: scenario !== 'click-deduped',
+      })
+    },
+  } as unknown as AffiliateClickService
+
+  /**
+   * Signature verification is a scenario flag here, not a real HMAC: the
+   * consumer cannot compute one without the partner secret, and proving the
+   * five-step verification order is the API suite's job. Body validation is real
+   * though, because the 400 the contract records is exactly "the signature
+   * passed and then Zod rejected the payload", and running the schema is the
+   * only way to record that ordering honestly.
+   */
+  const mockAffiliateWebhookService = {
+    recordConversion: (input: { rawBody?: Buffer }) => {
+      if (getProviderCommerceState()?.scenario === 'invalid-signature') {
+        throw new UnauthorizedException(WEBHOOK_SIGNATURE_INVALID_MESSAGE)
+      }
+
+      const parsed = affiliateWebhookPayloadSchema.safeParse(
+        JSON.parse(input.rawBody?.toString('utf8') ?? '{}')
+      )
+      if (!parsed.success) {
+        throw new BadRequestException('Invalid affiliate webhook payload')
+      }
+
+      return Promise.resolve({ data: { received: true as const } })
+    },
+  } as unknown as AffiliateWebhookService
+
   const moduleFixture = await Test.createTestingModule({
     controllers: [
       ApiHealthController,
@@ -979,6 +1116,9 @@ export async function startLocalPactProvider({
       WardrobeCapsuleController,
       WardrobeOnboardingController,
       WardrobeSilhouetteController,
+      CommercePreferencesController,
+      AffiliateClickController,
+      AffiliateWebhookController,
     ],
     providers: [
       EventsService,
@@ -1034,6 +1174,22 @@ export async function startLocalPactProvider({
         provide: WardrobeSilhouetteService,
         useValue: mockWardrobeSilhouetteService,
       },
+      {
+        provide: AffiliateOfferService,
+        useValue: mockAffiliateOfferService,
+      },
+      {
+        provide: CommercePreferencesService,
+        useValue: mockCommercePreferencesService,
+      },
+      {
+        provide: AffiliateClickService,
+        useValue: mockAffiliateClickService,
+      },
+      {
+        provide: AffiliateWebhookService,
+        useValue: mockAffiliateWebhookService,
+      },
     ],
   })
     .overrideGuard(RequestAuthGuard)
@@ -1042,7 +1198,13 @@ export async function startLocalPactProvider({
     )
     .compile()
 
-  const localApp = moduleFixture.createNestApplication()
+  /**
+   * `rawBody: true` matches all three real bootstraps (`src/main.ts`,
+   * `api/index.ts`, and the webhook integration spec). Without it
+   * `request.rawBody` is undefined here, the webhook double would read an empty
+   * body, and the 400 interaction would pass for the wrong reason.
+   */
+  const localApp = moduleFixture.createNestApplication({ rawBody: true })
 
   // WardrobeModule applies this through `configure`, which a bare testing module
   // never calls. Without it every capsule response, including errors, would be
@@ -1062,6 +1224,17 @@ export async function startLocalPactProvider({
       return
     }
     next()
+  })
+
+  /**
+   * `commerce.module.ts` applies this through `configure`, which a bare testing
+   * module never calls. Without it every commerce response, including the 403,
+   * 404, and 503 the contract records, would be missing the
+   * `Cache-Control: private, no-store` those interactions pin.
+   */
+  const commerceCacheHeaders = new CommerceCacheHeadersMiddleware()
+  localApp.use('/api/v1/commerce', (req: Request, res: Response, next: NextFunction) => {
+    commerceCacheHeaders.use(req, res, next)
   })
 
   await localApp.init()
@@ -1198,4 +1371,51 @@ export function getProviderSilhouetteState(): ProviderSilhouetteState | null {
 
 export function resetProviderSilhouetteState() {
   providerSilhouetteState = null
+}
+
+/* --------------------------------------------------------------------------- *
+ * Story 5.1 affiliate commerce provider states.
+ *
+ * The doubles below decide their answer from the scenario the verifier sets,
+ * not from a real database, feature flag, or HMAC. That is deliberate and it is
+ * what Pact is for here: the contract records which status, headers, and body a
+ * client must understand. WHEN each status is produced, meaning the eligibility
+ * chain, the 60-second dedupe window, and the five-step signature verification,
+ * is proven in the API unit suite and against real PostgreSQL in
+ * `apps/api/integration/commerce-affiliate-*.integration.spec.ts`. Reimplementing
+ * those rules here would make this suite agree with itself rather than with the
+ * provider.
+ * --------------------------------------------------------------------------- */
+export type ProviderCommerceScenario =
+  | 'eligible'
+  | 'opted-out'
+  | 'audience-ineligible'
+  | 'flag-disabled'
+  | 'unknown-offer'
+  | 'click-deduped'
+  | 'invalid-signature'
+
+export type ProviderCommerceState = {
+  userId: string | null
+  scenario: ProviderCommerceScenario
+}
+
+let providerCommerceState: ProviderCommerceState | null = null
+
+export function configureProviderCommerceState(state: {
+  userId?: string
+  scenario: ProviderCommerceScenario
+}) {
+  providerCommerceState = {
+    userId: state.userId ?? null,
+    scenario: state.scenario,
+  }
+}
+
+export function getProviderCommerceState(): ProviderCommerceState | null {
+  return providerCommerceState
+}
+
+export function resetProviderCommerceState() {
+  providerCommerceState = null
 }

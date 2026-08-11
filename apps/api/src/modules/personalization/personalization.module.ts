@@ -5,6 +5,7 @@ import { AuthStateModule } from '../auth/auth-state.module.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import { WeatherModule } from '../weather/weather.module.js'
 import { LocationPreferencesModule } from '../location-preferences/location-preferences.module.js'
+import { CommerceModule } from '../commerce/commerce.module.js'
 import { RitualController } from './ritual.controller.js'
 import { RitualService, RITUAL_REDIS_CLIENT } from './ritual.service.js'
 import { ComfortController } from './comfort.controller.js'
@@ -19,6 +20,8 @@ import { getRedisConfig, redisOptionsFromConfig } from '../../config/redis.js'
     AuthStateModule,
     WeatherModule,
     LocationPreferencesModule,
+    // Story 5.1: one-way. CommerceModule must never import this module back.
+    CommerceModule,
   ],
   controllers: [RitualController, ComfortController],
   providers: [

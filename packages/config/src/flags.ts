@@ -58,6 +58,14 @@ const FEATURE_FLAG_DEFINITIONS = {
     kind: 'boolean',
     defaultValue: true,
   },
+  // Story 5.1: the kill switch for affiliate commerce. Defaults false so a
+  // degraded PostHog can never switch commerce ON by accident -- the fallback
+  // order is remote answer, then the FeatureFlag cache row, then this default,
+  // and only the first two can ever say yes.
+  commerce_affiliate_enabled: {
+    kind: 'boolean',
+    defaultValue: false,
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<FeatureFlagStoredValue>>
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAG_DEFINITIONS

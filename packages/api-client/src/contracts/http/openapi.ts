@@ -18,6 +18,7 @@ import { registerWeatherContracts } from './weather'
 import { registerRitualContracts } from './ritual'
 import { registerComfortContracts } from './comfort'
 import { registerWardrobeContracts } from './wardrobe'
+import { registerCommerceContracts } from './commerce'
 
 export const HTTP_OPENAPI_OUTPUT_FILENAME = 'http.openapi.json'
 
@@ -64,6 +65,7 @@ export function createHttpOpenApiRegistry() {
   registerRitualContracts(registry, commonSchemas)
   registerComfortContracts(registry, commonSchemas)
   registerWardrobeContracts(registry, commonSchemas)
+  registerCommerceContracts(registry, commonSchemas)
 
   return registry
 }
@@ -81,7 +83,12 @@ export function generateHttpOpenApiDocument() {
       // one-time response-schema narrowing in this change: `breaking-changes`
       // defaults to `skip_when_major_version_changes`, which is the mechanism
       // intended for exactly this, rather than an operation-level exemption.
-      version: '1.0.0',
+      // Story 5.1 bumps the minor: the published contract gained four commerce
+      // operations and one additive field on the ritual response. Nothing here
+      // is breaking (`scenarioOutfitSchema` is not `.strict()`, so an added key
+      // is compatible), but a consumer reading the spec should be able to see
+      // that the surface grew without diffing it.
+      version: '1.1.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [

@@ -17,11 +17,15 @@ const {
   analyticsDistinctIdMock,
   loadMobileApiHealthMock,
   updatePreferredLocaleMock,
+  getCommercePreferenceMock,
+  updateCommercePreferenceMock,
 } = vi.hoisted(() => ({
   analyticsCaptureMock: vi.fn(),
   analyticsDistinctIdMock: vi.fn(() => 'test-user-id'),
   loadMobileApiHealthMock: vi.fn(),
   updatePreferredLocaleMock: vi.fn(),
+  getCommercePreferenceMock: vi.fn(),
+  updateCommercePreferenceMock: vi.fn(),
 }))
 
 vi.mock('@/src/analytics/mobile-analytics', () => ({
@@ -37,6 +41,13 @@ vi.mock('@/src/lib/api-health', () => ({
 
 vi.mock('@/src/lib/user', () => ({
   updatePreferredLocaleFromMobile: updatePreferredLocaleMock,
+}))
+
+// The commerce preference is a network boundary. Owning it here keeps the
+// locale tests deterministic and lets the opt-out tests drive both round trips.
+vi.mock('@/src/lib/commerce', () => ({
+  getCommercePreferenceFromMobile: getCommercePreferenceMock,
+  updateCommercePreferenceFromMobile: updateCommercePreferenceMock,
 }))
 
 import i18n, { initI18n } from '../lib/i18n'
@@ -59,6 +70,12 @@ describe('SettingsScreen', () => {
     loadMobileApiHealthMock.mockResolvedValue({ status: 'ok' })
     updatePreferredLocaleMock.mockReset()
     updatePreferredLocaleMock.mockResolvedValue({ success: true })
+    getCommercePreferenceMock.mockReset()
+    getCommercePreferenceMock.mockResolvedValue({ affiliateCtasEnabled: true })
+    updateCommercePreferenceMock.mockReset()
+    updateCommercePreferenceMock.mockImplementation((affiliateCtasEnabled: boolean) =>
+      Promise.resolve({ affiliateCtasEnabled })
+    )
     await i18n.changeLanguage('en-US')
   })
 
@@ -245,6 +262,119 @@ describe('SettingsScreen', () => {
     })
   })
 
+  it('5.1-MOB-SET-01 discloses the integration above the toggle and reflects the stored value', async () => {
+    await render(<SettingsScreen />)
+
+    const section = await screen.findByTestId('commerce-settings-section')
+    expect(screen.getByText('Shopping and partners')).toBeTruthy()
+    expect(screen.getByTestId('commerce-settings-disclosure').textContent).toContain(
+      'CoutureCast may earn a commission'
+    )
+
+    // PRD NFR Security 4 asks for disclosure *and* a toggle, so the paragraph
+    // has to precede the control rather than sit behind it.
+    const order = Array.from(section.querySelectorAll('[data-testid]')).map(
+      (node: Element) => node.getAttribute('data-testid')
+    )
+    expect(order.indexOf('commerce-settings-disclosure')).toBeLessThan(
+      order.indexOf('commerce-opt-out-toggle')
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('commerce-opt-out-toggle')).toHaveAttribute(
+        'aria-checked',
+        'true'
+      )
+    })
+  })
+
+  it('5.1-MOB-SET-02 turns the affiliate suggestions off and confirms the round trip', async () => {
+    await render(<SettingsScreen />)
+
+    const toggle = await screen.findByTestId('commerce-opt-out-toggle')
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-checked', 'true')
+    })
+
+    fireEvent.click(toggle)
+
+    await waitFor(() => {
+      expect(updateCommercePreferenceMock).toHaveBeenCalledWith(false)
+    })
+    await screen.findByText('Shopping preferences updated')
+    expect(screen.getByTestId('commerce-opt-out-toggle')).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
+  })
+
+  it('5.1-MOB-SET-03 turns them back on again', async () => {
+    getCommercePreferenceMock.mockResolvedValue({ affiliateCtasEnabled: false })
+
+    await render(<SettingsScreen />)
+
+    const toggle = await screen.findByTestId('commerce-opt-out-toggle')
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-checked', 'false')
+    })
+
+    fireEvent.click(toggle)
+
+    await waitFor(() => {
+      expect(updateCommercePreferenceMock).toHaveBeenCalledWith(true)
+    })
+    expect(screen.getByTestId('commerce-opt-out-toggle')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+  })
+
+  it('5.1-MOB-SET-04 reverts the optimistic switch and alerts when the write fails', async () => {
+    updateCommercePreferenceMock.mockRejectedValue(new Error('preferences unavailable'))
+
+    await render(<SettingsScreen />)
+    const toggle = await screen.findByTestId('commerce-opt-out-toggle')
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-checked', 'true')
+    })
+
+    fireEvent.click(toggle)
+
+    const alert = await screen.findByTestId('commerce-settings-error')
+    expect(alert.textContent).toBe('Unable to update shopping preferences.')
+    expect(alert).toHaveAttribute('role', 'alert')
+    // Leaving the switch in the position the user chose would claim a
+    // preference the server never stored.
+    expect(screen.getByTestId('commerce-opt-out-toggle')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+  })
+
+  it('5.1-MOB-SET-05 keeps the toggle inert while the stored value is unknown', async () => {
+    getCommercePreferenceMock.mockRejectedValue(new Error('preferences unavailable'))
+
+    await render(<SettingsScreen />)
+
+    await screen.findByTestId('commerce-settings-error')
+    const toggle = screen.getByTestId('commerce-opt-out-toggle')
+    // A failed read is not an opt-out. Rendering the switch as "off" would show
+    // the user a preference they never set.
+    expect(toggle).toHaveAttribute('aria-disabled', 'true')
+
+    fireEvent.click(toggle)
+    expect(updateCommercePreferenceMock).not.toHaveBeenCalled()
+  })
+
+  it('5.1-MOB-SET-06 gives the toggle a touch target of at least 44 by 44 pixels', async () => {
+    await render(<SettingsScreen />)
+
+    const toggle = await screen.findByTestId('commerce-opt-out-toggle')
+    const style = window.getComputedStyle(toggle)
+    expect(Number.parseFloat(style.minHeight)).toBeGreaterThanOrEqual(44)
+    expect(Number.parseFloat(style.minWidth)).toBeGreaterThanOrEqual(44)
+  })
+
   it('does not cause layout overflow or text truncation in any locale', async () => {
     loadMobileApiHealthMock.mockResolvedValue({ status: 'ok' })
 
@@ -267,6 +397,15 @@ describe('SettingsScreen', () => {
       })
 
       const { container, unmount } = await render(<SettingsScreen />)
+
+      // The commerce section carries the longest string on this screen, a
+      // multi-sentence disclosure, so it is named explicitly: without this the
+      // loop would still pass if the section vanished from a locale entirely.
+      const disclosure = await screen.findByTestId('commerce-settings-disclosure')
+      expect(
+        disclosure.textContent?.trim().length,
+        `${locale} disclosure`
+      ).toBeGreaterThan(0)
 
       const allElements = container.querySelectorAll('*')
       allElements.forEach((el: Element) => {

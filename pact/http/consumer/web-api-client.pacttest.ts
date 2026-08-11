@@ -46,6 +46,16 @@ import {
   myFormFailureReasons,
   verifyMyFormGuardianNotificationInteraction,
   verifyMyFormDeleteInteraction,
+  verifyRitualEligibleShopThisLookInteraction,
+  verifyCommercePreferencesReadInteraction,
+  verifyCommercePreferencesOptOutInteraction,
+  verifyAffiliateClickMintInteraction,
+  verifyAffiliateClickDedupeInteraction,
+  verifyAffiliateClickErrorInteraction,
+  affiliateClickErrorInteractions,
+  verifyAffiliateWebhookInteraction,
+  verifyAffiliateWebhookErrorInteraction,
+  affiliateWebhookErrorInteractions,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -244,4 +254,41 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
   it('deletes the My Form photo and reverts to the default mannequin', async () => {
     await verifyMyFormDeleteInteraction(pact, createWebClientForMockServer)
   })
+  it('gets a ritual whose cards carry an eligible affiliate offer', async () => {
+    await verifyRitualEligibleShopThisLookInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('reads the affiliate CTA preference', async () => {
+    await verifyCommercePreferencesReadInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('turns affiliate suggestions off', async () => {
+    await verifyCommercePreferencesOptOutInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('mints an attributed affiliate click', async () => {
+    await verifyAffiliateClickMintInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('dedupes a repeat activation onto the existing click', async () => {
+    await verifyAffiliateClickDedupeInteraction(pact, createWebClientForMockServer)
+  })
+
+  it.each(affiliateClickErrorInteractions)(
+    'preserves the documented affiliate click error envelope that $description',
+    async (interaction) => {
+      await verifyAffiliateClickErrorInteraction(pact, interaction)
+    }
+  )
+
+  it('records a signed partner conversion webhook', async () => {
+    await verifyAffiliateWebhookInteraction(pact, createWebClientForMockServer)
+  })
+
+  it.each(affiliateWebhookErrorInteractions)(
+    'preserves the documented affiliate webhook error envelope that $description',
+    async (interaction) => {
+      await verifyAffiliateWebhookErrorInteraction(pact, interaction)
+    }
+  )
 })

@@ -33,6 +33,14 @@ const prisma = {
   eventEnvelope: { deleteMany: () => Promise.resolve({ count: 0 }) },
   alertDeliveryOutbox: { deleteMany: () => Promise.resolve({ count: 0 }) },
   alertCooldownReservation: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  // Story 5.1 commerce. Every delegate `cleanup` touches has to appear here, or
+  // this template stops compiling, which is the point: the template is what a
+  // new suite copies, so a missing delegate would be inherited silently.
+  commercePartner: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  affiliateOffer: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  commercePreference: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  affiliateClick: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  affiliateConversion: { deleteMany: () => Promise.resolve({ count: 0 }) },
 } satisfies Record<string, DeleteManyRecorder>
 
 describe('example factory suite', () => {

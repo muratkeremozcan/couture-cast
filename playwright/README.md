@@ -16,11 +16,29 @@ NestJS API E2E coverage.
 ## Quick start
 
 1. `nvm use && npm install`
-2. `cp .env.example .env` and add secrets. Only
-   `SUPABASE_SERVICE_ROLE_KEY` is needed; all URLs and credentials are
-   in `playwright/support/config/environments.ts`.
+2. No `.env` is required for a local run. `DATABASE_URL` defaults to the
+   local Supabase container (`scripts/local-e2e-database.mjs`), and an
+   explicit value in the environment always wins. Create one only if you
+   need `SUPABASE_SERVICE_ROLE_KEY`; all URLs and credentials are in
+   `playwright/config/environments.ts`.
+
+   If you do copy `.env.example`, leave
+   `COMMERCE_PARTNER_SAMPLE_PARTNER_WEBHOOK_SECRET` commented out. See the
+   note in that file: setting it to the placeholder makes every valid
+   affiliate webhook return 401 while the rejection matrix still passes.
+
 3. `npx playwright install --with-deps`
 4. `npm run test:pw-local` (automatically sets `TEST_ENV=local`)
+
+   Startup runs `prisma migrate deploy` and then the seed, so a database
+   that has never been seeded still comes up with the fixtures the specs
+   read, including the affiliate `sample-partner` catalog and the
+   `commerce_affiliate_enabled` flag row. Every seed is an upsert and none
+   delete. Pass `SKIP_E2E_SEED=true` to skip it on a fast re-run.
+
+   Teardown runs `db:reset`, which drops and rebuilds the database. Set
+   `PLAYWRIGHT_SKIP_DB_RESET=true` if something else is using it.
+
 5. Use the other helpers, `npm run test:pw-preview` or
    `npm run test:pw-prod`, when remote deployments are ready, or run
    `TEST_ENV=<env> npm run test:pw` directly to target a custom

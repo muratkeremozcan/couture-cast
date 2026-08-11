@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
+import { applyLocalE2eDatabaseUrl } from './local-e2e-database.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const startWeb = process.argv.includes('--with-web')
@@ -17,6 +18,18 @@ const env = {
   API_BASE_URL: apiBaseUrl,
   HTTP_CORS_ORIGIN: process.env.HTTP_CORS_ORIGIN || webBaseUrl,
   PUBLIC_API_URL: process.env.PUBLIC_API_URL || apiBaseUrl,
+}
+
+// Applied after NODE_ENV and TEST_ENV are pinned above, so the local default is
+// evaluated against what this stack actually is rather than against whatever
+// the parent shell happened to be. An explicit DATABASE_URL, as CI supplies,
+// always wins, and `repoRootToScan` makes this stand down entirely when a
+// repo-level env file exists, because the children load those themselves and a
+// value injected here would shadow the file rather than defer to it.
+if (applyLocalE2eDatabaseUrl(env, { repoRootToScan: repoRoot })) {
+  console.log(
+    `[start-api-e2e-with-workers] No DATABASE_URL set; using the local end-to-end default ${env.DATABASE_URL}`
+  )
 }
 
 const processes = []
@@ -158,6 +171,28 @@ async function main() {
     (await isUrlHealthy(webBaseUrl))
   await runPreparation('npm', ['run', 'db:generate'])
   await runPreparation('node', ['scripts/prisma-migrate-deploy.mjs'])
+
+  /*
+   * Migrations create the schema and no rows, so a database that has never been
+   * seeded starts this stack perfectly and then fails any spec that reads a
+   * fixture. Story 5.1's affiliate specs are the sharp example: the sample
+   * partner catalog and the `commerce_affiliate_enabled` flag row only exist
+   * after a seed, and without them the suite reports "no offer was eligible",
+   * which reads as a product bug rather than an empty table.
+   *
+   * Safe to run every time, and safe to run against a database someone else is
+   * using: every seed in `packages/db/prisma/seeds` is an upsert and none of
+   * them delete. This is emphatically NOT `db:reset`, which drops the database
+   * and is reserved for the Playwright teardown and for CI.
+   */
+  if (process.env.SKIP_E2E_SEED === 'true') {
+    console.log(
+      '[start-api-e2e-with-workers] SKIP_E2E_SEED=true; leaving fixture data as it is.'
+    )
+  } else {
+    console.log('[start-api-e2e-with-workers] Applying idempotent seed fixtures...')
+    await runPreparation('npm', ['run', 'db:seed'])
+  }
   if (startWeb) {
     if (process.env.PLAYWRIGHT_SHARED_DEPS_PREPARED !== 'true') {
       await runPreparation('npm', ['run', 'prepare:playwright'])

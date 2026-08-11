@@ -18,6 +18,7 @@ import { AuthContext } from '../auth/security.decorators.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { RitualService } from './ritual.service.js'
+import { AffiliateOfferService } from '../commerce/affiliate-offer.service.js'
 import { toBadRequest } from '../../controllers/error-helpers.js'
 
 @Controller('/api/v1/ritual')
@@ -27,7 +28,9 @@ export class RitualController {
 
   constructor(
     @Inject(RitualService)
-    private readonly ritualService: RitualService
+    private readonly ritualService: RitualService,
+    @Inject(AffiliateOfferService)
+    private readonly affiliateOfferService: AffiliateOfferService
   ) {}
 
   @Get()
@@ -51,8 +54,31 @@ export class RitualController {
       parsedQuery.occasion
     )
 
+    // Story 5.1 decision 5: the commerce block is assembled HERE, not in
+    // RitualService. Every path -- cold generate, warm Redis cache, warm
+    // database cache -- passes through this line, which is what makes the
+    // opt-out take effect immediately even while a cached recommendation is
+    // being served. See AffiliateOfferService for why the service layer has no
+    // equivalent single point.
+    const shopThisLookByOutfitId = await this.affiliateOfferService.resolveShopThisLook({
+      userId: auth.userId,
+      outfits: data.outfits,
+      acceptLanguage,
+      requestedLocale: parsedQuery.locale,
+    })
+
+    const dataWithCommerce = {
+      ...data,
+      outfits: data.outfits.map((outfit) => ({
+        ...outfit,
+        // Always written, never omitted: the contract field is nullable and not
+        // optional precisely so a client never has to tell "absent" from "null".
+        shopThisLook: shopThisLookByOutfitId.get(outfit.id) ?? null,
+      })),
+    }
+
     try {
-      return ritualResponseSchema.parse({ data })
+      return ritualResponseSchema.parse({ data: dataWithCommerce })
     } catch (error) {
       this.logger.error(
         `Ritual response schema validation failed for user ${auth.userId}:`,

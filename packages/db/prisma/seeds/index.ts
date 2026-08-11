@@ -2,6 +2,7 @@
 import { PrismaClient } from '@prisma/client'
 import * as factoryModule from '../../../testing/src/factories/factory.ts'
 
+import { seedCommerceCatalog } from './commerce.js'
 import { seedFeatureFlags } from './feature-flags.js'
 import { unwrapCjsNamespace } from './interop.js'
 import { seedRituals } from './rituals.js'
@@ -20,6 +21,9 @@ async function main() {
   const weather = await seedWeather(prisma)
   await seedRituals(prisma, users.teens, garments, weather)
   await seedFeatureFlags(prisma)
+  // Story 5.1 decision 14. Self-guarded: a no-op outside non-production, so it
+  // is safe to call unconditionally here.
+  await seedCommerceCatalog(prisma)
 }
 
 main()

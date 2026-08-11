@@ -209,6 +209,56 @@ describe('ApiExceptionFilter', () => {
     ).not.toThrow()
   })
 
+  describe('affiliate webhook exclusion', () => {
+    it.each([
+      { name: 'the exact route', path: '/api/v1/commerce/affiliate/webhook' },
+      { name: 'a trailing slash', path: '/api/v1/commerce/affiliate/webhook/' },
+      { name: 'an uppercased path', path: '/API/V1/Commerce/Affiliate/Webhook' },
+    ])(
+      'writes no api_error_occurred row for a rejected webhook reached via $name',
+      ({ path }) => {
+        // The endpoint is unauthenticated, so one telemetry row per rejected
+        // request is a free amplification vector against a table pruned hourly.
+        // Express matches routes case-insensitively and tolerates trailing
+        // slashes, so the exclusion has to normalize before it compares.
+        const host = buildHost({ path, method: 'POST' })
+
+        filter.catch(new HttpException('Invalid webhook signature.', 401), host)
+
+        expect(replyMock).toHaveBeenCalled()
+        expect(captureEventMock).not.toHaveBeenCalled()
+      }
+    )
+
+    it('drops the query string before deciding whether to exclude', () => {
+      filter.catch(
+        new HttpException('Invalid webhook signature.', 401),
+        buildHost({
+          url: '/api/v1/commerce/affiliate/webhook?retry=7',
+          method: 'POST',
+        })
+      )
+
+      expect(captureEventMock).not.toHaveBeenCalled()
+    })
+
+    it('still captures errors on neighbouring commerce routes', () => {
+      // The exclusion is one route, not the whole commerce namespace: the
+      // authenticated click endpoint has a bearer token in front of it and its
+      // errors are worth counting.
+      filter.catch(
+        new HttpException('Affiliate offer not found.', 404),
+        buildHost({ path: '/api/v1/commerce/affiliate/clicks', method: 'POST' })
+      )
+
+      expect(captureEventMock).toHaveBeenCalledWith(
+        null,
+        'api_error_occurred',
+        expect.objectContaining({ route: '/api/v1/commerce/affiliate/clicks' })
+      )
+    })
+  })
+
   it('still returns the HTTP response when telemetry extraction throws', () => {
     // Telemetry is best-effort; the client must still receive its error response.
     captureEventMock.mockImplementation(() => {

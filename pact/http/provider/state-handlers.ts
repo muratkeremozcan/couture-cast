@@ -4,6 +4,7 @@ import {
   configureProviderEvent,
   configureProviderWardrobeState,
   configureProviderCapsuleState,
+  configureProviderCommerceState,
   configureProviderOnboardingState,
   configureProviderSilhouetteState,
   parsePactEvent,
@@ -33,6 +34,10 @@ type SilhouetteStateParams = {
 type SilhouetteFailureStateParams = {
   userId: string
   reason: SilhouettePhotoFailureReason
+}
+
+type CommerceStateParams = {
+  userId?: string
 }
 
 export const stateHandlers: StateHandlers = {
@@ -270,5 +275,53 @@ export const stateHandlers: StateHandlers = {
     return Promise.resolve({
       description: 'Configured an already-processed My Form commit',
     })
+  },
+
+  /* ----------------------------------------------------------------------- *
+   * Story 5.1 affiliate commerce.
+   *
+   * Each state names an OUTCOME the contract has to record, not the rule that
+   * produces it. "Affiliate commerce is disabled" configures a provider that
+   * answers 503; whether the `commerce_affiliate_enabled` flag resolving false
+   * is what gets it there is proven in the API suite, where a flag actually
+   * exists to resolve.
+   * ----------------------------------------------------------------------- */
+  'An eligible affiliate offer matches the outfit for user': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommerceStateParams
+    configureProviderCommerceState({ userId, scenario: 'eligible' })
+    return Promise.resolve({ description: 'Configured an eligible affiliate offer' })
+  },
+  'The user has opted out of affiliate suggestions': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommerceStateParams
+    configureProviderCommerceState({ userId, scenario: 'opted-out' })
+    return Promise.resolve({ description: 'Configured an opted-out user' })
+  },
+  'The user is outside the affiliate audience': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommerceStateParams
+    configureProviderCommerceState({ userId, scenario: 'audience-ineligible' })
+    return Promise.resolve({ description: 'Configured an audience-ineligible user' })
+  },
+  'Affiliate commerce is disabled': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommerceStateParams
+    configureProviderCommerceState({ userId, scenario: 'flag-disabled' })
+    return Promise.resolve({ description: 'Configured the commerce kill switch as off' })
+  },
+  'The affiliate offer is unknown, inactive, or out of window': (
+    parameters?: unknown
+  ) => {
+    const { userId } = (parameters ?? {}) as CommerceStateParams
+    configureProviderCommerceState({ userId, scenario: 'unknown-offer' })
+    return Promise.resolve({ description: 'Configured an unresolvable affiliate offer' })
+  },
+  'An affiliate click already exists inside the dedupe window': (
+    parameters?: unknown
+  ) => {
+    const { userId } = (parameters ?? {}) as CommerceStateParams
+    configureProviderCommerceState({ userId, scenario: 'click-deduped' })
+    return Promise.resolve({ description: 'Configured a deduped affiliate click' })
+  },
+  'The affiliate webhook signature is invalid': () => {
+    configureProviderCommerceState({ scenario: 'invalid-signature' })
+    return Promise.resolve({ description: 'Configured a failing webhook signature' })
   },
 }

@@ -2,6 +2,7 @@ import type { PrismaClient } from '@prisma/client'
 import * as sharedFlags from '../../../config/src/flags.ts'
 import type { FeatureFlagKey, FeatureFlagStoredValue } from '../../../config/src/flags.ts'
 
+import { allowsCommerceSeeding } from './commerce.js'
 import { unwrapCjsNamespace } from './interop.js'
 
 export type SeededFeatureFlag = {
@@ -21,6 +22,12 @@ const canonicalFlagOverrides: Record<FeatureFlagKey, FeatureFlagStoredValue> = {
   community_feed_enabled: false,
   color_analysis_enabled: getDefaultFeatureFlagValue('color_analysis_enabled'),
   weather_alerts_enabled: getDefaultFeatureFlagValue('weather_alerts_enabled'),
+  // Story 5.1 decision 14: three independent gates default to off, so without
+  // this the feature's positive path is not demonstrable anywhere and the
+  // end-to-end tasks would be uncloseable. This is the only lever that turns
+  // commerce on outside production, and it is guarded so it can never do so
+  // inside it.
+  commerce_affiliate_enabled: allowsCommerceSeeding(),
 }
 
 const supplementalFeatureFlags: SeededFeatureFlag[] = [

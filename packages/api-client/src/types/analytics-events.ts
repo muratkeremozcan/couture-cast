@@ -50,6 +50,13 @@ export const analyticsEventNameSchema = z.enum([
   'wardrobe_capsule_recommendation_selected',
   'wardrobe_onboarding_started',
   'wardrobe_onboarding_completed',
+  // Story 5.1. affiliate_cta_shown is emitted by the mobile client directly to
+  // PostHog and never reaches TelemetryService; the other two are emitted by the
+  // API with an HMAC subject id. See the property schemas below for why no URL,
+  // product title, garment id, or raw user id may ever appear in any of them.
+  'affiliate_cta_shown',
+  'affiliate_cta_clicked',
+  'affiliate_conversion_recorded',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -404,6 +411,80 @@ export type WardrobeOnboardingCompletedEvent = z.infer<
   typeof wardrobeOnboardingCompletedEventSchema
 >
 
+// --- Story 5.1: affiliate commerce ----------------------------------------
+//
+// Three events, and the shared constraint across all of them is what is NOT
+// here. No URL, no product title, no garment id, and no free-text field appears
+// in any property schema, and every schema is `.strict()` so a caller cannot
+// smuggle one in. `partner_id` is a slug and `offer_id` is a catalog row id;
+// both are operator-controlled and safe to log. The `analyticsSubjectId` on the
+// two server events is the HMAC pseudonym, never a raw user id.
+
+const affiliateSurfaceAnalyticsEnum = z.enum(['mobile_hero'])
+const affiliateScenarioAnalyticsEnum = z.enum(['morning', 'midday', 'evening'])
+/** Uppercase region subtag, or the '*' sentinel meaning "published globally". */
+const affiliateLocaleRegionSchema = z.union([
+  z.literal('*'),
+  z.string().regex(/^[A-Z0-9]{2,3}$/),
+])
+const affiliateConversionStatusAnalyticsEnum = z.enum([
+  'pending',
+  'confirmed',
+  'reversed',
+])
+
+export const affiliateCtaShownEventSchema = z.object({
+  // Client-side only: this event uses the mobile analytics client's own
+  // distinctId, exactly like trackMobileRitualCreated. It does NOT go through
+  // TelemetryService and writes no TelemetryEvent row, because a mobile client
+  // can neither compute the server-side HMAC subject nor write that table.
+  partnerId: nonEmptyString.max(128),
+  scenario: affiliateScenarioAnalyticsEnum,
+  surface: affiliateSurfaceAnalyticsEnum,
+  localeRegion: affiliateLocaleRegionSchema,
+  /**
+   * The ScenarioOutfit.id. This is the once-per-payload dedupe key the client
+   * needs, the join key between impression and click, and the correlation key
+   * that gives the PRD's "share of outfit sessions that trigger a brand click"
+   * metric its denominator. It is a synthetic server id carrying no user
+   * identity in itself, but it IS joinable to a user in the database. That is
+   * the deliberate tradeoff that makes the metric computable.
+   */
+  recommendationId: nonEmptyString.max(128),
+})
+
+export type AffiliateCtaShownEvent = z.infer<typeof affiliateCtaShownEventSchema>
+
+export const affiliateCtaClickedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  partnerId: nonEmptyString.max(128),
+  offerId: nonEmptyString.max(128),
+  scenario: affiliateScenarioAnalyticsEnum,
+  surface: affiliateSurfaceAnalyticsEnum,
+  localeRegion: affiliateLocaleRegionSchema,
+  recommendationId: nonEmptyString.max(128),
+})
+
+export type AffiliateCtaClickedEvent = z.infer<typeof affiliateCtaClickedEventSchema>
+
+export const affiliateConversionRecordedEventSchema = z.object({
+  /**
+   * When the posted click token matched a click, this is the HMAC of that
+   * click's owner and `matched` is true. When it matched nothing there is no
+   * user subject at all, so the partner slug stands in and `matched` is false.
+   */
+  analyticsSubjectId: nonEmptyString,
+  partnerId: nonEmptyString.max(128),
+  status: affiliateConversionStatusAnalyticsEnum,
+  currency: z.string().regex(/^[A-Z]{3}$/),
+  orderValueMinorUnits: z.number().int().min(0),
+  matched: z.boolean(),
+})
+
+export type AffiliateConversionRecordedEvent = z.infer<
+  typeof affiliateConversionRecordedEventSchema
+>
+
 export const analyticsEventSchemas = {
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
@@ -429,6 +510,9 @@ export const analyticsEventSchemas = {
     wardrobeCapsuleRecommendationSelectedEventSchema,
   wardrobe_onboarding_started: wardrobeOnboardingStartedEventSchema,
   wardrobe_onboarding_completed: wardrobeOnboardingCompletedEventSchema,
+  affiliate_cta_shown: affiliateCtaShownEventSchema,
+  affiliate_cta_clicked: affiliateCtaClickedEventSchema,
+  affiliate_conversion_recorded: affiliateConversionRecordedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -1175,6 +1259,119 @@ export function trackWardrobeOnboardingCompleted(
       garment_count: parsed.garmentCount,
       silhouette_mode: parsed.silhouetteMode,
       timestamp: parsed.timestamp,
+    }),
+  }
+}
+
+// --- Story 5.1: affiliate commerce property schemas and wrappers -----------
+//
+// Every schema below is `.strict()`. That is the enforcement point for the
+// story's privacy rule: a caller that tries to attach a URL, a product title, a
+// garment id, or a raw user id gets a parse failure at the wrapper rather than a
+// silent leak into PostHog. The negative fixtures in
+// `packages/api-client/testing/commerce-contract.spec.ts` exercise exactly that.
+
+export const affiliateCtaShownPropertiesSchema = z
+  .object({
+    partner_id: nonEmptyString.max(128),
+    scenario: z.enum(['morning', 'midday', 'evening']),
+    surface: z.enum(['mobile_hero']),
+    locale_region: z.union([z.literal('*'), z.string().regex(/^[A-Z0-9]{2,3}$/)]),
+    recommendation_id: nonEmptyString.max(128),
+  })
+  .strict()
+
+export type AffiliateCtaShownProperties = z.infer<
+  typeof affiliateCtaShownPropertiesSchema
+>
+
+export const affiliateCtaClickedPropertiesSchema = z
+  .object({
+    partner_id: nonEmptyString.max(128),
+    offer_id: nonEmptyString.max(128),
+    scenario: z.enum(['morning', 'midday', 'evening']),
+    surface: z.enum(['mobile_hero']),
+    locale_region: z.union([z.literal('*'), z.string().regex(/^[A-Z0-9]{2,3}$/)]),
+    recommendation_id: nonEmptyString.max(128),
+  })
+  .strict()
+
+export type AffiliateCtaClickedProperties = z.infer<
+  typeof affiliateCtaClickedPropertiesSchema
+>
+
+export const affiliateConversionRecordedPropertiesSchema = z
+  .object({
+    partner_id: nonEmptyString.max(128),
+    status: z.enum(['pending', 'confirmed', 'reversed']),
+    currency: z.string().regex(/^[A-Z]{3}$/),
+    order_value_minor_units: z.number().int().min(0),
+    matched: z.boolean(),
+  })
+  .strict()
+
+export type AffiliateConversionRecordedProperties = z.infer<
+  typeof affiliateConversionRecordedPropertiesSchema
+>
+
+export function trackAffiliateCtaShown(
+  event: AffiliateCtaShownEvent,
+  distinctId: string
+): AnalyticsCapturePayload<'affiliate_cta_shown', AffiliateCtaShownProperties> {
+  const parsed = affiliateCtaShownEventSchema.parse(event)
+
+  // The distinctId is passed in rather than read off the event, because this is
+  // the one commerce event with no server subject: the mobile analytics client
+  // owns its own identity here, matching trackMobileRitualCreated.
+  return {
+    distinctId,
+    event: 'affiliate_cta_shown',
+    properties: affiliateCtaShownPropertiesSchema.parse({
+      partner_id: parsed.partnerId,
+      scenario: parsed.scenario,
+      surface: parsed.surface,
+      locale_region: parsed.localeRegion,
+      recommendation_id: parsed.recommendationId,
+    }),
+  }
+}
+
+export function trackAffiliateCtaClicked(
+  event: AffiliateCtaClickedEvent
+): AnalyticsCapturePayload<'affiliate_cta_clicked', AffiliateCtaClickedProperties> {
+  const parsed = affiliateCtaClickedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'affiliate_cta_clicked',
+    properties: affiliateCtaClickedPropertiesSchema.parse({
+      partner_id: parsed.partnerId,
+      offer_id: parsed.offerId,
+      scenario: parsed.scenario,
+      surface: parsed.surface,
+      locale_region: parsed.localeRegion,
+      recommendation_id: parsed.recommendationId,
+    }),
+  }
+}
+
+export function trackAffiliateConversionRecorded(
+  event: AffiliateConversionRecordedEvent
+): AnalyticsCapturePayload<
+  'affiliate_conversion_recorded',
+  AffiliateConversionRecordedProperties
+> {
+  const parsed = affiliateConversionRecordedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'affiliate_conversion_recorded',
+    properties: affiliateConversionRecordedPropertiesSchema.parse({
+      partner_id: parsed.partnerId,
+      status: parsed.status,
+      currency: parsed.currency,
+      order_value_minor_units: parsed.orderValueMinorUnits,
+      matched: parsed.matched,
     }),
   }
 }

@@ -1,0 +1,219 @@
+# Story 5.1: affiliate "Shop this look" CTA, disclosure placement, and opt-out.
+#
+# Runs against the seeded `sample-partner` catalog (decision 14) plus the
+# public-API user the Maestro runner creates. There is no public catalog API and
+# there is not supposed to be one, so the offer rows must already be in the
+# database; `scripts/run-maestro.mjs` only creates the user, the location, and
+# the first ritual.
+#
+# The fresh user owns no garments, so every outfit slot is a
+# `default-{category}` placeholder. Those match only wildcard offers, which is
+# exactly what the seed publishes: `comfort_range: null` at `locale_region: '*'`.
+appId: ${MAESTRO_APP_ID}
+name: 'Affiliate shop this look CTA and opt-out'
+tags:
+  - e2e
+  - commerce
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu if it appears'
+- tapOn:
+    text: 'Open app'
+    optional: true
+    label: 'Dismiss Expo Go developer sheet if it appears'
+
+- extendedWaitUntil:
+    visible: 'Morning commute'
+    timeout: 30000
+
+# --- AC 1: the CTA renders, disclosed, on an eligible card -------------------
+
+- extendedWaitUntil:
+    visible: 'Paid partnership. CoutureCast may earn a commission.'
+    timeout: 30000
+    label: 'Affiliate disclosure is on the card before any interaction'
+
+- assertVisible: 'Presented by Sample Partner'
+- assertVisible: 'Shop this look'
+- assertVisible: 'Opens in an in-app browser'
+
+# PRD FR5.1 accepts only a disclosure that is visible BEFORE the click, so the
+# relative position is the assertion, not merely that both are on screen. A
+# disclosure moved below the control, into a tooltip, or into a post-tap
+# interstitial fails here.
+- assertVisible:
+    text: 'Shop this look'
+    below:
+      text: 'Paid partnership. CoutureCast may earn a commission.'
+    label: 'Disclosure renders above the control in reading order'
+
+- assertVisible:
+    text: 'Presented by Sample Partner'
+    below:
+      text: 'Paid partnership. CoutureCast may earn a commission.'
+
+- takeScreenshot:
+    path: maestro/artifacts/commerce-affiliate-cta-disclosed
+
+# --- AC 3: the settings section discloses the integration --------------------
+
+- tapOn:
+    id: 'tab-settings'
+    retryTapIfNoChange: true
+    label: 'Open settings'
+
+- extendedWaitUntil:
+    visible: 'Shopping and partners'
+    timeout: 15000
+
+# PRD NFR Security 4 wants the third-party disclosure alongside the toggle, not
+# behind it, so the paragraph is asserted in full rather than by its heading.
+- assertVisible:
+    text: 'When affiliate suggestions are on, tapping one opens a partner site and tells that partner the visit came from CoutureCast. CoutureCast may earn a commission. No wardrobe photos or personal details are shared.'
+    label: 'Third-party disclosure is visible in settings'
+
+- assertVisible:
+    id: 'commerce-opt-out-toggle'
+    below:
+      text: 'Shopping and partners'
+    label: 'Disclosure and heading precede the toggle'
+
+- takeScreenshot:
+    path: maestro/artifacts/commerce-affiliate-settings-disclosure
+
+# --- AC 3: turning the opt-out off hides the CTA -----------------------------
+
+# Tapped by id rather than by text: the visible label embeds escaped double
+# quotes (`Show "Shop this look" suggestions`), which no Maestro text selector
+# should have to carry.
+- tapOn:
+    id: 'commerce-opt-out-toggle'
+    retryTapIfNoChange: true
+    label: 'Turn affiliate suggestions off'
+
+- extendedWaitUntil:
+    visible: 'Shopping preferences updated'
+    timeout: 15000
+    label: 'The write round-tripped to the API'
+
+- takeScreenshot:
+    path: maestro/artifacts/commerce-affiliate-opted-out
+
+# Relaunch WITHOUT clearing state. The device ritual cache is minutes old, so
+# this is the exact path decision 6 exists to close: the cached payload is still
+# young enough to be served without a network call, and it must not resurrect a
+# CTA the user just switched off.
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: false
+    stopApp: true
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu if it appears'
+- tapOn:
+    text: 'Open app'
+    optional: true
+    label: 'Dismiss Expo Go developer sheet if it appears'
+
+- extendedWaitUntil:
+    visible: 'Morning commute'
+    timeout: 30000
+
+- assertNotVisible:
+    text: 'Paid partnership. CoutureCast may earn a commission.'
+    label: 'A cache-served payload never renders a CTA'
+- assertNotVisible: 'Presented by Sample Partner'
+
+# Relaunch WITH a cleared state. No device cache survives, so the card can only
+# come from a fresh GET /api/v1/ritual. That proves the server itself is now
+# emitting `shopThisLook: null`, which is the enforcement the client-side rule
+# above deliberately does not rely on.
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: true
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu if it appears'
+- tapOn:
+    text: 'Open app'
+    optional: true
+    label: 'Dismiss Expo Go developer sheet if it appears'
+
+- extendedWaitUntil:
+    visible: 'Morning commute'
+    timeout: 30000
+
+- assertNotVisible:
+    text: 'Paid partnership. CoutureCast may earn a commission.'
+    label: 'The server withholds the offer for an opted-out user'
+- assertNotVisible: 'Shop this look'
+
+- takeScreenshot:
+    path: maestro/artifacts/commerce-affiliate-cta-hidden
+
+# --- AC 3: turning it back on restores the CTA -------------------------------
+#
+# Also leaves the shared fixture the way it was found, so a later flow on the
+# same account does not inherit an opt-out it never made.
+
+- tapOn:
+    id: 'tab-settings'
+    retryTapIfNoChange: true
+
+- extendedWaitUntil:
+    visible: 'Shopping and partners'
+    timeout: 15000
+
+- tapOn:
+    id: 'commerce-opt-out-toggle'
+    retryTapIfNoChange: true
+    label: 'Turn affiliate suggestions back on'
+
+- extendedWaitUntil:
+    visible: 'Shopping preferences updated'
+    timeout: 15000
+
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: true
+
+- openLink: ${APP_URL}
+
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss Expo Go developer menu if it appears'
+- tapOn:
+    text: 'Open app'
+    optional: true
+    label: 'Dismiss Expo Go developer sheet if it appears'
+
+- extendedWaitUntil:
+    visible: 'Paid partnership. CoutureCast may earn a commission.'
+    timeout: 30000
+    label: 'The CTA returns once affiliate suggestions are on again'
+
+- assertVisible: 'Shop this look'
+
+- takeScreenshot:
+    path: maestro/artifacts/commerce-affiliate-cta-restored

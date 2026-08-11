@@ -1,7 +1,12 @@
-import React, { type ComponentRef, useState } from 'react'
+import React, { type ComponentRef, useRef, useState } from 'react'
 import { StyleSheet, Platform, Pressable } from 'react-native'
 import { Text, View } from '@/components/themed'
 import type { ScenarioOutfit } from '@couture/api-client/contracts/http'
+import {
+  mintAffiliateClickFromMobile,
+  openAffiliatePartnerSite,
+  resolveRenderableShopThisLook,
+} from '@/src/lib/commerce'
 import { GarmentItemTile } from './garment-item-tile'
 import { useHeroPalette } from './hero-theme'
 import { useTranslation } from 'react-i18next'
@@ -14,6 +19,12 @@ type OutfitRecommendationCardProps = {
     element: ComponentRef<typeof Pressable> | null
   ) => void
   isLoading?: boolean
+  /**
+   * True when `outfit` came out of the device ritual cache instead of the
+   * network. A cache-served payload never renders an affiliate CTA, because the
+   * cache outlives an opt-out (fifteen minutes online, indefinitely offline).
+   */
+  isCacheServed?: boolean
 }
 
 export function OutfitRecommendationCard({
@@ -21,8 +32,20 @@ export function OutfitRecommendationCard({
   onSwapGarment,
   onGarmentRef,
   isLoading,
+  isCacheServed = false,
 }: OutfitRecommendationCardProps) {
   const [selectedBadgeKey, setSelectedBadgeKey] = useState<string | null>(null)
+  // Stamped with the recommendation it belongs to. This component instance
+  // survives a scenario toggle, so an unstamped busy or error state would follow
+  // the user onto a different card and describe an offer they never touched.
+  const [ctaActivation, setCtaActivation] = useState<{
+    outfitId: string
+    status: 'pending' | 'error'
+  } | null>(null)
+  // State alone cannot block a double tap: two presses inside one React batch
+  // both read the pre-update value and both mint a click. The ref settles
+  // synchronously, so the second press is dropped before it reaches the network.
+  const ctaActivationInFlight = useRef(false)
   const { t } = useTranslation()
   const palette = useHeroPalette()
 
@@ -49,6 +72,50 @@ export function OutfitRecommendationCard({
   }
 
   const activeBadgeInfo = outfit.reasoningBadges?.find((b) => b.key === selectedBadgeKey)
+
+  const shopThisLook = resolveRenderableShopThisLook(outfit, isCacheServed)
+  const activationForThisCard =
+    ctaActivation?.outfitId === outfit.id ? ctaActivation.status : null
+  const isActivatingCta = activationForThisCard === 'pending'
+  const ctaError =
+    activationForThisCard === 'error' ? t('commerce.shopThisLook.error') : null
+  const ctaLabel = isActivatingCta
+    ? t('commerce.shopThisLook.loading')
+    : t('commerce.shopThisLook.cta')
+  const partnerLabel = shopThisLook
+    ? t('commerce.shopThisLook.partnerLabel', {
+        partner: shopThisLook.partnerDisplayName,
+      })
+    : ''
+  const opensInBrowserLabel = t('commerce.shopThisLook.opensInBrowser')
+
+  const handleShopThisLookPress = async () => {
+    if (!shopThisLook || ctaActivationInFlight.current) {
+      return
+    }
+
+    ctaActivationInFlight.current = true
+    setCtaActivation({ outfitId: outfit.id, status: 'pending' })
+
+    try {
+      const redirectUrl = await mintAffiliateClickFromMobile({
+        offerId: shopThisLook.offerId,
+        recommendationId: outfit.id,
+        surface: 'mobile_hero',
+      })
+      // Only navigate once the click is attributed. Traffic the partner cannot
+      // attribute is worth nothing to them and cannot be audited by us, so a
+      // failed mint stops here. A handoff that fails after a successful mint
+      // surfaces the same message: the click row and its event stand, and no
+      // compensating event is emitted.
+      await openAffiliatePartnerSite(redirectUrl)
+      setCtaActivation(null)
+    } catch {
+      setCtaActivation({ outfitId: outfit.id, status: 'error' })
+    } finally {
+      ctaActivationInFlight.current = false
+    }
+  }
 
   return (
     <View style={styles.container} testID="outfit-recommendation-card">
@@ -133,6 +200,78 @@ export function OutfitRecommendationCard({
           />
         ))}
       </View>
+
+      {/* Affiliate "Shop this look" block. Reading order is the requirement,
+          not a layout preference: PRD FR5.1 accepts only a disclosure that is
+          visible before the click, so it is a plain sibling text node ahead of
+          the control, never a post-tap interstitial, a tooltip, or an
+          accessibility label. */}
+      {shopThisLook && (
+        <View
+          style={[
+            styles.shopThisLook,
+            { backgroundColor: palette.subtleSurface, borderColor: palette.divider },
+          ]}
+          testID="shop-this-look-block"
+        >
+          <Text
+            style={[styles.shopThisLookDisclosure, { color: palette.text }]}
+            testID="shop-this-look-disclosure"
+          >
+            {t('commerce.shopThisLook.disclosure')}
+          </Text>
+          <Text
+            style={[styles.shopThisLookPartner, { color: palette.mutedText }]}
+            testID="shop-this-look-partner"
+          >
+            {partnerLabel}
+          </Text>
+          <Text
+            style={[styles.shopThisLookOfferTitle, { color: palette.text }]}
+            testID="shop-this-look-offer-title"
+          >
+            {shopThisLook.offerTitle}
+          </Text>
+          <Pressable
+            style={[styles.shopThisLookCta, { backgroundColor: palette.text }]}
+            onPress={() => {
+              void handleShopThisLookPress()
+            }}
+            testID="shop-this-look-cta"
+            accessibilityRole="button"
+            // Composed in the order decision 16 fixes: control label, partner,
+            // then the handoff warning. The visible label leads so the
+            // accessible name always contains what a speech-input user reads.
+            accessibilityLabel={[ctaLabel, partnerLabel, opensInBrowserLabel].join('. ')}
+            // Busy rather than disabled: the control is working, not
+            // unavailable. `aria-busy` rides alongside because react-native-web
+            // does not project `accessibilityState` onto the DOM, the same pair
+            // `components/chip-navigation.tsx` ships.
+            accessibilityState={{ busy: isActivatingCta }}
+            aria-busy={isActivatingCta}
+          >
+            <Text style={[styles.shopThisLookCtaLabel, { color: palette.background }]}>
+              {ctaLabel}
+            </Text>
+          </Pressable>
+          <Text
+            style={[styles.shopThisLookOpensInBrowser, { color: palette.mutedText }]}
+            testID="shop-this-look-opens-in-browser"
+          >
+            {opensInBrowserLabel}
+          </Text>
+          {ctaError ? (
+            <Text
+              style={[styles.shopThisLookError, { color: palette.danger }]}
+              testID="shop-this-look-error"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
+            >
+              {ctaError}
+            </Text>
+          ) : null}
+        </View>
+      )}
     </View>
   )
 }
@@ -238,6 +377,51 @@ const styles = StyleSheet.create({
   garmentsList: {
     backgroundColor: 'transparent',
     gap: 8,
+  },
+  shopThisLook: {
+    marginTop: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderRadius: 8,
+    gap: 8,
+  },
+  shopThisLookDisclosure: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+  },
+  shopThisLookPartner: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  shopThisLookOfferTitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  shopThisLookCta: {
+    // Decision 17: at least 44 by 44 device-independent pixels, so the control
+    // stays operable by touch and by switch input.
+    minHeight: 44,
+    minWidth: 44,
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shopThisLookCtaLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  shopThisLookOpensInBrowser: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  shopThisLookError: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
   },
   skeletonContainer: {
     paddingHorizontal: 16,

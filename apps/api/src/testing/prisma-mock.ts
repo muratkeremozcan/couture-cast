@@ -59,6 +59,13 @@ const MODEL_NAMES = [
   'guardianConsent',
   'forecastSegment',
   'weatherSnapshot',
+  'telemetryEvent',
+  // Story 5.1 commerce.
+  'commercePartner',
+  'commercePreference',
+  'affiliateOffer',
+  'affiliateClick',
+  'affiliateConversion',
 ] as const
 
 export type MockPrisma = Record<(typeof MODEL_NAMES)[number], Delegate> & {

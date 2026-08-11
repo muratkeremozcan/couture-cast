@@ -22,6 +22,8 @@ export const SLO = isSmoke
       capsuleRead: 3000,
       capsuleWrite: 5000,
       capsuleRitualCold: 5000,
+      // Story 5.1 affiliate eligibility, relaxed for smoke runs.
+      ritualEligible: 3000,
     }
   : {
       aggregate: 1500,
@@ -42,6 +44,42 @@ export const SLO = isSmoke
       capsuleRead: 300,
       capsuleWrite: 500,
       capsuleRitualCold: 800,
+      /**
+       * Story 5.1: a warm `GET /api/v1/ritual` for a user who IS affiliate
+       * eligible, so the full decision-4 chain runs -- a feature-flag read, a
+       * commerce preference read, a batched garment query, and the offer
+       * selection query -- on top of the cached ritual payload.
+       *
+       * ABSOLUTE, NOT RELATIVE, and that is deliberate. An earlier draft of the
+       * story budgeted "adds no more than 50 ms" over a baseline. This harness
+       * has no baseline-diff facility: `handleSummary` writes one run's summary
+       * and nothing compares two runs, so a relative budget would have been a
+       * threshold nobody could ever evaluate, which is worse than no threshold
+       * because it reads as a guarantee.
+       *
+       * 300 ms, chosen the same way `capsuleRead` was and for the same reason:
+       * this is an indexed read path with no generation work in it, and 300 ms
+       * is the number this repo already commits to for that shape. Four extra
+       * round trips against a warm cache cannot approach it unless the offer
+       * lookup has stopped using its index, which
+       * `commerce-affiliate-offers-query-plan.integration.spec.ts` asserts
+       * directly against a 4,000-row catalog.
+       *
+       * Observed at **37.2 ms** in the `k6 smoke` CI run recorded in the Story 5.1
+       * release QA artifact, against a real API and the seeded catalog, with the
+       * eligibility assertion passing so the measurement is of the eligible path
+       * rather than a ritual read that skipped offer selection. That is one sample
+       * at one VU, not a distribution, and smoke mode enforces the 3000 ms branch
+       * above rather than this one. So treat 300 ms as a bound with roughly 8x
+       * observed headroom, not as a tuned figure; tighten it once a load-profile
+       * run exists.
+       *
+       * Cold generation on the eligible path is NOT this key's job. It is
+       * already bounded by `capsuleRitualCold`, and folding generation in here
+       * would let a slow generator mask a regression in the commerce chain,
+       * which is the only thing this story added to the hot path.
+       */
+      ritualEligible: 300,
     }
 
 export function apiUrl(path: string) {

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -3246,6 +3246,56 @@
               "type": "string"
             },
             "description": "Optional list of garment IDs auto-filled into a partial capsule."
+          },
+          "shopThisLook": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "partnerId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "CommercePartner.slug. Stable, safe to log."
+              },
+              "partnerDisplayName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Rendered next to the CTA."
+              },
+              "offerId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Pass back to POST /api/v1/commerce/affiliate/clicks."
+              },
+              "offerTitle": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Partner-authored, already localized by the catalog row."
+              },
+              "garmentCategory": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom",
+                  "outerwear",
+                  "dress",
+                  "shoes",
+                  "accessory",
+                  null
+                ],
+                "description": "The outfit slot this offer matched."
+              }
+            },
+            "required": [
+              "partnerId",
+              "partnerDisplayName",
+              "offerId",
+              "offerTitle",
+              "garmentCategory"
+            ],
+            "additionalProperties": false,
+            "description": "Always present. Null means the acting user is not eligible for an affiliate CTA on this card, for any reason: the feature flag is off, the user opted out, or no active in-window offer matched a slot. Never populated from a cached payload."
           }
         },
         "required": [
@@ -3253,7 +3303,8 @@
           "scenario",
           "garmentIds",
           "reasoningBadges",
-          "comfortNotes"
+          "comfortNotes",
+          "shopThisLook"
         ]
       },
       "RitualResponse": {
@@ -3531,6 +3582,56 @@
                         "type": "string"
                       },
                       "description": "Optional list of garment IDs auto-filled into a partial capsule."
+                    },
+                    "shopThisLook": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "partnerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "CommercePartner.slug. Stable, safe to log."
+                        },
+                        "partnerDisplayName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Rendered next to the CTA."
+                        },
+                        "offerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Pass back to POST /api/v1/commerce/affiliate/clicks."
+                        },
+                        "offerTitle": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Partner-authored, already localized by the catalog row."
+                        },
+                        "garmentCategory": {
+                          "type": "string",
+                          "enum": [
+                            "top",
+                            "bottom",
+                            "outerwear",
+                            "dress",
+                            "shoes",
+                            "accessory",
+                            null
+                          ],
+                          "description": "The outfit slot this offer matched."
+                        }
+                      },
+                      "required": [
+                        "partnerId",
+                        "partnerDisplayName",
+                        "offerId",
+                        "offerTitle",
+                        "garmentCategory"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Always present. Null means the acting user is not eligible for an affiliate CTA on this card, for any reason: the feature flag is off, the user opted out, or no active in-window offer matched a slot. Never populated from a cached payload."
                     }
                   },
                   "required": [
@@ -3538,7 +3639,8 @@
                     "scenario",
                     "garmentIds",
                     "reasoningBadges",
-                    "comfortNotes"
+                    "comfortNotes",
+                    "shopThisLook"
                   ]
                 },
                 "minItems": 3,
@@ -6359,6 +6461,258 @@
           "message"
         ],
         "additionalProperties": false
+      },
+      "AffiliateSurface": {
+        "type": "string",
+        "enum": [
+          "mobile_hero"
+        ]
+      },
+      "AffiliateConversionStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "confirmed",
+          "reversed"
+        ]
+      },
+      "ShopThisLook": {
+        "type": "object",
+        "properties": {
+          "partnerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CommercePartner.slug. Stable, safe to log."
+          },
+          "partnerDisplayName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Rendered next to the CTA."
+          },
+          "offerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pass back to POST /api/v1/commerce/affiliate/clicks."
+          },
+          "offerTitle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Partner-authored, already localized by the catalog row."
+          },
+          "garmentCategory": {
+            "type": "string",
+            "enum": [
+              "top",
+              "bottom",
+              "outerwear",
+              "dress",
+              "shoes",
+              "accessory",
+              null
+            ],
+            "description": "The outfit slot this offer matched."
+          }
+        },
+        "required": [
+          "partnerId",
+          "partnerDisplayName",
+          "offerId",
+          "offerTitle",
+          "garmentCategory"
+        ],
+        "additionalProperties": false
+      },
+      "CommercePreference": {
+        "type": "object",
+        "properties": {
+          "affiliateCtasEnabled": {
+            "type": "boolean",
+            "description": "False hides every affiliate CTA. Defaults true; a user with no stored row reads as true."
+          }
+        },
+        "required": [
+          "affiliateCtasEnabled"
+        ],
+        "additionalProperties": false
+      },
+      "CommercePreferenceResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "affiliateCtasEnabled": {
+                "type": "boolean",
+                "description": "False hides every affiliate CTA. Defaults true; a user with no stored row reads as true."
+              }
+            },
+            "required": [
+              "affiliateCtasEnabled"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdateCommercePreferenceInput": {
+        "type": "object",
+        "properties": {
+          "affiliateCtasEnabled": {
+            "type": "boolean",
+            "description": "False hides every affiliate CTA. Defaults true; a user with no stored row reads as true."
+          }
+        },
+        "required": [
+          "affiliateCtasEnabled"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateCommercePreferenceResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "affiliateCtasEnabled": {
+                "type": "boolean",
+                "description": "False hides every affiliate CTA. Defaults true; a user with no stored row reads as true."
+              }
+            },
+            "required": [
+              "affiliateCtasEnabled"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AffiliateClickRequest": {
+        "type": "object",
+        "properties": {
+          "offerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The offerId returned in the ritual response shopThisLook block."
+          },
+          "recommendationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The ScenarioOutfit.id the CTA was rendered on."
+          },
+          "surface": {
+            "type": "string",
+            "enum": [
+              "mobile_hero"
+            ],
+            "description": "Where the CTA was activated."
+          }
+        },
+        "required": [
+          "offerId",
+          "recommendationId",
+          "surface"
+        ],
+        "additionalProperties": false
+      },
+      "AffiliateClickResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "redirectUrl": {
+                "type": "string",
+                "format": "uri",
+                "description": "Absolute https URL on the partner host, with the click token substituted. Built server-side; never cached by the client."
+              }
+            },
+            "required": [
+              "redirectUrl"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AffiliateWebhookPayload": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Partner-side unique event id. Replays of the same id write nothing."
+          },
+          "clickToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The token issued at click time. An unknown token is still recorded, unattributed."
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC instant the conversion happened partner-side."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed",
+              "reversed"
+            ]
+          },
+          "orderValueMinorUnits": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Integer minor units. Floating-point money is prohibited."
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "ISO 4217 alpha-3, uppercase."
+          }
+        },
+        "required": [
+          "eventId",
+          "clickToken",
+          "occurredAt",
+          "status",
+          "orderValueMinorUnits",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "AffiliateWebhookResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "received": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "required": [
+              "received"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
       }
     },
     "parameters": {}
@@ -9759,6 +10113,308 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SilhouettePreconditionRequiredError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/preferences": {
+      "get": {
+        "tags": [
+          "commerce"
+        ],
+        "summary": "Read the affiliate CTA preference",
+        "description": "Returns the affiliate CTA preference for the acting user. A user with no stored row reads as enabled. Deliberately NOT gated by commerce_affiliate_enabled: a user must always be able to read and set their own preference, including while affiliate commerce is switched off.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Preference retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommercePreferenceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "commerce"
+        ],
+        "summary": "Set the affiliate CTA preference",
+        "description": "Sets the affiliate CTA preference for the acting user and writes an audit row in the same transaction. An unchanged value returns 200 with the current state and writes no audit row, so the response stays uniform.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCommercePreferenceInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preference stored, including when the value was unchanged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateCommercePreferenceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/affiliate/clicks": {
+      "post": {
+        "tags": [
+          "commerce"
+        ],
+        "summary": "Mint an attributed affiliate click",
+        "description": "Creates one AffiliateClick and returns the outbound partner URL. 201 on a fresh mint, 200 when an identical activation inside 60 seconds is deduped to the existing row. Status precedence is fixed so assertions are deterministic: 503 (feature disabled) outranks 403 (audience), which outranks 403 (opted out), which outranks 404 (unknown, inactive, or out-of-window offer), which outranks 500 (invalid resolved URL).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AffiliateClickRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A click for the same user, offer, and recommendation already existed within 60 seconds; the same redirect URL is returned and no new row is created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffiliateClickResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "A new click was minted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffiliateClickResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Audience ineligible (\"Affiliate suggestions are unavailable for this account.\") or opted out (\"Affiliate suggestions are turned off for this account.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown, inactive, or out-of-window offer (\"Affiliate offer not found.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The offer's resolved URL failed validation (\"Affiliate offer is not configured correctly.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "commerce_affiliate_enabled resolved false (\"Affiliate suggestions are temporarily unavailable.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/affiliate/webhook": {
+      "post": {
+        "tags": [
+          "commerce"
+        ],
+        "summary": "Record an affiliate conversion",
+        "description": "Machine-to-machine, authenticated by HMAC signature rather than a bearer token. Append-only and idempotent on (partner, eventId): a replay returns 200 and writes nothing. An unknown clickToken is still persisted, unattributed, because rejecting it would trigger unbounded partner retries for a fact we cannot change. The commerce kill switch deliberately does NOT apply here: returning 503 to a retrying partner would drop conversion facts for purchases that already happened.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The CommercePartner slug."
+            },
+            "required": true,
+            "description": "The CommercePartner slug.",
+            "name": "x-couture-partner-id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,15}$",
+              "description": "Unix seconds, integer. Must be within 300 seconds of server time."
+            },
+            "required": true,
+            "description": "Unix seconds, integer. Must be within 300 seconds of server time.",
+            "name": "x-couture-timestamp",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "description": "Lowercase hex HMAC-SHA256 over `${timestamp}.${rawBody}`."
+            },
+            "required": true,
+            "description": "Lowercase hex HMAC-SHA256 over `${timestamp}.${rawBody}`.",
+            "name": "x-couture-signature",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AffiliateWebhookPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conversion recorded, or recognised as a replay and ignored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffiliateWebhookResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Signature verified but the body failed schema validation. Reached only after all four signature checks pass.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Any signature failure. Missing header, non-integer timestamp, unknown or inactive partner, unresolvable or too-short secret, timestamp outside ±300 seconds, and HMAC mismatch all return this identical message (\"Invalid webhook signature.\") so the endpoint is not a partner-enumeration oracle.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
                 }
               }
             }

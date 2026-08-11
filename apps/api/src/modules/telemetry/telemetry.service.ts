@@ -13,8 +13,14 @@ import {
   trackApiErrorOccurred,
   trackGarmentUploadCompleted,
   trackGarmentTaggingCompleted,
+  trackAffiliateCtaClicked,
+  trackAffiliateConversionRecorded,
   garmentTaggingCompletedEventSchema,
+  affiliateCtaClickedEventSchema,
+  affiliateConversionRecordedEventSchema,
   type AnalyticsEventName,
+  type AffiliateCtaClickedEvent,
+  type AffiliateConversionRecordedEvent,
   type GarmentTaggingCompletedProperties,
 } from '@couture/api-client'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment'
@@ -109,7 +115,31 @@ export interface TelemetryPropertiesMap {
     wasOverridden: boolean
     overrideFields: ('category' | 'material' | 'comfort_range')[]
   }
+  /**
+   * Story 5.1. Both affiliate server events omit `analyticsSubjectId`: callers do
+   * not hold the pseudonymization secret, so the subject is derived here from the
+   * raw user id passed as `captureEvent`'s first argument.
+   */
+  affiliate_cta_clicked: Omit<AffiliateCtaClickedEvent, 'analyticsSubjectId'>
+  affiliate_conversion_recorded: Omit<
+    AffiliateConversionRecordedEvent,
+    'analyticsSubjectId'
+  >
 }
+
+/**
+ * Derived from the published event schemas rather than restated, so a property
+ * added to the contract cannot silently bypass validation here. `.strict()` is
+ * what stops a caller from smuggling a URL, a product title, or a raw user id
+ * into a commerce event.
+ */
+const affiliateCtaClickedInputSchema = affiliateCtaClickedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const affiliateConversionRecordedInputSchema = affiliateConversionRecordedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
 
 const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   profile_completed: z.object({
@@ -138,9 +168,11 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
     })
     .strict(),
   garment_tagging_completed: garmentTaggingCompletedEventSchema,
+  affiliate_cta_clicked: affiliateCtaClickedInputSchema,
+  affiliate_conversion_recorded: affiliateConversionRecordedInputSchema,
 }
 
-function requireAnalyticsIdSecret(): string {
+export function requireAnalyticsIdSecret(): string {
   const configuredSecret = process.env.ANALYTICS_ID_SECRET?.trim()
   if (configuredSecret && configuredSecret.length >= 32) {
     return configuredSecret
@@ -151,7 +183,13 @@ function requireAnalyticsIdSecret(): string {
   throw new Error('ANALYTICS_ID_SECRET must contain at least 32 characters')
 }
 
-function buildAnalyticsSubjectId(userId: string, secret: string): string {
+/**
+ * The one place a raw user id becomes an analytics subject. Exported because
+ * every pseudonymous event across the API has to produce the same subject for the
+ * same user, and a second implementation somewhere else would silently split one
+ * person into two identities in PostHog.
+ */
+export function buildAnalyticsSubjectId(userId: string, secret: string): string {
   return createHmac('sha256', secret).update(userId).digest('base64url')
 }
 
@@ -349,6 +387,89 @@ function buildGarmentTaggingCompleted(
   })
 }
 
+function buildAffiliateCtaClicked(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Affiliate click telemetry requires an authenticated user')
+  }
+
+  // Re-parsed rather than cast. The validator above already ran, so this costs
+  // one pass over five fields and buys full type safety with no `as` in sight,
+  // which is what the repo's strict-TypeScript rule asks for.
+  const parsed = affiliateCtaClickedInputSchema.parse(props)
+
+  return trackAffiliateCtaClicked({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildAffiliateConversionRecorded(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const parsed = affiliateConversionRecordedInputSchema.parse(props)
+  const rawUserId = getString(userId)
+
+  if (parsed.matched && !rawUserId) {
+    // A matched conversion without a user is a contradiction that would publish
+    // the partner slug as if it were a person's pseudonym, quietly corrupting
+    // every per-user conversion metric. Better to fail the emission.
+    throw new Error(
+      'Affiliate conversion telemetry marked matched must carry the matched click owner'
+    )
+  }
+
+  return trackAffiliateConversionRecorded({
+    ...parsed,
+    // An unmatched conversion has no user subject at all. The partner slug stands
+    // in: it is operator-controlled, already present in the properties, and
+    // carries no personal data.
+    analyticsSubjectId: rawUserId
+      ? buildAnalyticsSubjectId(rawUserId, analyticsIdSecret)
+      : parsed.partnerId,
+  })
+}
+
+/**
+ * Events whose PostHog subject is the HMAC pseudonym rather than a raw user id.
+ * Membership here drives three things at once: `TelemetryEvent.user_id` is
+ * persisted as null, the persisted properties are the mapped payload rather than
+ * the caller's input, and `$ip: null` is attached on dispatch.
+ *
+ * This is a set and a lookup table rather than the pair of hard-coded
+ * two-value conditionals it replaced, because the previous shape required
+ * editing three separate expressions in lockstep to add one event, and getting
+ * two of the three right leaks a raw user id.
+ */
+const PSEUDONYMOUS_EVENT_TYPES: ReadonlySet<AnalyticsEventName> = new Set([
+  'garment_upload_completed',
+  'garment_tagging_completed',
+  'affiliate_cta_clicked',
+  'affiliate_conversion_recorded',
+])
+
+const pseudonymousEventBuilders: Partial<
+  Record<
+    AnalyticsEventName,
+    (
+      userId: string | null,
+      props: Record<string, unknown>,
+      analyticsIdSecret: string
+    ) => PostHogPayload
+  >
+> = {
+  garment_upload_completed: buildGarmentUploadCompleted,
+  garment_tagging_completed: buildGarmentTaggingCompleted,
+  affiliate_cta_clicked: buildAffiliateCtaClicked,
+  affiliate_conversion_recorded: buildAffiliateConversionRecorded,
+}
+
 const eventBuilders: Partial<
   Record<
     AnalyticsEventName,
@@ -392,27 +513,19 @@ export class TelemetryService {
       userId ??
       getStringOrNull(properties['userId']) ??
       getStringOrNull(properties['user_id'])
-    const payload =
-      eventType === 'garment_upload_completed'
-        ? buildGarmentUploadCompleted(resolvedUserId, properties, this.analyticsIdSecret)
-        : eventType === 'garment_tagging_completed'
-          ? buildGarmentTaggingCompleted(
-              resolvedUserId,
-              properties,
-              this.analyticsIdSecret
-            )
-          : (eventBuilders[eventType]?.(resolvedUserId, properties, timestamp) ?? null)
-    const isPseudonymousGarmentEvent =
-      eventType === 'garment_upload_completed' ||
-      eventType === 'garment_tagging_completed'
+    const pseudonymousBuilder = pseudonymousEventBuilders[eventType]
+    const payload = pseudonymousBuilder
+      ? pseudonymousBuilder(resolvedUserId, properties, this.analyticsIdSecret)
+      : (eventBuilders[eventType]?.(resolvedUserId, properties, timestamp) ?? null)
+    const isPseudonymousEvent = PSEUDONYMOUS_EVENT_TYPES.has(eventType)
     const persistedProperties =
-      isPseudonymousGarmentEvent && payload ? payload.properties : properties
+      isPseudonymousEvent && payload ? payload.properties : properties
 
     // 1. Start database persistence asynchronously (without awaiting)
     const dbPromise = this.prisma.telemetryEvent
       .create({
         data: {
-          user_id: isPseudonymousGarmentEvent ? null : userId,
+          user_id: isPseudonymousEvent ? null : userId,
           event_type: eventType,
           properties: persistedProperties as Prisma.InputJsonValue,
         },
@@ -423,7 +536,7 @@ export class TelemetryService {
           {
             dbError,
             eventType,
-            subject: isPseudonymousGarmentEvent ? payload?.distinctId : userId,
+            subject: isPseudonymousEvent ? payload?.distinctId : userId,
           },
           'Failed to persist telemetry event to database'
         )
@@ -435,7 +548,7 @@ export class TelemetryService {
         this.analyticsClient.capture({
           distinctId: payload.distinctId,
           event: payload.event,
-          properties: isPseudonymousGarmentEvent
+          properties: isPseudonymousEvent
             ? { ...payload.properties, $ip: null }
             : payload.properties,
         })
@@ -446,7 +559,7 @@ export class TelemetryService {
         {
           phError,
           eventType,
-          subject: isPseudonymousGarmentEvent ? payload?.distinctId : userId,
+          subject: isPseudonymousEvent ? payload?.distinctId : userId,
         },
         'Failed to dispatch telemetry event to PostHog'
       )

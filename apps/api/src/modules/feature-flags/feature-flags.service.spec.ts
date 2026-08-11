@@ -85,6 +85,7 @@ describe('FeatureFlagsService', () => {
       ['community_feed_enabled', false],
       ['color_analysis_enabled', undefined],
       ['weather_alerts_enabled', true],
+      ['commerce_affiliate_enabled', true],
     ])
 
     const cachedValues = new Map<string, boolean | null>([
@@ -92,6 +93,7 @@ describe('FeatureFlagsService', () => {
       ['community_feed_enabled', null],
       ['color_analysis_enabled', false],
       ['weather_alerts_enabled', null],
+      ['commerce_affiliate_enabled', null],
     ])
 
     const findValue = vi
@@ -113,12 +115,13 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 4, fallbackCount: 0 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 5, fallbackCount: 0 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: true },
       { key: 'community_feed_enabled', value: false },
       { key: 'color_analysis_enabled', value: false },
       { key: 'weather_alerts_enabled', value: true },
+      { key: 'commerce_affiliate_enabled', value: true },
     ])
   })
 
@@ -144,12 +147,15 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 4, fallbackCount: 4 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 5, fallbackCount: 5 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: false },
       { key: 'community_feed_enabled', value: false },
       { key: 'color_analysis_enabled', value: true },
       { key: 'weather_alerts_enabled', value: true },
+      // Story 5.1: with no remote answer and no cached row, the commerce kill
+      // switch must land on its code default of false, not on a truthy guess.
+      { key: 'commerce_affiliate_enabled', value: false },
     ])
   })
 })

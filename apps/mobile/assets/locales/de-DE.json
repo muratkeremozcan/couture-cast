@@ -301,5 +301,23 @@
         "confirm_required": "Bestätige den Hinweis zur Grundkleidung, bevor du hochlädst."
       }
     }
+  },
+  "commerce": {
+    "shopThisLook": {
+      "cta": "Diesen Look shoppen",
+      "disclosure": "Bezahlte Partnerschaft. CoutureCast erhält möglicherweise eine Provision.",
+      "partnerLabel": "Präsentiert von {{partner}}",
+      "opensInBrowser": "Wird in einem In-App-Browser geöffnet",
+      "loading": "Partnerseite wird geöffnet",
+      "error": "Die Partnerseite konnte nicht geöffnet werden. Bitte versuche es erneut."
+    },
+    "settings": {
+      "sectionTitle": "Shopping und Partner",
+      "disclosure": "Wenn Affiliate-Vorschläge aktiviert sind, öffnet ein Tippen die Seite eines Partners und teilt diesem Partner mit, dass der Besuch von CoutureCast kam. CoutureCast erhält möglicherweise eine Provision. Es werden keine Garderobenfotos und keine persönlichen Daten weitergegeben.",
+      "optOutLabel": "Vorschläge „Diesen Look shoppen“ anzeigen",
+      "optOutHelp": "Deaktiviere dies, um alle Partner- und Affiliate-Vorschläge auszublenden.",
+      "saved": "Shopping-Einstellungen aktualisiert",
+      "error": "Die Shopping-Einstellungen konnten nicht aktualisiert werden."
+    }
   }
 }

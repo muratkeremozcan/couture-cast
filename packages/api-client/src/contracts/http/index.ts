@@ -1,6 +1,7 @@
 export * from './alerts'
 export * from './auth'
 export * from './comfort'
+export * from './commerce'
 export * from './common'
 export * from './events'
 export * from './guardian'

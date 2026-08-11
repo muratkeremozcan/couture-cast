@@ -15,6 +15,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { config as loadEnv } from 'dotenv'
+import { applyLocalE2eDatabaseUrl } from './local-e2e-database.mjs'
 
 /**
  * Find the repository root by walking upward until we see the env files that
@@ -73,6 +74,15 @@ for (const file of rootEnvFiles) {
     override: shouldForceLocalEnv && file === '.env.local',
     quiet: true,
   })
+}
+
+// A fresh clone and a new git worktree both have no repo-level env file, so a
+// local run would otherwise stop here on a missing DATABASE_URL whose value is
+// not a secret. Only fills a gap, and only for a local or test run.
+if (applyLocalE2eDatabaseUrl(process.env)) {
+  console.log(
+    `[prisma-migrate-deploy] No DATABASE_URL set; using the local end-to-end default ${process.env.DATABASE_URL}`
+  )
 }
 
 // Run the deploy-style migration command, which applies committed migrations
