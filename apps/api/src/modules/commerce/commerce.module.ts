@@ -1,9 +1,24 @@
-import { Module } from '@nestjs/common'
+import {
+  MiddlewareConsumer,
+  Module,
+  RequestMethod,
+  type NestModule,
+} from '@nestjs/common'
+import { AnalyticsModule } from '../../analytics/analytics.module.js'
 import { PrismaModule } from '../../prisma/prisma.module.js'
 import { AuthStateModule } from '../auth/auth-state.module.js'
+import { RequestAuthGuard } from '../auth/security.guards.js'
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module.js'
 import { TelemetryModule } from '../telemetry/telemetry.module.js'
+import { AffiliateClickController } from './affiliate-click.controller.js'
+import { AffiliateClickService } from './affiliate-click.service.js'
+import { AffiliateClickTelemetry } from './affiliate-click.telemetry.js'
 import { AffiliateOfferService } from './affiliate-offer.service.js'
+import { CommerceCacheHeadersMiddleware } from './commerce-cache-headers.middleware.js'
+import { CommercePreferencesController } from './commerce-preferences.controller.js'
+import { CommercePreferencesService } from './commerce-preferences.service.js'
+import { CommerceRepository } from './commerce.repository.js'
+import { CommerceRetentionService } from './commerce-retention.service.js'
 
 /**
  * Story 5.1: affiliate commerce.
@@ -24,18 +39,44 @@ import { AffiliateOfferService } from './affiliate-offer.service.js'
  * 500, and 503 paths.
  */
 @Module({
-  imports: [PrismaModule, AuthStateModule, FeatureFlagsModule, TelemetryModule],
-  // Story 5.1 Task 3 adds CommercePreferencesController here.
-  // Story 5.1 Task 4 adds AffiliateClickController here.
-  // Story 5.1 Task 5 adds AffiliateWebhookController here.
-  controllers: [],
+  imports: [
+    PrismaModule,
+    AuthStateModule,
+    FeatureFlagsModule,
+    TelemetryModule,
+    // Task 4 emits `affiliate_cta_clicked` through `AffiliateClickTelemetry`,
+    // which forwards to PostHog directly until Task 5's `TelemetryService`
+    // generalization lands. `TelemetryModule` does not re-export
+    // `ANALYTICS_CLIENT`, so it is reached through its own module.
+    AnalyticsModule,
+  ],
+  controllers: [
+    // Story 5.1 Task 3 adds CommercePreferencesController here.
+    CommercePreferencesController,
+    // Story 5.1 Task 4 adds AffiliateClickController here.
+    AffiliateClickController,
+    // Story 5.1 Task 5 adds AffiliateWebhookController here.
+  ],
   providers: [
     AffiliateOfferService,
     // Story 5.1 Task 3 adds CommercePreferencesService, CommerceRepository,
     // and CommerceRetentionService here.
+    CommercePreferencesService,
+    CommerceRepository,
+    CommerceRetentionService,
+    RequestAuthGuard,
     // Story 5.1 Task 4 adds AffiliateClickService here.
+    AffiliateClickService,
+    AffiliateClickTelemetry,
     // Story 5.1 Task 5 adds AffiliateWebhookService here.
   ],
   exports: [AffiliateOfferService],
 })
-export class CommerceModule {}
+export class CommerceModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(CommerceCacheHeadersMiddleware).forRoutes({
+      path: '/api/v1/commerce{/*path}',
+      method: RequestMethod.ALL,
+    })
+  }
+}

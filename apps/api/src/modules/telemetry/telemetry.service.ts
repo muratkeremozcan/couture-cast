@@ -140,7 +140,7 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   garment_tagging_completed: garmentTaggingCompletedEventSchema,
 }
 
-function requireAnalyticsIdSecret(): string {
+export function requireAnalyticsIdSecret(): string {
   const configuredSecret = process.env.ANALYTICS_ID_SECRET?.trim()
   if (configuredSecret && configuredSecret.length >= 32) {
     return configuredSecret
@@ -151,7 +151,7 @@ function requireAnalyticsIdSecret(): string {
   throw new Error('ANALYTICS_ID_SECRET must contain at least 32 characters')
 }
 
-function buildAnalyticsSubjectId(userId: string, secret: string): string {
+export function buildAnalyticsSubjectId(userId: string, secret: string): string {
   return createHmac('sha256', secret).update(userId).digest('base64url')
 }
 
