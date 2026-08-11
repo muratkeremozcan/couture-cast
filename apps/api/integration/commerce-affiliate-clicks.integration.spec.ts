@@ -61,6 +61,13 @@ const prismaB = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
 
 const CLICK_TOKEN_SECRET = 'test-only-commerce-click-token-secret'
 const ALLOWED_HOST = 'partner.couturecast.test'
+/**
+ * A file-private publication region for this suite's catalog rows, chosen so
+ * they are invisible to every other integration file sharing this database. See
+ * the comment on `seedOffer` for why '*' was actively harmful here. Legal under
+ * the migration's check constraint, which allows '*' or `^[A-Z0-9]{2,3}$`.
+ */
+const CLICK_OFFER_LOCALE_REGION = 'ZZ'
 const VALID_TEMPLATE = `https://${ALLOWED_HOST}/shop?cc={clickToken}`
 
 let schemaReady = false
@@ -124,7 +131,26 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
         partner_id: partnerId,
         garment_category: 'top',
         comfort_range: null,
-        locale_region: '*',
+        /*
+         * Deliberately NOT the '*' sentinel, and this is load-bearing across
+         * files rather than a style choice.
+         *
+         * `vitest` runs integration files in parallel against one database. A
+         * catalog row at '*' matches EVERY request region, so publishing these
+         * offers globally made them visible to
+         * `commerce-affiliate-offers.integration.spec.ts`, whose whole point is
+         * to assert that a query returns no offer; its `expect(match).toBeNull()`
+         * cases saw these instead. Worse in the other direction: that file parks
+         * every active '*' offer belonging to another partner for its duration,
+         * so it switched these off mid-run and the mint here answered 404
+         * instead of 201.
+         *
+         * The click endpoint never filters on `locale_region` -- see
+         * `findActiveClickOffer`, which matches on id, status, and window only --
+         * so a file-private region costs this suite nothing and makes the
+         * interference impossible in both directions.
+         */
+        locale_region: CLICK_OFFER_LOCALE_REGION,
         title: `Offer ${id}`,
         deep_link_template: overrides.deepLinkTemplate ?? VALID_TEMPLATE,
         priority: 0,
