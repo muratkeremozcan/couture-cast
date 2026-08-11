@@ -70,6 +70,37 @@ export function commerceAccessToken(userId: string): string {
 }
 
 /**
+ * Gives the account a location preference.
+ *
+ * `GET /api/v1/ritual` answers 400 "No location preferences found for user"
+ * (`ritual.service.ts:906`) for an account that has none, so a freshly signed-up
+ * user cannot read a ritual, and therefore cannot reach the commerce block, until
+ * this exists. `ritual-daily-outfits.spec.ts` does the same thing for the same
+ * reason.
+ */
+export async function createLocationForUser(
+  request: APIRequestContext,
+  apiBaseUrl: string,
+  userId: string
+): Promise<void> {
+  const response = await request.post(`${apiBaseUrl}/api/v1/locations`, {
+    headers: authHeaders(userId, 'admin'),
+    data: {
+      label: 'Chicago',
+      locationKey: 'chicago-il',
+      latitude: 41.878,
+      longitude: -87.63,
+      timezone: 'America/Chicago',
+    },
+  })
+
+  expect(
+    response.status(),
+    `Location setup failed: ${response.status()} ${await response.text()}`
+  ).toBe(201)
+}
+
+/**
  * A signed-in browser session on a brand-new account.
  *
  * The init script goes on the context rather than the page so a reload, or a
@@ -150,6 +181,7 @@ export const commerceApiTest = test.extend<{ commerceApi: CommerceApiContext }>(
       'commerce-api-e2e',
       buildUniqueId('api', testInfo)
     )
+    await createLocationForUser(request, apiBaseUrl, userId)
 
     await use({ userId, apiBaseUrl, headers: authHeaders(userId, 'admin') })
   },

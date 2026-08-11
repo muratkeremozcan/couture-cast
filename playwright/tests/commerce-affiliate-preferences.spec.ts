@@ -45,6 +45,19 @@ function optOutToggle(page: Page): Locator {
   return page.getByRole('checkbox', { name: 'Show "Shop this look" suggestions' })
 }
 
+/**
+ * The section's own error, addressed by test id rather than by `role="alert"`.
+ *
+ * Next renders `<div role="alert" aria-live="assertive"
+ * id="__next-route-announcer__">` into every page, so `getByRole('alert')`
+ * always resolves to at least one element: asserting a count of zero can never
+ * pass, and asserting text is a strict-mode violation the moment the section's
+ * own alert appears. Both were real failures on the first CI run.
+ */
+function errorMessage(page: Page): Locator {
+  return page.getByTestId('commerce-error-message')
+}
+
 function watchPreferenceCall(
   interceptNetworkCall: InterceptNetworkCallFn,
   method: 'GET' | 'PUT'
@@ -138,7 +151,7 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     await expect(page.getByTestId('commerce-status-region')).toHaveText(
       'Shopping preferences updated'
     )
-    await expect(page.getByRole('alert')).toHaveCount(0)
+    await expect(errorMessage(page)).toHaveCount(0)
     await expect(optOutToggle(page)).not.toBeChecked()
 
     await log.step('Reload and assert the server, not the client, remembered it')
@@ -194,6 +207,10 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     interceptNetworkCall,
   }) => {
     expect((await openSettings(page, interceptNetworkCall)).status).toBe(200)
+    // The intercept resolves when the response arrives, which is a render
+    // earlier than the control becoming interactive. A disabled checkbox is not
+    // in the tab order, so tabbing before this lands on the nav instead.
+    await expect(optOutToggle(page)).toBeEnabled()
 
     await log.step('Tab from the top of the document to the control')
     // The skip link is the first focusable element in the layout and the
@@ -268,7 +285,7 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
       await optOutToggle(page).click()
       expect((await failedSave).status).toBe(503)
 
-      await expect(page.getByRole('alert')).toHaveText(
+      await expect(errorMessage(page)).toHaveText(
         'Affiliate suggestions are temporarily unavailable.'
       )
       // Reverted. A consent control that keeps showing a state the server

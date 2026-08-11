@@ -18,10 +18,29 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW }}
   COVERAGE_GIST_ID: 64348ebdc6e662b93ade9f40bdc03442
+  # The throwaway Supabase container this job starts for the test step. Keep
+  # identical to LOCAL_E2E_DATABASE_URL in scripts/local-e2e-database.mjs and to
+  # LOCAL_DATABASE_URL in pr-pw-e2e-local.yml; all three name the same container
+  # from supabase/config.toml (port 54322).
+  LOCAL_COVERAGE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
 jobs:
   quality-gate:
     runs-on: ubuntu-latest
+    services:
+      # `packages/db`'s suites and `apps/api`'s integration suites both talk to
+      # real infrastructure. Until Story 5.1 Task 1 gave `packages/db` a
+      # `test:coverage` script, this job never invoked them, so it never needed
+      # either service. It does now: see the Supabase and migration steps below.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -64,10 +83,30 @@ jobs:
           name: lighthouse-accessibility-${{ github.event.pull_request.number || github.sha }}
           path: playwright/artifacts/lighthouse/
 
+      # `packages/db/test/**` asserts RLS policies by `SET ROLE authenticated`,
+      # and no migration in this repository creates that role: it belongs to
+      # Supabase. So a plain postgres service is not enough and this is the same
+      # composite action `pr-pw-e2e-local.yml` already uses.
+      - name: Start local Supabase services
+        uses: ./.github/actions/start-local-supabase
+
+      - name: Apply migrations to the coverage database
+        run: node scripts/prisma-migrate-deploy.mjs
+        env:
+          DATABASE_URL: ${{ env.LOCAL_COVERAGE_DATABASE_URL }}
+
       - name: Run tests with coverage
         id: tests
         continue-on-error: true
         run: npm run test:coverage
+        env:
+          # Overrides the job-level DATABASE_URL, which points at a preview
+          # secret this job has no business writing to. Without a reachable,
+          # migrated database here, every `packages/db` suite aborts during
+          # collection, no lcov.info is written, and the coverage merge fails
+          # with a missing-report error that says nothing about the real cause.
+          DATABASE_URL: ${{ env.LOCAL_COVERAGE_DATABASE_URL }}
+          REDIS_URL: redis://localhost:6379
 
       - name: Coverage report and PR comment
         uses: ./.github/actions/unit-test-coverage-comment
