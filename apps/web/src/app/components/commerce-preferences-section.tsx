@@ -81,6 +81,17 @@ export function CommercePreferencesSection() {
    * a state the server rejected is a broken opt-out.
    */
   async function handleToggle(nextEnabled: boolean): Promise<void> {
+    /*
+     * Re-entrancy is refused here rather than by disabling the control.
+     * Disabling it mid-save removes it from the focus order, and the browser
+     * moves focus to `<body>`, so a keyboard user who toggles this loses their
+     * place in the page entirely. The end-to-end keyboard journey caught that.
+     * `aria-busy` announces the pending state without taking the control away.
+     */
+    if (isSaving) {
+      return
+    }
+
     const previous = enabled
     setEnabled(nextEnabled)
     setIsSaving(true)
@@ -107,7 +118,9 @@ export function CommercePreferencesSection() {
    * the default `true` would render an opted-out account as opted in, which
    * misstates a consent decision the server actually holds.
    */
-  const isInteractive = sectionState === 'ready' && !isSaving
+  // Deliberately not `&& !isSaving`. A save in flight is a busy control, not a
+  // disabled one; see the guard at the top of `handleToggle`.
+  const isInteractive = sectionState === 'ready'
   const describedBy = [HELP_ID, isSignedOut ? SIGNED_OUT_HINT_ID : null]
     .filter(Boolean)
     .join(' ')

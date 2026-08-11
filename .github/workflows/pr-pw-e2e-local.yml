@@ -63,6 +63,12 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
+      # Keep identical to LOCAL_E2E_DATABASE_URL in
+      # scripts/local-e2e-database.mjs, which is the default a local run falls
+      # back to when nothing sets DATABASE_URL. Both point at the Supabase
+      # container declared in supabase/config.toml (port 54322). Set explicitly
+      # here rather than relying on that fallback so CI never depends on a
+      # default it did not choose.
       LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     strategy:
       fail-fast: false
