@@ -140,10 +140,45 @@ outfit carries a non-null `shopThisLook`. Without that check, an environment
 where commerce is off would skip offer selection entirely and the P95 would pass
 while measuring a ritual read this story never touched.
 
-### Verification performed
+### Verification performed — EXECUTED IN CI
 
-`npm run test:k6:local` **could not be executed in this worktree.** Two
-independent environment gaps, both pre-existing and neither caused by this story:
+The `k6 smoke` workflow was dispatched on `feat/epic5-story1-webhook-p2`
+(run `31502012798`, **success**). That workflow starts local Supabase, runs
+`npm run db:reset` — which seeds the decision-14 catalog and turns
+`commerce_affiliate_enabled` on — and then runs `npm run test:k6:local`. So the
+scenario ran against a real API, a real database, and the seeded catalog.
+
+| Metric                                        | Observed                      |
+| --------------------------------------------- | ----------------------------- |
+| `http_req_duration{name:api/ritual-eligible}` | **37.2 ms** (avg = med = p95) |
+| `http_req_failed{name:api/ritual-eligible}`   | **0.00%**                     |
+| Checks, whole run                             | **52 of 52 passed**           |
+
+The checks that matter most, all green:
+
+```text
+✓ expected 3 scenario outfits to equal 3
+✓ expected at least one outfit is affiliate eligible to be at least 1
+✓ expected block names a partner to be at least 1
+✓ expected block names an offer to be at least 1
+```
+
+That third line is the load-bearing one. It proves the eligibility chain actually
+ran and produced a non-null `shopThisLook`, so the 37.2 ms is the cost of the
+**eligible** path and not of a ritual read that skipped offer selection. Without
+it the number would be meaningless.
+
+**Two honest caveats on that figure.** The smoke profile is one iteration at one
+VU per scenario, so `p(95)` here is a single sample rather than a distribution —
+it bounds nothing statistically, it just shows the order of magnitude. And smoke
+mode enforces the relaxed 3000 ms branch, so the **300 ms load-mode threshold is
+still unexercised**. What the run does establish is that the observed warm
+eligible read sits roughly 8× under that bound, which is the evidence the 300 ms
+choice was missing.
+
+`npm run test:k6:local` still **cannot be executed in this worktree**, which is why
+CI was used. Two independent environment gaps, both pre-existing and neither
+caused by this story:
 
 1. `start:api:e2e` runs `scripts/prisma-migrate-deploy.mjs`, which fails with
    **P3005 — "The database schema is not empty"**. The target database has the
@@ -155,7 +190,7 @@ independent environment gaps, both pre-existing and neither caused by this story
    `npm run build --workspace api` (`nest build`) exits with
    `sh: nest: command not found`, and `npm install` is disallowed here.
 
-What was verified instead, without a server:
+Additionally verified locally, without a server:
 
 | Check                                               | Command                                         | Result                                                                            |
 | --------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------- |
@@ -167,21 +202,20 @@ What was verified instead, without a server:
 | Error-rate threshold registered                     | `k6 inspect`                                    | `http_req_failed{name:api/ritual-eligible} -> ['rate<0.01']`                      |
 
 So both branches of the `SLO` object are wired and the tag names match the
-thresholds exactly. What is **not** yet established is a measured P95.
+thresholds exactly.
 
-**Status: PENDING execution.** The scenario, both SLO branches, and both
-thresholds are committed and verified structurally. The 300 ms figure is a
-reasoned bound calibrated against a sibling read path, **not an observed result**,
-and the comment in `config.ts` says so. Tighten it once a real run exists.
+**Status: SATISFIED in smoke mode.** The scenario executes against a real API and
+the seeded catalog, measures the genuinely eligible path, and passes every check.
+**PENDING for the 300 ms load-mode threshold**, which no run has yet exercised.
 
-| Field            | Value                                                                                               |
-| ---------------- | --------------------------------------------------------------------------------------------------- |
-| Date             | _to be completed_                                                                                   |
-| Environment      | _to be completed_                                                                                   |
-| Command          | `npm run test:k6:local`                                                                             |
-| Prerequisites    | Baseline `_prisma_migrations`; install `@nestjs/cli`; `npm run db:seed` so the eligible path exists |
-| Summary artifact | _attach `k6/summary-couture-api-baseline.json`_                                                     |
-| Result           | _PASS / FAIL per tag_                                                                               |
+| Field           | Value                                                                       |
+| --------------- | --------------------------------------------------------------------------- |
+| Date            | 2026-08-11                                                                  |
+| Environment     | GitHub Actions `ubuntu-latest`, local Supabase, `db:reset` seeded           |
+| Workflow        | `k6 smoke`, run `31502012798`, dispatched on `feat/epic5-story1-webhook-p2` |
+| Command         | `npm run test:k6:local` with `K6_RUN_MODE=smoke`                            |
+| Result          | **PASS.** `api/ritual-eligible` 37.2 ms, 0.00% failed, 52/52 checks         |
+| Not yet covered | Load mode, so the 300 ms branch and a real P95 distribution                 |
 
 ---
 

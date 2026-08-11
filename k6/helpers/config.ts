@@ -65,11 +65,14 @@ export const SLO = isSmoke
        * `commerce-affiliate-offers-query-plan.integration.spec.ts` asserts
        * directly against a 4,000-row catalog.
        *
-       * The number is NOT yet backed by a measured P95. `npm run test:k6:local`
-       * cannot complete in this worktree (see the Story 5.1 release QA artifact),
-       * so this is a reasoned bound calibrated against a sibling read path, and
-       * the artifact records it as pending execution rather than as an observed
-       * result. Tighten it once a real run exists.
+       * Observed at **37.2 ms** in the `k6 smoke` CI run recorded in the Story 5.1
+       * release QA artifact, against a real API and the seeded catalog, with the
+       * eligibility assertion passing so the measurement is of the eligible path
+       * rather than a ritual read that skipped offer selection. That is one sample
+       * at one VU, not a distribution, and smoke mode enforces the 3000 ms branch
+       * above rather than this one. So treat 300 ms as a bound with roughly 8x
+       * observed headroom, not as a tuned figure; tighten it once a load-profile
+       * run exists.
        *
        * Cold generation on the eligible path is NOT this key's job. It is
        * already bounded by `capsuleRitualCold`, and folding generation in here
