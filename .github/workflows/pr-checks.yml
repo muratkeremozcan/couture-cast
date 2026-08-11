@@ -120,6 +120,32 @@ jobs:
             )::jsonb
           $fn$;
           GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+
+          -- WITHOUT THIS LINE THE RLS SUITE'S NEGATIVE ASSERTIONS ARE VACUOUS.
+          --
+          -- Supabase grants the client roles default privileges on every table
+          -- created in `public`. That is why the migrations carry
+          -- `REVOKE ALL ON TABLE ... FROM authenticated, anon` on the three
+          -- commerce catalog tables: on Supabase there is something to revoke.
+          -- On a stock image there is not, so those REVOKEs are no-ops and
+          -- `expect(clientGrants.rows).toEqual([])` passes whether or not they
+          -- exist. Measured: deleting all three REVOKE statements left the RLS
+          -- suite at 49/49 green. The control that stops `authenticated`
+          -- reading the partner catalog was unfalsifiable in CI.
+          --
+          -- Scope is exact and both halves of it are load-bearing.
+          -- FOUR DML PRIVILEGES ONLY, never ALL: `GRANT ALL` also confers
+          -- REFERENCES, TRIGGER and TRUNCATE, which is the artefact the web
+          -- pane measured against a real `supabase start`, and the suites
+          -- assert an exact privilege set, so it fails 8 tests.
+          -- TO `authenticated` ONLY, never `anon`: the suites require `anon` to
+          -- hold zero grants everywhere, so including it fails 6 tests.
+          --
+          -- Verified against postgres:16-alpine: the real migration gives
+          -- 97/97 including 5.1-DB-020, and the REVOKE-deleted mutant now fails
+          -- 2 tests instead of passing silently.
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
           SQL
 
       - name: Apply migrations to the test database
