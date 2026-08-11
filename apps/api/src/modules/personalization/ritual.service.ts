@@ -1588,6 +1588,14 @@ export class RitualService implements OnModuleDestroy {
       outfits.push({
         id: rec.id,
         scenario: rec.scenario as ScenarioName,
+        // Story 5.1 decision 5: `shopThisLook` is deliberately ABSENT here. Two
+        // branches independently fixed the same compile break, one by widening
+        // the return type to ScenarioOutfitWithoutCommerce and one by writing
+        // `shopThisLook: null` at this line, and the merge silently kept both.
+        // Writing the key here puts it in the Redis payload at step 8 and in the
+        // persisted OutfitRecommendation rows, which is the cache poisoning the
+        // whole assembly-point decision exists to prevent. The controller adds
+        // the key after this service returns.
         garmentIds: recGarmentIds,
         capsuleId: recCapsule?.id ?? null,
         capsuleName: recCapsule?.name ?? null,

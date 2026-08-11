@@ -22,6 +22,21 @@ import {
  *     Date()` would put the boundary on the API process's clock, so the 59-second
  *     and 60.000-second dedupe cases would be decided by clock skew rather than
  *     by the rule.
+ *
+ * EVERY CLOCK COMPARISON BELOW IS `now() AT TIME ZONE 'UTC'`, NEVER BARE `now()`.
+ *
+ * `effective_from`, `effective_to`, and `created_at` are all
+ * `timestamp without time zone`, and Prisma writes them as UTC instants. `now()`
+ * returns `timestamptz`. PostgreSQL resolves a comparison between the two by
+ * reading the naive side in the SESSION time zone, so on any server whose
+ * TimeZone is not UTC every window boundary silently shifts by that offset. On
+ * the local Supabase container, whose session TimeZone is America/Chicago, that
+ * is five to six hours: a partner window scheduled to open at midnight UTC would
+ * open five hours late, and the 60-second dedupe window would never match.
+ *
+ * `now() AT TIME ZONE 'UTC'` yields a naive timestamp whose wall-clock reading
+ * IS the UTC instant, which is the same frame the columns were written in. Do not
+ * simplify these back to bare `now()`.
  */
 
 /** One `(category, comfortRange)` pair derived from an outfit's garment list. */
@@ -251,9 +266,17 @@ export class CommerceRepository {
       FROM "AffiliateOffer" o
       JOIN "CommercePartner" p ON p."id" = o."partner_id"
       WHERE o."status" = 'active'::"AffiliateOfferStatus"
-        AND o."locale_region" = ${localeRegion}
-        AND o."effective_from" <= now()
-        AND (o."effective_to" IS NULL OR now() < o."effective_to")
+        -- Story 5.1 decision 4: '*' on a CATALOG ROW means "published globally"
+        -- and matches every request region. Matching only exactly would make the
+        -- entire seeded catalog from decision 14 unreachable, because it is
+        -- published at '*' while any real user resolves to a country subtag, and
+        -- that would leave AC 1's positive path undemonstrable anywhere.
+        --
+        -- '*' also arrives as the REQUEST region when no locale resolves, which
+        -- the first branch already covers.
+        AND (o."locale_region" = ${localeRegion} OR o."locale_region" = '*')
+        AND o."effective_from" <= (now() AT TIME ZONE 'UTC')
+        AND (o."effective_to" IS NULL OR (now() AT TIME ZONE 'UTC') < o."effective_to")
         AND (${Prisma.join(slotClauses, ' OR ')})
       ORDER BY (o."comfort_range" IS NULL) ASC,
                o."priority" DESC,
@@ -286,8 +309,8 @@ export class CommerceRepository {
       JOIN "CommercePartner" p ON p."id" = o."partner_id"
       WHERE o."id" = ${offerId}
         AND o."status" = 'active'::"AffiliateOfferStatus"
-        AND o."effective_from" <= now()
-        AND (o."effective_to" IS NULL OR now() < o."effective_to")
+        AND o."effective_from" <= (now() AT TIME ZONE 'UTC')
+        AND (o."effective_to" IS NULL OR (now() AT TIME ZONE 'UTC') < o."effective_to")
       LIMIT 1
     `)
 
@@ -315,7 +338,7 @@ export class CommerceRepository {
       WHERE "user_id" = ${userId}
         AND "offer_id" = ${offerId}
         AND "recommendation_id" = ${recommendationId}
-        AND "created_at" > now() - interval '60 seconds'
+        AND "created_at" > (now() AT TIME ZONE 'UTC') - interval '60 seconds'
       ORDER BY "created_at" DESC
       LIMIT 1
     `)

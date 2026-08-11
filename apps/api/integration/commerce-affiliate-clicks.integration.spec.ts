@@ -22,6 +22,7 @@ import {
 } from '../src/contracts/http.js'
 import { AffiliateClickService } from '../src/modules/commerce/affiliate-click.service.js'
 import { AffiliateClickTelemetry } from '../src/modules/commerce/affiliate-click.telemetry.js'
+import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
 import { CommerceModule } from '../src/modules/commerce/commerce.module.js'
 import { CommerceRepository } from '../src/modules/commerce/commerce.repository.js'
 import { FeatureFlagsCron } from '../src/modules/feature-flags/feature-flags.cron.js'
@@ -378,7 +379,12 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
       if (!requireSchema(context)) return
       cleanupClickArtifacts()
 
-      const telemetry = new AffiliateClickTelemetry({ capture: vi.fn() }, prismaA)
+      // Post-merge shape: AffiliateClickTelemetry now delegates to
+      // TelemetryService rather than owning its own emit path, so it takes the
+      // service instead of an analytics client and a Prisma client.
+      const telemetry = new AffiliateClickTelemetry(
+        new TelemetryService(prismaA, { capture: vi.fn() })
+      )
       const build = (client: PrismaClient) =>
         new AffiliateClickService(
           featureFlags as unknown as FeatureFlagsService,

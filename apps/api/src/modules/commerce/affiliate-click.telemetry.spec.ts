@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AnalyticsClient } from '../../analytics/analytics.service.js'
 import { createMockPrisma, type MockPrisma } from '../../testing/prisma-mock.js'
+import { TelemetryService } from '../telemetry/telemetry.service.js'
 import { AffiliateClickTelemetry } from './affiliate-click.telemetry.js'
 
 const INPUT = {
@@ -26,9 +27,17 @@ describe('AffiliateClickTelemetry', () => {
   beforeEach(() => {
     prisma = createMockPrisma()
     analytics = { capture: vi.fn() }
+    // A REAL TelemetryService over mocked sinks, not a mocked TelemetryService.
+    // Every assertion below is about end behaviour: which subject reaches
+    // PostHog, that the persisted row carries user_id: null, that no raw user id
+    // or URL leaks. Substituting a mock here would reduce all of that to "we
+    // called captureEvent", which is exactly the assertion that would keep
+    // passing if decision 12's pseudonymous branch regressed.
     telemetry = new AffiliateClickTelemetry(
-      analytics as unknown as AnalyticsClient,
-      prisma as unknown as PrismaClient
+      new TelemetryService(
+        prisma as unknown as PrismaClient,
+        analytics as unknown as AnalyticsClient
+      )
     )
   })
 

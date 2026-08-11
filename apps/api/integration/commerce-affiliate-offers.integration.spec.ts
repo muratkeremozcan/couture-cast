@@ -71,6 +71,8 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
   let service: AffiliateOfferService
   let userId: string
   let partnerId: string
+  /** Ids of globally published seed offers switched off for this file only. */
+  let parkedOfferIds: string[] = []
 
   const featureFlags = { getFeatureFlag: vi.fn().mockResolvedValue(true) }
 
@@ -114,8 +116,21 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
     return offer.id
   }
 
+  /**
+   * The database clock, truncated to the precision of the columns it is compared
+   * against.
+   *
+   * `now()` carries microseconds while `effective_from` and `effective_to` are
+   * `TIMESTAMP(3)`, so an untruncated reading is ROUNDED on write, and roughly
+   * half the time it rounds UP. A value rounded up by a few hundred microseconds
+   * lands in the future relative to the `now()` the select reads a moment later,
+   * which silently inverts both window assertions below. That made these two
+   * tests a coin flip rather than a boundary check.
+   */
   async function databaseNow(): Promise<Date> {
-    const rows = await prisma.$queryRaw<{ now: Date }[]>`SELECT now() AS now`
+    const rows = await prisma.$queryRaw<{ now: Date }[]>`
+      SELECT date_trunc('milliseconds', now()) AS now
+    `
     const now = rows[0]?.now
     if (!now) {
       throw new Error('Could not read the database clock')
@@ -154,6 +169,33 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       },
     })
     partnerId = partner.id
+
+    /*
+     * Park the globally published catalog for the duration of this file.
+     *
+     * Decision 14 seeds `sample-partner` with offers at `locale_region: '*'`,
+     * and decision 4 makes '*' on a catalog row match EVERY request region.
+     * Both are correct and together they mean this database always has an offer
+     * that matches any query, so "no offer was selected" is not a statement this
+     * suite could otherwise make, and the seed's priority of 30 also outranks
+     * every fixture here.
+     *
+     * Parking rather than deleting, and recording the exact ids rather than
+     * re-activating everything at the end, because Playwright and Maestro setup
+     * depend on that catalog being present and active. Restored in `afterAll`.
+     */
+    const globallyPublished = await prisma.affiliateOffer.findMany({
+      where: { locale_region: '*', status: 'active', partner_id: { not: partnerId } },
+      select: { id: true },
+    })
+    parkedOfferIds = globallyPublished.map((offer) => offer.id)
+
+    if (parkedOfferIds.length > 0) {
+      await prisma.affiliateOffer.updateMany({
+        where: { id: { in: parkedOfferIds } },
+        data: { status: 'inactive' },
+      })
+    }
   })
 
   beforeEach(() => {
@@ -162,6 +204,15 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
 
   afterAll(async () => {
     if (schemaReady) {
+      // Un-park the globally published catalog first, so a failure in the
+      // deletes below cannot leave the shared seed switched off for Playwright.
+      if (parkedOfferIds.length > 0) {
+        await prisma.affiliateOffer.updateMany({
+          where: { id: { in: parkedOfferIds } },
+          data: { status: 'active' },
+        })
+      }
+
       // Reverse dependency order: clicks and offers before partners and users.
       await prisma.affiliateClick.deleteMany({ where: { user_id: userId } })
       await prisma.affiliateOffer.deleteMany({ where: { partner_id: partnerId } })
@@ -323,6 +374,43 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
         (await repository.findBestOffer([{ category: 'top', comfortRange: null }], 'CA'))
           ?.offer_id
       ).toBe(canadian)
+    })
+
+    it('publishes a globally published offer to every request region', async (context) => {
+      if (!requireSchema(context)) return
+
+      // Decision 4: '*' on a catalog row means "published globally". This is the
+      // property decision 14's seeded catalog depends on, and it was absent from
+      // the first implementation: `locale_region` was compared for exact
+      // equality only, so every seeded offer was unreachable to any real user
+      // and AC 1's positive path could not be demonstrated anywhere.
+      const global = await seedOffer({ id: 'global', localeRegion: '*' })
+      cleanupOffers([global])
+
+      for (const region of ['US', 'CA', '419']) {
+        const match = await repository.findBestOffer(
+          [{ category: 'top', comfortRange: null }],
+          region
+        )
+        expect(match?.offer_id).toBe(global)
+      }
+    })
+
+    it('matches a request with no resolvable locale against globally published rows', async (context) => {
+      if (!requireSchema(context)) return
+
+      // The other direction of the same sentinel: a request that resolves to no
+      // region at all also arrives as '*'.
+      const global = await seedOffer({ id: 'global-request', localeRegion: '*' })
+      const regional = await seedOffer({ id: 'regional', localeRegion: 'US' })
+      cleanupOffers([global, regional])
+
+      const match = await repository.findBestOffer(
+        [{ category: 'top', comfortRange: null }],
+        '*'
+      )
+
+      expect(match?.offer_id).toBe(global)
     })
 
     it('matches a placeholder slot against wildcard rows only', async (context) => {

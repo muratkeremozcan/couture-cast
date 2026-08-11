@@ -4,7 +4,6 @@ import {
   RequestMethod,
   type NestModule,
 } from '@nestjs/common'
-import { AnalyticsModule } from '../../analytics/analytics.module.js'
 import { PrismaModule } from '../../prisma/prisma.module.js'
 import { AuthStateModule } from '../auth/auth-state.module.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
@@ -14,6 +13,8 @@ import { AffiliateClickController } from './affiliate-click.controller.js'
 import { AffiliateClickService } from './affiliate-click.service.js'
 import { AffiliateClickTelemetry } from './affiliate-click.telemetry.js'
 import { AffiliateOfferService } from './affiliate-offer.service.js'
+import { AffiliateWebhookController } from './affiliate-webhook.controller.js'
+import { AffiliateWebhookService } from './affiliate-webhook.service.js'
 import { CommerceCacheHeadersMiddleware } from './commerce-cache-headers.middleware.js'
 import { CommercePreferencesController } from './commerce-preferences.controller.js'
 import { CommercePreferencesService } from './commerce-preferences.service.js'
@@ -43,19 +44,17 @@ import { CommerceRetentionService } from './commerce-retention.service.js'
     PrismaModule,
     AuthStateModule,
     FeatureFlagsModule,
+    // TelemetryModule is what supplies TelemetryService, which owns the single
+    // pseudonymous emit path for both server-side commerce events. Nothing here
+    // reaches ANALYTICS_CLIENT directly any more.
     TelemetryModule,
-    // Task 4 emits `affiliate_cta_clicked` through `AffiliateClickTelemetry`,
-    // which forwards to PostHog directly until Task 5's `TelemetryService`
-    // generalization lands. `TelemetryModule` does not re-export
-    // `ANALYTICS_CLIENT`, so it is reached through its own module.
-    AnalyticsModule,
   ],
   controllers: [
-    // Story 5.1 Task 3 adds CommercePreferencesController here.
     CommercePreferencesController,
-    // Story 5.1 Task 4 adds AffiliateClickController here.
     AffiliateClickController,
-    // Story 5.1 Task 5 adds AffiliateWebhookController here.
+    // No @UseGuards on this one. It is machine-to-machine and authenticated by
+    // HMAC signature over the raw request body.
+    AffiliateWebhookController,
   ],
   providers: [
     AffiliateOfferService,
@@ -69,6 +68,7 @@ import { CommerceRetentionService } from './commerce-retention.service.js'
     AffiliateClickService,
     AffiliateClickTelemetry,
     // Story 5.1 Task 5 adds AffiliateWebhookService here.
+    AffiliateWebhookService,
   ],
   exports: [AffiliateOfferService],
 })

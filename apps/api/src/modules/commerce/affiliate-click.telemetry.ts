@@ -1,42 +1,28 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { Prisma, PrismaClient } from '@prisma/client'
-import {
-  trackAffiliateCtaClicked,
-  type AffiliateCtaClickedEvent,
-} from '@couture/api-client'
-import {
-  InjectAnalyticsClient,
-  type AnalyticsClient,
-} from '../../analytics/analytics.service.js'
+import { type AffiliateCtaClickedEvent } from '@couture/api-client'
 import { createBaseLogger } from '../../logger/pino.config.js'
-import {
-  buildAnalyticsSubjectId,
-  requireAnalyticsIdSecret,
-} from '../telemetry/telemetry.service.js'
+import { TelemetryService } from '../telemetry/telemetry.service.js'
 
 /**
  * Emits `affiliate_cta_clicked` after a click row has committed.
  *
- * WHY THIS IS ITS OWN CLASS RATHER THAN A `TelemetryService.captureEvent` CALL.
+ * WHY THIS CLASS STILL EXISTS AFTER TASK 5.
  *
- * `captureEvent` is typed `<T extends keyof TelemetryPropertiesMap>` and its
- * validator table is exhaustive over that map, so an event name can only be
- * emitted through it once the name is registered there. Registering the two
- * server-side commerce events, and generalizing the hard-coded pseudonymous
- * branch that decides `user_id: null` and `$ip: null`, is Story 5.1 Task 5's
- * work on `telemetry.service.ts`. This class implements exactly that contract in
- * the meantime, using the same subject-id derivation so an impression, a click,
- * and a conversion all resolve to the same pseudonymous subject.
+ * It was originally a standalone emitter, because `captureEvent` is typed
+ * `<T extends keyof TelemetryPropertiesMap>` and could not accept an event name
+ * that Task 5 had not yet registered. Task 5 registered it, so the body is now
+ * a single delegating call and the duplicate HMAC-and-persist implementation is
+ * gone: story 5.1 decision 12 exists specifically to keep one pseudonymous
+ * path, and shipping two would have been the thing it argues against.
  *
- * Once Task 5 has landed, the body of {@link recordCtaClicked} collapses to a
- * single `captureEvent(userId, 'affiliate_cta_clicked', ...)`. The click service
- * and its tests do not change, which is the reason this seam exists at all.
+ * The class is kept rather than inlined so `AffiliateClickService` and its tests
+ * are unchanged, and so the one caller keeps a name that says what it does.
  *
- * PRIVACY. The subject is an HMAC of the user id, never the raw id. The
- * persisted row carries `user_id: null` and the forwarded event carries
- * `$ip: null`, so neither sink can re-identify the shopper. The property
- * allowlist in `@couture/api-client` is `.strict()`, so no URL, product title,
- * or garment id can be added here by accident.
+ * PRIVACY, now enforced centrally by `TelemetryService`: the subject is an HMAC
+ * of the user id, never the raw id; the persisted row carries `user_id: null`
+ * and the forwarded event carries `$ip: null`. The property allowlist in
+ * `@couture/api-client` is `.strict()`, so no URL, product title, or garment id
+ * can be attached here by accident.
  */
 export type AffiliateCtaClickedInput = Omit<
   AffiliateCtaClickedEvent,
@@ -48,50 +34,30 @@ export type AffiliateCtaClickedInput = Omit<
 @Injectable()
 export class AffiliateClickTelemetry {
   private readonly logger = createBaseLogger().child({ feature: 'commerce-clicks' })
-  private readonly analyticsIdSecret: string
 
   constructor(
-    @InjectAnalyticsClient() private readonly analyticsClient: AnalyticsClient,
-    @Inject(PrismaClient) private readonly prisma: PrismaClient
-  ) {
-    this.analyticsIdSecret = requireAnalyticsIdSecret()
-  }
+    @Inject(TelemetryService) private readonly telemetryService: TelemetryService
+  ) {}
 
   /**
-   * Fail-open in both sinks and never rethrows. A degraded PostHog, or a
-   * telemetry table under pressure, must never turn a committed commercial click
-   * into a failed request: the row and the redirect are what the partner is owed,
-   * and the event is a reporting convenience.
+   * Fail-open and never rethrows. A degraded PostHog, or a telemetry table under
+   * pressure, must never turn a committed commercial click into a failed
+   * request: the row and the redirect are what the partner is owed, and the
+   * event is a reporting convenience.
+   *
+   * `captureEvent` is already fail-open across both sinks. This catch covers the
+   * one thing it is not: a property that fails its own `.strict()` allowlist
+   * throws synchronously out of the validator, before either sink is touched.
    */
   async recordCtaClicked(input: AffiliateCtaClickedInput): Promise<void> {
+    const { userId, ...properties } = input
+
     try {
-      const payload = trackAffiliateCtaClicked({
-        analyticsSubjectId: buildAnalyticsSubjectId(input.userId, this.analyticsIdSecret),
-        partnerId: input.partnerId,
-        offerId: input.offerId,
-        scenario: input.scenario,
-        surface: input.surface,
-        localeRegion: input.localeRegion,
-        recommendationId: input.recommendationId,
-      })
-
-      await this.prisma.telemetryEvent
-        .create({
-          data: {
-            user_id: null,
-            event_type: payload.event,
-            properties: payload.properties as Prisma.InputJsonValue,
-          },
-        })
-        .catch((dbError: unknown) => {
-          this.logger.error({ dbError }, 'affiliate_cta_clicked_persist_failed')
-        })
-
-      this.analyticsClient.capture({
-        distinctId: payload.distinctId,
-        event: payload.event,
-        properties: { ...payload.properties, $ip: null },
-      })
+      await this.telemetryService.captureEvent(
+        userId,
+        'affiliate_cta_clicked',
+        properties
+      )
     } catch (error) {
       this.logger.error({ error }, 'affiliate_cta_clicked_emit_failed')
     }

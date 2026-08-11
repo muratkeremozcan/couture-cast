@@ -232,8 +232,16 @@ describe('CommerceRepository', () => {
       await repository.findBestOffer([TOP_SLOT], 'US')
 
       const sql = normalizeSql(lastRawQuery(prisma))
-      expect(sql).toContain('o."effective_from" <= now()')
-      expect(sql).toContain('(o."effective_to" IS NULL OR now() < o."effective_to")')
+      // The AT TIME ZONE 'UTC' wrapper is the assertion, not noise. These
+      // columns are `timestamp without time zone` holding UTC instants, while
+      // `now()` is `timestamptz`; comparing them bare makes PostgreSQL read the
+      // naive side in the session time zone and shifts every window boundary by
+      // the server's UTC offset. A bare now() here would be a real defect.
+      expect(sql).toContain('o."effective_from" <= (now() AT TIME ZONE \'UTC\')')
+      expect(sql).toContain(
+        '(o."effective_to" IS NULL OR (now() AT TIME ZONE \'UTC\') < o."effective_to")'
+      )
+      expect(sql).not.toMatch(/[^E]\bnow\(\)\s*[<>]/)
     })
 
     it('matches a slot against its exact comfort range or a wildcard row', async () => {
@@ -304,8 +312,16 @@ describe('CommerceRepository', () => {
       const query = lastRawQuery(prisma)
       const sql = normalizeSql(query)
       expect(sql).toContain('o."status" = \'active\'::"AffiliateOfferStatus"')
-      expect(sql).toContain('o."effective_from" <= now()')
-      expect(sql).toContain('(o."effective_to" IS NULL OR now() < o."effective_to")')
+      // The AT TIME ZONE 'UTC' wrapper is the assertion, not noise. These
+      // columns are `timestamp without time zone` holding UTC instants, while
+      // `now()` is `timestamptz`; comparing them bare makes PostgreSQL read the
+      // naive side in the session time zone and shifts every window boundary by
+      // the server's UTC offset. A bare now() here would be a real defect.
+      expect(sql).toContain('o."effective_from" <= (now() AT TIME ZONE \'UTC\')')
+      expect(sql).toContain(
+        '(o."effective_to" IS NULL OR (now() AT TIME ZONE \'UTC\') < o."effective_to")'
+      )
+      expect(sql).not.toMatch(/[^E]\bnow\(\)\s*[<>]/)
       expect(query.values).toEqual(['offer-1'])
     })
 
@@ -324,8 +340,11 @@ describe('CommerceRepository', () => {
       // Strictly greater: a click at exactly 60.000 seconds is a miss and mints
       // a fresh row. Both sides of that boundary are asserted against real
       // PostgreSQL in integration/commerce-affiliate-clicks.integration.spec.ts.
-      expect(normalizeSql(query)).toContain(
-        '"created_at" > now() - interval \'60 seconds\''
+      // A regex rather than toContain: the clause carries both quote styles, and
+      // prettier and the `quotes` rule disagree about how to spell a string
+      // literal that does, with no form satisfying both.
+      expect(normalizeSql(query)).toMatch(
+        /"created_at" > \(now\(\) AT TIME ZONE 'UTC'\) - interval '60 seconds'/
       )
       expect(query.values).toEqual(['user-1', 'offer-1', 'rec-1'])
     })
