@@ -868,7 +868,7 @@ lint` clean, `build:packages` clean. `@couture/api-client` 192/192,
       Confirmed via `git diff main feat/epic4-story4-t8-e2e --stat`
       (994 insertions / 33,614 deletions — entirely negative, `main` had
       already absorbed everything real on it) and `git merge-base
-    --is-ancestor` (diverged, not an ancestor of `main`). Deleted, local
+--is-ancestor` (diverged, not an ancestor of `main`). Deleted, local
       and `origin`, rather than merged.
 - [x] Task 8 and Task 9 — done: real work landed on a fresh branch,
       `feat/epic4-story4-t8t9-verification` (three Playwright specs, three
