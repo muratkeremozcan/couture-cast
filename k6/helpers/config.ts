@@ -22,6 +22,8 @@ export const SLO = isSmoke
       capsuleRead: 3000,
       capsuleWrite: 5000,
       capsuleRitualCold: 5000,
+      // Story 5.1 affiliate eligibility, relaxed for smoke runs.
+      ritualEligible: 3000,
     }
   : {
       aggregate: 1500,
@@ -42,6 +44,39 @@ export const SLO = isSmoke
       capsuleRead: 300,
       capsuleWrite: 500,
       capsuleRitualCold: 800,
+      /**
+       * Story 5.1: a warm `GET /api/v1/ritual` for a user who IS affiliate
+       * eligible, so the full decision-4 chain runs -- a feature-flag read, a
+       * commerce preference read, a batched garment query, and the offer
+       * selection query -- on top of the cached ritual payload.
+       *
+       * ABSOLUTE, NOT RELATIVE, and that is deliberate. An earlier draft of the
+       * story budgeted "adds no more than 50 ms" over a baseline. This harness
+       * has no baseline-diff facility: `handleSummary` writes one run's summary
+       * and nothing compares two runs, so a relative budget would have been a
+       * threshold nobody could ever evaluate, which is worse than no threshold
+       * because it reads as a guarantee.
+       *
+       * 300 ms, chosen the same way `capsuleRead` was and for the same reason:
+       * this is an indexed read path with no generation work in it, and 300 ms
+       * is the number this repo already commits to for that shape. Four extra
+       * round trips against a warm cache cannot approach it unless the offer
+       * lookup has stopped using its index, which
+       * `commerce-affiliate-offers-query-plan.integration.spec.ts` asserts
+       * directly against a 4,000-row catalog.
+       *
+       * The number is NOT yet backed by a measured P95. `npm run test:k6:local`
+       * cannot complete in this worktree (see the Story 5.1 release QA artifact),
+       * so this is a reasoned bound calibrated against a sibling read path, and
+       * the artifact records it as pending execution rather than as an observed
+       * result. Tighten it once a real run exists.
+       *
+       * Cold generation on the eligible path is NOT this key's job. It is
+       * already bounded by `capsuleRitualCold`, and folding generation in here
+       * would let a slow generator mask a regression in the commerce chain,
+       * which is the only thing this story added to the hot path.
+       */
+      ritualEligible: 300,
     }
 
 export function apiUrl(path: string) {

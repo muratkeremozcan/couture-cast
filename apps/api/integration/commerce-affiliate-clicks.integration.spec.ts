@@ -124,7 +124,25 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
         partner_id: partnerId,
         garment_category: 'top',
         comfort_range: null,
-        locale_region: '*',
+        /*
+         * A reserved region, NOT the '*' sentinel, and this is a concurrency fix
+         * rather than a preference.
+         *
+         * `commerce-affiliate-offers.integration.spec.ts` parks every globally
+         * published (`locale_region = '*'`, active) offer belonging to another
+         * partner by setting it inactive for the duration of that file, and
+         * restores it afterwards. While both files run, this fixture was being
+         * switched off underneath these tests, so `findActiveClickOffer` found no
+         * active offer and the click endpoint correctly answered 404 where 200 or
+         * 201 was expected. That surfaced as up to four intermittent failures in
+         * this file per full-suite run.
+         *
+         * Pinning the region costs nothing here: the click lookup resolves an
+         * offer by id and filters on status, partner status, and window only. It
+         * never filters on `locale_region`, so no assertion in this file depends
+         * on the value.
+         */
+        locale_region: 'ZZ7',
         title: `Offer ${id}`,
         deep_link_template: overrides.deepLinkTemplate ?? VALID_TEMPLATE,
         priority: 0,
