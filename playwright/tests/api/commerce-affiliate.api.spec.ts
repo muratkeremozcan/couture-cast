@@ -79,6 +79,13 @@ type ScenarioOutfit = {
 
 type RitualBody = { data?: { outfits: ScenarioOutfit[] } }
 
+/**
+ * Extracts the outfits from a ritual read, throwing rather than asserting.
+ *
+ * Setup that cannot proceed is an error, not a failed expectation; keeping
+ * `expect` out of the helpers is what makes a failure name the claim that broke
+ * instead of reporting "readRitual failed".
+ */
 async function readRitual(
   apiRequest: ApiRequestFn,
   commerce: CommerceApiContext
@@ -90,9 +97,13 @@ async function readRitual(
     headers: commerce.headers,
   })
 
-  expect(status, `Ritual read failed: ${JSON.stringify(body)}`).toBe(200)
+  if (status !== 200) {
+    throw new Error(`Ritual read returned ${status}: ${JSON.stringify(body)}`)
+  }
   const outfits = (body as RitualBody).data?.outfits ?? []
-  expect(outfits.length).toBeGreaterThan(0)
+  if (outfits.length === 0) {
+    throw new Error('Ritual returned no outfits, so there is nothing to evaluate.')
+  }
   return outfits
 }
 
@@ -102,21 +113,22 @@ function firstEligible(outfits: ScenarioOutfit[]): {
   offer: ShopThisLookBlock
 } {
   const outfit = outfits.find((candidate) => candidate.shopThisLook !== null)
-  expect(
-    outfit,
-    `No outfit carried a shopThisLook block. The seeded catalog is reachable only after db:seed, and commerce_affiliate_enabled must be on. Outfits: ${JSON.stringify(
-      outfits.map((o) => ({ id: o.id, garmentIds: o.garmentIds }))
-    )}`
-  ).toBeDefined()
+  if (!outfit?.shopThisLook) {
+    throw new Error(
+      `No outfit carried a shopThisLook block. The seeded catalog is reachable only after a seed, and commerce_affiliate_enabled must be on. Outfits: ${JSON.stringify(
+        outfits.map((o) => ({ id: o.id, garmentIds: o.garmentIds }))
+      )}`
+    )
+  }
 
-  return { outfit: outfit!, offer: outfit!.shopThisLook! }
+  return { outfit, offer: outfit.shopThisLook }
 }
 
 async function setPreference(
   apiRequest: ApiRequestFn,
   commerce: CommerceApiContext,
   affiliateCtasEnabled: boolean
-): Promise<void> {
+): Promise<{ status: number; stored: boolean }> {
   const { status, body } = await apiRequest({
     method: 'PUT',
     path: COMMERCE_PREFERENCES_PATH,
@@ -125,10 +137,13 @@ async function setPreference(
     body: { affiliateCtasEnabled },
   })
 
-  expect(status).toBe(200)
-  expect(commercePreferenceResponseSchema.parse(body).data.affiliateCtasEnabled).toBe(
-    affiliateCtasEnabled
-  )
+  if (status !== 200) {
+    throw new Error(`Preference write returned ${status}: ${JSON.stringify(body)}`)
+  }
+  return {
+    status,
+    stored: commercePreferenceResponseSchema.parse(body).data.affiliateCtasEnabled,
+  }
 }
 
 async function recordClick(
@@ -220,7 +235,7 @@ function withHeader(signed: SignedWebhook, name: string, value: string): SignedW
 }
 
 test.describe('Story 5.1 affiliate commerce API', () => {
-  test('5.1-E2E-API-01 returns one disclosed, deterministic offer for an eligible user', async ({
+  test('[P0] 5.1-E2E-API-01 returns one disclosed, deterministic offer for an eligible user', async ({
     apiRequest,
     commerceApi,
     validateSchema,
@@ -244,10 +259,19 @@ test.describe('Story 5.1 affiliate commerce API', () => {
     // leaked into the payload. The deep link is built server-side at click time
     // precisely so a client never holds one.
     expect(shopThisLookSchema.parse(offer)).toEqual(offer)
+    // The schema is `.strict()`, so parsing already rejects an extra field.
+    // Pinning the key set states the intent the strictness enforces: no url,
+    // no deep link, no product identifier ever reaches a client.
+    expect(Object.keys(offer).sort()).toEqual([
+      'garmentCategory',
+      'offerId',
+      'offerTitle',
+      'partnerDisplayName',
+      'partnerId',
+    ])
     expect(offer.partnerId).toBe(SAMPLE_PARTNER_SLUG)
     expect(offer.partnerDisplayName.length).toBeGreaterThan(0)
     expect(offer.offerTitle.length).toBeGreaterThan(0)
-    expect(JSON.stringify(offer)).not.toContain('http')
 
     await log.step('Assert selection is deterministic across repeated reads')
     // Without the full `(comfort_range IS NULL) ASC, priority DESC, id ASC`
@@ -258,7 +282,7 @@ test.describe('Story 5.1 affiliate commerce API', () => {
     expect(sameOutfit?.shopThisLook?.offerId).toBe(offer.offerId)
   })
 
-  test('5.1-E2E-API-02 returns a null block for every scenario once the user opts out', async ({
+  test('[P0] 5.1-E2E-API-02 returns a null block for every scenario once the user opts out', async ({
     apiRequest,
     commerceApi,
   }) => {
@@ -282,7 +306,7 @@ test.describe('Story 5.1 affiliate commerce API', () => {
     firstEligible(await readRitual(apiRequest, commerceApi))
   })
 
-  test('5.1-E2E-API-03 keeps the preference endpoints answering and the value round tripping', async ({
+  test('[P1] 5.1-E2E-API-03 keeps the preference endpoints answering and the value round tripping', async ({
     apiRequest,
     commerceApi,
     validateSchema,
@@ -301,10 +325,15 @@ test.describe('Story 5.1 affiliate commerce API', () => {
     ).toBe(true)
 
     await log.step('An unchanged write still answers 200 with the current state')
-    await setPreference(apiRequest, commerceApi, true)
+    const unchanged = await setPreference(apiRequest, commerceApi, true)
+    expect(unchanged.status).toBe(200)
+    expect(unchanged.stored).toBe(true)
 
     await log.step('A changed write persists')
-    await setPreference(apiRequest, commerceApi, false)
+    const changed = await setPreference(apiRequest, commerceApi, false)
+    expect(changed.status).toBe(200)
+    expect(changed.stored).toBe(false)
+
     const readBack = await apiRequest({
       method: 'GET',
       path: COMMERCE_PREFERENCES_PATH,
@@ -316,7 +345,7 @@ test.describe('Story 5.1 affiliate commerce API', () => {
     ).toBe(false)
   })
 
-  test('5.1-E2E-API-04 mints one attributed click on the partner host and dedupes a double tap', async ({
+  test('[P0] 5.1-E2E-API-04 mints one attributed click on the partner host and dedupes a double tap', async ({
     apiRequest,
     commerceApi,
     validateSchema,
@@ -366,7 +395,7 @@ test.describe('Story 5.1 affiliate commerce API', () => {
     )
   })
 
-  test('5.1-E2E-API-05 refuses a click for an opted-out user and for an unknown offer', async ({
+  test('[P1] 5.1-E2E-API-05 refuses a click for an opted-out user and for an unknown offer', async ({
     apiRequest,
     commerceApi,
     validateSchema,
@@ -400,7 +429,7 @@ test.describe('Story 5.1 affiliate commerce API', () => {
     )
   })
 
-  test('5.1-E2E-API-06 records a signed conversion, ignores a replay, and accepts an unknown token', async ({
+  test('[P1] 5.1-E2E-API-06 records a signed conversion, ignores a replay, and accepts an unknown token', async ({
     apiRequest,
     commerceApi,
     validateSchema,
@@ -457,7 +486,7 @@ test.describe('Story 5.1 affiliate commerce API', () => {
     expect(unmatched.body).toEqual({ data: { received: true } })
   })
 
-  test('5.1-E2E-API-07 rejects every malformed signature with one indistinguishable 401', async ({
+  test('[P1] 5.1-E2E-API-07 rejects every malformed signature with one indistinguishable 401', async ({
     apiRequest,
     commerceApi,
     validateSchema,
@@ -511,8 +540,11 @@ test.describe('Story 5.1 affiliate commerce API', () => {
         signed: signWebhook(payload, { partnerSlug: 'no-such-partner' }),
       },
       {
+        // Alters the currency rather than the amount. The amount's digits could
+        // appear inside a generated eventId, which would silently move the
+        // mutation somewhere the signature case was not meant to probe.
         name: 'body altered after signing',
-        signed: { ...valid, body: valid.body.replace('12900', '99900') },
+        signed: { ...valid, body: valid.body.replace('"USD"', '"EUR"') },
       },
     ]
 
@@ -534,7 +566,7 @@ test.describe('Story 5.1 affiliate commerce API', () => {
     }
   })
 
-  test('5.1-E2E-API-08 rejects a validly signed but malformed body with 400', async ({
+  test('[P2] 5.1-E2E-API-08 rejects a validly signed but malformed body with 400', async ({
     apiRequest,
     commerceApi,
     validateSchema,

@@ -59,24 +59,27 @@ function watchPreferenceCall(
 /**
  * Network-first: the read is registered before the navigation that triggers it,
  * so the spec never races the page and never needs a wait.
+ *
+ * Returns the exchange rather than asserting on it. An `expect` in here would
+ * report a failure as "openSettings failed" instead of naming the claim that
+ * broke, which is the whole reason assertions belong in test bodies.
  */
 async function openSettings(
   page: Page,
   interceptNetworkCall: InterceptNetworkCallFn
-): Promise<PreferenceBody | null> {
+): Promise<PreferenceExchange> {
   const load = watchPreferenceCall(interceptNetworkCall, 'GET')
 
   await page.goto('/settings')
 
-  const { status, responseJson } = await load
-  expect(status).toBe(200)
+  const exchange = await load
   await waitForAccessibilityReady(page)
 
-  return responseJson
+  return exchange
 }
 
 test.describe('Story 5.1 web settings affiliate opt-out', () => {
-  test('5.1-E2E-WEB-01 discloses the integration above the toggle and defaults to enabled', async ({
+  test('[P1] 5.1-E2E-WEB-01 discloses the integration above the toggle and defaults to enabled', async ({
     commerceSession: _commerceSession,
     page,
     interceptNetworkCall,
@@ -84,9 +87,10 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     await log.step('Load settings and capture the preference read')
     const loaded = await openSettings(page, interceptNetworkCall)
 
+    expect(loaded.status).toBe(200)
     // A user with no stored row reads as enabled; the server is the authority
     // on that default, not the client.
-    expect(loaded).toEqual({ data: { affiliateCtasEnabled: true } })
+    expect(loaded.responseJson).toEqual({ data: { affiliateCtasEnabled: true } })
 
     await log.step('Assert the section, its disclosure, and the control')
     await expect(
@@ -115,7 +119,7 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     expect(disclosurePrecedesControl).toBe(true)
   })
 
-  test('5.1-E2E-WEB-02 turns the opt-out off, persists it across a reload, and turns it back on', async ({
+  test('[P0] 5.1-E2E-WEB-02 turns the opt-out off, persists it across a reload, and turns it back on', async ({
     commerceSession: _commerceSession,
     page,
     interceptNetworkCall,
@@ -139,7 +143,8 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
 
     await log.step('Reload and assert the server, not the client, remembered it')
     const reloaded = await openSettings(page, interceptNetworkCall)
-    expect(reloaded).toEqual({ data: { affiliateCtasEnabled: false } })
+    expect(reloaded.status).toBe(200)
+    expect(reloaded.responseJson).toEqual({ data: { affiliateCtasEnabled: false } })
     await expect(optOutToggle(page)).not.toBeChecked()
 
     await log.step('Turn it back on and assert the round trip again')
@@ -153,16 +158,17 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     await expect(optOutToggle(page)).toBeChecked()
 
     const restored = await openSettings(page, interceptNetworkCall)
-    expect(restored).toEqual({ data: { affiliateCtasEnabled: true } })
+    expect(restored.status).toBe(200)
+    expect(restored.responseJson).toEqual({ data: { affiliateCtasEnabled: true } })
     await expect(optOutToggle(page)).toBeChecked()
   })
 
-  test('5.1-E2E-WEB-03 passes axe signed in and with the confirmation showing', async ({
+  test('[P1] 5.1-E2E-WEB-03 passes axe signed in and with the confirmation showing', async ({
     commerceSession: _commerceSession,
     page,
     interceptNetworkCall,
   }) => {
-    await openSettings(page, interceptNetworkCall)
+    expect((await openSettings(page, interceptNetworkCall)).status).toBe(200)
 
     await log.step('Scan the loaded settings page')
     await checkA11y(page, {
@@ -182,12 +188,12 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     })
   })
 
-  test('5.1-E2E-WEB-04 operates from the keyboard alone with a visible focus ring', async ({
+  test('[P1] 5.1-E2E-WEB-04 operates from the keyboard alone with a visible focus ring', async ({
     commerceSession: _commerceSession,
     page,
     interceptNetworkCall,
   }) => {
-    await openSettings(page, interceptNetworkCall)
+    expect((await openSettings(page, interceptNetworkCall)).status).toBe(200)
 
     await log.step('Tab from the top of the document to the control')
     // The skip link is the first focusable element in the layout and the
@@ -234,46 +240,49 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
   })
 
-  test('5.1-E2E-WEB-05 keeps the control enabled after a failed save and reverts it', async ({
-    commerceSession: _commerceSession,
-    page,
-    interceptNetworkCall,
-  }) => {
-    await openSettings(page, interceptNetworkCall)
+  test(
+    '[P1] 5.1-E2E-WEB-05 keeps the control enabled after a failed save and reverts it',
+    // The 503 below is the subject of the test, not an accident. The
+    // `networkErrorMonitor` fixture in `merged-fixtures.ts` is `auto: true` and
+    // fails any test that sees a response of 400 or worse, so without this
+    // annotation the test fails on the monitor before reaching its assertions.
+    // Same annotation, same reason, as `home-analytics-resilience.spec.ts`.
+    { annotation: [{ type: 'skipNetworkMonitoring' }] },
+    async ({ commerceSession: _commerceSession, page, interceptNetworkCall }) => {
+      expect((await openSettings(page, interceptNetworkCall)).status).toBe(200)
 
-    await log.step('Fail the write once at the transport layer')
-    await page.route(`**${COMMERCE_PREFERENCES_PATH}`, async (route, request) => {
-      if (request.method() !== 'PUT') {
-        await route.fallback()
-        return
-      }
-      await route.fulfill({
-        status: 503,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          statusCode: 503,
-          message: 'Affiliate suggestions are temporarily unavailable.',
-          error: 'Service Unavailable',
-        }),
+      await log.step('Fail the write and assert the app surfaces the server message')
+      const failedSave = interceptNetworkCall({
+        method: 'PUT',
+        url: PREFERENCES_URL,
+        fulfillResponse: {
+          status: 503,
+          body: {
+            statusCode: 503,
+            message: 'Affiliate suggestions are temporarily unavailable.',
+            error: 'Service Unavailable',
+          },
+        },
       })
-    })
 
-    await optOutToggle(page).click()
+      await optOutToggle(page).click()
+      expect((await failedSave).status).toBe(503)
 
-    await expect(page.getByRole('alert')).toHaveText(
-      'Affiliate suggestions are temporarily unavailable.'
-    )
-    // Reverted. A consent control that keeps showing a state the server
-    // rejected is a broken opt-out, not a cosmetic bug.
-    await expect(optOutToggle(page)).toBeChecked()
-    await expect(optOutToggle(page)).toBeEnabled()
-    await expect(page.getByTestId('commerce-status-region')).toHaveText('')
-  })
+      await expect(page.getByRole('alert')).toHaveText(
+        'Affiliate suggestions are temporarily unavailable.'
+      )
+      // Reverted. A consent control that keeps showing a state the server
+      // rejected is a broken opt-out, not a cosmetic bug.
+      await expect(optOutToggle(page)).toBeChecked()
+      await expect(optOutToggle(page)).toBeEnabled()
+      await expect(page.getByTestId('commerce-status-region')).toBeEmpty()
+    }
+  )
 })
 
 anonymousTest.describe('Story 5.1 web settings signed out', () => {
   anonymousTest(
-    '5.1-E2E-WEB-06 discloses the integration with the control disabled and issues no request',
+    '[P1] 5.1-E2E-WEB-06 discloses the integration with the control disabled and issues no request',
     async ({ page }) => {
       let preferenceRequests = 0
       await page.route(`**${COMMERCE_PREFERENCES_PATH}`, async (route) => {
