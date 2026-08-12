@@ -1,4 +1,7 @@
+// Learning path Step 28: Accessibility hardening.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 import type { Locator, Page } from '@playwright/test'
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
@@ -15,7 +18,10 @@ const viewports = [
   { name: 'mobile', width: 375, height: 812 },
 ] as const
 
-async function installAuthenticatedProfile(page: Page, route: string) {
+function installAuthenticatedProfile(
+  route: string,
+  interceptNetworkCall: InterceptNetworkCallFn
+) {
   if (route !== '/guardian/dashboard' && route !== '/teen/dashboard') {
     return
   }
@@ -57,21 +63,21 @@ async function installAuthenticatedProfile(page: Page, route: string) {
           linkedTeens: [],
         }
 
-  await page.route(
-    '**/api/v1/user/profile',
-    async (profileRoute) => {
-      await profileRoute.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(profile),
-      })
+  void interceptNetworkCall({
+    url: '**/api/v1/user/profile',
+    fulfillResponse: {
+      status: 200,
+      body: profile,
     },
-    { times: 1 }
-  )
+  })
 }
 
-async function openStablePage(page: Page, route: string) {
-  await installAuthenticatedProfile(page, route)
+async function openStablePage(
+  page: Page,
+  route: string,
+  interceptNetworkCall: InterceptNetworkCallFn
+) {
+  installAuthenticatedProfile(route, interceptNetworkCall)
   await page.goto(route)
   await waitForAccessibilityReady(page)
 
@@ -98,16 +104,16 @@ async function expectSkipContract(page: Page) {
   await expect(firstFocusable).toHaveAccessibleName('Skip to main content')
 }
 
-async function installSevereAlert(page: Page) {
-  await page.route('**/api/v1/events/poll**', async (route) => {
-    await route.fulfill({
+function installSevereAlert(interceptNetworkCall: InterceptNetworkCallFn) {
+  void interceptNetworkCall({
+    url: '**/api/v1/events/poll**',
+    fulfillResponse: {
       status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
+      body: {
         events: [createWeatherAlertPolledEvent('alert-999', 'guardian')],
         nextSince: '2026-08-03T12:00:00.000Z',
-      }),
-    })
+      },
+    },
   })
 }
 
@@ -150,13 +156,13 @@ async function focusColors(target: Locator) {
 }
 
 test.describe('Story 3.8 route audit matrix', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.route('**/api/v1/events/poll**', async (route) => {
-      await route.fulfill({
+  test.beforeEach(({ interceptNetworkCall }) => {
+    void interceptNetworkCall({
+      url: '**/api/v1/events/poll**',
+      fulfillResponse: {
         status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ events: [], nextSince: new Date(0).toISOString() }),
-      })
+        body: { events: [], nextSince: new Date(0).toISOString() },
+      },
     })
   })
 
@@ -164,9 +170,10 @@ test.describe('Story 3.8 route audit matrix', () => {
     for (const viewport of viewports) {
       test(`axe and landmark contract: ${route} at ${viewport.name}`, async ({
         page,
+        interceptNetworkCall,
       }) => {
         await page.setViewportSize(viewport)
-        await openStablePage(page, route)
+        await openStablePage(page, route, interceptNetworkCall)
         await expectSkipContract(page)
         await checkA11y(page)
       })
@@ -174,9 +181,12 @@ test.describe('Story 3.8 route audit matrix', () => {
   }
 
   for (const route of secondaryRoutes) {
-    test(`axe and landmark contract: ${route}`, async ({ page }) => {
+    test(`axe and landmark contract: ${route}`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
       await page.setViewportSize(viewports[0])
-      await openStablePage(page, route)
+      await openStablePage(page, route, interceptNetworkCall)
       await expectSkipContract(page)
       await checkA11y(page)
     })
@@ -184,18 +194,21 @@ test.describe('Story 3.8 route audit matrix', () => {
 })
 
 test.describe('Story 3.8 interaction states', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.route('**/api/v1/events/poll**', async (route) => {
-      await route.fulfill({
+  test.beforeEach(({ interceptNetworkCall }) => {
+    void interceptNetworkCall({
+      url: '**/api/v1/events/poll**',
+      fulfillResponse: {
         status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ events: [], nextSince: new Date(0).toISOString() }),
-      })
+        body: { events: [], nextSince: new Date(0).toISOString() },
+      },
     })
   })
 
-  test('skip link activation and forward plus reverse order', async ({ page }) => {
-    await openStablePage(page, '/')
+  test('skip link activation and forward plus reverse order', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    await openStablePage(page, '/', interceptNetworkCall)
 
     await page.keyboard.press('Tab')
     const skipLink = page.getByRole('link', { name: 'Skip to main content' })
@@ -213,8 +226,9 @@ test.describe('Story 3.8 interaction states', () => {
 
   test('chip keys preserve button semantics and Tab exits the group', async ({
     page,
+    interceptNetworkCall,
   }) => {
-    await openStablePage(page, '/')
+    await openStablePage(page, '/', interceptNetworkCall)
     const personal = page.getByTestId('chip-personal')
     const community = page.getByTestId('chip-community')
     const sponsored = page.getByTestId('chip-sponsored')
@@ -242,8 +256,15 @@ test.describe('Story 3.8 interaction states', () => {
     ).not.toHaveAttribute('tabindex')
   })
 
-  test('selected chips and an information banner pass axe', async ({ page }) => {
-    await openStablePage(page, '/?source=invalid_source&slot=bad_slot')
+  test('selected chips and an information banner pass axe', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    await openStablePage(
+      page,
+      '/?source=invalid_source&slot=bad_slot',
+      interceptNetworkCall
+    )
     await expect(page.getByTestId('deep-link-info-banner')).toBeVisible()
     await page.getByTestId('chip-community').click()
     await expect(page.getByTestId('chip-community')).toHaveAttribute(
@@ -255,11 +276,13 @@ test.describe('Story 3.8 interaction states', () => {
 
   test('severe alert and community deep-link targets receive programmatic focus', async ({
     page,
+    interceptNetworkCall,
   }) => {
-    await installSevereAlert(page)
+    installSevereAlert(interceptNetworkCall)
     await openStablePage(
       page,
-      '/?source=notification&type=severe_weather&alertId=alert-999'
+      '/?source=notification&type=severe_weather&alertId=alert-999',
+      interceptNetworkCall
     )
     const alert = page.getByTestId('severe-weather-alert-focused')
     await expect(alert).toBeFocused()
@@ -273,8 +296,11 @@ test.describe('Story 3.8 interaction states', () => {
     await checkA11y(page)
   })
 
-  test('client validation error passes axe with alert semantics', async ({ page }) => {
-    await openStablePage(page, '/signup')
+  test('client validation error passes axe with alert semantics', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    await openStablePage(page, '/signup', interceptNetworkCall)
     await page.getByLabel('Email').fill('teen@example.com')
     await page.getByLabel('Birthdate').fill('2020-01-01')
     await page.getByRole('button', { name: 'Create account' }).click()
@@ -282,20 +308,23 @@ test.describe('Story 3.8 interaction states', () => {
     await checkA11y(page)
   })
 
-  test('successful feedback state passes axe with status semantics', async ({ page }) => {
-    await page.route('**/api/v1/auth/signup', async (route) => {
-      await route.fulfill({
+  test('successful feedback state passes axe with status semantics', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    void interceptNetworkCall({
+      url: '**/api/v1/auth/signup',
+      fulfillResponse: {
         status: 201,
-        contentType: 'application/json',
-        body: JSON.stringify({
+        body: {
           userId: 'accessibility-adult',
           age: 30,
           accountStatus: 'active',
           guardianConsentRequired: false,
-        }),
-      })
+        },
+      },
     })
-    await openStablePage(page, '/signup')
+    await openStablePage(page, '/signup', interceptNetworkCall)
     await page.getByLabel('Email').fill('adult@example.com')
     await page.getByLabel('Birthdate').fill('1996-01-01')
     await page.getByRole('button', { name: 'Create account' }).click()
@@ -303,19 +332,23 @@ test.describe('Story 3.8 interaction states', () => {
     await checkA11y(page)
   })
 
-  test('baseline route inventory has no production web modal', async ({ page }) => {
+  test('baseline route inventory has no production web modal', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
     for (const route of [...primaryRoutes, ...secondaryRoutes]) {
-      await openStablePage(page, route)
+      await openStablePage(page, route, interceptNetworkCall)
       await expect(page.getByRole('dialog')).toHaveCount(0)
     }
   })
 
   test('reduced motion and forced colors preserve immediate visible focus', async ({
     page,
+    interceptNetworkCall,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.setViewportSize(viewports[0])
-    await openStablePage(page, '/')
+    await openStablePage(page, '/', interceptNetworkCall)
 
     const planner = page.getByRole('complementary', { name: 'Planner Rail' })
     await expect(planner).toBeVisible()
@@ -338,8 +371,9 @@ test.describe('Story 3.8 interaction states', () => {
 
   test('rendered light, dark, gold, and alert focus outlines meet 3:1', async ({
     page,
+    interceptNetworkCall,
   }) => {
-    await openStablePage(page, '/')
+    await openStablePage(page, '/', interceptNetworkCall)
 
     const dark = await focusColors(page.getByTestId('nav-ritual'))
     expect(contrastRatio(dark.outline, 'rgb(0, 0, 0)')).toBeGreaterThanOrEqual(3)
@@ -354,10 +388,11 @@ test.describe('Story 3.8 interaction states', () => {
     expect(contrastRatio(gold.outline, gold.background)).toBeGreaterThanOrEqual(3)
     expect(gold.outlineStyle).toBe('solid')
 
-    await installSevereAlert(page)
+    installSevereAlert(interceptNetworkCall)
     await openStablePage(
       page,
-      '/?source=notification&type=severe_weather&alertId=alert-999'
+      '/?source=notification&type=severe_weather&alertId=alert-999',
+      interceptNetworkCall
     )
     const alert = await focusColors(page.getByRole('button', { name: 'Plan week' }))
     expect(contrastRatio(alert.outline, 'rgb(54, 31, 31)')).toBeGreaterThanOrEqual(3)

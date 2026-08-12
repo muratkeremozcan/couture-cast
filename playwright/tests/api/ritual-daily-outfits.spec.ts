@@ -1,3 +1,7 @@
+// Learning path Step 21: Reasoning badges and explanations.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-21-reasoning-badges-and-explanations
+// Learning path Step 19: Scenario outfit generator.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-19-scenario-outfit-generator
 import { test, expect } from '../../support/fixtures/merged-fixtures'
 import {
   resolveApiBaseUrl,

@@ -1,3 +1,5 @@
+// Learning path Step 11: API observability with structured logging.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-11-api-observability-with-structured-logging
 import express from 'express'
 import request from 'supertest'
 import { Writable } from 'node:stream'

@@ -1,3 +1,5 @@
+// Learning path Step 32: Wardrobe onboarding and silhouette setup.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Story 4.4 Task 6 owner: locale parity for the new wardrobe.onboarding /
 // wardrobe.silhouette key trees, mirroring wardrobe-capsules-locales.spec.ts's
 // pattern for Story 4.3's capsule keys.

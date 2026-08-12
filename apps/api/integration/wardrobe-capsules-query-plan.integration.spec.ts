@@ -1,3 +1,5 @@
+// Learning path Step 31: Outfit capsule builder.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'

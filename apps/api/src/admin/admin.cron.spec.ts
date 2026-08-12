@@ -1,3 +1,5 @@
+// Learning path Step 5: Queueing and worker reliability.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-5-queueing-and-worker-reliability
 import { describe, expect, it, vi } from 'vitest'
 import { AdminCron } from './admin.cron'
 import type { AdminService } from './admin.service'

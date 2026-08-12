@@ -1,3 +1,5 @@
+// Learning path Step 23: Home and lock-screen widgets.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-23-home-and-lock-screen-widgets
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')

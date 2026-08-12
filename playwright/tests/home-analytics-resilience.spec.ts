@@ -1,3 +1,5 @@
+// Learning path Step 8: Shared analytics contracts and event tracking.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-8-shared-analytics-contracts-and-event-tracking
 import { log } from '@seontechnologies/playwright-utils/log'
 import { test, expect } from '../support/fixtures/merged-fixtures'
 

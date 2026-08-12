@@ -1,3 +1,5 @@
+// Learning path Step 32: Wardrobe onboarding and silhouette setup.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Story 4.4 Task 8 owner: keyboard-only completion, visible focus, slider
 // target geometry, live announcements, and axe for the guided onboarding flow
 // and the standalone silhouette settings surface (AC 5).
@@ -73,7 +75,7 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
 
   a11yTest(
     '4.4-A11Y-02 completes the starter-wardrobe path using only the keyboard',
-    async ({ apiRequest, cleanupState, page }, testInfo) => {
+    async ({ apiRequest, cleanupState, interceptNetworkCall, page }, testInfo) => {
       await signUpAndAuthenticate(
         apiRequest,
         page,
@@ -96,11 +98,10 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
 
       await test.step('The height slider is keyboard-adjustable', async () => {
         const heightSlider = page.getByTestId('silhouette-height-slider')
-        const saveResponse = page.waitForResponse(
-          (response) =>
-            response.url().includes('/api/v1/wardrobe/silhouette') &&
-            response.request().method() === 'PUT'
-        )
+        const saveResponse = interceptNetworkCall({
+          method: 'PUT',
+          url: '**/api/v1/wardrobe/silhouette*',
+        })
         await heightSlider.focus()
         await expect(heightSlider).toBeFocused()
         await heightSlider.press('ArrowRight')

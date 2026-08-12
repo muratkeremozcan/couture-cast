@@ -1,3 +1,5 @@
+// Learning path Step 9: Observability bootstrap with OpenTelemetry.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-9-observability-bootstrap-with-opentelemetry
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 

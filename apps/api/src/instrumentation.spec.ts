@@ -1,3 +1,5 @@
+// Learning path Step 9: Observability bootstrap with OpenTelemetry.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-9-observability-bootstrap-with-opentelemetry
 // Step 9 verification owner: searchable owner anchor
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DiagLogLevel } from '@opentelemetry/api'

@@ -1,3 +1,7 @@
+// Learning path Step 13: Serve one canonical OpenAPI contract from the API boundary.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-13-serve-one-canonical-openapi-contract-from-the-api-boundary
+// Learning path Step 15: Validate, generate, and consume the canonical contract.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-15-validate-generate-and-consume-the-canonical-contract
 import 'reflect-metadata'
 import type { INestApplication } from '@nestjs/common'
 import { generateHttpOpenApiDocument } from '@couture/api-client/contracts/http'

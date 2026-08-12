@@ -1,3 +1,5 @@
+// Learning path Step 6: Realtime and push delivery.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-6-realtime-and-push-delivery
 import { describe, expect, it, vi } from 'vitest'
 import type { EventEnvelope } from '@prisma/client'
 import type { EventsRepository } from './events.repository'

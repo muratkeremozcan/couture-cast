@@ -1,3 +1,5 @@
+// Learning path Step 24: watchOS glance companion app and complications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-24-watchos-glance-companion-app-and-complications
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')

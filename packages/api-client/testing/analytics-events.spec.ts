@@ -1,3 +1,11 @@
+// Learning path Step 18: Telemetry and audit baseline.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-18-telemetry-and-audit-baseline
+// Learning path Step 8: Shared analytics contracts and event tracking.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-8-shared-analytics-contracts-and-event-tracking
+// Learning path Step 29: Garment capture flow.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
+// Learning path Step 30: Smart tagging and comfort metadata.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 import { describe, expect, it } from 'vitest'
 import {
   analyticsEventNameSchema,

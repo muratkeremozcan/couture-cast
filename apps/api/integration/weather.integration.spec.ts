@@ -1,3 +1,5 @@
+// Learning path Step 16: Weather API ingestion service and durable worker ingestion.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-16-weather-api-ingestion-service-and-durable-worker-ingestion
 import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type INestApplication } from '@nestjs/common'

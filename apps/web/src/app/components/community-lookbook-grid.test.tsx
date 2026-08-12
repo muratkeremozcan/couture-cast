@@ -1,3 +1,7 @@
+// Learning path Step 25: Lookbook Prism responsive layout and community grid.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-25-lookbook-prism-responsive-layout-and-community-grid
+// Learning path Step 28: Accessibility hardening.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 // Story 3.5 Task 6 step 2 owner: unit-test community lookbook filter chip interactions and ARIA status in apps/web/src/app/components/community-lookbook-grid.test.tsx
 import { useState } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'

@@ -1,3 +1,5 @@
+// Learning path Step 29: Garment capture flow.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { WardrobeRetentionService } from './wardrobe-retention.service'
 import type { RitualService } from '../personalization/ritual.service'

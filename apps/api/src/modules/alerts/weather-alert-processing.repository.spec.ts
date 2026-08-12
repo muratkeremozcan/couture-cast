@@ -1,3 +1,5 @@
+// Learning path Step 17: Weather alert rules and notification pipeline.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-17-weather-alert-rules-and-notification-pipeline
 import { describe, expect, it, vi } from 'vitest'
 
 import { PrismaWeatherAlertProcessingRepository } from './weather-alert-processing.repository.js'

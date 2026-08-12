@@ -18,7 +18,9 @@ class FakeSocket {
 }
 
 test.describe('Realtime fallback', () => {
-  test('[P1] switches to polling on disconnect and stops on reconnect', async () => {
+  test('[P1] switches to polling on disconnect and stops on reconnect', async ({
+    recurse,
+  }) => {
     const socket = new FakeSocket()
     const telemetry: string[] = []
     const fetchCalls: (string | undefined)[] = []
@@ -48,13 +50,19 @@ test.describe('Realtime fallback', () => {
 
     socket.emit('disconnect')
 
-    await expect.poll(() => fetchCalls.length).toBe(1)
+    await recurse(
+      () => Promise.resolve(fetchCalls.length),
+      (length) => length === 1
+    )
     expect(telemetry).toContain('polling_activated')
     expect(telemetry).toContain('polling_events_received')
 
     socket.emit('connect')
 
-    await expect.poll(() => telemetry.includes('polling_deactivated')).toBe(true)
+    await recurse(
+      () => Promise.resolve(telemetry.includes('polling_deactivated')),
+      (deactivated) => deactivated === true
+    )
 
     // Ensure no extra polling cycles fire after reconnect
     await new Promise((resolve) => setTimeout(resolve, 50))

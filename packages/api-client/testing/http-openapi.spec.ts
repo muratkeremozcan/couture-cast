@@ -1,3 +1,7 @@
+// Learning path Step 14: Author public REST contracts in shared Zod modules.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-14-author-public-rest-contracts-in-shared-zod-modules
+// Learning path Step 15: Validate, generate, and consume the canonical contract.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-15-validate-generate-and-consume-the-canonical-contract
 // Step 15 step 5 owner: searchable owner anchor
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'

@@ -1,3 +1,5 @@
+// Learning path Step 14: Author public REST contracts in shared Zod modules.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-14-author-public-rest-contracts-in-shared-zod-modules
 import { expect, test } from 'vitest'
 import { z } from 'zod'
 import * as httpContracts from '../src/contracts/http'

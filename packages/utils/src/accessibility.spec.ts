@@ -1,3 +1,5 @@
+// Learning path Step 28: Accessibility hardening.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 import { describe, expect, it } from 'vitest'
 import {
   formatGarmentAltText,

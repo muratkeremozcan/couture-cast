@@ -1,3 +1,5 @@
+// Learning path Step 31: Outfit capsule builder.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'

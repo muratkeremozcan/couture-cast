@@ -1,3 +1,5 @@
+// Learning path Step 15: Validate, generate, and consume the canonical contract.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-15-validate-generate-and-consume-the-canonical-contract
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { loadMobileApiHealth } from './api-health'

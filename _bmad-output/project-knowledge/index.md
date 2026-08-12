@@ -149,6 +149,8 @@ These files describe the repository state captured by the completed deep scan.
 - [Feature flags](./feature-flags.md) - keys, fallback order, synchronization, and usage
 - [Observability](./observability.md) - implemented signals, dashboards, and local Grafana guidance
 - [Secrets management](./secrets-management.md) - local, CI, hosted, and rotation practices
+- [Premium release checklist](./premium-release-checklist.md) - human-only steps (accounts, store
+  products, smoke gate, locale review) before Premium goes live
 - [Guardian invitation environment setup](./guardian-invitation-env-setup.md) - invite URL and secret
   placement
 

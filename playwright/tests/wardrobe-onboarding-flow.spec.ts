@@ -1,3 +1,5 @@
+// Learning path Step 32: Wardrobe onboarding and silhouette setup.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Story 4.4 Task 8 owner: end-to-end coverage for the guided wardrobe onboarding
 // flow (AC 1, AC 3): permission, capture-and-tag one real garment through the
 // existing Story 4.1/4.2 components, the silhouette step, completion redirect,
@@ -6,6 +8,7 @@
 import path from 'node:path'
 import { garmentListResponseSchema } from '@couture/api-client/contracts/http'
 import type { Page } from '@playwright/test'
+import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { expect } from '../support/fixtures/merged-fixtures'
 import { resolveEnvironmentConfig } from '../config/environments'
 import { waitForAccessibilityReady } from '../support/helpers/accessibility'
@@ -33,14 +36,16 @@ const garmentFixturePath = path.resolve(
  * real rejected transition as its own failure instead of an unrelated
  * downstream timeout.
  */
-async function clickContinueAndWaitForAdvance(page: Page) {
-  const advanceResponse = page.waitForResponse(
-    (response) =>
-      response.url().includes('/api/v1/wardrobe/onboarding') &&
-      response.request().method() === 'PATCH'
-  )
+async function clickContinueAndWaitForAdvance(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn
+) {
+  const advanceResponse = interceptNetworkCall({
+    method: 'PATCH',
+    url: '**/api/v1/wardrobe/onboarding',
+  })
   await page.getByRole('button', { name: 'Continue' }).click()
-  expect((await advanceResponse).status()).toBe(200)
+  expect((await advanceResponse).status).toBe(200)
 }
 
 async function captureAndTagOneGarment(page: Page) {
@@ -81,7 +86,7 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
 
   onboardingTest(
     '[P0] [4.4-E2E-001] completes the guided path: permission, capture-and-tag one garment, silhouette sliders, and the completion redirect',
-    async ({ apiRequest, cleanupState, page }, testInfo) => {
+    async ({ apiRequest, cleanupState, interceptNetworkCall, page }, testInfo) => {
       await signUpAndAuthenticate(
         apiRequest,
         page,
@@ -123,18 +128,17 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
       })
 
       await test.step('Continue to the silhouette step', async () => {
-        await clickContinueAndWaitForAdvance(page) // capture -> tagging
-        await clickContinueAndWaitForAdvance(page) // tagging -> silhouette
+        await clickContinueAndWaitForAdvance(page, interceptNetworkCall) // capture -> tagging
+        await clickContinueAndWaitForAdvance(page, interceptNetworkCall) // tagging -> silhouette
         await expect(page.getByTestId('silhouette-settings-panel')).toBeVisible()
       })
 
       await test.step('Adjust the silhouette sliders', async () => {
         const heightSlider = page.getByTestId('silhouette-height-slider')
-        const saveResponse = page.waitForResponse(
-          (response) =>
-            response.url().includes('/api/v1/wardrobe/silhouette') &&
-            response.request().method() === 'PUT'
-        )
+        const saveResponse = interceptNetworkCall({
+          method: 'PUT',
+          url: '**/api/v1/wardrobe/silhouette*',
+        })
         await heightSlider.focus()
         for (let index = 0; index < 10; index += 1) {
           await heightSlider.press('ArrowRight')
@@ -165,7 +169,7 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
 
   onboardingTest(
     '[P0] [4.4-E2E-002] resumes at the persisted step, with the persisted silhouette slider value, after a reload',
-    async ({ apiRequest, cleanupState, page }, testInfo) => {
+    async ({ apiRequest, cleanupState, interceptNetworkCall, page }, testInfo) => {
       await signUpAndAuthenticate(
         apiRequest,
         page,
@@ -178,17 +182,16 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
       await waitForAccessibilityReady(page)
       await page.getByRole('button', { name: 'Allow camera and photo access' }).click()
       await captureAndTagOneGarment(page)
-      await clickContinueAndWaitForAdvance(page) // capture -> tagging
-      await clickContinueAndWaitForAdvance(page) // tagging -> silhouette
+      await clickContinueAndWaitForAdvance(page, interceptNetworkCall) // capture -> tagging
+      await clickContinueAndWaitForAdvance(page, interceptNetworkCall) // tagging -> silhouette
       await expect(page.getByTestId('silhouette-settings-panel')).toBeVisible()
 
       await test.step('Set a distinctive silhouette height before reloading', async () => {
         const heightSlider = page.getByTestId('silhouette-height-slider')
-        const saveResponse = page.waitForResponse(
-          (response) =>
-            response.url().includes('/api/v1/wardrobe/silhouette') &&
-            response.request().method() === 'PUT'
-        )
+        const saveResponse = interceptNetworkCall({
+          method: 'PUT',
+          url: '**/api/v1/wardrobe/silhouette*',
+        })
         await heightSlider.focus()
         for (let index = 0; index < 25; index += 1) {
           await heightSlider.press('ArrowRight')

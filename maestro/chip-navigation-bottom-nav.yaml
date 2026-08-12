@@ -1,3 +1,5 @@
+# Learning path Step 26: Chip navigation and sticky bottom nav.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
 # Story 3.6: Mobile chip navigation and bottom navigation E2E verification
 appId: ${MAESTRO_APP_ID}
 name: 'Chip navigation & sticky bottom nav flow'

@@ -1,3 +1,17 @@
+// Learning path Step 19: Scenario outfit generator.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-19-scenario-outfit-generator
+// Learning path Step 20: Comfort calibration settings.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-20-comfort-calibration-settings
+// Learning path Step 21: Reasoning badges and explanations.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-21-reasoning-badges-and-explanations
+// Learning path Step 30: Smart tagging and comfort metadata.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 31: Outfit capsule builder.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
+// Learning path Step 32: Wardrobe onboarding and silhouette setup.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 33: Affiliate "Shop this look" CTA.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import { PactV4 } from '@pact-foundation/pact'
 import { createApiClient } from '@couture/api-client'
 import path from 'node:path'

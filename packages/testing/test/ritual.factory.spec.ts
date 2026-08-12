@@ -1,3 +1,7 @@
+// Learning path Step 19: Scenario outfit generator.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-19-scenario-outfit-generator
+// Learning path Step 21: Reasoning badges and explanations.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-21-reasoning-badges-and-explanations
 import type { PrismaClient } from '@prisma/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 

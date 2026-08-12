@@ -1,3 +1,5 @@
+// Learning path Step 20: Comfort calibration settings.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-20-comfort-calibration-settings
 // Story 2.2 Task 3 step 2 owner: integration-test controller endpoints and validation boundaries
 import 'reflect-metadata'
 import { type INestApplication } from '@nestjs/common'

@@ -1,3 +1,5 @@
+// Learning path Step 33: Affiliate "Shop this look" CTA.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 // Story 5.1 Task 9: the affiliate commerce API against the seeded catalog.
 //
 // SETUP SHAPE. Decision 14: "seeded catalog plus public-API user setup", never

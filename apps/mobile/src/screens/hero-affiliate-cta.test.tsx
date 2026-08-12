@@ -1,3 +1,5 @@
+// Learning path Step 33: Affiliate "Shop this look" CTA.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 // Story 5.1 Task 6: the hero screen's half of the affiliate CTA. What the card
 // draws is covered in `components/hero/outfit-recommendation-card.test.tsx`;
 // what belongs here is the screen-owned behaviour: one impression per

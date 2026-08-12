@@ -1,3 +1,5 @@
+// Learning path Step 6: Realtime and push delivery.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-6-realtime-and-push-delivery
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PollingService } from '../src/realtime/polling-service'
 

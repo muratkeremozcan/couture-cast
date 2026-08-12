@@ -1,3 +1,4 @@
+import { log } from '@seontechnologies/playwright-utils/log'
 import { test, expect } from '../../support/fixtures/merged-fixtures'
 
 test.describe('API smoke', () => {
@@ -5,6 +6,7 @@ test.describe('API smoke', () => {
     const metadata = (testInfo.project.metadata ?? {}) as Record<string, string>
     const apiBaseUrl = metadata.apiBaseUrl ?? 'http://localhost:4000'
 
+    await log.step('Query API root endpoint and verify Hello World payload')
     const rawResponse: unknown = await apiRequest<string>({
       method: 'GET',
       path: '/',

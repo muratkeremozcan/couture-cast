@@ -1,3 +1,7 @@
+// Learning path Step 29: Garment capture flow.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
+// Learning path Step 30: Smart tagging and comfort metadata.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 /* eslint-disable @typescript-eslint/unbound-method -- assertions read vi.fn() members off the mock boundary objects, which is the established pattern for these suites. */
 import { createHash, createHmac } from 'node:crypto'
 import {

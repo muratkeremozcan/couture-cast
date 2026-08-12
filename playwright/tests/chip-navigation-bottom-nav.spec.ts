@@ -1,17 +1,21 @@
+// Learning path Step 26: Chip navigation and sticky bottom nav.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
+// Learning path Step 28: Accessibility hardening.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 // Story 3.6 Task 6 step 1 owner: E2E test sticky bottom nav viewport visibility, chip keyboard navigation, and reduced motion in playwright/tests/chip-navigation-bottom-nav.spec.ts
 import { test, expect } from '../support/fixtures/merged-fixtures'
 
 test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.route('**/api/v1/events/poll**', async (route) => {
-      await route.fulfill({
+  test.beforeEach(({ interceptNetworkCall }) => {
+    void interceptNetworkCall({
+      url: '**/api/v1/events/poll**',
+      fulfillResponse: {
         status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
+        body: {
           events: [],
           nextSince: new Date(0).toISOString(),
-        }),
-      })
+        },
+      },
     })
   })
 
@@ -52,6 +56,7 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
 
   test('3.6-E2E-002: chip navigation bar sticky positioning and click state updates', async ({
     page,
+    recurse,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto('/')
@@ -72,21 +77,25 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
       const top = element.getBoundingClientRect().top + window.scrollY
       window.scrollTo(0, top + 200)
     })
-    await expect.poll(async () => (await chipBar.boundingBox())?.y).toBeLessThanOrEqual(1)
+    await recurse(
+      async () => (await chipBar.boundingBox())?.y,
+      (y) => y !== undefined && y <= 1
+    )
 
     const lookbookFilters = page.getByRole('navigation', {
       name: 'Lookbook Filters',
     })
-    await expect
-      .poll(async () => {
+    await recurse(
+      async () => {
         const chipBox = await chipBar.boundingBox()
         const filterBox = await lookbookFilters.boundingBox()
         if (!chipBox || !filterBox) {
           return -1
         }
         return filterBox.y - (chipBox.y + chipBox.height)
-      })
-      .toBeGreaterThanOrEqual(0)
+      },
+      (delta) => delta >= 0
+    )
 
     await communityChip.click()
     await expect(communityChip).toHaveAttribute('aria-pressed', 'true')

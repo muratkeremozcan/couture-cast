@@ -6,7 +6,7 @@ baseline_commit: 2ad7fdc5ca837a093ebcae22fafc3f2f8a8c12d5
 
 # Story 5.1: Affiliate "Shop this look" CTA
 
-Status: review
+Status: done
 
 All decisions settled. **Decision 1** (minors and affiliate content) was
 resolved 2026-08-11 by product: affiliate CTAs are shown to users under 18,

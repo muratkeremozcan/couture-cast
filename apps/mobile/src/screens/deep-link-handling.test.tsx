@@ -1,3 +1,5 @@
+// Learning path Step 27: Widget and notification deep-link handling.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 /* eslint-disable @typescript-eslint/await-thenable */
 // Story 3.7 Task 5 step 2 owner: unit-test mobile deep-link hydration, severe weather alert focus, and community card highlight
 import React from 'react'

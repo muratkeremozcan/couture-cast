@@ -1,3 +1,5 @@
+// Learning path Step 27: Widget and notification deep-link handling.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 // Story 3.7 Task 5 step 3 owner: unit-test mobile deep-link handler orchestration logic across all branches
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import {

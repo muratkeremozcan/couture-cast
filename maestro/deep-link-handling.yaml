@@ -1,3 +1,5 @@
+# Learning path Step 27: Widget and notification deep-link handling.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 # Story 3.7: Widget / Notification Deep Link Handling
 appId: ${MAESTRO_APP_ID}
 name: 'Widget & Notification Deep Link Handling'

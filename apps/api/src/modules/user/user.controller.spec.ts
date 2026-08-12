@@ -1,3 +1,7 @@
+// Learning path Step 14: Author public REST contracts in shared Zod modules.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-14-author-public-rest-contracts-in-shared-zod-modules
+// Learning path Step 22: Localization infrastructure and quality gates.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-22-localization-infrastructure-and-quality-gates
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   buildUserProfileResponse,

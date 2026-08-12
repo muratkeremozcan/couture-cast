@@ -1,3 +1,5 @@
+// Learning path Step 29: Garment capture flow.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 import type { ExecutionContext } from '@nestjs/common'
 import { describe, expect, it, vi } from 'vitest'
 import type { GuardianService } from '../guardian/guardian.service'

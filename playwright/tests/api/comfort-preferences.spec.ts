@@ -1,3 +1,5 @@
+// Learning path Step 20: Comfort calibration settings.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-20-comfort-calibration-settings
 import { test, expect } from '../../support/fixtures/merged-fixtures'
 import {
   resolveApiBaseUrl,
