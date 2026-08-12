@@ -1,3 +1,5 @@
+// Learning path Step 28: Accessibility hardening.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 import type { PropsWithChildren } from 'react'
 import type * as ReactNativeModule from 'react-native'
 import { act, renderHook } from '@testing-library/react'

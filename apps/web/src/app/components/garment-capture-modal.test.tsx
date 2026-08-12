@@ -1,3 +1,5 @@
+// Learning path Step 29: Garment capture flow.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Story 4.1 Task 8 step 3 owner: unit-test web garment capture behavior
 // @vitest-environment jsdom
 import React from 'react'

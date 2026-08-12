@@ -1,3 +1,5 @@
+// Learning path Step 16: Weather API ingestion service and durable worker ingestion.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-16-weather-api-ingestion-service-and-durable-worker-ingestion
 import { describe, expect, it } from 'vitest'
 
 import {

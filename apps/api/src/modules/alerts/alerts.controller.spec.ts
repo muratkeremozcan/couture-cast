@@ -1,3 +1,5 @@
+// Learning path Step 17: Weather alert rules and notification pipeline.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-17-weather-alert-rules-and-notification-pipeline
 import 'reflect-metadata'
 import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'

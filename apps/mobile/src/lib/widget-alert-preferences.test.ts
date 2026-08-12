@@ -1,3 +1,5 @@
+// Learning path Step 24: watchOS glance companion app and complications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-24-watchos-glance-companion-app-and-complications
 import { describe, expect, it, vi } from 'vitest'
 import type { DefaultApi } from '@couture/api-client'
 import { loadWidgetAlertPreferences } from './widget-alert-preferences'

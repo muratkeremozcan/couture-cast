@@ -1,6 +1,51 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-08-10. Added Step 32 (Wardrobe onboarding and silhouette setup) for Story 4.4, documenting the forward-only onboarding state machine, slider/My-Form silhouette modeling, the "My Form" photo moderation pipeline, and the BullMQ job-id collision class of bug it surfaced. Previously: added Step 31 (Outfit capsule builder) for Story 4.3, documenting ETag concurrency control, occasion-driven modeling, web/mobile capsule builder UI, and Ritual cache invalidation. Corrected the Story 4.2 flow and strengthened the LLM writing-style guidance.
+Updated: 2026-08-12. Reworked Step 33 for completed Story 5.1 into the full learning format,
+including implementation lessons, traceability, a code-reading sequence, and an architecture
+diagram.
+Story 5.2 is ready for development and is the next learning milestone. Added an authoritative LLM
+update contract so future steps keep the same evidence-backed structure. Added test coverage maps
+and searchable test-file cross-links for Steps 1 through 33.
+
+## Instructions for LLMs updating this file
+
+This contract is authoritative. Read it before changing or adding a numbered step.
+
+1. Use Step 33 as the complete structural reference. Use Steps 25 through 32 as additional
+   story-specific examples. Read the completed story artifact, review log, test evidence, and live
+   implementation before writing the new step.
+2. Do not turn a planned story into implementation lessons. A story with status `ready-for-dev`
+   belongs in `Current position`. Add its numbered learning step only after implementation and
+   review produce verified evidence.
+3. Every numbered step must use this exact order:
+   - `## Step N: Title`
+   - `User/business impact:`
+   - `Key takeaways:`
+   - `Hard-won lessons from the implementation and code review of this story:` when verified
+     lessons exist
+   - `Story/Task mapping:`
+   - `Story reference:`
+   - `Cross-links:`
+   - `Sequence to follow:`
+   - `Task owner map:`
+   - `Tests that cover this step:`
+   - `Architecture diagram:` when a diagram materially improves understanding
+4. Do not omit a required section because the source story used a different layout. Derive each
+   section from repository evidence. If evidence is missing, state the evidence boundary instead
+   of inventing content.
+5. Update the `Updated` line, `Current position`, and `The whole project in plain English` table in
+   the same edit. Keep story statuses aligned with
+   `_bmad-output/implementation-artifacts/sprint-status.yaml`.
+6. Use exact repository paths and task numbers. Verify every referenced file exists. Preserve
+   security rules, failure modes, numeric thresholds, and known verification gaps.
+7. Keep `Key takeaways` focused on reusable architecture and product lessons. Put defects, review
+   discoveries, flaky-test causes, and integration surprises under `Hard-won lessons`.
+8. Treat tests as executable documentation. Group direct coverage by test level, link every test
+   file, explain what it proves, and add a Step cross-link comment to every listed test file. When
+   a step has no direct executable coverage, state that evidence boundary. Do not pad the map with
+   indirect suites.
+9. Run Markdown, owner-anchor, reference-path, and Mermaid checks after editing. Do not claim a
+   check passed unless it ran successfully.
 
 ## How to use this
 
@@ -8,6 +53,16 @@ Updated: 2026-08-10. Added Step 32 (Wardrobe onboarding and silhouette setup) fo
 2. Jump to the step you need. You do not need to read the file from top to bottom.
 3. Read the story, then open the files in `Sequence to follow`.
 4. Use `Task owner map` when you need the exact code location.
+5. Use `Tests that cover this step` when you want executable examples of the behavior and its
+   boundaries.
+
+## Current position
+
+- Latest completed step: Step 33, Story 5.1, Affiliate "Shop this look" CTA.
+- Next implementation story: Story 5.2, Premium subscription lifecycle, status
+  `ready-for-dev`. Its plan is in
+  `_bmad-output/implementation-artifacts/5-2-premium-subscription-lifecycle.md`.
+- Step 34 will capture verified Story 5.2 implementation lessons after the story is completed.
 
 ## The whole project in plain English
 
@@ -45,6 +100,7 @@ Updated: 2026-08-10. Added Step 32 (Wardrobe onboarding and silhouette setup) fo
 |   30 | Use AI to suggest garment tags. Let the user decide.             |
 |   31 | Group ready garments into outfit capsules with optimistic UI.    |
 |   32 | Guide a new user through closet setup, then model their body.    |
+|   33 | Add disclosed affiliate links and durable purchase attribution.  |
 
 ## Special feature: AI garment tagging
 
@@ -117,7 +173,7 @@ You are improving Couture Cast learning docs and code commentary.
 
 Primary goals:
 1) Keep `_bmad-output/project-knowledge/learning-path-step-by-step.md` clear, lean, and teachable.
-2) Preserve one standardized section template across numbered steps.
+2) Preserve one standardized section template across every numbered step.
 3) Keep the plain-English project map and special feature sections accurate.
 4) Make `Task owner map` the main search surface for finding source code.
 5) Keep implementation-anchor comments aligned with owner IDs in this document.
@@ -137,17 +193,22 @@ Primary goals:
 - Do not remove a useful explanation only because the same topic has a short summary elsewhere.
 
 Step template rules:
+- The authoritative contract is `Instructions for LLMs updating this file` near the top.
 - Every numbered step uses this order:
   `User/business impact`
   `Key takeaways`
+  optional `Hard-won lessons from the implementation and code review of this story`
   `Story/Task mapping`
   `Story reference`
   `Cross-links`
   `Sequence to follow`
   `Task owner map`
+  `Tests that cover this step`
   optional `Current repo note`
   optional `Architecture diagram`
 - Special feature sections may appear before the numbered steps.
+- A `ready-for-dev` story belongs in `Current position`; it does not receive a numbered learning
+  step until implementation and review provide verified lessons.
 - Do not add `Searchable strings:` or `Pattern summary:` sections.
 - Remove a section only when it adds no useful information.
 
@@ -165,6 +226,18 @@ Task owner map rules:
 - Use `_bmad-output/project-knowledge/owner-anchor-exceptions.md` when the target cannot hold a
   stable comment.
 
+Test coverage map rules:
+- Use the heading `Tests that cover this step:` in every numbered step.
+- Group tests by level: unit/repository, component/client, integration, Pact, Playwright, mobile
+  E2E, and performance. Omit only levels that genuinely have no coverage.
+- List each direct test file once and explain the behavior or boundary it proves.
+- If no direct executable test applies, state the evidence boundary instead of listing an indirect
+  suite.
+- Add a comment at the top of every listed test file naming the learning step and linking back to
+  `_bmad-output/project-knowledge/learning-path-step-by-step.md`.
+- Keep helpers and fixtures out of the list unless they contain assertions or are executable test
+  entrypoints.
+
 Code comment rules:
 - Keep behavior unchanged unless the task asks for a behavior change.
 - Keep comments concise and ASCII.
@@ -177,7 +250,7 @@ Working style:
 - Run formatting, Markdown, owner-anchor, and Mermaid checks after editing.
 ```
 
-## Step 1 - Understand product-to-engineering traceability
+## Step 1: Understand product-to-engineering traceability
 
 User/business impact:
 
@@ -221,6 +294,12 @@ Task owner map:
 - Step 1 step 4 owner: capture the technical decision layer in `_bmad-output/planning-artifacts/architecture.md`
 - Step 1 step 5 owner: decompose delivery into epics and implementation stories in `_bmad-output/planning-artifacts/epics.md` and `_bmad-output/implementation-artifacts/`
 
+Tests that cover this step:
+
+No direct executable test file is mapped to this step. This step defines the planning chain from
+product intent to implementation stories. Its evidence is the traceability between the brief,
+roadmap, PRD, architecture, epics, and story artifacts.
+
 Architecture diagram:
 
 ```mermaid
@@ -236,7 +315,7 @@ flowchart TD
   BRIEF --> ROADMAP --> PRD --> ARCH --> EPICS --> STORIES --> CODE
 ```
 
-## Step 2 - Monorepo and app boundaries
+## Step 2: Monorepo and app boundaries
 
 User/business impact:
 
@@ -296,6 +375,11 @@ Task owner map:
 - Step 2 step 4 owner: define the API runtime boundary in `apps/api/src/main.ts`
 - Step 2 step 5 owner: define shared package boundaries in `packages/api-client/package.json`, `packages/db/package.json`, `packages/testing/package.json`, and `packages/utils/package.json`
 
+Tests that cover this step:
+
+No direct executable test file is mapped to this step. Workspace manifests, Turbo tasks, build
+boundaries, and application entrypoints are the evidence for this repository-structure step.
+
 Current repo note:
 
 - **Rule of thumb:** Apps and packages own their direct usage; root owns cross-cutting dev tooling
@@ -346,7 +430,7 @@ flowchart TD
   API --> UTILS
 ```
 
-## Step 3 - Data model and deterministic seeds
+## Step 3: Data model and deterministic seeds
 
 User/business impact:
 
@@ -389,6 +473,12 @@ Task owner map:
 - Step 3 step 2 owner: orchestrate deterministic seed execution in `packages/db/prisma/seeds/index.ts`
 - Step 3 step 3 owner: prove a deterministic seeded domain slice in `packages/db/prisma/seeds/weather.ts`
 
+Tests that cover this step:
+
+No direct executable test file currently proves the complete seed order, repeatable seed identity,
+and idempotent upsert behavior described here. The current evidence boundary is Prisma migration,
+reset, and seed execution. Later domain factory and schema suites cover their own slices.
+
 Architecture diagram:
 
 ```mermaid
@@ -419,7 +509,7 @@ flowchart TD
   WEATHER --> RITUALS
 ```
 
-## Step 4 - Environment setup and Supabase operations
+## Step 4: Environment setup and Supabase operations
 
 User/business impact:
 
@@ -474,6 +564,14 @@ Task owner map:
 - Step 4 step 3 owner: keep local, CI, and hosted environment naming aligned in `_bmad-output/implementation-artifacts/0-3-set-up-supabase-projects-dev-staging-prod.md`
 - Story 0.11 Task 4 owner: enforce guardian-aware RLS and the auth-claim bridge in `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`
 
+Tests that cover this step:
+
+Real PostgreSQL integration test:
+
+- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts):
+  exercises the live Supabase-style claim bridge and the
+  teen, guardian, administrator, and revoked-consent policy boundaries.
+
 Current repo note:
 
 - Step 4 now includes the first real Supabase policy rollout, not only environment scaffolding.
@@ -502,7 +600,7 @@ flowchart TD
   PRODSB --> BUCKETS
 ```
 
-## Step 5 - Queueing and worker reliability
+## Step 5: Queueing and worker reliability
 
 User/business impact:
 
@@ -545,6 +643,26 @@ Task owner map:
 - Story 0.4 Task 5 owner: bootstrap and shut down the dedicated worker process group cleanly in `apps/api/src/workers/bootstrap.ts`
 - Step 5 support owner: expose operator read, replay, and prune flows in `apps/api/src/admin/admin.service.ts` and `apps/api/src/admin/admin.controller.ts`
 
+Tests that cover this step:
+
+Worker and operator unit tests:
+
+- [`apps/api/src/workers/base.worker.spec.ts`](../../apps/api/src/workers/base.worker.spec.ts):
+  proves shared retry settings, queue concurrency,
+  processor wiring, and durable dead-letter writes on failed jobs.
+- [`apps/api/src/admin/admin.service.spec.ts`](../../apps/api/src/admin/admin.service.spec.ts):
+  proves bounded DLQ listing, queue filtering, retention,
+  replay, and preservation of a failed record when requeueing fails.
+- [`apps/api/src/admin/admin.controller.spec.ts`](../../apps/api/src/admin/admin.controller.spec.ts):
+  proves the operator controller delegates list and
+  replay requests to the service with the requested queue and job identity.
+- [`apps/api/src/admin/admin.cron.spec.ts`](../../apps/api/src/admin/admin.cron.spec.ts):
+  proves scheduled 30-day pruning and scheduler survival
+  when pruning fails.
+- [`apps/api/src/workers/shutdown-resources.spec.ts`](../../apps/api/src/workers/shutdown-resources.spec.ts):
+  proves dependency-ordered shutdown, continued
+  cleanup after rejection, and forced disconnect after the graceful deadline.
+
 Architecture diagram:
 
 ```mermaid
@@ -577,7 +695,7 @@ flowchart TD
   ADM -->|re-enqueue| Q
 ```
 
-## Step 6 - Realtime and push delivery
+## Step 6: Realtime and push delivery
 
 User/business impact:
 
@@ -625,6 +743,41 @@ Task owner map:
 - Story 0.5 Task 4 owner: define shared socket payload schemas for realtime namespaces in `packages/api-client/src/types/socket-events.ts`
 - Story 0.5 Task 5 owner: activate, advance, and stop client polling when realtime is unavailable in `packages/api-client/src/realtime/polling-service.ts`
 
+Tests that cover this step:
+
+API and shared-client unit tests:
+
+- [`apps/api/src/modules/gateway/gateway.test.ts`](../../apps/api/src/modules/gateway/gateway.test.ts):
+  proves reconnect backoff, fallback activation,
+  lifecycle reset, and structured retry metadata.
+- [`apps/api/src/modules/gateway/gateway.gateway.spec.ts`](../../apps/api/src/modules/gateway/gateway.gateway.spec.ts):
+  proves namespace boundaries, socket
+  authentication, server-owned user rooms, and user-targeted weather delivery.
+- [`apps/api/src/modules/events/events.controller.spec.ts`](../../apps/api/src/modules/events/events.controller.spec.ts):
+  proves authenticated polling, an empty
+  initial result, and invalid cursor rejection.
+- [`apps/api/src/modules/events/events.service.spec.ts`](../../apps/api/src/modules/events/events.service.spec.ts):
+  proves event delivery with an advancing
+  cursor and the empty-result cursor contract.
+- [`apps/api/src/modules/events/events.repository.spec.ts`](../../apps/api/src/modules/events/events.repository.spec.ts):
+  proves user and global event scoping with
+  and without a cursor.
+- [`apps/api/src/modules/notifications/notifications.test.ts`](../../apps/api/src/modules/notifications/notifications.test.ts):
+  proves Expo token validation,
+  100-message batching, selective retries, timeouts, and mixed ticket handling.
+- [`apps/api/src/modules/notifications/push-token.repository.spec.ts`](../../apps/api/src/modules/notifications/push-token.repository.spec.ts):
+  proves normalized token
+  persistence, user lookup, provider-invalid token deletion, and deduplication.
+- [`packages/api-client/testing/polling-service.spec.ts`](../../packages/api-client/testing/polling-service.spec.ts):
+  proves immediate polling, cursor progress,
+  the 30-second cadence, failure recovery, stop, and restart behavior.
+
+Performance test:
+
+- [`k6/tests/couture-api-baseline.k6test.ts`](../../k6/tests/couture-api-baseline.k6test.ts):
+  exercises the realtime polling endpoint and applies its
+  environment-adjusted P95 latency and aggregate failure thresholds.
+
 Architecture diagram:
 
 ```mermaid
@@ -646,7 +799,7 @@ flowchart TD
   GW --> DEVICE
 ```
 
-## Step 7 - CI/CD and automated quality gates
+## Step 7: CI and CD automated quality gates
 
 User/business impact:
 
@@ -702,6 +855,21 @@ Task owner map:
 - Step 7 support owner: centralize install and browser setup in `.github/actions/install/action.yml` and `.github/actions/setup-playwright-browsers/action.yml`
 - Step 7 step 7 owner: wire monorepo workspace coverage directories and badge inputs in `.github/workflows/pr-checks.yml`
 - Step 7 step 8 owner: merge workspace summaries, upload coverage artifact, parse metrics, comment on PR, and update four gist-backed badges in `.github/actions/unit-test-coverage-comment/action.yml`
+
+Tests that cover this step:
+
+Workflow structure unit test:
+
+- [`apps/api/integration/deployment-workflows.spec.ts`](../../apps/api/integration/deployment-workflows.spec.ts):
+  asserts the preview and mobile deployment
+  workflow files, unified Vercel configuration, CI-safe API preparation, and migration-before-build
+  ordering.
+
+Playwright deployed smoke test:
+
+- [`playwright/tests/web-health-sha.spec.ts`](../../playwright/tests/web-health-sha.spec.ts):
+  verifies deployed health metadata and the expected Git
+  revision used by preview smoke gating.
 
 Architecture diagram:
 
@@ -1030,7 +1198,7 @@ repos, add a normalization step in the calling workflow before the action:
 The `functions` metric will be `0` for Python (coverage.py does not track functions). The PR
 comment displays `N/A` for missing metrics.
 
-## Step 8 - Shared analytics contracts and event tracking
+## Step 8: Shared analytics contracts and event tracking
 
 User/business impact:
 
@@ -1081,6 +1249,59 @@ Task owner map:
 - Story 0.7 Task 8 step 4 owner: fallback cache warmup and refresh in `apps/api/src/modules/feature-flags/feature-flags.cron.ts`
 - Step 8 feature-flag coordination owner: connect the request path and persistence layer in `apps/api/src/modules/feature-flags/feature-flags.service.ts` and `apps/api/src/modules/feature-flags/feature-flags.repository.ts`
 
+Tests that cover this step:
+
+Shared contract and API unit tests:
+
+- [`packages/api-client/testing/analytics-events.spec.ts`](../../packages/api-client/testing/analytics-events.spec.ts):
+  keeps canonical event names, schemas,
+  property normalization, identity rules, and validation boundaries in lockstep.
+- [`packages/config/src/flags.spec.ts`](../../packages/config/src/flags.spec.ts):
+  proves the typed flag registry and remote, stored, and code
+  default fallback order.
+- [`apps/api/src/posthog/posthog.service.spec.ts`](../../apps/api/src/posthog/posthog.service.spec.ts):
+  proves configured, unconfigured, boolean, and
+  non-boolean PostHog flag responses.
+- [`apps/api/src/modules/feature-flags/feature-flags.service.spec.ts`](../../apps/api/src/modules/feature-flags/feature-flags.service.spec.ts):
+  proves live evaluation, stored
+  fallback, type rejection, defaults, and fallback synchronization.
+- [`apps/api/src/modules/feature-flags/feature-flags.repository.spec.ts`](../../apps/api/src/modules/feature-flags/feature-flags.repository.spec.ts):
+  proves cached flag reads,
+  missing and null fallback values, and atomic multi-flag synchronization.
+- [`apps/api/src/modules/feature-flags/feature-flags.cron.spec.ts`](../../apps/api/src/modules/feature-flags/feature-flags.cron.spec.ts):
+  proves startup warmup and the
+  five-minute fallback refresh hook.
+
+Web and Mobile component tests:
+
+- [`apps/web/src/app/components/analytics-event-actions.test.tsx`](../../apps/web/src/app/components/analytics-event-actions.test.tsx):
+  proves CTA, upload, and alert
+  tracking plus degraded polling and malformed payload behavior.
+- [`apps/web/src/app/components/posthog-click-tracker.test.tsx`](../../apps/web/src/app/components/posthog-click-tracker.test.tsx):
+  proves attribute-driven click capture
+  and ignores elements without a declared event.
+- [`apps/mobile/src/analytics/mobile-analytics.test.tsx`](../../apps/mobile/src/analytics/mobile-analytics.test.tsx):
+  proves the repository analytics facade,
+  identity normalization, provider wrapper, and hook adapter.
+- [`apps/mobile/src/config/posthog.test.ts`](../../apps/mobile/src/config/posthog.test.ts):
+  proves disabled-client behavior, default hosting,
+  configuration warnings, and batched retry settings.
+
+Integration test:
+
+- [`apps/api/integration/analytics-tracking.integration.spec.ts`](../../apps/api/integration/analytics-tracking.integration.spec.ts):
+  proves authenticated guardian and
+  moderation tracking boundaries over HTTP.
+
+Playwright browser tests:
+
+- [`playwright/tests/home-analytics-capture.spec.ts`](../../playwright/tests/home-analytics-capture.spec.ts):
+  proves browser-side home analytics capture
+  through the user-facing surface.
+- [`playwright/tests/home-analytics-resilience.spec.ts`](../../playwright/tests/home-analytics-resilience.spec.ts):
+  proves primary, wardrobe, and community
+  interactions remain usable when event polling returns a temporary failure.
+
 Architecture diagram:
 
 ```mermaid
@@ -1095,7 +1316,7 @@ flowchart TD
   tests --> wrappers
 ```
 
-## Step 9 - Observability bootstrap with OpenTelemetry
+## Step 9: Observability bootstrap with OpenTelemetry
 
 User/business impact:
 
@@ -1150,6 +1371,23 @@ Task owner map:
 - Step 9 env-loading owner: keep root env loading aligned with OTEL startup in `apps/api/src/load-env.ts`
 - Step 9 verification owner: validate instrumentation and env-loading behavior in `apps/api/src/instrumentation.spec.ts` and `apps/api/src/load-env.spec.ts`
 
+Tests that cover this step:
+
+Bootstrap unit tests:
+
+- [`apps/api/src/instrumentation.spec.ts`](../../apps/api/src/instrumentation.spec.ts):
+  proves OTLP credential resolution, exporter URLs,
+  diagnostics, stable resources, W3C propagation, and one-time startup behavior.
+- [`apps/api/src/load-env.spec.ts`](../../apps/api/src/load-env.spec.ts):
+  proves development, local-test, and production environment-file
+  precedence before telemetry bootstrap.
+
+Integration test:
+
+- [`apps/api/integration/observability.integration.spec.ts`](../../apps/api/integration/observability.integration.spec.ts):
+  proves an instrumented API exports an
+  OTLP trace to the configured collector endpoint.
+
 Architecture diagram:
 
 ```mermaid
@@ -1169,7 +1407,7 @@ flowchart TD
   start --> tests["instrumentation.spec.ts validates init behavior"]
 ```
 
-## Step 10 - Grafana Cloud setup, telemetry inventory, and dashboard planning
+## Step 10: Grafana Cloud setup, telemetry inventory, and dashboard planning
 
 User/business impact:
 
@@ -1232,6 +1470,17 @@ Task owner map:
 - Step 10 step 5 owner: keep local and hosted Grafana credentials aligned in `.env.local`, `.env.preview`, and `.env.prod`
 - Step 10 support owner: document the manual verification workflow in `_bmad-output/project-knowledge/observability.md`
 
+Tests that cover this step:
+
+Integration test:
+
+- [`apps/api/integration/observability.integration.spec.ts`](../../apps/api/integration/observability.integration.spec.ts):
+  proves that an instrumented API exports
+  OTLP traces to the configured collector endpoint.
+
+Hosted Grafana stack creation, credentials, Explore inspection, and dashboard construction remain
+manual operational evidence. The integration suite does not assert the hosted dashboards.
+
 Architecture diagram:
 
 ```mermaid
@@ -1259,7 +1508,7 @@ flowchart TD
   api --> grafana["Grafana Explore: Tempo and Prometheus"]
 ```
 
-## Step 11 - API observability with structured logging
+## Step 11: API observability with structured logging
 
 User/business impact:
 
@@ -1313,6 +1562,26 @@ Task owner map:
 - Step 11 HTTP-boundary owner: apply the shared logger contract in `apps/api/src/logger/request-logger.middleware.ts`
 - Step 11 verification owner: validate logger behavior and observability integration in `apps/api/integration/observability.integration.spec.ts`, `apps/api/src/logger/pino.config.spec.ts`, `apps/api/src/logger/request-context.spec.ts`, `apps/api/src/logger/request-logger.middleware.spec.ts`, and `packages/api-client/src/testing/observability-assertions.ts`
 
+Tests that cover this step:
+
+Logging unit tests:
+
+- [`apps/api/src/logger/pino.config.spec.ts`](../../apps/api/src/logger/pino.config.spec.ts):
+  proves environment log levels, trace correlation,
+  structured fields, and redaction of upload credentials, paths, URLs, and image data.
+- [`apps/api/src/logger/request-context.spec.ts`](../../apps/api/src/logger/request-context.spec.ts):
+  proves request ID reuse and generation, feature
+  inference, authenticated identity precedence, and async-context isolation.
+- [`apps/api/src/logger/request-logger.middleware.spec.ts`](../../apps/api/src/logger/request-logger.middleware.spec.ts):
+  proves lifecycle logs, response request
+  IDs, normalized upload paths, and removal of query values.
+
+Integration test:
+
+- [`apps/api/integration/observability.integration.spec.ts`](../../apps/api/integration/observability.integration.spec.ts):
+  proves emitted request logs retain the
+  request ID across a real API request.
+
 Architecture diagram:
 
 ```mermaid
@@ -1330,7 +1599,7 @@ flowchart LR
   context --> svc
 ```
 
-## Step 12 - Cross-surface E2E confidence
+## Step 12: Cross-surface E2E confidence
 
 User/business impact:
 
@@ -1380,6 +1649,27 @@ Task owner map:
 - Step 12 step 4 owner: orchestrate the mobile test harness in `scripts/run-maestro.mjs` and `scripts/start-mobile-server.sh`
 - Step 12 step 5 owner: keep the mobile fallback runtime behavior aligned in `apps/mobile/src/realtime/mobile-fallback-controller.ts`
 - Step 12 step 6 owner: connect web and mobile E2E execution to CI in `.github/workflows/pr-pw-e2e-local.yml` and `.github/workflows/pr-mobile-e2e.yml`
+
+Tests that cover this step:
+
+Playwright browser and API E2E tests:
+
+- [`playwright/tests/home.spec.ts`](../../playwright/tests/home.spec.ts):
+  proves the healthy Web hero renders and passes its accessibility
+  scan.
+- [`playwright/tests/web-health-sha.spec.ts`](../../playwright/tests/web-health-sha.spec.ts):
+  proves deployed health and revision metadata.
+- [`playwright/tests/api/auth-moderation-security.spec.ts`](../../playwright/tests/api/auth-moderation-security.spec.ts):
+  proves missing-auth, role, actor-identity,
+  and authorized-request boundaries for security-sensitive API routes.
+- [`playwright/tests/api/auth-signup-age-gate.spec.ts`](../../playwright/tests/api/auth-signup-age-gate.spec.ts):
+  proves the under-13 rejection, guardian-consent
+  state, active-account state, and duplicate-email boundary over HTTP.
+
+Mobile E2E test:
+
+- [`maestro/sanity.yaml`](../../maestro/sanity.yaml):
+  exercises the core mobile smoke path through the built application.
 
 Current repo note:
 
@@ -1445,7 +1735,7 @@ flowchart LR
   C -. guardrail .-> G
 ```
 
-## Step 13 - Serve one canonical OpenAPI contract from the API boundary
+## Step 13: Serve one canonical OpenAPI contract from the API boundary
 
 User/business impact:
 
@@ -1497,6 +1787,20 @@ Task owner map:
 - Step 13 step 4 owner: write the canonical contract artifact to disk in `packages/api-client/scripts/generate-http-openapi.ts`
 - Story 0.9 Task 1 step 5 owner: prove the published API contract surface in `apps/api/src/openapi.spec.ts`
 
+Tests that cover this step:
+
+API publication unit test:
+
+- [`apps/api/src/openapi.spec.ts`](../../apps/api/src/openapi.spec.ts):
+  proves the API serves the canonical contract-derived document,
+  renders Swagger UI, and disables publication by default in production.
+
+Integration test:
+
+- [`apps/api/integration/http-contract-parity.integration.spec.ts`](../../apps/api/integration/http-contract-parity.integration.spec.ts):
+  proves representative live API
+  responses validate against the shared health, events, error, and user schemas.
+
 Current repo note:
 
 - Today `apps/api/src/openapi.ts` publishes the canonical document from
@@ -1524,7 +1828,7 @@ flowchart LR
   parity --> json
 ```
 
-## Step 14 - Author public REST contracts in shared Zod modules
+## Step 14: Author public REST contracts in shared Zod modules
 
 User/business impact:
 
@@ -1586,6 +1890,29 @@ Task owner map:
 - Story 0.9 Task 5 step 4 owner: shape the DB-backed authenticated user profile through shared contracts in `apps/api/src/modules/user/user.service.ts`
 - Story 0.9 Task 5 step 5 owner: expose the thin authenticated user REST adapter in `apps/api/src/modules/user/user.controller.ts`
 
+Tests that cover this step:
+
+Shared contract unit tests:
+
+- [`packages/api-client/testing/http-openapi.spec.ts`](../../packages/api-client/testing/http-openapi.spec.ts):
+  proves the contract builder emits valid
+  OpenAPI and remains synchronized with the checked-in canonical document.
+- [`packages/api-client/testing/contract-invariants-documented.spec.ts`](../../packages/api-client/testing/contract-invariants-documented.spec.ts):
+  proves runtime-only Zod
+  refinements are represented in published OpenAPI descriptions.
+- [`packages/api-client/testing/auth-contract.spec.ts`](../../packages/api-client/testing/auth-contract.spec.ts):
+  proves strict signup, age-gate, response
+  union, and guardian-consent contract boundaries.
+
+API adapter unit tests:
+
+- [`apps/api/src/modules/user/user.controller.spec.ts`](../../apps/api/src/modules/user/user.controller.spec.ts):
+  proves profile reads and preference updates
+  delegate through validated controller inputs.
+- [`apps/api/src/modules/user/user.service.spec.ts`](../../apps/api/src/modules/user/user.service.spec.ts):
+  proves shared response shaping, missing-profile
+  behavior, and atomic locale preference merging.
+
 Current repo note:
 
 - Health, polling, auth, moderation, and the first authenticated user profile slice now follow
@@ -1619,7 +1946,7 @@ flowchart TD
   events --> api
 ```
 
-## Step 15 - Validate, generate, and consume the canonical contract
+## Step 15: Validate, generate, and consume the canonical contract
 
 User/business impact:
 
@@ -1686,6 +2013,41 @@ Task owner map:
 - Story 0.9 Task 7 step 5 owner: route mobile API health checks through the generated client in `apps/mobile/src/lib/api-health.ts`
 - Story 0.9 Task 7 step 6 owner: consume generated-client health state in the mobile tab runtime in `apps/mobile/app/(tabs)/two.tsx`
 
+Tests that cover this step:
+
+Contract generation unit tests:
+
+- [`packages/api-client/testing/http-openapi.spec.ts`](../../packages/api-client/testing/http-openapi.spec.ts):
+  proves canonical document validity and checked-in
+  artifact synchronization.
+- [`packages/api-client/testing/generated-client.spec.ts`](../../packages/api-client/testing/generated-client.spec.ts):
+  proves the stable generated-client factory,
+  configuration overrides, token handling, and authenticated generated methods.
+- [`apps/api/src/openapi.spec.ts`](../../apps/api/src/openapi.spec.ts):
+  proves the API-published document equals the canonical builder output.
+
+Integration test:
+
+- [`apps/api/integration/http-contract-parity.integration.spec.ts`](../../apps/api/integration/http-contract-parity.integration.spec.ts):
+  proves representative live routes
+  return bodies accepted by the shared schemas.
+
+Web and Mobile client tests:
+
+- [`apps/web/src/lib/api-client.test.ts`](../../apps/web/src/lib/api-client.test.ts):
+  proves public-base-URL and same-origin Web client defaults.
+- [`apps/mobile/src/lib/api-client.test.ts`](../../apps/mobile/src/lib/api-client.test.ts):
+  proves Mobile base-URL selection, explicit overrides,
+  bearer-token forwarding, and missing-configuration rejection.
+- [`apps/mobile/src/lib/api-health.test.ts`](../../apps/mobile/src/lib/api-health.test.ts):
+  proves Mobile health loading through the generated client.
+- [`apps/mobile/src/screens/tab-two-screen.test.tsx`](../../apps/mobile/src/screens/tab-two-screen.test.tsx):
+  proves the Settings surface renders generated-client
+  health data and its unavailable fallback.
+- [`apps/mobile/components/msw-network.test.tsx`](../../apps/mobile/components/msw-network.test.tsx):
+  proves generated client consumers can use default and
+  per-test MSW network handlers.
+
 Current repo note:
 
 - The repo now enforces a four-layer contract loop: package-level builder validation and checked-in
@@ -1713,7 +2075,7 @@ flowchart TD
   diff --> apps
 ```
 
-## Step 16 - Weather API ingestion service and durable worker ingestion
+## Step 16: Weather API ingestion service and durable worker ingestion
 
 User/business impact:
 
@@ -1852,6 +2214,62 @@ Task owner map:
 - Story 1.1 Task 7 step 1 owner: weather API integration proof lives in
   `apps/api/integration/weather.integration.spec.ts`
 
+Tests that cover this step:
+
+Shared contract and fixture unit tests:
+
+- [`packages/api-client/testing/weather-contract.spec.ts`](../../packages/api-client/testing/weather-contract.spec.ts):
+  proves the latest-weather success and
+  freshness union plus authenticated OpenAPI route registration.
+- [`packages/testing/test/weather.factory.spec.ts`](../../packages/testing/test/weather.factory.spec.ts):
+  proves 48-hour fixture shape, caller-supplied
+  segments, alert JSON, persistence, and cleanup registration.
+
+Provider, service, repository, and worker unit tests:
+
+- [`apps/api/src/modules/weather/providers/openweather.provider.spec.ts`](../../apps/api/src/modules/weather/providers/openweather.provider.spec.ts):
+  proves normalization,
+  validation, retry classifications, privacy-safe failures, and location matching for OpenWeather.
+- [`apps/api/src/modules/weather/providers/weatherapi.provider.spec.ts`](../../apps/api/src/modules/weather/providers/weatherapi.provider.spec.ts):
+  proves the same adapter
+  boundaries for WeatherAPI, including missing and malformed forecast horizons.
+- [`apps/api/src/modules/weather/providers/weather.config.spec.ts`](../../apps/api/src/modules/weather/providers/weather.config.spec.ts):
+  proves typed provider settings,
+  validated canonical targets, and safe defaults.
+- [`apps/api/src/modules/weather/providers/weather-condition.mapper.spec.ts`](../../apps/api/src/modules/weather/providers/weather-condition.mapper.spec.ts):
+  proves condition and
+  severity normalization across provider payloads.
+- [`apps/api/src/modules/weather/weather-ingestion.service.spec.ts`](../../apps/api/src/modules/weather/weather-ingestion.service.spec.ts):
+  proves bounded primary retries,
+  failover, cached fallback, abort handling, and privacy-safe logs and metrics.
+- [`apps/api/src/modules/weather/weather.repository.spec.ts`](../../apps/api/src/modules/weather/weather.repository.spec.ts):
+  proves transactional snapshot and
+  segment persistence, idempotency, race recovery, public reads, and provider state.
+- [`apps/api/src/modules/weather/weather-query.service.spec.ts`](../../apps/api/src/modules/weather/weather-query.service.spec.ts):
+  proves fresh, cached, stale, and
+  unavailable classifications at their time boundary.
+- [`apps/api/src/modules/weather/weather-target-source.spec.ts`](../../apps/api/src/modules/weather/weather-target-source.spec.ts):
+  proves validated targets,
+  cross-source deduplication, and saved-primary-location discovery.
+- [`apps/api/src/modules/weather/weather-processor.spec.ts`](../../apps/api/src/modules/weather/weather-processor.spec.ts):
+  proves stable bucketed job IDs, target
+  coalescing, location processing, durable alert dispatch, and enqueue failure handling.
+- [`apps/api/src/modules/weather/weather-scheduler.spec.ts`](../../apps/api/src/modules/weather/weather-scheduler.spec.ts):
+  proves durable weather refresh and alert
+  outbox scheduler registration.
+- [`apps/api/src/modules/weather/weather.controller.spec.ts`](../../apps/api/src/modules/weather/weather.controller.spec.ts):
+  proves authentication, canonical success
+  and fallback envelopes, and invalid location rejection.
+- [`apps/api/src/modules/weather/weather-telemetry.spec.ts`](../../apps/api/src/modules/weather/weather-telemetry.spec.ts):
+  proves bounded provider, ingestion,
+  rate-limit, fallback, and snapshot-age metrics.
+
+Real PostgreSQL and HTTP integration tests:
+
+- [`apps/api/integration/weather.integration.spec.ts`](../../apps/api/integration/weather.integration.spec.ts):
+  proves transactional persistence,
+  idempotency, concurrent-race recovery, authentication, and canonical HTTP response validation.
+
 Current repo note:
 
 - Story 1.1 is implemented through Task 8. The provider adapters produce one
@@ -1883,7 +2301,7 @@ flowchart TD
   Repository --> Query["WeatherQueryService\nfresh/cached/stale/unavailable"]
 ```
 
-## Step 17 - Weather alert rules and notification pipeline
+## Step 17: Weather alert rules and notification pipeline
 
 User/business impact:
 
@@ -1944,6 +2362,86 @@ Task owner map:
 - Story 1.3 Task 7 step 1 owner: clean up event envelopes and alert tables on teardown in `packages/testing/src/cleanup.ts`
 - Story 1.3 Task 7 step 2 owner: verify realtime push suppression and quiet hours boundaries in `apps/api/src/modules/alerts/alert-fanout.processor.spec.ts`
 
+Tests that cover this step:
+
+Database structure and security tests:
+
+- [`packages/db/test/alert-schema.spec.ts`](../../packages/db/test/alert-schema.spec.ts):
+  proves user-owned alert rule and preference models,
+  constraints, opt-out storage, and self-only RLS migration shape.
+- [`packages/db/test/alert-outbox-schema.spec.ts`](../../packages/db/test/alert-outbox-schema.spec.ts):
+  proves durable queue handoff state, rolling cooldown
+  reservations, and rule-specific database thresholds.
+- [`packages/db/test/alert-delivery-security.spec.ts`](../../packages/db/test/alert-delivery-security.spec.ts):
+  proves self-only push tokens, owned or global
+  event reads, and worker-only cooldown reservations in migration SQL.
+
+Shared contract and fixture unit tests:
+
+- [`packages/api-client/testing/alerts-contract.spec.ts`](../../packages/api-client/testing/alerts-contract.spec.ts):
+  proves strict alert rule and preference HTTP
+  contracts plus canonical OpenAPI registration.
+- [`packages/testing/test/alert.factory.spec.ts`](../../packages/testing/test/alert.factory.spec.ts):
+  proves valid alert fixtures and persistence cleanup.
+
+API pipeline unit and repository tests:
+
+- [`apps/api/src/modules/alerts/weather-alert-evaluator.spec.ts`](../../apps/api/src/modules/alerts/weather-alert-evaluator.spec.ts):
+  proves temperature, precipitation,
+  severe-weather, change, and non-match rule evaluation.
+- [`apps/api/src/modules/alerts/alerts.controller.spec.ts`](../../apps/api/src/modules/alerts/alerts.controller.spec.ts):
+  proves authenticated, validated rule and
+  preference controller flows.
+- [`apps/api/src/modules/alerts/alerts.service.spec.ts`](../../apps/api/src/modules/alerts/alerts.service.spec.ts):
+  proves rule and preference orchestration.
+- [`apps/api/src/modules/alerts/alerts.repository.spec.ts`](../../apps/api/src/modules/alerts/alerts.repository.spec.ts):
+  proves owner-scoped rule and preference
+  persistence.
+- [`apps/api/src/modules/alerts/quiet-hours.spec.ts`](../../apps/api/src/modules/alerts/quiet-hours.spec.ts):
+  proves timezone-aware quiet-hour boundaries.
+- [`apps/api/src/modules/alerts/weather-alert-processing.service.spec.ts`](../../apps/api/src/modules/alerts/weather-alert-processing.service.spec.ts):
+  proves evaluation,
+  transactional outbox creation, cooldown handling, and queue dispatch orchestration.
+- [`apps/api/src/modules/alerts/weather-alert-processing.repository.spec.ts`](../../apps/api/src/modules/alerts/weather-alert-processing.repository.spec.ts):
+  proves alert envelope,
+  outbox, and cooldown persistence behavior.
+- [`apps/api/src/modules/alerts/weather-alert-fanout.queue.spec.ts`](../../apps/api/src/modules/alerts/weather-alert-fanout.queue.spec.ts):
+  proves stable fanout job identity
+  and queue options.
+- [`apps/api/src/modules/alerts/alert-fanout.processor.spec.ts`](../../apps/api/src/modules/alerts/alert-fanout.processor.spec.ts):
+  proves realtime-first delivery, push
+  suppression, quiet hours, and Expo fallback.
+- [`apps/api/src/modules/alerts/alert-fanout.repository.spec.ts`](../../apps/api/src/modules/alerts/alert-fanout.repository.spec.ts):
+  proves outbox claim and delivery-state
+  persistence.
+- [`apps/api/src/modules/alerts/redis-alert-realtime.publisher.spec.ts`](../../apps/api/src/modules/alerts/redis-alert-realtime.publisher.spec.ts):
+  proves Redis publication and
+  failure handling for the alert relay.
+- [`apps/api/src/modules/gateway/alert-weather-relay.service.spec.ts`](../../apps/api/src/modules/gateway/alert-weather-relay.service.spec.ts):
+  proves Redis messages are
+  validated and relayed only to their target user.
+- [`apps/api/src/modules/gateway/gateway.gateway.spec.ts`](../../apps/api/src/modules/gateway/gateway.gateway.spec.ts):
+  proves the static alert namespace and
+  server-owned user room delivery.
+- [`apps/api/src/modules/notifications/notifications.test.ts`](../../apps/api/src/modules/notifications/notifications.test.ts):
+  proves batching, retries, timeouts,
+  mixed Expo tickets, and provider failures.
+- [`apps/api/src/modules/notifications/push-token.repository.spec.ts`](../../apps/api/src/modules/notifications/push-token.repository.spec.ts):
+  proves user token lookup and
+  invalid-token removal.
+
+Real PostgreSQL integration tests:
+
+- [`apps/api/integration/weather-alert-cooldown.integration.spec.ts`](../../apps/api/integration/weather-alert-cooldown.integration.spec.ts):
+  proves cross-hour suppression,
+  atomic admission under races, and reservation rollback.
+- [`apps/api/integration/alerts.integration.spec.ts`](../../apps/api/integration/alerts.integration.spec.ts):
+  proves HTTP settings persistence, bearer-token
+  ownership, cross-owner isolation, and transactional rule-update rollback against PostgreSQL.
+- [`apps/api/integration/alert-pipeline-latency.integration.spec.ts`](../../apps/api/integration/alert-pipeline-latency.integration.spec.ts):
+  proves the instrumented alert
+  pipeline remains within its declared latency test boundary.
+
 Current repo note:
 
 - Realtime Socket.io connections are namespace-scoped to `/alert:weather`. Push notifications are suppressed with reason `realtime_active` if realtime publish resolves successfully.
@@ -1970,7 +2468,7 @@ flowchart TD
   QuietHours -->|no| Expo["PushNotificationService\nExpo Push SDK"]
 ```
 
-## Step 18 - Telemetry and audit baseline
+## Step 18: Telemetry and audit baseline
 
 User/business impact:
 
@@ -2026,6 +2524,32 @@ Task owner map:
 - Story 1.4 Task 5 step 1 owner: implement global api exception filter in `apps/api/src/filters/api-exception.filter.ts`
 - Story 1.4 Task 6 step 1 owner: verify telemetry RLS policies for authenticated users and the service role in `packages/db/test/rls-policies.spec.ts`
 
+Tests that cover this step:
+
+Real PostgreSQL security integration tests:
+
+- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts):
+  proves authenticated-user and service-role telemetry
+  policy boundaries against real PostgreSQL.
+- [`packages/db/test/audit-log-immutability.spec.ts`](../../packages/db/test/audit-log-immutability.spec.ts):
+  proves administrator-only audit reads and blocks
+  direct update, delete, and truncate operations.
+
+Shared telemetry contract unit test:
+
+- [`packages/api-client/testing/analytics-events.spec.ts`](../../packages/api-client/testing/analytics-events.spec.ts):
+  proves canonical telemetry event names,
+  schemas, normalized properties, subject handling, and invalid-input rejection.
+
+API unit tests:
+
+- [`apps/api/src/modules/telemetry/telemetry.service.spec.ts`](../../apps/api/src/modules/telemetry/telemetry.service.spec.ts):
+  proves independent database and PostHog
+  delivery, strict event mapping, pseudonymous garment telemetry, and 24-hour pruning.
+- [`apps/api/src/filters/api-exception.filter.spec.ts`](../../apps/api/src/filters/api-exception.filter.spec.ts):
+  proves exception telemetry extraction,
+  normalized routes, safe degradation, and continued HTTP responses during telemetry failure.
+
 Current repo note:
 
 - Telemetry calls run fire-and-forget in the main application flow, and are defensively wrapped to check if `telemetryPromise !== undefined` to prevent crash triggers in tests that use unmocked or stubbed service definitions.
@@ -2043,7 +2567,7 @@ flowchart TD
   RLS -->|service_role| AnonAllowed["Insert allowed with NULL user_id"]
 ```
 
-## Step 19 - Scenario outfit generator
+## Step 19: Scenario outfit generator
 
 User/business impact:
 
@@ -2126,6 +2650,50 @@ Task owner map:
 - Story 2.1 Task 5 step 1 owner: unit-test the algorithm, fallbacks, badges, and segment resolution in `apps/api/src/modules/personalization/ritual.service.spec.ts`
 - Story 2.1 Task 5 step 2 owner: integration-test the controller, Redis lifecycle, and DB persistence in `apps/api/src/modules/personalization/ritual.controller.spec.ts`
 
+Tests that cover this step:
+
+Shared contract and fixture unit tests:
+
+- [`packages/api-client/testing/ritual-contract.spec.ts`](../../packages/api-client/testing/ritual-contract.spec.ts):
+  proves exactly one outfit per scenario,
+  strict scenario and query values, badge bullet requirements, and optional capsule attribution.
+- [`packages/testing/test/ritual.factory.spec.ts`](../../packages/testing/test/ritual.factory.spec.ts):
+  proves scenario fixtures, reasoning badge shape,
+  optional forecast links, persistence, and cleanup registration.
+
+API unit tests:
+
+- [`apps/api/src/modules/personalization/ritual.service.spec.ts`](../../apps/api/src/modules/personalization/ritual.service.spec.ts):
+  proves timezone segment selection,
+  garments, persistence races, cache behavior, degradation, and complete scenario generation.
+- [`apps/api/src/modules/personalization/ritual.controller.spec.ts`](../../apps/api/src/modules/personalization/ritual.controller.spec.ts):
+  proves authentication, validated
+  queries, persisted recommendations, and Redis-backed controller behavior.
+
+Playwright API E2E test:
+
+- [`playwright/tests/api/ritual-daily-outfits.spec.ts`](../../playwright/tests/api/ritual-daily-outfits.spec.ts):
+  proves unauthenticated rejection, canonical
+  three-scenario responses, and the optional location query over HTTP.
+
+Pact contract tests:
+
+- [`pact/http/consumer/mobile-api-client.pacttest.ts`](../../pact/http/consumer/mobile-api-client.pacttest.ts):
+  proves the Mobile consumer expects the daily
+  Ritual interaction from its generated client.
+- [`pact/http/consumer/web-api-client.pacttest.ts`](../../pact/http/consumer/web-api-client.pacttest.ts):
+  proves the Web consumer expects the same Ritual
+  interaction.
+- [`pact/http/provider/api-provider.pacttest.ts`](../../pact/http/provider/api-provider.pacttest.ts):
+  replays the generated consumer Pacts against the
+  provider controller boundary and its configured provider states.
+
+Performance test:
+
+- [`k6/tests/couture-api-baseline.k6test.ts`](../../k6/tests/couture-api-baseline.k6test.ts):
+  exercises cold and cached Ritual reads, asserts three
+  outfits with reasoning and weather data, and applies environment-adjusted latency thresholds.
+
 Current repo note:
 
 - The `ritual.controller.ts` uses `RitualQueryParams` (imported from the shared Zod contract) as the
@@ -2160,7 +2728,7 @@ flowchart TD
   Cache --> Response
 ```
 
-## Step 20 - Comfort calibration settings
+## Step 20: Comfort calibration settings
 
 User/business impact:
 
@@ -2205,7 +2773,44 @@ Task owner map:
 - Story 2.2 Task 3 step 1 owner: unit-test default fallbacks, upserts, and cache invalidation in `apps/api/src/modules/personalization/comfort.service.spec.ts`
 - Story 2.2 Task 3 step 2 owner: integration-test controller endpoints and validation boundaries in `apps/api/src/modules/personalization/comfort.controller.spec.ts`
 
-## Step 21 - Reasoning badges & explanations
+Tests that cover this step:
+
+API unit tests:
+
+- [`apps/api/src/modules/personalization/comfort.service.spec.ts`](../../apps/api/src/modules/personalization/comfort.service.spec.ts):
+  proves default preferences, stored
+  value mapping, upsert, and Ritual cache invalidation.
+- [`apps/api/src/modules/personalization/comfort.controller.spec.ts`](../../apps/api/src/modules/personalization/comfort.controller.spec.ts):
+  proves authentication, request
+  validation, defaults, existing values, updates, and cache invalidation delegation.
+- [`apps/api/src/modules/personalization/ritual.service.spec.ts`](../../apps/api/src/modules/personalization/ritual.service.spec.ts):
+  proves hot and cold calibration,
+  wind tolerance, precipitation preparedness, and preference-driven cache invalidation.
+
+Playwright API E2E test:
+
+- [`playwright/tests/api/comfort-preferences.spec.ts`](../../playwright/tests/api/comfort-preferences.spec.ts):
+  proves unauthenticated rejection and the comfort
+  preference read and update lifecycle over HTTP.
+
+Pact contract tests:
+
+- [`pact/http/consumer/mobile-api-client.pacttest.ts`](../../pact/http/consumer/mobile-api-client.pacttest.ts):
+  proves the Mobile consumer's comfort preference
+  read and update interactions.
+- [`pact/http/consumer/web-api-client.pacttest.ts`](../../pact/http/consumer/web-api-client.pacttest.ts):
+  proves the Web consumer's matching interactions.
+- [`pact/http/provider/api-provider.pacttest.ts`](../../pact/http/provider/api-provider.pacttest.ts):
+  replays those generated Pacts against the provider
+  controller boundary and configured provider states.
+
+Performance test:
+
+- [`k6/tests/couture-api-baseline.k6test.ts`](../../k6/tests/couture-api-baseline.k6test.ts):
+  exercises default comfort reads and updated preference
+  writes with environment-adjusted latency thresholds.
+
+## Step 21: Reasoning badges and explanations
 
 User/business impact:
 
@@ -2252,7 +2857,52 @@ Task owner map:
 - Story 2.3 Task 3 step 2 owner: update provider mock responses in `pact/http/provider/provider-helper.ts`
 - Story 2.3 Task 4 step 1 owner: test badge keys, labels, and bullet interpolation rules in `apps/api/src/modules/personalization/ritual.service.spec.ts`
 
-## Step 22 - Localization infrastructure and quality gates
+Tests that cover this step:
+
+Shared contract and fixture unit tests:
+
+- [`packages/api-client/testing/ritual-contract.spec.ts`](../../packages/api-client/testing/ritual-contract.spec.ts):
+  proves each reasoning badge has at least one
+  bullet and rejects malformed scenario collections.
+- [`packages/testing/test/ritual.factory.spec.ts`](../../packages/testing/test/ritual.factory.spec.ts):
+  proves fixture badges match the UI-facing key,
+  label, and bullet shape.
+
+API unit test:
+
+- [`apps/api/src/modules/personalization/ritual.service.spec.ts`](../../apps/api/src/modules/personalization/ritual.service.spec.ts):
+  proves badge mapping, dynamic labels,
+  interpolation, fallback keys, and integer-safe wind and precipitation copy.
+
+Mobile component test:
+
+- [`apps/mobile/src/screens/hero-experience.test.tsx`](../../apps/mobile/src/screens/hero-experience.test.tsx):
+  proves the recommendation card renders a
+  reasoning badge in the loaded hero state.
+
+Playwright API E2E test:
+
+- [`playwright/tests/api/ritual-daily-outfits.spec.ts`](../../playwright/tests/api/ritual-daily-outfits.spec.ts):
+  proves every returned outfit carries
+  structured badge keys, labels, and non-empty bullet arrays over HTTP.
+
+Pact contract tests:
+
+- [`pact/http/consumer/mobile-api-client.pacttest.ts`](../../pact/http/consumer/mobile-api-client.pacttest.ts):
+  pins Ritual response badge keys, labels, and bullets in Mobile consumer expectations.
+- [`pact/http/consumer/web-api-client.pacttest.ts`](../../pact/http/consumer/web-api-client.pacttest.ts):
+  pins Ritual response badge keys, labels, and bullets in Web consumer expectations.
+- [`pact/http/provider/api-provider.pacttest.ts`](../../pact/http/provider/api-provider.pacttest.ts):
+  replays those expectations against the provider
+  controller boundary and configured Ritual state.
+
+Performance test:
+
+- [`k6/tests/couture-api-baseline.k6test.ts`](../../k6/tests/couture-api-baseline.k6test.ts):
+  asserts a generated Ritual has at least one reasoning
+  badge while exercising the environment-adjusted Ritual latency threshold.
+
+## Step 22: Localization infrastructure and quality gates
 
 User/business impact:
 
@@ -2300,7 +2950,60 @@ Task owner map:
 - Step 22 step 6 owner: mock localized database state response in Pact provider tests in `pact/http/provider/provider-helper.ts`
 - Step 22 step 7 owner: verify Settings screen layout boundaries in headless Chromium in `apps/mobile/src/screens/tab-two-screen.test.tsx`
 
-## Step 23 - Home/lock-screen widgets
+Tests that cover this step:
+
+Shared and API unit tests:
+
+- [`packages/api-client/testing/localization-contract.spec.ts`](../../packages/api-client/testing/localization-contract.spec.ts):
+  proves supported locale values,
+  normalization, weighted `Accept-Language` negotiation, and explicit Ritual locale overrides.
+- [`apps/api/src/modules/personalization/ritual.service.spec.ts`](../../apps/api/src/modules/personalization/ritual.service.spec.ts):
+  proves locale precedence, localized
+  notes and badges, cache isolation, translation-key parity, and placeholder parity.
+- [`apps/api/src/modules/personalization/ritual.controller.spec.ts`](../../apps/api/src/modules/personalization/ritual.controller.spec.ts):
+  proves explicit locale handling,
+  localized cache isolation, and unsupported-locale rejection.
+- [`apps/api/src/modules/user/user.controller.spec.ts`](../../apps/api/src/modules/user/user.controller.spec.ts):
+  proves valid locale updates and unsupported
+  locale rejection.
+- [`apps/api/src/modules/user/user.service.spec.ts`](../../apps/api/src/modules/user/user.service.spec.ts):
+  proves locale merging preserves unrelated profile
+  preferences.
+
+Mobile client and component tests:
+
+- [`apps/mobile/src/lib/formatters.test.ts`](../../apps/mobile/src/lib/formatters.test.ts):
+  proves locale-aware temperature, currency, and measurement
+  formatting plus a safe formatter fallback.
+- [`apps/mobile/src/lib/i18n.test.ts`](../../apps/mobile/src/lib/i18n.test.ts):
+  proves ranked device-locale resolution, first-launch adoption,
+  translation loading, persisted selection, and initialization memoization.
+- [`apps/mobile/src/lib/i18n-init-fallback.test.ts`](../../apps/mobile/src/lib/i18n-init-fallback.test.ts):
+  proves initialization can retry after total
+  failure and recover in English when a device locale bundle fails.
+- [`apps/mobile/src/screens/localization.test.tsx`](../../apps/mobile/src/screens/localization.test.tsx):
+  proves runtime language switching, English fallback,
+  regional device locale selection, and absence of a stored override.
+- [`apps/mobile/src/screens/tab-two-screen.test.tsx`](../../apps/mobile/src/screens/tab-two-screen.test.tsx):
+  proves locale persistence, sync retries, local
+  fallback, analytics, and layout without truncation across supported locales.
+
+Pact contract tests:
+
+- [`pact/http/consumer/mobile-api-client.pacttest.ts`](../../pact/http/consumer/mobile-api-client.pacttest.ts):
+  proves explicit localized Ritual and locale
+  preference interactions from the Mobile consumer.
+- [`pact/http/provider/api-provider.pacttest.ts`](../../pact/http/provider/api-provider.pacttest.ts):
+  replays the localized consumer Pacts against the
+  provider controller boundary and configured states.
+
+Mobile E2E test:
+
+- [`maestro/localization.yaml`](../../maestro/localization.yaml):
+  exercises language selection and localized visible copy in the built
+  Mobile application.
+
+## Step 23: Home and lock-screen widgets
 
 User/business impact:
 
@@ -2353,7 +3056,36 @@ Task owner map:
 - Story 3.3 Task 5 step 1 owner: verify widget deep link hydration and telemetry triggers in screen tests in `apps/mobile/src/screens/widget-deep-link.test.tsx`
 - Story 3.3 Task 5 step 2 owner: define E2E Maestro routing verification scenarios in `maestro/widget-deep-link.yaml`
 
-## Step 24 - watchOS glance companion app & complications
+Tests that cover this step:
+
+Native generation integration test:
+
+- [`apps/mobile/plugins/with-widgets.test.js`](../../apps/mobile/plugins/with-widgets.test.js):
+  proves a clean Expo prebuild generates iOS and Android
+  widget targets, bridges, entitlements, fonts, native registrations, and localized fallback copy.
+
+Mobile client unit and component tests:
+
+- [`apps/mobile/src/lib/background-fetch.test.ts`](../../apps/mobile/src/lib/background-fetch.test.ts):
+  proves freshness boundaries, task registration,
+  refresh and publication, locale reuse, degraded preferences, and failure preservation.
+- [`apps/mobile/src/lib/native-file-storage.test.ts`](../../apps/mobile/src/lib/native-file-storage.test.ts):
+  proves durable Ritual and settings storage plus
+  cache preservation when widget publication fails.
+- [`apps/mobile/src/lib/widget-share.test.ts`](../../apps/mobile/src/lib/widget-share.test.ts):
+  proves localized payload serialization, next-hour
+  selection, severe-alert filtering, preference failure behavior, and timezone fallback.
+- [`apps/mobile/src/screens/widget-deep-link.test.tsx`](../../apps/mobile/src/screens/widget-deep-link.test.tsx):
+  proves current and next widget hydration,
+  telemetry, repeated links, and rejection of malformed parameters.
+
+Mobile E2E test:
+
+- [`maestro/widget-deep-link.yaml`](../../maestro/widget-deep-link.yaml):
+  opens the current and next widget links and verifies the scenario
+  surface remains available after each route.
+
+## Step 24: watchOS glance companion app and complications
 
 User/business impact:
 
@@ -2400,6 +3132,31 @@ Task owner map:
 - Story 3.4 Task 3 step 1 owner: provide WidgetKit watch complications reading from watch App Group in `apps/mobile/targets/watchos/WatchComplication.swift`
 - Story 3.4 Task 4 step 1 owner: generate watchOS targets and link font resources in Expo config plugin in `apps/mobile/plugins/with-watchos.js`
 
+Tests that cover this step:
+
+Native generation and Swift integration test:
+
+- [`apps/mobile/plugins/with-watchos.test.js`](../../apps/mobile/plugins/with-watchos.test.js):
+  proves repeatable Expo prebuild generation, target
+  embedding, entitlements, sources, fonts, WatchConnectivity linking, payload decoding, and native
+  Swift behavior tests.
+
+Mobile payload and component tests:
+
+- [`apps/mobile/src/lib/widget-share.test.ts`](../../apps/mobile/src/lib/widget-share.test.ts):
+  proves the localized current and next forecast payload
+  that the phone makes available to glance surfaces.
+- [`apps/mobile/src/lib/widget-alert-preferences.test.ts`](../../apps/mobile/src/lib/widget-alert-preferences.test.ts):
+  proves canonical preference parsing and
+  fail-closed behavior when preferences are unavailable or invalid.
+- [`apps/mobile/src/screens/widget-deep-link.test.tsx`](../../apps/mobile/src/screens/widget-deep-link.test.tsx):
+  proves a watch handoff hydrates the next outfit
+  and records a `watch_tap` interaction without widget dimensions.
+
+There is no automated physical watch or simulator E2E file in the repository. The listed suites
+cover generated native projects, native Swift test entrypoints, payload preparation, and phone-side
+handoff behavior.
+
 Architecture diagram:
 
 ```mermaid
@@ -2411,7 +3168,7 @@ flowchart TD
   WatchGroup --> WatchWidget[WatchComplication.swift\nWidgetKit Complications]
 ```
 
-## Step 25 - Lookbook Prism responsive layout & community grid
+## Step 25: Lookbook Prism responsive layout and community grid
 
 User/business impact:
 
@@ -2462,6 +3219,25 @@ Task owner map:
 - Story 3.5 Task 6 step 3 owner: integration-test Lookbook Prism responsive layout, comparison mode, and focus rings in `apps/web/src/app/components/lookbook-prism-layout.test.tsx`
 - Story 3.5 Task 6 step 4 owner: E2E smoke test responsive layout boundaries across viewports in `playwright/tests/lookbook-prism.spec.ts`
 
+Tests that cover this step:
+
+Web unit and component tests:
+
+- [`apps/web/src/app/components/layout-controls.test.tsx`](../../apps/web/src/app/components/layout-controls.test.tsx):
+  proves the comparison and mobile-preview toggles, ARIA state, callbacks, and
+  `layout_interaction` telemetry.
+- [`apps/web/src/app/components/community-lookbook-grid.test.tsx`](../../apps/web/src/app/components/community-lookbook-grid.test.tsx):
+  proves filter state, polite announcements, click updates, and keyboard-safe image-failure
+  cards.
+- [`apps/web/src/app/components/lookbook-prism-layout.test.tsx`](../../apps/web/src/app/components/lookbook-prism-layout.test.tsx):
+  proves responsive regions, comparison cards, mobile preview, planner restoration, reduced
+  motion, semantic order, and chip synchronization.
+
+Playwright end-to-end test:
+
+- [`playwright/tests/lookbook-prism.spec.ts`](../../playwright/tests/lookbook-prism.spec.ts):
+  proves the layout and its controls render across desktop and mobile viewport boundaries.
+
 Architecture diagram:
 
 ```mermaid
@@ -2473,7 +3249,7 @@ flowchart TD
   Layout --> PlannerSlot["PlannerRail\n(Ultrawide ≥1440px Container)"]
 ```
 
-## Step 26 - Chip navigation & sticky bottom nav
+## Step 26: Chip navigation and sticky bottom nav
 
 User/business impact:
 
@@ -2523,6 +3299,37 @@ Task owner map:
 - Story 3.6 Task 5 step 3 owner: unit-test mobile React Native chip navigation pressables and selection state in `apps/mobile/components/chip-navigation.test.tsx`
 - Story 3.6 Task 6 step 1 owner: E2E test sticky bottom nav viewport visibility, chip keyboard navigation, and reduced motion in `playwright/tests/chip-navigation-bottom-nav.spec.ts`
 
+Tests that cover this step:
+
+Web unit and component tests:
+
+- [`apps/web/src/app/components/chip-navigation.test.tsx`](../../apps/web/src/app/components/chip-navigation.test.tsx):
+  proves chip semantics, arrow-key focus movement, clean Tab exit, announcements, telemetry, and
+  analytics failure isolation.
+- [`apps/web/src/app/components/sticky-bottom-nav.test.tsx`](../../apps/web/src/app/components/sticky-bottom-nav.test.tsx):
+  proves four-tab rendering, route-derived active state, the gold indicator, responsive
+  visibility classes, and click telemetry.
+- [`apps/web/src/app/components/lookbook-prism-layout.test.tsx`](../../apps/web/src/app/components/lookbook-prism-layout.test.tsx):
+  proves chip selection stays synchronized with the visible hero and community content.
+
+Mobile component tests:
+
+- [`apps/mobile/components/chip-navigation.test.tsx`](../../apps/mobile/components/chip-navigation.test.tsx):
+  proves the native chips render and report the selected value on press.
+- [`apps/mobile/src/screens/hero-experience.test.tsx`](../../apps/mobile/src/screens/hero-experience.test.tsx):
+  proves mobile chip selection changes the displayed recommendation.
+
+Playwright end-to-end test:
+
+- [`playwright/tests/chip-navigation-bottom-nav.spec.ts`](../../playwright/tests/chip-navigation-bottom-nav.spec.ts):
+  proves viewport visibility, sticky chip state, keyboard focus movement, focus appearance, and
+  reduced-motion behavior.
+
+Mobile end-to-end test:
+
+- [`maestro/chip-navigation-bottom-nav.yaml`](../../maestro/chip-navigation-bottom-nav.yaml):
+  exercises native chip selection and bottom-tab navigation to the Community screen.
+
 Architecture diagram:
 
 ```mermaid
@@ -2535,7 +3342,7 @@ flowchart TD
   BottomNav --> PostHogNav["PostHog bottom_nav_clicked"]
 ```
 
-## Step 27 - Widget / notification deep-link handling
+## Step 27: Widget and notification deep-link handling
 
 User/business impact:
 
@@ -2588,6 +3395,48 @@ Task owner map:
 - Story 3.7 Task 5 step 3 owner: unit-test mobile deep-link handler orchestration logic across all branches in `apps/mobile/src/lib/mobile-deep-link-handler.test.ts`
 - Story 3.7 Task 6 step 1 owner: E2E Playwright test widget tap, severe weather alert focus, community lookbook highlight, and invalid deep link fallback in `playwright/tests/deep-link-handling.spec.ts`
 
+Tests that cover this step:
+
+Shared parser and target-resolution unit tests:
+
+- [`packages/utils/src/deep-link.spec.ts`](../../packages/utils/src/deep-link.spec.ts):
+  proves parameter normalization, widget and notification validation, expiry handling, scenario
+  resolution, and deep-link intent detection.
+- [`packages/api-client/testing/deep-link-targets.spec.ts`](../../packages/api-client/testing/deep-link-targets.spec.ts):
+  proves newest and requested target selection, missing targets, channel exclusion, malformed
+  socket payload handling, and duplicate-event recency.
+
+Web component test:
+
+- [`apps/web/src/app/components/deep-link-handling.test.tsx`](../../apps/web/src/app/components/deep-link-handling.test.tsx):
+  proves widget hydration, severe-alert focus, community targeting, invalid-link telemetry, and
+  degraded fallbacks.
+
+Mobile unit and screen tests:
+
+- [`apps/mobile/src/lib/mobile-deep-link-handler.test.ts`](../../apps/mobile/src/lib/mobile-deep-link-handler.test.ts):
+  proves every orchestration branch for widget, watch, severe-weather, community, invalid,
+  missing, and failed target resolution.
+- [`apps/mobile/src/screens/deep-link-handling.test.tsx`](../../apps/mobile/src/screens/deep-link-handling.test.tsx):
+  proves visible focus, highlight, banner, and fallback states for notification links.
+- [`apps/mobile/src/screens/widget-deep-link.test.tsx`](../../apps/mobile/src/screens/widget-deep-link.test.tsx):
+  proves `now`, `next`, watch, later-link, and invalid widget hydration while the Home tab
+  remains mounted.
+
+Playwright end-to-end test:
+
+- [`playwright/tests/deep-link-handling.spec.ts`](../../playwright/tests/deep-link-handling.spec.ts):
+  proves widget hero hydration, severe-alert focus, community highlighting, and invalid-link
+  fallback in the browser.
+
+Mobile end-to-end test:
+
+- [`maestro/deep-link-handling.yaml`](../../maestro/deep-link-handling.yaml):
+  exercises severe-weather notification focus and the invalid-link information banner in a built
+  app.
+- [`maestro/widget-deep-link.yaml`](../../maestro/widget-deep-link.yaml):
+  opens native `now` and `next` widget links and verifies the scenario surface remains visible.
+
 Architecture diagram:
 
 ```mermaid
@@ -2602,7 +3451,7 @@ flowchart TD
   HighlightCard --> Telemetry
 ```
 
-## Step 28 - Accessibility hardening
+## Step 28: Accessibility hardening
 
 User/business impact:
 
@@ -2671,6 +3520,49 @@ Task owner map:
 - Story 3.8 Task 5 step 2 owner: E2E Playwright test skip-link activation, main landmark focus, and reduced-motion emulation in `playwright/tests/accessibility-hardening.spec.ts`
 - Story 3.8 Task 5 step 3 owner: implement reusable AxeBuilder accessibility scanning helper in `playwright/support/helpers/accessibility.ts`
 
+Tests that cover this step:
+
+Shared accessibility unit test:
+
+- [`packages/utils/src/accessibility.spec.ts`](../../packages/utils/src/accessibility.spec.ts):
+  proves localized weather and garment descriptions, invalid-value fallbacks, Fahrenheit output,
+  and announcement urgency.
+
+Web unit and component tests:
+
+- [`apps/web/src/app/components/accessibility-hardening.test.tsx`](../../apps/web/src/app/components/accessibility-hardening.test.tsx):
+  proves the skip link and route content share one focusable main target.
+- [`apps/web/src/app/components/community-lookbook-grid.test.tsx`](../../apps/web/src/app/components/community-lookbook-grid.test.tsx):
+  proves failed-image cards remain programmatically focusable without adding a routine Tab stop.
+- [`apps/web/src/app/components/lookbook-prism-layout.test.tsx`](../../apps/web/src/app/components/lookbook-prism-layout.test.tsx):
+  proves semantic reading order, static-card Tab behavior, and reduced-motion rendering.
+- [`apps/web/src/app/components/chip-navigation.test.tsx`](../../apps/web/src/app/components/chip-navigation.test.tsx):
+  proves pressed-state semantics, arrow-key traversal, visible focus targets, status
+  announcements, and clean Tab exit.
+
+Mobile unit and component tests:
+
+- [`apps/mobile/src/screens/accessibility-hardening.test.tsx`](../../apps/mobile/src/screens/accessibility-hardening.test.tsx):
+  proves announcement coalescing, assertive priority, deduplication, and reduced-motion default,
+  update, and rejection behavior.
+- [`apps/mobile/components/chip-navigation.test.tsx`](../../apps/mobile/components/chip-navigation.test.tsx):
+  proves native chip accessibility state follows selection.
+
+Playwright end-to-end tests:
+
+- [`playwright/tests/accessibility-hardening.spec.ts`](../../playwright/tests/accessibility-hardening.spec.ts):
+  proves route landmarks, Axe results, skip-link order, keyboard paths, deep-link focus,
+  validation status, reduced motion, forced colors, focus outlines, and contrast across the
+  tested viewport matrix.
+- [`playwright/tests/chip-navigation-bottom-nav.spec.ts`](../../playwright/tests/chip-navigation-bottom-nav.spec.ts):
+  proves the browser chip path is keyboard operable and exposes a visible focus ring.
+
+Mobile end-to-end test:
+
+- [`maestro/accessibility-hardening.yaml`](../../maestro/accessibility-hardening.yaml):
+  exercises identifiers and selected state across bottom tabs, chips, garment swapping, and
+  modal close behavior. It does not verify screen-reader speech or visual contrast.
+
 Architecture diagram:
 
 ```mermaid
@@ -2683,7 +3575,7 @@ flowchart TD
   Web --> Announcer["aria-live / AccessibilityInfo.announceForAccessibility"]
 ```
 
-## Step 29 - Garment capture flow
+## Step 29: Garment capture flow
 
 User/business impact:
 
@@ -2746,6 +3638,89 @@ Task owner map:
 - Story 4.1 Task 8 step 4 owner: E2E Playwright test for wardrobe capture modal accessibility and landmark visibility in `playwright/tests/wardrobe-garment-capture.spec.ts`
 - Story 4.1 Task 9 step 1 owner: Maestro E2E test script for mobile garment capture flow in `maestro/garment-capture-flow.yaml`
 
+Tests that cover this step:
+
+Real-PostgreSQL database tests:
+
+- [`packages/db/test/garment-upload-schema.spec.ts`](../../packages/db/test/garment-upload-schema.spec.ts):
+  proves upload lifecycle defaults, constraints, private storage setup, grants, and supporting
+  indexes against PostgreSQL.
+- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts):
+  proves owner, guardian, admin, and cross-user wardrobe access rules against PostgreSQL.
+
+Fixture and shared contract unit tests:
+
+- [`packages/testing/test/wardrobe-item.factory.spec.ts`](../../packages/testing/test/wardrobe-item.factory.spec.ts):
+  proves fixture lifecycle states, persistence mappings, relationships, and cleanup
+  registration.
+- [`packages/utils/src/wardrobe-object-path.spec.ts`](../../packages/utils/src/wardrobe-object-path.spec.ts):
+  proves garment object paths stay inside the expected user and garment namespace.
+- [`packages/api-client/testing/wardrobe-contract.spec.ts`](../../packages/api-client/testing/wardrobe-contract.spec.ts):
+  proves upload allocation, binary relay, commit schemas, route metadata, and the byte-upload
+  helper contract.
+- [`packages/api-client/testing/analytics-events.spec.ts`](../../packages/api-client/testing/analytics-events.spec.ts):
+  proves upload analytics keep the subject out of the provider property bag and preserve only
+  the canonical upload fields.
+
+API unit and boundary tests:
+
+- [`apps/api/src/modules/guardian/guardian.service.spec.ts`](../../apps/api/src/modules/guardian/guardian.service.spec.ts):
+  proves wardrobe upload eligibility follows age and fresh guardian consent.
+- [`apps/api/src/modules/wardrobe/wardrobe.guard.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.guard.spec.ts):
+  proves the authenticated actor reaches the wardrobe authorization decision and denials stop
+  the request.
+- [`apps/api/src/modules/wardrobe/wardrobe-image-validation.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-image-validation.spec.ts):
+  proves decoded image bytes must agree with declared MIME type, size, dimensions, and checksum.
+- [`apps/api/src/modules/wardrobe/wardrobe-storage.adapter.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-storage.adapter.spec.ts):
+  proves private-bucket writes, reads, removals, credential failure, and normalized storage
+  errors.
+- [`apps/api/src/modules/wardrobe/wardrobe-upload-token.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-upload-token.spec.ts):
+  proves upload-token signing, verification, expiry, tamper rejection, and secret requirements.
+- [`apps/api/src/modules/wardrobe/wardrobe-processing.queue.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-processing.queue.spec.ts):
+  proves garment processing jobs carry stable payloads and deduplicate the same upload attempt.
+- [`apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts):
+  proves allocation, raw-byte upload, commit validation, delegation, and fresh-versus-replay
+  statuses at the controller boundary.
+- [`apps/api/src/modules/wardrobe/wardrobe.service.regression.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.service.regression.spec.ts):
+  proves the allocation, byte upload, checksum, commit, idempotency, and processing-enqueue
+  lifecycle.
+- [`apps/api/src/modules/wardrobe/wardrobe.service.failure-paths.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.service.failure-paths.spec.ts):
+  proves upload and commit failures release claims, clean stored objects, preserve retryability,
+  and surface stable errors.
+- [`apps/api/src/modules/wardrobe/wardrobe-retention.service.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-retention.service.spec.ts):
+  proves deletion purges source and derived garment data, legal hold preserves it, and expired
+  pending uploads are claimed idempotently.
+- [`apps/api/src/modules/telemetry/telemetry.service.spec.ts`](../../apps/api/src/modules/telemetry/telemetry.service.spec.ts):
+  proves upload events use a pseudonymous subject, validated properties, independent sinks, and
+  disabled provider IP capture.
+
+Web and Mobile component/client tests:
+
+- [`apps/web/src/app/components/garment-capture-modal.test.tsx`](../../apps/web/src/app/components/garment-capture-modal.test.tsx):
+  proves camera and file capture, crop and cleanup choices, validation, progress, retry, dialog
+  semantics, and focus restoration.
+- [`apps/web/src/app/wardrobe/page.test.tsx`](../../apps/web/src/app/wardrobe/page.test.tsx):
+  proves the wardrobe hub opens capture, reconciles committed garments, polls processing state,
+  and renders failure recovery.
+- [`apps/web/src/lib/wardrobe.test.ts`](../../apps/web/src/lib/wardrobe.test.ts):
+  proves allocation, binary upload, and commit requests use canonical schemas, headers, status
+  handling, and abort signals.
+- [`apps/mobile/components/wardrobe/garment-capture-modal.test.tsx`](../../apps/mobile/components/wardrobe/garment-capture-modal.test.tsx):
+  proves native camera and library capture, upload lifecycle, progress, retry, consent errors,
+  and accessible modal controls.
+
+Playwright end-to-end test:
+
+- [`playwright/tests/wardrobe-garment-capture.spec.ts`](../../playwright/tests/wardrobe-garment-capture.spec.ts):
+  proves the wardrobe page opens the capture dialog with the expected landmark and accessible
+  surface.
+
+Mobile end-to-end test:
+
+- [`maestro/garment-capture-flow.yaml`](../../maestro/garment-capture-flow.yaml):
+  exercises fixture photo selection, crop options, capture completion, and return to the garment
+  list in a built app.
+
 Architecture diagram:
 
 ```mermaid
@@ -2759,7 +3734,7 @@ flowchart TD
   Commit --> Processing["GarmentItem (processing)\n+ garment_upload_completed Event"]
 ```
 
-## Step 30 - Smart tagging and comfort metadata
+## Step 30: Smart tagging and comfort metadata
 
 User/business impact:
 
@@ -2857,12 +3832,112 @@ Task owner map:
 - Story 4.2 Task 8 step 1 owner: implement native mobile garment tagging modal component in apps/mobile/components/wardrobe/garment-tagging-modal.tsx
 - Story 4.2 Task 9 step 1 owner: E2E Playwright test for smart tagging modal accessibility and flow in playwright/tests/wardrobe-smart-tagging.spec.ts
 
+Tests that cover this step:
+
+Real-PostgreSQL database tests:
+
+- [`packages/db/test/garment-upload-schema.spec.ts`](../../packages/db/test/garment-upload-schema.spec.ts):
+  proves smart-tagging enums, lifecycle columns, JSON constraints, confirmation fields, and
+  supporting indexes against PostgreSQL.
+- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts):
+  proves tagging metadata remains scoped by the wardrobe row-level security policy.
+
+Shared contract unit tests:
+
+- [`packages/api-client/testing/wardrobe-contract.spec.ts`](../../packages/api-client/testing/wardrobe-contract.spec.ts):
+  proves suggestion, confirmation, lifecycle, failure-code, and OpenAPI route schemas.
+- [`packages/api-client/testing/analytics-events.spec.ts`](../../packages/api-client/testing/analytics-events.spec.ts):
+  proves tagging analytics normalization, null-suggestion handling, override invariants,
+  duplicate rejection, and privacy-safe provider properties.
+
+Inference and worker unit tests:
+
+- [`apps/api/src/modules/wardrobe/garment-tagging.engine.spec.ts`](../../apps/api/src/modules/wardrobe/garment-tagging.engine.spec.ts):
+  proves confidence thresholds, lead margins, probability normalization, and comfort-range
+  derivation.
+- [`apps/api/src/modules/wardrobe/fashion-clip-tagging.engine.spec.ts`](../../apps/api/src/modules/wardrobe/fashion-clip-tagging.engine.spec.ts):
+  proves snapshot-resolution failures, direct-logit extraction, embedding-derived logits, and
+  invalid or non-finite output rejection.
+- [`apps/api/src/modules/wardrobe/fashion-clip-tagging.engine.lifecycle.spec.ts`](../../apps/api/src/modules/wardrobe/fashion-clip-tagging.engine.lifecycle.spec.ts):
+  proves worker startup, request correlation, validated suggestion projection, timeouts, failure
+  replacement, reuse, and shutdown behavior.
+- [`apps/api/src/modules/wardrobe/fashion-clip-inference.worker.spec.ts`](../../apps/api/src/modules/wardrobe/fashion-clip-inference.worker.spec.ts):
+  proves model-session loading, serialized inference, tensor output parsing, and worker error
+  replies.
+- [`apps/api/src/modules/wardrobe/garment-tagging.smoke.spec.ts`](../../apps/api/src/modules/wardrobe/garment-tagging.smoke.spec.ts):
+  exercises the prepared FashionCLIP snapshot when the optional real-model smoke environment is
+  available.
+- [`apps/api/src/modules/wardrobe/wardrobe-color.processor.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-color.processor.spec.ts):
+  proves image download, tag inference, `awaiting_tags` persistence, failure fallback, and retry
+  boundaries in the BullMQ processor.
+
+API unit and boundary tests:
+
+- [`apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts):
+  proves suggestion and confirmation routes validate ids, bodies, output envelopes, delegation,
+  and HTTP status behavior.
+- [`apps/api/src/modules/wardrobe/wardrobe.service.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.service.spec.ts):
+  proves eligible suggestion reads, confirmation overrides, ready-state transitions, telemetry,
+  and Ritual cache invalidation.
+- [`apps/api/src/modules/wardrobe/wardrobe.service.regression.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.service.regression.spec.ts):
+  proves tagging remains connected to the pre-existing garment upload lifecycle.
+- [`apps/api/src/modules/wardrobe/wardrobe.service.failure-paths.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.service.failure-paths.spec.ts):
+  proves invalid lifecycle states, stale or missing garments, telemetry failures, and
+  cache-clear failures do not corrupt confirmed tags.
+- [`apps/api/src/modules/personalization/ritual.service.spec.ts`](../../apps/api/src/modules/personalization/ritual.service.spec.ts):
+  proves only ready, tagged garments are eligible for outfit selection and cache reuse respects
+  wardrobe changes.
+- [`apps/api/src/modules/telemetry/telemetry.service.spec.ts`](../../apps/api/src/modules/telemetry/telemetry.service.spec.ts):
+  proves garment-tagging events are pseudonymized and restricted to allowlisted properties.
+
+Web and Mobile component/client tests:
+
+- [`apps/web/src/app/components/garment-tagging-modal.test.tsx`](../../apps/web/src/app/components/garment-tagging-modal.test.tsx):
+  proves suggestions, confidence guidance, manual overrides, validation, save states, errors,
+  accessibility, and focus restoration.
+- [`apps/web/src/app/wardrobe/page.test.tsx`](../../apps/web/src/app/wardrobe/page.test.tsx):
+  proves the hub moves a processed garment through `awaiting_tags` to `ready` and refreshes its
+  displayed metadata.
+- [`apps/web/src/lib/wardrobe.test.ts`](../../apps/web/src/lib/wardrobe.test.ts):
+  proves suggestion and confirmation client calls validate canonical requests and responses.
+- [`apps/mobile/components/wardrobe/garment-tagging-modal.test.tsx`](../../apps/mobile/components/wardrobe/garment-tagging-modal.test.tsx):
+  proves the native suggestion, correction, save, error, and accessibility flow.
+- [`apps/mobile/src/lib/wardrobe.test.ts`](../../apps/mobile/src/lib/wardrobe.test.ts):
+  proves the native suggestion client preserves structured API error codes used by the tagging
+  modal.
+- [`apps/mobile/src/i18n/wardrobe-tagging-locales.spec.ts`](../../apps/mobile/src/i18n/wardrobe-tagging-locales.spec.ts):
+  proves all supported Mobile catalogs contain complete, non-placeholder tagging copy.
+
+Pact contract tests:
+
+- [`pact/http/consumer/mobile-api-client.pacttest.ts`](../../pact/http/consumer/mobile-api-client.pacttest.ts):
+  defines Mobile's expected suggestion and tag-confirmation interactions against the Pact mock
+  server.
+- [`pact/http/consumer/web-api-client.pacttest.ts`](../../pact/http/consumer/web-api-client.pacttest.ts):
+  defines Web's expected suggestion and tag-confirmation interactions against the Pact mock
+  server.
+- [`pact/http/provider/api-provider.pacttest.ts`](../../pact/http/provider/api-provider.pacttest.ts):
+  replays generated tagging interactions against the Nest provider controllers and
+  scenario-controlled service doubles.
+
+Playwright end-to-end test:
+
+- [`playwright/tests/wardrobe-smart-tagging.spec.ts`](../../playwright/tests/wardrobe-smart-tagging.spec.ts):
+  proves upload, background processing, suggested tags, user override, save, ready-state
+  persistence, and accessibility through the browser flow.
+
+Mobile end-to-end test:
+
+- [`maestro/garment-smart-tagging-flow.yaml`](../../maestro/garment-smart-tagging-flow.yaml):
+  exercises capture, suggestion review, tag correction, save, app restart, and persisted ready
+  state in a built app.
+
 Current repo note:
 
 The standalone AI section near the top owns the plain-English explanation and architecture diagram.
 This numbered step remains the traceability and code-reading reference for Story 4.2.
 
-## Step 31 - Outfit capsule builder
+## Step 31: Outfit capsule builder
 
 User/business impact:
 
@@ -2990,6 +4065,130 @@ Task owner map:
 - Story 4.3 Task 6 step 2 owner: implement the mobile capsule screen in apps/mobile/app/wardrobe-capsules.tsx
 - Story 4.3 Task 8 step 1 owner: integration-test capsule locking and concurrency against real PostgreSQL in apps/api/integration/wardrobe-capsules.integration.spec.ts
 
+Tests that cover this step:
+
+Real-PostgreSQL database tests:
+
+- [`packages/db/test/outfit-capsule-schema.spec.ts`](../../packages/db/test/outfit-capsule-schema.spec.ts):
+  proves capsule defaults, ordered joins, constraints, indexes, cascades, row-level security,
+  and grants against PostgreSQL.
+- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts):
+  proves owner, guardian, admin, stranger, and spoofing boundaries for capsules and ordered
+  garment joins.
+
+Shared contract unit tests:
+
+- [`packages/api-client/testing/wardrobe-capsule-contract.spec.ts`](../../packages/api-client/testing/wardrobe-capsule-contract.spec.ts):
+  proves grapheme-aware normalization and create, update, favorite, list, filter, response, and
+  error schemas.
+- [`packages/api-client/testing/wardrobe-capsule-analytics.spec.ts`](../../packages/api-client/testing/wardrobe-capsule-analytics.spec.ts):
+  proves capsule analytics accept only the canonical privacy-safe property allowlists.
+
+API unit and repository tests:
+
+- [`apps/api/src/modules/wardrobe/wardrobe-access.service.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-access.service.spec.ts):
+  proves owner, admin, read-only guardian, full-consent guardian, and masked stranger
+  authorization.
+- [`apps/api/src/modules/wardrobe/wardrobe-capsule.normalize.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-capsule.normalize.spec.ts):
+  proves Unicode normalization, whitespace handling, canonical ordering, and stable payload
+  hashing.
+- [`apps/api/src/modules/wardrobe/wardrobe-capsule.controller.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-capsule.controller.spec.ts):
+  proves authentication, request validation, idempotency keys, ETags, `If-Match`, and
+  create/list/update/favorite/delete status behavior.
+- [`apps/api/src/modules/wardrobe/wardrobe-capsule.repository.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-capsule.repository.spec.ts):
+  proves owner scoping, shared lock order, eligibility, ordered joins, filtering, idempotency
+  races, optimistic revisions, no-op detection, durable claims, and deletion.
+- [`apps/api/src/modules/wardrobe/wardrobe-capsule.service.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-capsule.service.spec.ts):
+  proves strong ETag parsing, canonical payload rules, access checks, image signing, cache
+  invalidation, telemetry dispatch, and mutation failure isolation.
+- [`apps/api/src/modules/wardrobe/wardrobe-capsule.outbox.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-capsule.outbox.spec.ts):
+  proves in-transaction claim identity, delivery, replay suppression, failure recording, and
+  bounded retry sweeps.
+- [`apps/api/src/modules/personalization/capsule-recommendation.engine.spec.ts`](../../apps/api/src/modules/personalization/capsule-recommendation.engine.spec.ts):
+  proves eligibility, occasion filters, comfort scoring, slot filling, favorite scoring,
+  deterministic tie-breaks, and invalid-data exclusions.
+- [`apps/api/src/modules/personalization/ritual.service.spec.ts`](../../apps/api/src/modules/personalization/ritual.service.spec.ts):
+  proves capsule recommendations enter Rituals, report saved-capsule context, survive telemetry
+  failure, and reject stale cached revisions.
+- [`apps/api/src/modules/telemetry/telemetry.service.spec.ts`](../../apps/api/src/modules/telemetry/telemetry.service.spec.ts):
+  proves capsule events remain persisted when no PostHog mapping exists and analytics delivery is
+  skipped.
+
+Real-infrastructure integration tests:
+
+- [`apps/api/integration/wardrobe-capsules.integration.spec.ts`](../../apps/api/integration/wardrobe-capsules.integration.spec.ts):
+  proves real-PostgreSQL locks, concurrent revisions, rollback, eligibility, ordered
+  replacement, telemetry claims, idempotency races, and hard deletion.
+- [`apps/api/integration/wardrobe-capsules-query-plan.integration.spec.ts`](../../apps/api/integration/wardrobe-capsules-query-plan.integration.spec.ts):
+  proves the listing, search, occasion, favorite, and garment-filter indexes support their
+  intended query shapes.
+
+Web unit, component, and localization tests:
+
+- [`apps/web/src/lib/wardrobe.test.ts`](../../apps/web/src/lib/wardrobe.test.ts):
+  proves capsule client wrappers preserve idempotency keys, ETags, filters, canonical responses,
+  and server errors.
+- [`apps/web/src/app/components/capsule-builder-modal.test.tsx`](../../apps/web/src/app/components/capsule-builder-modal.test.tsx):
+  proves garment selection, occasion choices, limits, accessible reordering, validation,
+  mutation states, and focus restoration.
+- [`apps/web/src/app/wardrobe/capsules/page.test.tsx`](../../apps/web/src/app/wardrobe/capsules/page.test.tsx):
+  proves create, edit, favorite, delete, filtering, ETag conflict repair, focus refresh, and
+  superseded-request handling.
+- [`apps/web/src/i18n/wardrobe-capsules-locales.spec.ts`](../../apps/web/src/i18n/wardrobe-capsules-locales.spec.ts):
+  proves all supported Web catalogs have complete, meaningful capsule copy and valid plural
+  forms.
+
+Mobile unit, component, and localization tests:
+
+- [`apps/mobile/src/lib/wardrobe.test.ts`](../../apps/mobile/src/lib/wardrobe.test.ts):
+  proves the native client builds the documented strong capsule ETag.
+- [`apps/mobile/components/wardrobe/capsule-builder-modal.test.tsx`](../../apps/mobile/components/wardrobe/capsule-builder-modal.test.tsx):
+  proves native selection, occasion, limits, accessible move controls, save states, and
+  validation.
+- [`apps/mobile/src/screens/wardrobe-capsules-screen.test.tsx`](../../apps/mobile/src/screens/wardrobe-capsules-screen.test.tsx):
+  proves native listing, create/edit, filtering, favorite, deletion, conflict repair, and
+  lifecycle refresh.
+- [`apps/mobile/src/i18n/wardrobe-capsules-locales.spec.ts`](../../apps/mobile/src/i18n/wardrobe-capsules-locales.spec.ts):
+  proves all supported Mobile catalogs have complete, meaningful capsule copy and valid plural
+  forms.
+
+Pact contract tests:
+
+- [`pact/http/consumer/mobile-api-client.pacttest.ts`](../../pact/http/consumer/mobile-api-client.pacttest.ts):
+  defines Mobile's expected capsule CRUD, filter, conflict, and error interactions against the
+  Pact mock server.
+- [`pact/http/consumer/web-api-client.pacttest.ts`](../../pact/http/consumer/web-api-client.pacttest.ts):
+  defines Web's expected capsule CRUD, filter, conflict, and error interactions against the Pact
+  mock server.
+- [`pact/http/provider/api-provider.pacttest.ts`](../../pact/http/provider/api-provider.pacttest.ts):
+  replays generated capsule interactions against the Nest provider controllers and
+  scenario-controlled service doubles.
+
+Playwright end-to-end tests:
+
+- [`playwright/tests/wardrobe-capsule-create.spec.ts`](../../playwright/tests/wardrobe-capsule-create.spec.ts):
+  proves create, persisted garment order, second-client refresh, and combined filtering.
+- [`playwright/tests/wardrobe-capsule-repair.spec.ts`](../../playwright/tests/wardrobe-capsule-repair.spec.ts):
+  proves repair, favorite, and confirmed deletion journeys.
+- [`playwright/tests/wardrobe-capsule-accessibility.spec.ts`](../../playwright/tests/wardrobe-capsule-accessibility.spec.ts):
+  proves Axe results, keyboard-only creation, reorder focus and announcements, target size,
+  dialog focus restoration, and named confirmation semantics.
+
+Mobile end-to-end tests:
+
+- [`maestro/garment-capsule-create-flow.yaml`](../../maestro/garment-capsule-create-flow.yaml):
+  exercises native capsule creation and visible persistence.
+- [`maestro/garment-capsule-repair-flow.yaml`](../../maestro/garment-capsule-repair-flow.yaml):
+  exercises native repair, favorite, and saved-capsule recommendation handoff.
+- [`maestro/garment-capsule-localization-flow.yaml`](../../maestro/garment-capsule-localization-flow.yaml):
+  exercises localized capsule labels in a built app.
+
+Performance test:
+
+- [`k6/tests/couture-api-baseline.k6test.ts`](../../k6/tests/couture-api-baseline.k6test.ts):
+  exercises capsule list, detail, search, create, update, favorite, delete, and cold-Ritual
+  paths with endpoint-specific error-rate and environment-adjusted P95 thresholds.
+
 Architecture diagram:
 
 ```mermaid
@@ -3009,7 +4208,7 @@ flowchart TD
   Engine --> Ritual["RitualService\n(capsule revision gates cache reuse)"]
 ```
 
-## Step 32 - Wardrobe onboarding and silhouette setup
+## Step 32: Wardrobe onboarding and silhouette setup
 
 User/business impact:
 
@@ -3217,6 +4416,146 @@ Task owner map:
 - Story 4.4 Task 7 step 1 owner: wire real provider verification for onboarding and silhouette in pact/http/provider/provider-helper.ts
 - Story 4.4 Task 8 step 1 owner: real-PostgreSQL and real-Redis integration coverage in apps/api/integration/wardrobe-silhouette.integration.spec.ts
 
+Tests that cover this step:
+
+Real-PostgreSQL database tests:
+
+- [`packages/db/test/wardrobe-onboarding-schema.spec.ts`](../../packages/db/test/wardrobe-onboarding-schema.spec.ts):
+  proves onboarding and silhouette defaults, singleton and upload uniqueness, cascades,
+  moderation linkage, indexes, row-level security, and grants against PostgreSQL.
+- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts):
+  proves owner, guardian, admin, stranger, spoofing, and service-role boundaries for onboarding
+  and silhouette rows.
+
+Shared contract unit tests:
+
+- [`packages/utils/src/wardrobe-object-path.spec.ts`](../../packages/utils/src/wardrobe-object-path.spec.ts):
+  proves My Form object paths stay inside the expected user and silhouette-profile namespace.
+- [`packages/api-client/testing/wardrobe-onboarding-contract.spec.ts`](../../packages/api-client/testing/wardrobe-onboarding-contract.spec.ts):
+  proves valid state-machine shapes, impossible-state rejection, transition input, response
+  envelopes, OpenAPI routes, and precondition errors.
+- [`packages/api-client/testing/wardrobe-silhouette-contract.spec.ts`](../../packages/api-client/testing/wardrobe-silhouette-contract.spec.ts):
+  proves slider, My Form lifecycle, upload declaration, commit, failure reason, binary route,
+  ETag, and error schemas.
+- [`packages/api-client/testing/wardrobe-onboarding-analytics.spec.ts`](../../packages/api-client/testing/wardrobe-onboarding-analytics.spec.ts):
+  proves onboarding analytics accept canonical properties and reject photo, body-detail, and
+  non-allowlisted fields.
+
+API unit and boundary tests:
+
+- [`apps/api/src/modules/wardrobe/wardrobe-onboarding.controller.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-onboarding.controller.spec.ts):
+  proves GET and PATCH validation, `If-Match` forwarding, response envelopes, and ETag headers.
+- [`apps/api/src/modules/wardrobe/wardrobe-onboarding.service.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-onboarding.service.spec.ts):
+  proves strong ETags, forward-only transitions, server-authoritative garment counts, sticky
+  starter choice, revision races, no-op replay, and recoverable exactly-once telemetry.
+- [`apps/api/src/modules/wardrobe/wardrobe-silhouette.controller.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-silhouette.controller.spec.ts):
+  proves slider, upload allocation, raw-byte relay, commit, delete, request validation, ETags,
+  and real fresh-versus-replay wire statuses.
+- [`apps/api/src/modules/wardrobe/wardrobe-silhouette.service.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-silhouette.service.spec.ts):
+  proves slider persistence, optimistic revisions, My Form allocation/upload/commit/delete,
+  guardian consent, validation, idempotency, queue recovery, and signed ready-image access.
+- [`apps/api/src/modules/wardrobe/wardrobe-silhouette-image-validation.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-silhouette-image-validation.spec.ts):
+  proves decodable portrait framing and rejects declaration or geometry mismatches.
+- [`apps/api/src/modules/wardrobe/wardrobe-upload-token.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-upload-token.spec.ts):
+  proves the shared HMAC token handles My Form session payloads, multibyte subjects, tampering,
+  expiry, and weak secrets.
+- [`apps/api/src/modules/wardrobe/silhouette-photo-moderation.engine.spec.ts`](../../apps/api/src/modules/wardrobe/silhouette-photo-moderation.engine.spec.ts):
+  proves contrast and privacy verdict heuristics plus test-fixture engine environment guards.
+- [`apps/api/src/modules/wardrobe/silhouette-photo-processing.queue.spec.ts`](../../apps/api/src/modules/wardrobe/silhouette-photo-processing.queue.spec.ts):
+  proves unique, stable, BullMQ-safe per-attempt job-id derivation and job-payload validation.
+- [`apps/api/src/modules/wardrobe/silhouette-photo.processor.spec.ts`](../../apps/api/src/modules/wardrobe/silhouette-photo.processor.spec.ts):
+  proves ready, contrast, privacy, guardian-notification, stale-job, and storage-failure
+  processing paths.
+- [`apps/api/src/workers/wardrobe.bootstrap.spec.ts`](../../apps/api/src/workers/wardrobe.bootstrap.spec.ts):
+  proves the worker source registers one moderation-review consumer and selects the configured
+  moderation engine with stable failure classification.
+
+Real-infrastructure integration tests:
+
+- [`apps/api/integration/wardrobe-onboarding.integration.spec.ts`](../../apps/api/integration/wardrobe-onboarding.integration.spec.ts):
+  proves the virtual default, full and starter paths, advisory-lock concurrency, revision
+  conflicts, forward-only state, sticky choices, and telemetry recovery against PostgreSQL.
+- [`apps/api/integration/wardrobe-silhouette.integration.spec.ts`](../../apps/api/integration/wardrobe-silhouette.integration.spec.ts):
+  proves slider serialization, guardian denial, the real PostgreSQL and Redis/BullMQ My Form
+  pipeline, per-attempt jobs, deletion, and idempotent commit behavior.
+
+Web unit, component, and localization tests:
+
+- [`apps/web/src/lib/wardrobe.test.ts`](../../apps/web/src/lib/wardrobe.test.ts):
+  proves onboarding and silhouette client wrappers preserve schemas, ETags, idempotency keys,
+  raw uploads, statuses, and abort signals.
+- [`apps/web/src/app/components/silhouette-settings-panel.test.tsx`](../../apps/web/src/app/components/silhouette-settings-panel.test.tsx):
+  proves slider saves, My Form guidance, upload and processing, deletion, conflicts, retries,
+  accessibility, and stale-result suppression.
+- [`apps/web/src/app/wardrobe/onboarding/page.test.tsx`](../../apps/web/src/app/wardrobe/onboarding/page.test.tsx):
+  proves permission, capture, tagging, starter, silhouette, completion, resume, polling, focus,
+  announcements, concurrency guards, and error states.
+- [`apps/web/src/app/wardrobe/onboarding/page.bootstrap-failures.test.tsx`](../../apps/web/src/app/wardrobe/onboarding/page.bootstrap-failures.test.tsx):
+  proves bootstrap and transition failures render useful copy and late results are ignored after
+  unmount.
+- [`apps/web/src/app/wardrobe/onboarding/page.remaining-paths.test.tsx`](../../apps/web/src/app/wardrobe/onboarding/page.remaining-paths.test.tsx):
+  proves rejected camera permission and the remaining tagging-to-silhouette branch.
+- [`apps/web/src/app/wardrobe/page.test.tsx`](../../apps/web/src/app/wardrobe/page.test.tsx):
+  proves the wardrobe hub exposes onboarding and standalone silhouette entry points with the
+  correct current state.
+- [`apps/web/src/i18n/wardrobe-onboarding-locales.spec.ts`](../../apps/web/src/i18n/wardrobe-onboarding-locales.spec.ts):
+  proves all supported Web catalogs have complete, meaningful onboarding and silhouette copy.
+
+Mobile unit, component, and localization tests:
+
+- [`apps/mobile/src/lib/wardrobe.test.ts`](../../apps/mobile/src/lib/wardrobe.test.ts):
+  proves onboarding and silhouette request wrappers, ETags, upload sessions, commit statuses,
+  and error normalization.
+- [`apps/mobile/components/wardrobe/garment-capture-modal.test.tsx`](../../apps/mobile/components/wardrobe/garment-capture-modal.test.tsx):
+  proves the reusable native capture modal reports committed garments back to onboarding and
+  handles consent, progress, retry, and accessibility.
+- [`apps/mobile/components/wardrobe/silhouette-editor.test.tsx`](../../apps/mobile/components/wardrobe/silhouette-editor.test.tsx):
+  proves slider boundaries and saves, My Form guidance, upload, processing, retries, deletion,
+  announcements, and stale-response handling.
+- [`apps/mobile/src/features/wardrobe/wardrobe-onboarding-screen.test.tsx`](../../apps/mobile/src/features/wardrobe/wardrobe-onboarding-screen.test.tsx):
+  proves permission, capture, tagging, starter, silhouette, completion, resume, polling,
+  consent, offline, and stale-revision paths.
+- [`apps/mobile/src/features/wardrobe/wardrobe-silhouette-screen.test.tsx`](../../apps/mobile/src/features/wardrobe/wardrobe-silhouette-screen.test.tsx):
+  proves the standalone screen resolves authentication and exposes the shared editor or sign-in
+  state.
+- [`apps/mobile/src/features/wardrobe/wardrobe-hub-screen.test.tsx`](../../apps/mobile/src/features/wardrobe/wardrobe-hub-screen.test.tsx):
+  proves the hub reflects onboarding progress and routes to onboarding or My Form settings.
+- [`apps/mobile/src/i18n/wardrobe-onboarding-silhouette-locales.spec.ts`](../../apps/mobile/src/i18n/wardrobe-onboarding-silhouette-locales.spec.ts):
+  proves all supported Mobile catalogs have complete, meaningful onboarding and silhouette copy.
+
+Pact contract tests:
+
+- [`pact/http/consumer/mobile-api-client.pacttest.ts`](../../pact/http/consumer/mobile-api-client.pacttest.ts):
+  defines Mobile's expected onboarding, slider, My Form upload, commit, replay, and deletion
+  interactions against the Pact mock server.
+- [`pact/http/consumer/web-api-client.pacttest.ts`](../../pact/http/consumer/web-api-client.pacttest.ts):
+  defines Web's expected onboarding, slider, My Form upload, commit, replay, and deletion
+  interactions against the Pact mock server.
+- [`pact/http/provider/api-provider.pacttest.ts`](../../pact/http/provider/api-provider.pacttest.ts):
+  replays generated onboarding and silhouette interactions against real Nest controllers with
+  scenario-controlled service doubles.
+
+Playwright end-to-end tests:
+
+- [`playwright/tests/wardrobe-onboarding-flow.spec.ts`](../../playwright/tests/wardrobe-onboarding-flow.spec.ts):
+  proves the guided permission, capture, tagging, silhouette-slider, completion, redirect, and
+  persisted-resume journey.
+- [`playwright/tests/wardrobe-onboarding-my-form.spec.ts`](../../playwright/tests/wardrobe-onboarding-my-form.spec.ts):
+  proves My Form upload through ready, slider fallback to the mannequin, contrast-failure
+  recovery, and transient-network retry.
+- [`playwright/tests/wardrobe-onboarding-accessibility.spec.ts`](../../playwright/tests/wardrobe-onboarding-accessibility.spec.ts):
+  proves keyboard navigation, focus movement and restoration, announcements, target sizes, and
+  Axe results for onboarding and silhouette surfaces.
+
+Mobile end-to-end tests:
+
+- [`maestro/wardrobe-onboarding-flow.yaml`](../../maestro/wardrobe-onboarding-flow.yaml):
+  exercises the native guided onboarding path through completion.
+- [`maestro/wardrobe-onboarding-my-form-flow.yaml`](../../maestro/wardrobe-onboarding-my-form-flow.yaml):
+  exercises native My Form guidance, upload, ready result, removal, and mannequin fallback.
+- [`maestro/wardrobe-onboarding-localization-flow.yaml`](../../maestro/wardrobe-onboarding-localization-flow.yaml):
+  exercises localized onboarding and silhouette labels in a built app.
+
 Architecture diagram:
 
 ```mermaid
@@ -3235,7 +4574,7 @@ flowchart TD
   OS -- "started/completed" --> Telemetry["Guarded telemetry emission\n(started_telemetry_emitted_at / completed_telemetry_emitted_at)"]
 ```
 
-## Step 33 - Affiliate "Shop this look" CTA
+## Step 33: Affiliate "Shop this look" CTA
 
 User/business impact:
 
@@ -3253,13 +4592,49 @@ ever reaches an analytics property.
 
 Key takeaways:
 
+1. **Commerce is assembled after personalization.** `RitualService` owns the
+   cacheable outfit recommendation. `RitualController` adds `shopThisLook`
+   after every cold or warm service path has returned. This keeps catalog and
+   preference state out of Redis while giving every response one eligibility
+   checkpoint.
+2. **Opt-out is enforced on the server and protected on the device.** The
+   preferences API is always reachable, including when the affiliate feature
+   flag is disabled. Mobile removes `shopThisLook` before saving its device
+   cache, so cached and offline recommendations cannot revive a hidden CTA.
+3. **Attribution begins with a durable click.** The Ritual response carries no
+   partner URL. A click request rechecks eligibility, inserts or reuses one
+   `AffiliateClick`, mints an opaque HMAC token, validates the destination host,
+   and only then returns the redirect URL.
+4. **Product dedupe and concurrency dedupe are separate rules.** The service
+   enforces a rolling 60-second window. A partial unique index over the click's
+   minute bucket decides simultaneous insert races. The service still handles
+   taps that straddle adjacent minute buckets.
+5. **Webhook verification starts with the exact request bytes.** The public
+   conversion route authenticates with a timestamped HMAC over `rawBody`. Its
+   partner record can reference only an allowlisted environment variable name,
+   and the database never stores the secret value.
+6. **Commercial facts outlive analytics.** Clicks and conversions remain in
+   append-only commercial storage for 24 months. Telemetry receives strict,
+   privacy-safe properties and never receives redirect URLs, product titles,
+   garment ids, or raw user ids.
+7. **Commerce data is owner-only.** Guardians cannot read a user's preference
+   or purchase-intent trail. Catalog and conversion tables are server-only, and
+   negative RLS tests prove that the expected grants existed before revocation.
+8. **Offer selection is deterministic.** The lookup checks partner activity,
+   publication windows in a single UTC frame, exact locale before the `'*'`
+   fallback, priority, and id as the final tie-breaker. Shared seed data is
+   isolated by test-owned garment categories instead of being deleted or
+   parked while parallel suites are running.
+
+Hard-won lessons from the implementation and code review of this story:
+
 1. **A green test suite does not mean the code compiles.** Making
    `shopThisLook` a required field on `scenarioOutfitSchema` broke
    `RitualService`, which declares a return type it no longer satisfied. All
    1271 API tests still passed, because Vitest transpiles through esbuild
-   without type checking, and lint says nothing about assignability. `npm run
-typecheck` is a separate gate and belongs in the same breath as the test run
-   for any change that touches a shared contract type. This one shipped to a
+   without type checking, and lint says nothing about assignability.
+   `npm run typecheck` is a separate gate and belongs in the same breath as the
+   test run for any change that touches a shared contract type. This one shipped to a
    branch four other sessions then built on.
 
 2. **`timestamp without time zone` compared against `now()` silently shifts by
@@ -3268,9 +4643,9 @@ typecheck` is a separate gate and belongs in the same breath as the test run
    `timestamptz`. Comparing the two makes PostgreSQL read the naive side in the
    session's `TimeZone`, so on a container set to `America/Chicago` every
    affiliate publication window moved five hours and the sixty-second click
-   dedupe window could not match at all. The correct comparison is `now() AT
-TIME ZONE 'UTC'`, which yields a naive timestamp whose wall-clock reading is
-   the UTC instant, matching the frame the column was written in. What exposed
+   dedupe window could not match at all. The correct comparison is
+   `now() AT TIME ZONE 'UTC'`, which yields a naive timestamp whose wall-clock
+   reading is the UTC instant, matching the frame the column was written in. What exposed
    it was a pair of boundary tests that failed roughly half the time depending
    on whether `now()`'s sub-millisecond remainder rounded up on write. A test
    that is flaky at a boundary is often reporting a real frame mismatch rather
@@ -3301,11 +4676,11 @@ TIME ZONE 'UTC'`, which yields a naive timestamp whose wall-clock reading is
    right.** Once the sentinel worked, the seeded global catalog matched every
    query, and eight offer-selection tests that asserted "no offer was selected"
    started failing for a correct reason. On a database that carries a globally
-   published catalog, emptiness is not a statement a test can make. The suite now
-   parks the seeded rows for its own duration and restores them in `afterAll`,
-   rather than deleting state that Playwright and Maestro setup depend on. The
-   earlier version of a different spec did delete it, which made that spec pass
-   only on its second run and quietly broke its own first run.
+   published catalog, emptiness is not a statement a test can make. Temporarily
+   parking the shared rows also fails under parallel execution because it races
+   any suite creating new offers. The stable fix isolates each test with a
+   test-owned garment category while leaving the shared catalog intact for
+   Playwright, Maestro, and other integration suites.
 
 6. **Reading `process.env[<value from a database row>]` is an unbounded
    environment read.** Each affiliate partner names its own webhook signing
@@ -3345,8 +4720,9 @@ TIME ZONE 'UTC'`, which yields a naive timestamp whose wall-clock reading is
 9. **A uniqueness index that enforces concurrency is not the same rule as the
    product's window.** Click dedupe is a sixty-second sliding window, enforced by
    a read-then-insert that two simultaneous taps both pass. The backstop is a
-   unique index on `(user_id, offer_id, recommendation_id, date_trunc('minute',
-created_at))`, which guarantees exactly one row survives a race. It is
+   unique index on
+   `(user_id, offer_id, recommendation_id, date_trunc('minute', created_at))`,
+   which guarantees exactly one row survives a race. It is
    deliberately not the product rule: two taps at 10:00:59 and 10:01:01 fall in
    different buckets and both insert, and the service's own window check is what
    catches those. Both facts are asserted, so the gap between them is visible in
@@ -3386,6 +4762,269 @@ created_at))`, which guarantees exactly one row survives a race. It is
     they cannot both be satisfied by the same shape. Worth deciding up front
     which one a given story is more willing to pay.
 
+13. **`done` must keep its evidence boundaries visible.** The automated API,
+    database, contract, Playwright, and k6 evidence is recorded. The Maestro flow
+    has not completed end to end, VoiceOver and TalkBack were not observed, the
+    nine non-English disclosure translations still need human review, and Pact
+    provider verification retains a pre-existing intermittent Linux failure.
+    Story completion records those limits instead of turning them into implied
+    proof.
+
+Story/Task mapping:
+
+- Story 5.1
+- Task 1 (Prisma schema, migration, RLS, and reachable seed)
+- Task 2 (Contracts, analytics registries, fixtures, and factories)
+- Task 3 (Commerce module, preferences, eligibility, and retention)
+- Task 4 (Attributed click endpoint)
+- Task 5 (Conversion webhook)
+- Task 6 (Mobile CTA and settings)
+- Task 7 (Web settings surface)
+- Task 8 (Consumer and provider contracts)
+- Task 9 (End-to-end, accessibility, and performance evidence)
+- Task 10 (Verification gate)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/5-1-affiliate-shop-this-look-cta.md`
+- `_bmad-output/implementation-artifacts/5-1-review-log.md`
+- `_bmad-output/test-artifacts/story-5.1-release-qa.md`
+
+Cross-links:
+
+- Step 3 provides the Prisma modeling, migration, deterministic seed, and RLS
+  foundation for the five commerce models.
+- Step 7 provides the quality gates that must include type checking alongside
+  lint and tests.
+- Step 8 provides the shared analytics contracts and privacy allowlists.
+- Step 15 provides the canonical contract validation and generated-client flow.
+- Step 18 provides the audit and durable telemetry conventions.
+- Step 19 provides the cached Ritual recommendation that commerce decorates at
+  the controller boundary.
+- Step 22 provides localization parity across ten Web and Mobile catalogs.
+- Step 28 provides the keyboard, focus, and assistive-technology baseline.
+- Step 32 provides the negative-test and real-infrastructure review discipline
+  carried into this story.
+
+Sequence to follow:
+
+1. Read `packages/db/prisma/schema.prisma`,
+   `packages/db/prisma/migrations/20260811090000_add_commerce_affiliate/migration.sql`,
+   and `packages/db/prisma/seeds/commerce.ts` for the commercial record model,
+   constraints, policies, indexes, and globally reachable seed.
+2. Read `packages/api-client/src/contracts/http/commerce.ts`,
+   `packages/api-client/src/contracts/http/ritual.ts`, and
+   `packages/api-client/src/contracts/http/openapi.ts` for the public schemas,
+   nullable response decoration, status codes, and generated API boundary.
+3. Read `apps/api/src/modules/commerce/affiliate-offer.service.ts` for ordered
+   eligibility and offer selection, then `commerce-preferences.service.ts` and
+   `commerce-retention.service.ts` for opt-out, audit, and 24-month retention.
+4. Read `apps/api/src/modules/personalization/ritual.controller.ts` for the
+   post-cache assembly point. Then inspect `apps/mobile/src/lib/ritual-cache.ts`
+   and `apps/mobile/app/(tabs)/index.tsx` for device-cache stripping.
+5. Read `apps/api/src/modules/commerce/affiliate-click.service.ts`,
+   `commerce-click-token.ts`, and `affiliate-deep-link.ts` for dedupe, opaque
+   attribution, and redirect validation.
+6. Read `apps/api/src/modules/commerce/affiliate-webhook-signature.ts` and
+   `affiliate-webhook.service.ts`, then compare `apps/api/src/main.ts` with
+   `apps/api/api/index.ts` to see why raw-body configuration belongs in every
+   bootstrap.
+7. Read `apps/mobile/components/hero/outfit-recommendation-card.tsx`,
+   `apps/mobile/app/(tabs)/settings.tsx`, and
+   `apps/web/src/app/components/commerce-preferences-section.tsx` for disclosure,
+   browser handoff, accessibility, and immediate preference updates.
+8. Read the evidence in this order:
+   `apps/api/integration/commerce-affiliate-offers.integration.spec.ts`,
+   `commerce-affiliate-clicks.integration.spec.ts`,
+   `commerce-affiliate-webhook.integration.spec.ts`,
+   `packages/db/test/commerce-schema.spec.ts`,
+   `playwright/tests/api/commerce-affiliate.api.spec.ts`, and
+   `_bmad-output/test-artifacts/story-5.1-release-qa.md`.
+
+Task owner map:
+
+- Story 5.1 Task 1 step 1 owner: define commerce models, constraints, indexes,
+  and RLS policies in `packages/db/prisma/schema.prisma` and its migration.
+- Story 5.1 Task 1 step 2 owner: seed the partner, global offer, and feature flag
+  in `packages/db/prisma/seeds/commerce.ts` and `feature-flags.ts`.
+- Story 5.1 Task 2 step 1 owner: define commerce HTTP and Ritual response
+  contracts in `packages/api-client/src/contracts/http/commerce.ts` and
+  `ritual.ts`.
+- Story 5.1 Task 2 step 2 owner: register privacy-safe commerce analytics in
+  `packages/api-client/src/types/analytics-events.ts`.
+- Story 5.1 Task 3 step 1 owner: resolve eligible offers in
+  `apps/api/src/modules/commerce/affiliate-offer.service.ts`.
+- Story 5.1 Task 3 step 2 owner: persist preference changes and audit rows in
+  `apps/api/src/modules/commerce/commerce-preferences.service.ts`.
+- Story 5.1 Task 3 step 3 owner: assemble `shopThisLook` after the cached service
+  result in `apps/api/src/modules/personalization/ritual.controller.ts`.
+- Story 5.1 Task 4 step 1 owner: deduplicate clicks and mint attribution in
+  `apps/api/src/modules/commerce/affiliate-click.service.ts`.
+- Story 5.1 Task 5 step 1 owner: verify signatures and persist conversions in
+  `apps/api/src/modules/commerce/affiliate-webhook.service.ts`.
+- Story 5.1 Task 6 step 1 owner: render the disclosed Mobile CTA in
+  `apps/mobile/components/hero/outfit-recommendation-card.tsx`.
+- Story 5.1 Task 6 step 2 owner: strip commerce before device caching in
+  `apps/mobile/app/(tabs)/index.tsx`.
+- Story 5.1 Tasks 6 and 7 step 1 owner: implement Mobile and Web preference
+  controls in their settings surfaces.
+- Story 5.1 Task 8 step 1 owner: prove consumer and provider compatibility in
+  `pact/http/consumer/` and `pact/http/provider/`.
+- Story 5.1 Tasks 9 and 10 step 1 owner: record E2E, accessibility, query-plan,
+  performance, and verification evidence in the test suites and release QA
+  artifact.
+
+Tests that cover this step:
+
+Each file below starts with a Step 33 cross-link. Open the test before the
+implementation when you want to learn the behavior from executable examples.
+The map describes what each test asserts. Execution evidence and known gaps remain
+authoritative in `_bmad-output/test-artifacts/story-5.1-release-qa.md`.
+
+Configuration and fixture unit tests:
+
+- [`packages/config/src/flags.spec.ts`](../../packages/config/src/flags.spec.ts): proves the affiliate kill switch is
+  registered and defaults to off when remote and stored values are unavailable.
+- [`packages/testing/test/commerce.factory.spec.ts`](../../packages/testing/test/commerce.factory.spec.ts): proves
+  constraint-safe fixture defaults, Prisma mappings, relationship wiring, and
+  cleanup registration.
+- [`packages/testing/test/cleanup.spec.ts`](../../packages/testing/test/cleanup.spec.ts): proves tracked user cleanup reaches
+  preference and click delegates in the expected dependency order and clears the
+  registry afterward.
+
+Real-PostgreSQL database tests:
+
+- [`packages/db/test/commerce-schema.spec.ts`](../../packages/db/test/commerce-schema.spec.ts): proves defaults, constraints,
+  uniqueness, cascades, indexes, RLS enablement, and client grants.
+- [`packages/db/test/commerce-seed.spec.ts`](../../packages/db/test/commerce-seed.spec.ts): proves the non-production seed creates
+  active wildcard offers for four slots and never stores a real secret.
+- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts): proves owner access, guardian denial,
+  admin access, spoofing resistance, and server-only catalog/conversion tables.
+
+Shared contract and analytics tests:
+
+- [`packages/api-client/testing/commerce-contract.spec.ts`](../../packages/api-client/testing/commerce-contract.spec.ts): proves the
+  `shopThisLook`, preference, click, webhook, status, and error-envelope schemas.
+- [`packages/api-client/testing/commerce-analytics.spec.ts`](../../packages/api-client/testing/commerce-analytics.spec.ts): proves canonical
+  event builders and rejects URLs, titles, garment ids, and raw user ids.
+- [`packages/api-client/testing/ritual-contract.spec.ts`](../../packages/api-client/testing/ritual-contract.spec.ts): proves the existing
+  Ritual collection rules still accept outfits carrying `shopThisLook: null`.
+
+API unit and boundary tests:
+
+- [`apps/api/src/filters/api-exception.filter.spec.ts`](../../apps/api/src/filters/api-exception.filter.spec.ts): proves webhook rejections
+  are excluded from generic API-error telemetry while neighboring routes remain
+  observable.
+- [`apps/api/src/modules/commerce/affiliate-click.controller.spec.ts`](../../apps/api/src/modules/commerce/affiliate-click.controller.spec.ts): proves
+  authentication, locale forwarding, exception-to-status mapping, and `201`
+  versus `200`.
+- [`apps/api/src/modules/commerce/affiliate-click.service.spec.ts`](../../apps/api/src/modules/commerce/affiliate-click.service.spec.ts): proves click
+  eligibility precedence, recent-click replay behavior, race recovery, token
+  minting, and telemetry.
+- [`apps/api/src/modules/commerce/affiliate-click.telemetry.spec.ts`](../../apps/api/src/modules/commerce/affiliate-click.telemetry.spec.ts): proves click
+  analytics uses the pseudonymous subject and privacy-safe properties.
+- [`apps/api/src/modules/commerce/affiliate-deep-link.spec.ts`](../../apps/api/src/modules/commerce/affiliate-deep-link.spec.ts): proves template
+  substitution and the outbound host allowlist.
+- [`apps/api/src/modules/commerce/affiliate-offer.service.spec.ts`](../../apps/api/src/modules/commerce/affiliate-offer.service.spec.ts): proves every
+  eligibility short-circuit, slot derivation, and locale fallback.
+- [`apps/api/src/modules/commerce/affiliate-webhook-signature.spec.ts`](../../apps/api/src/modules/commerce/affiliate-webhook-signature.spec.ts): proves
+  raw-byte HMAC verification and constant-time signature handling.
+- [`apps/api/src/modules/commerce/affiliate-webhook.controller.spec.ts`](../../apps/api/src/modules/commerce/affiliate-webhook.controller.spec.ts): proves
+  raw bytes and all three signing headers reach the verification service unchanged.
+- [`apps/api/src/modules/commerce/affiliate-webhook.service.spec.ts`](../../apps/api/src/modules/commerce/affiliate-webhook.service.spec.ts): proves the
+  five verification stages, append-only idempotency, matching, and fail-open
+  analytics behavior.
+- [`apps/api/src/modules/commerce/commerce-cache-headers.middleware.spec.ts`](../../apps/api/src/modules/commerce/commerce-cache-headers.middleware.spec.ts):
+  proves the middleware sets a private, non-cacheable policy before continuing.
+- [`apps/api/src/modules/commerce/commerce-click-token.spec.ts`](../../apps/api/src/modules/commerce/commerce-click-token.spec.ts): proves click-token
+  HMAC construction, secret strength, and test-only fallback rules.
+- [`apps/api/src/modules/commerce/commerce-preferences.controller.spec.ts`](../../apps/api/src/modules/commerce/commerce-preferences.controller.spec.ts): proves
+  authenticated preference reads and writes plus response contract parsing.
+- [`apps/api/src/modules/commerce/commerce-retention.service.spec.ts`](../../apps/api/src/modules/commerce/commerce-retention.service.spec.ts): proves the
+  24-month commercial retention cutoff and failure isolation.
+- [`apps/api/src/modules/commerce/commerce.repository.spec.ts`](../../apps/api/src/modules/commerce/commerce.repository.spec.ts): proves the SQL
+  predicates for UTC windows, wildcard regions, dedupe, and persistence.
+- [`apps/api/src/modules/feature-flags/feature-flags.service.spec.ts`](../../apps/api/src/modules/feature-flags/feature-flags.service.spec.ts): proves the
+  PostHog, database, and safe-default fallback chain used by the kill switch.
+- [`apps/api/src/modules/personalization/ritual.controller.spec.ts`](../../apps/api/src/modules/personalization/ritual.controller.spec.ts): proves
+  commerce is assembled after cache reads and never written into Ritual caches.
+- [`apps/api/src/modules/telemetry/telemetry.service.spec.ts`](../../apps/api/src/modules/telemetry/telemetry.service.spec.ts): proves click and
+  conversion pseudonymization, property validation, and independent sinks.
+
+Real-infrastructure integration tests:
+
+- [`apps/api/integration/commerce-affiliate-offers.integration.spec.ts`](../../apps/api/integration/commerce-affiliate-offers.integration.spec.ts): proves
+  deterministic offer selection, UTC publication windows, wildcard regions, and
+  shared-seed isolation against real PostgreSQL.
+- [`apps/api/integration/commerce-affiliate-offers-query-plan.integration.spec.ts`](../../apps/api/integration/commerce-affiliate-offers-query-plan.integration.spec.ts):
+  proves the lookup indexes are usable, buffer reads stay bounded, and the
+  assertions fail when the index contract is removed.
+- [`apps/api/integration/commerce-affiliate-clicks.integration.spec.ts`](../../apps/api/integration/commerce-affiliate-clicks.integration.spec.ts): proves
+  real HTTP statuses, 60-second dedupe boundaries, concurrent taps, and redirect
+  safety against real PostgreSQL.
+- [`apps/api/integration/commerce-affiliate-webhook.integration.spec.ts`](../../apps/api/integration/commerce-affiliate-webhook.integration.spec.ts): proves
+  unauthenticated delivery, raw-body fidelity, signature boundaries, replay
+  races, telemetry exclusion, and separation from the 24-hour telemetry pruner
+  against real HTTP and PostgreSQL.
+
+Web unit and component tests:
+
+- [`apps/web/src/app/settings/page.test.tsx`](../../apps/web/src/app/settings/page.test.tsx): proves disclosure order, signed-out
+  behavior, optimistic toggling, persistence, confirmation, and error recovery.
+- [`apps/web/src/lib/commerce.test.ts`](../../apps/web/src/lib/commerce.test.ts): proves Web preference request and response
+  validation at the API-client boundary.
+- [`apps/web/src/i18n/commerce-locales.spec.ts`](../../apps/web/src/i18n/commerce-locales.spec.ts): proves all ten Web catalogs have
+  complete, non-placeholder commerce copy.
+
+Mobile unit and component tests:
+
+- [`apps/mobile/components/hero/outfit-recommendation-card.test.tsx`](../../apps/mobile/components/hero/outfit-recommendation-card.test.tsx): proves the
+  disclosed CTA, partner label, pending state, failure state, and browser handoff.
+- [`apps/mobile/src/lib/commerce.test.ts`](../../apps/mobile/src/lib/commerce.test.ts): proves locale derivation, network-only
+  CTA rendering, preference calls, click calls, and in-app browser opening.
+- [`apps/mobile/src/lib/native-file-storage.test.ts`](../../apps/mobile/src/lib/native-file-storage.test.ts): proves persisted Ritual data
+  cannot retain a `shopThisLook` block.
+- [`apps/mobile/src/screens/hero-affiliate-cta.test.tsx`](../../apps/mobile/src/screens/hero-affiliate-cta.test.tsx): proves network versus
+  cached rendering, once-per-recommendation impressions, cache stripping, and
+  CTA removal on the first Ritual load after opt-out.
+- [`apps/mobile/src/screens/tab-two-screen.test.tsx`](../../apps/mobile/src/screens/tab-two-screen.test.tsx): proves the Mobile settings
+  disclosure, preference round trip, accessibility, and all-locale layout bounds.
+- [`apps/mobile/src/i18n/commerce-locales.spec.ts`](../../apps/mobile/src/i18n/commerce-locales.spec.ts): proves all ten Mobile catalogs
+  have complete, non-placeholder commerce copy.
+
+Pact contract tests:
+
+- [`pact/http/consumer/mobile-api-client.pacttest.ts`](../../pact/http/consumer/mobile-api-client.pacttest.ts): defines Mobile's expected
+  eligible Ritual, preference, click mint/replay, and webhook interactions against
+  the Pact mock server.
+- [`pact/http/consumer/web-api-client.pacttest.ts`](../../pact/http/consumer/web-api-client.pacttest.ts): defines Web's expected eligible
+  Ritual, preference, click mint/replay, and webhook interactions against the
+  Pact mock server.
+- [`pact/http/provider/api-provider.pacttest.ts`](../../pact/http/provider/api-provider.pacttest.ts): replays generated consumer contracts
+  against real Nest controllers with scenario-controlled service doubles.
+
+Playwright end-to-end tests:
+
+- [`playwright/tests/api/commerce-affiliate.api.spec.ts`](../../playwright/tests/api/commerce-affiliate.api.spec.ts): proves the seeded public
+  API flow from Ritual eligibility through click dedupe and signed conversion.
+- [`playwright/tests/commerce-affiliate-preferences.spec.ts`](../../playwright/tests/commerce-affiliate-preferences.spec.ts): proves the real Web
+  disclosure and opt-out journey, persistence, Axe checks, and keyboard focus.
+
+Mobile end-to-end test:
+
+- [`maestro/commerce-affiliate.yaml`](../../maestro/commerce-affiliate.yaml): exercises the visible Mobile CTA,
+  browser-handoff disclosure text, and settings opt-out flow on a built app. It
+  does not tap the CTA or verify the browser opens. Story 5.1 records that this
+  flow has not completed end to end.
+
+Performance test:
+
+- [`k6/tests/couture-api-baseline.k6test.ts`](../../k6/tests/couture-api-baseline.k6test.ts): exercises an affiliate-eligible warm
+  Ritual read and enforces the environment-adjusted P95 threshold for the
+  commerce path.
+
+Architecture diagram:
+
 ```mermaid
 flowchart TD
   Ritual["GET /api/v1/ritual"] --> Svc["RitualService\n(caches payload, no commerce)"]
@@ -3399,8 +5038,12 @@ flowchart TD
   Click --> Mint["Mint AffiliateClick\nHMAC token over row id"]
   Mint --> Redirect["redirectUrl on allowed_host"]
   Redirect --> Browser["WebBrowser.openBrowserAsync"]
-  Partner["Affiliate partner"] -- "signed over raw bytes" --> Hook["POST /commerce/affiliate/webhook\nno guard, HMAC only"]
+  Partner["Affiliate partner"]
+  Hook["POST /commerce/affiliate/webhook\nno guard, HMAC only"]
+  Partner -- "signed over raw bytes" --> Hook
   Hook --> Conv["AffiliateConversion\nappend-only, per (partner, eventId)"]
-  Toggle["Settings toggle\nMobile + Web"] --> Pref["CommercePreference\n+ AuditLog in one transaction"]
+  Toggle["Settings toggle\nMobile + Web"]
+  Pref["CommercePreference\n+ AuditLog in one transaction"]
+  Toggle --> Pref
   Pref --> Elig
 ```

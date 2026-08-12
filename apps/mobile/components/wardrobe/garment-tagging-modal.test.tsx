@@ -1,3 +1,5 @@
+// Learning path Step 30: Smart tagging and comfort metadata.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'

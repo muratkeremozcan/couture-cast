@@ -1,3 +1,7 @@
+// Learning path Step 23: Home and lock-screen widgets.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-23-home-and-lock-screen-widgets
+// Learning path Step 24: watchOS glance companion app and complications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-24-watchos-glance-companion-app-and-complications
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RitualResponse } from '@couture/api-client/contracts/http'
 import { mockRitualResponse } from '../test-utils/msw/handlers'

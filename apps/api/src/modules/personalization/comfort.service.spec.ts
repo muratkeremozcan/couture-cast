@@ -1,3 +1,5 @@
+// Learning path Step 20: Comfort calibration settings.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-20-comfort-calibration-settings
 // Story 2.2 Task 3 step 1 owner: unit-test default fallbacks, upserts, and cache invalidation
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { ComfortService } from './comfort.service.js'

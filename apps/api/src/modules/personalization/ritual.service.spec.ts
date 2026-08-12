@@ -1,3 +1,15 @@
+// Learning path Step 19: Scenario outfit generator.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-19-scenario-outfit-generator
+// Learning path Step 20: Comfort calibration settings.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-20-comfort-calibration-settings
+// Learning path Step 21: Reasoning badges and explanations.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-21-reasoning-badges-and-explanations
+// Learning path Step 22: Localization infrastructure and quality gates.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-22-localization-infrastructure-and-quality-gates
+// Learning path Step 30: Smart tagging and comfort metadata.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 31: Outfit capsule builder.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 // Step 22 step 4 owner: verify translation key parity and placeholder replacements in apps/api/src/modules/personalization/ritual.service.spec.ts
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'

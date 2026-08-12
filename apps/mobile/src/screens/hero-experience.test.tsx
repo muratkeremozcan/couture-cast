@@ -1,3 +1,7 @@
+// Learning path Step 21: Reasoning badges and explanations.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-21-reasoning-badges-and-explanations
+// Learning path Step 26: Chip navigation and sticky bottom nav.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
 /* eslint-disable @typescript-eslint/await-thenable */
 import React from 'react'
 import { screen, fireEvent, waitFor } from '@testing-library/react'

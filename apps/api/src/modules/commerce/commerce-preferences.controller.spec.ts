@@ -1,3 +1,5 @@
+// Learning path Step 33: Affiliate "Shop this look" CTA.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import { Test, type TestingModule } from '@nestjs/testing'
 import { UnauthorizedException, type INestApplication } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'

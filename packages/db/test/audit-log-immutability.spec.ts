@@ -1,3 +1,5 @@
+// Learning path Step 18: Telemetry and audit baseline.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-18-telemetry-and-audit-baseline
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Pool, type PoolClient } from 'pg'

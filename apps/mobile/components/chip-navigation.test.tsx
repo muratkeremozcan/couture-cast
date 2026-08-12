@@ -1,3 +1,7 @@
+// Learning path Step 26: Chip navigation and sticky bottom nav.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
+// Learning path Step 28: Accessibility hardening.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 // Story 3.6 Task 5 step 3 owner: unit-test mobile React Native chip navigation pressables and selection state in apps/mobile/components/chip-navigation.test.tsx
 import React, { useState } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'

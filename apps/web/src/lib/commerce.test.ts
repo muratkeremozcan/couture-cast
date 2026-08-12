@@ -1,3 +1,5 @@
+// Learning path Step 33: Affiliate "Shop this look" CTA.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 // Story 5.1 Task 7 owner: the web commerce preference client.
 import { http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it, vi } from 'vitest'

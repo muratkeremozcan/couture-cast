@@ -1,3 +1,5 @@
+// Learning path Step 29: Garment capture flow.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Story 4.1 Task 8 step 4 owner: E2E Playwright test for wardrobe capture modal accessibility and landmark visibility
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
@@ -5,11 +7,13 @@ import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessi
 test.describe('Wardrobe Garment Capture Flow', () => {
   test('opens wardrobe hub, launches capture modal, and checks accessibility', async ({
     page,
+    interceptNetworkCall,
   }) => {
     // Network-first readiness signal: intercept navigation/readiness response before navigating
-    const responsePromise = page.waitForResponse(
-      (resp) => resp.url().includes('/wardrobe') || resp.status() === 200
-    )
+    const responsePromise = interceptNetworkCall({
+      method: 'GET',
+      url: '**/wardrobe*',
+    })
     await page.goto('/wardrobe')
     await responsePromise
     await waitForAccessibilityReady(page)

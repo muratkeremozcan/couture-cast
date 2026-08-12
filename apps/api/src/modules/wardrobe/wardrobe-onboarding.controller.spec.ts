@@ -1,3 +1,5 @@
+// Learning path Step 32: Wardrobe onboarding and silhouette setup.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/unbound-method */
 import type { Response } from 'express'
 import { describe, expect, it, vi } from 'vitest'

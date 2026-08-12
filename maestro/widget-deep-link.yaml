@@ -1,3 +1,7 @@
+# Learning path Step 23: Home and lock-screen widgets.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-23-home-and-lock-screen-widgets
+# Learning path Step 27: Widget and notification deep-link handling.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 # Story 3.3 Task 5 step 2 owner: define E2E Maestro routing verification scenarios in maestro/widget-deep-link.yaml
 appId: ${MAESTRO_APP_ID}
 name: 'Widget Deep Link Hydration'

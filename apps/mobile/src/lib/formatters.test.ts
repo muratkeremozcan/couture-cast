@@ -1,3 +1,5 @@
+// Learning path Step 22: Localization infrastructure and quality gates.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-22-localization-infrastructure-and-quality-gates
 import { describe, it, expect, vi } from 'vitest'
 import { formatTemperature, formatCurrency, formatMeasurement } from './formatters'
 

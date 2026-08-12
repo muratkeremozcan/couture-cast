@@ -1,3 +1,9 @@
+// Learning path Step 9: Observability bootstrap with OpenTelemetry.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-9-observability-bootstrap-with-opentelemetry
+// Learning path Step 10: Grafana Cloud setup, telemetry inventory, and dashboard planning.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-10-grafana-cloud-setup-telemetry-inventory-and-dashboard-planning
+// Learning path Step 11: API observability with structured logging.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-11-api-observability-with-structured-logging
 // Step 11 verification owner: searchable owner anchor
 import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

@@ -1,3 +1,7 @@
+// Learning path Step 23: Home and lock-screen widgets.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-23-home-and-lock-screen-widgets
+// Learning path Step 33: Affiliate "Shop this look" CTA.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockRitualResponse } from '../test-utils/msw/handlers'
 

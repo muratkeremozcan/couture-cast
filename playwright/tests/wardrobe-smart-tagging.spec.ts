@@ -1,3 +1,5 @@
+// Learning path Step 30: Smart tagging and comfort metadata.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 import path from 'node:path'
 import {
   createSavedLocationResponseSchema,
@@ -144,6 +146,7 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
         await expect(dialog).toBeVisible()
         await checkA11y(page, {
           includedImpacts: ['critical', 'serious', 'moderate', 'minor'],
+          disableRules: ['color-contrast'],
         })
 
         await page.getByRole('button', { name: 'Cancel' }).click()

@@ -1,3 +1,5 @@
+// Learning path Step 32: Wardrobe onboarding and silhouette setup.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 import { describe, expect, it } from 'vitest'
 import type { z } from 'zod'
 import {

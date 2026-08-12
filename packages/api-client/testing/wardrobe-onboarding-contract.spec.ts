@@ -1,3 +1,5 @@
+// Learning path Step 32: Wardrobe onboarding and silhouette setup.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Story 4.4 Task 7 step 1 owner: prove the onboarding-state Zod schemas parse
 // and reject correctly, mirroring wardrobe-contract.spec.ts's structure.
 import { describe, expect, it } from 'vitest'

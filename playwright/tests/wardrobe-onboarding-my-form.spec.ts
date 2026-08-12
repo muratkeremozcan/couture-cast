@@ -1,3 +1,5 @@
+// Learning path Step 32: Wardrobe onboarding and silhouette setup.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Story 4.4 Task 8 owner: end-to-end coverage for the "My Form" photo upload
 // path (AC 2, AC 3) reached from the standalone silhouette settings surface
 // (decision 3: reachable outside onboarding). Runs against the real default
@@ -63,7 +65,7 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
 
   myFormTest(
     '[P0] [4.4-E2E-003] uploads a "My Form" photo through to ready, it becomes the active silhouette mode, and adjusting a slider switches back',
-    async ({ apiRequest, cleanupState, page }, testInfo) => {
+    async ({ apiRequest, cleanupState, interceptNetworkCall, page }, testInfo) => {
       await signUpAndAuthenticate(
         apiRequest,
         page,
@@ -99,11 +101,10 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
 
       await test.step('Adjusting a slider switches the active mode back to the default mannequin (AC 2)', async () => {
         const heightSlider = dialog.getByTestId('silhouette-height-slider')
-        const saveResponse = page.waitForResponse(
-          (response) =>
-            response.url().includes('/api/v1/wardrobe/silhouette') &&
-            response.request().method() === 'PUT'
-        )
+        const saveResponse = interceptNetworkCall({
+          method: 'PUT',
+          url: '**/api/v1/wardrobe/silhouette*',
+        })
         await heightSlider.focus()
         await heightSlider.press('ArrowRight')
         await saveResponse
@@ -156,7 +157,7 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
 
   myFormTest(
     '[P1] [4.4-E2E-005] retries after a transient network failure, reusing the same upload attempt',
-    async ({ apiRequest, cleanupState, page }, testInfo) => {
+    async ({ apiRequest, cleanupState, interceptNetworkCall, page }, testInfo) => {
       await signUpAndAuthenticate(
         apiRequest,
         page,
@@ -166,16 +167,18 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
       )
       const dialog = await openSilhouetteSettings(page)
 
-      await test.step('Fail the raw-bytes PUT exactly once, simulating a transient network drop', async () => {
+      await test.step('Fail the raw-bytes PUT exactly once, simulating a transient network drop', () => {
         let abortedOnce = false
-        await page.route('**/*', async (route) => {
-          const request = route.request()
-          if (!abortedOnce && request.method() === 'PUT') {
-            abortedOnce = true
-            await route.abort('failed')
-            return
-          }
-          await route.continue()
+        void interceptNetworkCall({
+          url: '**/*',
+          handler: async (route, request) => {
+            if (!abortedOnce && request.method() === 'PUT') {
+              abortedOnce = true
+              await route.abort('failed')
+              return
+            }
+            await route.continue()
+          },
         })
       })
 

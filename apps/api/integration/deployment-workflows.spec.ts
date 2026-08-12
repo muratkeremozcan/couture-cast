@@ -1,3 +1,5 @@
+// Learning path Step 7: CI and CD automated quality gates.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-7-ci-and-cd-automated-quality-gates
 import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'

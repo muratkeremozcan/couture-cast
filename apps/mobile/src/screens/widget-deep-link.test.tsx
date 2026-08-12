@@ -1,3 +1,9 @@
+// Learning path Step 23: Home and lock-screen widgets.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-23-home-and-lock-screen-widgets
+// Learning path Step 24: watchOS glance companion app and complications.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-24-watchos-glance-companion-app-and-complications
+// Learning path Step 27: Widget and notification deep-link handling.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 /* eslint-disable @typescript-eslint/await-thenable */
 // Story 3.3 Task 5 step 1 owner: verify the production now/next widget link contract.
 import React from 'react'

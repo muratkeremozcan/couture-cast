@@ -1,3 +1,5 @@
+// Learning path Step 31: Outfit capsule builder.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/unbound-method */
 import type { Response } from 'express'
 import { describe, expect, it, vi } from 'vitest'

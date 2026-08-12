@@ -1,3 +1,5 @@
+// Learning path Step 33: Affiliate "Shop this look" CTA.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 // Story 5.1 Task 9: the Web settings opt-out journey against a real API.
 //
 // Round one built this page against MSW because the commerce endpoints did not

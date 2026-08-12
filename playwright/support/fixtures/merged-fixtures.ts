@@ -66,33 +66,40 @@ export const test = mergeTests(
 )
 
 // Capture Playwright test context and mock PostHog ingest endpoints before every test.
-test.beforeEach(async ({ page }, testInfo) => {
+// Note: Use `void` (not `await`) on `interceptNetworkCall` here because these are passive
+// background stubs. Invoking `interceptNetworkCall` registers `page.route` synchronously,
+// whereas awaiting the returned promise would block `beforeEach` until network traffic occurs
+// (which only happens after subsequent page navigation).
+test.beforeEach(({ interceptNetworkCall }, testInfo) => {
   captureTestContext(testInfo)
 
   // Mock PostHog ingest endpoints to return 200 OK
-  await page.route('**/ingest/static/**', async (route) => {
-    await route.fulfill({
+  void interceptNetworkCall({
+    url: '**/ingest/static/**',
+    fulfillResponse: {
       status: 200,
-      contentType: 'application/javascript',
+      headers: { 'content-type': 'application/javascript' },
       body: '/* mocked posthog asset */',
-    })
+    },
   })
 
-  await page.route('**/ingest/**', async (route) => {
-    const request = route.request()
-    if (request.method() === 'POST') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ status: 'ok' }),
-      })
-    } else {
-      await route.fulfill({
-        status: 200,
-        contentType: 'text/plain',
-        body: 'mocked',
-      })
-    }
+  void interceptNetworkCall({
+    url: '**/ingest/**',
+    handler: async (route, request) => {
+      if (request.method() === 'POST') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ok' }),
+        })
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/plain',
+          body: 'mocked',
+        })
+      }
+    },
   })
 })
 

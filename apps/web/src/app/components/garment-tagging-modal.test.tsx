@@ -1,3 +1,5 @@
+// Learning path Step 30: Smart tagging and comfort metadata.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 // @vitest-environment jsdom
 import React from 'react'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'

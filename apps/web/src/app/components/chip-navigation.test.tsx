@@ -1,3 +1,7 @@
+// Learning path Step 26: Chip navigation and sticky bottom nav.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
+// Learning path Step 28: Accessibility hardening.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 // Story 3.6 Task 5 step 1 owner: unit-test web chip navigation keyboard traversal, ARIA live updates, and telemetry error isolation in apps/web/src/app/components/chip-navigation.test.tsx
 import { useState } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'

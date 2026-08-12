@@ -1,3 +1,5 @@
+// Learning path Step 32: Wardrobe onboarding and silhouette setup.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 /* eslint-disable @typescript-eslint/unbound-method, @typescript-eslint/no-unsafe-assignment -- assertions read vi.fn() members off their mock object and nest expect.objectContaining(), which is the established pattern for these suites. */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConflictException, PreconditionFailedException } from '@nestjs/common'

@@ -1,3 +1,5 @@
+// Learning path Step 32: Wardrobe onboarding and silhouette setup.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Story 4.4 Task 5 owner: unit-test the web wardrobe onboarding guided flow's
 // bootstrap and step-advance failure paths. Split out of `page.test.tsx`
 // (Claude's TEA test review on PR #120, story 4.4 tasks 8/9): that file had

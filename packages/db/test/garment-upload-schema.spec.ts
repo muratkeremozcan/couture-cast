@@ -1,3 +1,7 @@
+// Learning path Step 29: Garment capture flow.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
+// Learning path Step 30: Smart tagging and comfort metadata.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 

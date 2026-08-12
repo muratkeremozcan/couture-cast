@@ -1,3 +1,5 @@
+// Learning path Step 27: Widget and notification deep-link handling.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 import { describe, expect, it, vi } from 'vitest'
 import { hasDeepLinkIntent, parseDeepLink, resolveDeepLinkScenario } from './deep-link'
 

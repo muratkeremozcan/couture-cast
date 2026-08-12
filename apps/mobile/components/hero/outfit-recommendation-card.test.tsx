@@ -1,3 +1,5 @@
+// Learning path Step 33: Affiliate "Shop this look" CTA.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 // Story 5.1 Task 6: the affiliate "Shop this look" block on the outfit card.
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'

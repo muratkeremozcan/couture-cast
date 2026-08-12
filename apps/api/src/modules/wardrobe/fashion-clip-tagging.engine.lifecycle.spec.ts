@@ -1,3 +1,5 @@
+// Learning path Step 30: Smart tagging and comfort metadata.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return -- the ONNX runtime session and tokenizer are stubbed with untyped test doubles, which is the established pattern for these suites. */
 import fs from 'node:fs'
 import path from 'node:path'

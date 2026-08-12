@@ -1,3 +1,5 @@
+// Learning path Step 29: Garment capture flow.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 import type { PrismaClient } from '@prisma/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 

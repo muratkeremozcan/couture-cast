@@ -1,3 +1,5 @@
+// Learning path Step 30: Smart tagging and comfort metadata.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 import type { PrismaClient } from '@prisma/client'
 import { GARMENT_TAGGING_ANALYSIS_VERSION } from '@couture/api-client'
 import { createGarmentTagSuggestionSnapshotFixture } from '@couture/api-client/testing/wardrobe-fixtures'

@@ -1,3 +1,5 @@
+// Learning path Step 29: Garment capture flow.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 /* eslint-disable @typescript-eslint/unbound-method -- assertions read vi.fn() members off the mocked BullMQ boundary, which is the established pattern for these suites. */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { QueueConfig } from '../../config/queues'

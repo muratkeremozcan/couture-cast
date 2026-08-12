@@ -1,3 +1,5 @@
+// Learning path Step 32: Wardrobe onboarding and silhouette setup.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 import { createHash } from 'node:crypto'
 import sharp from 'sharp'
 import { beforeAll, describe, expect, it } from 'vitest'

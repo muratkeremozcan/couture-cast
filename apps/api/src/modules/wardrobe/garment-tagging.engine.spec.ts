@@ -1,3 +1,5 @@
+// Learning path Step 30: Smart tagging and comfort metadata.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ANALYSIS_VERSION,

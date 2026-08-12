@@ -1,3 +1,5 @@
+// Learning path Step 8: Shared analytics contracts and event tracking.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-8-shared-analytics-contracts-and-event-tracking
 /* eslint-disable @typescript-eslint/await-thenable */
 import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'

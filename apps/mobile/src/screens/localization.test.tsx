@@ -1,3 +1,5 @@
+// Learning path Step 22: Localization infrastructure and quality gates.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-22-localization-infrastructure-and-quality-gates
 import { vi, describe, it, expect, beforeEach, beforeAll } from 'vitest'
 
 vi.mock('react-native', () => ({

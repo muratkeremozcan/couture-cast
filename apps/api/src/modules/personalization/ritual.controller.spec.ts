@@ -1,3 +1,9 @@
+// Learning path Step 19: Scenario outfit generator.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-19-scenario-outfit-generator
+// Learning path Step 22: Localization infrastructure and quality gates.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-22-localization-infrastructure-and-quality-gates
+// Learning path Step 33: Affiliate "Shop this look" CTA.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import 'reflect-metadata'
 import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'

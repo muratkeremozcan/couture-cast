@@ -1,3 +1,7 @@
+// Learning path Step 7: CI and CD automated quality gates.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-7-ci-and-cd-automated-quality-gates
+// Learning path Step 12: Cross-surface E2E confidence.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-12-cross-surface-e2e-confidence
 import { test, expect } from '../support/fixtures/merged-fixtures'
 
 const getExpectedSha = () =>

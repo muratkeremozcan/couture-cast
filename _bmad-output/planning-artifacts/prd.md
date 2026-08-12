@@ -49,16 +49,16 @@ No special regulatory domain constraints identified; standard consumer privacy a
 
 ### Business Metrics
 
-| Metric                       | Target                                                            | Purpose                                  |
-| ---------------------------- | ----------------------------------------------------------------- | ---------------------------------------- |
-| Activation completion        | ≥ 75% of new users finish profile + first outfit within 2 minutes | Confirms onboarding clarity and utility  |
-| Daily forecast engagement    | ≥ 1.5 forecast views per user per day                             | Validates weather habit formation        |
-| Outfit detail click-through  | ≥ 35% from “Today’s Look” tiles                                   | Ensures recommendations feel relevant    |
-| Commerce conversion          | ≥ 6% of outfit sessions trigger a brand click-to-buy              | Measures sponsorship/affiliate viability |
-| Community participation      | ≥ 30% of weekly actives post, react, or comment                   | Gauges social stickiness                 |
-| D7 / D30 retention           | ≥ 30% / ≥ 18%                                                     | Tracks cohort health                     |
-| Premium funnel               | ≥ 12% trial, ≥ 8% convert within 60 days                          | Confirms willingness to pay              |
-| “Outfit hit the mark?” score | ≥ 4.6 / 5                                                         | Measures perceived quality of AI styling |
+| Metric                       | Target                                                                                                                                | Purpose                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Activation completion        | ≥ 75% of new users finish profile + first outfit within 2 minutes                                                                     | Confirms onboarding clarity and utility  |
+| Daily forecast engagement    | ≥ 1.5 forecast views per user per day                                                                                                 | Validates weather habit formation        |
+| Outfit detail click-through  | ≥ 35% from “Today’s Look” tiles                                                                                                       | Ensures recommendations feel relevant    |
+| Commerce conversion          | ≥ 6% of outfit sessions trigger a brand click-to-buy                                                                                  | Measures sponsorship/affiliate viability |
+| Community participation      | ≥ 30% of weekly actives post, react, or comment                                                                                       | Gauges social stickiness                 |
+| D7 / D30 retention           | ≥ 30% / ≥ 18%                                                                                                                         | Tracks cohort health                     |
+| Premium funnel               | ≥ 8% of checkout starts convert within 60 days (no trial at launch; trial leg deferred, amended 2026-08-12 by CC-5.2 Open question 2) | Confirms willingness to pay              |
+| “Outfit hit the mark?” score | ≥ 4.6 / 5                                                                                                                             | Measures perceived quality of AI styling |
 
 ---
 

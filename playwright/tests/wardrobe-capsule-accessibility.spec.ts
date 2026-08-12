@@ -1,3 +1,5 @@
+// Learning path Step 31: Outfit capsule builder.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 // Story 4.3 Task 8: keyboard-only capsule creation, reorder semantics, and axe.
 import type { Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'

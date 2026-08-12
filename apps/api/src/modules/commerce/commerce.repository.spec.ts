@@ -1,3 +1,5 @@
+// Learning path Step 33: Affiliate "Shop this look" CTA.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Prisma } from '@prisma/client'
 import { createMockPrisma, type MockPrisma } from '../../testing/prisma-mock.js'
