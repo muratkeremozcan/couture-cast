@@ -13,19 +13,15 @@ env:
     clearState: false
     stopApp: false
 
-- openLink: ${APP_URL}
+- runFlow: subflows/open-app.yaml
 
+# Tabs are tapped by testID. The `25%,94%` / `75%,94%` coordinates these
+# replace were calibrated for a three-tab bar; adding Community shifted every
+# centre and the taps landed one tab short.
 - tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go developer menu if it appears'
-
-- tapOn:
-    point: '50%,92%'
-
-- tapOn:
-    point: '25%,94%'
+    id: 'tab-home'
     retryTapIfNoChange: true
+    label: 'Open home'
 
 - assertVisible: 'Morning commute'
 - tapOn:
@@ -33,10 +29,17 @@ env:
     retryTapIfNoChange: true
 - assertVisible: 'Evening plans'
 
-- tapOn:
-    point: '75%,94%'
-    retryTapIfNoChange: true
+- runFlow: subflows/open-settings.yaml
 - assertVisible: ${SETTINGS_TITLE}
+
+# The diagnostics panel is the last section on the settings screen, below
+# Language, Shopping and Premium, so it is off-screen on a phone until scrolled
+# to. Asserting it directly failed even with diagnostics correctly enabled.
+- scrollUntilVisible:
+    element:
+      text: 'Mobile analytics diagnostics'
+    direction: DOWN
+    timeout: 15000
 - assertVisible: 'Mobile analytics diagnostics'
 
 - tapOn:

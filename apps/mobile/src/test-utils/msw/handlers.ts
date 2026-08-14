@@ -37,6 +37,35 @@ export const mockShopThisLook = {
 export const mockAffiliateRedirectUrl =
   'https://partner.couturecast.test/go?token=mock-click-token'
 
+/**
+ * Story 5.2: subscription fixtures for both variants of the wire union. The
+ * default handler serves `none`; suites that need an entitled state override
+ * per test with `server.use(...)`.
+ */
+export const mockSubscriptionNone = {
+  data: {
+    status: 'none' as const,
+    store: null,
+    productId: null,
+    willRenew: null,
+    currentPeriodEnd: null,
+    syncedAt: null,
+    purchasesEnabled: true,
+  },
+}
+
+export const mockSubscriptionActive = {
+  data: {
+    status: 'active' as const,
+    store: 'app_store' as const,
+    productId: 'premium_monthly',
+    willRenew: true,
+    currentPeriodEnd: '2026-09-12T00:00:00.000Z',
+    syncedAt: '2026-08-12T00:00:00.000Z',
+    purchasesEnabled: true,
+  },
+}
+
 export const mockRitualResponse = {
   data: {
     weather: {
@@ -309,6 +338,12 @@ export const handlers = [
       { data: { redirectUrl: mockAffiliateRedirectUrl } },
       { status: 201 }
     )
+  ),
+  http.get('*/api/v1/commerce/subscription', () =>
+    HttpResponse.json(mockSubscriptionNone)
+  ),
+  http.post('*/api/v1/commerce/subscription/refresh', () =>
+    HttpResponse.json(mockSubscriptionNone)
   ),
   http.get('*/api/v1/alerts/preferences', () =>
     HttpResponse.json({

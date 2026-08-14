@@ -259,7 +259,9 @@
         "evening": "Noche",
         "outdoor": "Aire libre",
         "home": "Casa"
-      }
+      },
+      "garmentsSelected": "Prendas ({{count}} de {{max}} seleccionadas)",
+      "garmentOrder": "Orden de las prendas"
     },
     "onboarding": {
       "title": "Configura tu clóset",
@@ -318,6 +320,32 @@
       "optOutHelp": "Desactiva esto para ocultar todas las sugerencias de socios y afiliados.",
       "saved": "Preferencias de compra actualizadas",
       "error": "No se pudieron actualizar las preferencias de compra."
+    },
+    "premium": {
+      "sectionTitle": "Premium",
+      "disclosure": "Las suscripciones Premium se procesan mediante RevenueCat y, para compras en la web, Stripe. Reciben tu id de cuenta y el estado de la compra; nunca números de tarjeta ni fotos de tu guardarropa. Administra o cancela cuando quieras en la tienda donde te suscribiste.",
+      "status": {
+        "none": "No tienes una suscripción Premium.",
+        "active": "Premium está activo con el plan {{plan}}. El período actual termina el {{date}}.",
+        "gracePeriod": "Premium está en período de gracia con el plan {{plan}}. El período actual termina el {{date}}.",
+        "expired": "Tu suscripción Premium venció.",
+        "revoked": "Tu suscripción Premium fue revocada."
+      },
+      "planMonthly": "Premium mensual",
+      "planAnnual": "Premium anual",
+      "subscribe": "Desbloquea estilismo avanzado con Premium:",
+      "manage": "Administrar suscripción",
+      "manageInStore": "Esta suscripción se compró en la web. Adminístrala o cancélala en el sitio web de CoutureCast.",
+      "restore": "Restaurar compras",
+      "pendingApproval": "Esperando aprobación. “Pedir para comprar” está activo: cuando tu tutor apruebe, Premium se activará automáticamente.",
+      "activating": "Pago recibido. Activando Premium…",
+      "stillProcessing": "Aún en proceso. Tu compra se realizó; vuelve a revisar en unos minutos.",
+      "portalLagHint": "Los cambios de suscripción hechos en la web pueden tardar un par de horas en aparecer aquí.",
+      "graceBanner": "Hay un problema de pago con tu suscripción. Actualiza tu método de pago en la tienda para conservar Premium.",
+      "endedNote": "Tu suscripción terminó. Suscríbete de nuevo cuando quieras para recuperar las funciones Premium.",
+      "errorLoad": "No se pudo cargar el estado de tu suscripción. Inténtalo de nuevo.",
+      "errorPurchase": "No se pudo completar la compra. Inténtalo de nuevo.",
+      "unavailableInBuild": "Las compras no están disponibles en esta versión de la aplicación. Usa la versión de CoutureCast de la App Store o Play Store para suscribirte."
     }
   }
 }

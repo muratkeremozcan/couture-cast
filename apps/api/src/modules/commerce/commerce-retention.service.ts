@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { Cron, CronExpression } from '@nestjs/schedule'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { CommerceRepository } from './commerce.repository.js'
 
@@ -11,11 +10,19 @@ import { CommerceRepository } from './commerce.repository.js'
  * that retention would silently destroy the records a partner reconciles
  * against, so they get their own pruner with their own period, and
  * `TelemetryService.pruneOldTelemetryEvents` must never be generalized to reach
- * them.
+ * them. Story 5.2 adds `BillingEvent` at the same horizon (Open question 4's
+ * sign-off; the authoritative financial records live at the processors).
  *
  * 24 months is chosen to exceed the longest plausible partner reconciliation
  * window, and the job runs monthly because nothing about a two-year horizon
  * needs finer granularity than that.
+ *
+ * SUBSTRATE (Story 5.2 Decision 4a): this used to be a NestJS `@Cron`, which
+ * never provably fired — the API deploys as one serverless function and no
+ * schedule module runs there. The prune now runs as the monthly
+ * `commerce-retention-sweep` Job Scheduler on the `billing-reconciliation`
+ * queue in the worker runtime; `workers/bootstrap.ts` constructs this service
+ * and dispatches the job here. Same batch constants, same semantics.
  */
 const COMMERCE_RETENTION_MONTHS = 24
 
@@ -38,7 +45,6 @@ export class CommerceRetentionService {
     private readonly repository: CommerceRepository
   ) {}
 
-  @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
   async pruneExpiredCommerceRecords(): Promise<void> {
     const cutoff = this.retentionCutoff()
 
@@ -59,14 +65,25 @@ export class CommerceRetentionService {
         (limit) => this.repository.findExpiredClickIds(cutoff, limit),
         (ids) => this.repository.deleteClicksByIds(ids)
       )
+      // BillingEvent has no dependents (its user link is SetNull the other
+      // way), so it prunes independently of the affiliate ordering above.
+      const billingEventsDeleted = await this.pruneInBatches(
+        (limit) => this.repository.findExpiredBillingEventIds(cutoff, limit),
+        (ids) => this.repository.deleteBillingEventsByIds(ids)
+      )
 
       this.logger.info(
-        { cutoff: cutoff.toISOString(), conversionsDeleted, clicksDeleted },
+        {
+          cutoff: cutoff.toISOString(),
+          conversionsDeleted,
+          clicksDeleted,
+          billingEventsDeleted,
+        },
         'commerce_retention_pruned'
       )
     } catch (error) {
       // A failed prune is an operational problem, never a reason to crash the
-      // scheduler and take every other cron job down with it.
+      // worker and take the sibling reconciliation duty down with it.
       this.logger.error({ error }, 'commerce_retention_prune_failed')
     }
   }

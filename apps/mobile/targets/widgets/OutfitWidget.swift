@@ -2,7 +2,7 @@
 import SwiftUI
 import WidgetKit
 
-private let widgetAppGroup = "group.com.anonymous.mobile"
+private let widgetAppGroup = "group.com.couturecast.app"
 private let widgetPayloadKey = "widgetPayload"
 private let staleInterval: TimeInterval = 30 * 60
 private let onyx = Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255)

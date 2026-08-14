@@ -8,11 +8,11 @@ import WidgetKit
 class WatchConnectivityManager: NSObject, WCSessionDelegate, ObservableObject {
   static let shared = WatchConnectivityManager()
 
-  private let appGroup = "group.com.anonymous.mobile.watch"
+  private let appGroup = "group.com.couturecast.app.watch"
   private let payloadKey = "widgetPayload"
   private let lastAlertFingerprintKey = "lastSevereAlertFingerprint"
   private var pendingHandoffMessage: [String: Any]?
-  private let syncQueue = DispatchQueue(label: "com.anonymous.mobile.watch.connectivity.sync")
+  private let syncQueue = DispatchQueue(label: "com.couturecast.app.watch.connectivity.sync")
 
   @Published var currentPayload: String?
 

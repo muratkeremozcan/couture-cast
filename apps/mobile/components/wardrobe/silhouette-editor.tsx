@@ -480,9 +480,16 @@ export function SilhouetteEditor({
     setMyFormErrorKey(null)
   }
 
+  // The loading and error states carry their own testIDs. They used to reuse
+  // `silhouette-editor`, which made that id mean "this component exists in some
+  // state" rather than "the editor is ready" -- so an E2E assertion on it passed
+  // while the editor was still spinning or, worse, while it was showing an auth
+  // error, and the very next tap reported the tab "not found" on a screen the
+  // flow had just proved it was on. An id used as a synchronisation point has to
+  // name exactly one state.
   if (isLoading) {
     return (
-      <View testID="silhouette-editor" style={styles.container}>
+      <View testID="silhouette-editor-loading" style={styles.container}>
         <ActivityIndicator accessibilityLabel={t('wardrobe.silhouette.title')} />
       </View>
     )
@@ -490,7 +497,7 @@ export function SilhouetteEditor({
 
   if (loadError) {
     return (
-      <View testID="silhouette-editor" style={styles.container}>
+      <View testID="silhouette-editor-error" style={styles.container}>
         <View accessibilityRole="alert" style={styles.errorBox}>
           <Text>{loadError}</Text>
         </View>

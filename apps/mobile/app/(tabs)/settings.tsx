@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import {
   defaultSupportedLocale,
   resolveSupportedLocale,
+  type Subscription,
+  type SubscriptionPlan,
   type SupportedLocale,
 } from '@couture/api-client/contracts/http'
 
@@ -17,17 +19,56 @@ import {
 import {
   trackMobileAlertReceived,
   trackMobileLocaleSwitched,
+  trackMobilePremiumSubscribeTapped,
 } from '@/src/analytics/track-events'
 import { loadMobileApiHealth } from '@/src/lib/api-health'
 import {
   getCommercePreferenceFromMobile,
   updateCommercePreferenceFromMobile,
 } from '@/src/lib/commerce'
+import {
+  ensurePurchasesConfigured,
+  getSubscriptionFromMobile,
+  isEntitledSubscription,
+  pollSubscriptionUntilEntitled,
+  purchasePremiumPlan,
+  refreshSubscriptionFromMobile,
+  resolvePremiumSectionState,
+  restorePremiumPurchases,
+  showManageSubscriptionsInStore,
+  type PurchasesAvailability,
+} from '@/src/lib/premium'
 import { getSavedSettings, saveSettings } from '@/src/lib/settings-storage'
 import { updatePreferredLocaleFromMobile } from '@/src/lib/user'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 
-const API_HEALTH_TIMEOUT_MS = 5_000
+/** Exported so the screen test advances virtual time by the real bound rather
+ *  than by a copy of it that silently stops matching when this changes. */
+export const API_HEALTH_TIMEOUT_MS = 5_000
+
+/** Wire status → `commerce.premium.status.*` catalog key. */
+const premiumStatusKeys = {
+  none: 'none',
+  active: 'active',
+  grace_period: 'gracePeriod',
+  expired: 'expired',
+  revoked: 'revoked',
+} as const
+
+/**
+ * The purchase/restore flow the Premium section is in. Exactly one renders at
+ * a time; `pending-approval` (StoreKit Ask to Buy) and `still-processing`
+ * (post-purchase poll hit its 2-minute cap) are terminal until the user acts
+ * again or the entitlement arrives on a later visit.
+ */
+type PremiumFlowState =
+  | 'idle'
+  | 'purchasing'
+  | 'restoring'
+  | 'activating'
+  | 'pending-approval'
+  | 'still-processing'
+  | 'purchase-error'
 
 const availableLocales = [
   { code: 'en-US', label: 'English (US)' },
@@ -378,6 +419,8 @@ export default function SettingsScreen() {
             ) : null}
           </View>
 
+          <PremiumSettingsSection />
+
           <Text style={styles.infoText}>{apiHealthMessage}</Text>
           <Text style={styles.infoText}>
             {t('settings.diagnostic_info', {
@@ -405,6 +448,405 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  )
+}
+
+/** A store round trip is in flight; every premium control disables meanwhile. */
+function isPremiumFlowBusy(premiumFlow: PremiumFlowState): boolean {
+  return (
+    premiumFlow === 'purchasing' ||
+    premiumFlow === 'restoring' ||
+    premiumFlow === 'activating'
+  )
+}
+
+/**
+ * Premium subscription (Story 5.2), a sibling section after the commerce one.
+ * The disclosure names RevenueCat and Stripe per PRD NFR Security 4 and sits
+ * above every control, like the commerce section's. Purchases are never
+ * optimistic: the store's answer, not the tap, moves the UI. The status
+ * endpoint is not gated by the kill switch — a paying user always sees their
+ * subscription — while `purchasesEnabled` (the only kill-switch exposure)
+ * decides whether any subscribe control exists at all.
+ */
+function PremiumSettingsSection() {
+  const analytics = useMobileAnalytics()
+  const { t, i18n } = useTranslation()
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
+  const [subscriptionLoadFailed, setSubscriptionLoadFailed] = useState(false)
+  // `null` = the lazy SDK configure has not answered yet. The subscribe
+  // controls stay hidden until it has: rendering them first and swapping to
+  // the unavailable fallback after would flash a control that cannot work.
+  const [purchasesAvailability, setPurchasesAvailability] =
+    useState<PurchasesAvailability | null>(null)
+  const [premiumFlow, setPremiumFlow] = useState<PremiumFlowState>('idle')
+  const premiumFlowInFlight = useRef(false)
+  const premiumPollAbortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    void getSubscriptionFromMobile(controller.signal)
+      .then((current) => {
+        if (!controller.signal.aborted) {
+          setSubscription(current)
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setSubscriptionLoadFailed(true)
+        }
+      })
+
+    // Entering this section IS the SDK's configuration moment (Decision 11:
+    // lazily on first entry, never at app launch — the ritual path must not
+    // pay for a billing SDK). The memoized result makes re-entry free.
+    void ensurePurchasesConfigured().then((availability) => {
+      if (!controller.signal.aborted) {
+        setPurchasesAvailability(availability)
+      }
+    })
+
+    return () => {
+      controller.abort()
+      premiumPollAbortRef.current?.abort()
+    }
+  }, [])
+
+  /**
+   * Success-outcome follow-up only: refresh beats webhook latency, then the
+   * bounded poll (5-second interval, 2-minute hard stop) watches for the
+   * entitlement. A `none` mid-poll never renders as failure — the terminal
+   * cap state says "still processing", which is the truthful claim.
+   */
+  const watchEntitlementActivation = async () => {
+    setPremiumFlow('activating')
+    try {
+      const refreshed = await refreshSubscriptionFromMobile()
+      if (isEntitledSubscription(refreshed)) {
+        setSubscription(refreshed)
+        setPremiumFlow('idle')
+        return
+      }
+    } catch {
+      // The poll below is the retry mechanism.
+    }
+    const controller = new AbortController()
+    premiumPollAbortRef.current = controller
+    const activated = await pollSubscriptionUntilEntitled({ signal: controller.signal })
+    if (controller.signal.aborted) {
+      return
+    }
+    if (activated) {
+      setSubscription(activated)
+      setPremiumFlow('idle')
+    } else {
+      setPremiumFlow('still-processing')
+    }
+  }
+
+  const handlePremiumPurchase = async (plan: SubscriptionPlan) => {
+    if (premiumFlowInFlight.current) {
+      return
+    }
+    premiumFlowInFlight.current = true
+    setPremiumFlow('purchasing')
+    trackMobilePremiumSubscribeTapped(
+      analytics,
+      analytics.getDistinctId() || 'mobile-anonymous-user',
+      { plan, surface: 'mobile_settings' }
+    )
+
+    try {
+      const outcome = await purchasePremiumPlan(plan)
+      switch (outcome.kind) {
+        case 'success':
+          await watchEntitlementActivation()
+          break
+        case 'user-cancelled':
+          // A quiet return to idle: the user changed their mind, and an error
+          // banner over their own decision would read as a malfunction.
+          setPremiumFlow('idle')
+          break
+        case 'deferred':
+          setPremiumFlow('pending-approval')
+          break
+        case 'sdk-unavailable':
+          setPurchasesAvailability('unavailable')
+          setPremiumFlow('idle')
+          break
+        case 'error':
+          setPremiumFlow('purchase-error')
+          break
+      }
+    } finally {
+      premiumFlowInFlight.current = false
+    }
+  }
+
+  const handlePremiumRestore = async () => {
+    if (premiumFlowInFlight.current) {
+      return
+    }
+    premiumFlowInFlight.current = true
+    setPremiumFlow('restoring')
+
+    try {
+      const outcome = await restorePremiumPurchases()
+      if (outcome.kind === 'success') {
+        // Restore only syncs the store; the server subscription is the truth
+        // about what, if anything, came back.
+        try {
+          const refreshed = await refreshSubscriptionFromMobile()
+          setSubscription(refreshed)
+          setPremiumFlow('idle')
+        } catch {
+          setPremiumFlow('purchase-error')
+        }
+      } else if (outcome.kind === 'sdk-unavailable') {
+        setPurchasesAvailability('unavailable')
+        setPremiumFlow('idle')
+      } else {
+        setPremiumFlow('purchase-error')
+      }
+    } finally {
+      premiumFlowInFlight.current = false
+    }
+  }
+
+  const renderState = resolvePremiumSectionState(subscription, subscriptionLoadFailed)
+  const busy = isPremiumFlowBusy(premiumFlow)
+  const statusLine = (() => {
+    if (renderState.kind === 'entitled') {
+      const locale =
+        resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
+        defaultSupportedLocale
+      const planLabel = renderState.plan
+        ? t(
+            renderState.plan === 'premium_monthly'
+              ? 'commerce.premium.planMonthly'
+              : 'commerce.premium.planAnnual'
+          )
+        : renderState.productId
+      return t(
+        `commerce.premium.status.${renderState.showGraceBanner ? 'gracePeriod' : 'active'}`,
+        {
+          plan: planLabel,
+          date: new Date(renderState.currentPeriodEnd).toLocaleDateString(locale, {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          }),
+        }
+      )
+    }
+    if (renderState.kind === 'subscribe' && subscription) {
+      return t(`commerce.premium.status.${premiumStatusKeys[subscription.status]}`)
+    }
+    return null
+  })()
+
+  return (
+    <View style={styles.settingsSection} testID="premium-settings-section">
+      <Text style={styles.sectionTitle}>{t('commerce.premium.sectionTitle')}</Text>
+      <Text style={styles.disclosureText} testID="premium-settings-disclosure">
+        {t('commerce.premium.disclosure')}
+      </Text>
+      {renderState.kind === 'load-error' ? (
+        <Text
+          style={styles.errorText}
+          testID="premium-load-error"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
+          {t('commerce.premium.errorLoad')}
+        </Text>
+      ) : null}
+      {statusLine ? (
+        <Text style={styles.premiumStatusLine} testID="premium-status-line">
+          {statusLine}
+        </Text>
+      ) : null}
+      {renderState.kind === 'entitled' ? (
+        <>
+          {renderState.showGraceBanner ? (
+            <Text
+              style={styles.premiumGraceBanner}
+              testID="premium-grace-banner"
+              accessibilityLiveRegion="polite"
+            >
+              {t('commerce.premium.graceBanner')}
+            </Text>
+          ) : null}
+          {renderState.manageEntry === 'store' ? (
+            <Pressable
+              style={styles.actionButton}
+              onPress={() => {
+                void showManageSubscriptionsInStore()
+              }}
+              testID="premium-manage"
+              accessibilityRole="button"
+            >
+              <Text style={styles.actionText}>{t('commerce.premium.manage')}</Text>
+            </Pressable>
+          ) : null}
+          {renderState.manageEntry === 'web' ? (
+            <Text style={styles.helpText} testID="premium-manage-web-hint">
+              {t('commerce.premium.manageInStore')}
+            </Text>
+          ) : null}
+        </>
+      ) : null}
+      {renderState.kind === 'subscribe' ? (
+        <>
+          {renderState.ended ? (
+            <Text style={styles.helpText} testID="premium-ended-note">
+              {t('commerce.premium.endedNote')}
+            </Text>
+          ) : null}
+          {renderState.purchasesEnabled && purchasesAvailability === 'unavailable' ? (
+            <Text style={styles.helpText} testID="premium-unavailable">
+              {t('commerce.premium.unavailableInBuild')}
+            </Text>
+          ) : null}
+          {purchasesAvailability !== null && purchasesAvailability !== 'unavailable' ? (
+            <PremiumSubscribeControls
+              purchasesEnabled={renderState.purchasesEnabled}
+              busy={busy}
+              premiumFlow={premiumFlow}
+              onPurchase={(plan) => {
+                void handlePremiumPurchase(plan)
+              }}
+              onRestore={() => {
+                void handlePremiumRestore()
+              }}
+            />
+          ) : null}
+        </>
+      ) : null}
+      <PremiumFlowMessages premiumFlow={premiumFlow} />
+    </View>
+  )
+}
+
+/**
+ * The three store CTAs. Purchases show a busy state instead of optimistic UI:
+ * `accessibilityState={{ busy }}` plus the aria mirror, since react-native-web
+ * does not project `accessibilityState` onto the DOM (the commerce toggle's
+ * aria-checked precedent).
+ */
+function PremiumSubscribeControls({
+  purchasesEnabled,
+  busy,
+  premiumFlow,
+  onPurchase,
+  onRestore,
+}: {
+  purchasesEnabled: boolean
+  busy: boolean
+  premiumFlow: PremiumFlowState
+  onPurchase: (plan: SubscriptionPlan) => void
+  onRestore: () => void
+}) {
+  const { t } = useTranslation()
+  const plans = [
+    { plan: 'premium_monthly' as const, labelKey: 'commerce.premium.planMonthly' },
+    { plan: 'premium_annual' as const, labelKey: 'commerce.premium.planAnnual' },
+  ]
+
+  return (
+    <>
+      {/*
+        Only the BUY controls are behind the kill switch. Restore is not: it
+        mints no purchase, it re-reads what the store already sold this user.
+        Gating it too would mean a subscriber whose entitlement is missing from
+        our mirror cannot recover access while the switch is off, which is the
+        one thing AC 5 says must never happen. Decision 11 gates "the subscribe
+        CTA"; AC 1 lists restore as its own entry point.
+      */}
+      {purchasesEnabled ? (
+        <Text style={styles.helpText}>{t('commerce.premium.subscribe')}</Text>
+      ) : null}
+      {(purchasesEnabled ? plans : []).map(({ plan, labelKey }) => (
+        <Pressable
+          key={plan}
+          style={styles.actionButton}
+          disabled={busy}
+          onPress={() => {
+            onPurchase(plan)
+          }}
+          testID={`premium-subscribe-${plan === 'premium_monthly' ? 'monthly' : 'annual'}`}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busy, busy: premiumFlow === 'purchasing' }}
+          aria-disabled={busy}
+          aria-busy={premiumFlow === 'purchasing'}
+        >
+          <Text style={styles.actionText}>{t(labelKey)}</Text>
+        </Pressable>
+      ))}
+      <Pressable
+        style={styles.actionButton}
+        disabled={busy}
+        onPress={onRestore}
+        testID="premium-restore"
+        accessibilityRole="button"
+        accessibilityState={{ disabled: busy, busy: premiumFlow === 'restoring' }}
+        aria-disabled={busy}
+        aria-busy={premiumFlow === 'restoring'}
+      >
+        <Text style={styles.actionText}>{t('commerce.premium.restore')}</Text>
+      </Pressable>
+    </>
+  )
+}
+
+/**
+ * Exactly one flow message renders at a time; the error is an assertive alert
+ * (Decision 11) while the informational states announce politely.
+ */
+function PremiumFlowMessages({ premiumFlow }: { premiumFlow: PremiumFlowState }) {
+  const { t } = useTranslation()
+
+  return (
+    <>
+      {premiumFlow === 'activating' ? (
+        <Text
+          style={styles.statusText}
+          testID="premium-activating"
+          accessibilityLiveRegion="polite"
+        >
+          {t('commerce.premium.activating')}
+        </Text>
+      ) : null}
+      {premiumFlow === 'still-processing' ? (
+        <Text
+          style={styles.statusText}
+          testID="premium-still-processing"
+          accessibilityLiveRegion="polite"
+        >
+          {t('commerce.premium.stillProcessing')}
+        </Text>
+      ) : null}
+      {premiumFlow === 'pending-approval' ? (
+        <Text
+          style={styles.statusText}
+          testID="premium-pending-approval"
+          accessibilityLiveRegion="polite"
+        >
+          {t('commerce.premium.pendingApproval')}
+        </Text>
+      ) : null}
+      {premiumFlow === 'purchase-error' ? (
+        <Text
+          style={styles.errorText}
+          testID="premium-purchase-error"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
+          {t('commerce.premium.errorPurchase')}
+        </Text>
+      ) : null}
+    </>
   )
 }
 
@@ -496,6 +938,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     color: '#5C5C66',
+  },
+  premiumStatusLine: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  premiumGraceBanner: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#B54708',
+    backgroundColor: 'rgba(181, 71, 8, 0.08)',
+    color: '#B54708',
+    fontSize: 13,
+    fontWeight: '600',
   },
   statusText: {
     marginTop: 8,

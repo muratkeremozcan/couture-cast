@@ -14,17 +14,14 @@ tags:
     clearState: true
     stopApp: false
 
-- openLink: ${APP_URL}
+- runFlow: subflows/open-app.yaml
 
-- tapOn:
-    text: 'Continue'
-    optional: true
+# `wardrobe-capsules-link` lives on the wardrobe hub, but the app opens on
+# Home, so this flow never had a step to get there and the tap could only
+# ever report the link "not found".
+- runFlow: subflows/open-wardrobe-tab.yaml
 
-- tapOn:
-    id: 'wardrobe-capsules-link'
-
-- assertVisible:
-    id: 'create-capsule-button'
+- runFlow: subflows/open-capsules.yaml
 
 # A capsule holding an unavailable garment reports the count and stays manageable.
 - assertVisible:
@@ -49,8 +46,24 @@ tags:
 - tapOn:
     id: 'save-capsule-button'
 
+# The save is proved by what the user can actually see, not by the live region.
+#
+# `capsule-status-region` is styled `{ height: 0, opacity: 0, width: 0 }` -- it
+# is a deliberately visually-hidden `accessibilityLiveRegion` that exists to
+# announce the save politely to a screen reader. `assertVisible` on it therefore
+# could never pass: Maestro reports zero-size, zero-opacity nodes as not
+# visible, so this step failed on a save that had in fact round-tripped
+# perfectly. Measured on device, the library rendered "3 garments · Ready" at
+# the moment this assertion failed.
+- extendedWaitUntil:
+    visible:
+      id: 'capsule-card-.*'
+    timeout: 15000
+    label: 'Back on the capsule library after saving'
+
 - assertVisible:
-    id: 'capsule-status-region'
+    text: '.* garments · Ready'
+    label: 'The repaired capsule saved and reports a ready set'
 
 # Favorite the repaired capsule, then confirm the ritual can surface it.
 - tapOn:

@@ -126,7 +126,10 @@ export function OutfitRecommendationCard({
           { backgroundColor: palette.subtleSurface, borderColor: palette.divider },
         ]}
       >
-        <Text style={[styles.comfortNotes, { color: palette.text }]}>
+        <Text
+          style={[styles.comfortNotes, { color: palette.text }]}
+          testID="outfit-comfort-notes"
+        >
           {outfit.comfortNotes}
         </Text>
       </View>

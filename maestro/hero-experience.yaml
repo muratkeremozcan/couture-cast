@@ -11,35 +11,40 @@ tags:
     clearState: true
     stopApp: false
 
-- openLink: ${APP_URL}
-
-# Dismiss Expo developer sheets/menus if they appear
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go developer menu if it appears'
-- tapOn:
-    text: 'Open app'
-    optional: true
-    label: 'Dismiss Expo Go developer sheet if it appears'
+- runFlow: subflows/open-app.yaml
 
 # Assert landing screen elements are visible
+- assertVisible:
+    id: 'scenario-toggles'
 - assertVisible: 'Morning commute'
 - assertVisible: 'Midday'
 - assertVisible: 'Evening plans'
 
+# The recommendation card and its comfort notes are asserted by testID, never by
+# their copy. The exact strings this flow used to assert ("Warm and sunny
+# midday. Light tee is perfect.") exist only in the mobile unit tests' MSW
+# handlers; the live API composes comfortNotes from the templates in
+# `ritual.service.ts`, so those assertions could never pass against a real
+# server and this flow could only ever have gone green against mocks.
+- assertVisible:
+    id: 'outfit-recommendation-card'
+- assertVisible:
+    id: 'outfit-comfort-notes'
+
 # Toggle Midday scenario
 - tapOn:
-    text: 'Midday'
+    id: 'scenario-toggle-midday'
     retryTapIfNoChange: true
-- assertVisible: 'Warm and sunny midday. Light tee is perfect.'
+- assertVisible:
+    id: 'outfit-comfort-notes'
 - takeScreenshot:
     path: maestro/artifacts/hero-midday-scenario
 
 # Toggle Evening plans scenario
 - tapOn:
-    text: 'Evening plans'
+    id: 'scenario-toggle-evening'
     retryTapIfNoChange: true
-- assertVisible: 'Cool evening ahead. Sweater recommended.'
+- assertVisible:
+    id: 'outfit-comfort-notes'
 - takeScreenshot:
     path: maestro/artifacts/hero-evening-scenario

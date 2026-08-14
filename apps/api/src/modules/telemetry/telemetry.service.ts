@@ -15,13 +15,22 @@ import {
   trackGarmentTaggingCompleted,
   trackAffiliateCtaClicked,
   trackAffiliateConversionRecorded,
+  trackPremiumCheckoutStarted,
+  trackPremiumEntitlementActivated,
+  trackPremiumEntitlementDeactivated,
   garmentTaggingCompletedEventSchema,
   affiliateCtaClickedEventSchema,
   affiliateConversionRecordedEventSchema,
+  premiumCheckoutStartedEventSchema,
+  premiumEntitlementActivatedEventSchema,
+  premiumEntitlementDeactivatedEventSchema,
   type AnalyticsEventName,
   type AffiliateCtaClickedEvent,
   type AffiliateConversionRecordedEvent,
   type GarmentTaggingCompletedProperties,
+  type PremiumCheckoutStartedEvent,
+  type PremiumEntitlementActivatedEvent,
+  type PremiumEntitlementDeactivatedEvent,
 } from '@couture/api-client'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import { createBaseLogger } from '../../logger/pino.config'
@@ -125,6 +134,20 @@ export interface TelemetryPropertiesMap {
     AffiliateConversionRecordedEvent,
     'analyticsSubjectId'
   >
+  /**
+   * Story 5.2. Same rule as the affiliate server events: callers pass the raw
+   * user id as `captureEvent`'s first argument and the HMAC subject is derived
+   * here. premium_subscribe_tapped is client-side only and deliberately absent.
+   */
+  premium_checkout_started: Omit<PremiumCheckoutStartedEvent, 'analyticsSubjectId'>
+  premium_entitlement_activated: Omit<
+    PremiumEntitlementActivatedEvent,
+    'analyticsSubjectId'
+  >
+  premium_entitlement_deactivated: Omit<
+    PremiumEntitlementDeactivatedEvent,
+    'analyticsSubjectId'
+  >
 }
 
 /**
@@ -138,6 +161,18 @@ const affiliateCtaClickedInputSchema = affiliateCtaClickedEventSchema
   .strict()
 
 const affiliateConversionRecordedInputSchema = affiliateConversionRecordedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const premiumCheckoutStartedInputSchema = premiumCheckoutStartedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const premiumEntitlementActivatedInputSchema = premiumEntitlementActivatedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const premiumEntitlementDeactivatedInputSchema = premiumEntitlementDeactivatedEventSchema
   .omit({ analyticsSubjectId: true })
   .strict()
 
@@ -170,6 +205,9 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   garment_tagging_completed: garmentTaggingCompletedEventSchema,
   affiliate_cta_clicked: affiliateCtaClickedInputSchema,
   affiliate_conversion_recorded: affiliateConversionRecordedInputSchema,
+  premium_checkout_started: premiumCheckoutStartedInputSchema,
+  premium_entitlement_activated: premiumEntitlementActivatedInputSchema,
+  premium_entitlement_deactivated: premiumEntitlementDeactivatedInputSchema,
 }
 
 export function requireAnalyticsIdSecret(): string {
@@ -436,6 +474,57 @@ function buildAffiliateConversionRecorded(
   })
 }
 
+function buildPremiumCheckoutStarted(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Premium telemetry requires an authenticated user')
+  }
+  const parsed = premiumCheckoutStartedInputSchema.parse(props)
+
+  return trackPremiumCheckoutStarted({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildPremiumEntitlementActivated(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Premium telemetry requires an authenticated user')
+  }
+  const parsed = premiumEntitlementActivatedInputSchema.parse(props)
+
+  return trackPremiumEntitlementActivated({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildPremiumEntitlementDeactivated(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Premium telemetry requires an authenticated user')
+  }
+  const parsed = premiumEntitlementDeactivatedInputSchema.parse(props)
+
+  return trackPremiumEntitlementDeactivated({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
 /**
  * Events whose PostHog subject is the HMAC pseudonym rather than a raw user id.
  * Membership here drives three things at once: `TelemetryEvent.user_id` is
@@ -452,6 +541,9 @@ const PSEUDONYMOUS_EVENT_TYPES: ReadonlySet<AnalyticsEventName> = new Set([
   'garment_tagging_completed',
   'affiliate_cta_clicked',
   'affiliate_conversion_recorded',
+  'premium_checkout_started',
+  'premium_entitlement_activated',
+  'premium_entitlement_deactivated',
 ])
 
 const pseudonymousEventBuilders: Partial<
@@ -468,6 +560,9 @@ const pseudonymousEventBuilders: Partial<
   garment_tagging_completed: buildGarmentTaggingCompleted,
   affiliate_cta_clicked: buildAffiliateCtaClicked,
   affiliate_conversion_recorded: buildAffiliateConversionRecorded,
+  premium_checkout_started: buildPremiumCheckoutStarted,
+  premium_entitlement_activated: buildPremiumEntitlementActivated,
+  premium_entitlement_deactivated: buildPremiumEntitlementDeactivated,
 }
 
 const eventBuilders: Partial<

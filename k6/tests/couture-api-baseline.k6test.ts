@@ -29,6 +29,7 @@ import {
   testQueueHealth,
   testRealtimePoll,
 } from '../scenarios/health.scenarios'
+import { testSubscriptionStatus } from '../scenarios/premium.scenarios'
 import {
   testRitualCommerceEligible,
   testRitualOutfits,
@@ -47,6 +48,7 @@ export {
   testCapsuleWritePaths,
   testCapsuleColdRitual,
   testRitualCommerceEligible,
+  testSubscriptionStatus,
 }
 
 const scenarioNames = [
@@ -61,6 +63,7 @@ const scenarioNames = [
   'testCapsuleWritePaths',
   'testCapsuleColdRitual',
   'testRitualCommerceEligible',
+  'testSubscriptionStatus',
 ]
 
 export const options = {
@@ -117,6 +120,13 @@ export const options = {
       `p(95)<${SLO.ritualEligible + infraDelay}`,
     ],
     'http_req_failed{name:api/ritual-eligible}': ['rate<0.01'],
+    // Story 5.2: the subscription status read (local entitlement mirror plus
+    // flag evaluation). Refresh has no threshold because it has no scenario:
+    // it hits the RevenueCat ledger per call and stays out of load runs.
+    'http_req_duration{name:api/subscription-status}': [
+      `p(95)<${SLO.subscriptionStatus + infraDelay}`,
+    ],
+    'http_req_failed{name:api/subscription-status}': ['rate<0.01'],
   },
 }
 

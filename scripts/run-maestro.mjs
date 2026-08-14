@@ -17,7 +17,7 @@
  *   readable in one place.
  */
 import { spawn } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { createRequire } from 'node:module'
 import fs from 'node:fs'
 import net from 'node:net'
@@ -52,8 +52,30 @@ for (let index = 0; index < cliArgs.length; index += 1) {
     FLOW_PATHS.push(arg)
   }
 }
-const flowsToRun =
-  FLOW_PATHS.length > 0 ? FLOW_PATHS : ['maestro/sanity.yaml', 'maestro/analytics.yaml']
+/**
+ * Every flow in `maestro/`, discovered rather than listed, so a new flow is
+ * covered the moment it is written instead of when someone remembers to add it
+ * here. `subflows/` is excluded because those are fragments, not runnable flows.
+ *
+ * The default used to be just `sanity` and `analytics`, which meant
+ * `npm run test:mobile:e2e:ios` reported success having exercised two of
+ * eighteen flows. That is how a suite goes quietly stale.
+ *
+ * Order is alphabetical and therefore stable. The suite shares one fixture user
+ * across all flows, so any flow that changes durable state (locale is the one
+ * that bites) is responsible for restoring it before it ends; nothing here may
+ * depend on running before or after a particular sibling.
+ */
+const discoverFlows = () => {
+  const flowDir = path.join(projectRoot, 'maestro')
+  return fs
+    .readdirSync(flowDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))
+    .map((entry) => `maestro/${entry.name}`)
+    .sort()
+}
+
+const flowsToRun = FLOW_PATHS.length > 0 ? FLOW_PATHS : discoverFlows()
 const WRITE_ARTIFACTS =
   process.argv.includes('--ci') ||
   process.argv.includes('--artifacts') ||
@@ -65,7 +87,55 @@ const AUTO_BOOT_ANDROID = process.env.MOBILE_E2E_AUTO_BOOT_ANDROID !== '0'
 const REQUESTED_PLATFORM = process.env.MOBILE_E2E_PLATFORM || cliPlatform
 const EXPECTED_EXPO_GO_VERSION = process.env.MOBILE_E2E_EXPO_GO_VERSION || '54.0.8'
 
-const log = (msg) => console.log(`[maestro:runner] ${msg}`)
+/**
+ * Which iOS simulator this runner drives.
+ *
+ * `booted` is `simctl`'s own alias for "the one booted device" and is correct
+ * for a single serial run. `scripts/run-maestro-shards.mjs` runs several copies
+ * of this runner at once, each against its own simulator, and that alias is
+ * ambiguous the moment a second device boots: `simctl` errors rather than
+ * picking one. Every simulator-scoped call below therefore goes through this
+ * value, and the shard orchestrator sets it to an explicit UDID.
+ */
+const IOS_SIMULATOR_UDID = process.env.MOBILE_E2E_IOS_UDID || 'booted'
+
+/**
+ * Prefix every line of this runner's output with its shard, so four concurrent
+ * runners writing to one terminal stay readable.
+ */
+const SHARD_LABEL = process.env.MOBILE_E2E_SHARD_LABEL || ''
+
+/**
+ * Skip starting a wardrobe worker when reusing an already-running API.
+ *
+ * Sharded runs share one API that already owns its workers. Without this, each
+ * shard would start another worker against the same BullMQ queues.
+ */
+const SKIP_WORKER = process.env.MOBILE_E2E_SKIP_WORKER === '1'
+
+/**
+ * The one database this runner talks to directly.
+ *
+ * It must be the same database the API child process is given further down, or
+ * the runner and the app under test are looking at different data. Deliberately
+ * NOT falling back to `process.env.DATABASE_URL`: importing `@prisma/client`
+ * loads `packages/db/.env`, which on a developer machine points at their own
+ * working database (`postgresql://<user>@localhost:5432/couture_cast`) rather
+ * than the Supabase test instance on 54322.
+ *
+ * That fallback was live in `cleanupMobileE2EIdentity`, so the post-run cleanup
+ * was issuing its deletes against the developer's own database while the suite
+ * ran against 54322. The deletes matched nothing, the transaction committed,
+ * and the runner logged success — so every run silently leaked its signed-up
+ * fixture user, its location, and its ritual into the test database, and every
+ * run pointed a `deleteMany` at a database it was never meant to write to.
+ */
+const MOBILE_E2E_DATABASE_URL =
+  process.env.MOBILE_E2E_DATABASE_URL ||
+  'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+
+const log = (msg) =>
+  console.log(`[maestro:runner]${SHARD_LABEL ? ` [${SHARD_LABEL}]` : ''} ${msg}`)
 const isMac = os.platform() === 'darwin'
 
 const toPosixPath = (filePath) => filePath.split(path.sep).join('/')
@@ -366,6 +436,441 @@ const requestJson = async (url, init) => {
   return body
 }
 
+/**
+ * Seed the one event `deep-link-handling.yaml` needs.
+ *
+ * That flow opens `?source=notification&type=severe_weather&alertId=alert-777`
+ * and expects the Home screen to focus the matching alert. The app resolves the
+ * target from `GET /api/v1/events/poll`, matching on the event id, so an
+ * `alert:weather` envelope with exactly that id has to exist for the fixture
+ * user. Nothing produced one: real envelopes come from the weather-alert fanout
+ * worker, which needs a live alert to process, and `alert-777` was only ever a
+ * fixture id in the mobile unit tests. The flow was asserting against data that
+ * has never existed on a real server.
+ *
+ * Seeding it here rather than in `packages/db/prisma/seeds` keeps it attached to
+ * the fixture user the runner creates and tears down, so it cannot leak into
+ * another flow or outlive the run. The payload matches `alertWeatherEventSchema`
+ * in `packages/api-client`; if that contract changes, `safeParse` in
+ * `resolveWeatherAlertDeepLinkTarget` drops the event and this flow fails loudly.
+ */
+/**
+ * The envelope id is per user, not a fixed literal.
+ *
+ * `alert-777` was a single hardcoded primary key, so two runners seeding at the
+ * same time would `upsert` the same row and the second would re-own the first
+ * shard's alert. `deep-link-handling.yaml` reads the id from `WEATHER_ALERT_ID`
+ * rather than hardcoding it, for the same reason the capsule id became
+ * per-user.
+ *
+ * @param {string} userId
+ * @returns {string}
+ */
+const mobileE2EWeatherAlertId = (userId) => `alert-777-${userId}`
+
+const seedMobileE2EWeatherAlert = async (identity) => {
+  const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
+  try {
+    const payload = {
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      userId: identity.userId,
+      data: {
+        alertType: 'severe',
+        location: 'Chicago',
+        message: 'Severe winter storm warning for the Chicago area.',
+        severity: 'critical',
+      },
+    }
+
+    await prisma.eventEnvelope.upsert({
+      where: { id: mobileE2EWeatherAlertId(identity.userId) },
+      update: { channel: 'alert:weather', payload, user_id: identity.userId },
+      create: {
+        id: mobileE2EWeatherAlertId(identity.userId),
+        channel: 'alert:weather',
+        payload,
+        user_id: identity.userId,
+      },
+    })
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
+/**
+ * Give the fixture user a small wardrobe, through the real upload path.
+ *
+ * The capsule flows need garments to select and the fixture user owns none.
+ * Garments only ever appeared because `garment-capture-flow` and
+ * `garment-smart-tagging-flow` create them, and both sort AFTER
+ * `garment-capsule-*` alphabetically, so in the suite's own stable order the
+ * capsule builder always opened on "Garments (0 of 10 selected)" and reported
+ * `garment-checkbox-.*` "not found" on a screen that was working perfectly.
+ * That is exactly the sibling-ordering dependency this runner's flow-discovery
+ * comment forbids.
+ *
+ * This deliberately drives the same three public endpoints the app itself uses
+ * -- declare, upload bytes, commit -- rather than inserting `GarmentItem` rows
+ * with Prisma. Inserting rows directly produced garments whose `object_path`
+ * pointed at storage objects that did not exist, and `toResponse` in
+ * `wardrobe.service.ts` signs a read URL for every garment with no fallback, so
+ * `GET /api/v1/wardrobe/garments` answered 503 STORAGE_PERMISSION_DENIED for
+ * the whole list. A fixture that cannot survive the app's own read path is not
+ * a fixture, and weakening that signing behaviour to accommodate one would have
+ * hidden a genuine failure mode.
+ *
+ * The bundled silhouette fixture is reused as the image: it is a real PNG and
+ * clears the contract's 256px minimum.
+ */
+const MOBILE_E2E_GARMENT_COUNT = 4
+// Members of the `GarmentCategory` enum in packages/db/prisma/schema.prisma.
+const MOBILE_E2E_GARMENT_CATEGORIES = ['top', 'bottom', 'outerwear', 'shoes']
+const MOBILE_E2E_GARMENT_FIXTURE =
+  'apps/mobile/assets/images/silhouette-my-form-fixture.png'
+
+const readPngDimensions = (bytes) => {
+  if (bytes.length < 24 || bytes.toString('ascii', 12, 16) !== 'IHDR') {
+    throw new Error('Mobile E2E garment fixture is not a PNG')
+  }
+  return { widthPx: bytes.readUInt32BE(16), heightPx: bytes.readUInt32BE(20) }
+}
+
+/**
+ * Poll the wardrobe list until a garment has left analysis.
+ *
+ * `awaiting_tags` means the worker has produced suggestions and the tags PATCH
+ * will be accepted; `ready` means someone already confirmed them. Anything else
+ * is still in flight.
+ */
+const waitForGarmentAnalysis = async (apiBaseUrl, authorization, garmentId) => {
+  const deadline = Date.now() + 60_000
+  let lastStatus = 'unknown'
+  while (Date.now() < deadline) {
+    const listed = await requestJson(`${apiBaseUrl}/api/v1/wardrobe/garments`, {
+      headers: { authorization },
+    })
+    const garment = (listed?.data ?? []).find((item) => item?.id === garmentId)
+    lastStatus = garment?.status ?? 'missing'
+    if (lastStatus === 'awaiting_tags' || lastStatus === 'ready') {
+      return lastStatus
+    }
+    if (lastStatus === 'failed') {
+      throw new Error(`Mobile E2E garment ${garmentId} failed analysis`)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+  throw new Error(
+    `Mobile E2E garment ${garmentId} never left analysis (last status: ${lastStatus})`
+  )
+}
+
+const seedMobileE2EGarments = async (apiBaseUrl, identity) => {
+  const createdGarmentIds = []
+  const bytes = fs.readFileSync(path.join(projectRoot, MOBILE_E2E_GARMENT_FIXTURE))
+  const { widthPx, heightPx } = readPngDimensions(bytes)
+  const sha256 = createHash('sha256').update(bytes).digest('hex')
+  const authorization = `Bearer ${identity.accessToken}`
+
+  for (let index = 0; index < MOBILE_E2E_GARMENT_COUNT; index += 1) {
+    const session = await requestJson(`${apiBaseUrl}/api/v1/wardrobe/upload-url`, {
+      method: 'POST',
+      headers: {
+        authorization,
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      body: JSON.stringify({
+        fileSizeBytes: bytes.length,
+        mimeType: 'image/png',
+        sha256,
+        widthPx,
+        heightPx,
+      }),
+    })
+
+    const { garmentId, uploadSessionId, uploadToken } = session?.data ?? {}
+    if (!garmentId || !uploadSessionId || !uploadToken) {
+      throw new Error('Mobile E2E upload session response was missing fields')
+    }
+
+    const uploadResponse = await fetch(
+      `${apiBaseUrl}/api/v1/wardrobe/uploads/${uploadSessionId}`,
+      {
+        method: 'PUT',
+        headers: {
+          authorization,
+          'content-type': 'image/png',
+          'x-upload-token': uploadToken,
+        },
+        body: bytes,
+      }
+    )
+    if (!uploadResponse.ok) {
+      throw new Error(
+        `Mobile E2E garment upload failed (${uploadResponse.status} ${await uploadResponse.text()})`
+      )
+    }
+
+    await requestJson(`${apiBaseUrl}/api/v1/wardrobe/garments`, {
+      method: 'POST',
+      headers: {
+        authorization,
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      body: JSON.stringify({
+        garmentId,
+        uploadSessionId,
+        hasCropping: false,
+        hasBgCleanup: false,
+      }),
+    })
+
+    // Wait for analysis to finish before confirming tags.
+    //
+    // The commit kicks off the tagging worker, and `PATCH .../tags` answers 409
+    // GARMENT_ANALYSIS_PENDING until it has produced suggestions. The mobile app
+    // polls for exactly this (`pollGarmentUntilSettled`), so the seed does too
+    // rather than sleeping a hopeful fixed interval.
+    await waitForGarmentAnalysis(apiBaseUrl, authorization, garmentId)
+
+    // Confirm tags, which is what moves a garment to `ready`.
+    //
+    // A committed-but-untagged garment is not "available": the capsule builder
+    // treats it as removed and blocks the save with "N garments are no longer
+    // available and have been removed. Choose replacements before saving."
+    // Committing alone therefore produced a seeded capsule that could never be
+    // saved. This is the same PATCH the tagging modal issues when a user
+    // confirms the suggestions.
+    await requestJson(`${apiBaseUrl}/api/v1/wardrobe/garments/${garmentId}/tags`, {
+      method: 'PATCH',
+      headers: { authorization, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        category:
+          MOBILE_E2E_GARMENT_CATEGORIES[index % MOBILE_E2E_GARMENT_CATEGORIES.length],
+        material: 'cotton',
+        comfortRange: 'mild',
+      }),
+    })
+
+    createdGarmentIds.push(garmentId)
+  }
+
+  return createdGarmentIds
+}
+
+/**
+ * Give the fixture user one saved capsule.
+ *
+ * `garment-capsule-repair-flow` opens the capsule library and edits the first
+ * capsule it finds. The fixture user has none: `garment-capsule-create-flow` is
+ * the only flow that makes one, and it deletes it again through the UI as its
+ * own cleanup, so the repair flow found an empty library and reported
+ * `edit-capsule-button-.*` "not found" no matter which order the two ran in.
+ *
+ * Two garments, matching the flow's premise that a capsule holds a set it can
+ * repair. Deleted with the user: `OutfitCapsule` and `OutfitCapsuleGarment`
+ * both cascade from `User`, and the runner's teardown removes the user.
+ */
+/**
+ * Namespaced per user, never a fixed constant.
+ *
+ * A shared id meant each run's upsert re-pointed the SAME capsule row at the new
+ * fixture user while its existing `OutfitCapsuleGarment` rows still referenced
+ * the previous user's garments. That join's foreign key is composite on
+ * (garment_id, user_id), so re-owning the capsule orphaned them and the upsert
+ * died on `OutfitCapsuleGarment_garment_id_user_id_fkey`. Per-user ids cannot
+ * collide, and they are removed with the user by the existing cascade.
+ */
+const mobileE2ECapsuleId = (userId) => `mobile-e2e-capsule-${userId}`
+
+const seedMobileE2ECapsule = async (identity, garmentIds) => {
+  const capsuleId = mobileE2ECapsuleId(identity.userId)
+  const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
+  try {
+    await prisma.outfitCapsule.upsert({
+      where: { id: capsuleId },
+      update: {
+        name: 'Maestro seeded capsule',
+        user_id: identity.userId,
+        occasions: ['casual'],
+      },
+      create: {
+        id: capsuleId,
+        user_id: identity.userId,
+        name: 'Maestro seeded capsule',
+        description: 'Seeded so the repair flow has a capsule to open.',
+        // Required: `occasions` is a non-nullable `CapsuleOccasion[]`, so
+        // omitting it is a null-constraint violation rather than an empty list.
+        occasions: ['casual'],
+      },
+    })
+
+    // Garments are read back from the database rather than taken from the API
+    // responses. The join's foreign key is on (garment_id, user_id), so it can
+    // only be satisfied by rows this connection can actually see -- reading them
+    // back proves that, and fails loudly here rather than as an opaque FK
+    // violation if the API ever wrote somewhere else.
+    const ownedGarments = await prisma.garmentItem.findMany({
+      where: { user_id: identity.userId, retention_status: 'active' },
+      select: { id: true },
+      orderBy: { created_at: 'asc' },
+      take: 2,
+    })
+    if (ownedGarments.length < 2) {
+      throw new Error(
+        `Mobile E2E capsule seed expected 2 garments for ${identity.userId}, found ${ownedGarments.length}` +
+          ` (seeded ids: ${garmentIds.join(', ') || 'none'})`
+      )
+    }
+
+    for (const [index, garment] of ownedGarments.entries()) {
+      const garmentId = garment.id
+      await prisma.outfitCapsuleGarment.upsert({
+        where: {
+          capsule_id_garment_id: {
+            capsule_id: capsuleId,
+            garment_id: garmentId,
+          },
+        },
+        update: { garment_order: index },
+        create: {
+          capsule_id: capsuleId,
+          user_id: identity.userId,
+          garment_id: garmentId,
+          garment_order: index,
+        },
+      })
+    }
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
+/**
+ * Return the fixture user to a known state before each flow.
+ *
+ * The suite runs eighteen flows sequentially against ONE signed-up user,
+ * because `EXPO_PUBLIC_E2E_ACCESS_TOKEN` is baked into the Metro bundle at
+ * startup. `clearState: true` in a flow clears the *device*, so anything the
+ * app persisted server-side survives into the next flow, and the suite grows
+ * hidden ordering dependencies that only bite when someone adds or reorders a
+ * flow.
+ *
+ * The leak this closes: `WardrobeOnboardingState` advances as garments are
+ * captured, and the onboarding screen reads `current_step` from the server to
+ * decide which step to resume at. A flow that captured a garment therefore left
+ * the next run of `wardrobe-onboarding-flow.yaml` opening past its own first
+ * step, where it reported `onboarding-permission-step` "not found" — a stale
+ * server row presenting as a missing element, which is why it read as a
+ * selector bug for so long.
+ *
+ * Deliberately narrow. Garments are NOT reset here: `DELETE
+ * /api/v1/wardrobe/garments/:id` is a retention request rather than a hard
+ * delete, and `GarmentItem` has relations without `onDelete: Cascade`, so
+ * clearing them between flows means either an asynchronous retention worker or
+ * a hand-ordered cascade — neither of which belongs in a reset that runs
+ * eighteen times per suite on an unproven hunch. Add to this only with a
+ * failure that demonstrates the need.
+ */
+/**
+ * Delete the app's persisted settings file from the iOS simulator.
+ *
+ * The chosen locale is written to `couture-cast-settings.json` in the
+ * experience's document directory (`src/lib/settings-storage.ts`), and Maestro's
+ * `clearState: true` does not remove it. So a flow that switches the app to
+ * Turkish and then fails before its restore step leaves that file behind -- not
+ * just for the next flow, but for every LATER RUN on the machine. It is why a
+ * fresh run with a brand-new fixture user could open on a fully Turkish
+ * settings screen and fail `sanity` on the word "Language".
+ *
+ * The user profile is not the culprit here: each run signs up a new user whose
+ * profile locale is already the default. This file is device state, and it has
+ * to be cleared device-side.
+ *
+ * iOS only, and deliberately best-effort: if the container cannot be resolved
+ * there is nothing to clear and the run should continue rather than abort.
+ */
+const clearMobileE2EDeviceSettings = async () => {
+  if (!isMac) return
+  try {
+    const dataContainer = await captureProcess(
+      'xcrun',
+      ['simctl', 'get_app_container', IOS_SIMULATOR_UDID, 'host.exp.Exponent', 'data'],
+      { timeoutMs: 5000 }
+    )
+    const root = dataContainer.stdout.trim()
+    if (!root || !fs.existsSync(root)) return
+
+    let removed = 0
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          walk(full)
+        } else if (entry.name === 'couture-cast-settings.json') {
+          fs.rmSync(full, { force: true })
+          removed += 1
+        }
+      }
+    }
+    walk(root)
+    if (removed > 0) {
+      log(`Cleared ${removed} persisted device settings file(s) before the suite`)
+    }
+  } catch {
+    // Best effort: a missing container just means there is nothing to clear.
+  }
+}
+
+const resetMobileE2EPerFlowState = async (identity) => {
+  const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
+  try {
+    await prisma.wardrobeOnboardingState.deleteMany({
+      where: { user_id: identity.userId },
+    })
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
+/**
+ * Marker claim shared with `matchMobileE2EBypass` in
+ * `apps/api/src/modules/auth/access-token-identity.service.ts`. Kept in sync by
+ * hand: the API must not import a helper that manufactures bearer tokens.
+ */
+const MOBILE_E2E_TOKEN_MARKER = 'couturecast-mobile-e2e'
+
+/**
+ * Mint the bearer token the app under test runs as.
+ *
+ * This has to be JWT-*shaped*, not merely something the API accepts. The mobile
+ * client derives the signed-in user id by decoding the token's `sub` claim
+ * (`resolveOwnerUserId` in `apps/mobile/src/lib/wardrobe.ts`), because in
+ * production the token is always a Supabase JWT. The harness used to inject
+ * `test-token:guardian:<userId>`, which contains no `.` at all, so `split('.')`
+ * yielded no payload segment and the decode threw. Every screen that needs the
+ * signed-in user id -- the capsule library, the silhouette editor and the
+ * wardrobe onboarding screen -- caught that and rendered "Your session token is
+ * malformed. Sign in again." in place of its content. Because those screens
+ * reuse one testID across their loading, error and ready states, the error
+ * surfaced to Maestro as an element simply "not found" on a screen it had
+ * already asserted it was on, which is why it read as six separate selector
+ * bugs across six flows.
+ *
+ * The token is unsigned and is never verified as a JWT. The API matches it
+ * through its existing `TEST_ENV`-gated bypass list, keyed on the `e2e` marker
+ * claim.
+ */
+const buildMobileE2EAccessToken = (userId, role = 'guardian') => {
+  const encodeSegment = (value) =>
+    Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
+  const header = encodeSegment({ alg: 'none', typ: 'JWT' })
+  const payload = encodeSegment({ sub: userId, role, e2e: MOBILE_E2E_TOKEN_MARKER })
+  return `${header}.${payload}.${MOBILE_E2E_TOKEN_MARKER}`
+}
+
 const setupMobileE2EIdentity = async (apiBaseUrl) => {
   const email = `mobile-e2e-${randomUUID()}@example.com`
   const signup = await requestJson(`${apiBaseUrl}/api/v1/auth/signup`, {
@@ -381,7 +886,7 @@ const setupMobileE2EIdentity = async (apiBaseUrl) => {
     throw new Error('Mobile E2E signup did not return a userId')
   }
 
-  const accessToken = `test-token:guardian:${userId}`
+  const accessToken = buildMobileE2EAccessToken(userId)
   const authorization = `Bearer ${accessToken}`
   const identity = { accessToken, userId }
 
@@ -407,6 +912,10 @@ const setupMobileE2EIdentity = async (apiBaseUrl) => {
     await requestJson(`${apiBaseUrl}/api/v1/ritual?locale=en-US`, {
       headers: { authorization },
     })
+
+    await seedMobileE2EWeatherAlert(identity)
+    const garmentIds = await seedMobileE2EGarments(apiBaseUrl, identity)
+    await seedMobileE2ECapsule(identity, garmentIds)
 
     return identity
   } catch (error) {
@@ -444,11 +953,7 @@ const cleanupMobileE2EIdentity = async (apiBaseUrl, identity) => {
     }
   }
 
-  const databaseUrl =
-    process.env.MOBILE_E2E_DATABASE_URL ||
-    process.env.DATABASE_URL ||
-    'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
-  const prisma = new PrismaClient({ datasourceUrl: databaseUrl })
+  const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -819,6 +1324,11 @@ const hasBootedIosSimulator = async () => {
         timeoutMs: 5000,
       }
     )
+    // A shard is pinned to one simulator, and "some device is booted" is not
+    // the question it needs answered: three sibling shards each boot their own.
+    if (IOS_SIMULATOR_UDID !== 'booted') {
+      return result.stdout.includes(IOS_SIMULATOR_UDID)
+    }
     return /\(Booted\)/.test(result.stdout)
   } catch {
     return false
@@ -867,7 +1377,7 @@ const getInstalledExpoGoVersionOnIos = async () => {
   try {
     const appContainer = await captureProcess(
       'xcrun',
-      ['simctl', 'get_app_container', 'booted', 'host.exp.Exponent', 'app'],
+      ['simctl', 'get_app_container', IOS_SIMULATOR_UDID, 'host.exp.Exponent', 'app'],
       { timeoutMs: 5000 }
     )
     const version = await captureProcess(
@@ -951,7 +1461,7 @@ const ensureExpoGoOnIos = async () => {
     url: release.iosClientUrl,
   })
   log(`Installing Expo Go ${expectedVersion} on the booted iOS simulator`)
-  await spawnProcess('xcrun', ['simctl', 'install', 'booted', binaryPath], {
+  await spawnProcess('xcrun', ['simctl', 'install', IOS_SIMULATOR_UDID, binaryPath], {
     timeoutMs: 120_000,
   })
 
@@ -1009,7 +1519,21 @@ const resolveTarget = async () => {
   }
 
   log('No iOS simulator detected. Attempting to boot an iOS simulator.')
-  await spawnProcess('bash', ['./scripts/start-ios-simulator.sh'], { timeoutMs: 60_000 })
+  if (IOS_SIMULATOR_UDID === 'booted') {
+    await spawnProcess('bash', ['./scripts/start-ios-simulator.sh'], {
+      timeoutMs: 60_000,
+    })
+  } else {
+    // The shard owns a specific device; `start-ios-simulator.sh` boots whatever
+    // the default device name resolves to, which is another shard's simulator.
+    log(`Booting pinned simulator ${IOS_SIMULATOR_UDID}`)
+    await spawnProcess('xcrun', ['simctl', 'boot', IOS_SIMULATOR_UDID], {
+      timeoutMs: 120_000,
+    }).catch(() => {
+      // `simctl boot` exits non-zero when the device is already booted.
+    })
+    await waitForCondition(hasBootedIosSimulator, 120_000, 1_000)
+  }
 
   if (await hasBootedIosSimulator()) {
     const expoGoReady = await ensureExpoGoOnIos()
@@ -1029,6 +1553,48 @@ const resolveTarget = async () => {
  */
 const ensureMaestroTarget = async () => {
   return resolveTarget()
+}
+
+/**
+ * Build the JavaScript bundle before the first flow runs.
+ *
+ * Metro answers its health check as soon as it is listening, long before it can
+ * serve a bundle. A serial run hid that: `expo start --ios` opens the app on the
+ * simulator during setup, so the cold bundle was already paid for by the time
+ * Maestro started. Sharded runs do not open the app that way -- with four
+ * simulators booted, Expo CLI would open it on whichever one it resolved first
+ * -- so the cold build landed inside the first flow instead, and
+ * `analytics.yaml` failed on `tab-home` after 3m28s having never mounted.
+ *
+ * Requesting the bundle over HTTP is the deterministic fix: the response does
+ * not arrive until the bundle is built, so there is nothing to guess about.
+ * Best-effort by design. If Expo changes its entry path this logs and continues
+ * rather than failing a suite over a warm-up.
+ *
+ * @param {string} healthUrl
+ * @param {'android' | 'ios'} platform
+ * @returns {Promise<void>}
+ */
+const warmMetroBundle = async (healthUrl, platform) => {
+  const bundleUrl =
+    `${healthUrl.replace(/\/$/, '')}/node_modules/expo-router/entry.bundle` +
+    `?platform=${platform}&dev=true&hot=false`
+  const startedAt = Date.now()
+  try {
+    const response = await fetch(bundleUrl, {
+      signal: AbortSignal.timeout(300_000),
+    })
+    if (!response.ok) {
+      log(`Metro warm-up returned ${response.status}; continuing without it`)
+      return
+    }
+    // The body has to be drained for Metro to consider the build served.
+    const bytes = (await response.arrayBuffer()).byteLength
+    const seconds = ((Date.now() - startedAt) / 1000).toFixed(1)
+    log(`Metro bundle warm (${Math.round(bytes / 1024 / 1024)}MB in ${seconds}s)`)
+  } catch (error) {
+    log(`Metro warm-up failed (${error.message}); continuing without it`)
+  }
 }
 
 /**
@@ -1079,29 +1645,38 @@ const run = async () => {
 
   try {
     if (process.env.MOBILE_E2E_SKIP_API !== '1') {
+      let apiAlreadyRunning = false
       try {
         await waitForHealth(apiHealthUrl, 2_000, 250)
-        log(`Detected existing local API at ${apiHealthUrl}, reusing it`)
-        workerProcess = spawn(
-          'npm',
-          ['run', 'start:workers:wardrobe', '--workspace', 'api'],
-          {
-            cwd: projectRoot,
-            detached: process.platform !== 'win32',
-            stdio: ['inherit', 'pipe', 'pipe'],
-            env: {
-              ...process.env,
-              DATABASE_URL:
-                process.env.MOBILE_E2E_DATABASE_URL ||
-                'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
-              GARMENT_TAGGING_ENGINE: 'fixture',
-              TEST_ENV: 'local',
-            },
-          }
-        )
-        managedProcesses.set(workerProcess, 'Wardrobe worker')
-        await waitForProcessOutput(workerProcess, 'Dedicated wardrobe worker started')
+        apiAlreadyRunning = true
       } catch {
+        apiAlreadyRunning = false
+      }
+
+      if (apiAlreadyRunning) {
+        log(`Detected existing local API at ${apiHealthUrl}, reusing it`)
+        if (SKIP_WORKER) {
+          log('Skipping wardrobe worker start (MOBILE_E2E_SKIP_WORKER=1)')
+        } else {
+          workerProcess = spawn(
+            'npm',
+            ['run', 'start:workers:wardrobe', '--workspace', 'api'],
+            {
+              cwd: projectRoot,
+              detached: process.platform !== 'win32',
+              stdio: ['inherit', 'pipe', 'pipe'],
+              env: {
+                ...process.env,
+                DATABASE_URL: MOBILE_E2E_DATABASE_URL,
+                GARMENT_TAGGING_ENGINE: 'fixture',
+                TEST_ENV: 'local',
+              },
+            }
+          )
+          managedProcesses.set(workerProcess, 'Wardrobe worker')
+          await waitForProcessOutput(workerProcess, 'Dedicated wardrobe worker started')
+        }
+      } else {
         log('Starting local API for mobile E2E')
         apiProcess = spawn('npm', ['run', 'start:api:e2e-with-workers'], {
           cwd: projectRoot,
@@ -1110,9 +1685,7 @@ const run = async () => {
           env: {
             ...process.env,
             ALLOW_DEV_GUARDIAN_SECRET: 'true',
-            DATABASE_URL:
-              process.env.MOBILE_E2E_DATABASE_URL ||
-              'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+            DATABASE_URL: MOBILE_E2E_DATABASE_URL,
             GUARDIAN_INVITE_WEB_BASE_URL: 'http://127.0.0.1:3005',
             GARMENT_TAGGING_ENGINE: 'fixture',
             PUBLIC_API_URL: process.env.MOBILE_E2E_PUBLIC_API_URL || mobileApiBaseUrl,
@@ -1129,9 +1702,11 @@ const run = async () => {
         log(`Local API reachable on ${apiHealthUrl}`)
       }
 
+      await clearMobileE2EDeviceSettings()
       mobileIdentity = await setupMobileE2EIdentity(apiSetupBaseUrl)
       process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN = mobileIdentity.accessToken
       process.env.EXPO_PUBLIC_API_BASE_URL = mobileApiBaseUrl
+      process.env.WEATHER_ALERT_ID = mobileE2EWeatherAlertId(mobileIdentity.userId)
       log('Created authenticated mobile E2E fixture')
     } else if (!process.env.EXPO_PUBLIC_API_BASE_URL) {
       throw new Error(
@@ -1257,6 +1832,8 @@ const run = async () => {
         2_000
       ))
 
+    await warmMetroBundle(resolvedPair.health, target.platform)
+
     if (!iosExpoGoReady) {
       throw new Error(
         'Expo Go is still unavailable on the booted iOS simulator after starting Expo. Verify the simulator is healthy, then rerun `npm run test:mobile:e2e:ios`.'
@@ -1274,6 +1851,11 @@ const run = async () => {
       log('Using Android-only xcrun shim to avoid broken iOS simulator discovery')
     }
 
+    // A suite runner reports on every flow. Rejecting on the first failure hid
+    // the state of the other seventeen and made a full pass take one boot per
+    // flow, so failures are collected and rethrown as one summary at the end.
+    const flowFailures = []
+
     try {
       for (const flowPath of flowsToRun) {
         const maestroArgs = []
@@ -1289,8 +1871,15 @@ const run = async () => {
             flowPath
           )
         } else {
-          maestroArgs.push('--platform', target.platform, 'test')
+          maestroArgs.push('--platform', target.platform)
+          if (target.platform === 'ios' && IOS_SIMULATOR_UDID !== 'booted') {
+            // Without this, concurrent shards all drive whichever simulator
+            // Maestro picks first.
+            maestroArgs.push('--udid', IOS_SIMULATOR_UDID)
+          }
+          maestroArgs.push('test')
           maestroArgs.push('-e', `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`)
+          maestroArgs.push('-e', `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`)
           maestroArgs.push('-e', `APP_URL=${process.env.APP_URL}`)
           maestroArgs.push('-e', `WARDROBE_URL=${process.env.WARDROBE_URL}`)
           maestroArgs.push('-e', `WIDGET_NOW_URL=${process.env.WIDGET_NOW_URL}`)
@@ -1314,13 +1903,35 @@ const run = async () => {
           maestroArgs.push(flowPath)
         }
 
+        if (mobileIdentity) {
+          await resetMobileE2EPerFlowState(mobileIdentity)
+        }
+
         log(`Running Maestro flow (${maestroArgs.join(' ')})`)
-        await runMaestroCommand(maestroArgs, { env: maestroEnv, logFile: maestroLogFile })
+        try {
+          await runMaestroCommand(maestroArgs, {
+            env: maestroEnv,
+            logFile: maestroLogFile,
+          })
+          log(`PASS ${flowPath}`)
+        } catch (error) {
+          flowFailures.push(flowPath)
+          log(`FAIL ${flowPath} (${error.message})`)
+        }
       }
     } finally {
       if (xcrunShimDir) {
         fs.rmSync(xcrunShimDir, { recursive: true, force: true })
       }
+    }
+
+    const passedCount = flowsToRun.length - flowFailures.length
+    log(`Maestro suite: ${passedCount}/${flowsToRun.length} flows passed`)
+
+    if (flowFailures.length > 0) {
+      throw new Error(
+        `${flowFailures.length} Maestro flow(s) failed:\n  ${flowFailures.join('\n  ')}`
+      )
     }
   } finally {
     if (mobileIdentity) {

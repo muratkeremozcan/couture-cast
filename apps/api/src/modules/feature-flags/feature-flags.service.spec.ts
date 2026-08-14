@@ -90,6 +90,7 @@ describe('FeatureFlagsService', () => {
       ['color_analysis_enabled', undefined],
       ['weather_alerts_enabled', true],
       ['commerce_affiliate_enabled', true],
+      ['commerce_subscription_enabled', true],
     ])
 
     const cachedValues = new Map<string, boolean | null>([
@@ -98,6 +99,7 @@ describe('FeatureFlagsService', () => {
       ['color_analysis_enabled', false],
       ['weather_alerts_enabled', null],
       ['commerce_affiliate_enabled', null],
+      ['commerce_subscription_enabled', null],
     ])
 
     const findValue = vi
@@ -119,13 +121,14 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 5, fallbackCount: 0 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 6, fallbackCount: 0 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: true },
       { key: 'community_feed_enabled', value: false },
       { key: 'color_analysis_enabled', value: false },
       { key: 'weather_alerts_enabled', value: true },
       { key: 'commerce_affiliate_enabled', value: true },
+      { key: 'commerce_subscription_enabled', value: true },
     ])
   })
 
@@ -151,7 +154,7 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 5, fallbackCount: 5 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 6, fallbackCount: 6 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: false },
       { key: 'community_feed_enabled', value: false },
@@ -160,6 +163,8 @@ describe('FeatureFlagsService', () => {
       // Story 5.1: with no remote answer and no cached row, the commerce kill
       // switch must land on its code default of false, not on a truthy guess.
       { key: 'commerce_affiliate_enabled', value: false },
+      // Story 5.2: identical reasoning for the premium purchasing switch.
+      { key: 'commerce_subscription_enabled', value: false },
     ])
   })
 })

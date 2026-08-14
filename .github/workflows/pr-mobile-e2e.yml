@@ -1,59 +1,103 @@
 # Step 12 step 6 owner: searchable owner anchor
-name: Mobile e2e (Maestro) – manual only
+name: Mobile e2e (Maestro)
 
-# NOTE: Mobile E2E is intentionally disabled for PR/main because GitHub-hosted emulators
-# are slow/flaky (30–40m cold, frequent boot failures). Run manually via workflow_dispatch
-# or on a self-hosted runner/device cloud if needed.
+# This workflow runs the SAME harness as a local run: `scripts/run-maestro.mjs`
+# against Expo Go, with the local API and Metro started by the script itself.
+#
+# It used to do something different, and that divergence is why it never caught
+# anything. The old job built a debug APK, installed it as `com.couturecast.app`
+# and invoked `npx maestro test` directly with `MOBILE_E2E_SKIP_SERVER=1`. That
+# meant no API, no Metro, no seeded fixture user and, decisively, no `APP_URL`,
+# which every flow dereferences in `openLink: ${APP_URL}`. Only three shallow
+# flows were ever listed and two of them were `continue-on-error`, so the job
+# could report success while the app under test never even mounted. A crash that
+# took down all eighteen flows for months (`Intl.Segmenter` constructed at module
+# scope, absent in Hermes) sailed through it untouched.
+#
+# Two consequences worth knowing before editing:
+#
+# 1. Expo Go replaces the Gradle build. `scripts/install-expo-go.mjs` downloads
+#    the Expo Go APK and installs it over adb, so `expo prebuild` and
+#    `./gradlew assembleDebug` are gone, and with them the Android build-tools
+#    and platform SDK packages that only that build needed. `MAESTRO_APP_ID` is
+#    deliberately not set here: `run-maestro.mjs` resolves it to
+#    `host.exp.exponent` for Android.
+# 2. Hardware acceleration is on. The job has always enabled KVM and then
+#    thrown it away by passing `-accel off`, forcing software emulation and the
+#    30-40 minute cold runs the old comment complained about. GitHub extended
+#    hardware-accelerated Android virtualization to standard Linux runners in
+#    April 2024 and doubled public-repo runners to 4 vCPU / 16 GB in January
+#    2024, so the flag is simply left at the action's `auto` default now.
+# Intentionally dispatch-only for now. The `pull_request` and `push` triggers are
+# temporarily removed while the Maestro suite is being proven green locally; until
+# then an automatic run would spend an hour producing a red result we already know
+# about. The mobile workstream restores both triggers once the local suite passes.
 on:
   workflow_dispatch:
     inputs:
-      flow:
-        description: Maestro flow to run
+      suite:
+        description: Which flows to run
         required: true
-        default: sanity
+        default: full
         type: choice
         options:
-          - sanity
-          - analytics
-          - accessibility-hardening
+          - full
+          - smoke
 
 concurrency:
   group: mobile-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
-  MAESTRO_APP_ID: com.anonymous.mobile
-  MAESTRO_FLOW_PATH: ${{ inputs.flow == 'analytics' && 'maestro/analytics.yaml' || inputs.flow == 'accessibility-hardening' && 'maestro/accessibility-hardening.yaml' || 'maestro/sanity.yaml' }}
-  MOBILE_ANALYTICS_DIAGNOSTICS: ${{ inputs.flow == 'analytics' && '1' || '0' }}
-  EXPO_PUBLIC_MOBILE_ANALYTICS_DIAGNOSTICS: ${{ inputs.flow == 'analytics' && '1' || '0' }}
+  # Identical to LOCAL_E2E_DATABASE_URL in scripts/local-e2e-database.mjs and to
+  # the Playwright workflow's LOCAL_DATABASE_URL. Both point at the Supabase
+  # container declared in supabase/config.toml (port 54322).
+  LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+  ANDROID_API_LEVEL: '30'
+  ANDROID_TARGET: google_apis
+  ANDROID_ARCH: x86_64
+  ANDROID_PROFILE: pixel_3a
 
 jobs:
   mobile-e2e-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    continue-on-error: ${{ inputs.flow != 'accessibility-hardening' }}
+    # Eighteen flows run serially against one emulator. Locally a flow takes
+    # 1-2 minutes, and setup here adds `npm ci`, a Supabase stack, a database
+    # reset, an emulator boot and a cold Metro bundle. 45 minutes did not leave
+    # headroom for that. Treat this as provisional: the first completed run
+    # gives a real number, and if it lands anywhere near this ceiling the fix is
+    # to shard the flow list across parallel jobs sharing the same AVD cache,
+    # not to keep raising the limit.
+    timeout-minutes: 60
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: ./.github/actions/setup-node-env
+      - name: Setup Node environment
+        uses: ./.github/actions/install
         with:
-          use-npm-ci: 'true'
+          install-command: npm ci
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android build tools and platforms
-        run: sdkmanager "build-tools;36.0.0" "platforms;android-36" "build-tools;35.0.0" "platforms;android-35" "build-tools;34.0.0" "platforms;android-34" "platforms;android-30" "system-images;android-30;google_apis;x86_64"
-
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('apps/mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: gradle-${{ runner.os }}-
+      # Only the emulator system image is installed. The build-tools and
+      # platform packages for API 34/35/36 that used to be installed here served
+      # `gradlew assembleDebug`, which no longer runs.
+      - name: Install Android emulator system image
+        run: sdkmanager "system-images;android-${{ env.ANDROID_API_LEVEL }};${{ env.ANDROID_TARGET }};${{ env.ANDROID_ARCH }}"
 
       - name: Enable KVM
         run: |
@@ -61,53 +105,170 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Build Android APK
-        working-directory: apps/mobile
-        env:
-          EXPO_NO_TELEMETRY: 1
-          CI: true
-        run: |
-          npx expo prebuild --platform android --clean
-          cd android
-          ./gradlew assembleDebug
+      # Restore and save are deliberately split rather than using the combined
+      # `actions/cache@v4`. That action declares `post-if: success()`, so its
+      # save step is skipped the moment any earlier step fails, and a failing
+      # Maestro flow is exactly the case this job exists to produce. Combined,
+      # the cache would therefore never be written on a red run, and every red
+      # run would pay a full cold boot: the optimisation would cancel itself
+      # out at precisely the times it is most needed. `save-always` is the
+      # documented-but-deprecated patch for this; the restore/save split is
+      # what the action's own docs point to instead.
+      - name: Restore cached AVD and snapshot
+        uses: actions/cache/restore@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ env.ANDROID_API_LEVEL }}-${{ env.ANDROID_TARGET }}-${{ env.ANDROID_ARCH }}-${{ env.ANDROID_PROFILE }}
 
-      - name: Run tests with Android emulator
+      # First run for a given key boots a cold emulator and saves a snapshot.
+      # Every later run restores it, which is the whole point of the cache: the
+      # old job passed `-no-snapshot` and so paid a full cold boot every time.
+      - name: Create AVD and generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
-          target: google_apis
-          arch: x86_64
-          profile: pixel_3a
-          ram-size: 1536M
-          disk-size: 1024M
-          force-avd-creation: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot -accel off
-          emulator-boot-timeout: 1800
+          api-level: ${{ env.ANDROID_API_LEVEL }}
+          target: ${{ env.ANDROID_TARGET }}
+          arch: ${{ env.ANDROID_ARCH }}
+          profile: ${{ env.ANDROID_PROFILE }}
+          ram-size: 2048M
+          disk-size: 4096M
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-boot-timeout: 900
+          disable-animations: false
+          script: echo "Generated AVD snapshot for caching."
+
+      # Saved here, immediately after generation, rather than at job end. The
+      # snapshot is complete the moment the step above shuts its emulator down,
+      # so caching it does not need to wait on the test result that follows, nor
+      # be forfeited by it.
+      #
+      # No `always()`: a bare `if:` is implicitly `success() && (...)`, which is
+      # exactly right. Forcing the save to run regardless would publish a
+      # half-written AVD under the primary key whenever generation itself
+      # failed, and a poisoned cache is worse than no cache because every later
+      # run restores it instead of rebuilding.
+      - name: Save AVD and snapshot to cache
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: ${{ steps.avd-cache.outputs.cache-primary-key }}
+
+      - name: Start local Supabase services
+        uses: ./.github/actions/start-local-supabase
+
+      - name: Reset local database
+        run: npm run db:reset
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+
+      # `maestro:install` pipes get.maestro.mobile.dev into bash, and that
+      # installer only advertises itself by appending to ~/.bashrc, ~/.zshrc and
+      # ~/.bash_profile. Actions runs every step as `bash --noprofile --norc`,
+      # which sources none of them, so the binary lands in ~/.maestro/bin and
+      # stays invisible. That failure is silent rather than loud: run-maestro.mjs
+      # catches the ENOENT and falls back to `npx --yes maestro@latest`, so the
+      # job would keep working while testing against a floating Maestro version
+      # that no developer runs locally. Export the path, then assert the binary
+      # really is the one being used.
+      #
+      # Reproduced in a Linux container: with `bash --noprofile --norc` the
+      # freshly installed binary is not on PATH, and appending ~/.maestro/bin
+      # resolves it. The installer also needs a JDK and `unzip` present. Both
+      # ship on the ubuntu runner image, and if either goes missing the
+      # installer exits non-zero and fails this step loudly rather than
+      # degrading to the npx fallback.
+      - name: Install Maestro CLI
+        run: |
+          npm run maestro:install --silent
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Maestro CLI is on PATH
+        run: |
+          set -euo pipefail
+          if ! command -v maestro >/dev/null 2>&1; then
+            echo "::error::maestro is not on PATH after install. run-maestro.mjs would silently fall back to 'npx maestro@latest' and test a different version than local runs use."
+            exit 1
+          fi
+          echo "Using maestro at: $(command -v maestro)"
+          maestro --version
+
+      - name: Resolve flow list
+        id: flows
+        run: |
+          if [[ "${{ inputs.suite }}" == "smoke" ]]; then
+            FLOWS="maestro/sanity.yaml maestro/analytics.yaml maestro/premium-subscription.yaml"
+          else
+            # Every top-level flow. `maestro/subflows/` holds fragments that are
+            # only ever reached through `runFlow`, so it is excluded by the
+            # depth limit. `config.yaml` is excluded by name because that is
+            # Maestro's own reserved filename for suite configuration, not a
+            # flow: if one is ever added, running it as a flow would fail in a
+            # way that reads like a broken test rather than a bad flow list.
+            FLOWS=$(find maestro -maxdepth 1 -name '*.yaml' ! -name 'config.yaml' | sort | tr '\n' ' ')
+          fi
+          echo "list=$FLOWS" >> "$GITHUB_OUTPUT"
+          echo "Running flows: $FLOWS"
+
+      - name: Run Maestro suite
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+          MOBILE_E2E_DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+          MOBILE_E2E_PLATFORM: android
+          # The action supplies the emulator, so the runner must not try to boot
+          # a second one through scripts/start-android-emulator.sh.
+          MOBILE_E2E_AUTO_BOOT_ANDROID: '0'
+          # run-maestro.mjs shims `xcrun` onto PATH for Android runs, to stop
+          # Maestro hanging on a broken CoreSimulator install. That is a macOS
+          # developer-machine workaround and it is worse than useless here:
+          # Linux has no /usr/bin/xcrun for the shim to delegate to, and putting
+          # an `xcrun` on PATH where the platform has none inverts the very
+          # signal Maestro uses to decide whether iOS tooling exists. The script
+          # provides this escape hatch for exactly this case.
+          MAESTRO_DISABLE_ANDROID_XCRUN_SHIM: '1'
+          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+        with:
+          api-level: ${{ env.ANDROID_API_LEVEL }}
+          target: ${{ env.ANDROID_TARGET }}
+          arch: ${{ env.ANDROID_ARCH }}
+          profile: ${{ env.ANDROID_PROFILE }}
+          ram-size: 2048M
+          disk-size: 4096M
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          # This boot restores the snapshot the previous step saved, so it is
+          # short. A long ceiling here only buys a longer hang before the job
+          # gives up, and it competes with `timeout-minutes` for the same budget.
+          emulator-boot-timeout: 600
           disable-animations: true
+          # Several flows type into text fields (wardrobe onboarding, capsule
+          # create). The Android spell checker's suggestion strip is a known
+          # source of flake around text entry, and nothing under test depends
+          # on it.
+          disable-spellchecker: true
           script: |
+            set -euo pipefail
+
             adb wait-for-device
             adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
 
-            npm run maestro:install --silent
-
-            adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            # Expo Go is the app under test. This replaces the debug APK build.
+            npm run mobile:expo-go
 
             mkdir -p maestro/artifacts
-            FLOW_PATH="${MAESTRO_FLOW_PATH:-maestro/sanity.yaml}"
-            REPORT_NAME="${FLOW_PATH##*/}"
-            REPORT_PATH="maestro/artifacts/${REPORT_NAME%.yaml}-report.xml"
-            run_maestro() {
-              MOBILE_E2E_SKIP_SERVER=1 npx maestro test \
-                --format junit \
-                --output "$REPORT_PATH" \
-                --test-output-dir maestro/artifacts \
-                --debug-output maestro/artifacts \
-                "$FLOW_PATH"
-            }
-            run_maestro || (sleep 20 && run_maestro) || (sleep 60 && run_maestro)
+            node ./scripts/run-maestro.mjs ${{ steps.flows.outputs.list }} --ci
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: android-test-results
           path: maestro/artifacts/
+          retention-days: 7

@@ -19,6 +19,12 @@ export const DEFAULT_FACTORY_REGISTRY_KEYS = [
   'commercePreferences',
   'affiliateClicks',
   'affiliateConversions',
+  // Story 5.2. Billing events may carry user_id NULL (unknown-subject webhook
+  // deliveries), so cleanup pairs the tracked ids with the
+  // cleanupScopeStartedAt anchor for unowned rows; see cleanup.ts.
+  'premiumEntitlements',
+  'billingEvents',
+  'billingCustomers',
 ] as const
 
 export type FactoryRegistryKey = (typeof DEFAULT_FACTORY_REGISTRY_KEYS)[number]

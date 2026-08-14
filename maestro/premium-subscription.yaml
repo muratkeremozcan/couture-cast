@@ -1,0 +1,104 @@
+# Story 5.2 Task 9: premium subscription settings section (Decision 11).
+#
+# Honest scope. This harness pins Expo Go (`MOBILE_E2E_EXPO_GO_VERSION` in
+# scripts/run-maestro.mjs), and the `react-native-purchases` native module does
+# not exist inside Expo Go, so this flow can verify only the settings Premium
+# section rendering and the SDK-absent fallback branch ("purchases unavailable
+# in this build"). It can never exercise the purchase UI: the store sheets need
+# the native module, which needs the dev build. The purchase UI on a dev build
+# is exercised by the runbook's staged smoke gate, not by Maestro.
+#
+# Identity, stated plainly. `run-maestro.mjs` signs up a fresh public-API user
+# and bakes that user's token into the Metro bundle via
+# `EXPO_PUBLIC_E2E_ACCESS_TOKEN` before the Expo server starts; no Maestro flow
+# in this repo signs in through UI, and no runtime token override exists in the
+# app. The app therefore runs as that fresh user, whose subscription status is
+# `none`. The seeded entitled user (`premium-active-user`,
+# premium-active@example.com, decision 9) is out of a Maestro run's reach: its
+# entitled-state rendering (status line, web-managed hint) is proven by the
+# mobile screen tests (`tab-two-screen.test.tsx`, MSW) and by the Playwright
+# premium spec against the seeded users. The two branches are also mutually
+# exclusive in `resolvePremiumSectionState`: an entitled user never renders the
+# `premium-unavailable` fallback, which only exists in the subscribe branch.
+#
+# What IS deterministic here, and asserted below: for a status-`none` user with
+# `commerce_subscription_enabled` seeded on (purchasesEnabled: true) and the
+# SDK unavailable (no native module in Expo Go, and no
+# EXPO_PUBLIC_REVENUECAT_* key in the local harness), the section renders the
+# disclosure, the "no subscription" status line, and the informational fallback
+# instead of any subscribe/restore control.
+appId: ${MAESTRO_APP_ID}
+name: 'Premium subscription settings section'
+tags:
+  - e2e
+  - commerce
+  - premium
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+- runFlow: subflows/open-settings.yaml
+
+# The Premium section is the sibling after the commerce section, below the
+# fold on phone screens; scroll it into view before asserting anything.
+- scrollUntilVisible:
+    element:
+      id: 'premium-settings-section'
+    direction: DOWN
+    timeout: 15000
+
+# --- AC 6: the section discloses the processors before any control ----------
+
+# PRD NFR Security 4 precedent from commerce-affiliate.yaml: the disclosure is
+# asserted in full, alongside the section, never behind a control.
+- assertVisible:
+    text: 'Premium subscriptions are processed by RevenueCat and, for web purchases, Stripe. They receive your account id and purchase state, never card numbers or wardrobe photos. Manage or cancel anytime in the store you subscribed through.'
+    label: 'Processor disclosure is visible in the Premium section'
+
+# --- AC 1: the status line reflects the server subscription ------------------
+
+# `getSubscriptionFromMobile` round-trips to the local API; a rendered status
+# line also proves the load-error branch was not taken.
+- extendedWaitUntil:
+    visible:
+      id: 'premium-status-line'
+    timeout: 15000
+    label: 'Subscription status loaded from the API'
+
+- assertVisible:
+    text: 'You don’t have a Premium subscription.'
+    label: 'Fresh harness user is on the status-none branch'
+
+- assertNotVisible:
+    id: 'premium-load-error'
+
+# --- AC 1: the SDK-absent fallback branch ------------------------------------
+
+# `ensurePurchasesConfigured` answers `unavailable` in Expo Go, so the
+# informational fallback renders and no purchase control ever mounts.
+- extendedWaitUntil:
+    visible:
+      id: 'premium-unavailable'
+    timeout: 15000
+    label: 'SDK-absent fallback rendered'
+
+- assertVisible:
+    text: 'Purchases aren’t available in this version of the app. Use the App Store or Play Store build of CoutureCast to subscribe.'
+    label: 'Fallback copy names the store builds'
+
+# With the section scrolled into view and the fallback rendered in the same
+# subscribe branch, the store CTAs must not exist anywhere in it.
+- assertNotVisible:
+    id: 'premium-subscribe-monthly'
+- assertNotVisible:
+    id: 'premium-subscribe-annual'
+- assertNotVisible:
+    id: 'premium-restore'
+
+- takeScreenshot:
+    path: maestro/artifacts/premium-subscription-fallback

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AccessibilityInfo,
-  findNodeHandle,
   Platform,
   StyleSheet,
   Text,
@@ -14,6 +13,7 @@ import { hasDeepLinkIntent, parseDeepLink } from '@couture/utils'
 import { InfoBanner } from '@/components/info-banner'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { loadMobileCommunityCardTarget } from '@/src/lib/mobile-deep-link-handler'
+import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
 export default function CommunityScreen() {
   const { t } = useTranslation()
@@ -82,7 +82,7 @@ export default function CommunityScreen() {
       if (Platform.OS === 'web') {
         return
       }
-      const node = findNodeHandle(targetRef.current)
+      const node = safeFindNodeHandle(targetRef.current)
       if (node) {
         AccessibilityInfo.setAccessibilityFocus(node)
       }

@@ -5,8 +5,11 @@
 // Learning path Step 28: Accessibility hardening.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 // Story 3.5 Task 6 step 3 owner: integration-test Lookbook Prism responsive layout, comparison mode, and focus rings in apps/web/src/app/components/lookbook-prism-layout.test.tsx
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { http, HttpResponse } from 'msw'
+import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 
 // Mock posthog-js
@@ -23,6 +26,7 @@ vi.mock('next/navigation', () => ({
 describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    window.sessionStorage.clear()
   })
 
   it('3.5-INT-001: Renders Lookbook Prism responsive container with primary regions', () => {
@@ -111,6 +115,79 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
     expect(
       screen.getByRole('complementary', { name: /planner rail/i })
     ).toBeInTheDocument()
+  })
+
+  /**
+   * Story 5.2 Decision 2: the rail is the story's one real premium gate. With
+   * no session there is no entitlement request at all — the locked upsell is
+   * the default, which is also what the signed-out accessibility run sees.
+   */
+  it('5.2-WEB-RAIL-01 renders the locked upsell signed out, with no request', () => {
+    render(<LookbookPrismLayout />)
+
+    const rail = screen.getByRole('complementary', { name: /planner rail/i })
+    expect(rail).toBeInTheDocument()
+    expect(screen.getByTestId('planner-rail-locked')).toHaveTextContent(
+      'The 7-Day Planner is a Premium feature'
+    )
+    const cta = screen.getByTestId('planner-rail-get-premium')
+    expect(cta).toHaveAttribute('href', '/settings')
+    expect(cta).toHaveTextContent('Get Premium')
+    expect(screen.queryByText(/waterproof trench/i)).not.toBeInTheDocument()
+  })
+
+  it('5.2-WEB-RAIL-02 renders the planner shell for an entitled user', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    useMswHandlers(
+      http.get('/api/v1/commerce/subscription', () =>
+        HttpResponse.json({
+          data: {
+            status: 'active',
+            store: 'stripe',
+            productId: 'premium_monthly',
+            willRenew: true,
+            currentPeriodEnd: '2026-09-12T00:00:00.000Z',
+            syncedAt: '2026-08-12T00:00:00.000Z',
+            purchasesEnabled: true,
+          },
+        })
+      )
+    )
+
+    render(<LookbookPrismLayout />)
+
+    await waitFor(() =>
+      expect(screen.getByText(/waterproof trench/i)).toBeInTheDocument()
+    )
+    expect(screen.queryByTestId('planner-rail-locked')).not.toBeInTheDocument()
+  })
+
+  /** A non-entitled subscription state must not unlock the rail. */
+  it('5.2-WEB-RAIL-03 keeps the locked upsell for an expired subscription', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    const requested = vi.fn()
+    useMswHandlers(
+      http.get('/api/v1/commerce/subscription', () => {
+        requested()
+        return HttpResponse.json({
+          data: {
+            status: 'expired',
+            store: 'stripe',
+            productId: 'premium_monthly',
+            willRenew: false,
+            currentPeriodEnd: '2026-07-12T00:00:00.000Z',
+            syncedAt: '2026-08-12T00:00:00.000Z',
+            purchasesEnabled: true,
+          },
+        })
+      })
+    )
+
+    render(<LookbookPrismLayout />)
+
+    await waitFor(() => expect(requested).toHaveBeenCalled())
+    expect(screen.getByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(screen.queryByText(/waterproof trench/i)).not.toBeInTheDocument()
   })
 
   it('synchronizes chip selection across hero and community content', () => {

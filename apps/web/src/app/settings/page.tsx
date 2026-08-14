@@ -5,6 +5,7 @@ import { I18nextProvider } from 'react-i18next'
 import { getI18n } from '../../i18n'
 import { CommercePreferencesSection } from '../components/commerce-preferences-section'
 import { StickyBottomNav } from '../components/sticky-bottom-nav'
+import { SubscriptionSection } from '../components/subscription-section'
 
 /**
  * Four things on the `<main>` below are load-bearing and must survive any
@@ -32,6 +33,7 @@ export default function SettingsPage() {
       >
         <h1 className="text-4xl font-semibold">Settings</h1>
         <CommercePreferencesSection />
+        <SubscriptionSection />
         <StickyBottomNav />
       </main>
     </I18nextProvider>

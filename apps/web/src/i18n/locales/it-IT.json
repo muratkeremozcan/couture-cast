@@ -16,6 +16,36 @@
       "saved": "Preferenze di acquisto aggiornate",
       "error": "Impossibile aggiornare le preferenze di acquisto.",
       "signedOutHint": "Accedi per modificare questa impostazione"
+    },
+    "premium": {
+      "sectionTitle": "Premium",
+      "disclosure": "Gli abbonamenti Premium sono elaborati da RevenueCat e, per gli acquisti effettuati sul web, da Stripe. CoutureCast condivide l'id del tuo account e lo stato dell'acquisto con questi fornitori affinché il tuo abbonamento funzioni ovunque tu acceda. I numeri di carta sono gestiti dal fornitore di pagamento e non arrivano mai a CoutureCast.",
+      "status": {
+        "none": "Non hai ancora un abbonamento Premium.",
+        "active": "Premium è attivo: {{plan}}. Il periodo corrente termina il {{date}}.",
+        "gracePeriod": "Premium è attivo, ma c'è un problema di pagamento.",
+        "expired": "Il tuo abbonamento Premium è scaduto.",
+        "revoked": "Il tuo abbonamento Premium è stato revocato."
+      },
+      "planMonthly": "Premium mensile",
+      "planAnnual": "Premium annuale",
+      "subscribe": "Ottieni Premium",
+      "manage": "Gestisci abbonamento",
+      "manageInStore": "Gestisci questo abbonamento nell'App Store o nel Play Store in cui è stato acquistato.",
+      "restore": "Ripristina acquisti",
+      "pendingApproval": "Questo acquisto è in attesa dell'approvazione di un tutore. Premium si sbloccherà una volta approvato.",
+      "activating": "Pagamento ricevuto. Attivazione dell'abbonamento Premium in corso…",
+      "stillProcessing": "Ancora in elaborazione. Il pagamento è andato a buon fine; ricontrolla a breve.",
+      "portalLagHint": "Le modifiche effettuate nel portale di fatturazione, in particolare le cancellazioni, possono impiegare un paio d'ore per comparire qui.",
+      "graceBanner": "C'è un problema con il tuo metodo di pagamento. Aggiornalo nello store o nel portale di fatturazione con cui ti sei abbonato per mantenere Premium.",
+      "endedNote": "Il tuo abbonamento è terminato. Puoi riabbonarti in qualsiasi momento.",
+      "errorLoad": "Impossibile caricare lo stato dell'abbonamento.",
+      "errorPurchase": "Impossibile avviare il pagamento. Riprova.",
+      "signedOutHint": "Accedi per abbonarti o gestire Premium",
+      "plannerLocked": {
+        "title": "Il planner di 7 giorni è una funzione Premium",
+        "cta": "Ottieni Premium"
+      }
     }
   },
   "wardrobe": {

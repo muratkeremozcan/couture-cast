@@ -14,21 +14,12 @@ env:
     clearState: false
     stopApp: false
 
-- openLink: ${APP_URL}
+- runFlow: subflows/open-app.yaml
 
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go developer menu if it appears'
-
-- tapOn:
-    # Expo Go can render a first-run sheet over the app. This tap dismisses it
-    # on iOS while still landing in a harmless area once the sheet is gone.
-    point: '50%,92%'
-
-- tapOn:
-    point: '75%,94%'
-    retryTapIfNoChange: true
+# Tapped by testID, never by screen coordinate. The blind `75%,94%` tap this
+# replaces was calibrated for an older tab bar; once Community was added it
+# landed one tab short and every run failed on the assertion below.
+- runFlow: subflows/open-settings.yaml
 
 - assertVisible: ${SETTINGS_TITLE}
 

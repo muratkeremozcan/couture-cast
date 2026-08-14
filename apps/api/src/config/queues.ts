@@ -21,6 +21,7 @@ export type QueueName =
   | 'alert-fanout'
   | 'color-extraction'
   | 'moderation-review'
+  | 'billing-reconciliation'
 
 export type QueueConfig = {
   name: QueueName
@@ -67,6 +68,17 @@ export const queueConfigs: QueueConfig[] = [
   },
   {
     name: 'moderation-review',
+    options: {
+      connection,
+      defaultJobOptions,
+    },
+  },
+  // Story 5.2 Decision 4a: payment recovery (forward-outbox re-drive), drift
+  // correction, and commerce retention run as Job Schedulers on this queue —
+  // the worker runtime is the repo's only substrate where schedules provably
+  // fire (the serverless API's @Cron decorators never do).
+  {
+    name: 'billing-reconciliation',
     options: {
       connection,
       defaultJobOptions,

@@ -23,16 +23,7 @@ tags:
     clearState: true
     stopApp: false
 
-- openLink: ${APP_URL}
-
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go developer menu if it appears'
-- tapOn:
-    text: 'Open app'
-    optional: true
-    label: 'Dismiss Expo Go developer sheet if it appears'
+- runFlow: subflows/open-app.yaml
 
 - extendedWaitUntil:
     visible: 'Morning commute'
@@ -40,21 +31,58 @@ tags:
 
 # --- AC 1: the CTA renders, disclosed, on an eligible card -------------------
 
-- extendedWaitUntil:
-    visible: 'Paid partnership. CoutureCast may earn a commission.'
+# The affiliate block is the last child of the outfit card, below the comfort
+# notes, the reasoning badges and the garment tiles, so it starts off-screen on
+# every device this suite runs on. Maestro only sees what is rendered *and* on
+# screen, so this has to scroll rather than wait: waiting alone would time out
+# against a perfectly healthy card.
+#
+# Scroll to the block's LAST element rather than the block itself.
+# `scrollUntilVisible` stops the moment its target becomes visible, and the
+# container qualifies as soon as its first line does, which left the CTA below
+# the fold and failed the very next assertion. Targeting the trailing line puts
+# the whole block on screen, which the `below:` reading-order checks need anyway.
+- scrollUntilVisible:
+    element:
+      id: 'shop-this-look-opens-in-browser'
+    direction: DOWN
     timeout: 30000
-    label: 'Affiliate disclosure is on the card before any interaction'
+    label: 'Bring the whole affiliate block on screen'
 
+- assertVisible:
+    id: 'shop-this-look-block'
+
+- assertVisible: 'Paid partnership. CoutureCast may earn a commission.'
 - assertVisible: 'Presented by Sample Partner'
-- assertVisible: 'Shop this look'
 - assertVisible: 'Opens in an in-app browser'
+
+# The CTA is asserted by id, and its accessible name asserted separately in
+# full.
+#
+# `assertVisible: 'Shop this look'` could never pass here, and not because the
+# control was missing. The Pressable sets its own `accessibilityLabel`, which
+# collapses the inner Text into the composed name, so the only node in the
+# native hierarchy carrying those words reads "Shop this look. Presented by
+# Sample Partner. Opens in an in-app browser". Maestro matches a text selector
+# against the whole string, so the substring never matched a healthy, fully
+# rendered CTA.
+#
+# Asserting the composed name in full is also the stronger check: decision 16
+# fixes that order deliberately -- control label first, so a speech-input user's
+# accessible name begins with what they can actually read -- and this pins it.
+- assertVisible:
+    id: 'shop-this-look-cta'
+    label: 'The affiliate CTA control is on screen'
+- assertVisible:
+    text: 'Shop this look. Presented by Sample Partner. Opens in an in-app browser'
+    label: 'Accessible name leads with the visible control label (decision 16)'
 
 # PRD FR5.1 accepts only a disclosure that is visible BEFORE the click, so the
 # relative position is the assertion, not merely that both are on screen. A
 # disclosure moved below the control, into a tooltip, or into a post-tap
 # interstitial fails here.
 - assertVisible:
-    text: 'Shop this look'
+    id: 'shop-this-look-cta'
     below:
       text: 'Paid partnership. CoutureCast may earn a commission.'
     label: 'Disclosure renders above the control in reading order'
@@ -69,10 +97,7 @@ tags:
 
 # --- AC 3: the settings section discloses the integration --------------------
 
-- tapOn:
-    id: 'tab-settings'
-    retryTapIfNoChange: true
-    label: 'Open settings'
+- runFlow: subflows/open-settings.yaml
 
 - extendedWaitUntil:
     visible: 'Shopping and partners'
@@ -120,24 +145,27 @@ tags:
     clearState: false
     stopApp: true
 
-- openLink: ${APP_URL}
-
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go developer menu if it appears'
-- tapOn:
-    text: 'Open app'
-    optional: true
-    label: 'Dismiss Expo Go developer sheet if it appears'
+- runFlow: subflows/open-app.yaml
 
 - extendedWaitUntil:
     visible: 'Morning commute'
     timeout: 30000
 
+# Scroll to where the block would be before asserting it is not there.
+#
+# `assertNotVisible` on content that is merely below the fold passes for the
+# wrong reason: the CTA could still be rendering happily and this flow would
+# call it hidden. Scrolling to the garment tiles, which sit immediately above
+# the affiliate block, and then one screen further puts the assertion at the
+# bottom of the card where the block would be if it existed. That is what makes
+# the absence falsifiable.
+- runFlow: subflows/scroll-to-card-bottom.yaml
+
+- assertNotVisible:
+    id: 'shop-this-look-block'
+    label: 'A cache-served payload never renders a CTA'
 - assertNotVisible:
     text: 'Paid partnership. CoutureCast may earn a commission.'
-    label: 'A cache-served payload never renders a CTA'
 - assertNotVisible: 'Presented by Sample Partner'
 
 # Relaunch WITH a cleared state. No device cache survives, so the card can only
@@ -149,25 +177,25 @@ tags:
     clearState: true
     stopApp: true
 
-- openLink: ${APP_URL}
-
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go developer menu if it appears'
-- tapOn:
-    text: 'Open app'
-    optional: true
-    label: 'Dismiss Expo Go developer sheet if it appears'
+- runFlow: subflows/open-app.yaml
 
 - extendedWaitUntil:
     visible: 'Morning commute'
     timeout: 30000
 
+- runFlow: subflows/scroll-to-card-bottom.yaml
+
+- assertNotVisible:
+    id: 'shop-this-look-block'
+    label: 'The server withholds the offer for an opted-out user'
 - assertNotVisible:
     text: 'Paid partnership. CoutureCast may earn a commission.'
-    label: 'The server withholds the offer for an opted-out user'
-- assertNotVisible: 'Shop this look'
+# By id, not by text. `assertNotVisible: 'Shop this look'` passed here for the
+# wrong reason: no node ever carries that text on its own, so the assertion was
+# green whether or not the CTA rendered -- the same non-falsifiable shape the
+# opt-out checks above were already fixed for.
+- assertNotVisible:
+    id: 'shop-this-look-cta'
 
 - takeScreenshot:
     path: maestro/artifacts/commerce-affiliate-cta-hidden
@@ -177,9 +205,7 @@ tags:
 # Also leaves the shared fixture the way it was found, so a later flow on the
 # same account does not inherit an opt-out it never made.
 
-- tapOn:
-    id: 'tab-settings'
-    retryTapIfNoChange: true
+- runFlow: subflows/open-settings.yaml
 
 - extendedWaitUntil:
     visible: 'Shopping and partners'
@@ -199,23 +225,19 @@ tags:
     clearState: true
     stopApp: true
 
-- openLink: ${APP_URL}
+- runFlow: subflows/open-app.yaml
 
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go developer menu if it appears'
-- tapOn:
-    text: 'Open app'
-    optional: true
-    label: 'Dismiss Expo Go developer sheet if it appears'
-
-- extendedWaitUntil:
-    visible: 'Paid partnership. CoutureCast may earn a commission.'
+- scrollUntilVisible:
+    element:
+      id: 'shop-this-look-opens-in-browser'
+    direction: DOWN
     timeout: 30000
     label: 'The CTA returns once affiliate suggestions are on again'
 
-- assertVisible: 'Shop this look'
+- assertVisible: 'Paid partnership. CoutureCast may earn a commission.'
+- assertVisible:
+    id: 'shop-this-look-cta'
+    label: 'The CTA control is back'
 
 - takeScreenshot:
     path: maestro/artifacts/commerce-affiliate-cta-restored

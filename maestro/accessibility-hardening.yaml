@@ -14,12 +14,7 @@ tags:
     clearState: true
     stopApp: false
 
-- openLink: ${APP_URL}
-
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go developer menu if it appears'
+- runFlow: subflows/open-app.yaml
 
 - assertVisible:
     id: 'tab-home'
@@ -46,19 +41,55 @@ tags:
 - tapOn:
     id: 'tab-home'
 
-- assertVisible:
-    id: 'garment-tile-classic-trench-coat'
+# Garment swap: selector state and modal dismissal.
+#
+# These steps used to name `classic-trench-coat` and `leather-jacket`. Those are
+# MSW fixture names from the mobile unit tests; the live API seeds garments as
+# `<userId>-garment-<n>`, so the ids are generated per fixture user and differ on
+# every run. The flow could never have passed against a real server. What the
+# story actually asks this flow to prove is data-independent, so it is now
+# asserted that way: a garment tile opens the swap modal, the currently-worn
+# option carries `accessibilityState.selected`, and choosing a different option
+# dismisses the modal.
+# `centerElement: true` is load-bearing, not a nicety.
+#
+# Without it `scrollUntilVisible` stops as soon as the tile is inside the
+# viewport, which routinely leaves it at the very bottom of the screen -- and the
+# bottom tab bar is a sticky overlay sitting on top of that band. Maestro judged
+# the tile 100% visible and tapped the centre of its bounds; measured from the
+# failing run, the tile landed at [16,797][386,861] and `tab-home` occupies
+# [0,784][100,840], so the tap at (201,829) went to the Community tab instead of
+# the tile. Every assertion up to that point passed, the tap reported COMPLETED,
+# and the swap modal simply never opened -- the app was on another screen.
+# Centering puts the tile in the middle of the viewport, clear of the overlay.
+- scrollUntilVisible:
+    element:
+      id: 'garment-tile-.*'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+# `scrollUntilVisible` returns as soon as the element is on screen, while the
+# scroll view is still decelerating, and a tap delivered into a moving scroll
+# view is absorbed stopping it. Settle first, then tap.
+- waitForAnimationToEnd
+
 - tapOn:
-    id: 'garment-tile-classic-trench-coat'
+    id: 'garment-tile-.*'
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: 'garment-swap-modal'
+    timeout: 15000
 - assertVisible:
-    id: 'garment-swap-modal'
-- assertVisible:
-    id: 'swap-option-classic-trench-coat'
+    id: 'swap-option-.*'
     selected: true
 - tapOn:
-    id: 'swap-option-leather-jacket'
+    id: 'swap-option-.*'
+    index: 1
+- assertNotVisible:
+    id: 'garment-swap-modal'
 - assertVisible:
-    id: 'garment-tile-leather-jacket'
+    id: 'outfit-recommendation-card'
 
 - tapOn:
     id: 'header-info-modal'

@@ -18,7 +18,6 @@ import {
   ScrollView,
   StyleSheet,
   Text as RNText,
-  findNodeHandle,
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
@@ -29,7 +28,7 @@ import { MobileGarmentTaggingModal } from '@/components/wardrobe/garment-tagging
 import { SilhouetteEditor } from '@/components/wardrobe/silhouette-editor'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
-import { safeFindNodeHandle } from '@/src/lib/expo-native-helpers'
+import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import {
   getWardrobeOnboardingStateFromMobile,
   listGarmentsFromMobile,
@@ -121,7 +120,7 @@ export function WardrobeOnboardingScreen() {
 
   useEffect(() => {
     if (isLoading || Platform.OS === 'web') return
-    const node = findNodeHandle(headingRef.current)
+    const node = safeFindNodeHandle(headingRef.current)
     if (node) AccessibilityInfo.setAccessibilityFocus(node)
   }, [phase, isLoading])
 
@@ -239,7 +238,13 @@ export function WardrobeOnboardingScreen() {
 
   if (isLoading || isRedirecting) {
     return (
-      <View style={styles.screen} testID="wardrobe-onboarding-screen">
+      // The loading and error states carry their own testIDs so that
+      // `wardrobe-onboarding-screen` means "the onboarding steps are on screen"
+      // and nothing else. Sharing it across all three states made an E2E wait on
+      // it return during the spinner, and made a failed load look identical to a
+      // successful one until the next assertion reported the first step "not
+      // found".
+      <View style={styles.screen} testID="wardrobe-onboarding-screen-loading">
         <ActivityIndicator accessibilityLabel={t('wardrobe.onboarding.title')} />
       </View>
     )
@@ -247,7 +252,7 @@ export function WardrobeOnboardingScreen() {
 
   if (loadError) {
     return (
-      <View style={styles.screen} testID="wardrobe-onboarding-screen">
+      <View style={styles.screen} testID="wardrobe-onboarding-screen-error">
         <View accessibilityRole="alert" style={styles.errorBox}>
           <Text>{loadError}</Text>
         </View>

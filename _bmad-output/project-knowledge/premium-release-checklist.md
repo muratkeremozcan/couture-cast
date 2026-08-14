@@ -1,55 +1,52 @@
-# Premium release checklist (human-only steps)
+# Premium subscription release checklist (story 5.2)
 
-Created: 2026-08-12, alongside story CC-5.2 (`../implementation-artifacts/5-2-premium-subscription-lifecycle.md`).
+The human-only gate before `commerce_subscription_enabled` turns on in any real
+environment. The full provisioning runbook, with rationale and rotation notes,
+lives in `secrets-management.md` (Premium billing secrets); this file is the
+sign-off subset and must be kept consistent with it.
 
-Story CC-5.2 builds and tests the whole Premium subscription lifecycle against fakes: CI never
-talks to Apple, Google, Stripe, or RevenueCat. The steps below are the parts no agent can do,
-because they need the owner's legal identity, a payment card, or a physical device. Nothing here
-is needed to develop or merge the story; all of it is needed before the
-`commerce_subscription_enabled` flag turns on anywhere real.
+Accountable owner: named in the story 5.2 pull request description (5.1 C-8
+rule). Solo-maintainer project: product, legal, and operator are the same
+person, Murat.
 
-Do them in order. The exact settings for each step (products, webhook secrets, per-locale
-currency presentation) live in the story's Decision 9 operator runbook, which Task 10 folds into
-[secrets-management.md](./secrets-management.md).
+## Blocking items, in order
 
-## 1. Create the accounts (identity + card required)
+- [ ] App identity `com.couturecast.app` set in `apps/mobile/app.json`
+      (`bundleIdentifier` + Android `package`) and shipped in the store build.
+      Revisit the id at App Store record creation if a domain-matched id is
+      preferred — it is free to change until that record exists, impossible
+      after.
+- [ ] App Store Connect: app record, subscription group, `premium_monthly` and
+      `premium_annual` approved.
+- [ ] Play Console: app record and both base plans live, on a build carrying
+      Play Billing Library 8+ (hard deadline for app updates: 2026-08-31).
+- [ ] Stripe: both Prices with per-locale currency presentation; Customer
+      Portal configured with cancel and plan-switch enabled; webhook endpoint +
+      secret set.
+- [ ] RevenueCat: `premium` entitlement, both store apps, Stripe integration,
+      webhook (HMAC signing if available on our plan) + secret set; free-tier
+      webhook/integration availability confirmed.
+- [ ] All six environment variables set in the target environment (see the
+      table in `secrets-management.md`); no placeholders.
+- [ ] **Staged smoke run recorded:** one full web chain in Stripe test mode +
+      RC sandbox (checkout → Stripe webhook → forward → RC webhook →
+      entitlement visible on `GET /api/v1/commerce/subscription` within the
+      2-minute promise), and one sandbox store purchase on an EAS dev build.
+      This is the only pre-production proof of the real chain; CI fakes every
+      provider.
+- [ ] **Draft translations reviewed:** the nine non-English `commerce.premium.*`
+      catalogs on both surfaces are machine-translation drafts and the
+      disclosure strings are compliance copy (PRD NFR Localization 1). Human
+      review is a release blocker, exactly as 5.1's Decision 16 treated the
+      commerce tree.
+- [ ] Flag flip: `commerce_subscription_enabled` on in PostHog for the intended
+      audience — last, after everything above.
 
-- [ ] Apple Developer Program: $99/year. Needed for App Store Connect and TestFlight.
-- [ ] Google Play Console: $25 one-time.
-- [ ] Stripe: business/individual details and a bank account for payouts.
-- [ ] RevenueCat: free tier (free to $2,500 monthly tracked revenue, then ~1%). While signing up,
-      confirm webhooks and the Stripe integration are available on the free tier (Decision 1
-      flagged this as a provisioning-time check).
+## Non-blocking but dated
 
-## 2. Create the products (config only, no code)
-
-Follow Decision 9's dependency order. App identity is already decided and set by the story:
-`com.couturecast.app` on both platforms (changeable at zero cost only until the App Store app
-record below is created).
-
-- [ ] App Store Connect: app record + subscription group with `premium_monthly` / `premium_annual`.
-- [ ] Play Console: app record + base plans for the same two products.
-- [ ] Stripe: Products/Prices (launch defaults from Open question 3: $4.99/month, $39.99/year USD),
-      per-locale currency presentation, Customer Portal with cancel + plan switch enabled,
-      webhook endpoint + secret.
-- [ ] RevenueCat: project, `premium` entitlement, both store apps, Stripe integration,
-      webhook + secret (signature auth preferred per Decision 1).
-- [ ] Set the production env vars from Decision 10 in Vercel/EAS.
-- [ ] Do NOT configure a free trial anywhere. Open question 2 resolved no-trial at launch;
-      a trial is a deliberate future story with its own event and metric.
-
-## 3. Staged smoke gate (release blocker)
-
-Nothing in CI exercises the real payment chain, so this staged run is the only pre-production
-proof and must be recorded as such (Decision 9 step 6):
-
-- [ ] One full web chain in Stripe test mode + RevenueCat sandbox:
-      checkout → Stripe webhook → forward → RC webhook → entitlement visible via
-      `GET /api/v1/commerce/subscription`.
-- [ ] One sandbox store purchase on a real phone, using an EAS dev build
-      (purchases do not work in Expo Go).
-
-## 4. Locale review (release blocker)
-
-- [ ] Human review of the machine-translated Premium strings in all ten locale catalogs, both
-      surfaces (AC 7; same release-blocker convention as story 5.1 Decision 16).
+- Play Billing 8 self-service extension (to 2026-11-01) exists if the store
+  build slips; the pinned `react-native-purchases` v10.x already bundles
+  Billing 8.
+- Stripe-sourced cancellations can take ~2 hours to reflect in RevenueCat; the
+  portal-return copy sets that expectation. No action, just do not treat it as
+  an incident.

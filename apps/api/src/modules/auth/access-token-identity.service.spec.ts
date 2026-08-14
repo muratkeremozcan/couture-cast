@@ -8,6 +8,14 @@ import { AccessTokenIdentityService } from './access-token-identity.service.js'
 const requestWithHeaders = (headers: Record<string, string>) =>
   ({ headers }) as unknown as Request
 
+/**
+ * Must match `MOBILE_E2E_TOKEN_MARKER` in the service and the same literal in
+ * `scripts/run-maestro.mjs`. Written out here rather than imported so that a
+ * rename in the service surfaces as a failing test instead of silently
+ * following along.
+ */
+const MARKER = 'couturecast-mobile-e2e'
+
 function mockSupabaseUser(body: unknown, status = 200) {
   const fetchMock = vi.fn().mockImplementation(() =>
     Promise.resolve(
@@ -202,6 +210,84 @@ describe('AccessTokenIdentityService', () => {
       await expect(service.resolveIdentity(token)).resolves.toEqual({ userId, role })
     })
 
+    // The mobile Maestro harness's token has to be JWT-shaped, because the app
+    // under test decodes `sub` out of it to learn its own user id. These cases
+    // pin both halves of that contract: the shape the harness mints is accepted,
+    // and nothing that merely looks JWT-ish is.
+    describe('mobile Maestro bypass', () => {
+      const mintMobileToken = (claims: Record<string, unknown>, signature = MARKER) =>
+        [
+          Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url'),
+          Buffer.from(JSON.stringify(claims)).toString('base64url'),
+          signature,
+        ].join('.')
+
+      it('resolves the JWT-shaped mobile token from its sub and role claims', async () => {
+        const { service } = createService()
+
+        await expect(
+          service.resolveIdentity(
+            mintMobileToken({ sub: 'mobile-user-1', role: 'guardian', e2e: MARKER })
+          )
+        ).resolves.toEqual({ userId: 'mobile-user-1', role: 'guardian' })
+      })
+
+      it('exposes a payload the mobile client can decode back to the same sub', () => {
+        // Mirrors `resolveOwnerUserId` in apps/mobile/src/lib/wardrobe.ts: the
+        // regression this guards is a token the API accepts but the app cannot
+        // read, which is what left six flows on an auth error screen.
+        const token = mintMobileToken({
+          sub: 'mobile-user-1',
+          role: 'guardian',
+          e2e: MARKER,
+        })
+        const payloadSegment = token.split('.')[1] ?? ''
+        const normalized = payloadSegment.replace(/-/g, '+').replace(/_/g, '/')
+        const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+        const claims = JSON.parse(Buffer.from(padded, 'base64').toString('utf8')) as {
+          sub?: unknown
+        }
+
+        expect(claims.sub).toBe('mobile-user-1')
+      })
+
+      it.each([
+        {
+          name: 'the marker claim is absent',
+          token: mintMobileToken({ sub: 'mobile-user-1', role: 'guardian' }),
+        },
+        {
+          name: 'the marker signature segment is absent',
+          token: mintMobileToken(
+            { sub: 'mobile-user-1', role: 'guardian', e2e: MARKER },
+            'not-the-marker'
+          ),
+        },
+        {
+          name: 'the role is outside the allowlist',
+          token: mintMobileToken({ sub: 'mobile-user-1', role: 'root', e2e: MARKER }),
+        },
+        {
+          name: 'the sub claim is blank',
+          token: mintMobileToken({ sub: '   ', role: 'guardian', e2e: MARKER }),
+        },
+        {
+          name: 'the payload is not JSON',
+          token: ['header', Buffer.from('not json').toString('base64url'), MARKER].join(
+            '.'
+          ),
+        },
+      ])('falls through to Supabase when $name', async ({ token }) => {
+        const { service } = createService()
+        const fetchMock = mockSupabaseUser({}, 401)
+
+        await expect(service.resolveIdentity(token)).rejects.toBeInstanceOf(
+          UnauthorizedException
+        )
+        expect(fetchMock).toHaveBeenCalledOnce()
+      })
+    })
+
     it('resolves a Playwright bypass token using the x-user-id header', async () => {
       const { service } = createService()
 
@@ -291,6 +377,29 @@ describe('AccessTokenIdentityService', () => {
         requestWithHeaders({ 'x-user-role': 'admin', 'x-user-id': 'ops-1' })
       )
     ).rejects.toBeInstanceOf(UnauthorizedException)
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('never honours the JWT-shaped mobile token outside a test environment', async () => {
+    // Asserted separately from the case above because this token is the one
+    // that *looks* like a real credential. A reader skimming the bypass list
+    // could plausibly believe it takes the Supabase verification path on its
+    // own merits; it does not, and must not.
+    vi.stubEnv('TEST_ENV', undefined)
+    vi.stubEnv('VERCEL_ENV', undefined)
+    const fetchMock = mockSupabaseUser({}, 401)
+    const { service } = createService()
+    const token = [
+      Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url'),
+      Buffer.from(
+        JSON.stringify({ sub: 'mobile-user-1', role: 'admin', e2e: MARKER })
+      ).toString('base64url'),
+      MARKER,
+    ].join('.')
+
+    await expect(service.resolveIdentity(token)).rejects.toBeInstanceOf(
+      UnauthorizedException
+    )
     expect(fetchMock).toHaveBeenCalledOnce()
   })
 

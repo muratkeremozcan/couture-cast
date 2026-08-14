@@ -7,7 +7,7 @@ import WidgetKit
 
 @objc(WidgetSharedModule)
 class WidgetSharedModule: NSObject, WCSessionDelegate {
-  private let appGroup = "group.com.anonymous.mobile"
+  private let appGroup = "group.com.couturecast.app"
   private let payloadKey = "widgetPayload"
   private let pendingWatchPayload = PendingWatchPayload()
 

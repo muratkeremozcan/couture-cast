@@ -1,0 +1,44 @@
+# Switch the app locale through the real settings UI.
+#
+# Three flows used to declare the locale as a launch argument:
+#
+#   - launchApp:
+#       arguments:
+#         locale: 'tr-TR'
+#
+# That is a no-op twice over. Maestro's launch arguments go to the app being
+# launched, which in this harness is Expo Go (`host.exp.Exponent`), not
+# CoutureCast. And nothing in the app reads a locale launch argument anyway:
+# `apps/mobile/src/lib/i18n.ts` resolves the initial locale from saved device
+# settings, falling back to `Localization.getLocales()`. So those flows never
+# put the app into Turkish themselves. They could only ever see Turkish copy by
+# inheriting it from localization.yaml, which switched the locale earlier in the
+# same run and never switched it back — an order dependency between flows that
+# nothing declared and nothing enforced.
+#
+# Callers pass LOCALE, which must be one of the codes in
+# `packages/api-client/src/contracts/http/supported-locales.json`:
+#
+#   - runFlow:
+#       file: subflows/set-locale.yaml
+#       env:
+#         LOCALE: tr-TR
+#
+# The locale is synced to the fixture user's profile, not just to device
+# storage, so it survives `clearState: true`. Any flow that changes it MUST set
+# it back to en-US before finishing, or every later flow in the run asserts
+# English copy against a translated app.
+appId: ${MAESTRO_APP_ID}
+---
+# Sibling path, not `subflows/open-settings.yaml`: a nested `runFlow` resolves
+# relative to the file it appears in, so the prefixed form looks for
+# `maestro/subflows/subflows/open-settings.yaml` and fails with "Invalid File
+# Path". Top-level flows in `maestro/` do need the `subflows/` prefix.
+- runFlow: open-settings.yaml
+
+- tapOn:
+    id: 'locale-btn-${LOCALE}'
+    retryTapIfNoChange: true
+    label: 'Switch the app locale to ${LOCALE}'
+
+- waitForAnimationToEnd

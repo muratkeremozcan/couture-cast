@@ -43,9 +43,10 @@ function commerceClient() {
 /**
  * Bounds every commerce request. Without this a hung click leaves the CTA in
  * its busy state forever, which reads as a frozen button and no amount of
- * tapping recovers it.
+ * tapping recovers it. Exported for the premium boundary (`premium.ts`), which
+ * inherits the same rule for the subscription endpoints.
  */
-async function withRequestTimeout<T>(
+export async function withRequestTimeout<T>(
   signal: AbortSignal | undefined,
   request: (requestSignal: AbortSignal) => Promise<T>,
   timeoutMs = COMMERCE_REQUEST_TIMEOUT_MS

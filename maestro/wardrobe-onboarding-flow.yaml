@@ -43,11 +43,7 @@ tags:
       - tapOn:
           point: '9%,29%'
 
-- openLink: ${APP_URL}
-
-- tapOn:
-    text: 'Continue'
-    optional: true
+- runFlow: subflows/open-app.yaml
 
 - extendedWaitUntil:
     visible:
@@ -76,6 +72,44 @@ tags:
 
 - tapOn:
     id: 'onboarding-request-permission'
+
+# Expo Go asks its own per-experience permission question, on top of the OS one.
+#
+# `launchApp: permissions:` above pre-grants camera and photos to *Expo Go the
+# application*, which is a different consent from the one that blocks here: Expo
+# Go then asks whether THIS experience may use a permission already granted to
+# another experience ("@owner/couture-cast needs permissions for camera. You've
+# already granted permission to another Expo experience. Allow ...?"). Until it
+# is answered the dialog covers the app and the flow cannot advance.
+#
+# Unlike the Expo Go developer sheet, Maestro CAN see this one, so it is waited
+# for rather than blind-tapped. Both steps are optional: the dialog does not
+# appear on Android, nor on a simulator where this experience has already been
+# granted, and its absence is a perfectly healthy run.
+# Asked once PER PERMISSION TYPE, so this pair runs twice: measured on device,
+# Expo Go raises the dialog for `camera`, and then raises a second, identical
+# one for `mediaLibrary` after the first is granted. Answering only the first
+# leaves the second covering the screen and the step below reports the capture
+# step "not found" on an app that is simply waiting for consent.
+- extendedWaitUntil:
+    visible: 'Experience needs permissions'
+    timeout: 5000
+    optional: true
+    label: "Expo Go's per-experience camera prompt, when it appears"
+- tapOn:
+    text: 'Allow'
+    optional: true
+    label: 'Grant this experience the camera permission'
+
+- extendedWaitUntil:
+    visible: 'Experience needs permissions'
+    timeout: 5000
+    optional: true
+    label: "Expo Go's per-experience media-library prompt, when it appears"
+- tapOn:
+    text: 'Allow'
+    optional: true
+    label: 'Grant this experience the media-library permission'
 
 - extendedWaitUntil:
     visible:

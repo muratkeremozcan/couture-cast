@@ -612,6 +612,19 @@ export type BadRequestHttpErrorErrorEnum =
 /**
  *
  * @export
+ * @interface BillingWebhookResponse
+ */
+export interface BillingWebhookResponse {
+  /**
+   *
+   * @type {AffiliateWebhookResponseData}
+   * @memberof BillingWebhookResponse
+   */
+  data: AffiliateWebhookResponseData
+}
+/**
+ *
+ * @export
  * @interface CapsuleBadRequestError
  */
 export interface CapsuleBadRequestError {
@@ -920,6 +933,56 @@ export const CapsulePreconditionRequiredErrorErrorEnum = {
 export type CapsulePreconditionRequiredErrorErrorEnum =
   (typeof CapsulePreconditionRequiredErrorErrorEnum)[keyof typeof CapsulePreconditionRequiredErrorErrorEnum]
 
+/**
+ *
+ * @export
+ * @interface CheckoutSessionRequest
+ */
+export interface CheckoutSessionRequest {
+  /**
+   * Which Stripe price the session is for.
+   * @type {CheckoutSessionRequestPlanEnum}
+   * @memberof CheckoutSessionRequest
+   */
+  plan: CheckoutSessionRequestPlanEnum
+}
+
+/**
+ * @export
+ */
+export const CheckoutSessionRequestPlanEnum = {
+  premium_monthly: 'premium_monthly',
+  premium_annual: 'premium_annual',
+} as const
+export type CheckoutSessionRequestPlanEnum =
+  (typeof CheckoutSessionRequestPlanEnum)[keyof typeof CheckoutSessionRequestPlanEnum]
+
+/**
+ *
+ * @export
+ * @interface CheckoutSessionResponse
+ */
+export interface CheckoutSessionResponse {
+  /**
+   *
+   * @type {CheckoutSessionResponseData}
+   * @memberof CheckoutSessionResponse
+   */
+  data: CheckoutSessionResponseData
+}
+/**
+ *
+ * @export
+ * @interface CheckoutSessionResponseData
+ */
+export interface CheckoutSessionResponseData {
+  /**
+   * Stripe-hosted Checkout URL. The web app redirects with window.location.assign; no Stripe dependency exists client-side.
+   * @type {string}
+   * @memberof CheckoutSessionResponseData
+   */
+  url: string
+}
 /**
  *
  * @export
@@ -1771,6 +1834,18 @@ export const DeleteSavedLocationResponseDataDeletedEnum = {
 } as const
 export type DeleteSavedLocationResponseDataDeletedEnum =
   (typeof DeleteSavedLocationResponseDataDeletedEnum)[keyof typeof DeleteSavedLocationResponseDataDeletedEnum]
+
+/**
+ *
+ * @export
+ */
+export const EntitlementStore = {
+  app_store: 'app_store',
+  play_store: 'play_store',
+  stripe: 'stripe',
+  promotional: 'promotional',
+} as const
+export type EntitlementStore = (typeof EntitlementStore)[keyof typeof EntitlementStore]
 
 /**
  *
@@ -3794,6 +3869,32 @@ export interface PolledEvent {
    */
   createdAt: string
 }
+/**
+ *
+ * @export
+ * @interface PortalSessionResponse
+ */
+export interface PortalSessionResponse {
+  /**
+   *
+   * @type {PortalSessionResponseData}
+   * @memberof PortalSessionResponse
+   */
+  data: PortalSessionResponseData
+}
+/**
+ *
+ * @export
+ * @interface PortalSessionResponseData
+ */
+export interface PortalSessionResponseData {
+  /**
+   * Stripe Customer Portal URL. Cancel, upgrade, and downgrade for web-managed subscriptions happen there, never in hand-built UI.
+   * @type {string}
+   * @memberof PortalSessionResponseData
+   */
+  url: string
+}
 
 /**
  *
@@ -5155,6 +5256,189 @@ export const SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum = {
 } as const
 export type SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum =
   (typeof SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum)[keyof typeof SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum]
+
+/**
+ * @type Subscription
+ * One variant per subscription presence. The correlations between status and the entitlement fields are expressed by the variants themselves: a `none` response carries null entitlement fields with the keys still serialized, and an entitled response always carries all of them.
+ * @export
+ */
+export type Subscription = SubscriptionOneOf | SubscriptionOneOf1
+/**
+ *
+ * @export
+ * @interface SubscriptionOneOf
+ */
+export interface SubscriptionOneOf {
+  /**
+   *
+   * @type {SubscriptionOneOfStatusEnum}
+   * @memberof SubscriptionOneOf
+   */
+  status: SubscriptionOneOfStatusEnum
+  /**
+   *
+   * @type {null}
+   * @memberof SubscriptionOneOf
+   */
+  store: null
+  /**
+   *
+   * @type {null}
+   * @memberof SubscriptionOneOf
+   */
+  productId: null
+  /**
+   *
+   * @type {null}
+   * @memberof SubscriptionOneOf
+   */
+  willRenew: null
+  /**
+   *
+   * @type {null}
+   * @memberof SubscriptionOneOf
+   */
+  currentPeriodEnd: null
+  /**
+   *
+   * @type {null}
+   * @memberof SubscriptionOneOf
+   */
+  syncedAt: null
+  /**
+   * Server-evaluated commerce_subscription_enabled flag. The only flag exposure path: clients render subscribe controls only when true. Status, refresh, and portal stay available regardless.
+   * @type {boolean}
+   * @memberof SubscriptionOneOf
+   */
+  purchasesEnabled: boolean
+}
+
+/**
+ * @export
+ */
+export const SubscriptionOneOfStatusEnum = {
+  none: 'none',
+} as const
+export type SubscriptionOneOfStatusEnum =
+  (typeof SubscriptionOneOfStatusEnum)[keyof typeof SubscriptionOneOfStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface SubscriptionOneOf1
+ */
+export interface SubscriptionOneOf1 {
+  /**
+   *
+   * @type {SubscriptionOneOf1StatusEnum}
+   * @memberof SubscriptionOneOf1
+   */
+  status: SubscriptionOneOf1StatusEnum
+  /**
+   *
+   * @type {SubscriptionOneOf1StoreEnum}
+   * @memberof SubscriptionOneOf1
+   */
+  store: SubscriptionOneOf1StoreEnum
+  /**
+   * The provisioned product id, e.g. premium_monthly. Deliberately not the plan enum: the operator can add products without a contract change.
+   * @type {string}
+   * @memberof SubscriptionOneOf1
+   */
+  productId: string
+  /**
+   * False after a cancellation while status stays active: the user keeps what they paid for until currentPeriodEnd.
+   * @type {boolean}
+   * @memberof SubscriptionOneOf1
+   */
+  willRenew: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof SubscriptionOneOf1
+   */
+  currentPeriodEnd: string
+  /**
+   * Last successful sync from the entitlement ledger. Lets a client tell fresh state from a rate-limited refresh that served local state.
+   * @type {string}
+   * @memberof SubscriptionOneOf1
+   */
+  syncedAt: string
+  /**
+   * Server-evaluated commerce_subscription_enabled flag. The only flag exposure path: clients render subscribe controls only when true. Status, refresh, and portal stay available regardless.
+   * @type {boolean}
+   * @memberof SubscriptionOneOf1
+   */
+  purchasesEnabled: boolean
+}
+
+/**
+ * @export
+ */
+export const SubscriptionOneOf1StatusEnum = {
+  active: 'active',
+  grace_period: 'grace_period',
+  expired: 'expired',
+  revoked: 'revoked',
+} as const
+export type SubscriptionOneOf1StatusEnum =
+  (typeof SubscriptionOneOf1StatusEnum)[keyof typeof SubscriptionOneOf1StatusEnum]
+
+/**
+ * @export
+ */
+export const SubscriptionOneOf1StoreEnum = {
+  app_store: 'app_store',
+  play_store: 'play_store',
+  stripe: 'stripe',
+  promotional: 'promotional',
+} as const
+export type SubscriptionOneOf1StoreEnum =
+  (typeof SubscriptionOneOf1StoreEnum)[keyof typeof SubscriptionOneOf1StoreEnum]
+
+/**
+ *
+ * @export
+ */
+export const SubscriptionPlan = {
+  premium_monthly: 'premium_monthly',
+  premium_annual: 'premium_annual',
+} as const
+export type SubscriptionPlan = (typeof SubscriptionPlan)[keyof typeof SubscriptionPlan]
+
+/**
+ *
+ * @export
+ * @interface SubscriptionResponse
+ */
+export interface SubscriptionResponse {
+  /**
+   *
+   * @type {SubscriptionResponseData}
+   * @memberof SubscriptionResponse
+   */
+  data: SubscriptionResponseData
+}
+/**
+ * @type SubscriptionResponseData
+ * One variant per subscription presence. The correlations between status and the entitlement fields are expressed by the variants themselves: a `none` response carries null entitlement fields with the keys still serialized, and an entitled response always carries all of them.
+ * @export
+ */
+export type SubscriptionResponseData = SubscriptionOneOf | SubscriptionOneOf1
+
+/**
+ *
+ * @export
+ */
+export const SubscriptionStatus = {
+  none: 'none',
+  active: 'active',
+  grace_period: 'grace_period',
+  expired: 'expired',
+  revoked: 'revoked',
+} as const
+export type SubscriptionStatus =
+  (typeof SubscriptionStatus)[keyof typeof SubscriptionStatus]
 
 /**
  *

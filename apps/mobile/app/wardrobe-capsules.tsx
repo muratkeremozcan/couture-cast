@@ -21,6 +21,7 @@ import {
   MobileCapsuleBuilderModal,
   type MobileCapsuleSaveOptions,
 } from '@/components/wardrobe/capsule-builder-modal'
+import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
 import {
   capsuleETag,
@@ -257,8 +258,19 @@ export default function WardrobeCapsulesScreen() {
           testID="capsule-search-input"
         />
         <Pressable
+          // The ref is resolved through `safeFindNodeHandle`, never cast.
+          //
+          // This used to be `node as unknown as number`, which asserted to the
+          // type system that a host component instance was a reactTag and then
+          // stored it. `MobileCapsuleBuilderModal` feeds that value straight to
+          // `AccessibilityInfo.setAccessibilityFocus`, so on close it crossed
+          // the JSI bridge as a non-number and took the whole process down with
+          // `Exception in HostFunction: Unsupported jsi::Value kind` -- no red
+          // box, no recovery. It is the same defect as the eight raw
+          // `findNodeHandle` call sites already routed through this helper; this
+          // site was missed because it never called `findNodeHandle` at all.
           ref={(node) => {
-            setCreateNodeHandle(node ? (node as unknown as number) : null)
+            setCreateNodeHandle(safeFindNodeHandle(node))
           }}
           onPress={() => {
             setEditingCapsule(null)

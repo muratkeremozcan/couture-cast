@@ -26,6 +26,10 @@ import {
   affiliateCtaShownPropertiesSchema,
   affiliateCtaClickedPropertiesSchema,
   affiliateConversionRecordedPropertiesSchema,
+  premiumSubscribeTappedPropertiesSchema,
+  premiumCheckoutStartedPropertiesSchema,
+  premiumEntitlementActivatedPropertiesSchema,
+  premiumEntitlementDeactivatedPropertiesSchema,
   type AnalyticsEventName,
 } from '../types/analytics-events'
 import type { ExpectLike } from './expect-like'
@@ -70,6 +74,10 @@ const analyticsPropertySchemas = {
   affiliate_cta_shown: affiliateCtaShownPropertiesSchema,
   affiliate_cta_clicked: affiliateCtaClickedPropertiesSchema,
   affiliate_conversion_recorded: affiliateConversionRecordedPropertiesSchema,
+  premium_subscribe_tapped: premiumSubscribeTappedPropertiesSchema,
+  premium_checkout_started: premiumCheckoutStartedPropertiesSchema,
+  premium_entitlement_activated: premiumEntitlementActivatedPropertiesSchema,
+  premium_entitlement_deactivated: premiumEntitlementDeactivatedPropertiesSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

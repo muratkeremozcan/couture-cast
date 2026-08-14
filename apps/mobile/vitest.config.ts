@@ -90,6 +90,15 @@ export default defineConfig({
         ),
       },
       {
+        // Story 5.2: the RevenueCat SDK's native module is absent under vitest
+        // exactly as it is under Expo Go, so every import lands on the mock.
+        find: /^react-native-purchases$/,
+        replacement: path.resolve(
+          __dirname,
+          './src/test-utils/mocks/react-native-purchases.ts'
+        ),
+      },
+      {
         find: /^react-native-safe-area-context$/,
         replacement: path.resolve(
           __dirname,

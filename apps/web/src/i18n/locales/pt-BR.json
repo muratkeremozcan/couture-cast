@@ -16,6 +16,36 @@
       "saved": "Preferências de compra atualizadas",
       "error": "Não foi possível atualizar as preferências de compra.",
       "signedOutHint": "Entre na sua conta para alterar isto"
+    },
+    "premium": {
+      "sectionTitle": "Premium",
+      "disclosure": "As assinaturas Premium são processadas pela RevenueCat e, nas compras feitas na web, pela Stripe. O CoutureCast compartilha o id da sua conta e o estado da compra com esses processadores para que sua assinatura funcione onde você fizer login. Números de cartão são tratados pelo provedor de pagamento e nunca chegam ao CoutureCast.",
+      "status": {
+        "none": "Você ainda não tem uma assinatura Premium.",
+        "active": "O Premium está ativo: {{plan}}. O período atual termina em {{date}}.",
+        "gracePeriod": "O Premium está ativo, mas há um problema com o pagamento.",
+        "expired": "Sua assinatura Premium expirou.",
+        "revoked": "Sua assinatura Premium foi revogada."
+      },
+      "planMonthly": "Premium mensal",
+      "planAnnual": "Premium anual",
+      "subscribe": "Assinar Premium",
+      "manage": "Gerenciar assinatura",
+      "manageInStore": "Gerencie esta assinatura na App Store ou na Play Store onde ela foi comprada.",
+      "restore": "Restaurar compras",
+      "pendingApproval": "Esta compra está aguardando a aprovação de um responsável. O Premium será desbloqueado assim que for aprovada.",
+      "activating": "Pagamento recebido. Ativando sua assinatura Premium…",
+      "stillProcessing": "Ainda processando. Seu pagamento foi concluído; verifique novamente em instantes.",
+      "portalLagHint": "Alterações feitas no portal de cobrança, principalmente cancelamentos, podem levar algumas horas para aparecer aqui.",
+      "graceBanner": "Há um problema com seu método de pagamento. Atualize-o na loja ou no portal de cobrança da sua assinatura para manter o Premium.",
+      "endedNote": "Sua assinatura terminou. Você pode assinar de novo quando quiser.",
+      "errorLoad": "Não foi possível carregar o status da assinatura.",
+      "errorPurchase": "Não foi possível iniciar o checkout. Tente novamente.",
+      "signedOutHint": "Faça login para assinar ou gerenciar o Premium",
+      "plannerLocked": {
+        "title": "O planejador de 7 dias é um recurso Premium",
+        "cta": "Assinar Premium"
+      }
     }
   },
   "wardrobe": {

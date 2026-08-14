@@ -1,6 +1,6 @@
 // Learning path Step 31: Outfit capsule builder.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   createOutfitCapsuleInputSchema,
   favoriteOutfitCapsuleInputSchema,
@@ -86,6 +86,77 @@ describe('capsule name normalization', () => {
         buildCapsuleInput({ name: 'a'.repeat(61) })
       ).success
     ).toBe(false)
+  })
+})
+
+// `Intl.Segmenter` is optional under ECMA-402 and Hermes ships without it. This
+// module used to construct one at module scope, so merely *importing* it threw
+// under React Native and took the mobile app down at launch — every Maestro
+// flow failed on `launchApp` from 2026-08-08 until the segmenter was made lazy.
+// The API is the only caller of these validators and runs on Node, so exact
+// grapheme semantics are unaffected there; these tests pin the degraded path.
+describe('runtimes that ship no Intl.Segmenter', () => {
+  async function importContractsWithoutSegmenter() {
+    const descriptor = Object.getOwnPropertyDescriptor(Intl, 'Segmenter')
+    // @ts-expect-error -- deleting an optional Intl API to emulate Hermes
+    delete Intl.Segmenter
+    vi.resetModules()
+
+    try {
+      expect((Intl as { Segmenter?: unknown }).Segmenter).toBeUndefined()
+      return { contracts: await import('../src/contracts/http'), descriptor }
+    } catch (error) {
+      if (descriptor) {
+        Object.defineProperty(Intl, 'Segmenter', descriptor)
+      }
+      vi.resetModules()
+      throw error
+    }
+  }
+
+  function restore(descriptor: PropertyDescriptor | undefined) {
+    if (descriptor) {
+      Object.defineProperty(Intl, 'Segmenter', descriptor)
+    }
+    vi.resetModules()
+  }
+
+  it('imports the HTTP contracts without throwing', async () => {
+    const { contracts, descriptor } = await importContractsWithoutSegmenter()
+
+    try {
+      expect(contracts.createOutfitCapsuleInputSchema).toBeDefined()
+    } finally {
+      restore(descriptor)
+    }
+  })
+
+  it('still validates capsule names, counting code points', async () => {
+    const { contracts, descriptor } = await importContractsWithoutSegmenter()
+
+    try {
+      expect(
+        contracts.createOutfitCapsuleInputSchema.parse(buildCapsuleInput()).name
+      ).toBe('Rainy commute')
+
+      // An astral-plane emoji is one code point but two UTF-16 code units, so
+      // the fallback admits sixty of them where a `.length` check would have
+      // rejected everything past thirty.
+      const sixtyEmoji = '\u{1F457}'.repeat(60)
+      expect(sixtyEmoji.length).toBe(120)
+      expect(
+        contracts.createOutfitCapsuleInputSchema.safeParse(
+          buildCapsuleInput({ name: sixtyEmoji })
+        ).success
+      ).toBe(true)
+      expect(
+        contracts.createOutfitCapsuleInputSchema.safeParse(
+          buildCapsuleInput({ name: '\u{1F457}'.repeat(61) })
+        ).success
+      ).toBe(false)
+    } finally {
+      restore(descriptor)
+    }
   })
 })
 

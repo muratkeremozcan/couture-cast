@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+
+import { randomUuidV4 } from '@/src/lib/uuid'
 import {
   AccessibilityInfo,
   Modal,
@@ -9,7 +11,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  findNodeHandle,
   Platform,
 } from 'react-native'
 import type {
@@ -18,6 +19,7 @@ import type {
   GarmentItemContract,
   OutfitCapsuleContract,
 } from '@couture/api-client/contracts/http'
+import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
 export interface MobileCapsuleSaveOptions {
   /** Present only when editing; the current strong entity tag. */
@@ -106,15 +108,21 @@ export function MobileCapsuleBuilderModal({
       }
       setErrorMessage(null)
       setIsSubmitting(false)
-      /** One key per open form, reused across every retry of this submission. */
-      setIdempotencyKey(
-        typeof globalThis.crypto?.randomUUID === 'function'
-          ? globalThis.crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(16).slice(2)}`
-      )
+      /**
+       * One key per open form, reused across every retry of this submission.
+       *
+       * The API requires a UUID v4 and rejects anything else with
+       * `400 Idempotency-Key must be a UUID v4`. Hermes ships no
+       * `globalThis.crypto.randomUUID`, so the old
+       * `${Date.now()}-${Math.random()}` fallback fired on every real device and
+       * produced a string that is not a UUID at all -- saving a capsule from the
+       * app failed outright, and only ever succeeded in jsdom, where
+       * `globalThis.crypto` happens to exist. See `src/lib/uuid.ts`.
+       */
+      setIdempotencyKey(randomUuidV4())
 
       if (titleRef.current && Platform.OS !== 'web') {
-        const handle = findNodeHandle(titleRef.current)
+        const handle = safeFindNodeHandle(titleRef.current)
         if (handle) {
           AccessibilityInfo.setAccessibilityFocus(handle)
         }
@@ -347,9 +355,19 @@ export function MobileCapsuleBuilderModal({
               })}
             </View>
 
+            {/*
+              One interpolated key rather than a translated word with an
+              English tail. This used to concatenate `garmentsLabel` with a
+              hardcoded "(N of M selected)", so every non-English locale shipped
+              a half-translated label -- on device, Turkish rendered literally as
+              "Parçalar (0 of 10 selected)". Word order around the count also
+              differs by language, which concatenation cannot express.
+            */}
             <Text style={styles.label}>
-              {t('wardrobe.capsules.garmentsLabel')} ({selectedGarmentIds.length} of{' '}
-              {MAX_GARMENTS} selected)
+              {t('wardrobe.capsules.garmentsSelected', {
+                count: selectedGarmentIds.length,
+                max: MAX_GARMENTS,
+              })}
             </Text>
             <View style={styles.garmentListContainer}>
               {availableGarments.map((g) => {
@@ -375,7 +393,12 @@ export function MobileCapsuleBuilderModal({
 
             {selectedGarmentIds.length > 0 && (
               <View style={styles.reorderSection}>
-                <Text style={styles.label}>Garment Order</Text>
+                {/*
+                  Was a bare literal with no `t()` call at all, so this heading
+                  shipped in English in all ten locales -- the same defect class
+                  as the garment count above it, found in the same component.
+                */}
+                <Text style={styles.label}>{t('wardrobe.capsules.garmentOrder')}</Text>
                 {selectedGarmentIds.map((gId, idx) => {
                   const g = availableGarments.find((garment) => garment.id === gId)
                   const label = describeGarment(g, idx + 1)
@@ -394,7 +417,7 @@ export function MobileCapsuleBuilderModal({
                         <TouchableOpacity
                           ref={(node) => {
                             reorderNodeHandles.current[`up-${gId}`] =
-                              node && Platform.OS !== 'web' ? findNodeHandle(node) : null
+                              safeFindNodeHandle(node)
                           }}
                           onPress={() => moveGarment(idx, 'up')}
                           disabled={isFirst}
@@ -412,7 +435,7 @@ export function MobileCapsuleBuilderModal({
                         <TouchableOpacity
                           ref={(node) => {
                             reorderNodeHandles.current[`down-${gId}`] =
-                              node && Platform.OS !== 'web' ? findNodeHandle(node) : null
+                              safeFindNodeHandle(node)
                           }}
                           onPress={() => moveGarment(idx, 'down')}
                           disabled={isLast}

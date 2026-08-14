@@ -4,6 +4,21 @@ import { z } from 'zod'
 import type { Request } from 'express'
 import { API_ROLES, type ApiRole } from './security.types.js'
 
+/**
+ * Marker claim that identifies the mobile Maestro harness's test token.
+ *
+ * Kept in sync by hand with `scripts/run-maestro.mjs`, which mints the token.
+ * It deliberately does not live in a shared package: nothing in production
+ * should be able to import a helper that manufactures bearer tokens.
+ */
+const MOBILE_E2E_TOKEN_MARKER = 'couturecast-mobile-e2e'
+
+const mobileE2EClaimsSchema = z.object({
+  sub: z.string().trim().min(1),
+  role: z.unknown(),
+  e2e: z.literal(MOBILE_E2E_TOKEN_MARKER),
+})
+
 const supabaseIdentitySchema = z.object({
   app_metadata: z.record(z.unknown()).optional(),
   confirmed_at: z.unknown().optional(),
@@ -80,6 +95,51 @@ export class AccessTokenIdentityService {
     return null
   }
 
+  /**
+   * The mobile Maestro harness needs a token the *app under test* can read, not
+   * only one the API accepts. `resolveOwnerUserId` in
+   * `apps/mobile/src/lib/wardrobe.ts` derives the signed-in user id by decoding
+   * the bearer token's `sub` claim, because in production the token is always a
+   * Supabase JWT. The harness previously injected `test-token:guardian:<id>`,
+   * which has no `.` separator at all, so every owner-scoped screen (capsule
+   * library, silhouette editor, wardrobe onboarding) caught the decode failure
+   * and rendered "Your session token is malformed. Sign in again." instead of
+   * its content. The token therefore has to be JWT-*shaped*.
+   *
+   * Nothing here verifies a signature or treats the value as a real JWT. It is
+   * matched only inside the same `TEST_ENV` gate as every other bypass, only
+   * when the third segment is the literal marker, and only when the payload
+   * carries the explicit `e2e` marker claim -- so a genuine Supabase JWT, which
+   * carries neither, can never take this path and always falls through to real
+   * verification.
+   */
+  private matchMobileE2EBypass(token: string): AccessTokenIdentity | null {
+    const segments = token.split('.')
+    if (segments.length !== 3) {
+      return null
+    }
+
+    const payloadSegment = segments[1]
+    if (segments[2] !== MOBILE_E2E_TOKEN_MARKER || !payloadSegment) {
+      return null
+    }
+
+    let claims: unknown
+    try {
+      claims = JSON.parse(Buffer.from(payloadSegment, 'base64url').toString('utf8'))
+    } catch {
+      return null
+    }
+
+    const parsed = mobileE2EClaimsSchema.safeParse(claims)
+    if (!parsed.success) {
+      return null
+    }
+
+    const role = parseApiRole(parsed.data.role)
+    return role ? { userId: parsed.data.sub, role } : null
+  }
+
   private matchPlaywrightBypass(
     token: string,
     request?: Request
@@ -119,6 +179,7 @@ export class AccessTokenIdentityService {
     return (
       this.matchK6Bypass(token) ??
       this.matchIntegrationBypass(token) ??
+      this.matchMobileE2EBypass(token) ??
       this.matchPlaywrightBypass(token, request) ??
       this.matchFallbackBypass(token, request)
     )

@@ -4,14 +4,14 @@ const plist = require('@expo/plist').default
 const fs = require('fs')
 const path = require('path')
 
-const watchAppGroup = 'group.com.anonymous.mobile.watch'
-const iosAppGroup = 'group.com.anonymous.mobile'
+const watchAppGroup = 'group.com.couturecast.app.watch'
+const iosAppGroup = 'group.com.couturecast.app'
 
 const watchAppName = 'WatchApp'
-const watchAppBundleId = 'com.anonymous.mobile.watchapp'
+const watchAppBundleId = 'com.couturecast.app.watchapp'
 
 const watchWidgetName = 'WatchWidget'
-const watchWidgetBundleId = 'com.anonymous.mobile.watchapp.watchwidget'
+const watchWidgetBundleId = 'com.couturecast.app.watchapp.watchwidget'
 
 function ensureDirectory(directory) {
   fs.mkdirSync(directory, { recursive: true })
@@ -91,7 +91,7 @@ function withIosWatchAppGroup(config) {
   return withEntitlementsPlist(config, (modConfig) => {
     const currentGroups = modConfig.modResults['com.apple.security.application-groups']
     const groups = Array.isArray(currentGroups) ? currentGroups : []
-    // Ensure we keep the existing group.com.anonymous.mobile and add the watch group
+    // Ensure we keep the existing group.com.couturecast.app and add the watch group
     modConfig.modResults['com.apple.security.application-groups'] = [
       ...new Set([...groups, iosAppGroup, watchAppGroup]),
     ]
@@ -225,11 +225,11 @@ function writeWatchExtensionFiles(projectRoot, iosDirectory) {
       CFBundleVersion: '$(CURRENT_PROJECT_VERSION)',
       CFBundleURLTypes: [
         {
-          CFBundleURLName: 'com.anonymous.mobile.watchapp',
+          CFBundleURLName: 'com.couturecast.app.watchapp',
           CFBundleURLSchemes: ['couturecast-watch'],
         },
       ],
-      WKCompanionAppBundleIdentifier: 'com.anonymous.mobile',
+      WKCompanionAppBundleIdentifier: 'com.couturecast.app',
       WKApplication: true,
       UIAppFonts: ['SpaceGrotesk-WatchApp.ttf'],
     })

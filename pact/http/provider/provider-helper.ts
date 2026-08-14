@@ -51,6 +51,18 @@ const PACT_COMMERCE_OFFER_ID = 'offer-pact-1'
 const PACT_COMMERCE_OFFER_TITLE = 'Everyday Layering Tee'
 const PACT_COMMERCE_REDIRECT_URL =
   'https://partner.couturecast.test/shop?cc=pact-click-token'
+/**
+ * Story 5.2 premium subscription. Mirrors the identifiers the consumer pins in
+ * `pact/http/consumer/api-contract-interactions.ts`; both sides must agree or
+ * the `string()` matchers fail verification. Hosts are RFC-2606 `.test`,
+ * matching Decision 9's fake Stripe client, so nothing recorded in a pact file
+ * can resolve on the public internet.
+ */
+const PACT_SUBSCRIPTION_PRODUCT_ID = 'premium_monthly'
+const PACT_SUBSCRIPTION_PERIOD_END = '2026-09-11T10:00:00.000Z'
+const PACT_SUBSCRIPTION_SYNCED_AT = '2026-08-11T10:00:00.000Z'
+const PACT_SUBSCRIPTION_CHECKOUT_URL = 'https://checkout.stripe.test/c/pay/cs-pact-1'
+const PACT_SUBSCRIPTION_PORTAL_URL = 'https://billing.stripe.test/p/session/pact-1'
 import {
   BadRequestException,
   ConflictException,
@@ -108,6 +120,9 @@ import { AffiliateWebhookService } from '../../../apps/api/src/modules/commerce/
 import { CommerceCacheHeadersMiddleware } from '../../../apps/api/src/modules/commerce/commerce-cache-headers.middleware'
 import { CommercePreferencesController } from '../../../apps/api/src/modules/commerce/commerce-preferences.controller'
 import { CommercePreferencesService } from '../../../apps/api/src/modules/commerce/commerce-preferences.service'
+import { SubscriptionController } from '../../../apps/api/src/modules/commerce/subscription.controller'
+import { SubscriptionService } from '../../../apps/api/src/modules/commerce/subscription.service'
+import { StripeBillingService } from '../../../apps/api/src/modules/commerce/stripe-billing.service'
 import {
   formatSilhouetteETag,
   parseSilhouetteIfMatchHeader,
@@ -128,9 +143,14 @@ import {
   COMMERCE_DISABLED_MESSAGE,
   COMMERCE_OFFER_NOT_FOUND_MESSAGE,
   COMMERCE_OPTED_OUT_MESSAGE,
+  COMMERCE_SUBSCRIPTION_DISABLED_MESSAGE,
+  SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE,
+  SUBSCRIPTION_NOT_FOUND_MESSAGE,
   WEBHOOK_SIGNATURE_INVALID_MESSAGE,
 } from '@couture/api-client/contracts/http'
 import type {
+  EntitlementStore,
+  Subscription,
   SilhouetteMode,
   SilhouettePhotoFailureReason,
   SilhouettePhotoStatus,
@@ -196,6 +216,7 @@ export function resetProviderState() {
   resetProviderSilhouetteState()
   resetProviderCapsuleState()
   resetProviderCommerceState()
+  resetProviderSubscriptionState()
 }
 
 export function configureProviderWardrobeState(
@@ -1104,6 +1125,92 @@ export async function startLocalPactProvider({
     },
   } as unknown as AffiliateWebhookService
 
+  /**
+   * Story 5.2 premium subscription doubles, wired against the real
+   * `SubscriptionController`. Same stance as the 5.1 doubles above: the
+   * scenario the verifier sets decides the answer; WHEN each status is
+   * produced (the flag resolution, the refresh throttle, the entitlement
+   * transition table, real Stripe calls) is proven in the API unit and
+   * integration suites, where a database and a flag actually exist. An
+   * unconfigured scenario fails loudly rather than verifying against stale
+   * in-memory data.
+   */
+  const requireSubscriptionScenario = () => {
+    const state = getProviderSubscriptionState()
+    if (!state) {
+      throw new NotFoundException('SUBSCRIPTION_STATE_NOT_CONFIGURED')
+    }
+    return state
+  }
+
+  const subscriptionRepresentation = (): Subscription => {
+    const state = requireSubscriptionScenario()
+    if (state.scenario === 'entitled' || state.scenario === 'stripe-billing-profile') {
+      return {
+        status: 'active',
+        store: state.store,
+        productId: PACT_SUBSCRIPTION_PRODUCT_ID,
+        willRenew: true,
+        currentPeriodEnd: PACT_SUBSCRIPTION_PERIOD_END,
+        syncedAt: PACT_SUBSCRIPTION_SYNCED_AT,
+        purchasesEnabled: true,
+      }
+    }
+    return {
+      status: 'none',
+      store: null,
+      productId: null,
+      willRenew: null,
+      currentPeriodEnd: null,
+      syncedAt: null,
+      // The status endpoints stay reachable while purchasing is switched off;
+      // the kill switch reaches a client only as this server-evaluated field.
+      purchasesEnabled: state.scenario !== 'purchasing-disabled',
+    }
+  }
+
+  /**
+   * Refresh answers the same representation as status: the contract records
+   * the body a client must understand after a pull, not the pull itself (the
+   * ledger call, throttle window, and 503 timeout path live in
+   * `subscription.service.spec.ts` against fake timers).
+   */
+  const mockSubscriptionService = {
+    getSubscription: () => Promise.resolve(subscriptionRepresentation()),
+    refreshSubscription: () => Promise.resolve(subscriptionRepresentation()),
+  } as unknown as SubscriptionService
+
+  /**
+   * Decision 4's checkout status precedence, expressed as scenarios: the
+   * controller runs `assertPurchasingEnabled` before parsing the body (503
+   * outranks 400), and the service answers 409 for an already-entitled user
+   * before any Stripe call. Portal access hinges on the billing profile, not
+   * on the entitlement: only the `stripe-billing-profile` scenario has one,
+   * so an App Store subscriber correctly gets the 404 the consumer records.
+   */
+  const mockStripeBillingService = {
+    assertPurchasingEnabled: () => {
+      if (requireSubscriptionScenario().scenario === 'purchasing-disabled') {
+        throw new ServiceUnavailableException(COMMERCE_SUBSCRIPTION_DISABLED_MESSAGE)
+      }
+      return Promise.resolve()
+    },
+    createCheckoutSession: () => {
+      const { scenario } = requireSubscriptionScenario()
+      if (scenario === 'entitled' || scenario === 'stripe-billing-profile') {
+        throw new ConflictException(SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE)
+      }
+      return Promise.resolve({ url: PACT_SUBSCRIPTION_CHECKOUT_URL })
+    },
+    createPortalSession: () => {
+      const { scenario } = requireSubscriptionScenario()
+      if (scenario !== 'stripe-billing-profile') {
+        throw new NotFoundException(SUBSCRIPTION_NOT_FOUND_MESSAGE)
+      }
+      return Promise.resolve({ url: PACT_SUBSCRIPTION_PORTAL_URL })
+    },
+  } as unknown as StripeBillingService
+
   const moduleFixture = await Test.createTestingModule({
     controllers: [
       ApiHealthController,
@@ -1119,6 +1226,7 @@ export async function startLocalPactProvider({
       CommercePreferencesController,
       AffiliateClickController,
       AffiliateWebhookController,
+      SubscriptionController,
     ],
     providers: [
       EventsService,
@@ -1189,6 +1297,14 @@ export async function startLocalPactProvider({
       {
         provide: AffiliateWebhookService,
         useValue: mockAffiliateWebhookService,
+      },
+      {
+        provide: SubscriptionService,
+        useValue: mockSubscriptionService,
+      },
+      {
+        provide: StripeBillingService,
+        useValue: mockStripeBillingService,
       },
     ],
   })
@@ -1418,4 +1534,51 @@ export function getProviderCommerceState(): ProviderCommerceState | null {
 
 export function resetProviderCommerceState() {
   providerCommerceState = null
+}
+
+/* --------------------------------------------------------------------------- *
+ * Story 5.2 premium subscription provider states.
+ *
+ * Same design as the 5.1 commerce states above: each scenario names an
+ * arrangement the contract records an outcome for, and the doubles decide
+ * their answer from it rather than from a real database, flag, or Stripe
+ * call. The `store` field is the factory override the portal-404 arrangement
+ * needs — 'The user has an active premium entitlement' with `store:
+ * 'app_store'` is a paying store subscriber with no Stripe billing profile,
+ * which is exactly who the portal must answer 404 to.
+ * --------------------------------------------------------------------------- */
+export type ProviderSubscriptionScenario =
+  | 'entitled'
+  | 'never-subscribed'
+  | 'purchasing-disabled'
+  | 'stripe-billing-profile'
+
+export type ProviderSubscriptionState = {
+  userId: string | null
+  scenario: ProviderSubscriptionScenario
+  store: EntitlementStore
+}
+
+let providerSubscriptionState: ProviderSubscriptionState | null = null
+
+export function configureProviderSubscriptionState(state: {
+  userId?: string
+  scenario: ProviderSubscriptionScenario
+  store?: EntitlementStore
+}) {
+  providerSubscriptionState = {
+    userId: state.userId ?? null,
+    scenario: state.scenario,
+    // The web rail is the default; interactions pinning the store-managed
+    // arrangement pass 'app_store' explicitly.
+    store: state.store ?? 'stripe',
+  }
+}
+
+export function getProviderSubscriptionState(): ProviderSubscriptionState | null {
+  return providerSubscriptionState
+}
+
+export function resetProviderSubscriptionState() {
+  providerSubscriptionState = null
 }

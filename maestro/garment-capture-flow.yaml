@@ -13,32 +13,9 @@ tags:
     clearState: true
     stopApp: false
 
-- openLink: ${APP_URL}
+- runFlow: subflows/open-app.yaml
 
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go first-run sheet when present'
-
-- openLink: ${APP_URL}
-
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go developer menu onboarding when present'
-
-- extendedWaitUntil:
-    visible:
-      id: 'tab-wardrobe'
-    timeout: 60000
-
-- tapOn:
-    point: '93%,35%'
-    label: 'Close the Expo Go developer panel when it appears late'
-
-- tapOn:
-    id: 'tab-wardrobe'
-    retryTapIfNoChange: true
+- runFlow: subflows/open-wardrobe-tab.yaml
 
 - assertVisible:
     id: 'wardrobe-screen'
@@ -82,8 +59,17 @@ tags:
 - tapOn:
     id: 'garment-capture-done'
 
-- assertVisible:
-    id: 'wardrobe-garment-list'
+# Wait, do not assert. The hub renders `wardrobe-garment-list` only once
+# `garments.length > 0` and the load has settled, and the committed garment
+# arrives through a refetch after the capture modal closes. A bare
+# `assertVisible` on the next line races that round trip: it passed on one run
+# and failed on the next against identical, correct behaviour. Same condition,
+# given time to become true.
+- extendedWaitUntil:
+    visible:
+      id: 'wardrobe-garment-list'
+    timeout: 15000
+    label: 'Committed garment appears in the hub list'
 
 - takeScreenshot:
     path: maestro/artifacts/garment-capture-flow

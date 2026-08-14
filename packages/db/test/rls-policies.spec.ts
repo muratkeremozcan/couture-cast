@@ -100,6 +100,9 @@ type SeededScenario = {
   affiliateConversionId: string
   otherCommercePreferenceId: string
   otherAffiliateClickId: string
+  premiumEntitlementId: string
+  billingEventId: string
+  billingCustomerId: string
 }
 
 const buildClaims = (email: string, role: string) => ({
@@ -196,6 +199,9 @@ const seedScenario = async (): Promise<SeededScenario> => {
     affiliateConversionId: `affiliate-conversion-${suffix}`,
     otherCommercePreferenceId: `other-commerce-preference-${suffix}`,
     otherAffiliateClickId: `other-affiliate-click-${suffix}`,
+    premiumEntitlementId: `premium-entitlement-${suffix}`,
+    billingEventId: `billing-event-${suffix}`,
+    billingCustomerId: `billing-customer-${suffix}`,
   }
 
   const client = await adminPool.connect()
@@ -513,6 +519,40 @@ const seedScenario = async (): Promise<SeededScenario> => {
       ]
     )
 
+    // Story 5.2 billing fixtures. Rows exist for the teen so the worker-only
+    // matrix below can prove an authenticated client cannot reach even its own
+    // entitlement state: a client-forgeable entitlement row is free Premium.
+    await client.query(
+      `INSERT INTO public."PremiumEntitlement"
+        ("id", "user_id", "status", "store", "product_id", "will_renew",
+         "current_period_end", "synced_at", "last_event_occurred_at",
+         "last_event_id", "updated_at")
+       VALUES ($1, $2, 'active', 'stripe', 'premium_monthly', TRUE,
+               NOW() + INTERVAL '30 days', NOW(), NOW(), $3, NOW())`,
+      [seeded.premiumEntitlementId, seeded.teenId, `rls-fixture-event-${suffix}`]
+    )
+
+    await client.query(
+      `INSERT INTO public."BillingEvent"
+        ("id", "provider", "external_event_id", "event_type", "user_id",
+         "store", "product_id", "payload", "occurred_at")
+       VALUES ($1, 'revenuecat', $2, 'INITIAL_PURCHASE', $3,
+               'stripe', 'premium_monthly', $4::jsonb, NOW())`,
+      [
+        seeded.billingEventId,
+        `rls-fixture-billing-${suffix}`,
+        seeded.teenId,
+        JSON.stringify({ eventType: 'INITIAL_PURCHASE', store: 'stripe' }),
+      ]
+    )
+
+    await client.query(
+      `INSERT INTO public."BillingCustomer"
+        ("id", "user_id", "stripe_customer_id", "updated_at")
+       VALUES ($1, $2, $3, NOW())`,
+      [seeded.billingCustomerId, seeded.teenId, `cus_rls_fixture_${suffix}`]
+    )
+
     await client.query('COMMIT')
     return seeded
   } catch (error) {
@@ -532,6 +572,17 @@ const cleanupScenario = async (seeded: SeededScenario | undefined) => {
 
   try {
     await client.query('BEGIN')
+    // Story 5.2 billing fixtures, deleted before the users they hang off:
+    // events -> entitlements -> customers.
+    await client.query('DELETE FROM public."BillingEvent" WHERE "id" = $1', [
+      seeded.billingEventId,
+    ])
+    await client.query('DELETE FROM public."PremiumEntitlement" WHERE "id" = $1', [
+      seeded.premiumEntitlementId,
+    ])
+    await client.query('DELETE FROM public."BillingCustomer" WHERE "id" = $1', [
+      seeded.billingCustomerId,
+    ])
     // Story 5.1 commerce fixtures, deleted in reverse dependency order:
     // conversions -> clicks -> offers -> partners, before the users they hang
     // off are removed below.
@@ -2701,10 +2752,18 @@ describe.concurrent('guardian-aware RLS policies', () => {
     // instead protected by having no policies and no grants: the catalog is
     // operator-managed and conversions are written only by the
     // machine-to-machine webhook, so no client should ever reach either.
+    //
+    // Story 5.2 adds the billing tables to the same worker-only posture. These
+    // DO carry user_id, but the owner must still be denied: entitlement rows
+    // are privilege-bearing (a forgeable row is free Premium) and billing
+    // events are financial records, so all access flows through the API.
     const privateTables = [
       'CommercePartner',
       'AffiliateOffer',
       'AffiliateConversion',
+      'PremiumEntitlement',
+      'BillingEvent',
+      'BillingCustomer',
     ] as const
     const client = await adminPool.connect()
 
@@ -2763,6 +2822,47 @@ describe.concurrent('guardian-aware RLS policies', () => {
           }
         )
       }
+    }
+  )
+
+  scenarioTest(
+    '5.2-DB-013 rejects authenticated reads and forgeries of billing state',
+    async ({ scenario: seeded }) => {
+      // Same falsifiability standard as 5.1-DB-007: the seeded rows BELONG to
+      // this teen, and the owner is still rejected — the deny is worker-only
+      // posture, not a missing row. A forged INSERT is the free-Premium attack
+      // and must fail identically.
+      const billingTables = ['PremiumEntitlement', 'BillingEvent', 'BillingCustomer']
+
+      for (const table of billingTables) {
+        await withRole(
+          'authenticated',
+          buildClaims(seeded.teenEmail, 'teen'),
+          async (client) => {
+            await expect(
+              client.query(`SELECT "id" FROM public."${table}" LIMIT 1`)
+            ).rejects.toMatchObject({ code: '42501' })
+          }
+        )
+      }
+
+      await withRole(
+        'authenticated',
+        buildClaims(seeded.teenEmail, 'teen'),
+        async (client) => {
+          await expect(
+            client.query(
+              `INSERT INTO public."PremiumEntitlement"
+                ("id", "user_id", "status", "store", "product_id", "will_renew",
+                 "current_period_end", "synced_at", "last_event_occurred_at",
+                 "last_event_id", "updated_at")
+               VALUES ($1, $2, 'active', 'promotional', 'premium_annual', TRUE,
+                       NOW() + INTERVAL '365 days', NOW(), NOW(), 'forged', NOW())`,
+              [`forged-entitlement-${randomUUID()}`, seeded.teenId]
+            )
+          ).rejects.toMatchObject({ code: '42501' })
+        }
+      )
     }
   )
 })

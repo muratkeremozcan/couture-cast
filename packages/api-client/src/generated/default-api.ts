@@ -11,6 +11,7 @@ import {
   LocationsApi,
   ModerationApi,
   RitualApi,
+  SubscriptionApi,
   UserApi,
   WardrobeApi,
   WeatherApi,
@@ -47,6 +48,7 @@ export interface DefaultApi
     PublicApi<LocationsApi>,
     PublicApi<ModerationApi>,
     PublicApi<RitualApi>,
+    PublicApi<SubscriptionApi>,
     PublicApi<UserApi>,
     PublicApi<WardrobeApi>,
     PublicApi<WeatherApi> {}
@@ -68,6 +70,7 @@ applyApiMixins(DefaultApi, [
   LocationsApi,
   ModerationApi,
   RitualApi,
+  SubscriptionApi,
   UserApi,
   WardrobeApi,
   WeatherApi,

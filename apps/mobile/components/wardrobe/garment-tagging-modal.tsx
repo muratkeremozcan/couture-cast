@@ -11,7 +11,6 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
-  findNodeHandle,
   Platform,
 } from 'react-native'
 import type {
@@ -26,6 +25,7 @@ import {
   updateGarmentTagsFromMobile,
 } from '../../src/lib/wardrobe'
 import { useAccessibilityAnnouncer } from '../../src/hooks/use-accessibility-announcer'
+import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
 export interface MobileGarmentTaggingModalProps {
   visible: boolean
@@ -139,7 +139,7 @@ export function MobileGarmentTaggingModal({
       Platform.OS === 'web'
         ? null
         : setTimeout(() => {
-            const node = findNodeHandle(titleRef.current)
+            const node = safeFindNodeHandle(titleRef.current)
             if (node) AccessibilityInfo.setAccessibilityFocus(node)
           }, 150)
     const backSubscription = BackHandler.addEventListener('hardwareBackPress', () => {

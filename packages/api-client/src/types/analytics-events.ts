@@ -57,6 +57,14 @@ export const analyticsEventNameSchema = z.enum([
   'affiliate_cta_shown',
   'affiliate_cta_clicked',
   'affiliate_conversion_recorded',
+  // Story 5.2. premium_subscribe_tapped is emitted by clients directly to
+  // PostHog with their own distinctId and never reaches TelemetryService; the
+  // other three are server events with an HMAC subject id. Property allowlists
+  // permit product id and store enums only — no price, no receipt id, no URL.
+  'premium_subscribe_tapped',
+  'premium_checkout_started',
+  'premium_entitlement_activated',
+  'premium_entitlement_deactivated',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -485,6 +493,73 @@ export type AffiliateConversionRecordedEvent = z.infer<
   typeof affiliateConversionRecordedEventSchema
 >
 
+// --- Story 5.2: premium subscription ----------------------------------------
+//
+// Four events; the constraint is again what is NOT here. No price, no receipt
+// or transaction id, no URL, no email, and no free text appears in any schema,
+// and every wrapper parses `.strict()` so a caller cannot smuggle one in.
+//
+// Funnel honesty, stated in the story and repeated here: the computable convert
+// funnel lives in the SERVER event space (premium_checkout_started →
+// premium_entitlement_activated for web; store-attributed activations for
+// mobile). premium_subscribe_tapped uses the client's own distinctId, which is
+// a disjoint identifier space with no join to the HMAC subject — it measures
+// directional volume, not a funnel leg.
+
+const premiumPlanAnalyticsEnum = z.enum(['premium_monthly', 'premium_annual'])
+const premiumStoreAnalyticsEnum = z.enum([
+  'app_store',
+  'play_store',
+  'stripe',
+  'promotional',
+])
+const premiumSurfaceAnalyticsEnum = z.enum(['mobile_settings', 'web_settings'])
+/** Why an entitlement stopped: expiration, refund/revocation, or transfer-loss. */
+const premiumDeactivationReasonEnum = z.enum(['expired', 'revoked', 'transferred'])
+
+export const premiumSubscribeTappedEventSchema = z.object({
+  // Client-side only: uses the client analytics identity, exactly like
+  // affiliate_cta_shown. Does NOT go through TelemetryService.
+  plan: premiumPlanAnalyticsEnum,
+  surface: premiumSurfaceAnalyticsEnum,
+})
+
+export type PremiumSubscribeTappedEvent = z.infer<
+  typeof premiumSubscribeTappedEventSchema
+>
+
+export const premiumCheckoutStartedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  // Web-only by construction: checkout sessions exist only on the Stripe rail.
+  // The mobile funnel start is premium_subscribe_tapped.
+  plan: premiumPlanAnalyticsEnum,
+})
+
+export type PremiumCheckoutStartedEvent = z.infer<
+  typeof premiumCheckoutStartedEventSchema
+>
+
+export const premiumEntitlementActivatedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  store: premiumStoreAnalyticsEnum,
+  productId: nonEmptyString.max(128),
+})
+
+export type PremiumEntitlementActivatedEvent = z.infer<
+  typeof premiumEntitlementActivatedEventSchema
+>
+
+export const premiumEntitlementDeactivatedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  store: premiumStoreAnalyticsEnum,
+  productId: nonEmptyString.max(128),
+  reason: premiumDeactivationReasonEnum,
+})
+
+export type PremiumEntitlementDeactivatedEvent = z.infer<
+  typeof premiumEntitlementDeactivatedEventSchema
+>
+
 export const analyticsEventSchemas = {
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
@@ -513,6 +588,10 @@ export const analyticsEventSchemas = {
   affiliate_cta_shown: affiliateCtaShownEventSchema,
   affiliate_cta_clicked: affiliateCtaClickedEventSchema,
   affiliate_conversion_recorded: affiliateConversionRecordedEventSchema,
+  premium_subscribe_tapped: premiumSubscribeTappedEventSchema,
+  premium_checkout_started: premiumCheckoutStartedEventSchema,
+  premium_entitlement_activated: premiumEntitlementActivatedEventSchema,
+  premium_entitlement_deactivated: premiumEntitlementDeactivatedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -1372,6 +1451,126 @@ export function trackAffiliateConversionRecorded(
       currency: parsed.currency,
       order_value_minor_units: parsed.orderValueMinorUnits,
       matched: parsed.matched,
+    }),
+  }
+}
+
+// --- Story 5.2: premium subscription property schemas and wrappers ----------
+//
+// Every schema below is `.strict()`: a caller that tries to attach a price, a
+// receipt id, an email, or a URL gets a parse failure at the wrapper rather
+// than a silent leak into PostHog. The negative fixtures in
+// `packages/api-client/testing/premium-analytics.spec.ts` exercise exactly that.
+
+export const premiumSubscribeTappedPropertiesSchema = z
+  .object({
+    plan: premiumPlanAnalyticsEnum,
+    surface: premiumSurfaceAnalyticsEnum,
+  })
+  .strict()
+
+export type PremiumSubscribeTappedProperties = z.infer<
+  typeof premiumSubscribeTappedPropertiesSchema
+>
+
+export const premiumCheckoutStartedPropertiesSchema = z
+  .object({
+    plan: premiumPlanAnalyticsEnum,
+  })
+  .strict()
+
+export type PremiumCheckoutStartedProperties = z.infer<
+  typeof premiumCheckoutStartedPropertiesSchema
+>
+
+export const premiumEntitlementActivatedPropertiesSchema = z
+  .object({
+    store: premiumStoreAnalyticsEnum,
+    product_id: nonEmptyString.max(128),
+  })
+  .strict()
+
+export type PremiumEntitlementActivatedProperties = z.infer<
+  typeof premiumEntitlementActivatedPropertiesSchema
+>
+
+export const premiumEntitlementDeactivatedPropertiesSchema = z
+  .object({
+    store: premiumStoreAnalyticsEnum,
+    product_id: nonEmptyString.max(128),
+    reason: premiumDeactivationReasonEnum,
+  })
+  .strict()
+
+export type PremiumEntitlementDeactivatedProperties = z.infer<
+  typeof premiumEntitlementDeactivatedPropertiesSchema
+>
+
+export function trackPremiumSubscribeTapped(
+  event: PremiumSubscribeTappedEvent,
+  distinctId: string
+): AnalyticsCapturePayload<'premium_subscribe_tapped', PremiumSubscribeTappedProperties> {
+  const parsed = premiumSubscribeTappedEventSchema.parse(event)
+
+  // The distinctId is passed in rather than read off the event: this is the one
+  // premium event with no server subject, matching trackAffiliateCtaShown.
+  return {
+    distinctId,
+    event: 'premium_subscribe_tapped',
+    properties: premiumSubscribeTappedPropertiesSchema.parse({
+      plan: parsed.plan,
+      surface: parsed.surface,
+    }),
+  }
+}
+
+export function trackPremiumCheckoutStarted(
+  event: PremiumCheckoutStartedEvent
+): AnalyticsCapturePayload<'premium_checkout_started', PremiumCheckoutStartedProperties> {
+  const parsed = premiumCheckoutStartedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'premium_checkout_started',
+    properties: premiumCheckoutStartedPropertiesSchema.parse({
+      plan: parsed.plan,
+    }),
+  }
+}
+
+export function trackPremiumEntitlementActivated(
+  event: PremiumEntitlementActivatedEvent
+): AnalyticsCapturePayload<
+  'premium_entitlement_activated',
+  PremiumEntitlementActivatedProperties
+> {
+  const parsed = premiumEntitlementActivatedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'premium_entitlement_activated',
+    properties: premiumEntitlementActivatedPropertiesSchema.parse({
+      store: parsed.store,
+      product_id: parsed.productId,
+    }),
+  }
+}
+
+export function trackPremiumEntitlementDeactivated(
+  event: PremiumEntitlementDeactivatedEvent
+): AnalyticsCapturePayload<
+  'premium_entitlement_deactivated',
+  PremiumEntitlementDeactivatedProperties
+> {
+  const parsed = premiumEntitlementDeactivatedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'premium_entitlement_deactivated',
+    properties: premiumEntitlementDeactivatedPropertiesSchema.parse({
+      store: parsed.store,
+      product_id: parsed.productId,
+      reason: parsed.reason,
     }),
   }
 }

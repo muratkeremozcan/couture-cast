@@ -191,6 +191,18 @@ export async function seedWeather(prisma: PrismaClient): Promise<SeededWeather> 
         },
       })
 
+      // Idempotency for standalone re-runs. `forecast_at` is now-relative and
+      // (weather_snapshot_id, forecast_at) is unique, so a later run's new
+      // schedule overlaps the previous run's rows while the upserts are still
+      // in flight and fails with a unique violation. Shifting the existing rows
+      // uniformly far out of range first keeps them unique at every step, and
+      // the upserts below then move each row to its final slot. Rituals
+      // reference segments by id, so rows must be moved, never deleted.
+      await prisma.$executeRaw`
+        UPDATE "ForecastSegment"
+        SET "forecast_at" = "forecast_at" - interval '1000 years'
+        WHERE "weather_snapshot_id" = ${snapshot.id}`
+
       const segments = await Promise.all(
         segmentOffsets.map((offset) => {
           const segmentId = `${seed.id}-seg-${offset}`

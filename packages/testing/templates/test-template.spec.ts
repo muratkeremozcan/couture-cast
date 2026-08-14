@@ -41,6 +41,10 @@ const prisma = {
   commercePreference: { deleteMany: () => Promise.resolve({ count: 0 }) },
   affiliateClick: { deleteMany: () => Promise.resolve({ count: 0 }) },
   affiliateConversion: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  // Story 5.2 premium billing.
+  premiumEntitlement: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  billingEvent: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  billingCustomer: { deleteMany: () => Promise.resolve({ count: 0 }) },
 } satisfies Record<string, DeleteManyRecorder>
 
 describe('example factory suite', () => {

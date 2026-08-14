@@ -26,11 +26,7 @@ tags:
       - tapOn:
           point: '9%,29%'
 
-- openLink: ${APP_URL}
-
-- tapOn:
-    text: 'Continue'
-    optional: true
+- runFlow: subflows/open-app.yaml
 
 - extendedWaitUntil:
     visible:
@@ -136,7 +132,7 @@ tags:
           appId: ${MAESTRO_APP_ID}
           clearState: false
 
-- openLink: ${APP_URL}
+- runFlow: subflows/open-app.yaml
 
 - extendedWaitUntil:
     visible:

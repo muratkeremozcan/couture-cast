@@ -8,20 +8,12 @@
 // imports): this file's react-native/expo-crypto imports must never reach
 // wardrobe.ts, or every test that imports wardrobe.ts without mocking those
 // native modules breaks — screen/component test files already mock them.
-import { Platform, findNodeHandle } from 'react-native'
 import * as Crypto from 'expo-crypto'
 
-/**
- * react-native-web's `findNodeHandle` always throws ("not supported on web"),
- * including when called synchronously during render or from inside an event
- * handler regardless of ref nullity. Every call site must skip it on web,
- * matching the guard already proven in garment-tagging-modal.tsx and
- * capsule-builder-modal.tsx.
- */
-export function safeFindNodeHandle(node: unknown): number | null {
-  if (Platform.OS === 'web' || !node) return null
-  return findNodeHandle(node as never)
-}
+// One implementation, defined in a module free of expo-crypto so that screen
+// and component code can import it without dragging a native module into every
+// suite that renders them. Re-exported here for existing callers.
+export { safeFindNodeHandle } from './accessibility-focus'
 
 export async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   const digest = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, bytes)

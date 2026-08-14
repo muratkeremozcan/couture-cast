@@ -1,5 +1,6 @@
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
+import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommerceRepository } from './commerce.repository.js'
 import { CommerceRetentionService } from './commerce-retention.service.js'
@@ -10,6 +11,8 @@ describe('CommerceRetentionService', () => {
     deleteConversionsByIds: vi.fn(),
     findExpiredClickIds: vi.fn(),
     deleteClicksByIds: vi.fn(),
+    findExpiredBillingEventIds: vi.fn(),
+    deleteBillingEventsByIds: vi.fn(),
   }
 
   let service: CommerceRetentionService
@@ -22,6 +25,8 @@ describe('CommerceRetentionService', () => {
     repository.deleteConversionsByIds.mockReset().mockResolvedValue(0)
     repository.findExpiredClickIds.mockReset().mockResolvedValue([])
     repository.deleteClicksByIds.mockReset().mockResolvedValue(0)
+    repository.findExpiredBillingEventIds.mockReset().mockResolvedValue([])
+    repository.deleteBillingEventsByIds.mockReset().mockResolvedValue(0)
 
     service = new CommerceRetentionService(repository as unknown as CommerceRepository)
   })
@@ -88,6 +93,33 @@ describe('CommerceRetentionService', () => {
 
     expect(repository.deleteConversionsByIds).not.toHaveBeenCalled()
     expect(repository.deleteClicksByIds).not.toHaveBeenCalled()
+    expect(repository.deleteBillingEventsByIds).not.toHaveBeenCalled()
+  })
+
+  it('5.2-API-013 prunes BillingEvent rows on the same 24-month cutoff', async () => {
+    repository.findExpiredBillingEventIds.mockResolvedValueOnce(['b1', 'b2'])
+    repository.deleteBillingEventsByIds.mockResolvedValueOnce(2)
+
+    await service.pruneExpiredCommerceRecords()
+
+    expect(repository.findExpiredBillingEventIds).toHaveBeenCalledWith(
+      new Date('2024-08-11T00:00:00.000Z'),
+      expect.any(Number)
+    )
+    expect(repository.deleteBillingEventsByIds).toHaveBeenCalledWith(['b1', 'b2'])
+  })
+
+  it('carries no @Cron decorator: the schedule lives on the worker runtime (Decision 4a)', () => {
+    // The serverless API never fires @Cron; the monthly commerce-retention-sweep
+    // Job Scheduler is the substrate. A reintroduced decorator would silently
+    // split the schedule across a runtime where it never runs.
+    const metadataKeys = Reflect.getMetadataKeys(
+      Object.getOwnPropertyDescriptor(
+        CommerceRetentionService.prototype,
+        'pruneExpiredCommerceRecords'
+      )?.value as object
+    )
+    expect(metadataKeys.filter((key) => String(key).includes('CRON'))).toEqual([])
   })
 
   it('swallows a failed prune so the scheduler survives it', async () => {

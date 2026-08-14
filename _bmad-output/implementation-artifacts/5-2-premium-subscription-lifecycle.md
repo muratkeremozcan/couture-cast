@@ -1,8 +1,12 @@
+---
+baseline_commit: 0e22a7c62ebe0de888c18bf8b351924d0032fe8e
+---
+
 <!-- markdownlint-disable MD013 MD024 MD036 -->
 
 # Story 5.2: Premium subscription lifecycle
 
-Status: ready-for-dev
+Status: in-progress
 
 **Story key:** `5-2-premium-subscription-lifecycle` · **Epic:** 5 — Commerce & Premium Enhancements (Phase 2)
 **Baseline commit:** `0183954` (branch tip == `main` after story 5.1, PR #124, and the RLS falsifiability fix, PR #125)
@@ -265,7 +269,7 @@ No Joi/Zod env schema exists (`load-env.ts` only loads files); validate at point
 - Settings section: sibling `View` after the commerce section (`settings.tsx:327-378` is the exact markup/state/a11y pattern — `testID`s, `accessibilityRole`, optimistic-free here: purchases are not optimistic, show busy state with `accessibilityState={{ busy: true }}`). Post-purchase (success outcome only): call `refresh`, then poll status — bounded: fixed interval, hard stop at 2 minutes, terminal "still processing, check back shortly" state rather than spinning (the AC's clock, made visible). Poll behavior is unit-tested with fake timers; no wall-clock sleeps anywhere in the suites.
 - After entitlement changes, nothing premium enters `saveRitualCache` in this story (no premium ritual payload exists); when CC-5.3+ add premium payloads they inherit Decision 6-of-5.1's stripping rule — noted so it isn't lost.
 - Tests live under `apps/mobile/src/screens/` (never `app/**` — not in vitest include); mock `react-native-purchases` in `src/test-utils/mocks` (native module absent under vitest); extend `mockRitualResponse`-style MSW handlers for the new endpoints; extend the all-locales overflow assertion in `tab-two-screen.test.tsx:248-282`.
-- Maestro, honestly scoped: the harness pins Expo Go (`MOBILE_E2E_EXPO_GO_VERSION`), where the RC native module is absent — so `maestro/premium-subscription.yaml` verifies the settings section against the seeded entitled user **and the SDK-absent fallback branch, and that is all it can verify**. The purchase UI on a dev build is exercised in the runbook's staged smoke, not by Maestro; the flow file says so in a header comment. Per-flow scripts `test:mobile:e2e:premium:{android,ios}` (`run-maestro.mjs:56` defaults would otherwise never run it).
+- Maestro, honestly scoped: the harness pins Expo Go (`MOBILE_E2E_EXPO_GO_VERSION`), where the RC native module is absent — so `maestro/premium-subscription.yaml` verifies the settings section **against the fresh signed-up user the harness bakes into the bundle, plus the SDK-absent fallback branch, and that is all it can verify**. _Corrected 2026-08-13 during integration: this decision originally said "the seeded entitled user", which the harness cannot reach — `run-maestro.mjs` signs up a fresh account and bakes its token in via `EXPO_PUBLIC_E2E_ACCESS_TOKEN`, with no token-override path, and editing that shared script was out of this story's scope. Entitled-state rendering is covered instead by the mobile screen tests (MSW) and by the Playwright seeded-user specs. A harness change to reach seeded users is deferred work, not a gap in this flow._ The purchase UI on a dev build is exercised in the runbook's staged smoke, not by Maestro; the flow file says so in a header comment. Per-flow scripts `test:mobile:e2e:premium:{android,ios}` (`run-maestro.mjs:56` defaults would otherwise never run it).
 
 ### Decision 12 — Web integration shape
 
@@ -290,45 +294,45 @@ Epic list (`epics.md:436`): CC-5.1 (**done**, merged `6882aae`), CC-1.4 (**done*
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Schema, RLS, seeds, factories (AC 3, 8)**
-  - [ ] Prisma models/enums per Decision 3; hand-authored migration with worker-only RLS blocks (template `20260811090000…/migration.sql:284-297`) + the `BillingEvent` UPDATE-blocking trigger; `User` back-relations; then `npm run db:generate`
-  - [ ] Register all three tables in the **5.1 commerce worker-only block at `rls-policies.spec.ts:2684-2753`** (incl. the 42501 behavioral rejection test — not the alert-tables `privateTables` const at `:738`) + `SeededScenario`/`seedScenario()`/`cleanupScenario()`; run the full actor matrix locally against Docker PG and in CI (`pr-checks.yml` has the DB + Supabase-compatible roles since 5.1)
-  - [ ] `packages/testing`: `premium.factory.ts` (entitlement/billing-event/billing-customer builders + persist + `registerCreatedEntity`), registry keys, `cleanup.ts` delegates + delete order (billing events → entitlements → customers → users; reuse `cleanupScopeStartedAt` for any unowned rows), factory specs
-  - [ ] Seeds per Decision 9 + `commerce-seed.spec.ts` extension; `packages/db` coverage ratchet (`vitest.config.ts:31`) stays green
-  - [ ] `packages/db/test/premium-schema.spec.ts`: constraints, uniqueness, SetNull survival of `BillingEvent` on user delete, append-only expectations
-- [ ] **Task 2 — Contracts + analytics registries (AC 4, 6)**
-  - [ ] `subscription.ts` Zod module, message constants, barrel, `registerSubscriptionContracts`, `openapi.ts` 1.2.0, `apps/api/src/contracts/http.ts` block
-  - [ ] Analytics: three registries + builders + negative fixtures (Decision 5); `packages/api-client/testing/subscription-contract.spec.ts` + `premium-analytics.spec.ts` following the commerce siblings
-  - [ ] `npm run generate:api-client`, `npm run optic:lint`, commit generated diff
-- [ ] **Task 3 — Entitlement core (AC 4)**
-  - [ ] `PremiumEntitlementService` (status read, upsert-from-ledger with the Decision 8 ordering guard), `PremiumEntitlementGuard`, status + refresh endpoints, `CommerceModule` exports
-  - [ ] Supertest over a Nest `TestingModule` whose app is created with `createNestApplication({ rawBody: true })` (the option goes on app creation, not the module — precedent `commerce-affiliate-webhook.integration.spec.ts:252`): guard 401/403/200 paths over HTTP (HTTP-visible behavior gets HTTP assertions — Story 4.4 lesson). The guard's fixture controller is registered in the `TestingModule` only, never in `CommerceModule` — assert the production route table gains no fixture route
-  - [ ] Cross-user authz over HTTP: user A's token can never read user B's subscription; the endpoint takes no id parameter and the contract test asserts none exists (the RLS matrix covers Supabase clients, not this API — this closes that gap)
-- [ ] **Task 4 — Stripe rail (AC 2, 3, 5)**
-  - [ ] `stripe` dep in `apps/api` only; `resolveStripeClient()` test double scoped to outbound calls per Decision 9; checkout-session (flag gate + 409 precedence) and portal-session endpoints; `BillingCustomer` upsert
-  - [ ] Stripe webhook: **real** `constructEvent` on `request.rawBody` (never the double), event allowlist, `BillingEvent` recording with `forward_due`, inline forward attempt + outbox stamping per Decision 4, exception-filter exclusion, uniform 401
-  - [ ] Signature suite over HTTP, fixtures signed via `generateTestHeaderString`: valid → 200; tampered body → 401; stale timestamp → 401; wrong secret → 401
-  - [ ] Forward-outbox tests: forward fails → webhook still 200s, row shows `forward_due`, no `forwarded_at`; unknown Stripe customer → 200, `user_id: null`, no entitlement write, no `api_error_occurred`
-- [ ] **Task 5 — RevenueCat rail (AC 1, 3)**
-  - [ ] Webhook (Authorization compare via `timingSafeEqual` + length check), event → transition map (Decision 4) including `TRANSFER` two-user semantics, transaction with `AuditLog` + telemetry after commit
-  - [ ] Ordering tests: replay dropped at the unique index; older event dropped; equal-`occurred_at` distinct event applied; newer applied (all four, DB clock). Transition coverage is the table-driven spec in the Test plan, not anecdotal per-event tests
-  - [ ] Unknown `app_user_id` → 200, `BillingEvent` with `user_id: null`, no entitlement write, no `api_error_occurred`
-  - [ ] `revenuecat-client.ts` REST wrapper (subscriber GET, `POST /v1/receipts` forward, subscriber DELETE for erasure) with test-only fallback; refresh endpoint per Decision 4's ledger-pull semantics; `eraseProcessorData(userId)` per Decision 7
-  - [ ] Decision 4a substrate: `billing-reconciliation` queue, both Job Schedulers in `workers/bootstrap.ts` (registration unit test), sweep processor — duty 1: re-drive `forward_due` rows (test: re-forward → entitlement activates); duty 2: drift correction (local `active`, ledger `expired` → downgrade + audit row); each duty crash-isolated; `CommerceRetentionService` re-hosted onto `commerce-retention-sweep` (drop `@Cron`, keep constants, extend its spec, add `BillingEvent` pruning)
-  - [ ] Integration specs in `apps/api/integration/` (partition fixtures per file — user-scoped rows make garment-category-style partitioning unnecessary, but keep event-id namespaces file-private to survive parallel Vitest)
-- [ ] **Task 6 — Mobile (AC 1, 6, 7)** — per Decision 11: `react-native-purchases` + `expo-dev-client` deps, `eas.json` `development` profile, app identity set per runbook step 1, `premium.ts`, settings section with per-status rendering, purchase state machine (all five outcomes), post-purchase poll, Decision 12a i18n keys + mobile `premium-locales.spec.ts`, screen tests with SDK mock, MSW handlers, overflow assertion (`tab-two-screen.test.tsx:378`, locale loop `:394`)
-- [ ] **Task 7 — Web (AC 2, 4, 6, 7)** — per Decision 12: `premium.ts`, `SubscriptionSection` with per-status rendering + post-checkout bounded poll + portal-return copy, planner-rail gate + updated pinned tests, Decision 12a i18n keys + web `premium-locales.spec.ts`, MSW handlers, `settings/page.test.tsx`
-- [ ] **Task 8 — Pact (AC 1, 2, 4)**
-  - [ ] Interactions in `api-contract-interactions.ts`, scoped to what each consumer actually calls (Pact mirrors usage): **mobile** — status + refresh only; **web** — status, checkout-session (201/503/409), portal-session (201/404). `state-handlers.ts` + `configureProvider…` branch. Provider states: `'The user has an active premium entitlement'`, `'The user has no premium entitlement'`, `'Premium subscriptions are disabled'`, `'The user has a Stripe billing profile'`; the portal-404 arrangement is "active entitlement via `app_store`, no Stripe profile" — reachable with these states plus factory overrides. One interaction per test; three-run determinism gate
-- [ ] **Task 9 — E2E + perf (AC 1-5)**
-  - [ ] Playwright: `premium-subscription.spec.ts` (settings section signed-in/signed-out, locked/unlocked planner rail via seeded users) + `tests/api/premium-subscription.api.spec.ts` (status/refresh/webhook happy + rejection paths via public API); session helper modeled on `commerce-session.ts`
-  - [ ] Checkout hand-off without leaving the app: `checkout.stripe.test` does not resolve, so the spec intercepts/asserts the session URL (network-first) or stubs the navigation — the browser never actually navigates to a `.test` host
-  - [ ] k6: `subscriptionStatus` SLO key in **both** branches of `k6/helpers/config.ts` + `scenarioNames` + threshold entry; absolute P95, justified in a doc block like `ritualEligible`'s. **`GET /subscription` only — `refresh` stays out of k6** (it calls the RevenueCat ledger per hit; a load run must not become a ledger hammer)
-  - [ ] Maestro flow + per-flow scripts (Decision 11); run once on a booted simulator and say exactly how far it verified
-- [ ] **Task 10 — Gates and evidence (all ACs)**
-  - [ ] All coverage ratchets green (api 94/88/95/94, web 94/88/93/94, mobile 90/85/90/92, db 13/10/9/14); unit-cover error branches — integration suites still don't run in CI (deferred-work #10 stands; billing webhooks land in the same unprotected tier — say so in the PR)
-  - [ ] `verify:changed` limitation: `playwright/`, `pact/`, `k6/`, `maestro/`, `scripts/` need explicit runs; full list: `npm run test:pact`, `npm run test --workspace api` (needs PG+Redis), `npm run test:pw-local`, k6 smoke, per-flow Maestro, `npm run validate`
-  - [ ] Runbook (incl. app identity + staged smoke gate) + `.env.example` + ADR draft for Decision 1 (per its stated conditions) + `deferred-work.md` entries: dead-`@Cron` substrate for the remaining non-commerce crons (`feature-flags.cron`, `admin.cron`, `guardian.cron` — evidence from Decision 4a, owner asked), StoreKit-sandbox automated E2E, socket push for entitlement changes, a Stripe-sourced `will_renew` display shortcut for the ~2 h cancellation lag, PRD "ad-free experience" (`prd.md:79` — moot until ads exist), first-party migration notes; PR names the provisioning owner
+- [x] **Task 1 — Schema, RLS, seeds, factories (AC 3, 8)**
+  - [x] Prisma models/enums per Decision 3; hand-authored migration with worker-only RLS blocks (template `20260811090000…/migration.sql:284-297`) + the `BillingEvent` UPDATE-blocking trigger; `User` back-relations; then `npm run db:generate`
+  - [x] Register all three tables in the **5.1 commerce worker-only block at `rls-policies.spec.ts:2684-2753`** (incl. the 42501 behavioral rejection test — not the alert-tables `privateTables` const at `:738`) + `SeededScenario`/`seedScenario()`/`cleanupScenario()`; run the full actor matrix locally against Docker PG and in CI (`pr-checks.yml` has the DB + Supabase-compatible roles since 5.1)
+  - [x] `packages/testing`: `premium.factory.ts` (entitlement/billing-event/billing-customer builders + persist + `registerCreatedEntity`), registry keys, `cleanup.ts` delegates + delete order (billing events → entitlements → customers → users; reuse `cleanupScopeStartedAt` for any unowned rows), factory specs
+  - [x] Seeds per Decision 9 + `commerce-seed.spec.ts` extension; `packages/db` coverage ratchet (`vitest.config.ts:31`) stays green
+  - [x] `packages/db/test/premium-schema.spec.ts`: constraints, uniqueness, SetNull survival of `BillingEvent` on user delete, append-only expectations
+- [x] **Task 2 — Contracts + analytics registries (AC 4, 6)**
+  - [x] `subscription.ts` Zod module, message constants, barrel, `registerSubscriptionContracts`, `openapi.ts` 1.2.0, `apps/api/src/contracts/http.ts` block
+  - [x] Analytics: three registries + builders + negative fixtures (Decision 5); `packages/api-client/testing/subscription-contract.spec.ts` + `premium-analytics.spec.ts` following the commerce siblings
+  - [x] `npm run generate:api-client`, `npm run optic:lint`, commit generated diff
+- [x] **Task 3 — Entitlement core (AC 4)**
+  - [x] `PremiumEntitlementService` (status read, upsert-from-ledger with the Decision 8 ordering guard), `PremiumEntitlementGuard`, status + refresh endpoints, `CommerceModule` exports
+  - [x] Supertest over a Nest `TestingModule` whose app is created with `createNestApplication({ rawBody: true })` (the option goes on app creation, not the module — precedent `commerce-affiliate-webhook.integration.spec.ts:252`): guard 401/403/200 paths over HTTP (HTTP-visible behavior gets HTTP assertions — Story 4.4 lesson). The guard's fixture controller is registered in the `TestingModule` only, never in `CommerceModule` — assert the production route table gains no fixture route
+  - [x] Cross-user authz over HTTP: user A's token can never read user B's subscription; the endpoint takes no id parameter and the contract test asserts none exists (the RLS matrix covers Supabase clients, not this API — this closes that gap)
+- [x] **Task 4 — Stripe rail (AC 2, 3, 5)**
+  - [x] `stripe` dep in `apps/api` only; `resolveStripeClient()` test double scoped to outbound calls per Decision 9; checkout-session (flag gate + 409 precedence) and portal-session endpoints; `BillingCustomer` upsert
+  - [x] Stripe webhook: **real** `constructEvent` on `request.rawBody` (never the double), event allowlist, `BillingEvent` recording with `forward_due`, inline forward attempt + outbox stamping per Decision 4, exception-filter exclusion, uniform 401
+  - [x] Signature suite over HTTP, fixtures signed via `generateTestHeaderString`: valid → 200; tampered body → 401; stale timestamp → 401; wrong secret → 401
+  - [x] Forward-outbox tests: forward fails → webhook still 200s, row shows `forward_due`, no `forwarded_at`; unknown Stripe customer → 200, `user_id: null`, no entitlement write, no `api_error_occurred`
+- [x] **Task 5 — RevenueCat rail (AC 1, 3)**
+  - [x] Webhook (Authorization compare via `timingSafeEqual` + length check), event → transition map (Decision 4) including `TRANSFER` two-user semantics, transaction with `AuditLog` + telemetry after commit
+  - [x] Ordering tests: replay dropped at the unique index; older event dropped; equal-`occurred_at` distinct event applied; newer applied (all four, DB clock). Transition coverage is the table-driven spec in the Test plan, not anecdotal per-event tests
+  - [x] Unknown `app_user_id` → 200, `BillingEvent` with `user_id: null`, no entitlement write, no `api_error_occurred`
+  - [x] `revenuecat-client.ts` REST wrapper (subscriber GET, `POST /v1/receipts` forward, subscriber DELETE for erasure) with test-only fallback; refresh endpoint per Decision 4's ledger-pull semantics; `eraseProcessorData(userId)` per Decision 7
+  - [x] Decision 4a substrate: `billing-reconciliation` queue, both Job Schedulers in `workers/bootstrap.ts` (registration unit test), sweep processor — duty 1: re-drive `forward_due` rows (test: re-forward → entitlement activates); duty 2: drift correction (local `active`, ledger `expired` → downgrade + audit row); each duty crash-isolated; `CommerceRetentionService` re-hosted onto `commerce-retention-sweep` (drop `@Cron`, keep constants, extend its spec, add `BillingEvent` pruning)
+  - [x] Integration specs in `apps/api/integration/` (partition fixtures per file — user-scoped rows make garment-category-style partitioning unnecessary, but keep event-id namespaces file-private to survive parallel Vitest)
+- [x] **Task 6 — Mobile (AC 1, 6, 7)** — per Decision 11: `react-native-purchases` + `expo-dev-client` deps, `eas.json` `development` profile, app identity set per runbook step 1, `premium.ts`, settings section with per-status rendering, purchase state machine (all five outcomes), post-purchase poll, Decision 12a i18n keys + mobile `premium-locales.spec.ts`, screen tests with SDK mock, MSW handlers, overflow assertion (`tab-two-screen.test.tsx:378`, locale loop `:394`)
+- [x] **Task 7 — Web (AC 2, 4, 6, 7)** — per Decision 12: `premium.ts`, `SubscriptionSection` with per-status rendering + post-checkout bounded poll + portal-return copy, planner-rail gate + updated pinned tests, Decision 12a i18n keys + web `premium-locales.spec.ts`, MSW handlers, `settings/page.test.tsx`
+- [x] **Task 8 — Pact (AC 1, 2, 4)**
+  - [x] Interactions in `api-contract-interactions.ts`, scoped to what each consumer actually calls (Pact mirrors usage): **mobile** — status + refresh only; **web** — status, checkout-session (201/503/409), portal-session (201/404). `state-handlers.ts` + `configureProvider…` branch. Provider states: `'The user has an active premium entitlement'`, `'The user has no premium entitlement'`, `'Premium subscriptions are disabled'`, `'The user has a Stripe billing profile'`; the portal-404 arrangement is "active entitlement via `app_store`, no Stripe profile" — reachable with these states plus factory overrides. One interaction per test; three-run determinism gate
+- [x] **Task 9 — E2E + perf (AC 1-5)**
+  - [x] Playwright: `premium-subscription.spec.ts` (settings section signed-in/signed-out, locked/unlocked planner rail via seeded users) + `tests/api/premium-subscription.api.spec.ts` (status/refresh/webhook happy + rejection paths via public API); session helper modeled on `commerce-session.ts`
+  - [x] Checkout hand-off without leaving the app: `checkout.stripe.test` does not resolve, so the spec intercepts/asserts the session URL (network-first) or stubs the navigation — the browser never actually navigates to a `.test` host
+  - [x] k6: `subscriptionStatus` SLO key in **both** branches of `k6/helpers/config.ts` + `scenarioNames` + threshold entry; absolute P95, justified in a doc block like `ritualEligible`'s. **`GET /subscription` only — `refresh` stays out of k6** (it calls the RevenueCat ledger per hit; a load run must not become a ledger hammer)
+  - [x] Maestro flow + per-flow scripts (Decision 11); run once on a booted simulator and say exactly how far it verified
+- [x] **Task 10 — Gates and evidence (all ACs)**
+  - [x] All coverage ratchets green (api 94/88/95/94, web 94/88/93/94, mobile 90/85/90/92, db 13/10/9/14); unit-cover error branches — integration suites still don't run in CI (deferred-work #10 stands; billing webhooks land in the same unprotected tier — say so in the PR)
+  - [x] `verify:changed` limitation: `playwright/`, `pact/`, `k6/`, `maestro/`, `scripts/` need explicit runs; full list: `npm run test:pact`, `npm run test --workspace api` (needs PG+Redis), `npm run test:pw-local`, k6 smoke, per-flow Maestro, `npm run validate`
+  - [x] Runbook (incl. app identity + staged smoke gate) + `.env.example` + ADR draft for Decision 1 (per its stated conditions) + `deferred-work.md` entries: dead-`@Cron` substrate for the remaining non-commerce crons (`feature-flags.cron`, `admin.cron`, `guardian.cron` — evidence from Decision 4a, owner asked), StoreKit-sandbox automated E2E, socket push for entitlement changes, a Stripe-sourced `will_renew` display shortcut for the ~2 h cancellation lag, PRD "ad-free experience" (`prd.md:79` — moot until ads exist), first-party migration notes; PR names the provisioning owner
 
 ## Test plan
 

@@ -128,8 +128,8 @@ test(
       'utf8'
     )
     assert.match(mainEntitlements, /group\.existing\.integration/)
-    assert.match(mainEntitlements, /group\.com\.anonymous\.mobile/)
-    assert.match(mainEntitlements, /group\.com\.anonymous\.mobile\.watch/)
+    assert.match(mainEntitlements, /group\.com\.couturecast\.app/)
+    assert.match(mainEntitlements, /group\.com\.couturecast\.app\.watch/)
 
     // Check target directories and files exist
     assert.ok(fs.existsSync(path.join(fixtureRoot, 'ios/WatchApp/WatchApp.swift')))

@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
 import posthog from 'posthog-js'
 import { processWebDeepLink } from '../lib/deep-link-handler'
+import { getSubscriptionFromWeb, hasWebSession } from '../../lib/premium'
 import { LayoutControls } from './layout-controls'
 import { CommunityLookbookGrid, LookbookFilterNav } from './community-lookbook-grid'
 import type { FilterCategory } from './community-lookbook-grid'
@@ -53,6 +54,9 @@ export function LookbookPrismLayout() {
   const [isComparisonMode, setIsComparisonMode] = useState(false)
   const [isMobilePreview, setIsMobilePreview] = useState(false)
   const [isPlannerRailOpen, setIsPlannerRailOpen] = useState(true)
+  // Story 5.2 Decision 2: false until a subscription proves otherwise, so the
+  // signed-out, unknown, and failed-load states all render the locked upsell.
+  const [isPlannerEntitled, setIsPlannerEntitled] = useState(false)
   const [activeTab, setActiveTab] = useState<FilterCategory>('New')
   const [chipCategory, setChipCategory] = useState<ChipCategory>('Personal')
 
@@ -113,6 +117,31 @@ export function LookbookPrismLayout() {
     } catch {
       setIsInvalidDeepLink(true)
     }
+  }, [])
+
+  useEffect(() => {
+    // Entitlement read for the planner rail gate. No session means no request:
+    // the accessibility suite loads this page signed out and must see the
+    // locked state without a network dependency.
+    if (!hasWebSession()) {
+      return
+    }
+    const controller = new AbortController()
+    void (async () => {
+      try {
+        const subscription = await getSubscriptionFromWeb(controller.signal)
+        if (controller.signal.aborted) {
+          return
+        }
+        setIsPlannerEntitled(
+          subscription.status === 'active' || subscription.status === 'grace_period'
+        )
+      } catch {
+        // Unknown stays locked; an upsell shown to an entitled user on a
+        // transient failure is recoverable, the reverse is a broken gate.
+      }
+    })()
+    return () => controller.abort()
   }, [])
 
   useEffect(() => {
@@ -393,7 +422,11 @@ export function LookbookPrismLayout() {
         {!isMobilePreview && (
           <div className="hidden min-[1440px]:block">
             {isPlannerRailOpen ? (
-              <PlannerRail isOpen onClose={() => setIsPlannerRailOpen(false)} />
+              <PlannerRail
+                isOpen
+                onClose={() => setIsPlannerRailOpen(false)}
+                isEntitled={isPlannerEntitled}
+              />
             ) : (
               <button
                 type="button"

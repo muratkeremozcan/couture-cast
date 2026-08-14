@@ -1,4 +1,4 @@
-package com.anonymous.mobile
+package com.couturecast.app
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

@@ -12,30 +12,28 @@ tags:
 ---
 - launchApp:
     appId: ${MAESTRO_APP_ID}
-    # Clearing Expo Go state on iOS removes the project Expo CLI just opened and
-    # leaves the simulator on the Expo shell. The runner supplies a fresh API
-    # identity and Metro bundle for each invocation, so wrapper state is retained.
-    clearState: false
+    # `clearState: true`, like every other flow in this suite.
+    #
+    # It used to be false, on the reasoning that clearing Expo Go state removes
+    # the project Expo CLI just opened and strands the simulator on the Expo
+    # shell. That was true before `subflows/open-app.yaml` existed; the subflow
+    # now re-opens `${APP_URL}` inside a retry and waits for the tab bar, which
+    # is exactly the recovery that reasoning said was missing.
+    #
+    # Keeping it false made this flow inherit whatever screen its predecessor
+    # left behind, and `openLink` re-enters the app without popping the
+    # navigation stack. So when `wardrobe-onboarding-my-form-flow` started
+    # passing -- it ends on the pushed silhouette screen -- this flow began
+    # failing at `tab-home`, purely because of its position in the run. Pressing
+    # back does not recover it either: measured on device, two `back` presses
+    # both reported COMPLETED and the silhouette screen stayed put.
+    clearState: true
     stopApp: false
 
-- openLink: ${APP_URL}
-
-# Dismiss Expo developer sheets/menus if they appear
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go developer menu if it appears'
-- tapOn:
-    text: 'Open app'
-    optional: true
-    label: 'Dismiss Expo Go developer sheet if it appears'
+- runFlow: subflows/open-app.yaml
 
 # Verify default state
 - assertVisible: 'Morning commute'
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss delayed Expo Go developer menu if it appears'
 
 # Trigger the small-widget contract. The runner uses the production mobile://
 # URL on Android and Expo Go's equivalent routed URL on iOS, where a third-party

@@ -71,6 +71,9 @@ function createCleanupPrismaStub(
     commercePreference: createDelegate('commercePreference'),
     affiliateClick: createDelegate('affiliateClick'),
     affiliateConversion: createDelegate('affiliateConversion'),
+    premiumEntitlement: createDelegate('premiumEntitlement'),
+    billingEvent: createDelegate('billingEvent'),
+    billingCustomer: createDelegate('billingCustomer'),
   }
 }
 
@@ -103,6 +106,34 @@ describe('cleanup', () => {
     expect(where?.created_at.gte.getTime()).toBeGreaterThanOrEqual(before.getTime())
   })
 
+  it('bounds unowned billing events to the current cleanup scope', async () => {
+    // Story 5.2: unknown-subject webhook tests write BillingEvent rows with
+    // user_id NULL, which neither tracked ids nor the user filter can reach.
+    // Those are swept by the same scope anchor as the cooldown table — never
+    // an unscoped delete of every unowned billing event.
+    const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
+    const calls: CleanupCall[] = []
+    const prisma = createCleanupPrismaStub(calls)
+
+    const before = new Date()
+    configureCleanup({ prisma })
+    registry.track('users', 'user-1')
+    registry.track('billingEvents', 'event-1')
+
+    await cleanup({ prisma, registry })
+
+    const billingEvent = calls.find((call) => call.delegate === 'billingEvent')
+    const where = billingEvent?.where as {
+      OR: Record<string, unknown>[]
+    }
+    expect(where.OR).toHaveLength(3)
+    expect(where.OR[0]).toEqual({ id: { in: ['event-1'] } })
+    expect(where.OR[1]).toEqual({ user_id: { in: ['user-1'] } })
+    const anchored = where.OR[2] as { user_id: null; received_at: { gte: Date } }
+    expect(anchored.user_id).toBeNull()
+    expect(anchored.received_at.gte.getTime()).toBeGreaterThanOrEqual(before.getTime())
+  })
+
   it('removes registered entities in reverse dependency order', async () => {
     const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
     const calls: CleanupCall[] = []
@@ -124,6 +155,12 @@ describe('cleanup', () => {
     await cleanup({ prisma, registry })
 
     expect(calls.map((call) => call.delegate)).toEqual([
+      // Story 5.2: billing first — events, then the entitlement and customer
+      // rows that hang off the tracked user. All three are reachable through
+      // the user filter even with no billing ids registered.
+      'billingEvent',
+      'premiumEntitlement',
+      'billingCustomer',
       // Story 5.1: commerce first, and in reverse dependency order.
       // AffiliateClick holds RESTRICT foreign keys onto AffiliateOffer and
       // CommercePartner, so a catalog row cannot go before the clicks that
@@ -217,6 +254,9 @@ describe('cleanup', () => {
       commercePreferences: [],
       affiliateClicks: [],
       affiliateConversions: [],
+      premiumEntitlements: [],
+      billingEvents: [],
+      billingCustomers: [],
     })
   })
 

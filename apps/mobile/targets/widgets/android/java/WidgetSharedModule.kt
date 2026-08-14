@@ -1,4 +1,4 @@
-package com.anonymous.mobile
+package com.couturecast.app
 
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName

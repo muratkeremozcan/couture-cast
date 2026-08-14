@@ -43,6 +43,9 @@ export interface CleanupPrismaClient {
   commercePreference: CleanupDelegate
   affiliateClick: CleanupDelegate
   affiliateConversion: CleanupDelegate
+  premiumEntitlement: CleanupDelegate
+  billingEvent: CleanupDelegate
+  billingCustomer: CleanupDelegate
 }
 
 export interface CleanupConfiguration {
@@ -246,8 +249,14 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const affiliateClickIds = uniqueValues(tracked.affiliateClicks)
   const affiliateConversionIds = uniqueValues(tracked.affiliateConversions)
 
+  const premiumEntitlementIds = uniqueValues(tracked.premiumEntitlements)
+  const billingEventIds = uniqueValues(tracked.billingEvents)
+  const billingCustomerIds = uniqueValues(tracked.billingCustomers)
+
   const commercePreferenceWhere = buildDeleteWhere(commercePreferenceIds, userIds)
   const affiliateClickWhere = buildDeleteWhere(affiliateClickIds, userIds)
+  const premiumEntitlementWhere = buildDeleteWhere(premiumEntitlementIds, userIds)
+  const billingCustomerWhere = buildDeleteWhere(billingCustomerIds, userIds)
 
   const outfitRecommendationWhere = buildDeleteWhere(ritualIds, userIds)
   const outfitCapsuleGarmentWhere = buildDeleteWhere(outfitCapsuleGarmentIds, userIds)
@@ -265,6 +274,39 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   )
 
   try {
+    // Story 5.2 billing, deleted first: events -> entitlements -> customers,
+    // before the users they hang off are removed below. BillingEvent rows
+    // written by webhook tests may carry user_id NULL (unknown-subject
+    // deliveries), which neither tracked ids nor the user filter can reach, so
+    // those are bounded by the same cleanupScopeStartedAt anchor the cooldown
+    // table uses rather than an unscoped sweep.
+    {
+      const billingEventFilters: Record<string, unknown>[] = []
+      if (billingEventIds.length > 0) {
+        billingEventFilters.push(buildIdFilter(billingEventIds))
+      }
+      if (userIds.length > 0) {
+        billingEventFilters.push(buildUserFilter(userIds))
+        billingEventFilters.push({
+          user_id: null,
+          received_at: { gte: cleanupScopeStartedAt },
+        })
+      }
+      if (billingEventFilters.length > 0) {
+        await prisma.billingEvent.deleteMany({
+          where: { OR: billingEventFilters },
+        })
+      }
+    }
+
+    if (premiumEntitlementWhere) {
+      await prisma.premiumEntitlement.deleteMany({ where: premiumEntitlementWhere })
+    }
+
+    if (billingCustomerWhere) {
+      await prisma.billingCustomer.deleteMany({ where: billingCustomerWhere })
+    }
+
     // Story 5.1 commerce, deleted first and in reverse dependency order:
     // conversions -> clicks -> preferences -> offers -> partners. AffiliateClick
     // holds RESTRICT foreign keys onto AffiliateOffer and CommercePartner, so a
