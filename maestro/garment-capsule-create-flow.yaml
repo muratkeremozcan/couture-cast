@@ -33,7 +33,7 @@ tags:
     id: 'capsule-name-input'
 - inputText: 'Maestro capsule'
 
-# Dismiss the keyboard before touching the garment list.
+# Dismiss the keyboard before touching the garment list, on iOS only.
 #
 # The software keyboard stays up after `inputText` and covers the lower half of
 # the builder, which is where the garment checkboxes live. Maestro reported both
@@ -42,7 +42,23 @@ tags:
 # section -- which only renders once at least one garment is selected -- was
 # absent from the hierarchy entirely, and the reorder step failed looking for
 # controls the app had no reason to draw.
-- hideKeyboard
+#
+# On Android the same command closes the builder. Maestro dismisses the keyboard
+# there with a key press that React Native also treats as a request to dismiss
+# the modal, so the whole capsule builder goes with it. The step statuses show it
+# exactly: the `create-capsule-button` tap COMPLETED, `capsule-name-input`
+# asserted visible and was typed into, `hideKeyboard` COMPLETED, and then the
+# first `garment-checkbox-.*` tap failed with the capsule *library* on screen and
+# `create-capsule-button` visible on it again. Nothing else runs between those
+# two steps.
+#
+# Android does not need it in the first place: text arrives through adb rather
+# than the soft keyboard, so there is nothing covering the checkboxes to dismiss.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - hideKeyboard
 
 - tapOn:
     id: 'garment-checkbox-.*'
