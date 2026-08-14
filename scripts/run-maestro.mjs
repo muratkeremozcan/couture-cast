@@ -389,6 +389,57 @@ const resolveAdbBinary = () => {
  * @param {number[]} ports
  * @returns {Promise<void>}
  */
+/**
+ * Stop Android putting a system crash dialog in front of the app under test.
+ *
+ * This is what the CI job failed on once the manifest was fixed. The app
+ * launched, Metro bundled for it, and its own logs show a ritual being cached —
+ * and every flow still failed on `tab-home is visible`, because the hierarchy at
+ * the moment of the assertion was
+ *
+ *   android:id/alertTitle   Pixel Launcher isn't responding
+ *   android:id/aerr_wait    Wait
+ *
+ * An ANR dialog takes window focus, so an out-of-process UI driver sees the
+ * dialog and not the app behind it. All three shards showed the identical
+ * dialog. The workflow already carried a comment about the sibling SystemUI
+ * variant of this on API 30 (android-emulator-runner#140); it is not specific to
+ * that level, and a runner under four parallel emulators is exactly where an
+ * unrelated process gets starved enough to trigger it.
+ *
+ * `hide_error_dialogs` suppresses the whole class rather than teaching the flows
+ * to dismiss one dialog by id, which would leave every other crash dialog free
+ * to do the same thing. The setting is read back, because a `settings put` that
+ * silently did nothing would leave the run exposed while reporting it protected.
+ *
+ * @returns {Promise<void>}
+ */
+const suppressAndroidErrorDialogs = async () => {
+  const adbBinary = resolveAdbBinary()
+  try {
+    await captureProcess(
+      adbBinary,
+      ['shell', 'settings', 'put', 'global', 'hide_error_dialogs', '1'],
+      { timeoutMs: 15_000 }
+    )
+    const readBack = await captureProcess(
+      adbBinary,
+      ['shell', 'settings', 'get', 'global', 'hide_error_dialogs'],
+      { timeoutMs: 15_000 }
+    )
+    if (readBack.stdout.trim() === '1') {
+      log(`System crash dialogs suppressed on ${androidSerial || 'the attached device'}`)
+    } else {
+      log(
+        `Could not suppress system crash dialogs: hide_error_dialogs reads "${readBack.stdout.trim()}". ` +
+          'An ANR dialog will take focus from the app under test.'
+      )
+    }
+  } catch (error) {
+    log(`Could not set hide_error_dialogs: ${error.message}`)
+  }
+}
+
 const reverseAndroidPorts = async (ports) => {
   const adbBinary = resolveAdbBinary()
   for (const port of ports) {
@@ -1751,7 +1802,10 @@ const ensureExpoGoOnAndroid = async () => {
     log('Attempting to install Expo Go on the connected Android target')
     await spawnProcess('node', ['./scripts/install-expo-go.mjs'], {
       cwd: projectRoot,
-      timeoutMs: 180_000,
+      // A cold first device pays a ~180MB download and a streamed install of it,
+      // and 180 seconds was not enough for both. The installer caches the APK
+      // now, so later devices in a sharded run only pay the install.
+      timeoutMs: 480_000,
     })
 
     try {
@@ -2374,6 +2428,15 @@ const run = async () => {
   // would be calling itself. The probe opens its own throwaway listener rather
   // than fetching Metro, so it does not need the dev server to be up and can
   // run this early.
+  if (target.platform === 'android') {
+    for (const serial of ANDROID_SERIALS.length > 0 ? ANDROID_SERIALS : ['']) {
+      if (serial) useAndroidDevice(serial)
+      // eslint-disable-next-line no-await-in-loop -- adb is not concurrency safe
+      await suppressAndroidErrorDialogs()
+    }
+    if (SHARD_PLATFORM === 'android') useAndroidDevice(ANDROID_SERIALS[0])
+  }
+
   if (target.platform === 'android' && !process.env.MOBILE_E2E_ANDROID_HOST) {
     // Every emulator needs its own mapping: `adb reverse` is per device, so on a
     // sharded run mapping only the first one leaves the other three with no

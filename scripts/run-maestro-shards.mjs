@@ -114,6 +114,23 @@ const ANDROID_BASE_PORT = Number(process.env.ANDROID_EMULATOR_BASE_PORT || 5554)
 const ANDROID_HEADLESS = process.env.ANDROID_EMULATOR_HEADLESS === '1'
 
 /**
+ * The graphics backend the shard emulators are booted with.
+ *
+ * `auto`, not the `swiftshader_indirect` that `scripts/start-android-emulator.sh`
+ * passes for a single serial emulator. Measured on this Apple Silicon host:
+ * booting a second and third emulator under `swiftshader_indirect` produced a
+ * stream of
+ *
+ *   ERROR | Failed to make display surface context current: 12299
+ *   ERROR | Failed to bind to post worker context.
+ *
+ * and the devices never left `offline` in `adb devices`. The identical AVD with
+ * `-gpu auto` produced none of those errors. Software rendering is fine for one
+ * emulator and does not survive several at once here.
+ */
+const ANDROID_GPU_MODE = process.env.ANDROID_EMULATOR_GPU || 'auto'
+
+/**
  * How long one emulator gets to reach `sys.boot_completed`.
  *
  * Generous because four cold boots compete for the same CPU, and a boot that is
@@ -299,6 +316,102 @@ const resolveAndroidSystemImage = () => {
 }
 
 /**
+ * Repair the hardware config `avdmanager` writes.
+ *
+ * An AVD created from the command line is not the AVD Android Studio's Device
+ * Manager creates, and the three differences that matter here all break this
+ * suite rather than merely slowing it down. Measured against the
+ * `Medium_Phone` AVD that the serial Android runs used:
+ *
+ *   * `hw.gpu.enabled=no`. The emulator then has no GPU at all, gfxstream logs
+ *     `Failed to make display surface context current` and
+ *     `Failed to bind to post worker context`, and the device never reaches
+ *     `sys.boot_completed` — it sits at `offline` in `adb devices` forever.
+ *     This is what the first attempt at Android sharding died on.
+ *   * `hw.keyboard=no`. Maestro types through adb, and without a hardware
+ *     keyboard the soft keyboard takes the input instead.
+ *   * `disk.dataPartition.path=<temp>`. The data partition is discarded on
+ *     shutdown, so Expo Go and the per-device name this suite writes would not
+ *     survive a reboot, and every run would pay a fresh Expo Go install.
+ *
+ * Written after creation rather than passed to `avdmanager`, which has no flags
+ * for any of them.
+ *
+ * @param {string} name
+ * @returns {void}
+ */
+const applyShardAvdHardware = (name, apiDirectory) => {
+  // The acceleration bug, and it is the one that actually stopped this working.
+  //
+  // `avdmanager` writes the API level into the AVD's pointer file, and gets it
+  // wrong for a dotted level: `system-images;android-36.1;...` yields
+  // `target=android-0`. The emulator cannot resolve the platform, silently gives
+  // up on hardware acceleration -- `hvf is not enabled on this aarch64 host`,
+  // then `qemu_mprotect__osdep: mprotect failed: Permission denied` -- and
+  // software emulates ARM64 on an ARM64 host, so the device never leaves
+  // `offline` in `adb devices`. Measured: the identical AVD boots with zero
+  // acceleration warnings once `target` names the real level. The same parse
+  // failing elsewhere leaves `avd.id`/`avd.name` as the literal `<build>`.
+  const iniPath = path.join(os.homedir(), '.android', 'avd', `${name}.ini`)
+  if (fs.existsSync(iniPath)) {
+    fs.writeFileSync(
+      iniPath,
+      fs
+        .readFileSync(iniPath, 'utf8')
+        .split('\n')
+        .map((line) => (line.startsWith('target=') ? `target=${apiDirectory}` : line))
+        .join('\n')
+    )
+  }
+
+  const configPath = path.join(
+    os.homedir(),
+    '.android',
+    'avd',
+    `${name}.avd`,
+    'config.ini'
+  )
+  if (!fs.existsSync(configPath)) {
+    throw new Error(
+      `avdmanager created ${name} but no config.ini exists at ${configPath}`
+    )
+  }
+
+  // `hw.gpu.enabled=no` is the other `avdmanager` default that stops the device
+  // booting: gfxstream then logs `Failed to make display surface context
+  // current` and `Failed to bind to post worker context` and the emulator never
+  // reaches `sys.boot_completed`. `hw.keyboard=no` is milder but wrong for this
+  // suite, which types through adb rather than the soft keyboard.
+  //
+  // `disk.dataPartition.path=<temp>` is deliberately left alone. It means the
+  // data partition does not survive a shutdown, so Expo Go is reinstalled on
+  // each cold boot -- a cost, not a failure, and `ensureExpoGoOnAndroid` already
+  // installs it per device. Removing the key without providing a real userdata
+  // image gives the emulator no data partition at all, which hangs the boot.
+  const overrides = {
+    'hw.gpu.enabled': 'yes',
+    'hw.gpu.mode': 'auto',
+    'hw.keyboard': 'yes',
+  }
+  const kept = []
+  const seen = new Set()
+  for (const line of fs.readFileSync(configPath, 'utf8').split('\n')) {
+    const key = line.split('=')[0]?.trim()
+    if (key && key in overrides) {
+      kept.push(`${key}=${overrides[key]}`)
+      seen.add(key)
+      continue
+    }
+    kept.push(line)
+  }
+  for (const [key, value] of Object.entries(overrides)) {
+    if (!seen.has(key)) kept.push(`${key}=${value}`)
+  }
+  fs.writeFileSync(configPath, kept.join('\n'))
+  log(`Repaired ${name} config (target=${apiDirectory}, GPU on, hardware keyboard)`)
+}
+
+/**
  * Find or create the AVDs this run needs.
  *
  * Created once and reused, for the same reason the simulators are: a fresh AVD
@@ -353,6 +466,7 @@ const ensureShardAvds = async (count) => {
       ],
       { input: 'no\n' }
     )
+    applyShardAvdHardware(name, image.api)
   }
   return names
 }
@@ -387,6 +501,24 @@ const bootShardEmulators = async (avdNames) => {
     const serial = `emulator-${port}`
     serials.push(serial)
     if (attached.has(serial)) {
+      // Reuse only if it is actually the right AVD. A developer's own emulator
+      // lands on 5554 too, so "something is on this serial" is not the question
+      // that matters; a run that adopted it would drive an unintended device
+      // with an unintended screen size and report the results as this suite's.
+      const bootedAvd = (
+        await capture(adbBinary, ['-s', serial, 'emu', 'avd', 'name'], {
+          timeoutMs: 15_000,
+        }).catch(() => '')
+      )
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line && line !== 'OK')[0]
+      if (bootedAvd !== name) {
+        throw new Error(
+          `${serial} is running AVD "${bootedAvd || 'unknown'}", not "${name}". ` +
+            'Shut it down, or move this run with ANDROID_EMULATOR_BASE_PORT.'
+        )
+      }
       log(`Reusing already-booted ${serial} (${name})`)
       continue
     }
@@ -404,7 +536,7 @@ const bootShardEmulators = async (avdNames) => {
         '-no-boot-anim',
         '-no-audio',
         '-gpu',
-        'swiftshader_indirect',
+        ANDROID_GPU_MODE,
         ...(ANDROID_HEADLESS ? ['-no-window'] : []),
       ],
       {

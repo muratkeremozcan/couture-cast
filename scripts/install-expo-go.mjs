@@ -95,11 +95,67 @@ const ensureDevice = async (adbPath) => {
   if (!hasDevice) fail('No Android emulator/device detected. Boot an emulator first.')
 }
 
+/**
+ * Whether a file on disk is a complete ZIP archive, which an APK is.
+ *
+ * A ZIP ends with an end-of-central-directory record whose signature is
+ * `PK\x05\x06`, followed by at most 65535 bytes of comment, so it lives inside
+ * the last 64KB. A download that was interrupted has a plausible size and no
+ * such record.
+ *
+ * @param {string} filePath
+ * @returns {boolean}
+ */
+const isCompleteApk = (filePath) => {
+  if (!fs.existsSync(filePath)) return false
+  const size = fs.statSync(filePath).size
+  if (size < 22) return false
+
+  const tailLength = Math.min(size, 65_557)
+  const tail = Buffer.alloc(tailLength)
+  const handle = fs.openSync(filePath, 'r')
+  try {
+    fs.readSync(handle, tail, 0, tailLength, size - tailLength)
+  } finally {
+    fs.closeSync(handle)
+  }
+  return tail.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06])) !== -1
+}
+
 const main = async () => {
   const apkUrl = process.env.EXPO_GO_APK_URL || EXPO_GO_SDK_54_URL
 
-  log(`Downloading Expo Go from ${apkUrl}`)
-  await download(apkUrl, DOWNLOAD_PATH)
+  // Downloaded once per machine, not once per device.
+  //
+  // A sharded Android run calls this script for every emulator, and the SDK 54
+  // APK is about 180MB. Re-fetching it per device pushed the second install past
+  // the caller's bound, so a two-emulator run died after installing on exactly
+  // one of them. The APK is immutable at its pinned URL, so a complete file on
+  // disk is the same bytes.
+  //
+  // "Complete" has to mean complete. A first attempt at this cache accepted any
+  // non-empty file, and the very next run reused the 162MB fragment left behind
+  // when the previous download was killed. `adb install` then failed with
+  //
+  //   Failure [INSTALL_PARSE_FAILED_NOT_APK: Failed to parse ... base.apk]
+  //
+  // which names the symptom and not the cause. `isCompleteApk` reads the end of
+  // the file for the ZIP end-of-central-directory record, which a truncated
+  // download cannot have, so the check observes the property it claims.
+  if (isCompleteApk(DOWNLOAD_PATH)) {
+    const size = fs.statSync(DOWNLOAD_PATH).size
+    log(`Reusing Expo Go APK at ${DOWNLOAD_PATH} (${Math.round(size / 1e6)}MB)`)
+  } else {
+    if (fs.existsSync(DOWNLOAD_PATH)) {
+      log(`Discarding incomplete Expo Go APK at ${DOWNLOAD_PATH}`)
+      fs.rmSync(DOWNLOAD_PATH, { force: true })
+    }
+    log(`Downloading Expo Go from ${apkUrl}`)
+    await download(apkUrl, DOWNLOAD_PATH)
+    if (!isCompleteApk(DOWNLOAD_PATH)) {
+      fail(`Downloaded Expo Go APK at ${DOWNLOAD_PATH} is not a complete archive.`)
+    }
+  }
 
   const adbPath = getAdb()
   log(`Using adb at: ${adbPath}`)
