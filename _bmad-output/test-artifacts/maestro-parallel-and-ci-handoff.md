@@ -19,7 +19,29 @@ Four measured runs after sharding landed: 18/18, 17/18, 17/18, 18/18. The two
 17s were the same flow (`analytics`) with the same cause, now fixed. The first
 18/18 predated the reporting fix below, so the final 18/18 is the one to trust.
 
-## The three tasks handed over
+## The tasks handed over
+
+0. **Run Android locally first.** This machine can already do it — the SDK,
+   `adb`, `emulator` and a `Pixel_9_Pro_XL` AVD are installed under
+   `~/Library/Android/sdk`, just not on `PATH`. Nothing to install.
+
+   ```
+   MOBILE_E2E_PLATFORM=android node ./scripts/run-maestro.mjs maestro/sanity.yaml --artifacts
+   ```
+
+   Expecting CI to run a path that has never executed anywhere is the expensive
+   way to debug it: a local failure gives a live screenshot, a hierarchy dump and
+   a two-minute turnaround, where CI gives a log tail and a forty-minute wait.
+   Get `sanity` passing on Android locally, then a few more flows, before
+   dispatching anything.
+
+   Report the asymmetry honestly: the local AVD is **API 36 / arm64-v8a /
+   google_apis_playstore** and CI is **API 34 / x86_64 / google_apis** on Linux.
+   (CI ran API 30 when this was written; it was moved to 34 later that day.)
+   A local pass validates `ensureExpoGoOnAndroid`, `bootAndroidTarget`, the
+   `install-expo-go.mjs` adb path, the `10.0.2.2` host mapping and the
+   `host.exp.exponent` app id. It does **not** validate KVM, the AVD snapshot
+   cache, or the `$GITHUB_PATH` fix.
 
 1. `workflow_dispatch` the Maestro workflow with `suite: smoke` (3 flows). This
    exercises the whole pipeline — KVM, AVD snapshot, Expo Go install, Metro, the
