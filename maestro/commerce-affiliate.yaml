@@ -123,9 +123,21 @@ tags:
 # Tapped by id rather than by text: the visible label embeds escaped double
 # quotes (`Show "Shop this look" suggestions`), which no Maestro text selector
 # should have to carry.
+# No `retryTapIfNoChange` on a TOGGLE. Retrying one undoes it.
+#
+# A CI run failed the opt-out assertion below with the block fully rendered —
+# all five `shop-this-look-*` nodes present — and the API log shows why: TWO
+# `PUT /api/v1/commerce/preferences` calls 315ms apart, both 200. Maestro tapped,
+# did not see the screen change quickly enough, and tapped again, so the flow
+# opted out and straight back in. The ritual fetched afterwards then correctly
+# carried the offer, and the assertion was right to fail.
+#
+# `retryTapIfNoChange` is safe for an idempotent action — opening a screen, or
+# selecting an item that is already selected — and destructive for anything that
+# flips state. The `extendedWaitUntil` below already proves the write round
+# tripped, so a genuinely lost tap still fails loudly rather than silently.
 - tapOn:
     id: 'commerce-opt-out-toggle'
-    retryTapIfNoChange: true
     label: 'Turn affiliate suggestions off'
 
 - extendedWaitUntil:
@@ -211,9 +223,9 @@ tags:
     visible: 'Shopping and partners'
     timeout: 15000
 
+# Same reasoning as the opt-out above: retrying a toggle undoes it.
 - tapOn:
     id: 'commerce-opt-out-toggle'
-    retryTapIfNoChange: true
     label: 'Turn affiliate suggestions back on'
 
 - extendedWaitUntil:

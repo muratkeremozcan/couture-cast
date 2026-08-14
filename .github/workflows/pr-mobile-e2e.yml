@@ -28,11 +28,23 @@ name: Mobile e2e (Maestro)
 #    hardware-accelerated Android virtualization to standard Linux runners in
 #    April 2024 and doubled public-repo runners to 4 vCPU / 16 GB in January
 #    2024, so the flag is simply left at the action's `auto` default now.
-# Intentionally dispatch-only for now. The `pull_request` and `push` triggers are
-# temporarily removed while the Maestro suite is being proven green locally; until
-# then an automatic run would spend an hour producing a red result we already know
-# about. The mobile workstream restores both triggers once the local suite passes.
+# Triggers match the Playwright workflow's convention exactly: every pull
+# request, every push to `main`, plus manual dispatch. They were dispatch-only
+# while the suite was being proven, because an automatic run would have spent an
+# hour producing a red result already known about. That condition is met: the
+# suite reached a verified 18/18 both in CI and locally, so it now gates PRs.
+#
+# `workflow_dispatch` stays, as the optional path for running a subset by hand.
+# Its `suite` input is dispatch-only by nature: on a `pull_request` or `push`
+# event the `inputs` context is empty, so `${{ inputs.suite }}` renders as an
+# empty string, the smoke comparison in "Resolve this shard's flow list" is
+# false, and discovery takes the full-suite branch. That is the intended
+# behaviour for an automatic run; there is no default to declare here for it.
 on:
+  pull_request:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       suite:
