@@ -216,6 +216,22 @@ tags:
 
 # The postcondition, so a mis-tap fails here rather than several steps later as
 # a confusing message about a missing reorder button.
+#
+# Kept even though each tap now asserts its own checkbox, because this proves
+# something they cannot: that the builder's COUNT is two. Two checked boxes and
+# a count of three would pass both per-tap assertions and be wrong.
+#
+# Scrolled to first. The count label sits above the garment list, so the scroll
+# that reached the second garment left it off screen, and `visible` means inside
+# the viewport rather than present in the hierarchy. This assertion failed in
+# three consecutive CI runs for that reason alone, with the taps having worked
+# and the checkboxes carrying `checked=true` in the very same hierarchy dump.
+- scrollUntilVisible:
+    element:
+      text: 'Garments \(2 of .* selected\)'
+    direction: UP
+    timeout: 15000
+    label: 'Bring the selection count back into view'
 - assertVisible:
     # Parentheses escaped. Maestro treats `text:` as a regex, so the unescaped
     # form `Garments (2 of .* selected)` reads the brackets as a capture group
