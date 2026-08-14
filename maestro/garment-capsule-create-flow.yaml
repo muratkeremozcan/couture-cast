@@ -91,9 +91,32 @@ tags:
     label: 'Bring the first seeded garment on screen'
 - waitForAnimationToEnd
 
-- tapOn:
-    id: 'garment-checkbox-${GARMENT_A_ID}'
-    label: 'Select the first seeded garment'
+# Tap, then prove the tap took, and retry the pair if it did not.
+#
+# `tapOn` reports COMPLETED once it has resolved the element and dispatched a
+# touch, which is not the same as the app having handled it. Measured here in
+# isolation: the tap on the FIRST garment completed in 2.4s, the checkbox was
+# present, `clickable=true`, and unobstructed at the exact point tapped
+# (`[45,1807][1035,1924]`, nothing above it in the hierarchy at 540,1865) — and
+# the label still read `Garments (0 of 10 selected)` ten seconds later. The
+# touch is lost somewhere between the driver and React Native's handler.
+#
+# The assertion inside the retry is the real one, so this tolerates a lost touch
+# without weakening what the flow proves: after this block a garment IS
+# selected, or the flow fails. Asserting per tap rather than once at the end is
+# what identified which of the two taps was losing, since both reported
+# COMPLETED and only the end-of-sequence count disagreed.
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: 'garment-checkbox-${GARMENT_A_ID}'
+          label: 'Select the first seeded garment'
+      - extendedWaitUntil:
+          visible:
+            text: 'Garments \(1 of .* selected\)'
+          timeout: 10000
+          label: 'The first garment registered as selected'
 
 - scrollUntilVisible:
     element:
@@ -102,23 +125,31 @@ tags:
     centerElement: true
     timeout: 15000
     label: 'Bring the second seeded garment on screen'
-# The scroll has to settle before the tap.
-#
-# Without this the sharded Android run reached the count assertion with
-# `Garments (1 of 10 selected)` on screen: the first garment was selected, the
-# scroll to the second reported success, and the tap that followed landed while
-# the list was still moving, so it hit nothing. A missed tap on a virtualized
-# list is silent -- the flow only found out four steps later at the count.
 - waitForAnimationToEnd
 
-- tapOn:
-    id: 'garment-checkbox-${GARMENT_B_ID}'
-    label: 'Select the second seeded garment'
+# Same shape as the first garment, and for the same reason: a tap that reports
+# COMPLETED is not a tap the app handled.
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: 'garment-checkbox-${GARMENT_B_ID}'
+          label: 'Select the second seeded garment'
+      - extendedWaitUntil:
+          visible:
+            text: 'Garments \(2 of .* selected\)'
+          timeout: 10000
+          label: 'The second garment registered as selected'
 
 # The postcondition, so a mis-tap fails here rather than several steps later as
 # a confusing message about a missing reorder button.
 - assertVisible:
-    text: 'Garments (2 of .* selected)'
+    # Parentheses escaped. Maestro treats `text:` as a regex, so the unescaped
+    # form `Garments (2 of .* selected)` reads the brackets as a capture group
+    # and requires the literal string `Garments 2 of ... selected`. The label on
+    # screen is `Garments (2 of 10 selected)`, brackets included, so the
+    # unescaped pattern could not match however many garments were selected.
+    text: 'Garments \(2 of .* selected\)'
     label: 'Both garments are actually selected'
 
 # Reorder through the accessible controls, never through drag alone.
