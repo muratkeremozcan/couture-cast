@@ -546,6 +546,63 @@ process.once('SIGTERM', () => handleTerminationSignal('SIGTERM'))
  * @param {number} [intervalMs=2000]
  * @returns {Promise<void>}
  */
+/**
+ * Fetch the dev server's manifest the way Expo Go actually asks for it, and
+ * report the status and body.
+ *
+ * The plain health check below is not a proxy for this. A bare GET on `/`
+ * returns 200 with the browser interstitial HTML, because the middleware falls
+ * back to a browser response when the Expo Go headers are absent. So the run
+ * could log "Expo dev server reachable" while every request Expo Go makes was
+ * failing, which is exactly what happened on CI: Expo Go showed its own
+ * "Something went wrong." screen and expo-updates logged
+ *
+ *   Remote update request not successful   code=UpdateFailedToLoad
+ *
+ * That message is emitted at one place in expo-updates, behind
+ * `if (!response.isSuccessful)`, so it means the server answered with a
+ * non-2xx. The body carries the reason and is worth having in the log: every
+ * throw in the manifest path is serialized by Expo CLI as
+ * `{"error": "..."}` with status 500.
+ *
+ * @param {string} baseUrl
+ * @param {'android' | 'ios'} platform
+ * @returns {Promise<{ok: boolean, statusCode: number, body: string}>}
+ */
+const fetchExpoGoManifest = (baseUrl, platform) =>
+  new Promise((resolve) => {
+    const urlObj = new URL(baseUrl)
+    const requester = urlObj.protocol === 'https:' ? httpsRequest : httpRequest
+    const req = requester(
+      urlObj,
+      {
+        headers: {
+          'expo-platform': platform,
+          accept: 'multipart/mixed',
+        },
+      },
+      (res) => {
+        let body = ''
+        res.setEncoding('utf8')
+        res.on('data', (chunk) => {
+          // The manifest itself is large and uninteresting when it works; only
+          // an error body needs keeping.
+          if (body.length < 2000) body += chunk
+        })
+        res.on('end', () => {
+          const statusCode = res.statusCode ?? 0
+          resolve({ ok: statusCode >= 200 && statusCode < 300, statusCode, body })
+        })
+      }
+    )
+    req.on('error', (err) => resolve({ ok: false, statusCode: 0, body: err.message }))
+    req.setTimeout(20000, () => {
+      req.destroy()
+      resolve({ ok: false, statusCode: 0, body: 'manifest request timed out' })
+    })
+    req.end()
+  })
+
 const waitForHealth = (url, timeoutMs = 120000, intervalMs = 2000) =>
   new Promise((resolve, reject) => {
     const urlObj = new URL(url)
@@ -2096,6 +2153,19 @@ const run = async () => {
           await waitForHealth(pair.health)
           resolvedPair = pair
           log(`Expo dev server reachable on ${pair.health}`)
+          // Reachable is not the same as serving Expo Go. Ask for the manifest
+          // the way the app will, so a 500 here is named now rather than
+          // surfacing later as every flow failing on `tab-home`.
+          const manifest = await fetchExpoGoManifest(pair.health, target.platform)
+          if (manifest.ok) {
+            log(`Expo Go manifest served (HTTP ${manifest.statusCode})`)
+          } else {
+            log(
+              `Expo Go manifest request FAILED with HTTP ${manifest.statusCode}. ` +
+                `Expo Go will show "Something went wrong." and every flow will ` +
+                `report tab-home missing. Body: ${manifest.body.slice(0, 600) || '(empty)'}`
+            )
+          }
           break
         } catch {
           // try next candidate

@@ -45,8 +45,10 @@ appId: ${MAESTRO_APP_ID}
             #
             # Android's system back pops the React Navigation stack directly, so
             # it is the right tool there. It stays platform-guarded because on
-            # iOS Maestro's `back` is a left-edge swipe that this repo already
-            # measured as not popping these screens.
+            # `back` is documented as Android and Web only, and its iOS
+            # implementation is an empty method, so on iOS it would be a no-op
+            # that still reported COMPLETED.
+            # https://docs.maestro.dev/reference/commands-available/back
             - runFlow:
                 when:
                   platform: Android

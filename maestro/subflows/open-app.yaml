@@ -75,11 +75,14 @@ appId: ${MAESTRO_APP_ID}
       # a tab screen and never fires a stray gesture at the home screen.
       # Tapping the native `BackButton` rather than issuing `back`.
       #
-      # Maestro's `back` is a left-edge swipe on iOS and it does not pop these
-      # screens: measured on device, two `back` presses both reported COMPLETED
+      # Maestro's `back` does nothing at all on iOS. The command is documented
+      # as Android and Web only, and `IOSDriver.backPress()` is an empty method
+      # in the driver, so it reports COMPLETED without touching the device.
+      # That matches what was measured here: two `back` presses both COMPLETED
       # while the app sat unmoved on `wardrobe-silhouette-screen`. The same
       # hierarchy dump shows `resource-id: BackButton`, which Maestro can
       # address directly, so the header control is used instead.
+      # https://docs.maestro.dev/reference/commands-available/back
       #
       # Two conditional passes rather than a `repeat`/`while`: each is a no-op
       # once the tab bar is showing, and the pair is bounded, so a screen that
@@ -88,12 +91,13 @@ appId: ${MAESTRO_APP_ID}
       # The `back` is Android-only, and guarded on Expo Go not being on its own
       # error screen. Both halves were learned from a CI run.
       #
-      # Android-only because iOS gets nothing from it: Maestro's `back` is a
-      # left-edge swipe there and this repo already measured it as not popping
-      # these screens, which is why the `BackButton` tap exists. On Android it
-      # is the system BACK key and does real work, so it is what actually pops
-      # the stack on that platform, where `BackButton` is not in the hierarchy
-      # at all.
+      # Android-only because iOS gets nothing from it: `back` is documented as
+      # Android and Web only and its iOS implementation is an empty method, so
+      # there it is a no-op that still reports COMPLETED. That is why the
+      # `BackButton` tap exists. On Android `back` is the system BACK key
+      # (`input keyevent 4`) and does real work, so it is what actually pops the
+      # stack on that platform, where `BackButton` is not in the hierarchy at
+      # all.
       #
       # Guarded because `notVisible: tab-home` does not mean "a pushed route is
       # covering the tab bar". It is equally true when the app has not mounted,
