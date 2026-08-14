@@ -195,6 +195,51 @@ silently overrides the second to `assembleDebug`, and a `production` profile
 that builds an app bundle. Neither produces a release APK. The migration needs a
 new `e2e-test` profile.
 
+## Results after the fixes, measured
+
+|               | Start of 2026-08-14                         | End of 2026-08-14            |
+| ------------- | ------------------------------------------- | ---------------------------- |
+| CI Android    | 0 flows had ever passed; app never launched | 3 of 4 shards green          |
+| Local Android | 10/18, ~1.5-2 h, serial only                | 15/18, 21.1 min, 4 emulators |
+
+**Shard count: keep 4.** Measured on this machine, same suite, same day: four
+emulators finished in 21.1 minutes, two in 27.3 minutes. Four does oversubscribe
+the host — load average 20 on 14 cores, and per-flow times stretch from ~40
+seconds to several minutes — but total wall clock is still the shorter of the
+two, which is the number that gates a pull request.
+
+Flows that went green without being touched, once the manifest fix removed the
+per-launch signing round trip: `commerce-affiliate`, `garment-smart-tagging`,
+and all three onboarding flows.
+
+### The three that remain, each diagnosed rather than guessed
+
+- **`widget-deep-link`** — `openLink mobile://(tabs)` fails with
+  `Activity not started, unable to resolve Intent`. Expo Go does not register
+  the app's own scheme. Only a built artifact fixes this.
+- **`garment-capsule-create`** — reaches the count assertion with
+  `Garments (1 of 10 selected)` while _both_ checkbox taps report COMPLETED, so
+  one tap completes without registering. Adding a settle after each
+  `scrollUntilVisible` did **not** fix it, so the cause is not scroll momentum.
+  Next step is a per-tap assertion so the flow names which tap failed, rather
+  than a third guess.
+- **`premium-subscription`** — the section renders its title, disclosure and
+  status line (`You don't have a Premium subscription.`), and renders neither
+  `premium-unavailable` nor any purchase control. Reading
+  `apps/mobile/app/(tabs)/settings.tsx`, that narrows to exactly two states:
+  either `purchasesAvailability` is still `null` — meaning
+  `ensurePurchasesConfigured()` never settled, which would make
+  `await import('react-native-purchases')` an unbounded await in a UI path — or
+  it is `'unavailable'` while the server answered `purchasesEnabled: false`.
+  Separating them needs one bit of runtime state that the current UI does not
+  expose. In CI the same flow fails one assertion earlier, at
+  `premium-status-line`, with the API having answered
+  `/api/v1/commerce/subscription` 200 in 6ms, which is the same shape: the
+  client had not stored a result.
+
+  Note this flow's premise changes completely under a built artifact: RevenueCat
+  is present, so it would assert the real feature instead of its absence.
+
 ## Standing rules that still cost runs
 
 Unchanged from the previous handoff, and all still true:

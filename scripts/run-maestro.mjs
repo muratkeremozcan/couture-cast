@@ -2483,22 +2483,23 @@ const run = async () => {
   }
 
   /**
-   * Feature flags this suite asserts on must come from the seeded database, not
-   * from PostHog.
+   * Feature flags this suite asserts on come from the seeded database, not from
+   * PostHog.
    *
-   * `premium-subscription` failed on Android with `premium-unavailable` never
-   * rendering, and the screen hierarchy shows why: the premium section rendered
-   * its status line and disclosure but neither the fallback nor the purchase
-   * controls, which is the shape when the server answered
-   * `purchasesEnabled: false`. That field is
-   * `Boolean(getFeatureFlag('commerce_subscription_enabled', userId))`, the
-   * seeded row says `true`, and the only thing that outranks the row is a remote
-   * answer — evaluated per user, for a user this run created seconds earlier.
+   * A suite that asserts on flag-gated behaviour must not depend on a live
+   * remote service evaluating a rollout for a user the run created seconds
+   * earlier. `PostHogService` already treats a missing key as "remote answer
+   * unavailable" rather than throwing, and `getFeatureFlag` then falls back to
+   * the database cache, so clearing the key makes the seeded row authoritative
+   * for the whole run. Verified not to disturb the flags the suite does rely on:
+   * `commerce_affiliate_enabled` and `commerce_subscription_enabled` both still
+   * read `true` after a run, and `commerce-affiliate` passes.
    *
-   * `PostHogService` treats a missing key as "remote answer unavailable" rather
-   * than throwing, which is exactly the behaviour a deterministic suite wants:
-   * requests fall back to the database cache. Clearing the key here makes the
-   * seeded row authoritative for the whole run.
+   * Recorded honestly: this was introduced while chasing `premium-subscription`,
+   * on the theory that a remote `false` was the cause, and it did NOT fix that
+   * flow — it still fails with `premium-unavailable` absent. It is kept because
+   * removing a remote dependency from an E2E run is right on its own terms, not
+   * because it fixed anything.
    *
    * This does not disable mobile analytics. `maestro/analytics.yaml` asserts on
    * the client's own diagnostics channel (`MOBILE_ANALYTICS_DIAGNOSTICS`), which
