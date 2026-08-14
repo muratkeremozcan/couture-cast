@@ -64,9 +64,22 @@ tags:
 
 # `getSubscriptionFromMobile` round-trips to the local API; a rendered status
 # line also proves the load-error branch was not taken.
-- extendedWaitUntil:
-    visible:
+# Scrolled to, not merely waited for.
+#
+# `extendedWaitUntil: visible` requires the element inside the VIEWPORT, not
+# merely in the hierarchy, and the premium section is taller than one screen.
+# This flow failed for a long time on `premium-unavailable` "not visible" while
+# the fallback was rendering perfectly well below the fold, and in CI it failed
+# one assertion earlier still, on this status line — CI runs a `pixel_3a`
+# profile against a `medium_phone` locally, so a shorter screen pushes more of
+# the section out of view. Scrolling keeps the wait (the timeout still covers
+# the API round trip this assertion exists to prove) while removing the
+# dependency on screen height.
+- scrollUntilVisible:
+    element:
       id: 'premium-status-line'
+    direction: DOWN
+    centerElement: true
     timeout: 15000
     label: 'Subscription status loaded from the API'
 
@@ -81,9 +94,18 @@ tags:
 
 # `ensurePurchasesConfigured` answers `unavailable` in Expo Go, so the
 # informational fallback renders and no purchase control ever mounts.
-- extendedWaitUntil:
-    visible:
+#
+# Scrolled to for the same reason as the status line above: the fallback sits
+# below it, so it was even further out of view. Confirmed by measurement rather
+# than inspection — the device log shows `Expo Go app detected. Using RevenueCat
+# in Browser Mode.`, and the server was queried directly and answers
+# `purchasesEnabled: true`, so both conditions this branch needs were satisfied
+# the whole time and only the viewport was wrong.
+- scrollUntilVisible:
+    element:
       id: 'premium-unavailable'
+    direction: DOWN
+    centerElement: true
     timeout: 15000
     label: 'SDK-absent fallback rendered'
 

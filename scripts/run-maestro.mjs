@@ -2496,10 +2496,11 @@ const run = async () => {
    * read `true` after a run, and `commerce-affiliate` passes.
    *
    * Recorded honestly: this was introduced while chasing `premium-subscription`,
-   * on the theory that a remote `false` was the cause, and it did NOT fix that
-   * flow — it still fails with `premium-unavailable` absent. It is kept because
-   * removing a remote dependency from an E2E run is right on its own terms, not
-   * because it fixed anything.
+   * on the theory that a remote `false` was the cause. That theory was wrong.
+   * The API was later queried directly and answers `purchasesEnabled: true`;
+   * the flow was failing because its assertions required elements that render
+   * below the fold. This is kept because removing a remote dependency from an
+   * E2E run is right on its own terms, not because it fixed anything.
    *
    * This does not disable mobile analytics. `maestro/analytics.yaml` asserts on
    * the client's own diagnostics channel (`MOBILE_ANALYTICS_DIAGNOSTICS`), which

@@ -118,6 +118,28 @@ tags:
           timeout: 10000
           label: 'The first garment registered as selected'
 
+# Back to the top of the builder before searching for the second garment.
+#
+# `scrollUntilVisible` only ever travels in the direction it is given, and the
+# search for the first garment has already scrolled the list down. The wardrobe
+# renders newest-first, so the second seeded garment is ABOVE the first, and a
+# second DOWN search starts past it and travels further away. Measured here:
+# the two land adjacent (`[45,1690]` and `[45,1807]`), so today the second is
+# still on screen and the DOWN search is a harmless no-op — but that is the
+# wardrobe size and seeding order of this fixture, not a property the flow
+# should depend on.
+#
+# Returning to a known position first makes the second search identical to the
+# first: from the top, going down, whatever the order. The capsule name input is
+# the builder's own first field, so it is the top of this scroll container.
+- scrollUntilVisible:
+    element:
+      id: 'capsule-name-input'
+    direction: UP
+    timeout: 15000
+    label: 'Return to the top of the capsule builder'
+- waitForAnimationToEnd
+
 - scrollUntilVisible:
     element:
       id: 'garment-checkbox-${GARMENT_B_ID}'

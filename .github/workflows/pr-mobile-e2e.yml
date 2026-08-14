@@ -271,6 +271,18 @@ jobs:
           SHARDS=${{ strategy.job-total }}
           SHARD=${{ matrix.shard }}
 
+          # Zero flows is never legitimate, and it has to be rejected HERE
+          # rather than by the empty-shard branch below. That branch treats an
+          # empty shard as expected whenever `TOTAL < SHARDS`, and zero
+          # satisfies that for every shard, so a discovery that found nothing
+          # would skip all four and report the whole job green having executed
+          # no flow at all. A bad suite input or a moved flow directory is a
+          # broken pipeline, not a passing one.
+          if (( TOTAL == 0 )); then
+            echo "::error::Flow discovery found no flows to run. Suite input: '${{ inputs.suite }}'."
+            exit 1
+          fi
+
           # Round robin, not contiguous chunks. Flow cost is uneven and
           # alphabetical neighbours are usually related, so a contiguous split
           # lands every expensive wardrobe flow in the same shard.

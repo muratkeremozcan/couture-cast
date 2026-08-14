@@ -102,6 +102,27 @@ const ANDROID_DEVICE_PROFILE = process.env.ANDROID_AVD_DEVICE || 'medium_phone'
  */
 const ANDROID_BASE_PORT = Number(process.env.ANDROID_EMULATOR_BASE_PORT || 5554)
 
+// Validated up front, because every downstream serial is derived from it and a
+// bad value fails far from its cause. The emulator accepts a console port in
+// 5554-5584 and it must be even; an odd or out-of-range port is rejected by the
+// emulator itself, but only after the AVDs have been created and the run has
+// spent a boot's worth of time. The top of the range is checked against the
+// HIGHEST port this run will allocate rather than the base, so asking for more
+// shards than the range can hold fails here instead of on the last emulator.
+const ANDROID_TOP_PORT = ANDROID_BASE_PORT + (SHARD_COUNT - 1) * 2
+if (
+  !Number.isInteger(ANDROID_BASE_PORT) ||
+  ANDROID_BASE_PORT % 2 !== 0 ||
+  ANDROID_BASE_PORT < 5554 ||
+  ANDROID_TOP_PORT > 5584
+) {
+  throw new Error(
+    `ANDROID_EMULATOR_BASE_PORT=${ANDROID_BASE_PORT} cannot host ${SHARD_COUNT} emulators. ` +
+      'It must be an even integer, at least 5554, and leave room for ' +
+      `${SHARD_COUNT} ports two apart without passing 5584 (this run would reach ${ANDROID_TOP_PORT}).`
+  )
+}
+
 /**
  * Whether the shard emulators run without a window.
  *
@@ -532,7 +553,13 @@ const bootShardEmulators = async (avdNames) => {
         name,
         '-port',
         String(port),
-        '-no-snapshot',
+        // `-no-snapshot-save`, not `-no-snapshot`. The latter refuses to LOAD a
+        // snapshot as well as to save one, so every boot is cold. This keeps
+        // the fast restore of whatever snapshot the AVD has while discarding
+        // anything this run did to the device, which is what a repeatable
+        // suite wants: fast to start, and never inheriting the previous run's
+        // state.
+        '-no-snapshot-save',
         '-no-boot-anim',
         '-no-audio',
         '-gpu',
