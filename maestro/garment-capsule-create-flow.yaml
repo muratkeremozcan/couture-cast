@@ -138,6 +138,16 @@ tags:
 # selected, or the flow fails. Asserting per tap rather than once at the end is
 # what identified which of the two taps was losing, since both reported
 # COMPLETED and only the end-of-sequence count disagreed.
+#
+# The postcondition is the CHECKBOX's own state, not the `Garments (n of m
+# selected)` label. That label sits above the list, so scrolling down to reach a
+# garment pushes it out of the viewport — and `visible` means inside the
+# viewport, not present in the hierarchy. A CI run failed here with the label
+# absent from the dump entirely while a checkbox in the very same dump carried
+# `checked=true`: the tap had worked and the assertion still could not pass. An
+# assertion that depends on where the screen happens to be scrolled is a
+# screen-height dependency wearing a different hat, and the element the tap
+# targeted is the thing whose state the tap changes.
 - retry:
     maxRetries: 3
     commands:
@@ -154,7 +164,8 @@ tags:
           label: 'Select the first seeded garment'
       - extendedWaitUntil:
           visible:
-            text: 'Garments \(1 of .* selected\)'
+            id: 'garment-checkbox-${GARMENT_A_ID}'
+            checked: true
           timeout: 10000
           label: 'The first garment registered as selected'
 
@@ -198,7 +209,8 @@ tags:
           label: 'Select the second seeded garment'
       - extendedWaitUntil:
           visible:
-            text: 'Garments \(2 of .* selected\)'
+            id: 'garment-checkbox-${GARMENT_B_ID}'
+            checked: true
           timeout: 10000
           label: 'The second garment registered as selected'
 
