@@ -240,8 +240,22 @@ jobs:
           target: ${{ env.ANDROID_TARGET }}
           arch: ${{ env.ANDROID_ARCH }}
           profile: ${{ env.ANDROID_PROFILE }}
-          ram-size: 2048M
-          disk-size: 4096M
+          # `ram-size` and `disk-size` are deliberately absent here, unlike in
+          # the generation step above. The action applies them by appending
+          # `hw.ramSize` and `disk.dataPartition.size` to the AVD's config.ini,
+          # and this step runs against a config.ini restored from cache that
+          # already carries those lines from creation. Appending them a second
+          # time changes the hardware configuration the snapshot was captured
+          # against, so the emulator rejects it:
+          #
+          #   ERROR | The emulator hardware cannot load snapshot: default_boot
+          #   USER_INFO | The emulator is starting from scratch.
+          #               Reason: different AVD configuration
+          #
+          # The cache was therefore paying 25 seconds to restore a snapshot that
+          # was never loaded, and every run still took a ~40 second cold boot.
+          # The values themselves are not lost by omitting them: they live in
+          # the cached config.ini, which is the whole point of caching it.
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           # This boot restores the snapshot the previous step saved, so it is
