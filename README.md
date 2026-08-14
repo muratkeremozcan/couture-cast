@@ -96,7 +96,7 @@ npm run typecheck:clear-cache
 | `npm run maestro:install`                 | Installs the Maestro CLI (brew/curl on macOS; npx fallback on CI).                                                                              |
 | `npm run test:mobile:e2e:android`         | Boots/uses the Android emulator, starts Expo, and runs Maestro sanity + analytics flows.                                                        |
 | `npm run test:mobile:e2e:ios`             | Boots/uses the iOS simulator, starts Expo, and runs Maestro sanity + analytics flows.                                                           |
-| `npm run test:mobile:e2e:summary`         | Prints pass/fail per flow from the JUnit reports in `maestro/artifacts/`; the same data CI turns into the mobile PR comment.                    |
+| `npm run test:mobile:e2e:summary`         | Prints pass/fail/skipped per flow from the JUnit reports in `maestro/artifacts/`; the same data CI turns into the mobile PR comment.            |
 | `npm run validate`                        | Runs `typecheck`, then `lint`, then `test`, then `build` sequentially. This is the full local non-E2E gate.                                     |
 | `npm run clean`                           | Cleans each workspace’s build outputs.                                                                                                          |
 | `npm run clean:install`                   | Nukes every `node_modules` (root/apps/packages) and performs a fresh `npm install`.                                                             |

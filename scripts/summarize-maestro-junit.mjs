@@ -76,8 +76,37 @@ const unescapeXml = (value) =>
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
     .replace(/&amp;/g, '&')
 
+/**
+ * Everything up to the end of an element's opening tag.
+ *
+ * `attr` has to be confined to this. A `<testcase>` segment runs to the next
+ * one, so it carries the element's children too, and Maestro puts
+ * `<property name="tags" .../>` in there: without the bound, a testcase with no
+ * `name` of its own would silently report itself as the flow named "tags".
+ *
+ * @param {string} segment
+ * @returns {string}
+ */
+const openingTag = (segment) => {
+  const end = segment.indexOf('>')
+  return end === -1 ? segment : segment.slice(0, end)
+}
+
+/**
+ * Read one attribute off an element's opening tag.
+ *
+ * The leading boundary is load-bearing. Maestro writes `name` and `classname`
+ * on the same `<testcase>`, so a bare `name="..."` search matches whichever
+ * comes first in the file: today `name` precedes `classname` and the answer is
+ * right by luck, and an attribute reordering upstream would silently start
+ * reporting the classname as the flow name.
+ *
+ * @param {string} segment
+ * @param {string} name
+ * @returns {string | null}
+ */
 const attr = (segment, name) => {
-  const match = new RegExp(`${name}="([^"]*)"`).exec(segment)
+  const match = new RegExp(`(?:^|\\s)${name}="([^"]*)"`).exec(openingTag(segment))
   return match ? unescapeXml(match[1]) : null
 }
 
@@ -118,7 +147,13 @@ const parseReport = (reportPath) => {
     return { flows: [], unreadable: `${reportPath}: ${error.message}` }
   }
 
-  const device = attr(xml.split('<testcase')[0], 'device')
+  // Off the `<testsuite>` tag specifically. Reading it from "everything before
+  // the first testcase" would now stop at the `?>` of the XML declaration,
+  // which is the first `>` in the file and carries no attributes.
+  const device = attr(
+    /<testsuite\s[^>]*>/.exec(xml)?.[0]?.slice('<testsuite'.length) ?? '',
+    'device'
+  )
   const flows = []
 
   // Each `<testcase` runs to the next one, so a nested `<failure>`, `<error>`

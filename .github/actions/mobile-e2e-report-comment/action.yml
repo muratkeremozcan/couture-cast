@@ -105,6 +105,7 @@ runs:
           'passed=' + s.totals.passed,
           'failed=' + s.totals.failed,
           'skipped=' + s.totals.skipped,
+          'shards_seen=' + s.shards.length,
           'has_results=' + (s.totals.total > 0),
           '',
         ].join('\n'));
@@ -164,7 +165,31 @@ runs:
           // shard died before writing one; the job result alone is the exit
           // code this suite has learned not to trust on its own.
           const hasResults = totals.total > 0;
-          const isSuccess = hasResults && totals.failed === 0 && totals.skipped === 0 && suiteResult === 'success';
+
+          // And every shard has to be accounted for. A green matrix over three
+          // shards' worth of reports is a suite that silently ran three
+          // quarters of itself, which no other check here would catch: the
+          // download is a single step, so an artifact missing from it leaves no
+          // failure behind, only a smaller flow count.
+          //
+          // The exemption is real rather than defensive. `workflow_dispatch`
+          // with `suite: smoke` hands three flows to four shards, and the
+          // workflow's own "Resolve this shard's flow list" step treats an empty
+          // shard as legitimate exactly when there are fewer flows than shards
+          // and as a hard error otherwise. Same rule, same shape, applied to the
+          // evidence: only demand full coverage of a run big enough to fill
+          // every shard.
+          const expectedShards = Number(process.env.INPUT_SHARDS) || 0;
+          const shardsExpectedToReport =
+            expectedShards > 0 && totals.total < expectedShards ? totals.total : expectedShards;
+          const shardsMissing = Math.max(0, shardsExpectedToReport - shards.length);
+
+          const isSuccess =
+            hasResults &&
+            shardsMissing === 0 &&
+            totals.failed === 0 &&
+            totals.skipped === 0 &&
+            suiteResult === 'success';
           const statusEmoji = isSuccess ? '✅' : '❌';
           const statusText = isSuccess ? 'SUCCESS' : 'FAILURE';
 
@@ -199,6 +224,11 @@ runs:
           if (!hasResults) {
             lines.push(
               `> No JUnit report was found in any shard artifact. The suite did not get as far as running a flow, so there is nothing to attribute a failure to. Start from the [job logs](${runUrl}).`,
+              ''
+            );
+          } else if (shardsMissing > 0) {
+            lines.push(
+              `> ⚠️ Only ${shards.length} of ${shardsExpectedToReport} shards reported. The flow counts above describe part of the suite, so treat a clean result as unproven and start from the [job logs](${runUrl}).`,
               ''
             );
           }
@@ -278,7 +308,29 @@ runs:
             per_page: 100,
           });
 
-          const existing = comments.find((c) => c.body?.includes(marker));
+          // Who this action posts as, so it only ever edits its own comment.
+          // `getAuthenticated` is the direct answer but is not available to the
+          // default GITHUB_TOKEN, which is an App installation token and gets a
+          // 403 -- hence the fallback rather than a hard dependency on it. A
+          // custom PAT resolves to its own login and the sticky comment keeps
+          // working under that token too.
+          let selfLogin = null;
+          try {
+            const { data: self } = await github.rest.users.getAuthenticated();
+            selfLogin = self.login;
+          } catch (e) {
+            core.debug(`getAuthenticated unavailable for this token: ${e.message}`);
+          }
+
+          // `startsWith`, not `includes`: the marker is the first line of what
+          // this action writes, so anything merely QUOTING the marker -- a
+          // reviewer pasting the comment back, another bot summarising it --
+          // does not get hijacked and overwritten. The author check is the
+          // second half of that: without it, the first such quote on the PR
+          // becomes the comment this action edits for the rest of the PR's life.
+          const isOwnComment = (c) =>
+            selfLogin ? c.user?.login === selfLogin : c.user?.type === 'Bot';
+          const existing = comments.find((c) => c.body?.startsWith(marker) && isOwnComment(c));
 
           if (existing) {
             await github.rest.issues.updateComment({
@@ -315,6 +367,8 @@ runs:
         TOTAL: ${{ steps.summarize.outputs.total }}
         FAILED: ${{ steps.summarize.outputs.failed }}
         SKIPPED: ${{ steps.summarize.outputs.skipped }}
+        SHARDS_SEEN: ${{ steps.summarize.outputs.shards_seen }}
+        SHARDS_EXPECTED: ${{ inputs.shards }}
       run: |
         set -euo pipefail
         if [ "${TOTAL:-0}" -eq 0 ]; then
@@ -325,4 +379,15 @@ runs:
           echo "::error::The Maestro matrix reported success but the reports record ${FAILED} failed and ${SKIPPED} skipped flow(s)."
           exit 1
         fi
-        echo "Reports support the green result: ${TOTAL} flow(s), none failed or skipped."
+        # Same exemption the report body applies: a suite with fewer flows than
+        # shards (the smoke dispatch) legitimately leaves shards with nothing to
+        # run and nothing to upload.
+        EXPECTED="${SHARDS_EXPECTED:-0}"
+        if [ "${EXPECTED}" -gt 0 ] && [ "${TOTAL}" -lt "${EXPECTED}" ]; then
+          EXPECTED="${TOTAL}"
+        fi
+        if [ "${SHARDS_SEEN:-0}" -lt "${EXPECTED}" ]; then
+          echo "::error::The Maestro matrix reported success but only ${SHARDS_SEEN} of ${EXPECTED} shards left reports. Part of the suite is unaccounted for."
+          exit 1
+        fi
+        echo "Reports support the green result: ${TOTAL} flow(s) across ${SHARDS_SEEN} shard(s), none failed or skipped."
