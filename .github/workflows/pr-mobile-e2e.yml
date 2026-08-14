@@ -276,19 +276,32 @@ jobs:
           # lands every expensive wardrobe flow in the same shard.
           FLOWS=$(printf '%s\n' "$ALL" | sed '/^[[:space:]]*$/d' | awk -v s="$SHARD" -v n="$SHARDS" 'NR % n == s % n' | tr '\n' ' ')
 
-          # A shard with nothing to run is a configuration mistake, not a pass.
-          # Silently running zero flows and reporting success is the exact shape
-          # of hollow green this suite has been cleaned of elsewhere.
+          # A shard with nothing to run is only legitimate when there are fewer
+          # flows than shards, which is the smoke suite's case: three flows over
+          # four shards leaves one with nothing. That shard skips the rest of the
+          # job.
+          #
+          # With at least as many flows as shards, an empty shard means the
+          # distribution is broken, and reporting success over zero flows is the
+          # hollow green this suite has been cleaned of elsewhere. So that case
+          # fails loudly instead.
           if [[ -z "${FLOWS// /}" ]]; then
-            echo "::error::Shard $SHARD of $SHARDS resolved no flows out of $TOTAL. Check the shard count against the flow count."
+            if (( TOTAL < SHARDS )); then
+              echo "empty=true" >> "$GITHUB_OUTPUT"
+              echo "Shard $SHARD of $SHARDS has no flows: only $TOTAL flows in this suite. Skipping."
+              exit 0
+            fi
+            echo "::error::Shard $SHARD of $SHARDS resolved no flows out of $TOTAL. The distribution is wrong."
             exit 1
           fi
 
+          echo "empty=false" >> "$GITHUB_OUTPUT"
           echo "list=$FLOWS" >> "$GITHUB_OUTPUT"
           echo "Shard $SHARD of $SHARDS runs $(printf '%s' "$FLOWS" | wc -w | tr -d ' ') of $TOTAL flows:"
           printf '%s\n' $FLOWS
 
       - name: Run Maestro suite
+        if: steps.flows.outputs.empty != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         env:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
@@ -352,7 +365,7 @@ jobs:
           script: bash ./scripts/ci-mobile-e2e.sh ${{ steps.flows.outputs.list }}
 
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.flows.outputs.empty != 'true'
         with:
           # Per shard. Four jobs uploading one name collide, and upload-artifact
           # v4 rejects the duplicate rather than merging, so the shard that lost
