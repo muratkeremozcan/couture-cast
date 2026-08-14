@@ -28,7 +28,7 @@ Thin Turborepo for Couture Cast apps and smoke tests. Keep it lean: shared lint 
 | `apps/web`               | Next.js 15.5.6 App Router surface (React 19.1).                                                            |
 | `apps/mobile`            | Expo Router SDK 54 project (tabs template, React Native 0.81).                                             |
 | `apps/api`               | NestJS 11 monolith wired to Vitest 4.                                                                      |
-| `maestro/`               | Maestro smoke and analytics advisory flows for mobile sanity checks.                                       |
+| `maestro/`               | Maestro mobile E2E flows; every top-level flow here is a PR gate on Android.                               |
 | `k6/`                    | Performance baseline scenarios and load profiles (driven by `@couture/k6-utils`).                          |
 | `playwright/`            | Root-level Playwright smoke suite (fixtures + README) shared by web + API teams.                           |
 | `playwright/scripts`     | Utility scripts for Playwright (burn-in variants).                                                         |
@@ -47,7 +47,7 @@ npm run dev       # turbo spins up mobile, web, and api concurrently
 
 ### Mobile Testing
 
-**CI**: Mobile e2e is disabled on GitHub-hosted runners due to emulator instability and long runtimes. Use self-hosted/device cloud or trigger the manual workflow if needed.
+**CI**: Android mobile e2e runs on every PR on GitHub-hosted runners, sharded four ways, and posts a flow-level result comment. iOS is local-only.
 
 **Local**: iOS + Android testing supported (see `npm run test:mobile:e2e:android`, `npm run test:mobile:e2e:ios`, and \_bmad-output/implementation-artifacts/0-13-scaffold-cross-surface-e2e-automation.md)
 
@@ -96,6 +96,7 @@ npm run typecheck:clear-cache
 | `npm run maestro:install`                 | Installs the Maestro CLI (brew/curl on macOS; npx fallback on CI).                                                                              |
 | `npm run test:mobile:e2e:android`         | Boots/uses the Android emulator, starts Expo, and runs Maestro sanity + analytics flows.                                                        |
 | `npm run test:mobile:e2e:ios`             | Boots/uses the iOS simulator, starts Expo, and runs Maestro sanity + analytics flows.                                                           |
+| `npm run test:mobile:e2e:summary`         | Prints pass/fail/skipped per flow from the JUnit reports in `maestro/artifacts/`; the same data CI turns into the mobile PR comment.            |
 | `npm run validate`                        | Runs `typecheck`, then `lint`, then `test`, then `build` sequentially. This is the full local non-E2E gate.                                     |
 | `npm run clean`                           | Cleans each workspace’s build outputs.                                                                                                          |
 | `npm run clean:install`                   | Nukes every `node_modules` (root/apps/packages) and performs a fresh `npm install`.                                                             |
@@ -197,16 +198,16 @@ on iOS simulator.
 
 ### CI at a glance
 
-| Workflow                                         | What it runs                                          | Notes                                                                                                                                               |
-| ------------------------------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.github/workflows/schema-validation.yml`        | Canonical OpenAPI generation + Optic lint/diff        | Separate schema gate modeled after the reference repo. Generates `packages/api-client/docs/http.openapi.json`, fetches `main`, then runs Optic.     |
-| `.github/workflows/pr-checks.yml`                | Typecheck → Lint → Build → Tests (workspace graph)    | Required on PRs; matches Node 24 baseline.                                                                                                          |
-| `.github/workflows/pr-pw-e2e-local.yml`          | Playwright smoke (Chromium) with HTML/trace artifacts | Web-only e2e gate; uses webServer hook on port 3005.                                                                                                |
-| `.github/workflows/pr-pw-e2e-vercel-preview.yml` | Playwright smoke against Vercel Preview               | Triggered by Vercel `deployment_status`; runs `npm run test:pw-preview` against the Preview URL via `PREVIEW_WEB_E2E_BASE_URL`.                     |
-| `.github/workflows/pr-mobile-e2e.yml`            | Manual-only Maestro Android smoke (build + emulator)  | Not run on PRs: GitHub-hosted Android emulators are slow/flaky (30–40m, boot failures). Trigger via `workflow_dispatch` or run locally/self-hosted. |
+| Workflow                                         | What it runs                                          | Notes                                                                                                                                                            |
+| ------------------------------------------------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/schema-validation.yml`        | Canonical OpenAPI generation + Optic lint/diff        | Separate schema gate modeled after the reference repo. Generates `packages/api-client/docs/http.openapi.json`, fetches `main`, then runs Optic.                  |
+| `.github/workflows/pr-checks.yml`                | Typecheck → Lint → Build → Tests (workspace graph)    | Required on PRs; matches Node 24 baseline.                                                                                                                       |
+| `.github/workflows/pr-pw-e2e-local.yml`          | Playwright smoke (Chromium) with HTML/trace artifacts | Web-only e2e gate; uses webServer hook on port 3005.                                                                                                             |
+| `.github/workflows/pr-pw-e2e-vercel-preview.yml` | Playwright smoke against Vercel Preview               | Triggered by Vercel `deployment_status`; runs `npm run test:pw-preview` against the Preview URL via `PREVIEW_WEB_E2E_BASE_URL`.                                  |
+| `.github/workflows/pr-mobile-e2e.yml`            | Full Maestro Android suite on Expo Go, 4 shards       | Required on PRs. Cached AVD snapshot plus hardware acceleration put the suite at roughly 20 minutes; a `report` job posts the flow-level result as a PR comment. |
 
 **Playwright coverage:** web landing smoke with API health ping, hero/nav assertions, axe-core check, traces/artifacts uploaded in CI.  
-**Mobile e2e:** Maestro mobile flows are local-only; CI disabled due to GitHub-hosted emulator instability and long runtimes. Run via `npm run test:mobile:e2e:android` or `npm run test:mobile:e2e:ios` on your machine or on a self-hosted/device cloud runner if needed.
+**Mobile e2e:** every top-level flow in `maestro/` runs on an Android emulator on every PR, split across four shards. Each shard uploads its screenshots, Maestro logs and JUnit reports; the `report` job reads those reports and posts one sticky comment listing the failing flows and their assertion messages, so a red run is diagnosable without downloading anything. iOS coverage stays local (`npm run test:mobile:e2e:ios`).
 
 ### Vercel Preview testing
 

@@ -68,6 +68,7 @@
     "test:k6:prod": "npm run prepare:k6 && k6/scripts/run-k6-env.sh production",
     "maestro:install": "node ./scripts/maestro-install.mjs",
     "mobile:expo-go": "node ./scripts/install-expo-go.mjs",
+    "test:mobile:e2e:summary": "node ./scripts/summarize-maestro-junit.mjs --pretty",
     "test:mobile:e2e:android": "npm run maestro:install --silent && cross-env MOBILE_E2E_PLATFORM=android node ./scripts/run-maestro.mjs --artifacts",
     "test:mobile:e2e:ios": "npm run maestro:install --silent && cross-env MOBILE_E2E_PLATFORM=ios node ./scripts/run-maestro.mjs --artifacts",
     "test:mobile:e2e:ios:shards": "npm run maestro:install --silent && node ./scripts/run-maestro-shards.mjs",

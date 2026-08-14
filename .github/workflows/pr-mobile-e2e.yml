@@ -60,6 +60,9 @@ concurrency:
   group: mobile-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only by default. The reporting job at the bottom widens its own
+# permissions to what a PR comment needs, rather than granting write to the four
+# emulator jobs that only ever read.
 permissions:
   contents: read
 
@@ -436,3 +439,46 @@ jobs:
           name: android-test-results-shard-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
           path: maestro/artifacts/
           retention-days: 7
+
+  # One report for the whole matrix, in the same shape every other test tier in
+  # this repo posts: Playwright, Pact, k6 and the unit suite all leave a sticky
+  # PR comment. This suite left only a red or green check across four jobs, so
+  # finding out WHICH flow broke meant downloading four artifacts, and in
+  # practice a red shard got read as "mobile is flaky again" and re-run.
+  #
+  # A separate job rather than a step in the matrix, because a per-shard comment
+  # would be four comments racing for the same marker, and because the shard
+  # jobs run inside an emulator action whose `script:` is a poor place to do
+  # anything that talks to the GitHub API.
+  report:
+    needs: mobile-e2e-android
+    # `always()`, or the report disappears exactly when it is wanted: a default
+    # `if` skips this job when any shard fails.
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # Reading the run's artifacts to build the download links.
+      actions: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Summarize the Maestro run and comment
+        uses: ./.github/actions/mobile-e2e-report-comment
+        with:
+          # Scoped to this attempt. Artifacts belong to the run rather than the
+          # attempt, so a re-run leaves the previous attempt's uploads in place
+          # and an unscoped pattern would report both, double-counting flows and
+          # producing two "shard 1" download links.
+          artifact-pattern: android-test-results-shard-*-attempt-${{ github.run_attempt }}
+          suite-result: ${{ needs.mobile-e2e-android.result }}
+          # Keep in step with the `shard:` matrix above. `strategy.job-total` is
+          # not readable from a job that only `needs:` the matrix, so this is a
+          # label rather than a derived value; the flow counts in the comment
+          # come from the reports themselves and are unaffected by it.
+          shards: '4'
+          platform: Android (Expo Go)
+          device-label: API ${{ env.ANDROID_API_LEVEL }} · ${{ env.ANDROID_PROFILE }} · ${{ env.ANDROID_ARCH }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
