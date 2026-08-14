@@ -341,27 +341,39 @@ const probeAndroidMetroReachability = async (port) => {
   const adbBinary = resolveAdbBinary()
   const host = process.env.MOBILE_E2E_ANDROID_HOST || ANDROID_HOST_DEFAULT
   const url = `http://${host}:${port}/status`
+
+  // `nc -z` rather than an HTTP client. Android system images carry no curl and
+  // no wget -- `toybox wget` is absent on both API 30 and API 36, despite
+  // toybox itself being present -- while netcat is there and answers the exact
+  // question: can the device open a TCP connection to that host and port. It
+  // was measured against a live listener through the reverse mapping.
+  let output
   try {
     const result = await captureProcess(adbBinary, [
       'shell',
-      `toybox wget -q -O - ${url} 2>&1 || echo __DEVICE_CANNOT_REACH_METRO__`,
+      `nc -z ${host} ${port} && echo __OPEN__ || echo __SHUT__`,
     ])
-    const body = (result.stdout ?? '').trim()
-    if (body.includes('packager-status:running')) {
-      log(`Device reached Metro at ${url}`)
-      return true
-    }
+    output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim()
+  } catch (error) {
+    output = error.message ?? ''
+  }
+
+  if (output.includes('__OPEN__')) {
+    log(`Device reached Metro at ${url}`)
+    return true
+  }
+  if (output.includes('__SHUT__')) {
     log(
-      `Device could NOT reach Metro at ${url}. Expo Go will fail to load the ` +
-        `project and every flow will report tab-home missing. Response: ${
-          body.slice(0, 160) || '(empty)'
-        }`
+      `Device could NOT open ${host}:${port}. Expo Go will fail to load the ` +
+        `project and every flow will report tab-home missing.`
     )
     return false
-  } catch (error) {
-    log(`Device reachability probe could not run: ${error.message}`)
-    return false
   }
+
+  // Never claim a verdict the probe did not earn: an image without netcat says
+  // nothing about reachability either way.
+  log(`Device reachability probe could not run (${output.slice(0, 120) || 'no output'})`)
+  return null
 }
 
 const getLocalAppUrl = (platform, port) => {
