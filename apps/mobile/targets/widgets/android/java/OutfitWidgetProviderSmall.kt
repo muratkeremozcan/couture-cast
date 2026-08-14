@@ -1,4 +1,4 @@
-package com.anonymous.mobile
+package com.couturecast.app
 
 class OutfitWidgetProviderSmall : OutfitWidgetProvider() {
     override val layoutId = R.layout.widget_small

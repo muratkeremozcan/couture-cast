@@ -259,7 +259,10 @@
         "evening": "Akşam",
         "outdoor": "Açık hava",
         "home": "Ev"
-      }
+      },
+      "garmentsSelected": "Parçalar ({{max}} parçadan {{count}} tanesi seçildi)",
+      "garmentsRange": "{{min}} ile {{max}} arasında parça seçin.",
+      "garmentOrder": "Parça sırası"
     },
     "onboarding": {
       "title": "Gardırobunu oluştur",
@@ -318,6 +321,32 @@
       "optOutHelp": "Tüm iş ortağı ve bağlı kuruluş önerilerini gizlemek için bunu kapatın.",
       "saved": "Alışveriş tercihleri güncellendi",
       "error": "Alışveriş tercihleri güncellenemedi."
+    },
+    "premium": {
+      "sectionTitle": "Premium",
+      "disclosure": "Premium abonelikleri RevenueCat ve web satın alımlarında Stripe tarafından işlenir. Yalnızca hesap kimliğinizi ve satın alma durumunuzu alırlar; kart numaraları veya gardırop fotoğrafları asla paylaşılmaz. Aboneliğinizi, abone olduğunuz mağazadan istediğiniz zaman yönetebilir veya iptal edebilirsiniz.",
+      "status": {
+        "none": "Premium aboneliğiniz yok.",
+        "active": "Premium, {{plan}} planıyla etkin. Geçerli dönem {{date}} tarihinde sona eriyor.",
+        "gracePeriod": "Premium ek süre döneminde ({{plan}}). Geçerli dönem {{date}} tarihinde sona eriyor.",
+        "expired": "Premium aboneliğinizin süresi doldu.",
+        "revoked": "Premium aboneliğiniz feshedildi."
+      },
+      "planMonthly": "Aylık Premium",
+      "planAnnual": "Yıllık Premium",
+      "subscribe": "Premium ile gelişmiş stil özelliklerinin kilidini açın:",
+      "manage": "Aboneliği yönet",
+      "manageInStore": "Bu abonelik web üzerinden satın alındı. CoutureCast web sitesinden yönetebilir veya iptal edebilirsiniz.",
+      "restore": "Satın alımları geri yükle",
+      "pendingApproval": "Onay bekleniyor. “Satın Almadan Sor” etkin: veliniz onayladığında Premium otomatik olarak etkinleşecek.",
+      "activating": "Ödeme alındı. Premium etkinleştiriliyor…",
+      "stillProcessing": "İşlem sürüyor. Satın alma gerçekleşti; kısa süre sonra tekrar kontrol edin.",
+      "portalLagHint": "Webde yapılan abonelik değişikliklerinin burada görünmesi birkaç saat sürebilir.",
+      "graceBanner": "Aboneliğinizde bir ödeme sorunu var. Premium'u korumak için mağazadaki ödeme yönteminizi güncelleyin.",
+      "endedNote": "Aboneliğiniz sona erdi. Premium özelliklere yeniden kavuşmak için dilediğiniz zaman tekrar abone olun.",
+      "errorLoad": "Abonelik durumunuz yüklenemedi. Lütfen tekrar deneyin.",
+      "errorPurchase": "Satın alma tamamlanamadı. Lütfen tekrar deneyin.",
+      "unavailableInBuild": "Bu uygulama sürümünde satın alma yapılamıyor. Abone olmak için CoutureCast'in App Store veya Play Store sürümünü kullanın."
     }
   }
 }

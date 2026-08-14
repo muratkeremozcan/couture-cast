@@ -28,6 +28,8 @@ const canonicalFlagOverrides: Record<FeatureFlagKey, FeatureFlagStoredValue> = {
   // commerce on outside production, and it is guarded so it can never do so
   // inside it.
   commerce_affiliate_enabled: allowsCommerceSeeding(),
+  // Story 5.2 decision 9: same self-guarded lever for premium purchasing.
+  commerce_subscription_enabled: allowsCommerceSeeding(),
 }
 
 const supplementalFeatureFlags: SeededFeatureFlag[] = [

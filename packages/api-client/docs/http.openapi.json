@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -6713,6 +6713,324 @@
         "required": [
           "data"
         ]
+      },
+      "SubscriptionPlan": {
+        "type": "string",
+        "enum": [
+          "premium_monthly",
+          "premium_annual"
+        ]
+      },
+      "EntitlementStore": {
+        "type": "string",
+        "enum": [
+          "app_store",
+          "play_store",
+          "stripe",
+          "promotional"
+        ]
+      },
+      "SubscriptionStatus": {
+        "type": "string",
+        "enum": [
+          "none",
+          "active",
+          "grace_period",
+          "expired",
+          "revoked"
+        ]
+      },
+      "Subscription": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "none"
+                ]
+              },
+              "store": {
+                "type": "null"
+              },
+              "productId": {
+                "type": "null"
+              },
+              "willRenew": {
+                "type": "null"
+              },
+              "currentPeriodEnd": {
+                "type": "null"
+              },
+              "syncedAt": {
+                "type": "null"
+              },
+              "purchasesEnabled": {
+                "type": "boolean",
+                "description": "Server-evaluated commerce_subscription_enabled flag. The only flag exposure path: clients render subscribe controls only when true. Status, refresh, and portal stay available regardless."
+              }
+            },
+            "required": [
+              "status",
+              "store",
+              "productId",
+              "willRenew",
+              "currentPeriodEnd",
+              "syncedAt",
+              "purchasesEnabled"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "grace_period",
+                  "expired",
+                  "revoked"
+                ]
+              },
+              "store": {
+                "type": "string",
+                "enum": [
+                  "app_store",
+                  "play_store",
+                  "stripe",
+                  "promotional"
+                ]
+              },
+              "productId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The provisioned product id, e.g. premium_monthly. Deliberately not the plan enum: the operator can add products without a contract change."
+              },
+              "willRenew": {
+                "type": "boolean",
+                "description": "False after a cancellation while status stays active: the user keeps what they paid for until currentPeriodEnd."
+              },
+              "currentPeriodEnd": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "syncedAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Last successful sync from the entitlement ledger. Lets a client tell fresh state from a rate-limited refresh that served local state."
+              },
+              "purchasesEnabled": {
+                "type": "boolean",
+                "description": "Server-evaluated commerce_subscription_enabled flag. The only flag exposure path: clients render subscribe controls only when true. Status, refresh, and portal stay available regardless."
+              }
+            },
+            "required": [
+              "status",
+              "store",
+              "productId",
+              "willRenew",
+              "currentPeriodEnd",
+              "syncedAt",
+              "purchasesEnabled"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "description": "One variant per subscription presence. The correlations between status and the entitlement fields are expressed by the variants themselves: a `none` response carries null entitlement fields with the keys still serialized, and an entitled response always carries all of them."
+      },
+      "SubscriptionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "none"
+                    ]
+                  },
+                  "store": {
+                    "type": "null"
+                  },
+                  "productId": {
+                    "type": "null"
+                  },
+                  "willRenew": {
+                    "type": "null"
+                  },
+                  "currentPeriodEnd": {
+                    "type": "null"
+                  },
+                  "syncedAt": {
+                    "type": "null"
+                  },
+                  "purchasesEnabled": {
+                    "type": "boolean",
+                    "description": "Server-evaluated commerce_subscription_enabled flag. The only flag exposure path: clients render subscribe controls only when true. Status, refresh, and portal stay available regardless."
+                  }
+                },
+                "required": [
+                  "status",
+                  "store",
+                  "productId",
+                  "willRenew",
+                  "currentPeriodEnd",
+                  "syncedAt",
+                  "purchasesEnabled"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "grace_period",
+                      "expired",
+                      "revoked"
+                    ]
+                  },
+                  "store": {
+                    "type": "string",
+                    "enum": [
+                      "app_store",
+                      "play_store",
+                      "stripe",
+                      "promotional"
+                    ]
+                  },
+                  "productId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The provisioned product id, e.g. premium_monthly. Deliberately not the plan enum: the operator can add products without a contract change."
+                  },
+                  "willRenew": {
+                    "type": "boolean",
+                    "description": "False after a cancellation while status stays active: the user keeps what they paid for until currentPeriodEnd."
+                  },
+                  "currentPeriodEnd": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "syncedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Last successful sync from the entitlement ledger. Lets a client tell fresh state from a rate-limited refresh that served local state."
+                  },
+                  "purchasesEnabled": {
+                    "type": "boolean",
+                    "description": "Server-evaluated commerce_subscription_enabled flag. The only flag exposure path: clients render subscribe controls only when true. Status, refresh, and portal stay available regardless."
+                  }
+                },
+                "required": [
+                  "status",
+                  "store",
+                  "productId",
+                  "willRenew",
+                  "currentPeriodEnd",
+                  "syncedAt",
+                  "purchasesEnabled"
+                ],
+                "additionalProperties": false
+              }
+            ],
+            "description": "One variant per subscription presence. The correlations between status and the entitlement fields are expressed by the variants themselves: a `none` response carries null entitlement fields with the keys still serialized, and an entitled response always carries all of them."
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CheckoutSessionRequest": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "premium_monthly",
+              "premium_annual"
+            ],
+            "description": "Which Stripe price the session is for."
+          }
+        },
+        "required": [
+          "plan"
+        ],
+        "additionalProperties": false
+      },
+      "CheckoutSessionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri",
+                "description": "Stripe-hosted Checkout URL. The web app redirects with window.location.assign; no Stripe dependency exists client-side."
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PortalSessionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri",
+                "description": "Stripe Customer Portal URL. Cancel, upgrade, and downgrade for web-managed subscriptions happen there, never in hand-built UI."
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "BillingWebhookResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "received": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "required": [
+              "received"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
       }
     },
     "parameters": {}
@@ -10411,6 +10729,322 @@
           },
           "401": {
             "description": "Any signature failure. Missing header, non-integer timestamp, unknown or inactive partner, unresolvable or too-short secret, timestamp outside ±300 seconds, and HMAC mismatch all return this identical message (\"Invalid webhook signature.\") so the endpoint is not a partner-enumeration oracle.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/subscription": {
+      "get": {
+        "tags": [
+          "subscription"
+        ],
+        "summary": "Read the premium subscription status",
+        "description": "Returns the subscription state for the acting user from the local entitlement mirror, plus the server-evaluated purchasesEnabled flag. Deliberately NOT gated by commerce_subscription_enabled: a paying user must always be able to see their subscription, including while purchasing is switched off.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription state retrieved (status \"none\" when never subscribed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/subscription/refresh": {
+      "post": {
+        "tags": [
+          "subscription"
+        ],
+        "summary": "Refresh the subscription from the entitlement ledger",
+        "description": "Synchronously pulls the RevenueCat ledger and applies the snapshot, beating webhook latency after a purchase. Rate limited per user (10-second minimum interval; inside the window the local state is served — syncedAt tells the caller which happened). A ledger failure returns 503 (\"Subscription status is temporarily unavailable. Please try again shortly.\") rather than stale-as-fresh.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription state after the ledger pull (or local state inside the rate-limit window)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The entitlement ledger was unreachable (\"Subscription status is temporarily unavailable. Please try again shortly.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/subscription/checkout-session": {
+      "post": {
+        "tags": [
+          "subscription"
+        ],
+        "summary": "Create a Stripe Checkout session",
+        "description": "Creates a subscription-mode Stripe Checkout session for the requested plan and returns its URL. The Stripe customer is created or reused at session-creation time and linked via client_reference_id AND metadata.userId, so an abandoned checkout still leaves a portal-capable customer. Status precedence is fixed so assertions are deterministic: 503 (kill switch) outranks 400 (schema) outranks 409 (already subscribed) outranks 500 (Stripe failure).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Checkout session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input payload (unknown plan)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The account already has an active or grace-period subscription (\"This account already has an active Premium subscription.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The Stripe API call failed or the Stripe key is missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "commerce_subscription_enabled resolved false (\"Premium subscriptions are temporarily unavailable.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/subscription/portal-session": {
+      "post": {
+        "tags": [
+          "subscription"
+        ],
+        "summary": "Create a Stripe Customer Portal session",
+        "description": "Returns a Customer Portal URL for cancel/upgrade/downgrade of a web-managed subscription. Deliberately NOT gated by the kill switch: a paying user must always be able to manage and cancel. Store-managed subscriptions answer 409 (\"This subscription is managed in the app store it was purchased from.\"); clients normally render a \"manage in the App Store / Play Store\" hint instead of calling.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Portal session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalSessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No Stripe billing profile exists for this account (\"No web subscription found for this account.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The subscription is store-managed (\"This subscription is managed in the app store it was purchased from.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The Stripe API call failed or the Stripe key is missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/subscription/webhooks/stripe": {
+      "post": {
+        "tags": [
+          "subscription"
+        ],
+        "summary": "Receive a Stripe billing webhook",
+        "description": "Machine-to-machine, authenticated by the Stripe signature over the raw body — parsed only after verification. Idempotent on (provider, event id): replays return 200 and write nothing. Always records, even while purchasing is switched off: returning an error to a retrying provider would drop billing facts for payments that already happened. checkout.session.completed additionally records a forward obligation to the entitlement ledger, re-driven by the reconciliation sweep until satisfied.",
+        "responses": {
+          "200": {
+            "description": "Event recorded, or recognised as a replay and ignored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingWebhookResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Any signature failure — missing header, stale timestamp, wrong secret, tampered body — returns this identical message (\"Invalid webhook credentials.\"); the reason is logged server-side only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/subscription/webhooks/revenuecat": {
+      "post": {
+        "tags": [
+          "subscription"
+        ],
+        "summary": "Receive a RevenueCat entitlement webhook",
+        "description": "Machine-to-machine, authenticated by HMAC signature (preferred) or the static Authorization header, compared in constant time — parsed only after verification. The single entitlement writer: every applied event records a BillingEvent, drives the entitlement transition, and writes an audit row in one transaction. Idempotent on (provider, event id); out-of-order events older than the last applied event are dropped. Unknown app_user_ids and unknown event types return 200 and record without transitioning, so a delivery is never bounced for a fact we cannot change.",
+        "responses": {
+          "200": {
+            "description": "Event recorded (and applied when it transitions the entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingWebhookResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Any credential failure returns this identical message (\"Invalid webhook credentials.\"); the reason is logged server-side only.",
             "content": {
               "application/json": {
                 "schema": {

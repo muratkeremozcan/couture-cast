@@ -19,6 +19,7 @@ describe('feature flag registry', () => {
       'color_analysis_enabled',
       'weather_alerts_enabled',
       'commerce_affiliate_enabled',
+      'commerce_subscription_enabled',
     ])
   })
 
@@ -27,6 +28,12 @@ describe('feature flag registry', () => {
     // FeatureFlag cache row, then this default. Defaulting to false is what
     // stops a degraded PostHog from switching commerce on by accident.
     expect(getDefaultFeatureFlagValue('commerce_affiliate_enabled')).toBe(false)
+  })
+
+  it('defaults the premium purchasing kill switch to off', () => {
+    // Story 5.2 decision 13: same reasoning as the affiliate switch. Only
+    // purchasing is gated; status, refresh, portal, and webhooks stay on.
+    expect(getDefaultFeatureFlagValue('commerce_subscription_enabled')).toBe(false)
   })
 
   it('returns registry defaults for known keys', () => {

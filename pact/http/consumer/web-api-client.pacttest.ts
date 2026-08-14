@@ -70,6 +70,11 @@ import {
   verifyAffiliateWebhookInteraction,
   verifyAffiliateWebhookErrorInteraction,
   affiliateWebhookErrorInteractions,
+  verifyNeverSubscribedStatusInteraction,
+  verifyCheckoutSessionInteraction,
+  verifyPortalSessionInteraction,
+  verifySubscriptionErrorInteraction,
+  subscriptionErrorInteractions,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -303,6 +308,29 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
     'preserves the documented affiliate webhook error envelope that $description',
     async (interaction) => {
       await verifyAffiliateWebhookErrorInteraction(pact, interaction)
+    }
+  )
+
+  // Story 5.2: web reads status before rendering the subscribe CTA and
+  // creates the Stripe Checkout / Customer Portal sessions. The refresh poll
+  // is mobile's post-purchase concern; web returns from Checkout via the
+  // Stripe redirect and re-reads status instead.
+  it('reads the premium subscription status of a never-subscribed user', async () => {
+    await verifyNeverSubscribedStatusInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('creates a Stripe Checkout session', async () => {
+    await verifyCheckoutSessionInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('creates a Stripe Customer Portal session', async () => {
+    await verifyPortalSessionInteraction(pact, createWebClientForMockServer)
+  })
+
+  it.each(subscriptionErrorInteractions)(
+    'preserves the documented subscription error envelope that $description',
+    async (interaction) => {
+      await verifySubscriptionErrorInteraction(pact, interaction)
     }
   )
 })

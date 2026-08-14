@@ -1,0 +1,160 @@
+# Shared launch preamble: get from a bare `launchApp` to the app actually
+# mounted, reliably.
+#
+# Two Expo Go behaviours have to be absorbed here, and both were previously
+# copy-pasted (inconsistently) into every flow:
+#
+# 1. Expo Go drops the first `openLink` when it is still coming up from
+#    `clearState: true`. It processes the deep link before its own launcher has
+#    finished starting and silently sits on the "Development servers / Enter URL
+#    manually" screen. Every flow that opened the link exactly once failed on its
+#    first assertion with the app never mounted; the two that happened to open it
+#    twice passed. `retry` re-opens only when the mount actually failed, so the
+#    healthy path still opens the link once — opening it again unconditionally
+#    re-triggers the developer sheet described below.
+#
+# 2. Expo Go raises its one-time developer-menu sheet *after* the app has
+#    mounted. It is a native modal with a dimmed backdrop over the top half and
+#    the sheet itself over the bottom half. The app stays fully visible behind
+#    it, so every `assertVisible` still passes — and then the backdrop eats the
+#    flow's first tap. This was diagnosed for a long time as "Maestro cannot tap
+#    this component", because the symptom is always the same: assertions fine,
+#    first gesture silently ineffective, second gesture works.
+#
+# Callers keep their own `launchApp` because `clearState` differs per flow, then
+# `- runFlow: subflows/open-app.yaml` immediately after it.
+appId: ${MAESTRO_APP_ID}
+---
+- retry:
+    maxRetries: 2
+    commands:
+      - openLink: ${APP_URL}
+
+      # iOS asks for confirmation before handing an `exp://` link to Expo Go:
+      # a system alert reading `Open in "Expo Go"?` with Cancel and Open. It is
+      # per device and it is why a freshly created simulator behaves differently
+      # from the one a developer has been using for months. Nobody answers it,
+      # so Expo Go never opens the project and every flow fails on `tab-home`
+      # having never mounted -- which is exactly how four parallel shards failed
+      # identically on their first flow while the same flows passed serially on
+      # an older simulator.
+      #
+      # Guarded on the alert's own title rather than tapping a bare `Open`, so
+      # this can never fire a stray tap at the app.
+      - runFlow:
+          when:
+            visible:
+              text: 'Open in .*Expo Go.*'
+          commands:
+            - tapOn:
+                text: 'Open'
+                optional: true
+                label: 'Confirm the iOS prompt that hands the deep link to Expo Go'
+
+      - tapOn:
+          text: 'Continue'
+          optional: true
+          label: 'Dismiss Expo Go first-run sheet when present'
+      - tapOn:
+          text: 'Open app'
+          optional: true
+          label: 'Dismiss Expo Go developer sheet when present'
+
+      # Pop any pushed route the previous flow left behind.
+      #
+      # Flows launch with `stopApp: false`, and several end on a pushed screen
+      # (the silhouette editor, the capsule library). Expo Go therefore stays on
+      # that screen, and a `clearState: false` flow inherits it. `openLink`
+      # re-enters the app but does NOT pop the navigation stack, so the tab bar
+      # stays covered and every later step reports its target "not found" on a
+      # perfectly healthy app. That is exactly how `widget-deep-link` came to
+      # fail only when it ran eighteenth, behind a flow that had just started
+      # succeeding.
+      #
+      # Guarded on `tab-home`, so this is a no-op whenever the app is already on
+      # a tab screen and never fires a stray gesture at the home screen.
+      # Tapping the native `BackButton` rather than issuing `back`.
+      #
+      # Maestro's `back` is a left-edge swipe on iOS and it does not pop these
+      # screens: measured on device, two `back` presses both reported COMPLETED
+      # while the app sat unmoved on `wardrobe-silhouette-screen`. The same
+      # hierarchy dump shows `resource-id: BackButton`, which Maestro can
+      # address directly, so the header control is used instead.
+      #
+      # Two conditional passes rather than a `repeat`/`while`: each is a no-op
+      # once the tab bar is showing, and the pair is bounded, so a screen that
+      # never reveals the tab bar fails at the wait below with a clear message
+      # instead of spinning.
+      - runFlow:
+          when:
+            notVisible:
+              id: 'tab-home'
+          commands:
+            - tapOn:
+                id: 'BackButton'
+                optional: true
+                label: 'Pop a pushed route left behind by the previous flow'
+            - back
+      - runFlow:
+          when:
+            notVisible:
+              id: 'tab-home'
+          commands:
+            - tapOn:
+                id: 'BackButton'
+                optional: true
+                label: 'Pop a second pushed route'
+            - back
+
+      # The tab bar is the app's own first painted chrome, so a failure to mount
+      # is reported here, at the launch step, rather than as a confusing
+      # assertion failure deep inside the calling flow.
+      - extendedWaitUntil:
+          visible:
+            id: 'tab-home'
+          timeout: 45000
+          label: 'App mounted and tab bar painted'
+
+# Dismiss the developer sheet by spending a throwaway tap on its backdrop.
+#
+# It has to be a blind coordinate tap, and the reason is the whole reason this
+# defect survived so long: **Maestro cannot see this sheet.** It is drawn by
+# Expo Go itself rather than by the app under test, so it never appears in the
+# hierarchy Maestro queries. The step log shows the consequence plainly — with
+# the sheet filling the bottom half of the screen, `tapOn: text: 'Continue'`
+# still reports the element as not found, and an `assertNotVisible` on the
+# sheet's own body text passes. Nothing about the sheet can be asserted, which
+# is exactly why every symptom pointed at the app instead: assertions all green,
+# first gesture silently swallowed, second gesture fine.
+#
+# So the optional text taps below are kept only for the case where Expo Go
+# renders a variant Maestro *can* reach; the `point` tap is what actually does
+# the work. `50%,10%` is the navigation header, inert on the screen this subflow
+# always lands on, so it costs nothing when no sheet is present.
+#
+# Two taps, separated by a settle, because the sheet rises a beat after
+# `tab-home` paints and a single tap can land just before it appears. This
+# cannot be replaced by a condition, for the reason above; `tab-home` is the
+# only real post-condition available.
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Finish Expo Go developer-menu onboarding if Maestro can reach it'
+- tapOn:
+    text: 'Open app'
+    optional: true
+    label: 'Dismiss the Expo Go developer sheet if Maestro can reach it'
+
+- tapOn:
+    point: '50%,10%'
+    label: 'Absorb the developer sheet backdrop; inert on the app itself'
+- waitForAnimationToEnd
+- tapOn:
+    point: '50%,10%'
+    label: 'Absorb a sheet that rose after the first absorb tap'
+
+- assertVisible:
+    id: 'tab-home'
+    label: 'Still on the app after the absorb taps'
+
+- waitForAnimationToEnd

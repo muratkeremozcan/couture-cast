@@ -164,3 +164,206 @@ export async function seedCommerceCatalog(
 function buildSampleDeepLinkTemplate(category: string): string {
   return `https://${SAMPLE_PARTNER_ALLOWED_HOST}/shop/${category}?cc={clickToken}`
 }
+
+/**
+ * Story 5.2 decision 9: making the premium subscription state space reachable.
+ *
+ * PremiumEntitlement is worker-only (no public write path, by design — a
+ * client-writable entitlement row is free Premium), so end-to-end suites cannot
+ * arrange entitlement state through the public API the way the commerce specs
+ * arrange preferences. These deterministic users are how Playwright and Maestro
+ * reach the entitled, expired, and grace-period branches.
+ *
+ * The users are adults on purpose: a teen account is consent-gated by
+ * `RequestAuthGuard` before any commerce code runs, and age is not what a
+ * premium spec is exercising. `revoked` is deliberately NOT seeded — it is
+ * constructed per-test via the factory.
+ */
+export const PREMIUM_SEED_USERS = {
+  /** Active stripe monthly subscriber, with BillingCustomer + event pair. */
+  active: { id: 'premium-active-user', email: 'premium-active@example.com' },
+  /** Lapsed stripe subscriber: subscribe CTA plus "your subscription ended". */
+  expired: { id: 'premium-expired-user', email: 'premium-expired@example.com' },
+  /** App Store annual in billing grace: exercises the store-managed manage
+   *  hint and the payment-issue banner. */
+  grace: { id: 'premium-grace-user', email: 'premium-grace@example.com' },
+} as const
+
+/** Referenced by the E2E suites and the seeded BillingCustomer row. */
+export const PREMIUM_SEED_STRIPE_CUSTOMER_ID = 'cus_seed_premium_active'
+
+type PremiumSeedEntitlement = {
+  user: { id: string; email: string }
+  status: 'active' | 'expired' | 'grace_period'
+  store: 'stripe' | 'app_store'
+  productId: 'premium_monthly' | 'premium_annual'
+  willRenew: boolean
+  currentPeriodEnd: Date
+}
+
+/**
+ * Fixed instants, far from the suite's runtime clock, so assertions about
+ * period boundaries never race the wall clock. The active/grace period ends are
+ * far-future; the expired one is safely past.
+ */
+const PREMIUM_SEED_ENTITLEMENTS: PremiumSeedEntitlement[] = [
+  {
+    user: PREMIUM_SEED_USERS.active,
+    status: 'active',
+    store: 'stripe',
+    productId: 'premium_monthly',
+    willRenew: true,
+    currentPeriodEnd: new Date('2030-01-01T00:00:00.000Z'),
+  },
+  {
+    user: PREMIUM_SEED_USERS.expired,
+    status: 'expired',
+    store: 'stripe',
+    productId: 'premium_monthly',
+    willRenew: false,
+    currentPeriodEnd: new Date('2026-06-01T00:00:00.000Z'),
+  },
+  {
+    user: PREMIUM_SEED_USERS.grace,
+    status: 'grace_period',
+    store: 'app_store',
+    productId: 'premium_annual',
+    willRenew: true,
+    currentPeriodEnd: new Date('2030-01-01T00:00:00.000Z'),
+  },
+]
+
+const PREMIUM_SEED_SYNCED_AT = new Date('2026-08-01T00:00:00.000Z')
+
+export type SeededPremiumEntitlements = {
+  userIds: string[]
+}
+
+export async function seedPremiumEntitlements(
+  prisma: PrismaClient,
+  env: Readonly<NodeJS.ProcessEnv> = process.env
+): Promise<SeededPremiumEntitlements | null> {
+  if (!allowsCommerceSeeding(env)) {
+    return null
+  }
+
+  for (const seed of PREMIUM_SEED_ENTITLEMENTS) {
+    await prisma.user.upsert({
+      where: { id: seed.user.id },
+      update: { email: seed.user.email },
+      create: { id: seed.user.id, email: seed.user.email },
+    })
+
+    // An adult birthdate so RequestAuthGuard never consent-gates the account.
+    await prisma.userProfile.upsert({
+      where: { user_id: seed.user.id },
+      update: { birthdate: new Date('1990-01-01T00:00:00.000Z') },
+      create: {
+        user_id: seed.user.id,
+        display_name: `Premium ${seed.status} fixture`,
+        birthdate: new Date('1990-01-01T00:00:00.000Z'),
+      },
+    })
+
+    await prisma.premiumEntitlement.upsert({
+      where: { user_id: seed.user.id },
+      update: {
+        status: seed.status,
+        store: seed.store,
+        product_id: seed.productId,
+        will_renew: seed.willRenew,
+        current_period_end: seed.currentPeriodEnd,
+        synced_at: PREMIUM_SEED_SYNCED_AT,
+        last_event_occurred_at: PREMIUM_SEED_SYNCED_AT,
+        last_event_id: `seed-premium-${seed.status}`,
+      },
+      create: {
+        user_id: seed.user.id,
+        status: seed.status,
+        store: seed.store,
+        product_id: seed.productId,
+        will_renew: seed.willRenew,
+        current_period_end: seed.currentPeriodEnd,
+        synced_at: PREMIUM_SEED_SYNCED_AT,
+        last_event_occurred_at: PREMIUM_SEED_SYNCED_AT,
+        last_event_id: `seed-premium-${seed.status}`,
+      },
+    })
+  }
+
+  // The active web subscriber also carries the Stripe customer mapping (so the
+  // portal-session path is reachable) and its BillingEvent pair: the Stripe
+  // checkout completion (forward obligation already satisfied) and the
+  // RevenueCat activation that the entitlement row mirrors.
+  await prisma.billingCustomer.upsert({
+    where: { user_id: PREMIUM_SEED_USERS.active.id },
+    update: { stripe_customer_id: PREMIUM_SEED_STRIPE_CUSTOMER_ID },
+    create: {
+      user_id: PREMIUM_SEED_USERS.active.id,
+      stripe_customer_id: PREMIUM_SEED_STRIPE_CUSTOMER_ID,
+    },
+  })
+
+  const seededEvents = [
+    {
+      provider: 'stripe' as const,
+      externalEventId: 'seed-premium-checkout-completed',
+      eventType: 'checkout.session.completed',
+      forwardDue: true,
+      forwardedAt: PREMIUM_SEED_SYNCED_AT,
+    },
+    {
+      provider: 'revenuecat' as const,
+      externalEventId: 'seed-premium-initial-purchase',
+      eventType: 'INITIAL_PURCHASE',
+      forwardDue: false,
+      forwardedAt: null,
+    },
+  ]
+
+  for (const event of seededEvents) {
+    const existing = await prisma.billingEvent.findUnique({
+      where: {
+        provider_external_event_id: {
+          provider: event.provider,
+          external_event_id: event.externalEventId,
+        },
+      },
+      select: { id: true },
+    })
+
+    // BillingEvent is append-only past its outbox columns, so the seed inserts
+    // once and leaves the row alone on later runs rather than upserting.
+    if (existing) {
+      continue
+    }
+
+    await prisma.billingEvent.create({
+      data: {
+        provider: event.provider,
+        external_event_id: event.externalEventId,
+        event_type: event.eventType,
+        user_id: PREMIUM_SEED_USERS.active.id,
+        store: 'stripe',
+        product_id: 'premium_monthly',
+        payload: {
+          eventType: event.eventType,
+          store: 'stripe',
+          productId: 'premium_monthly',
+          periodType: null,
+          purchasedAtMs: PREMIUM_SEED_SYNCED_AT.getTime(),
+          expirationAtMs: new Date('2030-01-01T00:00:00.000Z').getTime(),
+          cancelReason: null,
+          environment: 'sandbox',
+        },
+        occurred_at: PREMIUM_SEED_SYNCED_AT,
+        forward_due: event.forwardDue,
+        forwarded_at: event.forwardedAt,
+      },
+    })
+  }
+
+  return {
+    userIds: PREMIUM_SEED_ENTITLEMENTS.map((entitlement) => entitlement.user.id),
+  }
+}

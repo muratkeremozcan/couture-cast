@@ -16,6 +16,36 @@
       "saved": "Alışveriş tercihleri güncellendi",
       "error": "Alışveriş tercihleri güncellenemedi.",
       "signedOutHint": "Bunu değiştirmek için oturum açın"
+    },
+    "premium": {
+      "sectionTitle": "Premium",
+      "disclosure": "Premium abonelikleri RevenueCat ve web üzerinden yapılan satın alımlarda Stripe tarafından işlenir. CoutureCast, aboneliğinin giriş yaptığın her yerde çalışması için hesap kimliğini ve satın alma durumunu bu işleyicilerle paylaşır. Kart numaraları ödeme sağlayıcısı tarafından işlenir ve hiçbir zaman CoutureCast'e ulaşmaz.",
+      "status": {
+        "none": "Henüz bir Premium aboneliğin yok.",
+        "active": "Premium etkin: {{plan}}. Geçerli dönem {{date}} tarihinde sona eriyor.",
+        "gracePeriod": "Premium etkin, ancak bir ödeme sorunu var.",
+        "expired": "Premium aboneliğinin süresi doldu.",
+        "revoked": "Premium aboneliğin iptal edildi."
+      },
+      "planMonthly": "Aylık Premium",
+      "planAnnual": "Yıllık Premium",
+      "subscribe": "Premium'a geç",
+      "manage": "Aboneliği yönet",
+      "manageInStore": "Bu aboneliği satın alındığı App Store veya Play Store üzerinden yönet.",
+      "restore": "Satın alımları geri yükle",
+      "pendingApproval": "Bu satın alma bir velinin onayını bekliyor. Onaylandığında Premium açılacak.",
+      "activating": "Ödeme alındı. Premium aboneliğin etkinleştiriliyor…",
+      "stillProcessing": "Hâlâ işleniyor. Ödemen tamamlandı; kısa süre sonra tekrar kontrol et.",
+      "portalLagHint": "Faturalama portalında yapılan değişikliklerin, özellikle iptallerin burada görünmesi birkaç saat sürebilir.",
+      "graceBanner": "Ödeme yönteminde bir sorun var. Premium'u korumak için abone olduğun mağaza veya faturalama portalından güncelle.",
+      "endedNote": "Aboneliğin sona erdi. İstediğin zaman yeniden abone olabilirsin.",
+      "errorLoad": "Abonelik durumu yüklenemedi.",
+      "errorPurchase": "Ödeme başlatılamadı. Lütfen tekrar dene.",
+      "signedOutHint": "Premium'a abone olmak veya yönetmek için giriş yap",
+      "plannerLocked": {
+        "title": "7 Günlük Planlayıcı bir Premium özelliğidir",
+        "cta": "Premium'a geç"
+      }
     }
   },
   "wardrobe": {
@@ -32,6 +62,9 @@
       "descriptionLabel": "Açıklama",
       "descriptionPlaceholder": "İsteğe bağlı açıklama",
       "garmentsLabel": "Parçalar",
+      "garmentsSelected": "Parçalar ({{max}} parçadan {{count}} tanesi seçildi)",
+      "garmentsRange": "{{min}} ile {{max}} arasında parça seçin.",
+      "garmentOrder": "Parça sırası",
       "garmentPosition": "{{count}} konumdan {{position}}. konum",
       "moveGarmentUp": "{{garment}} parçasını yukarı taşı",
       "moveGarmentDown": "{{garment}} parçasını aşağı taşı",

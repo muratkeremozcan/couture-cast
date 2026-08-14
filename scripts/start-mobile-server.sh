@@ -17,7 +17,14 @@ export EXPO_NO_INTERACTIVE=1
 # Expo Go startup differs by platform: iOS can fetch/install Expo Go via Expo
 # CLI, while Android local smoke assumes an already attached Expo Go target.
 ARGS=(--clear --port "$METRO_PORT")
-if [[ "${MOBILE_E2E_PLATFORM:-}" == "ios" ]]; then
+if [[ "${MOBILE_E2E_EXPO_NO_OPEN:-}" == "1" ]]; then
+  # Sharded runs boot one simulator per shard, and `--ios` tells Expo CLI to
+  # open the app on whichever simulator it resolves first, which is another
+  # shard's device. Maestro launches the app itself through `openLink`, so the
+  # bundler only has to serve; the runner has already installed Expo Go on the
+  # simulator this shard owns.
+  ARGS+=(--go)
+elif [[ "${MOBILE_E2E_PLATFORM:-}" == "ios" ]]; then
   ARGS+=(--ios --go)
 elif [[ "${MOBILE_E2E_PLATFORM:-}" == "android" ]]; then
   # Android Expo Go needs a signed manifest on a fresh machine; offline mode can

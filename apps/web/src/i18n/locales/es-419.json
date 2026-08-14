@@ -16,6 +16,36 @@
       "saved": "Preferencias de compra actualizadas",
       "error": "No se pudieron actualizar las preferencias de compra.",
       "signedOutHint": "Inicia sesión para cambiar esto"
+    },
+    "premium": {
+      "sectionTitle": "Premium",
+      "disclosure": "Las suscripciones Premium son procesadas por RevenueCat y, para compras hechas en la web, por Stripe. CoutureCast comparte tu id de cuenta y el estado de tu compra con estos procesadores para que tu suscripción funcione dondequiera que inicies sesión. Los números de tarjeta los maneja el proveedor de pagos y nunca llegan a CoutureCast.",
+      "status": {
+        "none": "Todavía no tienes una suscripción Premium.",
+        "active": "Premium está activo: {{plan}}. El período actual termina el {{date}}.",
+        "gracePeriod": "Premium está activo, pero hay un problema con el pago.",
+        "expired": "Tu suscripción Premium venció.",
+        "revoked": "Tu suscripción Premium fue revocada."
+      },
+      "planMonthly": "Premium mensual",
+      "planAnnual": "Premium anual",
+      "subscribe": "Obtener Premium",
+      "manage": "Administrar suscripción",
+      "manageInStore": "Administra esta suscripción en el App Store o Play Store donde se compró.",
+      "restore": "Restaurar compras",
+      "pendingApproval": "Esta compra está esperando la aprobación de un tutor. Premium se desbloqueará cuando sea aprobada.",
+      "activating": "Pago recibido. Activando tu suscripción Premium…",
+      "stillProcessing": "Todavía en proceso. Tu pago se realizó; vuelve a revisar en un momento.",
+      "portalLagHint": "Los cambios hechos en el portal de facturación, especialmente las cancelaciones, pueden tardar un par de horas en aparecer aquí.",
+      "graceBanner": "Hay un problema con tu método de pago. Actualízalo en la tienda o el portal de facturación donde te suscribiste para conservar Premium.",
+      "endedNote": "Tu suscripción terminó. Puedes suscribirte de nuevo cuando quieras.",
+      "errorLoad": "No se pudo cargar el estado de la suscripción.",
+      "errorPurchase": "No se pudo iniciar el pago. Inténtalo de nuevo.",
+      "signedOutHint": "Inicia sesión para suscribirte o administrar Premium",
+      "plannerLocked": {
+        "title": "El planificador de 7 días es una función Premium",
+        "cta": "Obtener Premium"
+      }
     }
   },
   "wardrobe": {
@@ -32,6 +62,9 @@
       "descriptionLabel": "Descripción",
       "descriptionPlaceholder": "Descripción opcional",
       "garmentsLabel": "Prendas",
+      "garmentsSelected": "Prendas ({{count}} de {{max}} seleccionadas)",
+      "garmentsRange": "Selecciona de {{min}} a {{max}} prendas.",
+      "garmentOrder": "Orden de las prendas",
       "garmentPosition": "Posición {{position}} de {{count}}",
       "moveGarmentUp": "Mover {{garment}} hacia arriba",
       "moveGarmentDown": "Mover {{garment}} hacia abajo",

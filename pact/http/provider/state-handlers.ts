@@ -1,5 +1,8 @@
 import type { VerifierOptions } from '@pact-foundation/pact'
-import type { SilhouettePhotoFailureReason } from '@couture/api-client/contracts/http'
+import type {
+  EntitlementStore,
+  SilhouettePhotoFailureReason,
+} from '@couture/api-client/contracts/http'
 import {
   configureProviderEvent,
   configureProviderWardrobeState,
@@ -7,6 +10,7 @@ import {
   configureProviderCommerceState,
   configureProviderOnboardingState,
   configureProviderSilhouetteState,
+  configureProviderSubscriptionState,
   parsePactEvent,
   type PactEvent,
 } from './provider-helper'
@@ -38,6 +42,17 @@ type SilhouetteFailureStateParams = {
 
 type CommerceStateParams = {
   userId?: string
+}
+
+type SubscriptionStateParams = {
+  userId?: string
+  /**
+   * Factory override for the entitled state: which rail the subscription was
+   * bought on. 'app_store' arranges the portal-404 case (a paying store
+   * subscriber with no Stripe billing profile); omitted, it defaults to
+   * 'stripe' in the configurator.
+   */
+  store?: EntitlementStore
 }
 
 export const stateHandlers: StateHandlers = {
@@ -323,5 +338,43 @@ export const stateHandlers: StateHandlers = {
   'The affiliate webhook signature is invalid': () => {
     configureProviderCommerceState({ scenario: 'invalid-signature' })
     return Promise.resolve({ description: 'Configured a failing webhook signature' })
+  },
+
+  /* ----------------------------------------------------------------------- *
+   * Story 5.2 premium subscription lifecycle.
+   *
+   * Each state names an arrangement the contract records an outcome for, not
+   * the rule that produces it. 'Premium subscriptions are disabled'
+   * configures a provider that answers 503 on checkout; whether the
+   * commerce_subscription_enabled flag resolving false is what gets it there
+   * is proven in the API suite, where a flag actually exists to resolve.
+   * ----------------------------------------------------------------------- */
+  'The user has an active premium entitlement': (parameters?: unknown) => {
+    const { userId, store } = (parameters ?? {}) as SubscriptionStateParams
+    configureProviderSubscriptionState({ userId, scenario: 'entitled', store })
+    return Promise.resolve({
+      description: `Configured an active premium entitlement via ${store ?? 'stripe'}`,
+    })
+  },
+  'The user has no premium entitlement': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as SubscriptionStateParams
+    configureProviderSubscriptionState({ userId, scenario: 'never-subscribed' })
+    return Promise.resolve({ description: 'Configured a never-subscribed user' })
+  },
+  'Premium subscriptions are disabled': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as SubscriptionStateParams
+    configureProviderSubscriptionState({ userId, scenario: 'purchasing-disabled' })
+    return Promise.resolve({
+      description: 'Configured the subscription kill switch as off',
+    })
+  },
+  'The user has a Stripe billing profile': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as SubscriptionStateParams
+    configureProviderSubscriptionState({
+      userId,
+      scenario: 'stripe-billing-profile',
+      store: 'stripe',
+    })
+    return Promise.resolve({ description: 'Configured a Stripe billing profile' })
   },
 }

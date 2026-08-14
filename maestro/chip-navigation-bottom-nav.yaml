@@ -13,13 +13,7 @@ tags:
     clearState: true
     stopApp: false
 
-- openLink: ${APP_URL}
-
-# Dismiss Expo developer sheets if present
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go developer menu if it appears'
+- runFlow: subflows/open-app.yaml
 
 # Verify chip selection is available on the mobile Home screen
 - assertVisible:
@@ -31,6 +25,9 @@ tags:
 
 - tapOn:
     id: 'chip-community'
+
+- takeScreenshot:
+    path: maestro/artifacts/chip-navigation-community-selected
 
 - assertVisible:
     id: 'chip-community'

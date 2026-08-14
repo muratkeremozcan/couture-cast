@@ -70,6 +70,17 @@ export {
   persistCommercePreference,
 } from './commerce.factory.js'
 export {
+  buildBillingCustomerCreateInput,
+  buildBillingEventCreateInput,
+  buildPremiumEntitlementCreateInput,
+  createBillingCustomer,
+  createBillingEvent,
+  createPremiumEntitlement,
+  persistBillingCustomer,
+  persistBillingEvent,
+  persistPremiumEntitlement,
+} from './premium.factory.js'
+export {
   DEFAULT_FACTORY_REGISTRY_KEYS,
   createFactoryRegistry,
   factoryRegistry,
@@ -164,3 +175,11 @@ export type {
   CommercePreferenceFixture,
   PersistedCommerceCatalog,
 } from './commerce.factory.js'
+export type {
+  BillingCustomerFactoryOverrides,
+  BillingCustomerFixture,
+  BillingEventFactoryOverrides,
+  BillingEventFixture,
+  PremiumEntitlementFactoryOverrides,
+  PremiumEntitlementFixture,
+} from './premium.factory.js'

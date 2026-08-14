@@ -13,25 +13,15 @@ tags:
     clearState: true
     stopApp: false
 
-- openLink: ${APP_URL}
+- runFlow: subflows/open-app.yaml
 
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go developer menu if it appears'
-- tapOn:
-    text: 'Open app'
-    optional: true
-    label: 'Dismiss Expo Go developer sheet if it appears'
-
-- tapOn:
-    id: 'settings-tab'
-    retryTapIfNoChange: true
-    label: 'Open language settings'
-
-- tapOn:
-    id: 'locale-btn-tr-TR'
-    retryTapIfNoChange: true
+# set-locale.yaml navigates to settings itself. This flow used to tap a
+# `settings-tab` id, which `(tabs)/_layout.tsx` has never declared — it is
+# `tab-settings` — so that step could only ever fail with "Element not found".
+- runFlow:
+    file: subflows/set-locale.yaml
+    env:
+      LOCALE: tr-TR
 
 - assertVisible: 'Ayarlar'
 - assertVisible: 'Dil'
@@ -47,3 +37,22 @@ tags:
 
 - takeScreenshot:
     path: maestro/artifacts/localization-tr-TR
+
+# --- Restore the shared fixture ---------------------------------------------
+#
+# Every flow in this suite runs as the one user `scripts/run-maestro.mjs` signs
+# up, and the locale choice is synced to that user's profile, not just to device
+# storage. So a Turkish locale left behind here does not stop at the next
+# `clearState: true` — it is refetched with the profile and every later flow in
+# the run asserts English copy against a Turkish app. This flow must put the
+# locale back the way it found it, exactly as commerce-affiliate.yaml restores
+# the affiliate opt-out it toggles.
+- runFlow:
+    file: subflows/set-locale.yaml
+    env:
+      LOCALE: en-US
+
+- extendedWaitUntil:
+    visible: 'Language'
+    timeout: 15000
+    label: 'Locale is back to English for the flows that follow'

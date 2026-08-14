@@ -2,7 +2,7 @@
 import SwiftUI
 import WidgetKit
 
-private let watchAppGroup = "group.com.anonymous.mobile.watch"
+private let watchAppGroup = "group.com.couturecast.app.watch"
 private let widgetPayloadKey = "widgetPayload"
 private let onyx = Color(red: 17 / 255, green: 17 / 255, blue: 17 / 255)
 private let gold = Color(red: 201 / 255, green: 161 / 255, blue: 74 / 255)

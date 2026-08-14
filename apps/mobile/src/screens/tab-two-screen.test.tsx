@@ -9,6 +9,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { afterEach, beforeEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import type * as PremiumModule from '../lib/premium'
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -25,6 +26,9 @@ const {
   updatePreferredLocaleMock,
   getCommercePreferenceMock,
   updateCommercePreferenceMock,
+  getSubscriptionMock,
+  ensurePurchasesConfiguredMock,
+  premiumPassthroughMocks,
 } = vi.hoisted(() => ({
   analyticsCaptureMock: vi.fn(),
   analyticsDistinctIdMock: vi.fn(() => 'test-user-id'),
@@ -32,6 +36,17 @@ const {
   updatePreferredLocaleMock: vi.fn(),
   getCommercePreferenceMock: vi.fn(),
   updateCommercePreferenceMock: vi.fn(),
+  getSubscriptionMock: vi.fn(),
+  ensurePurchasesConfiguredMock: vi.fn(),
+  premiumPassthroughMocks: {
+    refreshSubscriptionFromMobile: vi.fn(),
+    pollSubscriptionUntilEntitled: vi.fn(),
+    purchasePremiumPlan: vi.fn(),
+    restorePremiumPurchases: vi.fn(),
+    showManageSubscriptionsInStore: vi.fn(),
+    resolvePremiumSectionState: vi.fn(),
+    isEntitledSubscription: vi.fn(),
+  },
 }))
 
 vi.mock('@/src/analytics/mobile-analytics', () => ({
@@ -47,6 +62,9 @@ vi.mock('@/src/lib/api-health', () => ({
 
 vi.mock('@/src/lib/user', () => ({
   updatePreferredLocaleFromMobile: updatePreferredLocaleMock,
+  // The real premium lib (loaded via vi.importActual for its pure exports)
+  // imports this from './user'; the mocked module has to keep the name.
+  getUserProfileFromMobile: vi.fn(),
 }))
 
 // The commerce preference is a network boundary. Owning it here keeps the
@@ -54,18 +72,41 @@ vi.mock('@/src/lib/user', () => ({
 vi.mock('@/src/lib/commerce', () => ({
   getCommercePreferenceFromMobile: getCommercePreferenceMock,
   updateCommercePreferenceFromMobile: updateCommercePreferenceMock,
+  // The real premium lib (loaded via vi.importActual for its pure exports)
+  // imports this from './commerce'; the mocked module has to keep the name.
+  withRequestTimeout: vi.fn(),
+}))
+
+// Story 5.2: the premium boundary is owned the same way. The factory has to be
+// static (browser-mode mocking cannot resolve importOriginal factories); the
+// resolver and entitlement predicate get their REAL implementations wired in
+// beforeAll/beforeEach via vi.importActual, so the section still renders from
+// actual render-state logic. The dedicated premium suite
+// (`settings-premium-section.test.tsx`) drives the purchase flows; here the
+// section only has to render deterministically.
+vi.mock('@/src/lib/premium', () => ({
+  getSubscriptionFromMobile: getSubscriptionMock,
+  ensurePurchasesConfigured: ensurePurchasesConfiguredMock,
+  ...premiumPassthroughMocks,
 }))
 
 import i18n, { initI18n } from '../lib/i18n'
+import { mockSubscriptionNone } from '../test-utils/msw/handlers'
 import { getSavedSettings } from '../lib/settings-storage'
 import { setMobileAnalyticsDiagnosticsEnabled } from '../analytics/mobile-analytics-diagnostics'
-import SettingsScreen from '../../app/(tabs)/settings'
+import SettingsScreen, { API_HEALTH_TIMEOUT_MS } from '../../app/(tabs)/settings'
+
+/** jsdom reports integer scroll/client widths; see the overflow assertion. */
+const SUBPIXEL_ROUNDING_SLACK_PX = 2
 
 const SETTINGS_STORAGE_KEY = 'couture-cast-settings.json'
 
 describe('SettingsScreen', () => {
+  let actualPremium: typeof PremiumModule
+
   beforeAll(async () => {
     await initI18n()
+    actualPremium = await vi.importActual<typeof PremiumModule>('@/src/lib/premium')
   })
 
   beforeEach(async () => {
@@ -81,6 +122,17 @@ describe('SettingsScreen', () => {
     updateCommercePreferenceMock.mockReset()
     updateCommercePreferenceMock.mockImplementation((affiliateCtasEnabled: boolean) =>
       Promise.resolve({ affiliateCtasEnabled })
+    )
+    getSubscriptionMock.mockReset()
+    getSubscriptionMock.mockResolvedValue(mockSubscriptionNone.data)
+    ensurePurchasesConfiguredMock.mockReset()
+    ensurePurchasesConfiguredMock.mockResolvedValue('ready')
+    // Re-wired every test: restoreMocks strips implementations between tests.
+    premiumPassthroughMocks.resolvePremiumSectionState.mockImplementation(
+      actualPremium.resolvePremiumSectionState
+    )
+    premiumPassthroughMocks.isEntitledSubscription.mockImplementation(
+      actualPremium.isEntitledSubscription
     )
     await i18n.changeLanguage('en-US')
   })
@@ -107,7 +159,9 @@ describe('SettingsScreen', () => {
     await render(<SettingsScreen />)
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5_000)
+      // The screen's own bound, imported rather than mirrored: a change there
+      // must not leave this test silently advancing past a different timeout.
+      await vi.advanceTimersByTimeAsync(API_HEALTH_TIMEOUT_MS)
     })
 
     expect(screen.getByText('API health unavailable')).toBeTruthy()
@@ -413,12 +467,31 @@ describe('SettingsScreen', () => {
         `${locale} disclosure`
       ).toBeGreaterThan(0)
 
+      // Story 5.2: the premium section carries the other multi-sentence
+      // disclosure plus the subscribe controls; named for the same reason —
+      // the loop must not pass because the section vanished from a locale.
+      const premiumDisclosure = await screen.findByTestId('premium-settings-disclosure')
+      expect(
+        premiumDisclosure.textContent?.trim().length,
+        `${locale} premium disclosure`
+      ).toBeGreaterThan(0)
+      const subscribeControl = await screen.findByTestId('premium-subscribe-monthly')
+      expect(
+        subscribeControl.textContent?.trim().length,
+        `${locale} premium plan label`
+      ).toBeGreaterThan(0)
+
       const allElements = container.querySelectorAll('*')
       allElements.forEach((el: Element) => {
         if (el.children.length === 0 && el.textContent && el.textContent.trim()) {
           const scrollWidth = el.scrollWidth
           const clientWidth = el.clientWidth
-          expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 2)
+          // 2px of slack for sub-pixel rounding: jsdom reports integer
+          // scroll/client widths, so a fractional layout can round one up and
+          // the other down without any real overflow.
+          expect(scrollWidth).toBeLessThanOrEqual(
+            clientWidth + SUBPIXEL_ROUNDING_SLACK_PX
+          )
         }
       })
 

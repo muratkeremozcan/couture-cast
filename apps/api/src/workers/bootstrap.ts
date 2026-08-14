@@ -18,6 +18,17 @@ import {
   WeatherAlertFanoutQueue,
   type AlertFanoutJobData,
 } from '../modules/alerts/weather-alert-fanout.queue'
+import {
+  BILLING_RECONCILIATION_JOB_NAME,
+  COMMERCE_RETENTION_JOB_NAME,
+  registerBillingReconciliationSchedulers,
+} from '../modules/commerce/billing-reconciliation.scheduler'
+import { BillingReconciliationService } from '../modules/commerce/billing-reconciliation.service'
+import { CommerceRepository } from '../modules/commerce/commerce.repository'
+import { CommerceRetentionService } from '../modules/commerce/commerce-retention.service'
+import { PremiumEntitlementService } from '../modules/commerce/premium-entitlement.service'
+import { resolveRevenueCatClient } from '../modules/commerce/revenuecat-client'
+import { resolveStripeClient } from '../modules/commerce/stripe-client'
 import { PushNotificationService } from '../modules/notifications/push-notification.service'
 import { PushTokenRepository } from '../modules/notifications/push-token.repository'
 import { loadWeatherConfig } from '../modules/weather/providers/weather.config'
@@ -56,10 +67,18 @@ async function startWorkers() {
     const colorExtractionQueue = startedQueues.find(
       (queue) => queue.name === 'color-extraction'
     )
+    const billingReconciliationQueue = startedQueues.find(
+      (queue) => queue.name === 'billing-reconciliation'
+    )
 
-    if (!weatherQueue || !alertFanoutQueue || !colorExtractionQueue) {
+    if (
+      !weatherQueue ||
+      !alertFanoutQueue ||
+      !colorExtractionQueue ||
+      !billingReconciliationQueue
+    ) {
       throw new Error(
-        'Required weather-ingestion, alert-fanout, and color-extraction queues were not created'
+        'Required weather-ingestion, alert-fanout, color-extraction, and billing-reconciliation queues were not created'
       )
     }
 
@@ -118,6 +137,27 @@ async function startWorkers() {
 
     await registerWeatherRefreshScheduler(weatherQueue, weatherConfig)
 
+    // Story 5.2 Decision 4a: billing reconciliation + commerce retention run
+    // here — the worker runtime is the only substrate in this repo where
+    // schedules provably fire (the serverless API's @Cron never has).
+    const revenueCatClient = resolveRevenueCatClient()
+    const premiumEntitlementService = new PremiumEntitlementService(
+      prisma,
+      revenueCatClient,
+      resolveStripeClient()
+    )
+    const billingReconciliationService = new BillingReconciliationService(
+      prisma,
+      revenueCatClient,
+      premiumEntitlementService,
+      telemetryService
+    )
+    const commerceRetentionService = new CommerceRetentionService(
+      new CommerceRepository(prisma)
+    )
+
+    await registerBillingReconciliationSchedulers(billingReconciliationQueue)
+
     // Flow ref S0.4/T4: start one worker per queue with the queue-specific
     // concurrency and optional rate limiter policy.
     workers.push(
@@ -137,6 +177,29 @@ async function startWorkers() {
         },
         {
           ...defaultWorkerOptions(20),
+        }
+      )
+    )
+
+    workers.push(
+      // One consumer, one process group (the bootstrap.ts:144-151 rule): both
+      // billing jobs are DB/HTTP-bound sweeps, serial on purpose so a slow
+      // ledger cannot stack concurrent sweeps against RC's rate limits.
+      createWorker(
+        'billing-reconciliation',
+        async (job) => {
+          if (job.name === BILLING_RECONCILIATION_JOB_NAME) {
+            await billingReconciliationService.sweep()
+            return
+          }
+          if (job.name === COMMERCE_RETENTION_JOB_NAME) {
+            await commerceRetentionService.pruneExpiredCommerceRecords()
+            return
+          }
+          logger.warn({ jobName: job.name }, 'Unknown billing-reconciliation job')
+        },
+        {
+          ...defaultWorkerOptions(1),
         }
       )
     )

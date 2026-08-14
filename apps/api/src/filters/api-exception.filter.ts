@@ -27,6 +27,11 @@ interface AuthenticatedRequest {
  */
 const TELEMETRY_EXCLUDED_ROUTES: ReadonlySet<string> = new Set([
   '/api/v1/commerce/affiliate/webhook',
+  // Story 5.2: the billing webhooks share the affiliate webhook's exact
+  // amplification-vector reasoning — unauthenticated by bearer design, so an
+  // anonymous caller must not be able to write a telemetry row per attempt.
+  '/api/v1/commerce/subscription/webhooks/stripe',
+  '/api/v1/commerce/subscription/webhooks/revenuecat',
 ])
 
 /**

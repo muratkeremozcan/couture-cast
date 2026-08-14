@@ -24,7 +24,6 @@ import {
   Switch,
   Text,
   View,
-  findNodeHandle,
 } from 'react-native'
 import {
   createGarmentItemResponseSchema,
@@ -36,6 +35,7 @@ import {
 import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
 import { sha256Hex } from '@/src/lib/expo-native-helpers'
+import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
 type CaptureStep = 'source' | 'crop' | 'uploading' | 'complete'
 type AspectRatio = '1:1' | '4:3'
@@ -104,7 +104,7 @@ export function MobileGarmentCaptureModal({
       Platform.OS === 'web'
         ? null
         : setTimeout(() => {
-            const node = findNodeHandle(titleRef.current)
+            const node = safeFindNodeHandle(titleRef.current)
             if (node) AccessibilityInfo.setAccessibilityFocus(node)
           }, 150)
     return () => {

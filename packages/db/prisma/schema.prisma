@@ -159,6 +159,28 @@ enum AffiliateConversionStatus {
   reversed
 }
 
+/// Lowercase members serialize straight to JSON with no mapping layer.
+enum BillingProvider {
+  stripe
+  revenuecat
+}
+
+/// Mirrors RevenueCat store values; `promotional` covers RC promotional grants
+/// (the operator break-glass path in the premium runbook).
+enum EntitlementStore {
+  app_store
+  play_store
+  stripe
+  promotional
+}
+
+enum PremiumEntitlementStatus {
+  active
+  grace_period
+  expired
+  revoked
+}
+
 model User {
   id                            String                   @id @default(cuid())
   email                         String                   @unique
@@ -191,6 +213,9 @@ model User {
   silhouette_profile            SilhouetteProfile?
   commerce_preference           CommercePreference?
   affiliate_clicks              AffiliateClick[]
+  premium_entitlement           PremiumEntitlement?
+  billing_events                BillingEvent[]
+  billing_customer              BillingCustomer?
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -884,4 +909,81 @@ model AffiliateConversion {
   @@index([affiliate_click_id, occurred_at(sort: Desc)])
   @@index([received_at])
   @@map("AffiliateConversion")
+}
+
+/// Story 5.2: mirror of the RevenueCat entitlement ledger — our database
+/// mirrors, never originates, entitlement state. RLS: worker-only. Zero client
+/// policies, zero grants: a client-forgeable entitlement row is free Premium.
+model PremiumEntitlement {
+  id                     String                   @id @default(cuid())
+  user                   User                     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                String                   @unique
+  status                 PremiumEntitlementStatus
+  store                  EntitlementStore
+  /// 'premium_monthly' | 'premium_annual' today; deliberately unconstrained so
+  /// the operator can add products without a migration.
+  product_id             String
+  will_renew             Boolean
+  /// UTC in timestamp-without-tz; every SQL clock comparison goes through
+  /// `now() AT TIME ZONE 'UTC'`.
+  current_period_end     DateTime
+  /// Last successful sync from the ledger (webhook apply or REST pull).
+  synced_at              DateTime
+  /// Ordering guard: apply an event iff occurred_at is newer, or equal with a
+  /// distinct event id. Strictly-older events are dropped.
+  last_event_occurred_at DateTime
+  /// Provider event id of the last applied event ('pull:<cuid>' for REST pulls).
+  last_event_id          String
+  created_at             DateTime                 @default(now())
+  updated_at             DateTime                 @updatedAt
+
+  @@map("PremiumEntitlement")
+}
+
+/// Story 5.2: append-only receipt log — the "receipts stored securely" record.
+/// RLS: worker-only. `payload` is an allowlisted projection, never a raw
+/// provider body. An UPDATE-blocking trigger in the migration enforces
+/// append-only; DELETE stays open for the 24-month retention pruner.
+model BillingEvent {
+  id                 String            @id @default(cuid())
+  provider           BillingProvider
+  /// RevenueCat event.id / Stripe event.id
+  external_event_id  String
+  /// Provider's own type string, e.g. 'INITIAL_PURCHASE', 'customer.subscription.updated'
+  event_type         String
+  /// SetNull so financial facts survive account erasure as unattributed rows.
+  user               User?             @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  user_id            String?
+  store              EntitlementStore?
+  product_id         String?
+  payload            Json
+  occurred_at        DateTime
+  received_at        DateTime          @default(now())
+  /// Forward obligation (Stripe checkout events only). NULL-equivalent default
+  /// false = nothing to forward. A due-but-unforwarded row is re-driven by the
+  /// reconciliation sweep until forwarded_at is set; a dropped forward would be
+  /// an unrecoverable lost payment, so this is an outbox, never fire-and-forget.
+  forward_due        Boolean           @default(false)
+  forwarded_at       DateTime?
+  forward_attempts   Int               @default(0)
+  forward_last_error String?
+
+  @@unique([provider, external_event_id])
+  @@index([received_at])
+  @@index([forward_due, forwarded_at])
+  @@map("BillingEvent")
+}
+
+/// Story 5.2: Stripe customer mapping so Checkout/Portal sessions reuse one
+/// customer. Upserted at checkout-session creation time, not webhook time.
+/// RLS: worker-only.
+model BillingCustomer {
+  id                 String   @id @default(cuid())
+  user               User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id            String   @unique
+  stripe_customer_id String   @unique
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  @@map("BillingCustomer")
 }

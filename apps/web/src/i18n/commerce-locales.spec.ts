@@ -51,7 +51,11 @@ const CATALOGS: Record<SupportedLocale, Catalog> = {
 const APPROVED_COGNATES: Record<string, readonly SupportedLocale[]> = {}
 
 function commerceTree(catalog: Catalog): Record<string, unknown> {
-  return (catalog.commerce ?? {}) as Record<string, unknown>
+  // Story 5.2 nests its `premium` namespace under `commerce.*` (Decision 12a)
+  // but audits it in `premium-locales.spec.ts`; this spec keeps pinning the
+  // 5.1 key set exactly, so the subtree is excluded rather than absorbed.
+  const commerce = (catalog.commerce ?? {}) as Record<string, unknown>
+  return Object.fromEntries(Object.entries(commerce).filter(([key]) => key !== 'premium'))
 }
 
 function flatten(value: unknown, prefix = ''): Map<string, string> {

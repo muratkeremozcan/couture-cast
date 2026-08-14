@@ -1,0 +1,63 @@
+# Navigate to the Settings tab and prove you actually landed there.
+#
+# A bare `tapOn: id: tab-settings` is not reliable in Expo Go. The developer
+# sheet can rise over the lower half of the screen at any point after mount,
+# which is exactly where the tab bar lives, so the tap is swallowed by the sheet
+# and the flow carries on believing it navigated. The symptom is always a
+# confusing downstream failure — `premium-settings-section` "not found",
+# `locale-btn-tr-TR` "not found" — on a screen that renders both perfectly well.
+#
+# So the tap is paired with an assertion on the destination screen and the pair
+# is retried. `settings-screen` is the testID on the settings container in
+# `app/(tabs)/settings.tsx`.
+appId: ${MAESTRO_APP_ID}
+---
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: 'Continue'
+          optional: true
+          label: 'Dismiss an Expo Go sheet covering the tab bar'
+      # Pop a pushed route first. The tab bar is not reachable from the capsule
+      # library or the silhouette editor, and a caller can arrive here with one
+      # of those on top -- `garment-capsule-localization-flow` did, and reported
+      # `tab-settings` "not found" while the capsule library sat on screen with
+      # its `BackButton` plainly visible in the hierarchy. Optional, so this is a
+      # no-op whenever a tab screen is already showing.
+      - runFlow:
+          when:
+            notVisible:
+              id: 'tab-settings'
+          commands:
+            - tapOn:
+                id: 'BackButton'
+                optional: true
+                label: 'Leave a pushed route so the tab bar is reachable'
+      - tapOn:
+          id: 'tab-settings'
+          retryTapIfNoChange: true
+          label: 'Open settings'
+      - extendedWaitUntil:
+          visible:
+            id: 'settings-screen'
+          timeout: 15000
+          label: 'Settings screen is the one on top'
+
+# Land at the TOP of the settings screen, wherever a previous flow left it.
+#
+# The settings list is one long ScrollView and its scroll offset survives a tab
+# switch, so a flow that scrolled down to the Premium section leaves the next
+# flow looking at the middle of the page. `analytics` inherited exactly that and
+# failed on "Language" — the first section on the screen — while the screenshot
+# showed the Premium and diagnostics sections rendering perfectly well further
+# down. Anchored on the en-US locale button rather than the "Language" heading
+# because the testID is stable across locales and the heading is translated.
+- scrollUntilVisible:
+    element:
+      id: 'locale-btn-en-US'
+    direction: UP
+    timeout: 10000
+    label: 'Settings list is scrolled to the top'
+
+- waitForAnimationToEnd

@@ -1,5 +1,5 @@
 // Story 3.3 Task 2 step 1 owner: render the atomic shared payload in Android widgets.
-package com.anonymous.mobile
+package com.couturecast.app
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager

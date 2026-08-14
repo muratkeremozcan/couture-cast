@@ -71,6 +71,8 @@ import {
   verifyAffiliateWebhookInteraction,
   verifyAffiliateWebhookErrorInteraction,
   affiliateWebhookErrorInteractions,
+  verifyEntitledSubscriptionStatusInteraction,
+  verifySubscriptionRefreshInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -303,4 +305,18 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
       await verifyAffiliateWebhookErrorInteraction(pact, interaction)
     }
   )
+
+  // Story 5.2: mobile reads status and triggers the post-purchase refresh
+  // poll only. Checkout and portal sessions are the web rail's; the store
+  // purchase itself goes through RevenueCat, never through this API.
+  it('reads the premium subscription status of an entitled user', async () => {
+    await verifyEntitledSubscriptionStatusInteraction(
+      pact,
+      createMobileClientForMockServer
+    )
+  })
+
+  it('refreshes the premium subscription from the entitlement ledger', async () => {
+    await verifySubscriptionRefreshInteraction(pact, createMobileClientForMockServer)
+  })
 })

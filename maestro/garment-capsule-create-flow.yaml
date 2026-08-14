@@ -14,19 +14,14 @@ tags:
     clearState: true
     stopApp: false
 
-- openLink: ${APP_URL}
+- runFlow: subflows/open-app.yaml
 
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss Expo Go first-run sheet when present'
+# `wardrobe-capsules-link` lives on the wardrobe hub, but the app opens on
+# Home, so this flow never had a step to get there and the tap could only
+# ever report the link "not found".
+- runFlow: subflows/open-wardrobe-tab.yaml
 
-- tapOn:
-    id: 'wardrobe-capsules-link'
-    label: 'Open the outfit capsule library'
-
-- assertVisible:
-    id: 'create-capsule-button'
+- runFlow: subflows/open-capsules.yaml
 
 - tapOn:
     id: 'create-capsule-button'
@@ -38,6 +33,17 @@ tags:
     id: 'capsule-name-input'
 - inputText: 'Maestro capsule'
 
+# Dismiss the keyboard before touching the garment list.
+#
+# The software keyboard stays up after `inputText` and covers the lower half of
+# the builder, which is where the garment checkboxes live. Maestro reported both
+# selection taps COMPLETED because it found the elements in the hierarchy, but
+# the touches landed on the keyboard: nothing was selected, so the garment-order
+# section -- which only renders once at least one garment is selected -- was
+# absent from the hierarchy entirely, and the reorder step failed looking for
+# controls the app had no reason to draw.
+- hideKeyboard
+
 - tapOn:
     id: 'garment-checkbox-.*'
     index: 0
@@ -48,6 +54,19 @@ tags:
     label: 'Select the second garment'
 
 # Reorder through the accessible controls, never through drag alone.
+#
+# Scrolled to first: the reorder section sits below the full garment list inside
+# the builder's scrolling modal, so with a seeded four-garment wardrobe the
+# controls start off-screen and a bare tap reports them "not found".
+- scrollUntilVisible:
+    element:
+      id: 'move-down-button-.*'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+    label: 'Bring the garment-order controls on screen'
+- waitForAnimationToEnd
+
 - tapOn:
     id: 'move-down-button-.*'
     index: 0

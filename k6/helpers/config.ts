@@ -24,6 +24,8 @@ export const SLO = isSmoke
       capsuleRitualCold: 5000,
       // Story 5.1 affiliate eligibility, relaxed for smoke runs.
       ritualEligible: 3000,
+      // Story 5.2 subscription status read, relaxed for smoke runs.
+      subscriptionStatus: 3000,
     }
   : {
       aggregate: 1500,
@@ -80,6 +82,37 @@ export const SLO = isSmoke
        * which is the only thing this story added to the hot path.
        */
       ritualEligible: 300,
+      /**
+       * Story 5.2: `GET /api/v1/commerce/subscription` for the seeded active
+       * subscriber, i.e. the status read mobile performs on every launch to
+       * decide whether premium surfaces render. The route reads the LOCAL
+       * entitlement mirror only: one indexed single-row `PremiumEntitlement`
+       * lookup by unique `user_id` plus the `commerce_subscription_enabled`
+       * flag evaluation, run in parallel — no ledger call, no generation work.
+       *
+       * ABSOLUTE, NOT RELATIVE, for the same reason as `ritualEligible`: this
+       * harness has no baseline-diff facility (`handleSummary` writes one
+       * run's summary and nothing compares two runs), so a relative budget
+       * would be a threshold nobody could ever evaluate.
+       *
+       * 300 ms, chosen the same way `capsuleRead` and `ritualEligible` were:
+       * this is an indexed read path on a warm API, and 300 ms is the number
+       * this repo already commits to for that shape. For this bound to breach,
+       * either the unique-index lookup on `PremiumEntitlement.user_id` would
+       * have to stop being an index hit, or the feature-flag read would have
+       * to start blocking — both regressions this threshold exists to name.
+       *
+       * No observed figure yet: the first measurement comes from the Story 5.2
+       * verification smoke run and will be recorded in the story evidence.
+       * Until then treat 300 ms as the committed bound for this read shape,
+       * not a tuned figure; tighten it once a load-profile run exists.
+       *
+       * `POST /subscription/refresh` deliberately has NO SLO key and NO
+       * scenario: it pulls the RevenueCat ledger per call outside its
+       * rate-limit window, and a load run must not become a ledger hammer.
+       * See k6/scenarios/premium.scenarios.ts for the full rationale.
+       */
+      subscriptionStatus: 300,
     }
 
 export function apiUrl(path: string) {

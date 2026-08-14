@@ -50,7 +50,7 @@ struct WatchContentView: View {
   }
 
   private func loadLocalData() -> WidgetData {
-    guard let sharedDefaults = UserDefaults(suiteName: "group.com.anonymous.mobile.watch"),
+    guard let sharedDefaults = UserDefaults(suiteName: "group.com.couturecast.app.watch"),
       let payload = sharedDefaults.string(forKey: "widgetPayload"),
       let data = payload.data(using: .utf8),
       let decoded = try? JSONDecoder().decode(WidgetData.self, from: data),

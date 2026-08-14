@@ -3,10 +3,14 @@ import {
   trackAffiliateCtaShown,
   trackAlertReceived,
   trackLocaleSwitched,
+  trackPremiumSubscribeTapped,
   trackRitualCreated,
   trackWardrobeUploadStarted,
 } from '@couture/api-client'
-import type { AffiliateCtaShownEvent } from '@couture/api-client'
+import type {
+  AffiliateCtaShownEvent,
+  PremiumSubscribeTappedEvent,
+} from '@couture/api-client'
 import type { MobileAnalyticsClient } from './mobile-analytics'
 
 /** Story 0.7 support file: mobile analytics wrapper layer.
@@ -101,6 +105,24 @@ export function trackMobileAffiliateCtaShown(
   input: AffiliateCtaShownEvent
 ) {
   const payload = trackAffiliateCtaShown(input, distinctId)
+
+  client.capture(payload.event, payload.properties)
+}
+
+/**
+ * Story 5.2: the mobile funnel start for a Premium purchase. Client-side only,
+ * on the analytics client's own `distinctId`, exactly like
+ * {@link trackMobileAffiliateCtaShown} — it never touches `TelemetryService`.
+ * The identifier space is disjoint from the server HMAC subject, so this event
+ * is directional volume, not a funnel leg; the computable funnel lives in the
+ * server events.
+ */
+export function trackMobilePremiumSubscribeTapped(
+  client: MobileAnalyticsCaptureClient,
+  distinctId: string,
+  input: PremiumSubscribeTappedEvent
+) {
+  const payload = trackPremiumSubscribeTapped(input, distinctId)
 
   client.capture(payload.event, payload.properties)
 }

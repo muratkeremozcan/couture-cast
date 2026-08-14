@@ -16,6 +16,36 @@
       "saved": "Shopping-Einstellungen aktualisiert",
       "error": "Shopping-Einstellungen konnten nicht aktualisiert werden.",
       "signedOutHint": "Melde dich an, um dies zu ändern"
+    },
+    "premium": {
+      "sectionTitle": "Premium",
+      "disclosure": "Premium-Abonnements werden von RevenueCat und bei Käufen im Web von Stripe verarbeitet. CoutureCast teilt deine Konto-ID und deinen Kaufstatus mit diesen Dienstleistern, damit dein Abonnement überall funktioniert, wo du dich anmeldest. Kartennummern verarbeitet ausschließlich der Zahlungsanbieter; sie erreichen CoutureCast nie.",
+      "status": {
+        "none": "Du hast noch kein Premium-Abonnement.",
+        "active": "Premium ist aktiv: {{plan}}. Der aktuelle Zeitraum endet am {{date}}.",
+        "gracePeriod": "Premium ist aktiv, aber es gibt ein Zahlungsproblem.",
+        "expired": "Dein Premium-Abonnement ist abgelaufen.",
+        "revoked": "Dein Premium-Abonnement wurde widerrufen."
+      },
+      "planMonthly": "Premium monatlich",
+      "planAnnual": "Premium jährlich",
+      "subscribe": "Premium holen",
+      "manage": "Abonnement verwalten",
+      "manageInStore": "Verwalte dieses Abonnement im App Store oder Play Store, in dem es gekauft wurde.",
+      "restore": "Käufe wiederherstellen",
+      "pendingApproval": "Dieser Kauf wartet auf die Freigabe durch einen Erziehungsberechtigten. Premium wird freigeschaltet, sobald er genehmigt ist.",
+      "activating": "Zahlung eingegangen. Dein Premium-Abonnement wird aktiviert…",
+      "stillProcessing": "Wird noch verarbeitet. Deine Zahlung ist eingegangen; schau in Kürze wieder vorbei.",
+      "portalLagHint": "Änderungen im Abrechnungsportal, insbesondere Kündigungen, können ein paar Stunden brauchen, bis sie hier erscheinen.",
+      "graceBanner": "Es gibt ein Problem mit deiner Zahlungsmethode. Aktualisiere sie im Store oder Abrechnungsportal deines Abonnements, um Premium zu behalten.",
+      "endedNote": "Dein Abonnement ist beendet. Du kannst jederzeit wieder abonnieren.",
+      "errorLoad": "Abostatus konnte nicht geladen werden.",
+      "errorPurchase": "Checkout konnte nicht gestartet werden. Bitte versuche es erneut.",
+      "signedOutHint": "Melde dich an, um Premium zu abonnieren oder zu verwalten",
+      "plannerLocked": {
+        "title": "Der 7-Tage-Planer ist eine Premium-Funktion",
+        "cta": "Premium holen"
+      }
     }
   },
   "wardrobe": {
@@ -32,6 +62,9 @@
       "descriptionLabel": "Beschreibung",
       "descriptionPlaceholder": "Optionale Beschreibung",
       "garmentsLabel": "Kleidungsstücke",
+      "garmentsSelected": "Kleidungsstücke ({{count}} von {{max}} ausgewählt)",
+      "garmentsRange": "Wähle {{min}} bis {{max}} Kleidungsstücke aus.",
+      "garmentOrder": "Reihenfolge der Kleidungsstücke",
       "garmentPosition": "Position {{position}} von {{count}}",
       "moveGarmentUp": "{{garment}} nach oben verschieben",
       "moveGarmentDown": "{{garment}} nach unten verschieben",

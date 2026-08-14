@@ -345,11 +345,42 @@ export const capsuleIdPathParamsSchema = z
  * Capsule text limits are expressed in extended grapheme clusters, which is what
  * a user perceives as a character. Counting UTF-16 code units would reject a
  * five-emoji name and accept a 120-character combining-mark name.
+ *
+ * `Intl.Segmenter` is optional under ECMA-402 and Hermes ships without it, so
+ * the segmenter is resolved lazily behind a feature detect. Constructing it at
+ * module scope threw `TypeError: Cannot read property 'prototype' of undefined`
+ * while merely *importing* this module under React Native, which took the whole
+ * mobile app down at launch even though only the API ever calls the grapheme
+ * validators. Same shape as the `Intl.ListFormat` fallback in
+ * `@couture/utils/accessibility`.
  */
-const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+let graphemeSegmenter: Intl.Segmenter | undefined
+let graphemeSegmenterResolved = false
+
+function getGraphemeSegmenter(): Intl.Segmenter | undefined {
+  if (!graphemeSegmenterResolved) {
+    graphemeSegmenterResolved = true
+    const segmenter = (Intl as typeof Intl & { Segmenter?: typeof Intl.Segmenter })
+      .Segmenter
+    if (segmenter) {
+      graphemeSegmenter = new segmenter(undefined, { granularity: 'grapheme' })
+    }
+  }
+
+  return graphemeSegmenter
+}
 
 function countGraphemes(value: string): number {
-  return [...graphemeSegmenter.segment(value)].length
+  const segmenter = getGraphemeSegmenter()
+  if (segmenter) {
+    return [...segmenter.segment(value)].length
+  }
+
+  // No ICU segmentation in this runtime. Code points still beat UTF-16 code
+  // units: an astral-plane emoji counts once instead of twice. Combining marks
+  // and ZWJ sequences over-count, which can only reject input the server would
+  // have accepted, never accept input the server would reject.
+  return [...value].length
 }
 
 /** PostgreSQL `text` cannot store a NUL byte, so it is invalid input, not a 500. */

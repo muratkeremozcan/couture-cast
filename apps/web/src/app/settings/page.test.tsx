@@ -21,6 +21,29 @@ vi.mock('posthog-js', () => ({
 }))
 
 const PREFERENCES_PATH = '/api/v1/commerce/preferences'
+const SUBSCRIPTION_PATH = '/api/v1/commerce/subscription'
+
+/**
+ * Story 5.2 mounts `SubscriptionSection` on this page, so every signed-in
+ * render also reads the subscription status. The default here is the
+ * never-subscribed body; section-specific states live in
+ * `subscription-section.test.tsx`.
+ */
+function subscriptionHandler() {
+  return http.get(SUBSCRIPTION_PATH, () =>
+    HttpResponse.json({
+      data: {
+        status: 'none',
+        store: null,
+        productId: null,
+        willRenew: null,
+        currentPeriodEnd: null,
+        syncedAt: null,
+        purchasesEnabled: true,
+      },
+    })
+  )
+}
 
 function signIn() {
   window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
@@ -44,6 +67,7 @@ function preferenceHandlers(options: {
 }) {
   const initial = options.initial ?? true
   return [
+    subscriptionHandler(),
     http.get(PREFERENCES_PATH, () => {
       if (options.getStatus) {
         return HttpResponse.json(
@@ -166,6 +190,7 @@ describe('Web settings page', () => {
     signIn()
     const authorization = vi.fn<(value: string | null) => void>()
     useMswHandlers(
+      subscriptionHandler(),
       http.get(PREFERENCES_PATH, ({ request }) => {
         authorization(request.headers.get('authorization'))
         return HttpResponse.json({ data: { affiliateCtasEnabled: true } })
@@ -277,6 +302,7 @@ describe('Web settings page', () => {
     signIn()
     let putStatus: number | undefined = 500
     useMswHandlers(
+      subscriptionHandler(),
       http.get(PREFERENCES_PATH, () =>
         HttpResponse.json({ data: { affiliateCtasEnabled: true } })
       ),
@@ -351,6 +377,7 @@ describe('Web settings page', () => {
     const gate = deferred<void>()
     const aborted = deferred<void>()
     useMswHandlers(
+      subscriptionHandler(),
       http.get(PREFERENCES_PATH, async ({ request }) => {
         request.signal.addEventListener('abort', () => aborted.resolve())
         await gate.promise
@@ -366,6 +393,25 @@ describe('Web settings page', () => {
     gate.resolve()
 
     expect(screen.queryByTestId('commerce-preferences-section')).not.toBeInTheDocument()
+  })
+
+  /**
+   * Story 5.2 Decision 12: the Premium section is the second child section,
+   * after the commerce preferences. Both sections must render signed out (the
+   * unauthenticated axe run loads this page), each with its own disclosure.
+   */
+  it('5.2-WEB-SETTINGS-01 renders the Premium section after the commerce section', () => {
+    render(<SettingsPage />)
+
+    const commerce = screen.getByTestId('commerce-preferences-section')
+    const premium = screen.getByTestId('premium-subscription-section')
+    expect(
+      commerce.compareDocumentPosition(premium) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Premium' })).toBeInTheDocument()
+    const disclosure = screen.getByTestId('premium-disclosure')
+    expect(disclosure).toHaveTextContent('RevenueCat')
+    expect(disclosure).toHaveTextContent('Stripe')
   })
 
   it('5.1-WEB-SETTINGS-11 labels the toggle and describes it with the help text', async () => {

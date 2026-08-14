@@ -5047,3 +5047,568 @@ flowchart TD
   Toggle --> Pref
   Pref --> Elig
 ```
+
+## Step 34: Premium subscription lifecycle
+
+User/business impact:
+
+Turns the product into a paid one. A signed-in user can subscribe on iOS or
+Android through App Store or Play billing, or on the web through Stripe
+Checkout, and the entitlement they just paid for becomes visible everywhere
+within two minutes. Upgrade, downgrade, and cancellation work on both rails,
+managed where the purchase was made: the store's own subscription controls on
+mobile, the Stripe Customer Portal on web. Every provider event lands as an
+append-only billing record, drives one entitlement transition, and writes an
+audit row. A single operator kill switch stops new purchasing without ever
+taking away what a paying customer can already see, read, or cancel. This is
+the first recurring-revenue surface in the product, so the failure modes carry
+as much design weight as the happy path: a dropped hand-off between Stripe and
+the entitlement ledger would be a lost payment, and a client-forgeable
+entitlement row would be free Premium.
+
+Key takeaways:
+
+1. **The database mirrors entitlement state; it never originates it.**
+   RevenueCat is the ledger for all three stores, and exactly one thing writes
+   `PremiumEntitlement` from provider events: the RevenueCat webhook. The
+   refresh endpoint and the reconciliation sweep also write, but only by
+   applying a ledger snapshot through the same ordering guard, so there is
+   still one source of truth and one set of rules.
+2. **Web purchases join the same ledger instead of forming a second one.**
+   Stripe Checkout completes, and the subscription is forwarded into RevenueCat
+   as a receipt. A Stripe-sourced provisional activation was considered and
+   rejected: two writers drift, and bounded delay is a better failure than
+   inconsistent entitlement.
+3. **The forward is an outbox obligation, never a fire-and-forget call.** The
+   webhook persists the billing event with the obligation recorded before it
+   acknowledges Stripe, attempts the forward inline, and stamps the result. A
+   sweep re-drives anything still owed.
+4. **Cancellation is not a downgrade.** `CANCELLATION` sets `will_renew` false
+   and leaves the status active; `EXPIRATION` is what actually removes access at
+   period end. Grace period keeps access too, because a card hiccup is not a
+   decision to stop paying.
+5. **The kill switch is scoped to purchasing alone.** Checkout-session creation
+   answers `503` when it is off, and a server-evaluated `purchasesEnabled` flag
+   on the status response is the only path by which the flag reaches a client.
+   Status, refresh, the Customer Portal, and both webhooks keep working, because
+   a paying user must always be able to see and cancel a subscription.
+6. **Entitlement rows are privilege-bearing, so clients cannot reach them at
+   all.** All three billing tables enable row-level security with zero policies
+   and zero grants. Unlike the owner-only commerce tables from Step 33, even the
+   owner is denied: every read flows through the API.
+7. **Receipts are stored as an allowlisted projection.** Billing events keep an
+   enumerated set of fields and never a raw provider body, so no email, address,
+   card metadata, or promotional code enters the table. The full-fidelity record
+   stays in the provider dashboards, which is where refund and tax disputes are
+   worked anyway.
+8. **The two-minute promise is decomposed into things that can actually be
+   proven.** The webhook write is synchronous, so a receipt is visible in the
+   same request cycle; the refresh endpoint pulls the ledger on demand; both
+   clients poll on a bounded five-second interval with a hard two-minute stop.
+   Provider-to-us delivery latency is monitored, not tested, and the story says
+   so rather than implying a server-side SLO.
+
+Hard-won lessons from the implementation and review of this story:
+
+1. **A NestJS `@Cron` in this API has never provably fired in production.** The
+   API deploys as a single Vercel serverless function, no `crons` configuration
+   exists anywhere in the repository, and `ScheduleModule.forRoot()` is
+   registered only in the request application. Step 33's `CommerceRetentionService`
+   inherited that defect silently. Billing recovery cannot sit on a decorator
+   that only runs where nobody deploys it, so the reconciliation sweep and the
+   re-hosted retention prune both moved onto BullMQ Job Schedulers in the
+   standalone worker runtime, which is the substrate ADR-012 already
+   established. The remaining `@Cron` consumers belong to other epics and were
+   routed to `deferred-work.md` with the evidence rather than changed blind
+   inside a billing story.
+
+2. **An append-only trigger that blocks every `UPDATE` breaks its own outbox.**
+   The story specified an UPDATE-blocking trigger on the billing event table and
+   also specified forward-outbox columns that a sweep must stamp. Implemented
+   literally, the first requirement makes the second impossible. The trigger
+   therefore rejects changes to the financial columns and allows the bookkeeping
+   ones. The same reading matters for erasure: PostgreSQL implements
+   `ON DELETE SET NULL` as an `UPDATE` of the referencing row, so a blanket block
+   would have made user deletion fail against the very rows designed to outlive
+   it. Two specification clauses can each be correct and jointly unimplementable;
+   the resolution belongs in the migration comment, not in a reviewer's head.
+
+3. **Ordering needs three cases, because equal timestamps are real.** RevenueCat
+   emits `RENEWAL` and `PRODUCT_CHANGE` pairs carrying identical `occurred_at`
+   values at period boundaries. "Newest wins" drops the second one; "drop
+   anything not strictly newer" drops it too. The rule that works is: apply when
+   the event is strictly newer, or when it carries the same instant but a
+   different event id. All three cases plus the replay case are asserted against
+   the database clock, because a guard whose boundary is untested is a guard
+   whose boundary is a guess.
+
+4. **A pseudonymous event has no user id to clean up by.** The premium telemetry
+   events are pseudonymous, so the telemetry service deliberately persists them
+   with a null user id and an HMAC subject. A test-quality review recommended
+   scoping an over-broad cleanup by user id, which would have matched zero rows
+   forever and silently disabled the cleanup entirely — a worse defect than the
+   one being fixed. The correct scope is a suite-start time anchor, the same
+   compromise the shared cleanup helper already makes for unowned rows. A review
+   recommendation is a hypothesis about the code, and it gets verified against
+   the code like any other.
+
+5. **A scan that matches nothing looks exactly like a scan that finds nothing.**
+   The determinism sweep over thirty-four test files reported a clean result on
+   its first pass. BSD `xargs` does not support the `-a` flag that supplied the
+   file list, so the pattern search ran against no files at all and every check
+   "passed" vacuously. Confirming that thirty-four files actually resolved
+   turned the same command into real signal. This is Step 33's unfalsifiable-test
+   lesson wearing different clothes: green earned by matching nothing is not
+   green, and the only defence is asserting the input was non-empty.
+
+6. **Shipping a factory does not mean anything uses it.** Task 1 added premium
+   fixture factories that pin the payload allowlist and a set of fixed instants.
+   Four integration suites then hand-rolled the same rows anyway, re-hardcoding
+   those instants and re-stating the allowlist, so a projection change would have
+   needed edits in five places. The reason was mechanical rather than careless:
+   the premium factory was the only factory in the package missing the repo's
+   `build*CreateInput` convention, so it did not fit the upsert shape the suites
+   needed and they reached past it. Adding the convention was what made the
+   factory usable.
+
+7. **A test id on a `describe` is not a test id.** The ordering and signature
+   quartets carried their plan range on the enclosing block while the individual
+   tests were titled with bare numbers. Every member was implemented and passing,
+   yet a traceability join on full identifiers found one of four in each group.
+   Ranges are for prose; tests need whole identifiers in their titles.
+
+8. **"One ledger" is a claim about writers, not about machinery.** The honest
+   statement of this design is that one component writes entitlement state. The
+   parts list is still two webhook endpoints, a forward outbox, a REST client,
+   and a reconciliation sweep. Stating the simplification precisely, in the
+   architecture decision record, is what keeps a later reader from assuming a
+   single integration and being surprised by four.
+
+9. **The degraded mode has a name and a runbook, not an assumption.** When the
+   entitlement ledger is unavailable, new activations are delayed while
+   already-synced entitlements keep working from the mirror. That state is called
+   paid-but-locked, the obligation survives in the outbox, the sweep re-drives it
+   on recovery, the web client shows a bounded pending state rather than a false
+   failure, and the operator break-glass is a promotional grant. An outage
+   nobody named in advance becomes an incident improvised at the worst moment.
+
+10. **Idempotency has to be exercised standalone, not only as part of a reset.**
+    The premium seed needed to run on its own, which is how a pre-existing defect
+    surfaced: a second `db:seed` without a preceding reset failed on a forecast
+    segment uniqueness collision, because the seed writes now-relative forecast
+    times and the new window overlapped the old rows mid-upsert. Every seed in
+    this repository claims to be idempotent; only the ones actually run twice in
+    a row have demonstrated it.
+
+11. **Parallel sessions need a foundation that type-checks before they start.**
+    The schema, contracts, entitlement core, and feature flag were built and
+    verified first, then three peer sessions worked the Stripe and RevenueCat
+    rails, the mobile surface, and the web surface on branches stacked on that
+    commit. Two coordination facts made it work: a shared contract that was
+    final before fan-out, so the web session could build against endpoints
+    another session had not written yet, and one cross-session correction when
+    the two locale catalogs risked diverging on which keys each surface carries.
+
+Story/Task mapping:
+
+- Story 5.2
+- Task 1 (Prisma models, migration, worker-only RLS, seeds, and factories)
+- Task 2 (Subscription contracts and premium analytics registries)
+- Task 3 (Entitlement service, premium guard, status and refresh endpoints)
+- Task 4 (Stripe rail: sessions, webhook, forward outbox)
+- Task 5 (RevenueCat rail, reconciliation worker, retention re-host)
+- Task 6 (Mobile purchase flow and settings section)
+- Task 7 (Web subscription section and planner-rail gate)
+- Task 8 (Consumer and provider contracts)
+- Task 9 (End-to-end, accessibility, and performance evidence)
+- Task 10 (Verification gate, runbook, and architecture decision record)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/5-2-premium-subscription-lifecycle.md`
+- `_bmad-output/test-artifacts/test-reviews/test-review-5-2-premium-subscription-lifecycle.md`
+- `_bmad-output/project-knowledge/premium-release-checklist.md`
+
+Cross-links:
+
+- Step 33 provides the commerce module, the cache-headers middleware, the
+  uniform webhook rejection pattern, and the retention service this story
+  re-hosts onto a substrate that actually fires.
+- Step 3 provides the Prisma modeling, migration, and row-level-security
+  foundation the three billing tables extend with a stricter worker-only posture.
+- Step 8 provides the shared analytics contracts and the pseudonymous subject
+  discipline the four premium events follow.
+- Step 15 provides the canonical contract validation and generated-client flow
+  that the subscription contracts and the OpenAPI minor bump pass through.
+
+Sequence to follow:
+
+1. Read `packages/db/prisma/schema.prisma` and
+   `packages/db/prisma/migrations/20260812090000_add_premium_subscription/migration.sql`
+   for the three billing models, the append-only trigger and exactly which
+   columns it exempts, and the zero-policy zero-grant row-level security block.
+2. Read `packages/api-client/src/contracts/http/subscription.ts` for the
+   discriminated status union, the wire-only `none` value, the single
+   flag-exposure field, and the seven exported message constants.
+3. Read `apps/api/src/modules/commerce/premium-entitlement.service.ts` for the
+   ordering guard, the audit-on-change rule, and the shared telemetry emission
+   rules, then `premium-entitlement.guard.ts` for the access rule.
+4. Read `subscription.service.ts` for status serialization, the refresh throttle,
+   and the honest unavailable response when the ledger cannot be reached.
+5. Read `stripe-billing.service.ts` and `billing-webhook.service.ts` for session
+   creation, raw-body signature verification, the allowlisted payload
+   projection, and the forward outbox.
+6. Read `billing-reconciliation.service.ts` and `apps/api/src/workers/bootstrap.ts`
+   for the sweep's two crash-isolated duties and the job schedulers that run them,
+   then compare against `apps/api/vercel.json` to see why the decorator-based
+   schedule was abandoned.
+7. Read `apps/mobile/src/lib/premium.ts` and the settings premium section for
+   the five purchase outcomes and the bounded post-purchase poll, then
+   `apps/web/src/lib/premium.ts` and `subscription-section.tsx` for the web
+   equivalents and the post-checkout activation poll.
+8. Read the evidence in this order:
+   `packages/db/test/premium-schema.spec.ts`,
+   `apps/api/integration/premium-revenuecat-webhook.integration.spec.ts`,
+   `premium-stripe-rail.integration.spec.ts`,
+   `premium-reconciliation.integration.spec.ts`, and the test-quality review in
+   `_bmad-output/test-artifacts/test-reviews/`.
+
+Task owner map:
+
+- Story 5.2 Task 1 step 1 owner: define the billing models, append-only trigger,
+  and worker-only row-level security in `packages/db/prisma/schema.prisma` and
+  its migration.
+- Story 5.2 Task 1 step 2 owner: seed the three entitlement states and the
+  purchasing flag in `packages/db/prisma/seeds/commerce.ts` and
+  `feature-flags.ts`.
+- Story 5.2 Task 2 step 1 owner: define the subscription HTTP contracts in
+  `packages/api-client/src/contracts/http/subscription.ts`.
+- Story 5.2 Task 2 step 2 owner: register the premium analytics events and their
+  property allowlists in `packages/api-client/src/types/analytics-events.ts`.
+- Story 5.2 Task 3 step 1 owner: own entitlement reads and writes, including the
+  ordering guard, in `apps/api/src/modules/commerce/premium-entitlement.service.ts`.
+- Story 5.2 Task 3 step 2 owner: serialize status and run the ledger refresh in
+  `apps/api/src/modules/commerce/subscription.service.ts`.
+- Story 5.2 Task 4 step 1 owner: create Checkout and Portal sessions in
+  `apps/api/src/modules/commerce/stripe-billing.service.ts`.
+- Story 5.2 Task 5 step 1 owner: apply provider events and drive the forward
+  outbox in `apps/api/src/modules/commerce/billing-webhook.service.ts`.
+- Story 5.2 Task 5 step 2 owner: re-drive owed forwards and correct drift in
+  `apps/api/src/modules/commerce/billing-reconciliation.service.ts`.
+- Story 5.2 Task 6 step 1 owner: own the mobile purchase outcomes and poll in
+  `apps/mobile/src/lib/premium.ts`.
+- Story 5.2 Task 7 step 1 owner: own the web subscription surface in
+  `apps/web/src/app/components/subscription-section.tsx`.
+
+Tests that cover this step:
+
+Configuration and fixture unit tests:
+
+- [`packages/config/src/flags.spec.ts`](../../packages/config/src/flags.spec.ts): proves the purchasing kill switch
+  is registered and defaults to off.
+- [`packages/testing/test/premium.factory.spec.ts`](../../packages/testing/test/premium.factory.spec.ts): proves the billing fixtures
+  pin the payload allowlist, the fixed instants, and the cleanup registration.
+- [`packages/testing/test/cleanup.spec.ts`](../../packages/testing/test/cleanup.spec.ts): proves teardown deletes are never
+  unscoped, including the time-anchored sweep for billing rows with no owner.
+
+Real-PostgreSQL database tests:
+
+- [`packages/db/test/premium-schema.spec.ts`](../../packages/db/test/premium-schema.spec.ts): proves the idempotency barrier,
+  the append-only trigger and its outbox exemption, and that a billing record
+  survives account erasure as an unattributed row.
+- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts): proves an authenticated client is
+  denied reads on all three billing tables and cannot forge an entitlement row.
+- [`packages/db/test/commerce-seed.spec.ts`](../../packages/db/test/commerce-seed.spec.ts): proves the premium seed is guarded
+  outside non-production and idempotent across repeated runs.
+
+Shared contract and analytics tests:
+
+- [`packages/api-client/testing/subscription-contract.spec.ts`](../../packages/api-client/testing/subscription-contract.spec.ts): proves an
+  unsubscribed response cannot carry entitlement fields, an entitled one cannot
+  omit them, and no error envelope carries a machine-readable code.
+- [`packages/api-client/testing/premium-analytics.spec.ts`](../../packages/api-client/testing/premium-analytics.spec.ts): proves the property
+  allowlists reject prices, receipt identifiers, URLs, and raw user ids.
+
+API unit tests:
+
+- [`apps/api/src/modules/commerce/premium-entitlement.service.spec.ts`](../../apps/api/src/modules/commerce/premium-entitlement.service.spec.ts): proves the
+  ordering guard's three cases and the audit-only-on-change rule.
+- [`apps/api/src/modules/commerce/premium-entitlement.guard.spec.ts`](../../apps/api/src/modules/commerce/premium-entitlement.guard.spec.ts): proves grace
+  period keeps access and a missing auth context is never anonymous premium.
+- [`apps/api/src/modules/commerce/subscription.service.spec.ts`](../../apps/api/src/modules/commerce/subscription.service.spec.ts): proves status
+  serialization, the refresh throttle, and fail-open telemetry.
+- [`apps/api/src/modules/commerce/billing-webhook.service.spec.ts`](../../apps/api/src/modules/commerce/billing-webhook.service.spec.ts): proves the
+  payload projection strips a maximal provider fixture.
+- [`apps/api/src/modules/commerce/billing-reconciliation.service.spec.ts`](../../apps/api/src/modules/commerce/billing-reconciliation.service.spec.ts): proves the
+  sweep's duties are crash-isolated and unfulfillable obligations are abandoned
+  loudly rather than rescanned forever.
+- [`apps/api/src/modules/commerce/billing-reconciliation.scheduler.spec.ts`](../../apps/api/src/modules/commerce/billing-reconciliation.scheduler.spec.ts): proves both
+  job schedulers are registered with the intended cadences.
+
+Real-infrastructure integration tests:
+
+- [`apps/api/integration/premium-subscription.integration.spec.ts`](../../apps/api/integration/premium-subscription.integration.spec.ts): proves the status
+  and refresh endpoints, the guard over real HTTP, and that one account can
+  never read another's subscription.
+- [`apps/api/integration/premium-revenuecat-webhook.integration.spec.ts`](../../apps/api/integration/premium-revenuecat-webhook.integration.spec.ts): proves the
+  full transition table cell by cell, the ordering quartet against the database
+  clock, and the two-user transfer semantics.
+- [`apps/api/integration/premium-stripe-rail.integration.spec.ts`](../../apps/api/integration/premium-stripe-rail.integration.spec.ts): proves the
+  signature quartet against the real verifier and the forward outbox's failure
+  path.
+- [`apps/api/integration/premium-reconciliation.integration.spec.ts`](../../apps/api/integration/premium-reconciliation.integration.spec.ts): proves a re-driven
+  forward closes the paid-but-locked window and that drift correction downgrades
+  a stale entitlement the ledger disowns.
+
+Web unit and component tests:
+
+- [`apps/web/src/app/components/subscription-section.test.tsx`](../../apps/web/src/app/components/subscription-section.test.tsx): proves the bounded
+  activation poll, that a mid-poll unsubscribed response never renders as
+  failure, and that subscribe controls appear only when purchasing is enabled.
+- [`apps/web/src/app/components/lookbook-prism-layout.test.tsx`](../../apps/web/src/app/components/lookbook-prism-layout.test.tsx): proves the planner
+  rail's locked and unlocked states.
+- [`apps/web/src/i18n/premium-locales.spec.ts`](../../apps/web/src/i18n/premium-locales.spec.ts): proves all ten Web catalogs carry
+  complete premium copy.
+
+Mobile unit and component tests:
+
+- [`apps/mobile/src/lib/premium.test.ts`](../../apps/mobile/src/lib/premium.test.ts): proves the post-purchase poll bounds and
+  that the pending-approval outcome never starts one.
+- [`apps/mobile/src/screens/settings-premium-section.test.tsx`](../../apps/mobile/src/screens/settings-premium-section.test.tsx): proves all five
+  purchase outcomes and the per-status rendering rules.
+- [`apps/mobile/src/i18n/premium-locales.spec.ts`](../../apps/mobile/src/i18n/premium-locales.spec.ts): proves all ten Mobile catalogs
+  carry complete premium copy.
+
+Evidence boundaries at the time of writing:
+
+The consumer and provider contracts, the Playwright journeys, the k6 threshold,
+and the Maestro flow are Task 8 and Task 9 and were still being produced when
+this section was written; they are not claimed here. Neither is anything the
+providers themselves do: no automated test in this repository exercises a real
+App Store, Play, Stripe, or RevenueCat call, because every provider is faked. The
+only proof of the real chain is the staged smoke run recorded in the premium
+release checklist, and the nine non-English catalogs remain machine-translation
+drafts pending human review before release.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  subgraph Mobile
+    MSDK["react-native-purchases\nstore purchase"]
+  end
+  subgraph Web
+    WCO["POST /subscription/checkout-session"] --> Stripe["Stripe Checkout"]
+  end
+  Stripe -- "checkout.session.completed\n(signed, raw body)" --> SHook["POST /webhooks/stripe"]
+  SHook --> BE["BillingEvent\nappend-only, forward_due"]
+  BE --> Fwd["Forward to RevenueCat\n(inline attempt)"]
+  Fwd -. "on failure, obligation stays due" .-> Sweep["billing-reconciliation-sweep\nevery 15 min, worker runtime"]
+  Sweep --> Fwd
+  MSDK --> RC["RevenueCat\nentitlement ledger"]
+  Fwd --> RC
+  RC -- "signed webhook" --> RHook["POST /webhooks/revenuecat\nTHE single entitlement writer"]
+  RHook --> Guard{"Ordering guard\nnewer, or equal with a distinct id"}
+  Guard -- "older" --> Drop["record only, no transition"]
+  Guard -- "apply" --> Ent["PremiumEntitlement\n+ AuditLog, one transaction"]
+  Ent --> Status["GET /subscription\nprivate, no-store"]
+  Refresh["POST /subscription/refresh"] --> RC
+  Refresh --> Ent
+  Sweep -- "drift: local active, ledger disowns" --> Ent
+  Status --> Clients["Mobile + Web\nbounded 5s poll, 2 min cap"]
+  Ent --> PGuard["PremiumEntitlementGuard\nactive or grace passes"]
+  Flag["commerce_subscription_enabled"] -- "503 on checkout only" --> WCO
+  Flag -- "purchasesEnabled" --> Status
+```
+
+## Step 35: Reviving the Maestro mobile E2E tier
+
+User/business impact:
+
+The mobile end-to-end tier had been dead since 2026-08-08 and nobody knew,
+because nothing ran it. Eighteen Maestro flows covering the hero ritual, chip
+and tab navigation, wardrobe capture, smart tagging, outfit capsules, wardrobe
+onboarding, silhouette setup, deep links, localization, the affiliate CTA, and
+the premium settings section were all failing at app launch. Reviving the tier
+recovered that coverage and, in the process, surfaced two real crashes that
+shipped to users and could not have been caught anywhere else: no unit test
+mounts the app inside Hermes, and no Playwright test runs React Native at all.
+
+Key takeaways:
+
+1. **A test tier nobody executes decays silently, and CI can hide that.**
+   `pr-mobile-e2e.yml` was `workflow_dispatch`-only, listed three of the
+   eighteen flows, and marked two of them `continue-on-error`. It also built a
+   debug APK and invoked `npx maestro test` with `MOBILE_E2E_SKIP_SERVER=1`, so
+   there was no API, no Metro, no seeded fixture user, and no `APP_URL` — which
+   every flow dereferences in `openLink: ${APP_URL}`. The job could therefore
+   report success while the app under test never mounted. The divergence between
+   the CI harness and the local one is what let the decay go unseen; the fix is
+   for CI to run the same `scripts/run-maestro.mjs` path a developer runs.
+
+2. **An optional platform API constructed at module scope is a crash, not a
+   feature detect.** `packages/api-client/src/contracts/http/wardrobe.ts` built
+   an `Intl.Segmenter` at import time to count grapheme clusters for capsule
+   text limits. `Intl.Segmenter` is optional under ECMA-402 and Hermes ships
+   without it, so merely importing the contracts module threw and took
+   `(tabs)/_layout.tsx` down with it. Only the API ever calls those validators,
+   and the API runs on Node, so nothing needed the segmenter on the device at
+   all. Resolving it lazily behind a feature detect, with a code-point fallback,
+   keeps exact grapheme semantics where they matter and costs nothing where they
+   do not.
+
+3. **A truthy wrong type defeats the guard everyone writes.** Eight call sites
+   passed `findNodeHandle(ref)` straight to
+   `AccessibilityInfo.setAccessibilityFocus`, each behind an `if (node)` check.
+   Under the New Architecture (`newArchEnabled: true`, RN 0.81.5)
+   `findNodeHandle` can return a host object rather than the numeric reactTag
+   its types promise. A host object is truthy, so every guard passed, the object
+   crossed the JSI bridge, and the process died with `Exception in HostFunction:
+Unsupported jsi::Value kind` — no red box, no recoverable error. The guard has
+   to assert the type, not the truthiness, and it belongs in one shared helper
+   rather than at eight call sites.
+
+4. **Selectors must be identifiers, never coordinates or copy.** Flows tapped
+   tabs at `75%,94%`, calibrated for a three-tab bar; once Community was added
+   every tap landed one tab short. `localization.yaml` tapped `settings-tab`, a
+   testID this app has never declared. `hero-experience.yaml` asserted copy that
+   exists only in the mobile unit tests' MSW handlers, so it could never have
+   passed against a live API. And `tapOn: text: 'COMMUNITY'` matches the
+   bottom-nav Community tab rather than the chip, because text is ambiguous
+   across surfaces in this app.
+
+5. **A suite that shares one fixture user across sequential flows is a suite
+   with hidden ordering dependencies.** Three separate leaks were found: the
+   locale, which syncs to the user profile and therefore survives
+   `clearState: true`; the settings screen's scroll offset, which survives a tab
+   switch and left a later flow asserting against mid-page; and the affiliate
+   opt-out, which `commerce-affiliate` already restored. Worse, two localization
+   flows declared `launchApp: arguments: locale: 'tr-TR'` — a no-op twice over,
+   since launch arguments reach Expo Go rather than the app and nothing reads a
+   locale launch argument — so they only ever saw Turkish by inheriting a leak
+   from a flow that ran earlier. A flow that mutates shared state must restore
+   it, and a flow that depends on state must establish it.
+
+6. **Put the fragile parts in one place.** The launch dance (Expo Go drops the
+   first `openLink` after `clearState`, and its developer sheet can rise over the
+   tab bar and swallow a tap) was copy-pasted, inconsistently, into eighteen
+   files. It now lives in `maestro/subflows/open-app.yaml`,
+   `open-settings.yaml`, `open-wardrobe-tab.yaml`, `open-capsules.yaml`, and
+   `set-locale.yaml`, each pairing an action with an assertion on its destination
+   and retrying the pair. Note that a nested `runFlow` path resolves relative to
+   the file it appears in, so subflows reference their siblings without the
+   `subflows/` prefix.
+
+7. **A modal your tool cannot see is indistinguishable from a broken
+   component.** Expo Go raises a one-time developer-menu sheet after the app has
+   mounted: a native modal with a dimmed backdrop over the top half. The app
+   stays fully rendered behind it, so every `assertVisible` passes — and then the
+   backdrop silently swallows the flow's first tap. The signature is always the
+   same: assertions green, first gesture ineffective, second gesture fine. It
+   cost one full session, which concluded that Maestro simply could not tap a
+   `Pressable` and shipped a `longPressOn` workaround; the long press only worked
+   because a coordinate tap had already spent the backdrop. What made it so hard
+   is that **Maestro cannot see the sheet at all** — it is drawn by Expo Go
+   rather than by the app under test, so it is absent from the queried
+   hierarchy. With the sheet filling half the screen, `tapOn: text: 'Continue'`
+   reports the element not found and `assertNotVisible` on the sheet's own body
+   text passes. Nothing about it can be asserted or waited on, so the only remedy
+   is a deliberate throwaway tap on the backdrop, and the honest thing to write
+   in the subflow is why no assertion is possible. The general lesson: when
+   assertions and interactions disagree, suspect something outside the tool's
+   model of the screen before you suspect the component.
+
+8. **A negative assertion that cannot fail is not a test.** `commerce-affiliate`
+   proved the affiliate CTA disappears after opt-out with three
+   `assertNotVisible` checks against content that was below the fold in the first
+   place. Off-screen content is "not visible" whether or not it renders, so those
+   assertions would have gone green against a CTA that was still showing — the
+   exact regression they existed to catch. Any negative assertion about scrolled
+   content has to scroll to where the content would be and anchor on something
+   that is genuinely on screen. Related: `scrollUntilVisible` stops the moment
+   its target _begins_ to be visible, so targeting a container leaves the rest of
+   it below the fold.
+
+9. **Point every test-harness database read and write at one resolved URL.** The
+   Maestro runner handed the API `MOBILE_E2E_DATABASE_URL || <local 54322>` but
+   resolved its own cleanup as
+   `MOBILE_E2E_DATABASE_URL || process.env.DATABASE_URL || <local 54322>`.
+   Importing `@prisma/client` loads `packages/db/.env`, which sets
+   `DATABASE_URL` to the developer's own database, so the suite ran against one
+   database while cleanup deleted from another. The deletes matched nothing, the
+   transaction committed, and the runner logged success — so every run leaked its
+   fixture user into the test database while appearing to tidy up after itself. A
+   cleanup that cannot fail loudly is worse than no cleanup.
+
+10. **A default that runs less than it claims is a dead tier in waiting.**
+    `npm run test:mobile:e2e:ios` with no arguments ran two of the eighteen flows
+    and reported success. The default is now discovered from the flow directory,
+    so a new flow is covered when it is written rather than when someone
+    remembers to add it to a list.
+
+11. **Diagnose from the step log, not the screenshot.** Maestro captures its
+    failure screenshot after tearing the app down, so a failure routinely shows
+    the Expo Go launcher and reads as a crash when nothing crashed. The
+    authoritative record is `commands-*.json` in the artifact directory, which
+    carries a per-step `metadata.status` — though its array is not in
+    chronological order, so read statuses rather than sequence. Reading
+    screenshots instead cost this work two wrong hypotheses. Where a screenshot
+    genuinely is the right instrument, take it mid-flow with `takeScreenshot`:
+    a three-shot ladder around a single tap is what finally settled the chip
+    question above.
+
+Evidence boundaries at the time of writing:
+
+Nine of the eighteen flows pass: `sanity`, `analytics`,
+`chip-navigation-bottom-nav`, `deep-link-handling`, `garment-capture-flow`,
+`garment-smart-tagging-flow`, `hero-experience`, `localization`, and
+`premium-subscription`. Nine still fail, each at a named assertion:
+`accessibility-hardening` (`garment-swap-modal`), `commerce-affiliate`
+("Shop this look"), `garment-capsule-create-flow` (`create-capsule-button`),
+`garment-capsule-repair-flow` (`wardrobe-capsules-link`),
+`garment-capsule-localization-flow` ("Kombin kapsülleri"),
+`wardrobe-onboarding-flow` (`onboarding-permission-step`),
+`wardrobe-onboarding-my-form-flow` (`silhouette-tab-my-form`),
+`wardrobe-onboarding-localization-flow` ("Gardırobunu oluştur"), and
+`widget-deep-link` (`tab-home`, failing at launch as the eighteenth flow in the
+run). Those nine are still under investigation and no claim is made about their
+causes here.
+
+The chip-activation problem described in earlier revisions of this step is
+resolved, and the cause was the Expo Go developer sheet in takeaway 7 rather
+than anything in the component. It was settled by a mid-flow screenshot ladder:
+the sheet is still up when the launch subflow returns, the first plain `tapOn`
+is spent dismissing its backdrop, and a second identical `tapOn` selects the
+chip. Both flows are back on a plain `tapOn`, `chip-navigation-bottom-nav`
+passes, and `accessibility-hardening` now fails later at `garment-swap-modal`.
+The three app-side explanations tried earlier (the hero ScrollView's
+`stickyHeaderIndices`, `delaysContentTouches` on the chip row, and the
+`Pressable`'s press-state style callback) were disproved because none of them
+was the cause; all three changes were reverted, so
+`apps/mobile/components/chip-navigation.tsx` is unmodified.
+
+The rewritten `pr-mobile-e2e.yml` has never executed and nothing about its
+runtime behaviour is claimed. Android was never exercised locally, because this
+machine has no `adb`; every result above is iOS-only. Full suite state is in
+`_bmad-output/test-artifacts/maestro-suite-repair-handoff.md`, and the CI
+workflow's state is in
+`_bmad-output/test-artifacts/mobile-ci-maestro-handoff.md`.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Dev["npm run test:mobile:e2e:ios"] --> Runner["scripts/run-maestro.mjs"]
+  Runner --> Boot["Boot simulator\n+ install pinned Expo Go"]
+  Runner --> API["Start API :4000\nmigrate + seed"]
+  Runner --> Metro["Start Metro :8081"]
+  API --> Fixture["Sign up fresh user\nbake EXPO_PUBLIC_E2E_ACCESS_TOKEN"]
+  Fixture --> Metro
+  Boot --> Flows
+  Metro --> Flows["Run each flow, collect failures,\nreport N/18 at the end"]
+  Flows --> Sub["subflows/open-app\nopen-settings · open-wardrobe-tab · set-locale"]
+  Sub -. "action paired with a destination\nassertion, then retried" .-> Flows
+  Flows --> Art["maestro/artifacts/\ncommands-*.json is the source of truth"]
+  Art -. "screenshot is captured AFTER teardown\nand misleads" .-> Art
+  Flows --> CI["pr-mobile-e2e.yml\nsame runner, Expo Go, KVM, AVD cache\n(UNVERIFIED — never executed)"]
+```

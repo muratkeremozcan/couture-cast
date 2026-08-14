@@ -261,7 +261,10 @@ export function CapsuleBuilderModal({
     }
   }
 
-  const selectionCountLabel = `${selectedGarmentIds.length} of ${MAX_GARMENTS} selected`
+  const selectionCountLabel = t('wardrobe.capsules.garmentsSelected', {
+    count: selectedGarmentIds.length,
+    max: MAX_GARMENTS,
+  })
 
   return (
     <AccessibleModal
@@ -388,7 +391,11 @@ export function CapsuleBuilderModal({
             className="mt-1 text-xs text-zinc-500 dark:text-zinc-400"
             data-testid="capsule-selection-count"
           >
-            {selectionCountLabel}. Select {MIN_GARMENTS} to {MAX_GARMENTS}.
+            {selectionCountLabel}{' '}
+            {t('wardrobe.capsules.garmentsRange', {
+              min: MIN_GARMENTS,
+              max: MAX_GARMENTS,
+            })}
           </p>
           <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
             {availableGarments.map((garment) => (
@@ -416,7 +423,7 @@ export function CapsuleBuilderModal({
         {selectedGarmentIds.length > 0 && (
           <div>
             <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              {t('wardrobe.capsules.garmentsLabel')}
+              {t('wardrobe.capsules.garmentOrder')}
             </h3>
             <ul className="mt-2 space-y-2" data-testid="capsule-garment-ordering-list">
               {selectedGarmentIds.map((garmentId, index) => {

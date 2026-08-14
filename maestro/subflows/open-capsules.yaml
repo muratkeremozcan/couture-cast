@@ -1,0 +1,36 @@
+# Navigate from the wardrobe hub to the outfit capsule library.
+#
+# Same reasoning as `open-wardrobe-tab.yaml` and `open-settings.yaml`: pair the
+# tap with an assertion on the destination and retry the pair, rather than
+# asserting immediately and hoping the navigation has landed.
+#
+# `wardrobe-capsules-link` calls `router.push('/wardrobe-capsules')`, so the
+# screen has to mount and fetch its capsules before its toolbar paints. A bare
+# `assertVisible` on the next line races that and reports `create-capsule-button`
+# "not found" on a screen that renders it perfectly well a moment later.
+#
+# Callers must already be on the wardrobe hub — the link exists nowhere else.
+appId: ${MAESTRO_APP_ID}
+---
+- retry:
+    maxRetries: 3
+    commands:
+      # Wait for the link rather than tapping straight into the hub. The hub
+      # asserts `wardrobe-screen` as soon as its outer View mounts, which is
+      # before the header has painted, so tapping immediately can report the
+      # link "not found" on a screen that is merely still arriving.
+      - extendedWaitUntil:
+          visible:
+            id: 'wardrobe-capsules-link'
+          timeout: 15000
+          label: 'Wardrobe hub header has painted'
+      - tapOn:
+          id: 'wardrobe-capsules-link'
+          label: 'Open the outfit capsule library'
+      - extendedWaitUntil:
+          visible:
+            id: 'create-capsule-button'
+          timeout: 15000
+          label: 'Capsule library is the screen on top'
+
+- waitForAnimationToEnd

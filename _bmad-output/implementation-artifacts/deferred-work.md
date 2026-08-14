@@ -146,3 +146,111 @@ later story does not have to rediscover the reasoning.
   signature; reverting story work is not. The proposed remedy is bumping
   `@pact-foundation/pact` from the pinned 16.4.0 to 17.1.2, which is a dependency
   change with its own blast radius and does not belong inside a commerce story.
+
+## Deferred from: story 5.2 premium subscription lifecycle (2026-08-12)
+
+These were identified while implementing story 5.2 and deliberately left out of
+its scope. Each records what was narrowed and why.
+
+- **The remaining `@Cron` consumers sit on a substrate that never fires in
+  production.** Story 5.2 verified the deploy-target facts: the API ships as
+  one Vercel serverless function (`apps/api/vercel.json`), no Vercel `crons`
+  config exists, and `ScheduleModule.forRoot()` lives only in the request app —
+  so a NestJS `@Cron` in this API has never provably fired in production.
+  Story 5.2 moved its own periodic work (billing reconciliation, commerce
+  retention) onto BullMQ Job Schedulers in the standalone worker runtime
+  (ADR-012's substrate) and took `CommerceRetentionService` off `@Cron` with
+  it. The remaining consumers — `feature-flags.cron`, `admin.cron`,
+  `guardian.cron` — share the dead-substrate defect but belong to other epics'
+  features; unverifiable cross-feature changes do not belong in a billing PR.
+  Owner ask: whoever owns flags/admin/guardian operations should re-host these
+  onto worker Job Schedulers the same way. Evidence: story 5.2 Decision 4a.
+
+- **No automated store-purchase E2E.** StoreKit-sandbox / Play-internal-testing
+  purchase automation does not exist; the Maestro harness pins Expo Go, where
+  the RevenueCat native module is absent, so mobile E2E verifies the settings
+  section and the SDK-absent fallback only. The real purchase chain is proven
+  by the runbook's staged smoke gate (recorded in
+  `premium-release-checklist.md`), not by CI.
+
+- **No socket push for entitlement changes.** Polling (bounded 5s/2-minute
+  client poll) plus the refresh endpoint meets the 2-minute AC. A
+  `premium:update` socket event would tighten UX after webhook-driven changes
+  (e.g. Ask-to-Buy approvals landing hours later) but is not required by any
+  AC.
+
+- **Stripe-sourced `will_renew` display shortcut.** RevenueCat documents up to
+  ~2 hours for Stripe-sourced cancellation sync. The web portal-return copy
+  sets that expectation; a faster path would read our own recorded
+  `customer.subscription.updated` BillingEvents to display `willRenew: false`
+  early WITHOUT writing entitlement state (the one-writer rule stands). Purely
+  a display optimization; deferred.
+
+- **PRD "ad-free experience" premium benefit is moot until ads exist.**
+  `prd.md:79` lists ad-free as a premium benefit; the product has no ads
+  anywhere, so there is nothing to gate. Revisit if ads ever ship.
+
+- **First-party store API migration notes.** If ADR-015 is ever reversed, the
+  landing points are: Apple App Store Server API + Server Notifications V2
+  (`@apple/app-store-server-library` v3.x, JWS x5c verification) and Google
+  Play Developer API + RTDN (requires a Google Cloud Pub/Sub push
+  subscription — a new vendor surface this repo does not have). The server
+  contract (PremiumEntitlement mirror, status/refresh, guard) is
+  vendor-neutral and survives; the RC SDK in shipped mobile binaries is the
+  expensive half (multi-release migration; keep RC alive for old installs).
+
+### Added during the story 5.2 test-quality review (2026-08-13)
+
+- **`packages/db/test/rls-policies.spec.ts` is 2868 lines and grows with every
+  story.** The TEA review scored it the only HIGH maintainability violation in
+  the 34-file story-5.2 review set (limit: 1000 lines). It now carries the RLS
+  matrices of stories 4.3, 4.4, 5.1, and 5.2 plus the guardian-consent,
+  telemetry, and alert-delivery suites in a single describe, and its ~110-line
+  `SeededScenario` type and ~410-line `seedScenario`/`cleanupScenario` pair must
+  both grow for each new story, so every story raises the cost of touching any
+  older one. Story 5.2 added roughly 90 lines.
+
+  Deliberately not fixed inside the billing story: this is the repo's most
+  security-critical test file, and a botched split weakens RLS coverage silently
+  rather than loudly. The safe recipe, for whoever takes it: split into
+  per-story spec files over one shared seeded-scenario harness, and prove the
+  split is behaviour-preserving by asserting the total test count and the full
+  actor matrix are identical before and after (`npm run test -w packages/db`
+  reported 112 tests at the time of this entry). Do it as its own change, not
+  as a rider on a feature story.
+
+- **Two shared Pact files have grown past the length limit the same way.**
+  `pact/http/consumer/api-contract-interactions.ts` is 3589 lines and
+  `pact/http/provider/provider-helper.ts` is 1583 lines. Neither is a story-5.2
+  artefact: both are cross-story accumulators that every story appends its
+  interactions and provider doubles to (5.2 added 393 and 162 lines
+  respectively). This is the identical pattern to the RLS spec above and should
+  be solved the same way and at the same time — per-domain modules behind one
+  registry, with the three-run Pact determinism gate as the proof the split
+  changed nothing. Filed together so whoever takes one takes both.
+
+- **Locale-parity scaffolding is duplicated across four i18n specs.** The
+  `SUPPORTED_LOCALES`/catalog map, flatten, placeholder check, cognate
+  allowlist, and tree selector appear nearly verbatim in
+  `apps/{web,mobile}/src/i18n/{commerce,premium}-locales.spec.ts` (~80 lines
+  each). A shared parity harness parameterized by subtree selector would
+  collapse all four. Cross-surface harness work; no registry row; not owned by
+  any single story.
+
+- **The premium integration suites duplicate their bootstrap.** The
+  `databaseUrl` fallback, `probeSchema`, and `requireSchema` trio appears in all
+  four `apps/api/integration/premium-*.integration.spec.ts` files, and the
+  identical `RequestAuthGuard` override (the `Bearer premium-test:<id>` parser)
+  appears verbatim in three. Both belong in a shared integration-test helper.
+
+- **The Maestro harness cannot reach the seeded premium users.**
+  `scripts/run-maestro.mjs` signs up a fresh account and bakes its token into
+  the Expo bundle via `EXPO_PUBLIC_E2E_ACCESS_TOKEN`; there is no token-override
+  path, so a flow can only ever run as that fresh user. Story 5.2's Decision 11
+  originally claimed the premium flow verifies "the seeded entitled user's
+  settings section", which is not achievable without changing that shared
+  script — out of scope for a billing story. The decision text was corrected
+  in place on 2026-08-13 and the flow header states the real scope. Entitled
+  rendering is covered by the mobile screen tests and the Playwright
+  seeded-user specs. The harness change (an env-driven token override so flows
+  can run as a chosen seed user) is the deferred item.

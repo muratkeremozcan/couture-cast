@@ -77,7 +77,7 @@ test(
       'utf8'
     )
     assert.match(mainEntitlements, /group\.existing\.integration/)
-    assert.match(mainEntitlements, /group\.com\.anonymous\.mobile/)
+    assert.match(mainEntitlements, /group\.com\.couturecast\.app/)
     assert.ok(
       fs.existsSync(path.join(fixtureRoot, 'ios/OutfitWidget/OutfitWidget.swift'))
     )
@@ -103,7 +103,7 @@ test(
     const androidMain = fs.readFileSync(
       path.join(
         fixtureRoot,
-        'android/app/src/main/java/com/anonymous/mobile/MainApplication.kt'
+        'android/app/src/main/java/com/couturecast/app/MainApplication.kt'
       ),
       'utf8'
     )
@@ -118,7 +118,7 @@ test(
       fs.existsSync(
         path.join(
           fixtureRoot,
-          'android/app/src/main/java/com/anonymous/mobile/WidgetSharedModule.kt'
+          'android/app/src/main/java/com/couturecast/app/WidgetSharedModule.kt'
         )
       )
     )
@@ -126,7 +126,7 @@ test(
       fs.existsSync(
         path.join(
           fixtureRoot,
-          'android/app/src/main/java/com/anonymous/mobile/WidgetConstants.kt'
+          'android/app/src/main/java/com/couturecast/app/WidgetConstants.kt'
         )
       )
     )

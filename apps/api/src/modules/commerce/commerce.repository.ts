@@ -452,4 +452,37 @@ export class CommerceRepository {
     })
     return result.count
   }
+
+  /**
+   * Story 5.2: BillingEvent shares the 24-month commerce horizon (Open
+   * question 4's sign-off). The append-only trigger blocks UPDATE, not DELETE
+   * — deliberately, exactly so this pruner can run. Rows still owing a
+   * forward (`forward_due` unmet) are never pruned regardless of age: an
+   * unmet payment obligation must not age out of existence.
+   */
+  async findExpiredBillingEventIds(
+    cutoff: Date,
+    limit: number
+  ): Promise<readonly string[]> {
+    const rows = await this.prisma.billingEvent.findMany({
+      where: {
+        received_at: { lt: cutoff },
+        NOT: { forward_due: true, forwarded_at: null },
+      },
+      select: { id: true },
+      orderBy: { received_at: 'asc' },
+      take: limit,
+    })
+    return rows.map((row) => row.id)
+  }
+
+  async deleteBillingEventsByIds(ids: readonly string[]): Promise<number> {
+    if (ids.length === 0) {
+      return 0
+    }
+    const result = await this.prisma.billingEvent.deleteMany({
+      where: { id: { in: [...ids] } },
+    })
+    return result.count
+  }
 }

@@ -14,17 +14,22 @@ tags:
     appId: ${MAESTRO_APP_ID}
     clearState: true
     stopApp: false
-    arguments:
-      locale: 'tr-TR'
 
-- openLink: ${APP_URL}
+- runFlow: subflows/open-app.yaml
 
-- tapOn:
-    text: 'Continue'
-    optional: true
+# This flow asserts Turkish copy, so it has to put the app into Turkish
+# itself rather than inherit it from whatever ran before it.
+- runFlow:
+    file: subflows/set-locale.yaml
+    env:
+      LOCALE: tr-TR
 
-- tapOn:
-    id: 'wardrobe-capsules-link'
+# `wardrobe-capsules-link` lives on the wardrobe hub, but the app opens on
+# Home, so this flow never had a step to get there and the tap could only
+# ever report the link "not found".
+- runFlow: subflows/open-wardrobe-tab.yaml
+
+- runFlow: subflows/open-capsules.yaml
 
 # Turkish strings come from the shared wardrobe.capsules key tree.
 - assertVisible:
@@ -38,9 +43,14 @@ tags:
     text: 'Kapsül adı'
     label: 'Name label is localized'
 
+# The whole label, including the count, because Maestro matches a text selector
+# against an entire node and this label carries its count inline. Asserting the
+# full string is also what proves the fix: the count used to be a hardcoded
+# English tail, so this node read "Parçalar (0 of 10 selected)" on a Turkish
+# device.
 - assertVisible:
-    text: 'Parçalar'
-    label: 'Garments label is localized'
+    text: 'Parçalar (10 parçadan 0 tanesi seçildi)'
+    label: 'Garments label and its count are both localized'
 
 - tapOn:
     id: 'save-capsule-button'
@@ -51,3 +61,19 @@ tags:
 
 - tapOn:
     id: 'close-modal-button'
+
+# --- Restore the shared fixture ---------------------------------------------
+#
+# Every flow in this suite runs as the single user `scripts/run-maestro.mjs`
+# signs up, and the locale is synced to that user's profile, so it outlives
+# `clearState: true`. Leaving Turkish behind makes every later flow in the run
+# assert English copy against a Turkish app.
+- runFlow:
+    file: subflows/set-locale.yaml
+    env:
+      LOCALE: en-US
+
+- extendedWaitUntil:
+    visible: 'Language'
+    timeout: 15000
+    label: 'Locale is back to English for the flows that follow'

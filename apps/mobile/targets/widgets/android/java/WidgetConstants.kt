@@ -1,4 +1,4 @@
-package com.anonymous.mobile
+package com.couturecast.app
 
 internal object WidgetConstants {
     const val WIDGET_PREFERENCES = "OutfitWidgetPrefs"

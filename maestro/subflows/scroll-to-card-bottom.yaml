@@ -1,0 +1,23 @@
+# Scroll the Home hero down to the bottom of the outfit recommendation card.
+#
+# Exists so that `assertNotVisible` checks against the affiliate block are
+# falsifiable. Maestro only sees what is rendered *and* on screen, so asserting
+# that the block is absent while it is simply below the fold passes whether or
+# not the block is there — the check would go green against a CTA that is still
+# rendering, which is the exact regression it is meant to catch.
+#
+# The garment tiles are the last element of the card that is always present, and
+# the affiliate block sits directly beneath them, so scrolling to the tiles and
+# then one screen further lands the viewport where the block would be.
+appId: ${MAESTRO_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: 'garment-tile-.*'
+    direction: DOWN
+    timeout: 20000
+    label: 'Garment tiles are the anchor above the affiliate block'
+
+- scroll
+
+- waitForAnimationToEnd

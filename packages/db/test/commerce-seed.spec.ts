@@ -4,11 +4,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 
 import {
+  PREMIUM_SEED_STRIPE_CUSTOMER_ID,
+  PREMIUM_SEED_USERS,
   SAMPLE_PARTNER_ALLOWED_HOST,
   SAMPLE_PARTNER_SLUG,
   SAMPLE_PARTNER_WEBHOOK_SECRET_REF,
   allowsCommerceSeeding,
   seedCommerceCatalog,
+  seedPremiumEntitlements,
 } from '../prisma/seeds/commerce.js'
 
 /**
@@ -162,5 +165,115 @@ describe('commerce catalog seed', () => {
       where: { partner_id: first?.partnerId },
     })
     expect(offerCount).toBe(4)
+  })
+})
+
+describe('premium entitlement seed', () => {
+  // The seeded ids are deterministic and every write is an upsert or an
+  // insert-once, so this suite can run against whatever state `db:reset` left
+  // behind without a snapshot/restore dance: re-running the seed IS the
+  // restore.
+  const seededUserIds = Object.values(PREMIUM_SEED_USERS).map((user) => user.id)
+
+  it('5.2-DB-030 refuses to seed anything outside a test or local environment', async () => {
+    // Guard behaviour only — asserting on row absence would be falsified by
+    // the standing `db:reset` seed state this suite deliberately preserves.
+    for (const env of [
+      { NODE_ENV: 'production' },
+      { NODE_ENV: 'production', TEST_ENV: 'preview' },
+      { NODE_ENV: 'development' },
+      {},
+    ]) {
+      await expect(seedPremiumEntitlements(prisma, env)).resolves.toBeNull()
+    }
+  })
+
+  it('5.2-DB-031 publishes the three entitlement states the E2E suites need', async () => {
+    const result = await seedPremiumEntitlements(prisma, { NODE_ENV: 'test' })
+
+    expect(result?.userIds).toEqual(seededUserIds)
+
+    const entitlements = await prisma.premiumEntitlement.findMany({
+      where: { user_id: { in: seededUserIds } },
+    })
+    const byUser = new Map(entitlements.map((row) => [row.user_id, row]))
+
+    expect(byUser.get(PREMIUM_SEED_USERS.active.id)).toMatchObject({
+      status: 'active',
+      store: 'stripe',
+      product_id: 'premium_monthly',
+      will_renew: true,
+    })
+    expect(byUser.get(PREMIUM_SEED_USERS.expired.id)).toMatchObject({
+      status: 'expired',
+      store: 'stripe',
+      will_renew: false,
+    })
+    expect(byUser.get(PREMIUM_SEED_USERS.grace.id)).toMatchObject({
+      status: 'grace_period',
+      store: 'app_store',
+      product_id: 'premium_annual',
+    })
+
+    // `revoked` is deliberately not seeded; it is constructed per-test.
+    expect(entitlements.map((row) => row.status).sort()).toEqual([
+      'active',
+      'expired',
+      'grace_period',
+    ])
+
+    // The active web subscriber carries the portal-capable customer mapping
+    // and its event pair (checkout completion + RevenueCat activation).
+    const customer = await prisma.billingCustomer.findUnique({
+      where: { user_id: PREMIUM_SEED_USERS.active.id },
+    })
+    expect(customer?.stripe_customer_id).toBe(PREMIUM_SEED_STRIPE_CUSTOMER_ID)
+
+    const events = await prisma.billingEvent.findMany({
+      where: { user_id: PREMIUM_SEED_USERS.active.id },
+    })
+    expect(events.map((event) => event.event_type).sort()).toEqual([
+      'INITIAL_PURCHASE',
+      'checkout.session.completed',
+    ])
+    // The seeded checkout event's forward obligation is already satisfied, so
+    // the reconciliation sweep never re-drives a fixture.
+    const checkout = events.find(
+      (event) => event.event_type === 'checkout.session.completed'
+    )
+    expect(checkout?.forward_due).toBe(true)
+    expect(checkout?.forwarded_at).not.toBeNull()
+
+    // Adult birthdates: a consent-gated fixture user would 403 before any
+    // premium code ran.
+    const profiles = await prisma.userProfile.findMany({
+      where: { user_id: { in: seededUserIds } },
+      select: { birthdate: true },
+    })
+    expect(profiles).toHaveLength(3)
+    for (const profile of profiles) {
+      expect(profile.birthdate?.getFullYear()).toBeLessThan(2000)
+    }
+  })
+
+  it('5.2-DB-032 is idempotent across repeated runs', async () => {
+    const first = await seedPremiumEntitlements(prisma, { NODE_ENV: 'test' })
+    const second = await seedPremiumEntitlements(prisma, { NODE_ENV: 'test' })
+
+    expect(second?.userIds).toEqual(first?.userIds)
+
+    // One entitlement row per user, and the append-only event pair is inserted
+    // once, never duplicated (BillingEvent cannot be upserted past its outbox
+    // columns, so the seed must read before writing).
+    expect(
+      await prisma.premiumEntitlement.count({
+        where: { user_id: { in: seededUserIds } },
+      })
+    ).toBe(3)
+    expect(
+      await prisma.billingEvent.count({
+        where: { user_id: PREMIUM_SEED_USERS.active.id },
+      })
+    ).toBe(2)
   })
 })

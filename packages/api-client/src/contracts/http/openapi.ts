@@ -19,6 +19,7 @@ import { registerRitualContracts } from './ritual'
 import { registerComfortContracts } from './comfort'
 import { registerWardrobeContracts } from './wardrobe'
 import { registerCommerceContracts } from './commerce'
+import { registerSubscriptionContracts } from './subscription'
 
 export const HTTP_OPENAPI_OUTPUT_FILENAME = 'http.openapi.json'
 
@@ -66,6 +67,7 @@ export function createHttpOpenApiRegistry() {
   registerComfortContracts(registry, commonSchemas)
   registerWardrobeContracts(registry, commonSchemas)
   registerCommerceContracts(registry, commonSchemas)
+  registerSubscriptionContracts(registry, commonSchemas)
 
   return registry
 }
@@ -88,7 +90,10 @@ export function generateHttpOpenApiDocument() {
       // is breaking (`scenarioOutfitSchema` is not `.strict()`, so an added key
       // is compatible), but a consumer reading the spec should be able to see
       // that the surface grew without diffing it.
-      version: '1.1.0',
+      // Story 5.2 bumps the minor again: six additive subscription operations
+      // (status, refresh, checkout-session, portal-session, two webhooks) and
+      // no changes to existing operations.
+      version: '1.2.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [

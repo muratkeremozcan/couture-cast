@@ -15,11 +15,20 @@ import { AffiliateClickTelemetry } from './affiliate-click.telemetry.js'
 import { AffiliateOfferService } from './affiliate-offer.service.js'
 import { AffiliateWebhookController } from './affiliate-webhook.controller.js'
 import { AffiliateWebhookService } from './affiliate-webhook.service.js'
+import { BillingWebhookController } from './billing-webhook.controller.js'
+import { BillingWebhookService } from './billing-webhook.service.js'
 import { CommerceCacheHeadersMiddleware } from './commerce-cache-headers.middleware.js'
 import { CommercePreferencesController } from './commerce-preferences.controller.js'
 import { CommercePreferencesService } from './commerce-preferences.service.js'
 import { CommerceRepository } from './commerce.repository.js'
 import { CommerceRetentionService } from './commerce-retention.service.js'
+import { PremiumEntitlementGuard } from './premium-entitlement.guard.js'
+import { PremiumEntitlementService } from './premium-entitlement.service.js'
+import { RevenueCatClient, resolveRevenueCatClient } from './revenuecat-client.js'
+import { StripeBillingClient, resolveStripeClient } from './stripe-client.js'
+import { StripeBillingService } from './stripe-billing.service.js'
+import { SubscriptionController } from './subscription.controller.js'
+import { SubscriptionService } from './subscription.service.js'
 
 /**
  * Story 5.1: affiliate commerce.
@@ -55,6 +64,11 @@ import { CommerceRetentionService } from './commerce-retention.service.js'
     // No @UseGuards on this one. It is machine-to-machine and authenticated by
     // HMAC signature over the raw request body.
     AffiliateWebhookController,
+    // Story 5.2: subscription status/refresh plus the Stripe session routes.
+    SubscriptionController,
+    // No @UseGuards on this one either: machine-to-machine, authenticated by
+    // the provider credential over the raw request body.
+    BillingWebhookController,
   ],
   providers: [
     AffiliateOfferService,
@@ -69,8 +83,23 @@ import { CommerceRetentionService } from './commerce-retention.service.js'
     AffiliateClickTelemetry,
     // Story 5.1 Task 5 adds AffiliateWebhookService here.
     AffiliateWebhookService,
+    // Story 5.2: the premium entitlement core. RevenueCatClient resolves to a
+    // deterministic fake in test/local environments and to the REST client (or
+    // a loud unconfigured placeholder) elsewhere; see revenuecat-client.ts.
+    PremiumEntitlementService,
+    PremiumEntitlementGuard,
+    SubscriptionService,
+    { provide: RevenueCatClient, useFactory: resolveRevenueCatClient },
+    // Story 5.2 Tasks 4+5: the Stripe rail and both webhook rails. The Stripe
+    // client seam resolves like the RevenueCat one: real with a key, fake in
+    // allowsTestOnlySecrets environments, loud placeholder otherwise.
+    { provide: StripeBillingClient, useFactory: resolveStripeClient },
+    StripeBillingService,
+    BillingWebhookService,
   ],
-  exports: [AffiliateOfferService],
+  // PremiumEntitlementService and the guard are exported for CC-5.3/5.4/5.5,
+  // whose surfaces (themes, palette analysis, planner API) gate on them.
+  exports: [AffiliateOfferService, PremiumEntitlementService, PremiumEntitlementGuard],
 })
 export class CommerceModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

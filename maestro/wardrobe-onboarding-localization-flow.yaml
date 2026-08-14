@@ -19,8 +19,6 @@ tags:
     appId: ${MAESTRO_APP_ID}
     clearState: true
     stopApp: false
-    arguments:
-      locale: 'tr-TR'
 
 - runFlow:
     when:
@@ -32,11 +30,14 @@ tags:
       - tapOn:
           point: '9%,29%'
 
-- openLink: ${APP_URL}
+- runFlow: subflows/open-app.yaml
 
-- tapOn:
-    text: 'Continue'
-    optional: true
+# This flow asserts Turkish copy, so it has to put the app into Turkish
+# itself rather than inherit it from whatever ran before it.
+- runFlow:
+    file: subflows/set-locale.yaml
+    env:
+      LOCALE: tr-TR
 
 - extendedWaitUntil:
     visible:
@@ -48,13 +49,25 @@ tags:
     label: 'Open the Wardrobe tab'
 
 # wardrobe.onboarding.title / wardrobe.onboarding.permission_body
+#
+# Asserted as ONE composed string, because that is what exists on the device.
+# `wardrobe-onboarding-card` is a Pressable, so React Native marks it a single
+# accessibility element and merges both of its Text children into one name
+# joined with ", ". The two child strings therefore never appear as separate
+# nodes, and Maestro matches a text selector against a whole node, so asserting
+# either half alone could not pass against a correctly rendered, correctly
+# translated card. Measured from the hierarchy dump of a failing run.
+#
+# Asserting the composed name is also stricter than the two separate assertions
+# were: it pins title-before-body reading order, which is what a screen reader
+# announces.
 - assertVisible:
-    text: 'Gardırobunu oluştur'
-    label: 'Onboarding entry card title is localized'
+    id: 'wardrobe-onboarding-card'
+    label: 'Onboarding entry card is offered'
 
 - assertVisible:
-    text: 'CoutureCast, kıyafetlerini yakalamak için kamera veya kitaplık erişimine ihtiyaç duyar.'
-    label: 'Onboarding entry card body is localized'
+    text: 'Gardırobunu oluştur, CoutureCast, kıyafetlerini yakalamak için kamera veya kitaplık erişimine ihtiyaç duyar.'
+    label: 'Onboarding entry card title and body are localized, in reading order'
 
 # wardrobe.silhouette.title, on the hub's own entry-point link.
 - assertVisible:
@@ -97,3 +110,19 @@ tags:
 
 - takeScreenshot:
     path: maestro/artifacts/wardrobe-onboarding-localization-flow
+
+# --- Restore the shared fixture ---------------------------------------------
+#
+# Every flow in this suite runs as the single user `scripts/run-maestro.mjs`
+# signs up, and the locale is synced to that user's profile, so it outlives
+# `clearState: true`. Leaving Turkish behind makes every later flow in the run
+# assert English copy against a Turkish app.
+- runFlow:
+    file: subflows/set-locale.yaml
+    env:
+      LOCALE: en-US
+
+- extendedWaitUntil:
+    visible: 'Language'
+    timeout: 15000
+    label: 'Locale is back to English for the flows that follow'

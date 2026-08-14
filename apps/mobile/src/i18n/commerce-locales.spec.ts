@@ -52,7 +52,11 @@ const CATALOGS: Record<SupportedLocale, Catalog> = {
 const APPROVED_COGNATES: Record<string, readonly SupportedLocale[]> = {}
 
 function commerceTree(catalog: Catalog): Record<string, unknown> {
-  return (catalog.commerce ?? {}) as Record<string, unknown>
+  // Story 5.2 nests its keys under `commerce.premium` and ships its own parity
+  // spec (`premium-locales.spec.ts`). Excluding the subtree here keeps this
+  // file the 5.1 affiliate suite: one spec owns each key set.
+  const commerce = (catalog.commerce ?? {}) as Record<string, unknown>
+  return Object.fromEntries(Object.entries(commerce).filter(([key]) => key !== 'premium'))
 }
 
 function flatten(value: unknown, prefix = ''): Map<string, string> {

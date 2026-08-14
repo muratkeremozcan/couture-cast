@@ -141,3 +141,77 @@ and `seeds/feature-flags.ts` seeds `commerce_affiliate_enabled: true`. Both are
 guarded so they are a no-op unless `NODE_ENV=test` or `TEST_ENV=local`. The
 matching secret resolves through the same `allowsTestOnlySecrets()` fallback as
 `WARDROBE_UPLOAD_TOKEN_SECRET`. None of this can exist in production.
+
+## Premium billing secrets (story 5.2)
+
+Premium subscriptions introduce two vendors (Stripe for web checkout,
+RevenueCat as the entitlement ledger for all three stores) and six environment
+variables. Every one validates at point of use — the server throws with an
+actionable message at first use, never at boot — and every one falls back to a
+deterministic test-only value under `allowsTestOnlySecrets()`. A set-but-
+placeholder value is worse than an unset one: the server then verifies with one
+secret while suites sign with the test fallback, and every valid webhook 401s.
+
+| Variable                                                                         | Holds                                                                                                    | Rotation notes                                             |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `STRIPE_SECRET_KEY`                                                              | Stripe API key (server only; test mode outside prod)                                                     | Rotate in the Stripe dashboard; sessions in flight survive |
+| `STRIPE_WEBHOOK_SECRET`                                                          | Signing secret of our Stripe webhook endpoint                                                            | Stripe supports dual-active secrets during rotation        |
+| `STRIPE_PREMIUM_MONTHLY_PRICE_ID` / `STRIPE_PREMIUM_ANNUAL_PRICE_ID`             | Price ids for the two plans                                                                              | Not secrets, but env-scoped: test-mode ids in non-prod     |
+| `REVENUECAT_SECRET_API_KEY`                                                      | RC REST reads + Stripe receipt forwarding                                                                | Rotate in the RC dashboard                                 |
+| `REVENUECAT_WEBHOOK_AUTH`                                                        | RC webhook credential (HMAC signing secret preferred; static Authorization value otherwise), >= 32 bytes | Rotating breaks in-flight deliveries briefly; RC retries   |
+| `EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY` / `EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY` | RC public SDK keys                                                                                       | Public by design; still env-scoped per store app           |
+
+### Operator runbook: provisioning premium subscriptions
+
+Everything below is operator work the code cannot do, in dependency order.
+The human-only release-gate subset lives in
+`premium-release-checklist.md` and must be kept consistent with this list.
+
+1. **App identity first — everything else is blocked on it.** Set
+   `com.couturecast.app` (product-approved 2026-08-12) as the iOS
+   `bundleIdentifier` and Android `package` in `apps/mobile/app.json`. An iOS
+   bundle id cannot be changed after the App Store app record exists, and it is
+   changeable at zero cost until then — revisit at record creation if a
+   domain-matched id is preferred.
+2. **Stores.** App Store Connect: app record + subscription group with
+   `premium_monthly` / `premium_annual`. Play Console: app + base plans for the
+   same two products. Launch pricing (resolved 2026-08-12): monthly $4.99 USD,
+   annual $39.99 USD; nothing in code depends on the amounts.
+3. **Stripe.** Products/Prices for both plans with per-locale currency
+   presentation for the PRD locales (Checkout and Portal render prices, which
+   is how PRD NFR Localization 2 is satisfied); Customer Portal configuration
+   with cancel AND plan-switch enabled (this doubles as FR5.2's documented
+   downgrade path); webhook endpoint pointed at
+   `/api/v1/commerce/subscription/webhooks/stripe` + its signing secret.
+4. **RevenueCat.** Project; entitlement id `premium`; both store apps; the
+   Stripe integration (this is what makes forwarded web subscriptions land in
+   the one ledger); webhook pointed at
+   `/api/v1/commerce/subscription/webhooks/revenuecat` with HMAC signing
+   preferred over the static header; confirm webhook + Stripe-integration
+   availability on the free tier during setup, and note that forwarded Stripe
+   revenue counts toward RC's monthly tracked revenue.
+5. **Environment variables** from the table above, per environment.
+6. **Staged smoke gate (release blocker).** Before the
+   `commerce_subscription_enabled` flag turns on anywhere real: one full web
+   chain in Stripe test mode + RC sandbox (checkout -> Stripe webhook ->
+   forward -> RC webhook -> entitlement visible on
+   `GET /api/v1/commerce/subscription`), and one sandbox store purchase on an
+   EAS dev build. Nothing in CI executes the real chain — every provider is
+   faked there — so this staged run is the only pre-production proof and is
+   recorded as such.
+
+Break-glass for a RevenueCat outage that leaves a customer paid-but-locked: an
+RC promotional grant (the `promotional` store member exists exactly for this),
+then let the reconciliation sweep true things up when RC recovers.
+
+### Non-production
+
+`packages/db/prisma/seeds/commerce.ts` also seeds three deterministic premium
+users (`premium-active-user` with a Stripe customer mapping and its billing
+event pair, `premium-expired-user`, `premium-grace-user`) and
+`seeds/feature-flags.ts` seeds `commerce_subscription_enabled: true`, all
+behind the same `allowsCommerceSeeding()` guard. Suites sign Stripe webhook
+fixtures with the test-only `STRIPE_WEBHOOK_SECRET` via
+`stripe.webhooks.generateTestHeaderString`; outbound Stripe calls and the
+RevenueCat ledger resolve to deterministic fakes. None of this can exist in
+production.

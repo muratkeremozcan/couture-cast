@@ -2,7 +2,6 @@ import { type ComponentRef, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AccessibilityInfo,
-  findNodeHandle,
   Pressable,
   StyleSheet,
   ScrollView,
@@ -52,6 +51,7 @@ import { useHeroPalette } from '@/components/hero/hero-theme'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
+import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
 type SwapFocusTarget = number | { focus?: () => void }
@@ -90,7 +90,7 @@ function focusAccessibilityTarget(
     return
   }
 
-  const node = findNodeHandle(target)
+  const node = safeFindNodeHandle(target)
   if (node) {
     AccessibilityInfo.setAccessibilityFocus(node)
   }
@@ -133,6 +133,44 @@ const alternateGarments: Record<string, string[]> = {
   Footwear: ['leather-boots', 'canvas-sneakers', 'loafers', 'derby-shoes'],
   Accessories: ['umbrella', 'wool-scarf', 'leather-gloves', 'sunglasses', 'beanie'],
   Garment: ['basic-socks', 'leather-belt'],
+}
+
+/**
+ * The options offered in the garment swap modal, worn garment first.
+ *
+ * `alternateGarments` is a fixed catalogue, so a worn garment outside it --
+ * every `default-*` placeholder a user with an empty wardrobe sees, which is
+ * every new account -- was absent from its own swap modal. The modal declares
+ * `accessibilityRole="radiogroup"` and marks the worn option
+ * `accessibilityState.selected`, so in that state it rendered a radiogroup with
+ * no selected radio at all: a screen-reader user was offered five alternatives
+ * with nothing indicating which one they are wearing now, and no way to return
+ * to it once they moved off.
+ *
+ * Leading with it also puts `firstSwapOptionRef` -- the element focused when the
+ * modal opens -- on the current selection, which is where focus belongs in a
+ * radiogroup.
+ *
+ * Extracted from the screen component rather than inlined: these branches are a
+ * pure function of the garment id, and carrying them inside `TabOneScreen` put
+ * that component over the repository's cyclomatic complexity limit.
+ */
+function resolveGarmentSwap(swappingGarmentId: string | null): {
+  category: string
+  options: string[]
+} {
+  const category = swappingGarmentId
+    ? parseGarmentId(swappingGarmentId).category
+    : 'Garment'
+  const baseSwapOptions = alternateGarments[category] || alternateGarments.Garment || []
+
+  return {
+    category,
+    options:
+      swappingGarmentId && !baseSwapOptions.includes(swappingGarmentId)
+        ? [swappingGarmentId, ...baseSwapOptions]
+        : baseSwapOptions,
+  }
 }
 
 export default function TabOneScreen() {
@@ -387,7 +425,7 @@ export default function TabOneScreen() {
           webNode?.focus?.()
           return
         }
-        const node = findNodeHandle(focusedAlertRef.current)
+        const node = safeFindNodeHandle(focusedAlertRef.current)
         if (node) {
           AccessibilityInfo.setAccessibilityFocus(node)
         }
@@ -498,7 +536,7 @@ export default function TabOneScreen() {
         webNode?.focus?.()
         return
       }
-      const node = findNodeHandle(firstSwapOptionRef.current)
+      const node = safeFindNodeHandle(firstSwapOptionRef.current)
       if (node) {
         AccessibilityInfo.setAccessibilityFocus(node)
       }
@@ -581,11 +619,8 @@ export default function TabOneScreen() {
     setActiveScenario(CHIP_SCENARIOS[category])
   }
 
-  // Determine swap category list
-  const swapCategory = swappingGarmentId
-    ? parseGarmentId(swappingGarmentId).category
-    : 'Garment'
-  const swapOptions = alternateGarments[swapCategory] || alternateGarments.Garment || []
+  const { category: swapCategory, options: swapOptions } =
+    resolveGarmentSwap(swappingGarmentId)
 
   return (
     <SafeAreaView style={[styles.safeContainer, { backgroundColor: palette.background }]}>

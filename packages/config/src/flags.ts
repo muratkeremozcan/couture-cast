@@ -66,6 +66,17 @@ const FEATURE_FLAG_DEFINITIONS = {
     kind: 'boolean',
     defaultValue: false,
   },
+  // Story 5.2: the kill switch for premium subscription PURCHASING. Same
+  // defaults-false reasoning as commerce_affiliate_enabled: a degraded PostHog
+  // can never switch commerce ON by accident. Scope is deliberately narrow --
+  // it gates checkout-session creation and the purchasesEnabled field on the
+  // status response, and nothing else: webhooks always record, and status,
+  // refresh, and the Customer Portal always work, because a paying user must
+  // always be able to see and cancel their subscription.
+  commerce_subscription_enabled: {
+    kind: 'boolean',
+    defaultValue: false,
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<FeatureFlagStoredValue>>
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAG_DEFINITIONS

@@ -16,6 +16,36 @@
       "saved": "Shopping preferences updated",
       "error": "Unable to update shopping preferences.",
       "signedOutHint": "Sign in to change this"
+    },
+    "premium": {
+      "sectionTitle": "Premium",
+      "disclosure": "Premium subscriptions are processed by RevenueCat and, for purchases made on the web, Stripe. CoutureCast shares your account id and purchase state with these processors so your subscription works everywhere you sign in. Card numbers are handled by the payment provider and never reach CoutureCast.",
+      "status": {
+        "none": "You don't have a Premium subscription yet.",
+        "active": "Premium is active: {{plan}}. The current period ends {{date}}.",
+        "gracePeriod": "Premium is active, but there is a payment issue.",
+        "expired": "Your Premium subscription has expired.",
+        "revoked": "Your Premium subscription was revoked."
+      },
+      "planMonthly": "Premium Monthly",
+      "planAnnual": "Premium Annual",
+      "subscribe": "Get Premium",
+      "manage": "Manage subscription",
+      "manageInStore": "Manage this subscription in the App Store or Play Store where it was purchased.",
+      "restore": "Restore purchases",
+      "pendingApproval": "This purchase is waiting for a guardian's approval. Premium unlocks once it is approved.",
+      "activating": "Payment received. Activating your Premium subscription…",
+      "stillProcessing": "Still processing. Your payment went through; check back shortly.",
+      "portalLagHint": "Changes made in the billing portal, especially cancellations, can take a couple of hours to show up here.",
+      "graceBanner": "There is a problem with your payment method. Update it in the store or billing portal you subscribed through to keep Premium.",
+      "endedNote": "Your subscription has ended. You can subscribe again at any time.",
+      "errorLoad": "Unable to load subscription status.",
+      "errorPurchase": "Unable to start checkout. Please try again.",
+      "signedOutHint": "Sign in to subscribe or manage Premium",
+      "plannerLocked": {
+        "title": "The 7-Day Planner is a Premium feature",
+        "cta": "Get Premium"
+      }
     }
   },
   "wardrobe": {
@@ -32,6 +62,9 @@
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Optional description",
       "garmentsLabel": "Garments",
+      "garmentsSelected": "Garments ({{count}} of {{max}} selected)",
+      "garmentsRange": "Select {{min}} to {{max}} garments.",
+      "garmentOrder": "Garment order",
       "garmentPosition": "Position {{position}} of {{count}}",
       "moveGarmentUp": "Move {{garment}} up",
       "moveGarmentDown": "Move {{garment}} down",

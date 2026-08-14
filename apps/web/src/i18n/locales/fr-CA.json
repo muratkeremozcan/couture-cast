@@ -16,6 +16,36 @@
       "saved": "Préférences de magasinage mises à jour",
       "error": "Impossible de mettre à jour les préférences de magasinage.",
       "signedOutHint": "Connectez-vous pour modifier ce réglage"
+    },
+    "premium": {
+      "sectionTitle": "Premium",
+      "disclosure": "Les abonnements Premium sont traités par RevenueCat et, pour les achats effectués sur le web, par Stripe. CoutureCast partage votre identifiant de compte et l'état de votre achat avec ces prestataires afin que votre abonnement fonctionne partout où vous vous connectez. Les numéros de carte sont gérés par le prestataire de paiement et ne parviennent jamais à CoutureCast.",
+      "status": {
+        "none": "Vous n'avez pas encore d'abonnement Premium.",
+        "active": "Premium est actif : {{plan}}. La période en cours se termine le {{date}}.",
+        "gracePeriod": "Premium est actif, mais il y a un problème de paiement.",
+        "expired": "Votre abonnement Premium a expiré.",
+        "revoked": "Votre abonnement Premium a été révoqué."
+      },
+      "planMonthly": "Premium mensuel",
+      "planAnnual": "Premium annuel",
+      "subscribe": "Obtenir Premium",
+      "manage": "Gérer l'abonnement",
+      "manageInStore": "Gérez cet abonnement dans l'App Store ou le Play Store où il a été acheté.",
+      "restore": "Restaurer les achats",
+      "pendingApproval": "Cet achat attend l'approbation d'un tuteur. Premium sera débloqué dès qu'il sera approuvé.",
+      "activating": "Paiement reçu. Activation de votre abonnement Premium…",
+      "stillProcessing": "Toujours en cours de traitement. Votre paiement a bien été effectué ; revenez sous peu.",
+      "portalLagHint": "Les changements effectués dans le portail de facturation, en particulier les annulations, peuvent mettre quelques heures à apparaître ici.",
+      "graceBanner": "Il y a un problème avec votre moyen de paiement. Mettez-le à jour dans la boutique ou le portail de facturation de votre abonnement pour conserver Premium.",
+      "endedNote": "Votre abonnement est terminé. Vous pouvez vous réabonner à tout moment.",
+      "errorLoad": "Impossible de charger l'état de l'abonnement.",
+      "errorPurchase": "Impossible de démarrer le paiement. Veuillez réessayer.",
+      "signedOutHint": "Connectez-vous pour vous abonner ou gérer Premium",
+      "plannerLocked": {
+        "title": "Le planificateur 7 jours est une fonctionnalité Premium",
+        "cta": "Obtenir Premium"
+      }
     }
   },
   "wardrobe": {
@@ -32,6 +62,9 @@
       "descriptionLabel": "Description",
       "descriptionPlaceholder": "Description facultative",
       "garmentsLabel": "Vêtements",
+      "garmentsSelected": "Vêtements ({{count}} sur {{max}} sélectionnés)",
+      "garmentsRange": "Sélectionnez de {{min}} à {{max}} vêtements.",
+      "garmentOrder": "Ordre des vêtements",
       "garmentPosition": "Position {{position}} sur {{count}}",
       "moveGarmentUp": "Déplacer {{garment}} vers le haut",
       "moveGarmentDown": "Déplacer {{garment}} vers le bas",

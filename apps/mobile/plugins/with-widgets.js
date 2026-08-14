@@ -11,9 +11,9 @@ const plist = require('@expo/plist').default
 const fs = require('fs')
 const path = require('path')
 
-const appGroup = 'group.com.anonymous.mobile'
+const appGroup = 'group.com.couturecast.app'
 const extensionName = 'OutfitWidget'
-const extensionBundleIdentifier = 'com.anonymous.mobile.OutfitWidget'
+const extensionBundleIdentifier = 'com.couturecast.app.OutfitWidget'
 const androidWidgetClasses = [
   'OutfitWidgetProvider',
   'OutfitWidgetProviderSmall',

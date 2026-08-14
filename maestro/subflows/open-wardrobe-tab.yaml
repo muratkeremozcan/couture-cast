@@ -1,0 +1,31 @@
+# Navigate to the Wardrobe tab and prove you actually landed there.
+#
+# Same reasoning as `subflows/open-settings.yaml`: in Expo Go the developer
+# sheet can rise over the tab bar after mount and silently eat the tap, so the
+# tap is paired with an assertion on the destination and the pair is retried.
+# Without it the failure surfaces much later as `wardrobe-garment-list` or
+# `wardrobe-capsules-link` "not found" on a screen that renders both.
+#
+# This is the tab-bar route. `subflows/open-wardrobe.yaml` is the deep-link
+# route (`${WARDROBE_URL}`) and is what flows should use when they are not
+# specifically exercising tab navigation.
+appId: ${MAESTRO_APP_ID}
+---
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: 'Continue'
+          optional: true
+          label: 'Dismiss an Expo Go sheet covering the tab bar'
+      - tapOn:
+          id: 'tab-wardrobe'
+          retryTapIfNoChange: true
+          label: 'Open wardrobe'
+      - extendedWaitUntil:
+          visible:
+            id: 'wardrobe-screen'
+          timeout: 15000
+          label: 'Wardrobe screen is the one on top'
+
+- waitForAnimationToEnd
