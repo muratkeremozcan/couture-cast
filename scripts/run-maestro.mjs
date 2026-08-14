@@ -2748,12 +2748,26 @@ const run = async () => {
     process.env.MOBILE_E2E_HEALTH_URL = resolvedPair.health
     process.env.APP_URL = resolvedPair.app
     process.env.WARDROBE_URL = `${resolvedPair.app}wardrobe`
+    // The same `exp://` form on both platforms.
+    //
+    // Android used to build these as `mobile://(tabs)?...`, the app's own
+    // scheme, which Expo Go does not register — `openLink` failed with
+    // `Activity not started, unable to resolve Intent` and the flow was written
+    // off as impossible in the shell. iOS was already using the `exp://.../--/`
+    // form, which Expo Go routes into the app with the query string intact, and
+    // it is exactly how `APP_URL` and `WARDROBE_URL` reach the app on both
+    // platforms. There was never a reason for the two to differ.
+    //
+    // The slots are `am` and `evening` rather than `now` and `next` so the flow
+    // can assert what the link DID. `resolveDeepLinkScenario` maps those two
+    // deterministically to `morning` and `evening`, while `now`/`next` resolve
+    // against the current time and the ritual's forecast, which cannot be
+    // asserted without either freezing the clock or reimplementing the
+    // resolution in the flow. The deep link path under test is identical.
     const widgetUrl = (size, slot) =>
-      target.platform === 'ios'
-        ? `${resolvedPair.app}(tabs)?source=widget&size=${size}&slot=${slot}`
-        : `mobile://(tabs)?source=widget&size=${size}&slot=${slot}`
-    process.env.WIDGET_NOW_URL = widgetUrl('small', 'now')
-    process.env.WIDGET_NEXT_URL = widgetUrl('medium', 'next')
+      `${resolvedPair.app}(tabs)?source=widget&size=${size}&slot=${slot}`
+    process.env.WIDGET_MORNING_URL = widgetUrl('small', 'am')
+    process.env.WIDGET_EVENING_URL = widgetUrl('medium', 'evening')
     if (!process.env.MAESTRO_APP_ID) {
       process.env.MAESTRO_APP_ID = target.appId
     }
@@ -2849,9 +2863,9 @@ const run = async () => {
             '-e',
             `WARDROBE_URL=${process.env.WARDROBE_URL}`,
             '-e',
-            `WIDGET_NOW_URL=${process.env.WIDGET_NOW_URL}`,
+            `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`,
             '-e',
-            `WIDGET_NEXT_URL=${process.env.WIDGET_NEXT_URL}`,
+            `WIDGET_EVENING_URL=${process.env.WIDGET_EVENING_URL}`,
           ]
           if (WRITE_ARTIFACTS) {
             fs.mkdirSync(path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR), {
@@ -2947,9 +2961,9 @@ const run = async () => {
             '-e',
             `WARDROBE_URL=${process.env.WARDROBE_URL}`,
             '-e',
-            `WIDGET_NOW_URL=${process.env.WIDGET_NOW_URL}`,
+            `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`,
             '-e',
-            `WIDGET_NEXT_URL=${process.env.WIDGET_NEXT_URL}`,
+            `WIDGET_EVENING_URL=${process.env.WIDGET_EVENING_URL}`,
           ]
           if (WRITE_ARTIFACTS) {
             serialArgs.push(
@@ -3007,8 +3021,8 @@ const run = async () => {
           maestroArgs.push('-e', `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`)
           maestroArgs.push('-e', `APP_URL=${process.env.APP_URL}`)
           maestroArgs.push('-e', `WARDROBE_URL=${process.env.WARDROBE_URL}`)
-          maestroArgs.push('-e', `WIDGET_NOW_URL=${process.env.WIDGET_NOW_URL}`)
-          maestroArgs.push('-e', `WIDGET_NEXT_URL=${process.env.WIDGET_NEXT_URL}`)
+          maestroArgs.push('-e', `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`)
+          maestroArgs.push('-e', `WIDGET_EVENING_URL=${process.env.WIDGET_EVENING_URL}`)
           if (WRITE_ARTIFACTS) {
             fs.mkdirSync(path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR), {
               recursive: true,
