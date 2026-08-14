@@ -18,17 +18,17 @@ Passing: `sanity`, `analytics`, `chip-navigation-bottom-nav`,
 
 Failing, with the assertion that fails:
 
-| Flow | Fails on |
-|---|---|
-| `accessibility-hardening` | `garment-swap-modal` |
-| `commerce-affiliate` | `Shop this look` |
-| `garment-capsule-create-flow` | `create-capsule-button` |
-| `garment-capsule-repair-flow` | `wardrobe-capsules-link` |
-| `garment-capsule-localization-flow` | `Kombin kapsülleri` |
-| `wardrobe-onboarding-flow` | `onboarding-permission-step` |
-| `wardrobe-onboarding-my-form-flow` | `silhouette-tab-my-form` |
-| `wardrobe-onboarding-localization-flow` | `Gardırobunu oluştur` |
-| `widget-deep-link` | `tab-home`, at launch, as the 18th flow in the run |
+| Flow                                    | Fails on                                           |
+| --------------------------------------- | -------------------------------------------------- |
+| `accessibility-hardening`               | `garment-swap-modal`                               |
+| `commerce-affiliate`                    | `Shop this look`                                   |
+| `garment-capsule-create-flow`           | `create-capsule-button`                            |
+| `garment-capsule-repair-flow`           | `wardrobe-capsules-link`                           |
+| `garment-capsule-localization-flow`     | `Kombin kapsülleri`                                |
+| `wardrobe-onboarding-flow`              | `onboarding-permission-step`                       |
+| `wardrobe-onboarding-my-form-flow`      | `silhouette-tab-my-form`                           |
+| `wardrobe-onboarding-localization-flow` | `Gardırobunu oluştur`                              |
+| `widget-deep-link`                      | `tab-home`, at launch, as the 18th flow in the run |
 
 Two things a fresh session should not have to rediscover:
 
@@ -82,16 +82,16 @@ installer puts the binary in `~/.maestro/bin` and advertises it **only** by
 appending to `~/.bashrc`, `~/.zshrc` and `~/.bash_profile`. GitHub Actions runs
 every step as `bash --noprofile --norc`, which sources none of them.
 
-This failed *silently*, not loudly: `run-maestro.mjs` catches the `ENOENT` and
+This failed _silently_, not loudly: `run-maestro.mjs` catches the `ENOENT` and
 falls back to `npx --yes maestro@latest`, so the job would have kept working
 while testing against a floating Maestro version no developer runs locally.
 
 Reproduced on `eclipse-temurin:17-jdk`:
 
-| shell | result |
-|---|---|
-| `bash --noprofile --norc -c 'command -v maestro'` | not found |
-| same, with `PATH=$PATH:$HOME/.maestro/bin` | `/root/.maestro/bin/maestro` |
+| shell                                             | result                       |
+| ------------------------------------------------- | ---------------------------- |
+| `bash --noprofile --norc -c 'command -v maestro'` | not found                    |
+| same, with `PATH=$PATH:$HOME/.maestro/bin`        | `/root/.maestro/bin/maestro` |
 
 Fixed by appending to `$GITHUB_PATH`, plus a `Verify Maestro CLI is on PATH`
 step that fails the job rather than letting it degrade silently again.

@@ -5464,7 +5464,7 @@ Key takeaways:
    `findNodeHandle` can return a host object rather than the numeric reactTag
    its types promise. A host object is truthy, so every guard passed, the object
    crossed the JSI bridge, and the process died with `Exception in HostFunction:
-   Unsupported jsi::Value kind` — no red box, no recoverable error. The guard has
+Unsupported jsi::Value kind` — no red box, no recoverable error. The guard has
    to assert the type, not the truthiness, and it belongs in one shared helper
    rather than at eight call sites.
 
@@ -5526,7 +5526,7 @@ Key takeaways:
    exact regression they existed to catch. Any negative assertion about scrolled
    content has to scroll to where the content would be and anchor on something
    that is genuinely on screen. Related: `scrollUntilVisible` stops the moment
-   its target *begins* to be visible, so targeting a container leaves the rest of
+   its target _begins_ to be visible, so targeting a container leaves the rest of
    it below the fold.
 
 9. **Point every test-harness database read and write at one resolved URL.** The

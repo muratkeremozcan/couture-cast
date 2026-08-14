@@ -54,7 +54,7 @@ shared subflow is broken, sanity fails in ~2 minutes instead of after twenty.
    `capsule-builder-modal.tsx` minted the API idempotency key as
    ``globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}` ``.
    The API requires a UUID v4 and answers `400 Idempotency-Key must be a UUID
-   v4`. Hermes has no `globalThis.crypto.randomUUID`, so the fallback fired on
+v4`. Hermes has no `globalThis.crypto.randomUUID`, so the fallback fired on
    every real device. Fixed with `src/lib/uuid.ts`.
    **A unit test was enshrining this**: `4.3-MOB-MODAL-13` asserted the key
    matched `/^\d+-[0-9a-z]+$/`, i.e. that it was explicitly not a UUID. It named
@@ -101,7 +101,7 @@ shared subflow is broken, sanity fails in ~2 minutes instead of after twenty.
   it does.
 - **Three ordering dependencies** the runner's own comment forbids. The fixture
   user owned no garments and no capsules, but the flows that create them sort
-  *after* the capsule flows alphabetically, and `create` deletes its own capsule
+  _after_ the capsule flows alphabetically, and `create` deletes its own capsule
   as cleanup. The runner now seeds four garments **through the real public API**
   (declare → PUT bytes → commit → poll for analysis → confirm tags) plus one
   capsule. Prisma-inserted rows do not work: their `object_path` points at
@@ -112,7 +112,7 @@ shared subflow is broken, sanity fails in ~2 minutes instead of after twenty.
   React Native merges a Pressable's children into one accessible name, and
   Maestro matches a text selector against a whole node:
   - `'Shop this look'` → really `"Shop this look. Presented by Sample Partner.
-    Opens in an in-app browser"`
+Opens in an in-app browser"`
   - `'Gardırobunu oluştur'` → really the title and body joined with `", "`
   - `capsule-status-region` is styled `{height: 0, opacity: 0, width: 0}` — a
     deliberately invisible live region that `assertVisible` can never see

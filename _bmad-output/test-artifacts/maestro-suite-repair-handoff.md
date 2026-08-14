@@ -54,7 +54,7 @@ Per-flow lines are `[maestro:runner] PASS|FAIL <path>`; the tail is
 `Maestro suite: N/18`.
 
 **Diagnose from `commands-*.json`, never from screenshots.** Maestro takes its
-failure screenshot *after* tearing the app down, so failures show the Expo Go
+failure screenshot _after_ tearing the app down, so failures show the Expo Go
 launcher and look like crashes when nothing crashed. `commands-*.json` in
 `maestro/artifacts/<timestamp>/` carries a per-step `metadata.status`. Note the
 array is **not in chronological order** — read statuses, not sequence.
@@ -88,17 +88,17 @@ flagged as such.
 
 **Failing (9):**
 
-| Flow | Failing assertion |
-|---|---|
-| `accessibility-hardening` | `id: garment-swap-modal` |
-| `commerce-affiliate` | `text: 'Shop this look'` |
-| `garment-capsule-create-flow` | `id: create-capsule-button` |
-| `garment-capsule-repair-flow` | `id: wardrobe-capsules-link` |
-| `garment-capsule-localization-flow` | `text: 'Kombin kapsülleri'` |
-| `wardrobe-onboarding-flow` | `id: onboarding-permission-step` |
-| `wardrobe-onboarding-my-form-flow` | `id: silhouette-tab-my-form` |
-| `wardrobe-onboarding-localization-flow` | `text: 'Gardırobunu oluştur'` |
-| `widget-deep-link` | `id: tab-home`, at launch, as the 18th flow |
+| Flow                                    | Failing assertion                           |
+| --------------------------------------- | ------------------------------------------- |
+| `accessibility-hardening`               | `id: garment-swap-modal`                    |
+| `commerce-affiliate`                    | `text: 'Shop this look'`                    |
+| `garment-capsule-create-flow`           | `id: create-capsule-button`                 |
+| `garment-capsule-repair-flow`           | `id: wardrobe-capsules-link`                |
+| `garment-capsule-localization-flow`     | `text: 'Kombin kapsülleri'`                 |
+| `wardrobe-onboarding-flow`              | `id: onboarding-permission-step`            |
+| `wardrobe-onboarding-my-form-flow`      | `id: silhouette-tab-my-form`                |
+| `wardrobe-onboarding-localization-flow` | `text: 'Gardırobunu oluştur'`               |
+| `widget-deep-link`                      | `id: tab-home`, at launch, as the 18th flow |
 
 Three of these (`chip-navigation-bottom-nav`, `deep-link-handling`,
 `garment-smart-tagging-flow`) were red before this session and are now green.
@@ -120,11 +120,11 @@ silently ineffective, second gesture works.
 
 Proved with a screenshot ladder (probe flow, since deleted):
 
-| Shot | After | Result |
-|---|---|---|
-| `probe-00` | `runFlow: subflows/open-app.yaml` returns | **sheet still up**; `assertVisible: chip-community` passes anyway |
-| `probe-01` | first plain `tapOn: chip-community` | sheet dismissed, PERSONAL still selected — the tap was spent on the backdrop |
-| `probe-02` | second identical plain `tapOn` | **COMMUNITY selected.** Plain `tapOn` works |
+| Shot       | After                                     | Result                                                                       |
+| ---------- | ----------------------------------------- | ---------------------------------------------------------------------------- |
+| `probe-00` | `runFlow: subflows/open-app.yaml` returns | **sheet still up**; `assertVisible: chip-community` passes anyway            |
+| `probe-01` | first plain `tapOn: chip-community`       | sheet dismissed, PERSONAL still selected — the tap was spent on the backdrop |
+| `probe-02` | second identical plain `tapOn`            | **COMMUNITY selected.** Plain `tapOn` works                                  |
 
 This retires every earlier hypothesis. `longPressOn` only ever "worked" because a
 coordinate tap had already spent the backdrop. The three disproved app-side
@@ -182,10 +182,10 @@ removed along with that flow's hand-rolled launch preamble.
     `scripts/run-maestro.mjs` now seeds exactly that envelope for the fixture user
     it creates, so it is torn down with the user. **This flow now passes.**
 
-18. **The runner's cleanup was pointed at the wrong database.** *(the serious
-    one — worth telling him about explicitly)* `cleanupMobileE2EIdentity`
+18. **The runner's cleanup was pointed at the wrong database.** _(the serious
+    one — worth telling him about explicitly)_ `cleanupMobileE2EIdentity`
     resolved `MOBILE_E2E_DATABASE_URL || process.env.DATABASE_URL || <local
-    54322>`, while the API child process is handed
+54322>`, while the API child process is handed
     `MOBILE_E2E_DATABASE_URL || <local 54322>` and ignores `DATABASE_URL`.
     Importing `@prisma/client` loads `packages/db/.env`, which sets
     `DATABASE_URL` to the developer's own database
@@ -222,7 +222,7 @@ removed along with that flow's hand-rolled launch preamble.
     presenting as a missing element. `scripts/run-maestro.mjs` now deletes that
     row before every flow (`resetMobileE2EPerFlowState`).
     **Deliberately narrow:** garments are NOT reset, because
-    `DELETE /api/v1/wardrobe/garments/:id` is a retention *request* rather than a
+    `DELETE /api/v1/wardrobe/garments/:id` is a retention _request_ rather than a
     hard delete and `GarmentItem` has relations without `onDelete: Cascade`.
     Adding a hand-ordered cascade that runs 18 times per suite on a hunch was not
     justified. Extend it only with a failure that demonstrates the need.
@@ -259,7 +259,7 @@ hierarchy**, not merely slow. `subflows/open-capsules.yaml` waits for it with
 survived 45 s of polling and still reported not found. My "the hub is still
 mounting" hypothesis is therefore **disproved** — the added wait did not help.
 
-Also established: `open-wardrobe-tab.yaml` succeeded first, so the app *is* on
+Also established: `open-wardrobe-tab.yaml` succeeded first, so the app _is_ on
 `wardrobe-screen`. And in an earlier run (before the subflow existed) the very
 same `tapOn: id: 'wardrobe-capsules-link'` **completed** in
 `garment-capsule-create-flow`, and only the following
@@ -383,7 +383,7 @@ neither of which unit tests cover, but run it before declaring done.
 3. **`assertNotVisible` on below-the-fold content passes for the wrong reason.**
    Any negative assertion about card content must scroll first or it is
    unfalsifiable.
-4. **`scrollUntilVisible` stops when its target *starts* being visible.** Target
+4. **`scrollUntilVisible` stops when its target _starts_ being visible.** Target
    the last element of a block, not the block container, or the rest stays below
    the fold.
 5. **`@prisma/client` loads `packages/db/.env` on import**, silently setting

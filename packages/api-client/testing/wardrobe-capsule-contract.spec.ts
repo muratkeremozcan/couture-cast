@@ -104,7 +104,13 @@ describe('runtimes that ship no Intl.Segmenter', () => {
 
     try {
       expect((Intl as { Segmenter?: unknown }).Segmenter).toBeUndefined()
-      return { contracts: await import('../src/contracts/http'), descriptor }
+      // The extension is required: a dynamic `import()` is always ESM under
+      // `moduleResolution: NodeNext`, so an extensionless relative specifier
+      // fails to resolve (TS2834) and the module type degrades to `any`, which
+      // is what turned every use of `contracts` below into an unsafe-any lint
+      // error. The static import at the top of this file is unaffected because
+      // it resolves through CommonJS.
+      return { contracts: await import('../src/contracts/http/index.js'), descriptor }
     } catch (error) {
       if (descriptor) {
         Object.defineProperty(Intl, 'Segmenter', descriptor)

@@ -1,6 +1,5 @@
-import { readdirSync, statSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -43,8 +42,28 @@ const OPTIONAL_INTL_APIS = [
   'DurationFormat',
 ] as const
 
-const here = fileURLToPath(new URL('.', import.meta.url))
-const srcDir = join(here, '..', 'src')
+/**
+ * Anchored on the working directory rather than `import.meta.url`, because this
+ * package emits CommonJS and TypeScript rejects `import.meta` in that mode
+ * (TS1470) even though Vitest executes this file as ESM. Vitest runs the suites
+ * with the package root as the working directory; the manifest check turns any
+ * other working directory into a loud failure here instead of a silent walk
+ * over the wrong tree.
+ */
+const packageRoot = process.cwd()
+const manifest = JSON.parse(
+  readFileSync(join(packageRoot, 'package.json'), 'utf8')
+) as { name?: string }
+
+if (manifest.name !== '@couture/api-client') {
+  throw new Error(
+    `Expected the @couture/api-client package root as the working directory, found ${
+      manifest.name ?? 'an unnamed package'
+    } at ${packageRoot}`
+  )
+}
+
+const srcDir = join(packageRoot, 'src')
 
 function collectModules(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {

@@ -360,7 +360,8 @@ let graphemeSegmenterResolved = false
 function getGraphemeSegmenter(): Intl.Segmenter | undefined {
   if (!graphemeSegmenterResolved) {
     graphemeSegmenterResolved = true
-    const segmenter = (Intl as typeof Intl & { Segmenter?: typeof Intl.Segmenter }).Segmenter
+    const segmenter = (Intl as typeof Intl & { Segmenter?: typeof Intl.Segmenter })
+      .Segmenter
     if (segmenter) {
       graphemeSegmenter = new segmenter(undefined, { granularity: 'grapheme' })
     }

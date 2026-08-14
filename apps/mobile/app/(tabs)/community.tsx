@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  AccessibilityInfo,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native'
+import { AccessibilityInfo, Platform, StyleSheet, Text, View } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
 import type { CommunityCardDeepLinkTarget } from '@couture/api-client'
 import { hasDeepLinkIntent, parseDeepLink } from '@couture/utils'
