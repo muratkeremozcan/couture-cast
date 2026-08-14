@@ -342,37 +342,79 @@ const probeAndroidMetroReachability = async (host, port) => {
   const adbBinary = resolveAdbBinary()
   const url = `http://${host}:${port}/status`
 
-  // `nc -z` rather than an HTTP client. Android system images carry no curl and
-  // no wget -- `toybox wget` is absent on both API 30 and API 36, despite
-  // toybox itself being present -- while netcat is there and answers the exact
-  // question: can the device open a TCP connection to that host and port. It
-  // was measured against a live listener through the reverse mapping.
-  let output
-  try {
-    const result = await captureProcess(adbBinary, [
-      'shell',
-      `nc -z ${host} ${port} && echo __OPEN__ || echo __SHUT__`,
-    ])
-    output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim()
-  } catch (error) {
-    output = error.message ?? ''
-  }
+  // The verdict is taken on this side of the connection, not the device's.
+  //
+  // Asking the device to open Metro's own port and calling a successful connect
+  // "reachable" does not work: with `adb reverse` in place the device always has
+  // something listening on that port locally, so the connect succeeds whether or
+  // not anything on the host is behind it. That reports a healthy route over a
+  // dead one, which is the failure mode this probe exists to catch.
+  //
+  // So a throwaway listener is opened here, on a port nobody else is using, and
+  // the device is asked to connect to it by the route under test. If the
+  // connection lands, the route works, and there is nothing to misread: this
+  // process saw the socket. `nc` is the only client available, since Android
+  // system images ship no curl and no wget (`toybox wget` is absent on API 30
+  // and API 36 alike).
+  const routeWorks = await new Promise((resolve) => {
+    const server = net.createServer()
+    let sawConnection = false
+    let settled = false
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      server.close(() => resolve(value))
+    }
 
-  if (output.includes('__OPEN__')) {
-    log(`Device reached Metro at ${url}`)
+    server.on('connection', (socket) => {
+      sawConnection = true
+      socket.destroy()
+    })
+    server.on('error', () => finish(null))
+
+    // Loopback is right for both routes: `10.0.2.2` is QEMU's alias for exactly
+    // this interface, and the reverse mapping forwards here too.
+    server.listen(0, '127.0.0.1', async () => {
+      const probePort = server.address().port
+      let removeReverse = false
+      try {
+        if (host === '127.0.0.1') {
+          await captureProcess(adbBinary, [
+            'reverse',
+            `tcp:${probePort}`,
+            `tcp:${probePort}`,
+          ])
+          removeReverse = true
+        }
+        await captureProcess(adbBinary, ['shell', `nc -z -w 3 ${host} ${probePort}`])
+      } catch {
+        // A refused connect or a missing nc both land here; `sawConnection`
+        // stays false and the route is reported dead, which is the honest read
+        // for the first and a conservative one for the second.
+      }
+      if (removeReverse) {
+        await captureProcess(adbBinary, [
+          'reverse',
+          '--remove',
+          `tcp:${probePort}`,
+        ]).catch(() => {})
+      }
+      finish(sawConnection)
+    })
+  })
+
+  if (routeWorks === true) {
+    log(`Device reached this machine at ${host} (checked for ${url})`)
     return true
   }
-  if (output.includes('__SHUT__')) {
+  if (routeWorks === false) {
     log(
-      `Device could NOT open ${host}:${port}. Expo Go will fail to load the ` +
-        `project and every flow will report tab-home missing.`
+      `Device could NOT reach this machine at ${host}. Expo Go cannot load the ` +
+        `project over that route; flows would report tab-home missing.`
     )
     return false
   }
-
-  // Never claim a verdict the probe did not earn: an image without netcat says
-  // nothing about reachability either way.
-  log(`Device reachability probe could not run (${output.slice(0, 120) || 'no output'})`)
+  log(`Device reachability probe could not run for ${host}`)
   return null
 }
 
