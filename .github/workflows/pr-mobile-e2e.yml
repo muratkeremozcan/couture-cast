@@ -75,7 +75,28 @@ env:
   ANDROID_API_LEVEL: '34'
   ANDROID_TARGET: google_apis
   ANDROID_ARCH: x86_64
-  ANDROID_PROFILE: pixel_3a
+  # `medium_phone`, matching what `scripts/run-maestro-shards.mjs` creates
+  # locally. This is a correctness requirement, not a preference.
+  #
+  # A `pixel_3a` is 1080x2220 at 440dpi, which is about 807dp tall. A
+  # `medium_phone` is 1080x2400 at 420dpi, about 914dp. CI was therefore running
+  # a screen roughly 12% shorter than the one every local run used, and this
+  # suite asserts on elements inside scrolling sections. The result was a class
+  # of failure that reproduced nowhere else: `premium-status-line`,
+  # `garment-confirm-image`, `reorder-row-.*` and `garment-tag-comfort-mild` all
+  # reported "not visible" in CI while passing locally, because
+  # `assertVisible`/`extendedWaitUntil` require an element inside the VIEWPORT
+  # rather than merely in the hierarchy, and a shorter screen pushes more of
+  # each section below the fold.
+  #
+  # Two devices means two layouts and a suite that cannot tell a real regression
+  # from a screen-height artifact. Flows should still scroll to what they assert
+  # on, and several now do, but that is defence in depth rather than a reason to
+  # keep the asymmetry.
+  #
+  # This changes the AVD cache key, so the next run pays one cold snapshot
+  # generation, exactly as the API-level comment above describes.
+  ANDROID_PROFILE: medium_phone
 
 jobs:
   mobile-e2e-android:
