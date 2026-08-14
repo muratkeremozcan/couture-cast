@@ -88,20 +88,42 @@ const REQUESTED_PLATFORM = process.env.MOBILE_E2E_PLATFORM || cliPlatform
 const EXPECTED_EXPO_GO_VERSION = process.env.MOBILE_E2E_EXPO_GO_VERSION || '54.0.8'
 
 /**
- * Which iOS simulator this runner drives.
+ * The simulators this run drives.
  *
- * `booted` is `simctl`'s own alias for "the one booted device" and is correct
- * for a single serial run. `scripts/run-maestro-shards.mjs` runs several copies
- * of this runner at once, each against its own simulator, and that alias is
- * ambiguous the moment a second device boots: `simctl` errors rather than
- * picking one. Every simulator-scoped call below therefore goes through this
- * value, and the shard orchestrator sets it to an explicit UDID.
+ * One entry is a normal serial run. Several entries put the run in parallel
+ * mode: Maestro splits the flow list across the devices inside a single
+ * process, and each device signs in as its own fixture user.
+ *
+ * It has to be one Maestro process. Maestro pins its iOS driver to a fixed host
+ * port and assigns per-device ports itself from the device list it was given,
+ * so two `maestro` processes on one machine drive the same XCUITest runner and
+ * fail with `only one gesture can be performed at a time` or
+ * `Failed to connect to /127.0.0.1:7001`.
  */
-const IOS_SIMULATOR_UDID = process.env.MOBILE_E2E_IOS_UDID || 'booted'
+const IOS_UDIDS = (
+  process.env.MOBILE_E2E_IOS_UDIDS ||
+  process.env.MOBILE_E2E_IOS_UDID ||
+  ''
+)
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean)
+
+const PARALLEL_DEVICES = IOS_UDIDS.length > 1
 
 /**
- * Prefix every line of this runner's output with its shard, so four concurrent
- * runners writing to one terminal stay readable.
+ * Which simulator single-device operations act on.
+ *
+ * `booted` is `simctl`'s own alias for "the one booted device", which is
+ * ambiguous the moment a second simulator boots. In parallel mode this is
+ * pointed at each device in turn while Expo Go is installed and device state is
+ * cleared.
+ */
+let iosSimulatorUdid = IOS_UDIDS[0] || 'booted'
+
+/**
+ * Prefix every line of this runner's output with its label, so a parallel run
+ * stays readable.
  */
 const SHARD_LABEL = process.env.MOBILE_E2E_SHARD_LABEL || ''
 
@@ -797,7 +819,7 @@ const clearMobileE2EDeviceSettings = async () => {
   try {
     const dataContainer = await captureProcess(
       'xcrun',
-      ['simctl', 'get_app_container', IOS_SIMULATOR_UDID, 'host.exp.Exponent', 'data'],
+      ['simctl', 'get_app_container', iosSimulatorUdid, 'host.exp.Exponent', 'data'],
       { timeoutMs: 5000 }
     )
     const root = dataContainer.stdout.trim()
@@ -1326,8 +1348,8 @@ const hasBootedIosSimulator = async () => {
     )
     // A shard is pinned to one simulator, and "some device is booted" is not
     // the question it needs answered: three sibling shards each boot their own.
-    if (IOS_SIMULATOR_UDID !== 'booted') {
-      return result.stdout.includes(IOS_SIMULATOR_UDID)
+    if (iosSimulatorUdid !== 'booted') {
+      return result.stdout.includes(iosSimulatorUdid)
     }
     return /\(Booted\)/.test(result.stdout)
   } catch {
@@ -1377,7 +1399,7 @@ const getInstalledExpoGoVersionOnIos = async () => {
   try {
     const appContainer = await captureProcess(
       'xcrun',
-      ['simctl', 'get_app_container', IOS_SIMULATOR_UDID, 'host.exp.Exponent', 'app'],
+      ['simctl', 'get_app_container', iosSimulatorUdid, 'host.exp.Exponent', 'app'],
       { timeoutMs: 5000 }
     )
     const version = await captureProcess(
@@ -1461,7 +1483,7 @@ const ensureExpoGoOnIos = async () => {
     url: release.iosClientUrl,
   })
   log(`Installing Expo Go ${expectedVersion} on the booted iOS simulator`)
-  await spawnProcess('xcrun', ['simctl', 'install', IOS_SIMULATOR_UDID, binaryPath], {
+  await spawnProcess('xcrun', ['simctl', 'install', iosSimulatorUdid, binaryPath], {
     timeoutMs: 120_000,
   })
 
@@ -1512,6 +1534,28 @@ const resolveTarget = async () => {
 
   await ensureIosSimulatorTooling()
 
+  if (PARALLEL_DEVICES) {
+    // Every device has to be booted and carrying Expo Go before Maestro starts,
+    // because Maestro is handed the whole device list at once.
+    let expoGoReady = true
+    for (const udid of IOS_UDIDS) {
+      iosSimulatorUdid = udid
+      if (!(await hasBootedIosSimulator())) {
+        log(`Booting simulator ${udid}`)
+        await spawnProcess('xcrun', ['simctl', 'boot', udid], {
+          timeoutMs: 120_000,
+        }).catch(() => {
+          // `simctl boot` exits non-zero when the device is already booted.
+        })
+        await waitForCondition(hasBootedIosSimulator, 120_000, 1_000)
+      }
+      expoGoReady = (await ensureExpoGoOnIos()) && expoGoReady
+    }
+    iosSimulatorUdid = IOS_UDIDS[0]
+    log(`Using ${IOS_UDIDS.length} iOS simulators for a parallel Maestro run`)
+    return { platform: 'ios', appId: 'host.exp.Exponent', expoGoReady }
+  }
+
   if (await hasBootedIosSimulator()) {
     const expoGoReady = await ensureExpoGoOnIos()
     log('Using booted iOS simulator for Maestro run')
@@ -1519,15 +1563,15 @@ const resolveTarget = async () => {
   }
 
   log('No iOS simulator detected. Attempting to boot an iOS simulator.')
-  if (IOS_SIMULATOR_UDID === 'booted') {
+  if (iosSimulatorUdid === 'booted') {
     await spawnProcess('bash', ['./scripts/start-ios-simulator.sh'], {
       timeoutMs: 60_000,
     })
   } else {
     // The shard owns a specific device; `start-ios-simulator.sh` boots whatever
     // the default device name resolves to, which is another shard's simulator.
-    log(`Booting pinned simulator ${IOS_SIMULATOR_UDID}`)
-    await spawnProcess('xcrun', ['simctl', 'boot', IOS_SIMULATOR_UDID], {
+    log(`Booting pinned simulator ${iosSimulatorUdid}`)
+    await spawnProcess('xcrun', ['simctl', 'boot', iosSimulatorUdid], {
       timeoutMs: 120_000,
     }).catch(() => {
       // `simctl boot` exits non-zero when the device is already booted.
@@ -1553,6 +1597,83 @@ const resolveTarget = async () => {
  */
 const ensureMaestroTarget = async () => {
   return resolveTarget()
+}
+
+/**
+ * Look up a simulator's name from its UDID.
+ *
+ * The name is the key the app matches on: `mobile-auth.ts` reads
+ * `Constants.deviceName` and finds its own entry in the token map.
+ *
+ * @param {string} udid
+ * @returns {Promise<string>}
+ */
+const getSimulatorName = async (udid) => {
+  const result = await captureProcess('xcrun', ['simctl', 'list', 'devices', '-j'], {
+    timeoutMs: 15_000,
+  })
+  const parsed = JSON.parse(result.stdout)
+  for (const devices of Object.values(parsed.devices ?? {})) {
+    for (const device of devices) {
+      if (device?.udid === udid && typeof device?.name === 'string') {
+        return device.name
+      }
+    }
+  }
+  throw new Error(`No simulator found for UDID ${udid}`)
+}
+
+/**
+ * Read which flows a JUnit report recorded as passed and failed.
+ *
+ * The report is the authority on a sharded run, not the exit code. Maestro
+ * 2.0.10 has been observed exiting 0 from a `--shard-split` invocation whose own
+ * summary said `Passed: 16/17` and whose report carried `failures="1"`. A runner
+ * that trusts the exit code turns that into a green suite, which is the exact
+ * hollow green this harness exists to prevent.
+ *
+ * Names here are flow titles (the `name:` inside the flow), not file names.
+ *
+ * @param {string} reportPath
+ * @returns {{ passed: string[], failed: string[] }}
+ */
+const readSuiteReport = (reportPath) => {
+  try {
+    const xml = fs.readFileSync(path.resolve(projectRoot, reportPath), 'utf8')
+    const passed = []
+    const failed = []
+    for (const segment of xml.split('<testcase').slice(1)) {
+      const name = /name="([^"]+)"/.exec(segment)?.[1]
+      if (!name) continue
+      if (segment.includes('<failure')) failed.push(name)
+      else passed.push(name)
+    }
+    return { passed, failed }
+  } catch {
+    return { passed: [], failed: [] }
+  }
+}
+
+/**
+ * Kill iOS driver processes left behind by an earlier run.
+ *
+ * Maestro's iOS driver listens on a fixed host port. A driver that outlived its
+ * run keeps that port, and the next run's first flow dies with
+ * `Failed to connect to /127.0.0.1:7001` -- a failure that looks exactly like a
+ * flaky device and was recorded as one twice before it was traced here.
+ *
+ * @returns {Promise<void>}
+ */
+const killStaleIosDrivers = async () => {
+  if (!isMac) return
+  for (const pattern of [
+    'maestro-driver-iosUITests-Runner',
+    'maestro-driver-ios-config.xctestrun',
+  ]) {
+    await spawnProcess('pkill', ['-f', pattern], { timeoutMs: 5_000 }).catch(() => {
+      // `pkill` exits non-zero when nothing matched, which is the normal case.
+    })
+  }
 }
 
 /**
@@ -1633,6 +1754,7 @@ const runMaestroCommand = async (args, options = {}) => {
  * @returns {Promise<void>}
  */
 const run = async () => {
+  await killStaleIosDrivers()
   const metroPort = await chooseMetroPort()
   process.env.MOBILE_E2E_METRO_PORT = String(metroPort)
   const target = await ensureMaestroTarget()
@@ -1642,6 +1764,8 @@ const run = async () => {
   let apiProcess
   let workerProcess
   let mobileIdentity
+  /** @type {{ accessToken: string, userId: string }[]} */
+  const mobileIdentities = []
 
   try {
     if (process.env.MOBILE_E2E_SKIP_API !== '1') {
@@ -1702,12 +1826,33 @@ const run = async () => {
         log(`Local API reachable on ${apiHealthUrl}`)
       }
 
-      await clearMobileE2EDeviceSettings()
-      mobileIdentity = await setupMobileE2EIdentity(apiSetupBaseUrl)
+      if (PARALLEL_DEVICES) {
+        // One fixture user per simulator. The bundle carries the whole map and
+        // each device selects its own entry in `mobile-auth.ts`, because a
+        // single Metro bundle cannot hold a different token per device.
+        const tokensByDeviceName = {}
+        for (const udid of IOS_UDIDS) {
+          iosSimulatorUdid = udid
+          await clearMobileE2EDeviceSettings()
+          const identity = await setupMobileE2EIdentity(apiSetupBaseUrl)
+          const deviceName = await getSimulatorName(udid)
+          tokensByDeviceName[deviceName] = identity.accessToken
+          mobileIdentities.push(identity)
+          log(`Created authenticated mobile E2E fixture for ${deviceName}`)
+        }
+        iosSimulatorUdid = IOS_UDIDS[0]
+        mobileIdentity = mobileIdentities[0]
+        process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE =
+          JSON.stringify(tokensByDeviceName)
+      } else {
+        await clearMobileE2EDeviceSettings()
+        mobileIdentity = await setupMobileE2EIdentity(apiSetupBaseUrl)
+        mobileIdentities.push(mobileIdentity)
+        log('Created authenticated mobile E2E fixture')
+      }
       process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN = mobileIdentity.accessToken
       process.env.EXPO_PUBLIC_API_BASE_URL = mobileApiBaseUrl
       process.env.WEATHER_ALERT_ID = mobileE2EWeatherAlertId(mobileIdentity.userId)
-      log('Created authenticated mobile E2E fixture')
     } else if (!process.env.EXPO_PUBLIC_API_BASE_URL) {
       throw new Error(
         'MOBILE_E2E_SKIP_API=1 requires EXPO_PUBLIC_API_BASE_URL and an externally managed test identity.'
@@ -1856,7 +2001,176 @@ const run = async () => {
     // flow, so failures are collected and rethrown as one summary at the end.
     const flowFailures = []
 
+    /**
+     * @param {string[]} failures
+     * @returns {void}
+     */
+    const finishSuite = (failures) => {
+      const passedCount = flowsToRun.length - failures.length
+      log(`Maestro suite: ${passedCount}/${flowsToRun.length} flows passed`)
+      if (failures.length > 0) {
+        throw new Error(
+          `${failures.length} Maestro flow(s) failed:\n  ${failures.join('\n  ')}`
+        )
+      }
+    }
+
+    // Flows that depend on a value seeded for one specific user cannot be
+    // sharded: Maestro passes one set of `-e` values to every device, so
+    // `WEATHER_ALERT_ID` can only ever match the user of one of them. There is
+    // exactly one such flow, and it runs on the first device after the sharded
+    // pass rather than being weakened to suit the split.
+    const USER_SCOPED_FLOWS = ['maestro/deep-link-handling.yaml']
+
     try {
+      if (PARALLEL_DEVICES) {
+        const shardedFlows = flowsToRun.filter(
+          (flow) => !USER_SCOPED_FLOWS.includes(flow)
+        )
+        const serialFlows = flowsToRun.filter((flow) => USER_SCOPED_FLOWS.includes(flow))
+
+        for (const identity of mobileIdentities) {
+          await resetMobileE2EPerFlowState(identity)
+        }
+
+        if (shardedFlows.length > 0) {
+          const reportPath = toPosixPath(
+            path.join(MAESTRO_ARTIFACT_DIR, 'parallel-suite-report.xml')
+          )
+          const parallelArgs = [
+            '--platform',
+            target.platform,
+            '--udid',
+            IOS_UDIDS.join(','),
+            'test',
+            '--shard-split',
+            String(IOS_UDIDS.length),
+            '-e',
+            `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`,
+            '-e',
+            `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`,
+            '-e',
+            `APP_URL=${process.env.APP_URL}`,
+            '-e',
+            `WARDROBE_URL=${process.env.WARDROBE_URL}`,
+            '-e',
+            `WIDGET_NOW_URL=${process.env.WIDGET_NOW_URL}`,
+            '-e',
+            `WIDGET_NEXT_URL=${process.env.WIDGET_NEXT_URL}`,
+          ]
+          if (WRITE_ARTIFACTS) {
+            fs.mkdirSync(path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR), {
+              recursive: true,
+            })
+            parallelArgs.push(
+              '--format',
+              'junit',
+              '--output',
+              reportPath,
+              '--test-output-dir',
+              MAESTRO_ARTIFACT_DIR,
+              '--debug-output',
+              MAESTRO_ARTIFACT_DIR
+            )
+          }
+          parallelArgs.push(...shardedFlows)
+
+          log(
+            `Running ${shardedFlows.length} flows across ${IOS_UDIDS.length} simulators`
+          )
+          // The exit code is not trusted on its own here. A sharded invocation
+          // has been observed exiting 0 while its own summary printed
+          // `Passed: 16/17` and the JUnit report recorded `failures="1"`, so
+          // believing the exit code reported a green suite over a red one. The
+          // report is the evidence; the exit code only adds a failure the
+          // report could not describe.
+          let maestroExitError
+          try {
+            await runMaestroCommand(parallelArgs, {
+              env: maestroEnv,
+              logFile: WRITE_ARTIFACTS
+                ? path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR, 'parallel-suite.log')
+                : undefined,
+            })
+          } catch (error) {
+            maestroExitError = error
+          }
+
+          const report = readSuiteReport(reportPath)
+          for (const name of report.failed) {
+            flowFailures.push(name)
+            log(`FAIL ${name}`)
+          }
+          for (const name of report.passed) {
+            log(`PASS ${name}`)
+          }
+
+          const accountedFor = report.failed.length + report.passed.length
+          if (accountedFor !== shardedFlows.length) {
+            // Every flow handed to Maestro has to appear in the report, or the
+            // count this run reports is a guess. Fail loudly instead.
+            const missing = shardedFlows.length - accountedFor
+            flowFailures.push(
+              `${missing} flow(s) missing from ${reportPath} (ran ${shardedFlows.length}, report described ${accountedFor})`
+            )
+            log(`FAIL ${missing} flow(s) absent from the JUnit report`)
+          } else if (maestroExitError && report.failed.length === 0) {
+            flowFailures.push(
+              `Maestro exited non-zero with no failure in the report: ${maestroExitError.message}`
+            )
+            log('FAIL Maestro exited non-zero while the report recorded no failure')
+          }
+        }
+
+        for (const flowPath of serialFlows) {
+          const serialArgs = [
+            '--platform',
+            target.platform,
+            '--udid',
+            IOS_UDIDS[0],
+            'test',
+            '-e',
+            `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`,
+            '-e',
+            `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`,
+            '-e',
+            `APP_URL=${process.env.APP_URL}`,
+            '-e',
+            `WARDROBE_URL=${process.env.WARDROBE_URL}`,
+            '-e',
+            `WIDGET_NOW_URL=${process.env.WIDGET_NOW_URL}`,
+            '-e',
+            `WIDGET_NEXT_URL=${process.env.WIDGET_NEXT_URL}`,
+          ]
+          if (WRITE_ARTIFACTS) {
+            serialArgs.push(
+              '--format',
+              'junit',
+              '--output',
+              getFlowReportPath(flowPath),
+              '--test-output-dir',
+              MAESTRO_ARTIFACT_DIR,
+              '--debug-output',
+              MAESTRO_ARTIFACT_DIR
+            )
+          }
+          serialArgs.push(flowPath)
+
+          log(`Running user-scoped flow on ${IOS_UDIDS[0]}: ${flowPath}`)
+          try {
+            await runMaestroCommand(serialArgs, {
+              env: maestroEnv,
+              logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
+            })
+            log(`PASS ${flowPath}`)
+          } catch (error) {
+            flowFailures.push(flowPath)
+            log(`FAIL ${flowPath} (${error.message})`)
+          }
+        }
+        return await finishSuite(flowFailures)
+      }
+
       for (const flowPath of flowsToRun) {
         const maestroArgs = []
         let maestroLogFile
@@ -1872,10 +2186,10 @@ const run = async () => {
           )
         } else {
           maestroArgs.push('--platform', target.platform)
-          if (target.platform === 'ios' && IOS_SIMULATOR_UDID !== 'booted') {
+          if (target.platform === 'ios' && iosSimulatorUdid !== 'booted') {
             // Without this, concurrent shards all drive whichever simulator
             // Maestro picks first.
-            maestroArgs.push('--udid', IOS_SIMULATOR_UDID)
+            maestroArgs.push('--udid', iosSimulatorUdid)
           }
           maestroArgs.push('test')
           maestroArgs.push('-e', `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`)
@@ -1925,19 +2239,12 @@ const run = async () => {
       }
     }
 
-    const passedCount = flowsToRun.length - flowFailures.length
-    log(`Maestro suite: ${passedCount}/${flowsToRun.length} flows passed`)
-
-    if (flowFailures.length > 0) {
-      throw new Error(
-        `${flowFailures.length} Maestro flow(s) failed:\n  ${flowFailures.join('\n  ')}`
-      )
-    }
+    finishSuite(flowFailures)
   } finally {
-    if (mobileIdentity) {
+    for (const identity of mobileIdentities) {
       log('Cleaning authenticated mobile E2E fixture')
       try {
-        await cleanupMobileE2EIdentity(apiSetupBaseUrl, mobileIdentity)
+        await cleanupMobileE2EIdentity(apiSetupBaseUrl, identity)
       } catch (cleanupError) {
         console.error('[maestro:runner] Failed to clean mobile E2E fixture')
         console.error(cleanupError)

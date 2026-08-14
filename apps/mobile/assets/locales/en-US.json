@@ -261,6 +261,7 @@
         "home": "Home"
       },
       "garmentsSelected": "Garments ({{count}} of {{max}} selected)",
+      "garmentsRange": "Select {{min}} to {{max}} garments.",
       "garmentOrder": "Garment order"
     },
     "onboarding": {

@@ -261,6 +261,7 @@
         "home": "Maison"
       },
       "garmentsSelected": "Vêtements ({{count}} sur {{max}} sélectionnés)",
+      "garmentsRange": "Sélectionnez de {{min}} à {{max}} vêtements.",
       "garmentOrder": "Ordre des vêtements"
     },
     "onboarding": {

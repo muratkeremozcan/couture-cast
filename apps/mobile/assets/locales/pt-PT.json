@@ -261,6 +261,7 @@
         "home": "Casa"
       },
       "garmentsSelected": "Peças ({{count}} de {{max}} selecionadas)",
+      "garmentsRange": "Selecione de {{min}} a {{max}} peças.",
       "garmentOrder": "Ordem das peças"
     },
     "onboarding": {

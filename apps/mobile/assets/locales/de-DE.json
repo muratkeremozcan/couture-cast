@@ -261,6 +261,7 @@
         "home": "Zuhause"
       },
       "garmentsSelected": "Kleidungsstücke ({{count}} von {{max}} ausgewählt)",
+      "garmentsRange": "Wähle {{min}} bis {{max}} Kleidungsstücke aus.",
       "garmentOrder": "Reihenfolge der Kleidungsstücke"
     },
     "onboarding": {

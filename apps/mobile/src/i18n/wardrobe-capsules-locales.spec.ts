@@ -86,8 +86,20 @@ function placeholders(value: string): string[] {
 const reference = flatten(capsuleTree(enUS as Catalog))
 
 describe('4.3 mobile wardrobe capsule locale parity', () => {
-  it('4.3-I18N-MOB-01 ships 49 capsule keys in the reference catalog', () => {
-    expect(reference.size).toBe(49)
+  // 52, not 49. Three keys were added while localizing the capsule builder
+  // modal, all of which had been hardcoded English rendering untranslated on
+  // every non-English device: `garmentsSelected` (the garment count),
+  // `garmentOrder` (the ordering heading) and `garmentsRange` (the selection
+  // bounds hint).
+  //
+  // `garmentsRange` is rendered by web and not by mobile. The mobile modal
+  // already surfaces the same sentence through `errors.garmentCount`, so
+  // rendering both put the identical string on screen twice -- caught by
+  // 4.3-MOB-MODAL-04 and -15, which then matched two elements. The key stays in
+  // the mobile catalogs because 4.3-I18N-MOB-06 requires one key tree across
+  // both surfaces.
+  it('4.3-I18N-MOB-01 ships 52 capsule keys in the reference catalog', () => {
+    expect(reference.size).toBe(52)
   })
 
   it('4.3-I18N-MOB-02 uses an identical key tree in every locale', () => {

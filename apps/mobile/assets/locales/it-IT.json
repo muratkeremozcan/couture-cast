@@ -261,6 +261,7 @@
         "home": "Casa"
       },
       "garmentsSelected": "Capi ({{count}} di {{max}} selezionati)",
+      "garmentsRange": "Seleziona da {{min}} a {{max}} capi.",
       "garmentOrder": "Ordine dei capi"
     },
     "onboarding": {

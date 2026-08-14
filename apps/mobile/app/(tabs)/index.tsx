@@ -135,6 +135,44 @@ const alternateGarments: Record<string, string[]> = {
   Garment: ['basic-socks', 'leather-belt'],
 }
 
+/**
+ * The options offered in the garment swap modal, worn garment first.
+ *
+ * `alternateGarments` is a fixed catalogue, so a worn garment outside it --
+ * every `default-*` placeholder a user with an empty wardrobe sees, which is
+ * every new account -- was absent from its own swap modal. The modal declares
+ * `accessibilityRole="radiogroup"` and marks the worn option
+ * `accessibilityState.selected`, so in that state it rendered a radiogroup with
+ * no selected radio at all: a screen-reader user was offered five alternatives
+ * with nothing indicating which one they are wearing now, and no way to return
+ * to it once they moved off.
+ *
+ * Leading with it also puts `firstSwapOptionRef` -- the element focused when the
+ * modal opens -- on the current selection, which is where focus belongs in a
+ * radiogroup.
+ *
+ * Extracted from the screen component rather than inlined: these branches are a
+ * pure function of the garment id, and carrying them inside `TabOneScreen` put
+ * that component over the repository's cyclomatic complexity limit.
+ */
+function resolveGarmentSwap(swappingGarmentId: string | null): {
+  category: string
+  options: string[]
+} {
+  const category = swappingGarmentId
+    ? parseGarmentId(swappingGarmentId).category
+    : 'Garment'
+  const baseSwapOptions = alternateGarments[category] || alternateGarments.Garment || []
+
+  return {
+    category,
+    options:
+      swappingGarmentId && !baseSwapOptions.includes(swappingGarmentId)
+        ? [swappingGarmentId, ...baseSwapOptions]
+        : baseSwapOptions,
+  }
+}
+
 export default function TabOneScreen() {
   const analytics = useMobileAnalytics()
   const router = useRouter()
@@ -581,33 +619,8 @@ export default function TabOneScreen() {
     setActiveScenario(CHIP_SCENARIOS[category])
   }
 
-  // Determine swap category list
-  const swapCategory = swappingGarmentId
-    ? parseGarmentId(swappingGarmentId).category
-    : 'Garment'
-
-  /**
-   * The garment currently worn always leads the list.
-   *
-   * `alternateGarments` is a fixed catalogue, so a worn garment outside it --
-   * every `default-*` placeholder a user with an empty wardrobe sees, which is
-   * every new account -- was absent from its own swap modal. The modal declares
-   * `accessibilityRole="radiogroup"` and marks the worn option
-   * `accessibilityState.selected`, so in that state it rendered a radiogroup
-   * with no selected radio at all: a screen-reader user was offered five
-   * alternatives with nothing indicating which one they are wearing now, and no
-   * way to return to it once they moved off.
-   *
-   * Leading with it also puts `firstSwapOptionRef` -- the element focused when
-   * the modal opens -- on the current selection, which is where focus belongs
-   * in a radiogroup.
-   */
-  const baseSwapOptions =
-    alternateGarments[swapCategory] || alternateGarments.Garment || []
-  const swapOptions =
-    swappingGarmentId && !baseSwapOptions.includes(swappingGarmentId)
-      ? [swappingGarmentId, ...baseSwapOptions]
-      : baseSwapOptions
+  const { category: swapCategory, options: swapOptions } =
+    resolveGarmentSwap(swappingGarmentId)
 
   return (
     <SafeAreaView style={[styles.safeContainer, { backgroundColor: palette.background }]}>

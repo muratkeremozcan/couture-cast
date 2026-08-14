@@ -261,6 +261,7 @@
         "home": "Ev"
       },
       "garmentsSelected": "Parçalar ({{max}} parçadan {{count}} tanesi seçildi)",
+      "garmentsRange": "{{min}} ile {{max}} arasında parça seçin.",
       "garmentOrder": "Parça sırası"
     },
     "onboarding": {
