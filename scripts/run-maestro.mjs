@@ -353,6 +353,25 @@ const probeAndroidMetroReachability = async (host, port) => {
   // process saw the socket. `nc` is the only client available, since Android
   // system images ship no curl and no wget (`toybox wget` is absent on API 30
   // and API 36 alike).
+  // Establish that the client exists before reading anything into its silence.
+  // Without this, an image with no netcat is indistinguishable from a dead
+  // route: the connect attempt throws, no connection arrives, and the route
+  // gets convicted on the strength of a missing binary. That false negative has
+  // already been reported twice by earlier versions of this probe.
+  try {
+    const ncCheck = await captureProcess(adbBinary, [
+      'shell',
+      'command -v nc >/dev/null 2>&1 && echo __HAS_NC__ || echo __NO_NC__',
+    ])
+    if (!`${ncCheck.stdout ?? ''}`.includes('__HAS_NC__')) {
+      log(`Device has no netcat, so ${host} cannot be probed; not treating that as unreachable`)
+      return null
+    }
+  } catch {
+    log(`Could not check for netcat on the device; not treating ${host} as unreachable`)
+    return null
+  }
+
   const routeWorks = await new Promise((resolve) => {
     const server = net.createServer()
     let sawConnection = false
@@ -1987,20 +2006,27 @@ const run = async () => {
   if (target.platform === 'android' && !process.env.MOBILE_E2E_ANDROID_HOST) {
     await reverseAndroidPorts([...new Set([metroPort, 8081, 4000])])
     const reachable = []
+    let anyVerdict = false
     for (const candidate of ['127.0.0.1', '10.0.2.2']) {
       // eslint-disable-next-line no-await-in-loop -- two candidates, ordered
-      if (await probeAndroidMetroReachability(candidate, metroPort)) {
-        reachable.push(candidate)
-      }
+      const verdict = await probeAndroidMetroReachability(candidate, metroPort)
+      if (verdict !== null) anyVerdict = true
+      if (verdict === true) reachable.push(candidate)
     }
-    if (reachable.length === 0) {
-      // 10.0.2.2 is QEMU's own alias and needs no adb cooperation, so it is the
-      // better thing to be wrong with.
-      log('No candidate host answered; falling back to 10.0.2.2')
+    if (reachable.length > 0) {
+      if (reachable[0] !== androidHost) {
+        log(`Using ${reachable[0]} as the Android host: the device can reach it`)
+        androidHost = reachable[0]
+      }
+    } else if (anyVerdict) {
+      // A real refusal on both routes. 10.0.2.2 is QEMU's own alias and needs no
+      // adb cooperation, so it is the better one to be wrong with.
+      log('Neither host answered; falling back to 10.0.2.2')
       androidHost = '10.0.2.2'
-    } else if (reachable[0] !== androidHost) {
-      log(`Using ${reachable[0]} as the Android host: the device can reach it`)
-      androidHost = reachable[0]
+    } else {
+      // Nothing was measured. Changing the host on the strength of a probe that
+      // could not run would be guessing with extra steps.
+      log(`Reachability could not be measured; keeping ${androidHost}`)
     }
   }
 

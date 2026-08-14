@@ -206,7 +206,7 @@ jobs:
           npm run maestro:install --silent
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
-      - name: Verify Maestro CLI is on PATH
+      - name: Verify Maestro CLI is on PATH and is the pinned version
         run: |
           set -euo pipefail
           if ! command -v maestro >/dev/null 2>&1; then
@@ -215,6 +215,17 @@ jobs:
           fi
           echo "Using maestro at: $(command -v maestro)"
           maestro --version
+          # Presence was never the real risk. This step used to accept any
+          # version, so CI ran whatever get.maestro.mobile.dev served that day
+          # while developers ran whatever Homebrew had, and nothing reported the
+          # gap. scripts/maestro-install.mjs owns the pin; this asserts it held.
+          PINNED=$(node -p "require('fs').readFileSync('scripts/maestro-install.mjs','utf8').match(/PINNED_VERSION = process\.env\.MAESTRO_VERSION \?\? '([^']+)'/)[1]")
+          FOUND=$(maestro --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ "$FOUND" != "$PINNED" ]; then
+            echo "::error::maestro $FOUND is on PATH but this repo pins $PINNED. CI and local would be testing different versions."
+            exit 1
+          fi
+          echo "Maestro version matches the pin: $PINNED"
 
       - name: Resolve flow list
         id: flows
