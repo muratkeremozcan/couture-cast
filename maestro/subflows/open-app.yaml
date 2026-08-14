@@ -85,6 +85,25 @@ appId: ${MAESTRO_APP_ID}
       # once the tab bar is showing, and the pair is bounded, so a screen that
       # never reveals the tab bar fails at the wait below with a clear message
       # instead of spinning.
+      # The `back` is Android-only, and guarded on Expo Go not being on its own
+      # error screen. Both halves were learned from a CI run.
+      #
+      # Android-only because iOS gets nothing from it: Maestro's `back` is a
+      # left-edge swipe there and this repo already measured it as not popping
+      # these screens, which is why the `BackButton` tap exists. On Android it
+      # is the system BACK key and does real work, so it is what actually pops
+      # the stack on that platform, where `BackButton` is not in the hierarchy
+      # at all.
+      #
+      # Guarded because `notVisible: tab-home` does not mean "a pushed route is
+      # covering the tab bar". It is equally true when the app has not mounted,
+      # and on a GitHub runner it was: Expo Go could not fetch the manifest and
+      # was sitting on `Something went wrong.`. Both blocks then fired, and two
+      # system BACK presses walked Expo Go out to its own home screen and then
+      # to the Android launcher, so the failure was reported as `tab-home` never
+      # appearing with the launcher on screen -- which points at everything
+      # except the real cause. Without the back presses the run fails at the
+      # wait below, still red, but pointing at the app that would not load.
       - runFlow:
           when:
             notVisible:
@@ -94,7 +113,13 @@ appId: ${MAESTRO_APP_ID}
                 id: 'BackButton'
                 optional: true
                 label: 'Pop a pushed route left behind by the previous flow'
-            - back
+            - runFlow:
+                when:
+                  platform: Android
+                  notVisible:
+                    text: 'Something went wrong.'
+                commands:
+                  - back
       - runFlow:
           when:
             notVisible:
@@ -104,7 +129,13 @@ appId: ${MAESTRO_APP_ID}
                 id: 'BackButton'
                 optional: true
                 label: 'Pop a second pushed route'
-            - back
+            - runFlow:
+                when:
+                  platform: Android
+                  notVisible:
+                    text: 'Something went wrong.'
+                commands:
+                  - back
 
       # The tab bar is the app's own first painted chrome, so a failure to mount
       # is reported here, at the launch step, rather than as a confusing

@@ -34,6 +34,24 @@ appId: ${MAESTRO_APP_ID}
                 id: 'BackButton'
                 optional: true
                 label: 'Leave a pushed route so the tab bar is reachable'
+            # `BackButton` is an iOS identity and does not exist on Android, so
+            # the optional tap above is a silent no-op there and the pushed
+            # route stays on top. Confirmed from a failure hierarchy: the
+            # silhouette editor exposed `wardrobe-silhouette-screen`,
+            # `silhouette-editor` and its own controls, and no back affordance
+            # Maestro could address. Three flows reported `tab-settings` "not
+            # found" this way while sitting on a perfectly healthy pushed
+            # screen.
+            #
+            # Android's system back pops the React Navigation stack directly, so
+            # it is the right tool there. It stays platform-guarded because on
+            # iOS Maestro's `back` is a left-edge swipe that this repo already
+            # measured as not popping these screens.
+            - runFlow:
+                when:
+                  platform: Android
+                commands:
+                  - back
       - tapOn:
           id: 'tab-settings'
           retryTapIfNoChange: true
