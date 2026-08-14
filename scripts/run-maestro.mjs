@@ -309,7 +309,9 @@ const reverseAndroidPorts = async (ports) => {
   const adbBinary = resolveAdbBinary()
   for (const port of ports) {
     try {
-      await captureProcess(adbBinary, ['reverse', `tcp:${port}`, `tcp:${port}`])
+      await captureProcess(adbBinary, ['reverse', `tcp:${port}`, `tcp:${port}`], {
+        timeoutMs: 15_000,
+      })
       log(`Reversed Android port ${port} to the host`)
     } catch (error) {
       log(`Could not reverse Android port ${port}: ${error.message}`)
@@ -362,7 +364,7 @@ const probeAndroidMetroReachability = async (host, port) => {
     const ncCheck = await captureProcess(adbBinary, [
       'shell',
       'command -v nc >/dev/null 2>&1 && echo __HAS_NC__ || echo __NO_NC__',
-    ])
+    ], { timeoutMs: 15_000 })
     if (!`${ncCheck.stdout ?? ''}`.includes('__HAS_NC__')) {
       log(`Device has no netcat, so ${host} cannot be probed; not treating that as unreachable`)
       return null
@@ -403,7 +405,7 @@ const probeAndroidMetroReachability = async (host, port) => {
             'reverse',
             `tcp:${probePort}`,
             `tcp:${probePort}`,
-          ])
+          ], { timeoutMs: 15_000 })
           removeReverse = true
 
           // Control: with the reverse mapping in place the DEVICE is listening
@@ -415,7 +417,7 @@ const probeAndroidMetroReachability = async (host, port) => {
           const control = await captureProcess(adbBinary, [
             'shell',
             `nc -z -w 3 127.0.0.1 ${probePort} && echo __NC_WORKS__ || echo __NC_BROKEN__`,
-          ]).catch(() => ({ stdout: '' }))
+          ], { timeoutMs: 20_000 }).catch(() => ({ stdout: '' }))
           if (!`${control.stdout ?? ''}`.includes('__NC_WORKS__')) {
             log(
               `nc -z does not work on this device image, so ${host} cannot be probed; ` +
@@ -430,7 +432,9 @@ const probeAndroidMetroReachability = async (host, port) => {
             return
           }
         }
-        await captureProcess(adbBinary, ['shell', `nc -z -w 3 ${host} ${probePort}`])
+        await captureProcess(adbBinary, ['shell', `nc -z -w 3 ${host} ${probePort}`], {
+          timeoutMs: 20_000,
+        })
       } catch {
         // A refused connect lands here; `sawConnection` stays false and the
         // route is reported dead, which is the honest read now that the
@@ -441,7 +445,7 @@ const probeAndroidMetroReachability = async (host, port) => {
           'reverse',
           '--remove',
           `tcp:${probePort}`,
-        ]).catch(() => {})
+        ], { timeoutMs: 10_000 }).catch(() => {})
       }
       finish(sawConnection)
     })
