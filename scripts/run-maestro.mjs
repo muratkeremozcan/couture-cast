@@ -316,6 +316,54 @@ const reverseAndroidPorts = async (ports) => {
   }
 }
 
+/**
+ * Ask the device itself whether it can reach Metro, and say so plainly.
+ *
+ * The runner's own health check proves only that Metro answers on the *host*.
+ * The device is a separate network namespace, and when it cannot get through,
+ * Expo Go fails the manifest fetch and shows its own "Something went wrong."
+ * screen. Maestro then reports every flow as `tab-home` never appearing, which
+ * reads as the app being broken and sends the investigation to the wrong place
+ * entirely. A GitHub runner did exactly this, failing 0.7 seconds after the
+ * deep link, far too fast to be a timeout.
+ *
+ * `toybox wget` is used because the Android system image has no curl or wget of
+ * its own, and Metro's `/status` answers `packager-status:running`.
+ *
+ * Diagnostic only: a failed probe is logged loudly and the run continues, since
+ * the probe is newer than the setup it inspects and should not be the thing
+ * that fails a suite.
+ *
+ * @param {number} port
+ * @returns {Promise<boolean>}
+ */
+const probeAndroidMetroReachability = async (port) => {
+  const adbBinary = resolveAdbBinary()
+  const host = process.env.MOBILE_E2E_ANDROID_HOST || ANDROID_HOST_DEFAULT
+  const url = `http://${host}:${port}/status`
+  try {
+    const result = await captureProcess(adbBinary, [
+      'shell',
+      `toybox wget -q -O - ${url} 2>&1 || echo __DEVICE_CANNOT_REACH_METRO__`,
+    ])
+    const body = (result.stdout ?? '').trim()
+    if (body.includes('packager-status:running')) {
+      log(`Device reached Metro at ${url}`)
+      return true
+    }
+    log(
+      `Device could NOT reach Metro at ${url}. Expo Go will fail to load the ` +
+        `project and every flow will report tab-home missing. Response: ${
+          body.slice(0, 160) || '(empty)'
+        }`
+    )
+    return false
+  } catch (error) {
+    log(`Device reachability probe could not run: ${error.message}`)
+    return false
+  }
+}
+
 const getLocalAppUrl = (platform, port) => {
   const host =
     platform === 'android'
@@ -1994,6 +2042,12 @@ const run = async () => {
           await waitForHealth(pair.health)
           resolvedPair = pair
           log(`Expo dev server reachable on ${pair.health}`)
+          if (target.platform === 'android') {
+            // The host answering is not the same as the device being able to
+            // reach it. Ask the device before handing it a URL.
+            const probedPort = Number(new URL(pair.health).port || metroPort)
+            await probeAndroidMetroReachability(probedPort)
+          }
           break
         } catch {
           // try next candidate
