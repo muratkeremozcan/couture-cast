@@ -31,7 +31,32 @@ tags:
 
 - tapOn:
     id: 'capsule-name-input'
-- inputText: 'Maestro capsule'
+
+# Cleared before typing, and the result checked.
+#
+# A sharded Android run committed a capsule called `MMaestro capsule` — the
+# leading character duplicated. `inputText` reaches an Android device through
+# adb rather than the soft keyboard, and under the load of four emulators the
+# first character can arrive twice. Nothing downstream notices: the capsule
+# saves, the library shows it, and the flow only fails much later at
+# `assertVisible: 'Maestro capsule'`, several steps from the cause.
+#
+# `text:` is matched against the WHOLE element, so `Maestro capsule` does not
+# match `MMaestro capsule` and the assertion is right to reject it. That is
+# worth keeping in mind before treating a name assertion as too strict: here the
+# strictness is the only reason a corrupted name was ever noticed.
+#
+# `eraseText` first, because the field may already hold a partial value from a
+# previous attempt, and the retry proves what was actually typed rather than
+# trusting that `inputText` delivered it.
+- retry:
+    maxRetries: 3
+    commands:
+      - eraseText
+      - inputText: 'Maestro capsule'
+      - assertVisible:
+          text: 'Maestro capsule'
+          label: 'The capsule name field holds exactly the intended name'
 
 # Dismiss the keyboard before touching the garment list, on iOS only.
 #
