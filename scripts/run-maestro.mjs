@@ -84,6 +84,11 @@ const MAESTRO_ARTIFACT_DIR = process.env.MAESTRO_ARTIFACT_DIR || 'maestro/artifa
 
 const START_SERVER = process.env.MOBILE_E2E_SKIP_SERVER !== '1'
 const AUTO_BOOT_ANDROID = process.env.MOBILE_E2E_AUTO_BOOT_ANDROID !== '0'
+// Android reaches the host through `adb reverse`, so the device addresses Metro
+// and the API on its own loopback. See reverseAndroidPorts for why this is not
+// `10.0.2.2`. Override with MOBILE_E2E_ANDROID_HOST to go back to the QEMU
+// host alias on a machine where the reverse mapping is unavailable.
+const ANDROID_HOST_DEFAULT = process.env.MOBILE_E2E_ANDROID_HOST || '127.0.0.1'
 const REQUESTED_PLATFORM = process.env.MOBILE_E2E_PLATFORM || cliPlatform
 const EXPECTED_EXPO_GO_VERSION = process.env.MOBILE_E2E_EXPO_GO_VERSION || '54.0.8'
 
@@ -255,10 +260,66 @@ const chooseMetroPort = async () => {
   return preferred[preferred.length - 1]
 }
 
+/**
+ * Resolve the adb binary the same way everywhere in this script.
+ *
+ * @returns {string}
+ */
+const resolveAdbBinary = () => {
+  const sdkRoot =
+    process.env.ANDROID_HOME ||
+    process.env.ANDROID_SDK_ROOT ||
+    path.join(process.env.HOME ?? '', 'Library', 'Android', 'sdk')
+  if (
+    process.env.ADB_PATH ||
+    (sdkRoot && fs.existsSync(path.join(sdkRoot, 'platform-tools', 'adb')))
+  ) {
+    return process.env.ADB_PATH || path.join(sdkRoot, 'platform-tools', 'adb')
+  }
+  return 'adb'
+}
+
+/**
+ * Map host ports into the Android device's own loopback with `adb reverse`.
+ *
+ * The device has to reach two servers on the machine running this script: Metro
+ * and the local API. Addressing them as `10.0.2.2` works only because that is
+ * QEMU's alias for the host loopback, which makes it emulator-only and, more
+ * to the point, dependent on the guest being able to route there at all. On a
+ * GitHub runner it could not: Expo Go failed the manifest fetch outright and
+ * showed its own error screen, with `expo-updates` logging
+ *
+ *   Remote update request not successful   code=UpdateFailedToLoad
+ *   Failed to launch embedded or launchable update
+ *
+ * which surfaced to the suite as every flow failing on `tab-home` never
+ * appearing. `adb reverse` is the mechanism React Native and Expo CLI use for
+ * exactly this, it works for physical devices as well as emulators, and it lets
+ * the device address both servers as plain `127.0.0.1`.
+ *
+ * Failures here are logged rather than thrown: the `10.0.2.2` route still works
+ * on a developer machine, so a device that refuses the reverse mapping should
+ * degrade to the old behaviour instead of failing the run outright.
+ *
+ * @param {number[]} ports
+ * @returns {Promise<void>}
+ */
+const reverseAndroidPorts = async (ports) => {
+  const adbBinary = resolveAdbBinary()
+  for (const port of ports) {
+    try {
+      await captureProcess(adbBinary, ['reverse', `tcp:${port}`, `tcp:${port}`])
+      log(`Reversed Android port ${port} to the host`)
+    } catch (error) {
+      log(`Could not reverse Android port ${port}: ${error.message}`)
+    }
+  }
+}
+
 const getLocalAppUrl = (platform, port) => {
   const host =
     platform === 'android'
-      ? process.env.MOBILE_E2E_ANDROID_HOST || '10.0.2.2'
+      ? process.env.MOBILE_E2E_ANDROID_HOST || ANDROID_HOST_DEFAULT
       : process.env.MOBILE_E2E_IOS_HOST || '127.0.0.1'
   return `exp://${host}:${port}/--/`
 }
@@ -266,7 +327,7 @@ const getLocalAppUrl = (platform, port) => {
 const getLocalApiUrl = (platform) => {
   const host =
     platform === 'android'
-      ? process.env.MOBILE_E2E_ANDROID_HOST || '10.0.2.2'
+      ? process.env.MOBILE_E2E_ANDROID_HOST || ANDROID_HOST_DEFAULT
       : '127.0.0.1'
   return `http://${host}:4000`
 }
@@ -1862,6 +1923,13 @@ const run = async () => {
     await stopManagedProcess(workerProcess, 'Wardrobe worker')
     await stopManagedProcess(apiProcess, 'Local API')
     throw error
+  }
+
+  // Before any URL is handed to the device, give it a route to the host. Both
+  // candidate Metro ports are mapped because the pair list below falls back
+  // from the chosen port to 8081.
+  if (target.platform === 'android') {
+    await reverseAndroidPorts([...new Set([metroPort, 8081, 4000])])
   }
 
   // Maestro needs both an app URL and a health URL. We probe the explicit env
