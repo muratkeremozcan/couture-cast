@@ -1,6 +1,6 @@
 # Maestro burn-in: investment decision
 
-Updated: 2026-08-14 - Initial decision recorded after the Maestro suite began gating pull requests.
+Updated: 2026-08-14 - Initial decision recorded after the Maestro suite began gating pull requests, then extended the same day with the viewport gap and the scroll convention approved to close it.
 
 Status: active - revisit on or after 2026-08-28
 
@@ -21,6 +21,11 @@ Two branches, decided in advance so the re-evaluation is a lookup rather than an
   record the measured rate here.
 - **Measured flake rate around 3-5%** — build it. The design in this document is ready to
   implement and does not need re-deriving.
+
+This is a deferral, not a decline. The investment is explicitly contingent on the suite degrading:
+if the mobile suite starts failing unpredictably, burn-in gets built, and the two-week date below
+is a floor rather than a gate. Anyone finding this document during a bad week should read it as
+permission to start, not as a decision to wait longer.
 
 ## Why defer
 
@@ -80,6 +85,115 @@ pinned 2.8.0 binary via `maestro test --help`: `--repeat`, `--retry` and `--last
 **absent**; `--shard-all`, `--shard-split` and `--flatten-debug-output` are **present**. There is
 no vendor burn-in to buy and no flow-level retry to configure.
 
+## The viewport gap, and the convention approved to close it
+
+This is a separate decision from the one above, recorded here because it comes out of the same
+middle row of the table. Unlike burn-in, it is **approved and being built**.
+
+### What Maestro is actually missing
+
+The gap is usually described as "Maestro has no auto-scroll". That is the symptom. The cause is
+narrower and sharper: **Maestro ships exactly one visibility assertion, and it means in-viewport.**
+
+Playwright has two words for two different claims. `toBeVisible()` means rendered with a non-empty
+box and does _not_ require the viewport; `toBeInViewport()` is a separate matcher you opt into. So
+the common assertion on the web is the weak one, and the strong one is explicit.
+
+Verified against the pinned Maestro 2.8.0 with `maestro check-syntax`, using an unknown property as
+a negative control to confirm the checker rejects things that do not exist:
+
+| Command            | 2.8.0                          |
+| ------------------ | ------------------------------ |
+| `assertVisible`    | present, and means in-viewport |
+| `assertExists`     | **Invalid**                    |
+| `assertPresent`    | **Invalid**                    |
+| `assertNotVisible` | present                        |
+
+There is no way to assert that an element is in the hierarchy without also asserting it is on
+screen. So Maestro cannot simply make `assertVisible` auto-scroll: doing that would silently
+downgrade the only strong assertion it has and leave nothing to test with. Adding auto-scroll would
+require first adding the weak assertion it never built.
+
+Scrolling is also genuinely harder on a device than in a browser. `scrollIntoViewIfNeeded()` is one
+deterministic DOM call. Maestro drives a black-box screen through an accessibility hierarchy, so
+reaching an element means guessing which container scrolls, in which direction, and how far, then
+re-dumping the hierarchy and checking. That is why `scrollUntilVisible` takes an explicit
+`direction`, and why it cannot be applied implicitly without risking a scroll of the wrong pane.
+
+### Our exposure, measured
+
+12 of the 18 top-level flows contain **no scroll command at all**, and hold 91 assertions between
+them. The worst are `wardrobe-onboarding-flow` with 17 assertions and 0 scrolls,
+`wardrobe-onboarding-localization-flow` with 11 and 0, and `garment-capture-flow` with 10 and 0.
+
+Every one of those passes today only because CI and local now boot the same `medium_phone` profile.
+Profile parity is the systemic fix and remains correct, but it is a single point of failure:
+changing one device profile returns a whole class of failures across many flows at once, which is
+exactly what the `pixel_3a` episode was.
+
+### The decision
+
+Build a house convention rather than a one-off repair, and build it inside couture-cast first,
+extracting it once it has run green against all 18 real flows. The convention is the deliverable,
+in the same shape as `playwright-utils`: a small utility, a documented rule, and a lint that
+enforces it. A fix tuned to this repository's current measurements does not travel; a convention
+does.
+
+Three pieces:
+
+1. **A wrapper subflow**, `maestro/subflows/assert-visible-scrolled.yaml`, taking the target id
+   through `runFlow` and `env`, scrolling to it and then asserting it. Both the wrapper and the
+   `runFlow`/`env` call site were confirmed with `maestro check-syntax` against 2.8.0, as were all
+   six `scrollUntilVisible` parameters in use (`element`, `direction`, `timeout`, `speed`,
+   `visibilityPercentage`, `centerElement`). The `timeout` is set explicitly rather than left at
+   the default; see the tail measurement below for why.
+2. **A lint** that fails when a top-level flow asserts on an id without going through the wrapper.
+   This is what turns the convention from a suggestion into a rule, and it is the piece that
+   travels to other repositories unchanged. It must support an explicit opt-out marker carrying a
+   reason, because for some assertions "on screen without scrolling" _is_ the claim under test: a
+   sticky bottom navigation bar that needs a scroll to see is a defect, not a test problem.
+3. **A one-time fold-margin measurement** to seed those opt-out markers rather than hand-classifying
+   91 sites. Every `screen-hierarchy/step-*.json` the suite already uploads carries per-element
+   `bounds` in the form `[x1,y1][x2,y2]`, so the distance between an asserted element's lower edge
+   and the bottom of the screen is computable from artifacts already in hand. This runs once during
+   the migration and is not part of the ongoing tooling.
+
+### The measurement that settled the design
+
+The obvious objection to wrapping every assertion is the cost of a scroll attempt on elements that
+are already on screen. Measured from 292 real `scrollUntilVisible` executions across this
+repository's existing artifacts:
+
+| Statistic       | Value                   |
+| --------------- | ----------------------- |
+| Minimum         | 19 ms                   |
+| Median          | 138 ms                  |
+| 90th percentile | 3,464 ms                |
+| Maximum         | 17,338 ms               |
+| Under 500 ms    | 196 of 292              |
+| Status          | 287 completed, 5 failed |
+
+The command short-circuits when the element is already visible, so the median cost is negligible:
+wrapping all 91 unprotected assertions adds on the order of 13 seconds in total, against flows that
+each cost 3 to 5 minutes. The objection does not survive the data.
+
+What does survive is the tail. A p90 of 3.5 seconds and a maximum of 17 seconds is what happens
+when the target is not in the scrolled container at all, and the command scrolls until it gives up.
+Left at the default timeout, the convention would convert fast, clear failures into slow, confusing
+ones. Hence the explicit `timeout` in the wrapper.
+
+### Rejected alternative
+
+Compiling the flows inside `scripts/run-maestro.mjs`, so the runner injects the scrolls and authors
+write only intent, is the truest expression of "be the framework". It was rejected for this suite
+specifically: it shifts every `commands.json` entry and `screen-hierarchy/step-NNN` index onto
+generated files, and those two artifacts are the only way this suite gets diagnosed. The debugging
+cost outweighs the authoring convenience here.
+
+For completeness, `waitUntilVisible: true` on `tapOn` is authorable in 2.8.0 and is the closest
+thing Maestro ships to actionability, but it only waits. It does not scroll, so it does not close
+this gap.
+
 ## The design, if we do build it
 
 Recorded so a future session does not re-derive it.
@@ -128,7 +242,10 @@ previous session invented a property and broke all eighteen flows on a parse err
 
 ## What to spend on instead in the meantime
 
-From the open items in `maestro-handoff-2026-08-14-evening.md`, both of which beat burn-in on
+First, the scroll convention described under "The viewport gap" above. It is approved and in
+progress, and it addresses a gap we have measured rather than one we suspect.
+
+Then, from the open items in `maestro-handoff-2026-08-14-evening.md`, both of which beat burn-in on
 certainty per hour today:
 
 1. **`--flatten-debug-output`** — roughly an hour of work. It drops the per-run timestamped
