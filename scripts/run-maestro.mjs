@@ -320,6 +320,62 @@ const reverseAndroidPorts = async (ports) => {
 }
 
 /**
+ * Whether `nc -z` actually works on the attached device, checked once.
+ *
+ * `command -v nc` only proves the binary exists. On the GitHub runner's system
+ * image it exists and `nc -z` does not work, and a probe that cannot tell those
+ * apart reports a healthy route as dead. The check establishes ground truth by
+ * reverse-mapping a throwaway port: with the mapping in place the device is
+ * listening on that port locally, so a connect MUST succeed regardless of what
+ * is on the host side. If it does not, netcat is unusable here.
+ *
+ * @param {string} adbBinary
+ * @returns {Promise<boolean>}
+ */
+const checkDeviceNetcat = async (adbBinary) => {
+  try {
+    const present = await captureProcess(
+      adbBinary,
+      ['shell', 'command -v nc >/dev/null 2>&1 && echo __HAS_NC__ || echo __NO_NC__'],
+      { timeoutMs: 15_000 }
+    )
+    if (!`${present.stdout ?? ''}`.includes('__HAS_NC__')) return false
+  } catch {
+    return false
+  }
+
+  return await new Promise((resolve) => {
+    const server = net.createServer()
+    server.on('connection', (socket) => socket.destroy())
+    server.on('error', () => resolve(false))
+    server.listen(0, '0.0.0.0', async () => {
+      const port = server.address().port
+      let works = false
+      try {
+        await captureProcess(adbBinary, ['reverse', `tcp:${port}`, `tcp:${port}`], {
+          timeoutMs: 15_000,
+        })
+        const result = await captureProcess(
+          adbBinary,
+          ['shell', `nc -z -w 3 127.0.0.1 ${port} && echo __NC_WORKS__ || echo __NC_BROKEN__`],
+          { timeoutMs: 20_000 }
+        )
+        works = `${result.stdout ?? ''}`.includes('__NC_WORKS__')
+      } catch {
+        works = false
+      }
+      await captureProcess(adbBinary, ['reverse', '--remove', `tcp:${port}`], {
+        timeoutMs: 10_000,
+      }).catch(() => {})
+      server.close(() => resolve(works))
+    })
+  })
+}
+
+/** Memoized result of checkDeviceNetcat; null until measured. */
+let ncUsable = null
+
+/**
  * Ask the device itself whether it can reach Metro, and say so plainly.
  *
  * The runner's own health check proves only that Metro answers on the *host*.
@@ -355,6 +411,20 @@ const probeAndroidMetroReachability = async (host, port) => {
   // process saw the socket. `nc` is the only client available, since Android
   // system images ship no curl and no wget (`toybox wget` is absent on API 30
   // and API 36 alike).
+  // Establish that the client WORKS before reading anything into its silence.
+  //
+  // `command -v nc` only proves a binary is present. On the CI system image the
+  // binary exists and `nc -z` does not work, which produced a confident "route
+  // dead" for a host that had never been tested. The control below settles that
+  // once, for both candidate hosts, rather than only for the reverse-mapped one.
+  if (ncUsable === null) {
+    ncUsable = await checkDeviceNetcat(adbBinary)
+  }
+  if (ncUsable === false) {
+    log(`netcat is unusable on this device image, so ${host} cannot be probed`)
+    return null
+  }
+
   // Establish that the client exists before reading anything into its silence.
   // Without this, an image with no netcat is indistinguishable from a dead
   // route: the connect attempt throws, no connection arrives, and the route
@@ -625,8 +695,14 @@ const fetchExpoGoManifest = (baseUrl, platform) =>
       urlObj,
       {
         headers: {
+          // The header set Expo Go actually sends. A partial set gets answered
+          // by the browser interstitial instead of the manifest, which is a 200
+          // that proves nothing.
           'expo-platform': platform,
-          accept: 'multipart/mixed',
+          'expo-protocol-version': '1',
+          'expo-api-version': '1',
+          'expo-updates-environment': 'EXPO_GO',
+          accept: 'multipart/mixed, application/expo+json, application/json',
         },
       },
       (res) => {
@@ -639,7 +715,20 @@ const fetchExpoGoManifest = (baseUrl, platform) =>
         })
         res.on('end', () => {
           const statusCode = res.statusCode ?? 0
-          resolve({ ok: statusCode >= 200 && statusCode < 300, statusCode, body })
+          const contentType = String(res.headers['content-type'] ?? '')
+          // A 2xx is not enough, and this is the second time that has mattered.
+          // With the wrong headers the dev server answers `/` with the browser
+          // interstitial HTML and a 200, so a status-only check reports a
+          // healthy manifest endpoint while every Expo Go request is being
+          // served a web page. The response has to actually BE a manifest.
+          const looksLikeManifest =
+            /multipart\/mixed|application\/expo\+json|application\/json/.test(contentType)
+          resolve({
+            ok: statusCode >= 200 && statusCode < 300 && looksLikeManifest,
+            statusCode,
+            contentType,
+            body,
+          })
         })
       }
     )
@@ -2308,12 +2397,15 @@ const run = async () => {
           // surfacing later as every flow failing on `tab-home`.
           const manifest = await fetchExpoGoManifest(pair.health, target.platform)
           if (manifest.ok) {
-            log(`Expo Go manifest served (HTTP ${manifest.statusCode})`)
+            log(
+              `Expo Go manifest served (HTTP ${manifest.statusCode}, ${manifest.contentType})`
+            )
           } else {
             log(
-              `Expo Go manifest request FAILED with HTTP ${manifest.statusCode}. ` +
-                `Expo Go will show "Something went wrong." and every flow will ` +
-                `report tab-home missing. Body: ${manifest.body.slice(0, 600) || '(empty)'}`
+              `Expo Go manifest request FAILED (HTTP ${manifest.statusCode}, ` +
+                `content-type ${manifest.contentType || 'none'}). Expo Go will show ` +
+                `"Something went wrong." and every flow will report tab-home missing. ` +
+                `Body: ${manifest.body.slice(0, 600) || '(empty)'}`
             )
           }
           break
