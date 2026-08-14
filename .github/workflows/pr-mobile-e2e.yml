@@ -109,11 +109,10 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # Only the emulator system image is installed. The build-tools and
-      # platform packages for API 34/35/36 that used to be installed here served
-      # `gradlew assembleDebug`, which no longer runs.
-      - name: Install Android emulator system image
-        run: sdkmanager "system-images;android-${{ env.ANDROID_API_LEVEL }};${{ env.ANDROID_TARGET }};${{ env.ANDROID_ARCH }}"
+      # No explicit system-image install step: android-emulator-runner's own SDK
+      # installer runs `sdkmanager --install "system-images;android-<api>;<target>;<arch>"`
+      # from the same inputs, so a step here only duplicated it and gave the two
+      # a chance to drift apart.
 
       - name: Enable KVM
         run: |
@@ -137,7 +136,14 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-${{ env.ANDROID_API_LEVEL }}-${{ env.ANDROID_TARGET }}-${{ env.ANDROID_ARCH }}-${{ env.ANDROID_PROFILE }}
+          # The runner image is part of the key on purpose. A snapshot is only
+          # valid for the emulator binary and system image it was captured with,
+          # and this job reinstalls the SDK from the runner image every time. On
+          # a key without it, an emulator bump on the image silently invalidates
+          # the snapshot while the key still HITS, so every later run restores a
+          # snapshot it cannot load and pays a full cold boot with nothing in the
+          # log to say why. That is the failure this cache exists to avoid.
+          key: avd-${{ runner.os }}-${{ env.ImageOS }}-${{ env.ANDROID_API_LEVEL }}-${{ env.ANDROID_TARGET }}-${{ env.ANDROID_ARCH }}-${{ env.ANDROID_PROFILE }}
 
       # First run for a given key boots a cold emulator and saves a snapshot.
       # Every later run restores it, which is the whole point of the cache: the
@@ -295,25 +301,17 @@ jobs:
           # source of flake around text entry, and nothing under test depends
           # on it.
           disable-spellchecker: true
-          # POSIX shell only, deliberately. This action does not run `script:`
-          # through bash: it hands the block to `/usr/bin/sh`, which on the
-          # ubuntu runner image is dash. `set -o pipefail` and `[[ ]]` are both
-          # bashisms, and dash rejects the first one before executing a single
-          # command, so the step died with `set: Illegal option -o pipefail`
-          # after paying the full seven minutes of setup that precedes it.
-          # `set -eu` is the portable subset that still matters here, and there
-          # is no pipeline in this block for `pipefail` to guard.
-          script: |
-            set -eu
-
-            adb wait-for-device
-            adb shell 'while [ -z "$(getprop sys.boot_completed)" ]; do sleep 1; done'
-
-            # Expo Go is the app under test. This replaces the debug APK build.
-            npm run mobile:expo-go
-
-            mkdir -p maestro/artifacts
-            node ./scripts/run-maestro.mjs ${{ steps.flows.outputs.list }} --ci
+          # One line, deliberately, invoking a real bash script.
+          #
+          # This action splits `script:` on newlines and runs EACH LINE through
+          # its own `sh -c`, and `/usr/bin/sh` here is dash. So a multi-line
+          # block is not the shell script it appears to be: `set -euo pipefail`
+          # dies on line one (which cost this job a full run), a bare `set -eu`
+          # is inert for every later line, and variables, `cd` and multi-line
+          # constructs do not survive between lines. Keeping the body in
+          # scripts/ci-mobile-e2e.sh gets real bash and working strict mode, and
+          # lets a developer run the exact CI path locally.
+          script: bash ./scripts/ci-mobile-e2e.sh ${{ steps.flows.outputs.list }}
 
       - uses: actions/upload-artifact@v4
         if: always()

@@ -1874,20 +1874,74 @@ const getSimulatorName = async (udid) => {
  * @returns {{ passed: string[], failed: string[] }}
  */
 const readSuiteReport = (reportPath) => {
+  const absolute = path.resolve(projectRoot, reportPath)
+  let xml
   try {
-    const xml = fs.readFileSync(path.resolve(projectRoot, reportPath), 'utf8')
-    const passed = []
-    const failed = []
-    for (const segment of xml.split('<testcase').slice(1)) {
-      const name = /name="([^"]+)"/.exec(segment)?.[1]
-      if (!name) continue
-      if (segment.includes('<failure')) failed.push(name)
-      else passed.push(name)
-    }
-    return { passed, failed }
-  } catch {
-    return { passed: [], failed: [] }
+    xml = fs.readFileSync(absolute, 'utf8')
+  } catch (error) {
+    // Returning an empty result here used to be indistinguishable from a report
+    // that legitimately recorded nothing, which matters because this report is
+    // the suite's source of truth: a silently empty read reports a green suite.
+    return { passed: [], failed: [], unreadable: `${absolute}: ${error.message}` }
   }
+
+  const passed = []
+  const failed = []
+  const skipped = []
+  // Each `<testcase>` runs to the next one, so a nested `<failure>` or
+  // `<skipped>` can be attributed to the case that owns it. Self-closing cases
+  // (`<testcase ... />`) carry neither and are passes.
+  for (const segment of xml.split('<testcase').slice(1)) {
+    const name = /name="([^"]+)"/.exec(segment)?.[1]
+    if (!name) continue
+    const body = segment.split('</testcase>')[0]
+    if (/<failure[\s>]/.test(body) || /<error[\s>]/.test(body)) {
+      failed.push(name)
+    } else if (/<skipped[\s/>]/.test(body)) {
+      // A skipped flow did not assert anything. Counting it as passed is how a
+      // suite reports success over work it never did.
+      skipped.push(name)
+    } else {
+      passed.push(name)
+    }
+  }
+  return { passed, failed, skipped, unreadable: null }
+}
+
+/**
+ * Locate the JUnit report Maestro wrote, across layouts.
+ *
+ * Maestro 2.8.0 moved its artifacts to `<timestamp>/<Flow Name>/…` and writes
+ * the report at the path given to `--output`. Resolving the requested path
+ * first and falling back to a search keeps this working if the layout moves
+ * again, rather than silently reading nothing.
+ *
+ * @param {string} requestedPath
+ * @returns {string | null}
+ */
+const resolveReportPath = (requestedPath) => {
+  const absolute = path.resolve(projectRoot, requestedPath)
+  if (fs.existsSync(absolute)) return requestedPath
+
+  const artifactRoot = path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR)
+  if (!fs.existsSync(artifactRoot)) return null
+  const wanted = path.basename(requestedPath)
+  const stack = [artifactRoot]
+  while (stack.length > 0) {
+    const dir = stack.pop()
+    let entries
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) stack.push(full)
+      else if (entry.name === wanted) return path.relative(projectRoot, full)
+    }
+  }
+  return null
 }
 
 /**
@@ -2388,16 +2442,26 @@ const run = async () => {
             maestroExitError = error
           }
 
-          const report = readSuiteReport(reportPath)
+          const resolvedReportPath = resolveReportPath(reportPath) ?? reportPath
+          const report = readSuiteReport(resolvedReportPath)
+          if (report.unreadable) {
+            flowFailures.push(`JUnit report unreadable (${report.unreadable})`)
+            log(`FAIL JUnit report could not be read: ${report.unreadable}`)
+          }
           for (const name of report.failed) {
             flowFailures.push(name)
             log(`FAIL ${name}`)
+          }
+          for (const name of report.skipped) {
+            flowFailures.push(`${name} (skipped, asserted nothing)`)
+            log(`FAIL ${name} was skipped and asserted nothing`)
           }
           for (const name of report.passed) {
             log(`PASS ${name}`)
           }
 
-          const accountedFor = report.failed.length + report.passed.length
+          const accountedFor =
+            report.failed.length + report.passed.length + report.skipped.length
           if (accountedFor !== shardedFlows.length) {
             // Every flow handed to Maestro has to appear in the report, or the
             // count this run reports is a guess. Fail loudly instead.
@@ -2514,15 +2578,55 @@ const run = async () => {
         }
 
         log(`Running Maestro flow (${maestroArgs.join(' ')})`)
+        let maestroExitError
         try {
           await runMaestroCommand(maestroArgs, {
             env: maestroEnv,
             logFile: maestroLogFile,
           })
-          log(`PASS ${flowPath}`)
         } catch (error) {
+          maestroExitError = error
+        }
+
+        // The report is the evidence on this path too, not just the sharded one.
+        //
+        // This loop used to take the exit code as the whole answer, which is the
+        // opposite of what the sharded path does and the weaker of the two --
+        // and it is the path CI runs on Android, so the stricter rule was being
+        // applied only where it was least needed. The rule is the same in both
+        // places now: a flow that the report records as failed or skipped fails
+        // the run, a flow the report never mentions fails the run, and a
+        // non-zero exit can only ADD a failure the report could not describe,
+        // never clear one.
+        if (WRITE_ARTIFACTS) {
+          const resolvedReportPath =
+            resolveReportPath(getFlowReportPath(flowPath)) ?? getFlowReportPath(flowPath)
+          const report = readSuiteReport(resolvedReportPath)
+          if (report.unreadable) {
+            flowFailures.push(`${flowPath} (JUnit report unreadable: ${report.unreadable})`)
+            log(`FAIL ${flowPath} (JUnit report could not be read)`)
+          } else if (report.failed.length > 0) {
+            flowFailures.push(flowPath)
+            log(`FAIL ${flowPath} (${report.failed.join(', ')})`)
+          } else if (report.skipped.length > 0) {
+            flowFailures.push(`${flowPath} (skipped, asserted nothing)`)
+            log(`FAIL ${flowPath} was skipped and asserted nothing`)
+          } else if (report.passed.length === 0) {
+            flowFailures.push(`${flowPath} (absent from its own JUnit report)`)
+            log(`FAIL ${flowPath} did not appear in its JUnit report`)
+          } else if (maestroExitError) {
+            flowFailures.push(
+              `${flowPath} (Maestro exited non-zero with no failure in the report: ${maestroExitError.message})`
+            )
+            log(`FAIL ${flowPath} (non-zero exit, clean report)`)
+          } else {
+            log(`PASS ${flowPath}`)
+          }
+        } else if (maestroExitError) {
           flowFailures.push(flowPath)
-          log(`FAIL ${flowPath} (${error.message})`)
+          log(`FAIL ${flowPath} (${maestroExitError.message})`)
+        } else {
+          log(`PASS ${flowPath}`)
         }
       }
     } finally {
