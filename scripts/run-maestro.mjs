@@ -328,15 +328,12 @@ const reverseAndroidPorts = async (ports) => {
  * entirely. A GitHub runner did exactly this, failing 0.7 seconds after the
  * deep link, far too fast to be a timeout.
  *
- * `toybox wget` is used because the Android system image has no curl or wget of
- * its own, and Metro's `/status` answers `packager-status:running`.
+ * The result selects the host the run uses, so this is not diagnostic-only.
  *
- * Diagnostic only: a failed probe is logged loudly and the run continues, since
- * the probe is newer than the setup it inspects and should not be the thing
- * that fails a suite.
- *
- * @param {number} port
- * @returns {Promise<boolean>}
+ * @param {string} host - candidate host as the DEVICE would address it
+ * @param {number} port - only used for the log line's context
+ * @returns {Promise<boolean | null>} true/false for a verdict, null if the
+ *   probe could not run at all
  */
 const probeAndroidMetroReachability = async (host, port) => {
   const adbBinary = resolveAdbBinary()
@@ -404,7 +401,7 @@ const probeAndroidMetroReachability = async (host, port) => {
   })
 
   if (routeWorks === true) {
-    log(`Device reached this machine at ${host} (checked for ${url})`)
+    log(`Device reached this machine at ${host}, so Metro on ${url} is routable`)
     return true
   }
   if (routeWorks === false) {
@@ -1978,6 +1975,35 @@ const run = async () => {
   const metroPort = await chooseMetroPort()
   process.env.MOBILE_E2E_METRO_PORT = String(metroPort)
   const target = await ensureMaestroTarget()
+
+  // Decide how Android addresses this machine BEFORE anything is derived from
+  // it. `mobileApiBaseUrl` below is baked into the bundle as
+  // EXPO_PUBLIC_API_BASE_URL, so resolving the host later would leave the app
+  // loading over one route while every API call went out over another: with the
+  // host switched to 10.0.2.2 and the API still on 127.0.0.1:4000, the device
+  // would be calling itself. The probe opens its own throwaway listener rather
+  // than fetching Metro, so it does not need the dev server to be up and can
+  // run this early.
+  if (target.platform === 'android' && !process.env.MOBILE_E2E_ANDROID_HOST) {
+    await reverseAndroidPorts([...new Set([metroPort, 8081, 4000])])
+    const reachable = []
+    for (const candidate of ['127.0.0.1', '10.0.2.2']) {
+      // eslint-disable-next-line no-await-in-loop -- two candidates, ordered
+      if (await probeAndroidMetroReachability(candidate, metroPort)) {
+        reachable.push(candidate)
+      }
+    }
+    if (reachable.length === 0) {
+      // 10.0.2.2 is QEMU's own alias and needs no adb cooperation, so it is the
+      // better thing to be wrong with.
+      log('No candidate host answered; falling back to 10.0.2.2')
+      androidHost = '10.0.2.2'
+    } else if (reachable[0] !== androidHost) {
+      log(`Using ${reachable[0]} as the Android host: the device can reach it`)
+      androidHost = reachable[0]
+    }
+  }
+
   const apiHealthUrl = 'http://127.0.0.1:4000/api/health'
   const apiSetupBaseUrl = 'http://127.0.0.1:4000'
   const mobileApiBaseUrl = getLocalApiUrl(target.platform)
@@ -2190,41 +2216,6 @@ const run = async () => {
       resolvedPair = portPairs[0]
       if (!resolvedPair) {
         throw new Error('Unable to resolve Expo dev server port configuration')
-      }
-    }
-
-    // Android reaches the host by one of two routes and which one works is a
-    // property of the machine, not something worth assuming. `adb reverse` plus
-    // `127.0.0.1` works on a developer machine; on a GitHub runner the reverse
-    // is accepted by adb and the device still cannot open the port, and the
-    // suite fails with every flow reporting `tab-home` missing while Expo Go
-    // sits on its own "Something went wrong." screen. `10.0.2.2` is QEMU's alias
-    // for the host loopback and does not depend on the reverse at all.
-    //
-    // So the device is asked which one it can actually open, and the answer is
-    // used. Both are probed and logged even after one succeeds, because knowing
-    // that the other route is dead is what makes the next failure diagnosable.
-    if (target.platform === 'android' && !process.env.MOBILE_E2E_ANDROID_HOST) {
-      const port = Number(new URL(resolvedPair.health).port || metroPort)
-      const reachable = []
-      for (const candidate of ['127.0.0.1', '10.0.2.2']) {
-        // eslint-disable-next-line no-await-in-loop -- two candidates, ordered
-        if (await probeAndroidMetroReachability(candidate, port)) {
-          reachable.push(candidate)
-        }
-      }
-      if (reachable.length > 0 && reachable[0] !== androidHost) {
-        log(`Switching the Android host to ${reachable[0]}: the device can open it`)
-        androidHost = reachable[0]
-        resolvedPair = {
-          app: getLocalAppUrl(target.platform, port),
-          health: resolvedPair.health,
-        }
-      } else if (reachable.length === 0) {
-        log(
-          `The device could not open Metro on any candidate host. Expo Go will ` +
-            `fail to load the project; every flow will report tab-home missing.`
-        )
       }
     }
 

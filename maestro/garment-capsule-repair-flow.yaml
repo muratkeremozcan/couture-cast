@@ -70,9 +70,36 @@ tags:
     id: 'favorite-button-.*'
     index: 0
 
-- back
-
-- assertVisible:
-    text: 'Saved capsule'
+# Leave the capsule library the same way every other flow does.
+#
+# This was a bare `back`, which is documented as Android and Web only and whose
+# iOS implementation is an empty method: on iOS it reported COMPLETED without
+# moving the app. The assertion below was `optional: true`, so it could not fail
+# either, and the pair could never have caught a regression on iOS.
+# https://docs.maestro.dev/reference/commands-available/back
+- tapOn:
+    id: 'BackButton'
     optional: true
-    label: 'Saved-capsule badge appears when a capsule wins a scenario'
+    label: 'Leave the capsule library'
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+
+# The "Saved capsule" badge is deliberately NOT asserted here.
+#
+# It was, as `assertVisible: text: 'Saved capsule'` with `optional: true`, which
+# could not fail and so proved nothing. It could not have passed either: the
+# label is produced by the ritual service (`ritual.service.ts`) and rendered on
+# the Home screen, and this flow ends on the wardrobe hub, which is where the
+# preceding back press lands. The failure hierarchy confirms it: `wardrobe-screen`
+# and `wardrobe-garment-list` on screen, no badge anywhere.
+#
+# The behaviour it was reaching for is asserted where it belongs, against the
+# service that produces it, in `ritual.service.spec.ts` ("Saved capsule"). A
+# mobile flow re-proving it would depend on a ritual refresh picking this
+# capsule, which is not deterministic from here.
+#
+# What this flow does own is that the favourite persisted, which is asserted by
+# the capsule library state above.

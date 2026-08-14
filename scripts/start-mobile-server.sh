@@ -57,8 +57,9 @@ fi
 # against a real listener plus four connected Expo Go clients: the unrestricted
 # form returned all five, this form returns only the listener.
 #
-# `xargs -r` is also gone: it is a GNU extension that BSD xargs does not accept,
-# so the guard was relying on the `|| true` to swallow its own failure.
+# `xargs -r` is gone only because the empty case is now handled by the `-n`
+# test above, which is clearer. It was never broken: BSD xargs documents `-r`
+# explicitly for GNU compatibility and macOS accepts it.
 if command -v lsof >/dev/null 2>&1; then
   METRO_LISTENER_PIDS=$(lsof -ti tcp:"$METRO_PORT" -sTCP:LISTEN || true)
   if [ -n "$METRO_LISTENER_PIDS" ]; then
