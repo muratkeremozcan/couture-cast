@@ -28,11 +28,23 @@ name: Mobile e2e (Maestro)
 #    hardware-accelerated Android virtualization to standard Linux runners in
 #    April 2024 and doubled public-repo runners to 4 vCPU / 16 GB in January
 #    2024, so the flag is simply left at the action's `auto` default now.
-# Intentionally dispatch-only for now. The `pull_request` and `push` triggers are
-# temporarily removed while the Maestro suite is being proven green locally; until
-# then an automatic run would spend an hour producing a red result we already know
-# about. The mobile workstream restores both triggers once the local suite passes.
+# Triggers match pr-pw-e2e-local.yml, deliberately: every pull request, and
+# pushes to main. There is no path filter, because `gate` waits on this job by
+# name and a path-filtered job that never starts is not the same thing to it as
+# one that passed.
+#
+# These were removed for a while on the theory that a dispatch-only workflow
+# could not redden a pull request. That theory was wrong. A `workflow_dispatch`
+# run still publishes its check run against the head SHA it was dispatched on,
+# and pr-gate reads check runs on that SHA, so the mobile job gated pull
+# requests the entire time it was supposedly opted out. The only thing removing
+# the triggers achieved was hiding the job from the PR's checks list while it
+# went on failing the gate.
 on:
+  pull_request:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       suite:
