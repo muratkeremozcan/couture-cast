@@ -56,7 +56,23 @@ env:
   # the Playwright workflow's LOCAL_DATABASE_URL. Both point at the Supabase
   # container declared in supabase/config.toml (port 54322).
   LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-  ANDROID_API_LEVEL: '30'
+  # Not 30. API 30 emulators on GitHub-hosted runners have had no network
+  # connectivity since 2026-06-25, which for this suite is a total-failure mode
+  # rather than a slowdown: the device has to reach Metro, the local API and
+  # Supabase on the host. Expo Go fails the manifest fetch about 0.7 seconds
+  # after the deep link, shows its own "Something went wrong." screen, and every
+  # flow is then reported as `tab-home` never appearing, which reads as the app
+  # being broken. The reporter's own resolution was to bump the API level.
+  # https://github.com/ReactiveCircus/android-emulator-runner/issues/479
+  #
+  # API 30 also carries a long-standing SystemUI "isn't responding" dialog on
+  # this action that holds window focus for a whole run, which is directly in
+  # the way of an out-of-process UI driver.
+  # https://github.com/ReactiveCircus/android-emulator-runner/issues/140
+  #
+  # Bumping the level changes the AVD cache key, so the next run pays one cold
+  # snapshot generation by design.
+  ANDROID_API_LEVEL: '34'
   ANDROID_TARGET: google_apis
   ANDROID_ARCH: x86_64
   ANDROID_PROFILE: pixel_3a
