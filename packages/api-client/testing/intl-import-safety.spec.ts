@@ -51,9 +51,9 @@ const OPTIONAL_INTL_APIS = [
  * over the wrong tree.
  */
 const packageRoot = process.cwd()
-const manifest = JSON.parse(
-  readFileSync(join(packageRoot, 'package.json'), 'utf8')
-) as { name?: string }
+const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
+  name?: string
+}
 
 if (manifest.name !== '@couture/api-client') {
   throw new Error(
