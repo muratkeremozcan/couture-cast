@@ -7,9 +7,17 @@ type ExpoExtra = {
 }
 
 const extra = (Constants.expoConfig?.extra ?? {}) as ExpoExtra
-const apiKey = extra.posthogApiKey ?? process.env.EXPO_PUBLIC_POSTHOG_KEY
+// `||`, not `??`, on both hops. app.config.ts resolves this value as
+// `process.env.POSTHOG_API_KEY ?? ''`, so an environment without the variable
+// supplies an empty string rather than undefined, and `??` treats that as a
+// present value: the env fallback never fires and the empty string reaches the
+// PostHog constructor, which throws `You must pass your PostHog project's api
+// key` at module scope. That crash takes the whole bundle down, so every
+// Maestro flow fails with the app never mounting, and it fires on any machine
+// without a key configured, which is every CI runner.
+const apiKey = extra.posthogApiKey || process.env.EXPO_PUBLIC_POSTHOG_KEY
 const host =
-  extra.posthogHost ?? process.env.EXPO_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com'
+  extra.posthogHost || process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'
 const isPostHogConfigured = Boolean(apiKey && apiKey !== 'phc_your_project_key')
 
 if (!isPostHogConfigured) {
@@ -32,34 +40,41 @@ if (!isPostHogConfigured) {
  *
  * @see https://posthog.com/docs/libraries/react-native
  */
-export const posthogProviderClient = new PostHog(apiKey ?? 'placeholder_key', {
-  // PostHog API host
-  host,
+// The placeholder is used whenever the key is not usable, not merely when it is
+// nullish. `disabled` below already reads `isPostHogConfigured`, but the
+// constructor rejects a falsy key before any option is consulted, so the guard
+// has to be on the argument itself.
+export const posthogProviderClient = new PostHog(
+  isPostHogConfigured && apiKey ? apiKey : 'placeholder_key',
+  {
+    // PostHog API host
+    host,
 
-  // Disable PostHog if API key is not configured
-  disabled: !isPostHogConfigured,
+    // Disable PostHog if API key is not configured
+    disabled: !isPostHogConfigured,
 
-  // Capture app lifecycle events:
-  // - Application Installed, Application Updated
-  // - Application Opened, Application Became Active, Application Backgrounded
-  captureAppLifecycleEvents: true,
+    // Capture app lifecycle events:
+    // - Application Installed, Application Updated
+    // - Application Opened, Application Became Active, Application Backgrounded
+    captureAppLifecycleEvents: true,
 
-  // Batching: queue events and flush periodically to optimize battery usage
-  flushAt: 20, // Number of events to queue before sending
-  flushInterval: 10000, // Interval in ms between periodic flushes
-  maxBatchSize: 100, // Maximum events per batch
-  maxQueueSize: 1000, // Maximum queued events (oldest dropped when full)
+    // Batching: queue events and flush periodically to optimize battery usage
+    flushAt: 20, // Number of events to queue before sending
+    flushInterval: 10000, // Interval in ms between periodic flushes
+    maxBatchSize: 100, // Maximum events per batch
+    maxQueueSize: 1000, // Maximum queued events (oldest dropped when full)
 
-  // Feature flags
-  preloadFeatureFlags: true, // Load flags on initialization
-  sendFeatureFlagEvent: true, // Track getFeatureFlag calls for experiments
-  featureFlagsRequestTimeoutMs: 10000, // Timeout for flag requests
+    // Feature flags
+    preloadFeatureFlags: true, // Load flags on initialization
+    sendFeatureFlagEvent: true, // Track getFeatureFlag calls for experiments
+    featureFlagsRequestTimeoutMs: 10000, // Timeout for flag requests
 
-  // Network settings
-  requestTimeout: 10000, // General request timeout in ms
-  fetchRetryCount: 3, // Number of retry attempts for failed requests
-  fetchRetryDelay: 3000, // Delay between retries in ms
-})
+    // Network settings
+    requestTimeout: 10000, // General request timeout in ms
+    fetchRetryCount: 3, // Number of retry attempts for failed requests
+    fetchRetryDelay: 3000, // Delay between retries in ms
+  }
+)
 
 // Backwards-compatible alias while the repo-local facade rolls out across the
 // mobile app.
