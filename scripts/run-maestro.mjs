@@ -1203,6 +1203,16 @@ const setupMobileE2EIdentity = async (apiBaseUrl) => {
     const garmentIds = await seedMobileE2EGarments(apiBaseUrl, identity)
     await seedMobileE2ECapsule(identity, garmentIds)
 
+    // Hand two specific garment ids to the flows, the same way WEATHER_ALERT_ID
+    // is handed over. Flows that need "two different garments" were selecting
+    // `garment-checkbox-.*` by `index: 0` and `index: 1`, and `index` resolves
+    // against what is CURRENTLY RENDERED: with ten seeded garments the list is
+    // virtualized, so the second tap was landing somewhere other than the second
+    // garment. Nothing caught it, because the flow asserted no count -- the
+    // builder sat on `Garments (1 of 10 selected)` while the flow believed it
+    // had selected two, and every later step still passed.
+    identity.garmentIds = garmentIds
+
     return identity
   } catch (error) {
     try {
@@ -2207,6 +2217,8 @@ const run = async () => {
       process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN = mobileIdentity.accessToken
       process.env.EXPO_PUBLIC_API_BASE_URL = mobileApiBaseUrl
       process.env.WEATHER_ALERT_ID = mobileE2EWeatherAlertId(mobileIdentity.userId)
+      process.env.GARMENT_A_ID = mobileIdentity.garmentIds?.[0] ?? ''
+      process.env.GARMENT_B_ID = mobileIdentity.garmentIds?.[1] ?? ''
     } else if (!process.env.EXPO_PUBLIC_API_BASE_URL) {
       throw new Error(
         'MOBILE_E2E_SKIP_API=1 requires EXPO_PUBLIC_API_BASE_URL and an externally managed test identity.'
@@ -2424,6 +2436,10 @@ const run = async () => {
             '-e',
             `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`,
             '-e',
+            `GARMENT_A_ID=${process.env.GARMENT_A_ID ?? ''}`,
+            '-e',
+            `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`,
+            '-e',
             `APP_URL=${process.env.APP_URL}`,
             '-e',
             `WARDROBE_URL=${process.env.WARDROBE_URL}`,
@@ -2518,6 +2534,10 @@ const run = async () => {
             '-e',
             `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`,
             '-e',
+            `GARMENT_A_ID=${process.env.GARMENT_A_ID ?? ''}`,
+            '-e',
+            `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`,
+            '-e',
             `APP_URL=${process.env.APP_URL}`,
             '-e',
             `WARDROBE_URL=${process.env.WARDROBE_URL}`,
@@ -2578,6 +2598,8 @@ const run = async () => {
           maestroArgs.push('test')
           maestroArgs.push('-e', `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`)
           maestroArgs.push('-e', `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`)
+          maestroArgs.push('-e', `GARMENT_A_ID=${process.env.GARMENT_A_ID ?? ''}`)
+          maestroArgs.push('-e', `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`)
           maestroArgs.push('-e', `APP_URL=${process.env.APP_URL}`)
           maestroArgs.push('-e', `WARDROBE_URL=${process.env.WARDROBE_URL}`)
           maestroArgs.push('-e', `WIDGET_NOW_URL=${process.env.WIDGET_NOW_URL}`)

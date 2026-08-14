@@ -60,26 +60,29 @@ tags:
     commands:
       - hideKeyboard
 
-- tapOn:
-    id: 'garment-checkbox-.*'
-    index: 0
-    label: 'Select the first garment'
-
-- tapOn:
-    id: 'garment-checkbox-.*'
-    index: 1
-    label: 'Select the second garment'
-
-# Assert the selection took, rather than trusting two taps.
+# Select two garments BY ID, not by position.
 #
-# `index:` on a regex selector resolves to the Nth CURRENTLY-RENDERED match, not
-# the Nth garment, so anything that changes what is rendered between the two taps
-# silently changes what the second one hits. That is not hypothetical here: a
-# scroll step that used to sit between these taps left the builder holding one
-# garment while the flow believed it held two, and nothing noticed until the
-# reorder controls failed several steps later with a message about a missing
-# button. The builder prints its own count, so the postcondition is cheap to
-# state and fails where the mistake actually happens.
+# These were `garment-checkbox-.*` with `index: 0` and `index: 1`. `index`
+# resolves against what is currently RENDERED, and with ten seeded garments the
+# list is virtualized, so the second tap landed somewhere other than the second
+# garment. Nothing caught it: the flow asserted no count, so the builder sat on
+# `Garments (1 of 10 selected)` while the flow believed it held two, and every
+# later step still passed. The reorder controls render for a single garment, so
+# even those did not object.
+#
+# The runner seeds these garments through the public API and now passes two of
+# their ids, the same way it already passes WEATHER_ALERT_ID. Selecting by id is
+# independent of render order, scroll position and wardrobe size.
+- tapOn:
+    id: 'garment-checkbox-${GARMENT_A_ID}'
+    label: 'Select the first seeded garment'
+
+- tapOn:
+    id: 'garment-checkbox-${GARMENT_B_ID}'
+    label: 'Select the second seeded garment'
+
+# The postcondition, so a mis-tap fails here rather than several steps later as
+# a confusing message about a missing reorder button.
 - assertVisible:
     text: 'Garments (2 of .* selected)'
     label: 'Both garments are actually selected'
