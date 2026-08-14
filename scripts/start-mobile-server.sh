@@ -17,19 +17,27 @@ export EXPO_NO_INTERACTIVE=1
 # Expo Go startup differs by platform: iOS can fetch/install Expo Go via Expo
 # CLI, while Android local smoke assumes an already attached Expo Go target.
 ARGS=(--clear --port "$METRO_PORT")
-if [[ "${MOBILE_E2E_EXPO_NO_OPEN:-}" == "1" ]]; then
+if [[ "${MOBILE_E2E_EXPO_NO_OPEN:-}" == "1" || "${MOBILE_E2E_PLATFORM:-}" == "android" ]]; then
   # Sharded runs boot one simulator per shard, and `--ios` tells Expo CLI to
   # open the app on whichever simulator it resolves first, which is another
   # shard's device. Maestro launches the app itself through `openLink`, so the
   # bundler only has to serve; the runner has already installed Expo Go on the
   # simulator this shard owns.
+  #
+  # Android takes the same branch, for the same reason plus two Android-specific
+  # ones. `--android` makes Expo CLI resolve a device itself, and when the
+  # runner's target is not attached at that instant it boots an AVD of its own
+  # choosing rather than the one `bootAndroidTarget` prepared: on a machine with
+  # more than one AVD that is simply the wrong device, carrying whatever stale
+  # Expo Go its system image shipped with. Expo CLI then asks whether to install
+  # its recommended Expo Go build on that device, and since this script exports
+  # EXPO_NO_INTERACTIVE=1 the prompt cannot be answered, so the bundler exits 1
+  # before serving anything and the run dies on "Expo dev server never became
+  # healthy". Dropping `--android` leaves device selection entirely to
+  # `ensureExpoGoOnAndroid`, which pins the Expo Go version deliberately.
   ARGS+=(--go)
 elif [[ "${MOBILE_E2E_PLATFORM:-}" == "ios" ]]; then
   ARGS+=(--ios --go)
-elif [[ "${MOBILE_E2E_PLATFORM:-}" == "android" ]]; then
-  # Android Expo Go needs a signed manifest on a fresh machine; offline mode can
-  # fail before Maestro ever reaches the app.
-  ARGS+=(--android --go)
 else
   ARGS+=(--offline)
 fi

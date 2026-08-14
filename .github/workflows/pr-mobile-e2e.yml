@@ -254,11 +254,19 @@ jobs:
           # source of flake around text entry, and nothing under test depends
           # on it.
           disable-spellchecker: true
+          # POSIX shell only, deliberately. This action does not run `script:`
+          # through bash: it hands the block to `/usr/bin/sh`, which on the
+          # ubuntu runner image is dash. `set -o pipefail` and `[[ ]]` are both
+          # bashisms, and dash rejects the first one before executing a single
+          # command, so the step died with `set: Illegal option -o pipefail`
+          # after paying the full seven minutes of setup that precedes it.
+          # `set -eu` is the portable subset that still matters here, and there
+          # is no pipeline in this block for `pipefail` to guard.
           script: |
-            set -euo pipefail
+            set -eu
 
             adb wait-for-device
-            adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
+            adb shell 'while [ -z "$(getprop sys.boot_completed)" ]; do sleep 1; done'
 
             # Expo Go is the app under test. This replaces the debug APK build.
             npm run mobile:expo-go
