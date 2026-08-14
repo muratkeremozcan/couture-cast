@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import https from 'node:https'
 import path from 'node:path'
@@ -7,7 +8,25 @@ import { spawn } from 'node:child_process'
 
 const EXPO_GO_SDK_54_URL =
   'https://github.com/expo/expo-go-releases/releases/download/Expo-Go-54.0.8/Expo-Go-54.0.8.apk'
-const DOWNLOAD_PATH = path.join('/tmp', 'ExpoGo-latest.apk')
+
+/**
+ * Where a given APK URL is cached.
+ *
+ * Keyed on the URL, because the cache below reuses any complete file it finds
+ * and `EXPO_GO_APK_URL` can change which APK is wanted. On one fixed path, a
+ * run with the override would install the default APK left by the previous run
+ * (and the run after it would install the override's), which is the one thing
+ * an override exists to prevent. Distinct URLs therefore get distinct files,
+ * and each stays reusable.
+ *
+ * @param {string} url
+ * @returns {string}
+ */
+const cachePathFor = (url) =>
+  path.join(
+    '/tmp',
+    `ExpoGo-${crypto.createHash('sha256').update(url).digest('hex').slice(0, 12)}.apk`
+  )
 
 const log = (msg) => console.log(`[expo-go] ${msg}`)
 const fail = (msg) => {
@@ -124,6 +143,7 @@ const isCompleteApk = (filePath) => {
 
 const main = async () => {
   const apkUrl = process.env.EXPO_GO_APK_URL || EXPO_GO_SDK_54_URL
+  const downloadPath = cachePathFor(apkUrl)
 
   // Downloaded once per machine, not once per device.
   //
@@ -142,18 +162,18 @@ const main = async () => {
   // which names the symptom and not the cause. `isCompleteApk` reads the end of
   // the file for the ZIP end-of-central-directory record, which a truncated
   // download cannot have, so the check observes the property it claims.
-  if (isCompleteApk(DOWNLOAD_PATH)) {
-    const size = fs.statSync(DOWNLOAD_PATH).size
-    log(`Reusing Expo Go APK at ${DOWNLOAD_PATH} (${Math.round(size / 1e6)}MB)`)
+  if (isCompleteApk(downloadPath)) {
+    const size = fs.statSync(downloadPath).size
+    log(`Reusing Expo Go APK at ${downloadPath} (${Math.round(size / 1e6)}MB)`)
   } else {
-    if (fs.existsSync(DOWNLOAD_PATH)) {
-      log(`Discarding incomplete Expo Go APK at ${DOWNLOAD_PATH}`)
-      fs.rmSync(DOWNLOAD_PATH, { force: true })
+    if (fs.existsSync(downloadPath)) {
+      log(`Discarding incomplete Expo Go APK at ${downloadPath}`)
+      fs.rmSync(downloadPath, { force: true })
     }
     log(`Downloading Expo Go from ${apkUrl}`)
-    await download(apkUrl, DOWNLOAD_PATH)
-    if (!isCompleteApk(DOWNLOAD_PATH)) {
-      fail(`Downloaded Expo Go APK at ${DOWNLOAD_PATH} is not a complete archive.`)
+    await download(apkUrl, downloadPath)
+    if (!isCompleteApk(downloadPath)) {
+      fail(`Downloaded Expo Go APK at ${downloadPath} is not a complete archive.`)
     }
   }
 
@@ -162,7 +182,7 @@ const main = async () => {
   await ensureDevice(adbPath)
 
   log('Installing Expo Go on connected device/emulator')
-  await run(adbPath, ['install', '-r', DOWNLOAD_PATH])
+  await run(adbPath, ['install', '-r', downloadPath])
   log('Expo Go installed successfully')
 }
 

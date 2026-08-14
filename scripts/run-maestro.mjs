@@ -26,6 +26,7 @@ import { request as httpsRequest } from 'node:https'
 import os from 'node:os'
 import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
+import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
@@ -2387,8 +2388,23 @@ const warmMetroBundle = async (healthUrl, platform) => {
 }
 
 /**
- * Run Maestro from the local installation when available, otherwise fall back
- * to `npx maestro@latest`.
+ * Run Maestro from the pinned installation, wherever that turns out to be.
+ *
+ * PATH is tried first, then the pinned install, then the pinned npx package.
+ *
+ * The middle step is the one that matters. `npm run maestro:install` puts the
+ * binary in `~/.maestro/bin` and the installer adds that directory to the user's
+ * SHELL PROFILE, which does nothing for the `npm run maestro:install && node
+ * ./scripts/run-maestro.mjs` process that is already running on the PATH it
+ * started with. So on a clean checkout the pinned binary exists, `maestro` is
+ * still not on PATH, and this fell straight through to a floating version --
+ * silently, and in the one place the pin was supposed to hold. The mobile
+ * workflow already fails loudly on exactly this; local runs had nothing.
+ *
+ * The last step is pinned for the same reason. It was `maestro@latest`, which
+ * meant the fallback tested whatever Maestro released that day. On Windows it is
+ * not a fallback at all but the delivery mechanism: `maestro-install.mjs` has no
+ * installer there and verifies the pin through npx.
  *
  * @param {string[]} args
  * @param {SpawnProcessOptions} [options]
@@ -2397,14 +2413,23 @@ const warmMetroBundle = async (healthUrl, platform) => {
 const runMaestroCommand = async (args, options = {}) => {
   try {
     await spawnProcess('maestro', args, options)
+    return
   } catch (err) {
-    if (err.code === 'ENOENT') {
-      log('System maestro command missing, retrying via npx maestro@latest')
-      await spawnProcess('npx', ['--yes', 'maestro@latest', ...args], options)
-    } else {
-      throw err
-    }
+    if (err.code !== 'ENOENT') throw err
   }
+
+  if (fs.existsSync(MAESTRO_BIN)) {
+    log(`maestro is not on PATH; using the pinned install at ${MAESTRO_BIN}`)
+    await spawnProcess(MAESTRO_BIN, args, options)
+    return
+  }
+
+  log(`No installed maestro found, retrying via npx maestro@${MAESTRO_PINNED_VERSION}`)
+  await spawnProcess(
+    'npx',
+    ['--yes', `maestro@${MAESTRO_PINNED_VERSION}`, ...args],
+    options
+  )
 }
 
 /**
@@ -2621,6 +2646,17 @@ const run = async () => {
       process.env.WEATHER_ALERT_ID = mobileE2EWeatherAlertId(mobileIdentity.userId)
       process.env.GARMENT_A_ID = mobileIdentity.garmentIds?.[0] ?? ''
       process.env.GARMENT_B_ID = mobileIdentity.garmentIds?.[1] ?? ''
+      // The seeded capsule by id, so the repair flow stops taking whichever
+      // capsule the library happens to list first. That order is
+      // `is_favorite desc, updated_at desc` (`wardrobe-capsule.repository.ts`),
+      // and this very flow favourites a capsule, so "first" is a property of what
+      // ran before it rather than of the capsule the flow means.
+      process.env.CAPSULE_ID = mobileE2ECapsuleId(mobileIdentity.userId)
+      // A garment the seeded capsule does NOT already hold, so choosing a
+      // replacement adds one rather than deselecting a member.
+      // `seedMobileE2ECapsule` takes the two OLDEST garments, so the newest is
+      // always outside it.
+      process.env.REPLACEMENT_GARMENT_ID = mobileIdentity.garmentIds?.at(-1) ?? ''
     } else if (!process.env.EXPO_PUBLIC_API_BASE_URL) {
       throw new Error(
         'MOBILE_E2E_SKIP_API=1 requires EXPO_PUBLIC_API_BASE_URL and an externally managed test identity.'
@@ -2859,6 +2895,10 @@ const run = async () => {
             '-e',
             `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`,
             '-e',
+            `CAPSULE_ID=${process.env.CAPSULE_ID ?? ''}`,
+            '-e',
+            `REPLACEMENT_GARMENT_ID=${process.env.REPLACEMENT_GARMENT_ID ?? ''}`,
+            '-e',
             `APP_URL=${process.env.APP_URL}`,
             '-e',
             `WARDROBE_URL=${process.env.WARDROBE_URL}`,
@@ -2957,6 +2997,10 @@ const run = async () => {
             '-e',
             `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`,
             '-e',
+            `CAPSULE_ID=${process.env.CAPSULE_ID ?? ''}`,
+            '-e',
+            `REPLACEMENT_GARMENT_ID=${process.env.REPLACEMENT_GARMENT_ID ?? ''}`,
+            '-e',
             `APP_URL=${process.env.APP_URL}`,
             '-e',
             `WARDROBE_URL=${process.env.WARDROBE_URL}`,
@@ -3019,6 +3063,11 @@ const run = async () => {
           maestroArgs.push('-e', `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`)
           maestroArgs.push('-e', `GARMENT_A_ID=${process.env.GARMENT_A_ID ?? ''}`)
           maestroArgs.push('-e', `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`)
+          maestroArgs.push('-e', `CAPSULE_ID=${process.env.CAPSULE_ID ?? ''}`)
+          maestroArgs.push(
+            '-e',
+            `REPLACEMENT_GARMENT_ID=${process.env.REPLACEMENT_GARMENT_ID ?? ''}`
+          )
           maestroArgs.push('-e', `APP_URL=${process.env.APP_URL}`)
           maestroArgs.push('-e', `WARDROBE_URL=${process.env.WARDROBE_URL}`)
           maestroArgs.push('-e', `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`)

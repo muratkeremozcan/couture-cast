@@ -227,9 +227,11 @@ tags:
     label: 'Bring the garment-order controls on screen'
 - waitForAnimationToEnd
 
+# By id, like the checkboxes above and for the same reason. The reorder rows are
+# keyed `move-down-button-<garmentId>` and rendered in selection order, so the
+# first garment this flow selected is the one it means to move.
 - tapOn:
-    id: 'move-down-button-.*'
-    index: 0
+    id: 'move-down-button-${GARMENT_A_ID}'
     label: 'Move the first garment down'
 
 - tapOn:
@@ -240,9 +242,27 @@ tags:
     label: 'Committed capsule appears in the library'
 
 # Reopen and confirm the order survived the round trip.
+#
+# By index, unavoidably: the capsule this flow just created has a server-issued
+# id that the flow has no way to learn, so there is nothing to interpolate the
+# way the repair flow interpolates `CAPSULE_ID`. The library also holds the
+# runner's seeded capsule, and sorts on `is_favorite desc, updated_at desc`, so
+# the just-saved capsule is first only because nothing has favourited the other
+# one.
+#
+# The assertion below is what makes that survivable. `reorder-row-.*` alone
+# passes for ANY capsule with garments, including the seeded one, so opening the
+# wrong card would have read as a pass. Checking the name field pins the tap to
+# the capsule this flow created, and `text:` matches the whole element, so
+# `Maestro seeded capsule` cannot satisfy it.
 - tapOn:
     id: 'edit-capsule-button-.*'
     index: 0
+
+- assertVisible:
+    id: 'capsule-name-input'
+    text: 'Maestro capsule'
+    label: 'The reopened capsule is the one this flow created'
 
 - assertVisible:
     id: 'reorder-row-.*'
@@ -252,6 +272,10 @@ tags:
     id: 'close-modal-button'
 
 # Public-API cleanup: remove the capsule created by this flow.
+#
+# By index for the same reason as the reopen above, and guarded the same way: the
+# `assertNotVisible` at the end of this flow fails if the tap removed the seeded
+# capsule instead, because the capsule this flow created would still be listed.
 - tapOn:
     id: 'delete-capsule-button-.*'
     index: 0

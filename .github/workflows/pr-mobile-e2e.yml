@@ -262,7 +262,16 @@ jobs:
           # version, so CI ran whatever get.maestro.mobile.dev served that day
           # while developers ran whatever Homebrew had, and nothing reported the
           # gap. scripts/maestro-install.mjs owns the pin; this asserts it held.
-          PINNED=$(node -p "require('fs').readFileSync('scripts/maestro-install.mjs','utf8').match(/PINNED_VERSION = process\.env\.MAESTRO_VERSION \?\? '([^']+)'/)[1]")
+          # Imported, not scraped. This used to regex the constant out of
+          # `scripts/maestro-install.mjs`, which broke the moment the pin moved
+          # into its own module: the match returned null and the step died on
+          # `[1] of null` — a failure that says nothing about Maestro. Asking the
+          # module for its own value cannot drift from what the installer uses.
+          PINNED=$(node -e "import('./scripts/maestro-version.mjs').then((m) => console.log(m.MAESTRO_PINNED_VERSION))")
+          if [ -z "$PINNED" ]; then
+            echo "::error::Could not read the pinned Maestro version from scripts/maestro-version.mjs."
+            exit 1
+          fi
           FOUND=$(maestro --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
           if [ "$FOUND" != "$PINNED" ]; then
             echo "::error::maestro $FOUND is on PATH but this repo pins $PINNED. CI and local would be testing different versions."
@@ -400,10 +409,18 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always() && steps.flows.outputs.empty != 'true'
         with:
-          # Per shard. Four jobs uploading one name collide, and upload-artifact
-          # v4 rejects the duplicate rather than merging, so the shard that lost
-          # the race would have no artifacts at all -- and artifacts are how this
-          # suite is diagnosed.
-          name: android-test-results-shard-${{ matrix.shard }}
+          # Per shard, and per attempt. Four jobs uploading one name collide,
+          # and upload-artifact v4 rejects the duplicate rather than merging, so
+          # the shard that lost the race would have no artifacts at all -- and
+          # artifacts are how this suite is diagnosed.
+          #
+          # The attempt is in the name for the same reason. A v4 artifact
+          # belongs to the RUN, not to the attempt, and it outlives the attempt
+          # that produced it, so re-running a failed shard uploads into a name
+          # that already exists and gets a 409 -- losing the artifacts of the
+          # run you re-ran precisely because you needed to look at them. The
+          # alternative, `overwrite: true`, resolves the conflict by deleting
+          # the earlier attempt's evidence, which is the wrong half to keep.
+          name: android-test-results-shard-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
           path: maestro/artifacts/
           retention-days: 7

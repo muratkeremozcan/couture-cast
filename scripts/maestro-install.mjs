@@ -15,10 +15,10 @@
  */
 import { execSync } from 'node:child_process'
 import path from 'node:path'
-
-// Bump deliberately, in a reviewable commit. Never let this float.
-const PINNED_VERSION = process.env.MAESTRO_VERSION ?? '2.8.0'
-const MAESTRO_BIN = path.join(process.env.HOME ?? '', '.maestro', 'bin', 'maestro')
+import {
+  MAESTRO_BIN,
+  MAESTRO_PINNED_VERSION as PINNED_VERSION,
+} from './maestro-version.mjs'
 
 const log = (msg) => console.log(`[maestro:install] ${msg}`)
 
@@ -64,7 +64,17 @@ try {
 
   if (process.platform === 'win32') {
     // No official installer for Windows; npx can at least honour the pin.
+    //
+    // Returning here rather than falling through to the check below, which reads
+    // `~/.maestro/bin/maestro`. npx runs the package out of its own cache and
+    // never writes that path, so every Windows run reached the check, found
+    // nothing, and exited 1 immediately after the pinned command had succeeded.
+    // `runMaestroCommand` in `scripts/run-maestro.mjs` falls back to the same
+    // pinned npx invocation, so this is a complete delivery on Windows even
+    // though nothing lands on disk.
     run(`npx maestro@${PINNED_VERSION} --version`)
+    log(`Maestro ${PINNED_VERSION} available through npx`)
+    process.exit(0)
   } else {
     // What matters is the version, not who installed it. The official installer
     // refuses to run while a Homebrew maestro exists, and uninstalling someone's

@@ -122,8 +122,8 @@ appId: ${MAESTRO_APP_ID}
       # once the tab bar is showing, and the pair is bounded, so a screen that
       # never reveals the tab bar fails at the wait below with a clear message
       # instead of spinning.
-      # The `back` is Android-only, and guarded on Expo Go not being on its own
-      # error screen. Both halves were learned from a CI run.
+      # The `back` is Android-only, and guarded on Expo Go not showing one of
+      # its own screens. Both halves were learned from a CI run.
       #
       # Android-only because iOS gets nothing from it: `back` is documented as
       # Android and Web only and its iOS implementation is an empty method, so
@@ -142,6 +142,23 @@ appId: ${MAESTRO_APP_ID}
       # appearing with the launcher on screen -- which points at everything
       # except the real cause. Without the back presses the run fails at the
       # wait below, still red, but pointing at the app that would not load.
+      #
+      # The error screen is not the only such state and it is not the common
+      # one, so the guard lists every Expo Go screen measured here so far. The
+      # local run under maestro/artifacts/2026-08-14_120603 has the whole
+      # sequence in its hierarchy dumps: at step 13 the screen was Expo Go's
+      # splash for this project (`Splash Screen Image` and `Couture Cast`, none
+      # of the app yet) because the bundle was still loading, so the first block
+      # fired and BACK landed on Expo Go's own home screen (`Development
+      # servers`, `Enter URL manually`); the error-screen guard had nothing to
+      # say about either, so the second block fired too, and step 20 dumps
+      # `com.google.android.apps.nexuslauncher` -- the Android launcher, exactly
+      # the walk this guard was added to stop. The flow then spent the 45s wait
+      # below and its entire first `retry` attempt recovering.
+      #
+      # `Couture Cast` is the app `name` from apps/mobile/app.json, which Expo
+      # Go paints under the splash image. It cannot collide with a screen of
+      # ours: every user-facing string in the app spells it `CoutureCast`.
       - runFlow:
           when:
             notVisible:
@@ -155,9 +172,15 @@ appId: ${MAESTRO_APP_ID}
                 when:
                   platform: Android
                   notVisible:
-                    text: 'Something went wrong.'
+                    text: 'Something went wrong.|Development servers|Couture Cast'
                 commands:
                   - back
+            # Let the pop finish before the second block asks the same question.
+            # The two blocks are independent evaluations of `notVisible:
+            # tab-home`, and a stack transition still animating answers with the
+            # screen that is on its way out, so the second pop fires on a
+            # hierarchy that is already stale.
+            - waitForAnimationToEnd
       - runFlow:
           when:
             notVisible:
@@ -171,7 +194,7 @@ appId: ${MAESTRO_APP_ID}
                 when:
                   platform: Android
                   notVisible:
-                    text: 'Something went wrong.'
+                    text: 'Something went wrong.|Development servers|Couture Cast'
                 commands:
                   - back
 
