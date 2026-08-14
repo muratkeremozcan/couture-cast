@@ -390,7 +390,11 @@ const probeAndroidMetroReachability = async (host, port) => {
 
     // Loopback is right for both routes: `10.0.2.2` is QEMU's alias for exactly
     // this interface, and the reverse mapping forwards here too.
-    server.listen(0, '127.0.0.1', async () => {
+    // Bound on every interface, not just loopback: `10.0.2.2` is documented as
+    // an alias for the host loopback, but binding narrowly makes a probe
+    // failure and a routing failure look identical, and this probe has already
+    // produced three false negatives from exactly that kind of ambiguity.
+    server.listen(0, '0.0.0.0', async () => {
       const probePort = server.address().port
       let removeReverse = false
       try {
@@ -401,12 +405,36 @@ const probeAndroidMetroReachability = async (host, port) => {
             `tcp:${probePort}`,
           ])
           removeReverse = true
+
+          // Control: with the reverse mapping in place the DEVICE is listening
+          // on this port locally, so a connect must succeed at TCP level even
+          // if nothing on the host answers. If it does not, `nc -z` itself does
+          // not work on this image and a negative result would say nothing
+          // about the network. Verifying the instrument before trusting a
+          // reading it produces.
+          const control = await captureProcess(adbBinary, [
+            'shell',
+            `nc -z -w 3 127.0.0.1 ${probePort} && echo __NC_WORKS__ || echo __NC_BROKEN__`,
+          ]).catch(() => ({ stdout: '' }))
+          if (!`${control.stdout ?? ''}`.includes('__NC_WORKS__')) {
+            log(
+              `nc -z does not work on this device image, so ${host} cannot be probed; ` +
+                `not treating that as unreachable`
+            )
+            await captureProcess(adbBinary, [
+              'reverse',
+              '--remove',
+              `tcp:${probePort}`,
+            ]).catch(() => {})
+            finish(null)
+            return
+          }
         }
         await captureProcess(adbBinary, ['shell', `nc -z -w 3 ${host} ${probePort}`])
       } catch {
-        // A refused connect or a missing nc both land here; `sawConnection`
-        // stays false and the route is reported dead, which is the honest read
-        // for the first and a conservative one for the second.
+        // A refused connect lands here; `sawConnection` stays false and the
+        // route is reported dead, which is the honest read now that the
+        // instrument itself has been checked.
       }
       if (removeReverse) {
         await captureProcess(adbBinary, [
