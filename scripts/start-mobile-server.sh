@@ -42,10 +42,28 @@ else
   ARGS+=(--offline)
 fi
 
+# `-sTCP:LISTEN` is load-bearing, not tidiness. `lsof -i tcp:8081` matches every
+# socket with 8081 at *either* end, so it returns the clients connected to Metro
+# as well as Metro itself: the Android emulator, which reaches the bundler over
+# `10.0.2.2:8081` and therefore holds a host-side socket whose peer port is
+# 8081, and every Expo Go process on a booted iOS simulator. Killing that list
+# to free the port shot the emulator instead, which is why a first run on a
+# freshly booted device always worked and every run after it died partway
+# through startup with
+#
+#   You have 0 devices connected, which is not enough to run 1 shards.
+#
+# Restricting the match to listening sockets leaves the clients alone. Verified
+# against a real listener plus four connected Expo Go clients: the unrestricted
+# form returned all five, this form returns only the listener.
+#
+# `xargs -r` is also gone: it is a GNU extension that BSD xargs does not accept,
+# so the guard was relying on the `|| true` to swallow its own failure.
 if command -v lsof >/dev/null 2>&1; then
-  if lsof -ti tcp:"$METRO_PORT" >/dev/null 2>&1; then
-    echo "[mobile-server] Port $METRO_PORT in use, stopping existing process"
-    lsof -ti tcp:"$METRO_PORT" | xargs -r kill || true
+  METRO_LISTENER_PIDS=$(lsof -ti tcp:"$METRO_PORT" -sTCP:LISTEN || true)
+  if [ -n "$METRO_LISTENER_PIDS" ]; then
+    echo "[mobile-server] Port $METRO_PORT in use, stopping existing listener"
+    echo "$METRO_LISTENER_PIDS" | xargs kill || true
     sleep 1
   fi
 fi
