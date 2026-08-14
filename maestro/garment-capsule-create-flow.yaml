@@ -64,6 +64,27 @@ tags:
     id: 'garment-checkbox-.*'
     index: 0
     label: 'Select the first garment'
+
+# Bring the garment list back before selecting the second.
+#
+# Selecting a garment inserts the garment-order section into the builder, and
+# the modal comes back to the top of its scroll. On Android the garment list is
+# then outside the rendered window entirely: the failure hierarchy for the
+# second tap holds `capsule-modal-title`, `capsule-name-input`,
+# `capsule-desc-input` and `save-capsule-button` and not one
+# `garment-checkbox-*`, so the tap reported the element missing on a builder
+# that was open and healthy the whole time.
+#
+# `scrollUntilVisible` rather than a bare tap so the step describes what it
+# needs. It is a no-op on a platform that never scrolled away.
+- scrollUntilVisible:
+    element:
+      id: 'garment-checkbox-.*'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+    label: 'Bring the garment list back on screen'
+
 - tapOn:
     id: 'garment-checkbox-.*'
     index: 1

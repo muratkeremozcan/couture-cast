@@ -59,6 +59,30 @@ tags:
 - tapOn:
     id: 'garment-capture-done'
 
+# Dismiss the smart-tagging sheet that follows a capture.
+#
+# Committing a captured garment hands off to the tagging modal, which offers the
+# suggested category, material and comfort range. `garment-smart-tagging-flow`
+# covers that modal in its own right, and shows both that it appears after
+# `garment-capture-done` and that closing it keeps the garment: the flow closes
+# it and then finds the garment in the hub under a "Needs tags" chip. This flow
+# is about capture, so it closes the modal and moves on.
+#
+# It went unnoticed because the modal does not block the assertion below on
+# every platform. On Android the hub list is not in the hierarchy Maestro queries
+# while the modal is up, so the wait expired with `Confirm & Save Tags`,
+# `Category *` and the whole `garment-tag-*` control set on screen.
+#
+# Guarded on the modal actually being present so this can never fire a stray tap.
+- runFlow:
+    when:
+      visible:
+        id: 'garment-tagging-modal'
+    commands:
+      - tapOn:
+          id: 'garment-tagging-close'
+          label: 'Close the tagging modal; the garment is already committed'
+
 # Wait, do not assert. The hub renders `wardrobe-garment-list` only once
 # `garments.length > 0` and the load has settled, and the committed garment
 # arrives through a refetch after the capture modal closes. A bare
