@@ -73,9 +73,34 @@ tags:
 # The runner seeds these garments through the public API and now passes two of
 # their ids, the same way it already passes WEATHER_ALERT_ID. Selecting by id is
 # independent of render order, scroll position and wardrobe size.
+#
+# Scrolled to, not merely tapped. Selecting by id removed the positional
+# ambiguity but not the virtualization that caused it: the builder renders ten
+# seeded garments in a virtualized list, so a garment below the fold is not in
+# the hierarchy at all and `tapOn` reports it as
+# `Element not found: Id matching regex: garment-checkbox-<uuid>`. That is the
+# exact failure this flow hit on Android. Both are scrolled to rather than only
+# the second, because which ids land above the fold depends on seeding order,
+# screen height and platform, none of which this flow should be sensitive to.
+- scrollUntilVisible:
+    element:
+      id: 'garment-checkbox-${GARMENT_A_ID}'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+    label: 'Bring the first seeded garment on screen'
+
 - tapOn:
     id: 'garment-checkbox-${GARMENT_A_ID}'
     label: 'Select the first seeded garment'
+
+- scrollUntilVisible:
+    element:
+      id: 'garment-checkbox-${GARMENT_B_ID}'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+    label: 'Bring the second seeded garment on screen'
 
 - tapOn:
     id: 'garment-checkbox-${GARMENT_B_ID}'
