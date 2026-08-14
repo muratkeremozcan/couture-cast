@@ -70,6 +70,20 @@ tags:
     index: 1
     label: 'Select the second garment'
 
+# Assert the selection took, rather than trusting two taps.
+#
+# `index:` on a regex selector resolves to the Nth CURRENTLY-RENDERED match, not
+# the Nth garment, so anything that changes what is rendered between the two taps
+# silently changes what the second one hits. That is not hypothetical here: a
+# scroll step that used to sit between these taps left the builder holding one
+# garment while the flow believed it held two, and nothing noticed until the
+# reorder controls failed several steps later with a message about a missing
+# button. The builder prints its own count, so the postcondition is cheap to
+# state and fails where the mistake actually happens.
+- assertVisible:
+    text: 'Garments (2 of .* selected)'
+    label: 'Both garments are actually selected'
+
 # Reorder through the accessible controls, never through drag alone.
 #
 # Scrolled to first: the reorder section sits below the full garment list inside
