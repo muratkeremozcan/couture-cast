@@ -80,14 +80,30 @@ env:
 jobs:
   mobile-e2e-android:
     runs-on: ubuntu-latest
-    # Eighteen flows run serially against one emulator. Locally a flow takes
-    # 1-2 minutes, and setup here adds `npm ci`, a Supabase stack, a database
-    # reset, an emulator boot and a cold Metro bundle. 45 minutes did not leave
-    # headroom for that. Treat this as provisional: the first completed run
-    # gives a real number, and if it lands anywhere near this ceiling the fix is
-    # to shard the flow list across parallel jobs sharing the same AVD cache,
-    # not to keep raising the limit.
-    timeout-minutes: 60
+    # Sharded across parallel jobs, because serial does not fit.
+    #
+    # Measured here: setup is about 6 minutes once the AVD snapshot is cached,
+    # and a flow costs roughly 3m20s on a 4 vCPU runner. Eighteen flows serially
+    # is therefore about 66 minutes, which does not fit in this job's ceiling
+    # even when every flow passes. Raising the ceiling would only make a slow
+    # suite slower to fail.
+    #
+    # Each shard is a full, independent job: its own emulator, Supabase, API and
+    # Metro, running a slice of the flow list. They share the AVD snapshot cache,
+    # so the expensive part is paid once per key rather than once per shard.
+    # Wall clock becomes setup plus the longest slice, so four shards put the
+    # suite at roughly 20 minutes.
+    #
+    # Round-robin slicing rather than contiguous chunks: flow cost is uneven and
+    # alphabetical neighbours tend to be related, so contiguous chunks put the
+    # expensive wardrobe flows in one shard and the cheap ones in another.
+    strategy:
+      # A failing shard must not cancel the others. The point of a suite is to
+      # learn everything that is broken in one run.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    timeout-minutes: 45
     services:
       redis:
         image: redis:7-alpine
@@ -233,11 +249,14 @@ jobs:
           fi
           echo "Maestro version matches the pin: $PINNED"
 
-      - name: Resolve flow list
+      - name: Resolve this shard's flow list
         id: flows
         run: |
+          set -euo pipefail
           if [[ "${{ inputs.suite }}" == "smoke" ]]; then
-            FLOWS="maestro/sanity.yaml maestro/analytics.yaml maestro/premium-subscription.yaml"
+            ALL="maestro/sanity.yaml
+          maestro/analytics.yaml
+          maestro/premium-subscription.yaml"
           else
             # Every top-level flow. `maestro/subflows/` holds fragments that are
             # only ever reached through `runFlow`, so it is excluded by the
@@ -245,10 +264,29 @@ jobs:
             # Maestro's own reserved filename for suite configuration, not a
             # flow: if one is ever added, running it as a flow would fail in a
             # way that reads like a broken test rather than a bad flow list.
-            FLOWS=$(find maestro -maxdepth 1 -name '*.yaml' ! -name 'config.yaml' | sort | tr '\n' ' ')
+            ALL=$(find maestro -maxdepth 1 -name '*.yaml' ! -name 'config.yaml' | sort)
           fi
+
+          TOTAL=$(printf '%s\n' "$ALL" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
+          SHARDS=${{ strategy.job-total }}
+          SHARD=${{ matrix.shard }}
+
+          # Round robin, not contiguous chunks. Flow cost is uneven and
+          # alphabetical neighbours are usually related, so a contiguous split
+          # lands every expensive wardrobe flow in the same shard.
+          FLOWS=$(printf '%s\n' "$ALL" | sed '/^[[:space:]]*$/d' | awk -v s="$SHARD" -v n="$SHARDS" 'NR % n == s % n' | tr '\n' ' ')
+
+          # A shard with nothing to run is a configuration mistake, not a pass.
+          # Silently running zero flows and reporting success is the exact shape
+          # of hollow green this suite has been cleaned of elsewhere.
+          if [[ -z "${FLOWS// /}" ]]; then
+            echo "::error::Shard $SHARD of $SHARDS resolved no flows out of $TOTAL. Check the shard count against the flow count."
+            exit 1
+          fi
+
           echo "list=$FLOWS" >> "$GITHUB_OUTPUT"
-          echo "Running flows: $FLOWS"
+          echo "Shard $SHARD of $SHARDS runs $(printf '%s' "$FLOWS" | wc -w | tr -d ' ') of $TOTAL flows:"
+          printf '%s\n' $FLOWS
 
       - name: Run Maestro suite
         uses: reactivecircus/android-emulator-runner@v2
@@ -316,6 +354,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: android-test-results
+          # Per shard. Four jobs uploading one name collide, and upload-artifact
+          # v4 rejects the duplicate rather than merging, so the shard that lost
+          # the race would have no artifacts at all -- and artifacts are how this
+          # suite is diagnosed.
+          name: android-test-results-shard-${{ matrix.shard }}
           path: maestro/artifacts/
           retention-days: 7
