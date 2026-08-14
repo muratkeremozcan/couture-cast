@@ -30,6 +30,40 @@ appId: ${MAESTRO_APP_ID}
     commands:
       - openLink: ${APP_URL}
 
+      # Dismiss an Android system "isn't responding" dialog before anything else.
+      #
+      # This is what kept CI red after the manifest fix. The app launched, Metro
+      # bundled for the device and the app's own code ran, and every flow still
+      # failed on `tab-home is visible` -- because the hierarchy at that moment
+      # was an ANR dialog:
+      #
+      #   android:id/alertTitle   Pixel Launcher isn't responding
+      #   android:id/aerr_wait    Wait
+      #
+      # An ANR dialog takes window focus, so an out-of-process driver sees the
+      # dialog and not the app behind it. All three shards showed the identical
+      # one, and the per-step hierarchies place it at step 9, well before this
+      # subflow's own back presses -- so the harness does not cause it; a starved
+      # launcher on a CI runner does.
+      #
+      # `settings put global hide_error_dialogs 1` is also set per device by the
+      # runner, and is NOT sufficient on its own: ActivityManager latches that
+      # value at boot and on configuration change, so setting it on a running
+      # device did not prevent the dialog. This is the belt to that braces.
+      #
+      # "Wait" rather than "Close app": closing the launcher kills a process the
+      # device immediately restarts, and this suite has no interest in either
+      # outcome beyond getting the dialog off the screen.
+      - runFlow:
+          when:
+            platform: Android
+            visible:
+              id: 'android:id/aerr_wait'
+          commands:
+            - tapOn:
+                id: 'android:id/aerr_wait'
+                label: 'Dismiss an Android application-not-responding dialog'
+
       # iOS asks for confirmation before handing an `exp://` link to Expo Go:
       # a system alert reading `Open in "Expo Go"?` with Cancel and Open. It is
       # per device and it is why a freshly created simulator behaves differently

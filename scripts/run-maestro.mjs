@@ -428,7 +428,14 @@ const suppressAndroidErrorDialogs = async () => {
       { timeoutMs: 15_000 }
     )
     if (readBack.stdout.trim() === '1') {
-      log(`System crash dialogs suppressed on ${androidSerial || 'the attached device'}`)
+      // Deliberately narrow wording. This establishes that the setting is
+      // written, and NOT that no dialog will appear: `hide_error_dialogs` is
+      // latched into ActivityManager's `mShowDialogs` at boot and on
+      // configuration change, so setting it on a running device does not
+      // necessarily take effect, and a CI run with it set to 1 still met a
+      // `Pixel Launcher isn't responding` dialog. An earlier version of this
+      // line said "suppressed", which claimed the outcome rather than the act.
+      log(`hide_error_dialogs=1 set on ${androidSerial || 'the attached device'}`)
     } else {
       log(
         `Could not suppress system crash dialogs: hide_error_dialogs reads "${readBack.stdout.trim()}". ` +
@@ -2475,6 +2482,30 @@ const run = async () => {
     }
   }
 
+  /**
+   * Feature flags this suite asserts on must come from the seeded database, not
+   * from PostHog.
+   *
+   * `premium-subscription` failed on Android with `premium-unavailable` never
+   * rendering, and the screen hierarchy shows why: the premium section rendered
+   * its status line and disclosure but neither the fallback nor the purchase
+   * controls, which is the shape when the server answered
+   * `purchasesEnabled: false`. That field is
+   * `Boolean(getFeatureFlag('commerce_subscription_enabled', userId))`, the
+   * seeded row says `true`, and the only thing that outranks the row is a remote
+   * answer — evaluated per user, for a user this run created seconds earlier.
+   *
+   * `PostHogService` treats a missing key as "remote answer unavailable" rather
+   * than throwing, which is exactly the behaviour a deterministic suite wants:
+   * requests fall back to the database cache. Clearing the key here makes the
+   * seeded row authoritative for the whole run.
+   *
+   * This does not disable mobile analytics. `maestro/analytics.yaml` asserts on
+   * the client's own diagnostics channel (`MOBILE_ANALYTICS_DIAGNOSTICS`), which
+   * is unrelated to the API's flag provider.
+   */
+  const deterministicFlagEnv = { POSTHOG_API_KEY: '' }
+
   const apiHealthUrl = 'http://127.0.0.1:4000/api/health'
   const apiSetupBaseUrl = 'http://127.0.0.1:4000'
   const mobileApiBaseUrl = getLocalApiUrl(target.platform)
@@ -2510,6 +2541,7 @@ const run = async () => {
                 ...process.env,
                 DATABASE_URL: MOBILE_E2E_DATABASE_URL,
                 GARMENT_TAGGING_ENGINE: 'fixture',
+                ...deterministicFlagEnv,
                 TEST_ENV: 'local',
               },
             }
@@ -2529,6 +2561,7 @@ const run = async () => {
             DATABASE_URL: MOBILE_E2E_DATABASE_URL,
             GUARDIAN_INVITE_WEB_BASE_URL: 'http://127.0.0.1:3005',
             GARMENT_TAGGING_ENGINE: 'fixture',
+            ...deterministicFlagEnv,
             PUBLIC_API_URL: process.env.MOBILE_E2E_PUBLIC_API_URL || mobileApiBaseUrl,
             TEST_ENV: 'local',
           },

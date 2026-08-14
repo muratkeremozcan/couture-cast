@@ -89,6 +89,7 @@ tags:
     centerElement: true
     timeout: 15000
     label: 'Bring the first seeded garment on screen'
+- waitForAnimationToEnd
 
 - tapOn:
     id: 'garment-checkbox-${GARMENT_A_ID}'
@@ -101,6 +102,14 @@ tags:
     centerElement: true
     timeout: 15000
     label: 'Bring the second seeded garment on screen'
+# The scroll has to settle before the tap.
+#
+# Without this the sharded Android run reached the count assertion with
+# `Garments (1 of 10 selected)` on screen: the first garment was selected, the
+# scroll to the second reported success, and the tap that followed landed while
+# the list was still moving, so it hit nothing. A missed tap on a virtualized
+# list is silent -- the flow only found out four steps later at the count.
+- waitForAnimationToEnd
 
 - tapOn:
     id: 'garment-checkbox-${GARMENT_B_ID}'
