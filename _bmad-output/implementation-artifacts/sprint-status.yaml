@@ -89,7 +89,7 @@ development_status:
   # Epic 5: Commerce & Premium Enhancements (Phase 2)
   epic-5: in-progress
   5-1-affiliate-shop-this-look-cta: done
-  5-2-premium-subscription-lifecycle: in-progress
+  5-2-premium-subscription-lifecycle: done
   5-3-premium-theme-switcher: backlog
   5-4-color-palette-beauty-accessory-advisor: backlog
   5-5-premium-7-day-outfit-planner: backlog

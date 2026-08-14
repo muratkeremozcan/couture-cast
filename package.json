@@ -71,6 +71,7 @@
     "test:mobile:e2e:android": "npm run maestro:install --silent && cross-env MOBILE_E2E_PLATFORM=android node ./scripts/run-maestro.mjs --artifacts",
     "test:mobile:e2e:ios": "npm run maestro:install --silent && cross-env MOBILE_E2E_PLATFORM=ios node ./scripts/run-maestro.mjs --artifacts",
     "test:mobile:e2e:ios:shards": "npm run maestro:install --silent && node ./scripts/run-maestro-shards.mjs",
+    "test:mobile:e2e:android:shards": "npm run maestro:install --silent && node ./scripts/run-maestro-shards.mjs --platform android",
     "test:mobile:e2e:commerce:android": "npm run maestro:install --silent && cross-env MOBILE_E2E_PLATFORM=android node ./scripts/run-maestro.mjs maestro/commerce-affiliate.yaml --artifacts",
     "test:mobile:e2e:commerce:ios": "npm run maestro:install --silent && cross-env MOBILE_E2E_PLATFORM=ios node ./scripts/run-maestro.mjs maestro/commerce-affiliate.yaml --artifacts",
     "test:mobile:e2e:premium:android": "npm run maestro:install --silent && cross-env MOBILE_E2E_PLATFORM=android node ./scripts/run-maestro.mjs maestro/premium-subscription.yaml --artifacts",

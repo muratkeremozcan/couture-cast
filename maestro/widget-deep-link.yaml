@@ -35,20 +35,46 @@ tags:
 # Verify default state
 - assertVisible: 'Morning commute'
 
-# Trigger the small-widget contract. The runner uses the production mobile://
-# URL on Android and Expo Go's equivalent routed URL on iOS, where a third-party
-# host app cannot register CoutureCast's native URL scheme.
-- openLink: ${WIDGET_NOW_URL}
+# Assert what the link DID, not that the screen it landed on still exists.
+#
+# This flow used to open the widget link and then assert `scenario-toggles` was
+# visible. That container is part of the home screen the flow is already sitting
+# on, so the assertion held whether or not the deep link did anything at all —
+# and it did nothing on Android, where the URL was built with the app's own
+# `mobile://` scheme that Expo Go cannot resolve. The flow was green in CI and
+# red locally for the same reason: on one API level the intent resolved to
+# something and `openLink` completed, on the other it errored outright. Neither
+# outcome had anything to do with widget hydration.
+#
+# `slot=am` resolves deterministically to the `morning` scenario and
+# `slot=evening` to `evening` (`resolveDeepLinkScenario` in `@couture/utils`),
+# which drives `setActiveScenario` and therefore which toggle carries
+# `accessibilityState.selected`. Asserting the SELECTED toggle is the smallest
+# assertion that can only pass if the link was parsed, routed, and applied.
+- openLink: ${WIDGET_MORNING_URL}
 
-- assertVisible:
-    id: 'scenario-toggles'
+- extendedWaitUntil:
+    visible:
+      id: 'scenario-toggle-morning'
+      selected: true
+    timeout: 15000
+    label: 'The am widget link selected the morning scenario'
 - takeScreenshot:
-    path: maestro/artifacts/widget-deep-link-now
+    path: maestro/artifacts/widget-deep-link-morning
 
-# Trigger the medium next-hour contract.
-- openLink: ${WIDGET_NEXT_URL}
+# The second link must MOVE the selection, which is what proves the first
+# assertion was not simply the app's default state agreeing with it.
+- openLink: ${WIDGET_EVENING_URL}
 
-- assertVisible:
-    id: 'scenario-toggles'
+- extendedWaitUntil:
+    visible:
+      id: 'scenario-toggle-evening'
+      selected: true
+    timeout: 15000
+    label: 'The evening widget link moved the selection to the evening scenario'
+- assertNotVisible:
+    id: 'scenario-toggle-morning'
+    selected: true
+    label: 'The morning scenario is no longer selected'
 - takeScreenshot:
-    path: maestro/artifacts/widget-deep-link-next
+    path: maestro/artifacts/widget-deep-link-evening

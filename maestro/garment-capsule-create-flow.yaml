@@ -31,9 +31,34 @@ tags:
 
 - tapOn:
     id: 'capsule-name-input'
-- inputText: 'Maestro capsule'
 
-# Dismiss the keyboard before touching the garment list.
+# Cleared before typing, and the result checked.
+#
+# A sharded Android run committed a capsule called `MMaestro capsule` — the
+# leading character duplicated. `inputText` reaches an Android device through
+# adb rather than the soft keyboard, and under the load of four emulators the
+# first character can arrive twice. Nothing downstream notices: the capsule
+# saves, the library shows it, and the flow only fails much later at
+# `assertVisible: 'Maestro capsule'`, several steps from the cause.
+#
+# `text:` is matched against the WHOLE element, so `Maestro capsule` does not
+# match `MMaestro capsule` and the assertion is right to reject it. That is
+# worth keeping in mind before treating a name assertion as too strict: here the
+# strictness is the only reason a corrupted name was ever noticed.
+#
+# `eraseText` first, because the field may already hold a partial value from a
+# previous attempt, and the retry proves what was actually typed rather than
+# trusting that `inputText` delivered it.
+- retry:
+    maxRetries: 3
+    commands:
+      - eraseText
+      - inputText: 'Maestro capsule'
+      - assertVisible:
+          text: 'Maestro capsule'
+          label: 'The capsule name field holds exactly the intended name'
+
+# Dismiss the keyboard before touching the garment list, on iOS only.
 #
 # The software keyboard stays up after `inputText` and covers the lower half of
 # the builder, which is where the garment checkboxes live. Maestro reported both
@@ -42,16 +67,179 @@ tags:
 # section -- which only renders once at least one garment is selected -- was
 # absent from the hierarchy entirely, and the reorder step failed looking for
 # controls the app had no reason to draw.
-- hideKeyboard
+#
+# On Android the same command closes the builder. Maestro dismisses the keyboard
+# there with a key press that React Native also treats as a request to dismiss
+# the modal, so the whole capsule builder goes with it. The step statuses show it
+# exactly: the `create-capsule-button` tap COMPLETED, `capsule-name-input`
+# asserted visible and was typed into, `hideKeyboard` COMPLETED, and then the
+# first `garment-checkbox-.*` tap failed with the capsule *library* on screen and
+# `create-capsule-button` visible on it again. Nothing else runs between those
+# two steps.
+#
+# Android does not need it in the first place: text arrives through adb rather
+# than the soft keyboard, so there is nothing covering the checkboxes to dismiss.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - hideKeyboard
 
-- tapOn:
-    id: 'garment-checkbox-.*'
-    index: 0
-    label: 'Select the first garment'
-- tapOn:
-    id: 'garment-checkbox-.*'
-    index: 1
-    label: 'Select the second garment'
+# Select two garments BY ID, not by position.
+#
+# These were `garment-checkbox-.*` with `index: 0` and `index: 1`. `index`
+# resolves against what is currently RENDERED, and with ten seeded garments the
+# list is virtualized, so the second tap landed somewhere other than the second
+# garment. Nothing caught it: the flow asserted no count, so the builder sat on
+# `Garments (1 of 10 selected)` while the flow believed it held two, and every
+# later step still passed. The reorder controls render for a single garment, so
+# even those did not object.
+#
+# The runner seeds these garments through the public API and now passes two of
+# their ids, the same way it already passes WEATHER_ALERT_ID. Selecting by id is
+# independent of render order, scroll position and wardrobe size.
+#
+# Scrolled to, not merely tapped. Selecting by id removed the positional
+# ambiguity but not the virtualization that caused it: the builder renders ten
+# seeded garments in a virtualized list, so a garment below the fold is not in
+# the hierarchy at all and `tapOn` reports it as
+# `Element not found: Id matching regex: garment-checkbox-<uuid>`. That is the
+# exact failure this flow hit on Android. Both are scrolled to rather than only
+# the second, because which ids land above the fold depends on seeding order,
+# screen height and platform, none of which this flow should be sensitive to.
+- scrollUntilVisible:
+    element:
+      id: 'capsule-name-input'
+    direction: UP
+    timeout: 15000
+    label: 'Start each garment search from the top of the builder'
+- waitForAnimationToEnd
+
+# Locate, tap, prove the tap took, and retry ALL THREE if it did not.
+#
+# The scroll is inside the retry deliberately. A CI run failed this flow with the
+# second garment's assertion exhausting every attempt — eight checkbox taps
+# against only two scrolls, because the search sat outside the retry and each
+# attempt re-tapped a coordinate resolved once, before the first selection had
+# re-rendered the list underneath it. A retry that does not re-locate its target
+# is a retry of a stale position, and it will fail identically however many
+# times it runs.
+#
+# `tapOn` reports COMPLETED once it has resolved the element and dispatched a
+# touch, which is not the same as the app having handled it. Measured here in
+# isolation: the tap on the FIRST garment completed in 2.4s, the checkbox was
+# present, `clickable=true`, and unobstructed at the exact point tapped
+# (`[45,1807][1035,1924]`, nothing above it in the hierarchy at 540,1865) — and
+# the label still read `Garments (0 of 10 selected)` ten seconds later. The
+# touch is lost somewhere between the driver and React Native's handler.
+#
+# The assertion inside the retry is the real one, so this tolerates a lost touch
+# without weakening what the flow proves: after this block a garment IS
+# selected, or the flow fails. Asserting per tap rather than once at the end is
+# what identified which of the two taps was losing, since both reported
+# COMPLETED and only the end-of-sequence count disagreed.
+#
+# The postcondition is the CHECKBOX's own state, not the `Garments (n of m
+# selected)` label. That label sits above the list, so scrolling down to reach a
+# garment pushes it out of the viewport — and `visible` means inside the
+# viewport, not present in the hierarchy. A CI run failed here with the label
+# absent from the dump entirely while a checkbox in the very same dump carried
+# `checked=true`: the tap had worked and the assertion still could not pass. An
+# assertion that depends on where the screen happens to be scrolled is a
+# screen-height dependency wearing a different hat, and the element the tap
+# targeted is the thing whose state the tap changes.
+- retry:
+    maxRetries: 3
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: 'garment-checkbox-${GARMENT_A_ID}'
+          direction: DOWN
+          centerElement: true
+          timeout: 15000
+          label: 'Bring the first seeded garment on screen'
+      - waitForAnimationToEnd
+      - tapOn:
+          id: 'garment-checkbox-${GARMENT_A_ID}'
+          label: 'Select the first seeded garment'
+      - extendedWaitUntil:
+          visible:
+            id: 'garment-checkbox-${GARMENT_A_ID}'
+            checked: true
+          timeout: 10000
+          label: 'The first garment registered as selected'
+
+# Back to the top of the builder before searching for the second garment.
+#
+# `scrollUntilVisible` only ever travels in the direction it is given, and the
+# search for the first garment has already scrolled the list down. The wardrobe
+# renders newest-first, so the second seeded garment is ABOVE the first, and a
+# second DOWN search starts past it and travels further away. Measured here:
+# the two land adjacent (`[45,1690]` and `[45,1807]`), so today the second is
+# still on screen and the DOWN search is a harmless no-op — but that is the
+# wardrobe size and seeding order of this fixture, not a property the flow
+# should depend on.
+#
+# Returning to a known position first makes the second search identical to the
+# first: from the top, going down, whatever the order. The capsule name input is
+# the builder's own first field, so it is the top of this scroll container.
+- waitForAnimationToEnd
+
+# Same shape as the first garment, and for the same reason: a tap that reports
+# COMPLETED is not a tap the app handled.
+- retry:
+    maxRetries: 3
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: 'capsule-name-input'
+          direction: UP
+          timeout: 15000
+          label: 'Back to the top before locating the second garment'
+      - scrollUntilVisible:
+          element:
+            id: 'garment-checkbox-${GARMENT_B_ID}'
+          direction: DOWN
+          centerElement: true
+          timeout: 15000
+          label: 'Bring the second seeded garment on screen'
+      - waitForAnimationToEnd
+      - tapOn:
+          id: 'garment-checkbox-${GARMENT_B_ID}'
+          label: 'Select the second seeded garment'
+      - extendedWaitUntil:
+          visible:
+            id: 'garment-checkbox-${GARMENT_B_ID}'
+            checked: true
+          timeout: 10000
+          label: 'The second garment registered as selected'
+
+# The postcondition, so a mis-tap fails here rather than several steps later as
+# a confusing message about a missing reorder button.
+#
+# Kept even though each tap now asserts its own checkbox, because this proves
+# something they cannot: that the builder's COUNT is two. Two checked boxes and
+# a count of three would pass both per-tap assertions and be wrong.
+#
+# Scrolled to first. The count label sits above the garment list, so the scroll
+# that reached the second garment left it off screen, and `visible` means inside
+# the viewport rather than present in the hierarchy. This assertion failed in
+# three consecutive CI runs for that reason alone, with the taps having worked
+# and the checkboxes carrying `checked=true` in the very same hierarchy dump.
+- scrollUntilVisible:
+    element:
+      text: 'Garments \(2 of .* selected\)'
+    direction: UP
+    timeout: 15000
+    label: 'Bring the selection count back into view'
+- assertVisible:
+    # Parentheses escaped. Maestro treats `text:` as a regex, so the unescaped
+    # form `Garments (2 of .* selected)` reads the brackets as a capture group
+    # and requires the literal string `Garments 2 of ... selected`. The label on
+    # screen is `Garments (2 of 10 selected)`, brackets included, so the
+    # unescaped pattern could not match however many garments were selected.
+    text: 'Garments \(2 of .* selected\)'
+    label: 'Both garments are actually selected'
 
 # Reorder through the accessible controls, never through drag alone.
 #
@@ -67,9 +255,11 @@ tags:
     label: 'Bring the garment-order controls on screen'
 - waitForAnimationToEnd
 
+# By id, like the checkboxes above and for the same reason. The reorder rows are
+# keyed `move-down-button-<garmentId>` and rendered in selection order, so the
+# first garment this flow selected is the one it means to move.
 - tapOn:
-    id: 'move-down-button-.*'
-    index: 0
+    id: 'move-down-button-${GARMENT_A_ID}'
     label: 'Move the first garment down'
 
 - tapOn:
@@ -80,9 +270,27 @@ tags:
     label: 'Committed capsule appears in the library'
 
 # Reopen and confirm the order survived the round trip.
+#
+# By index, unavoidably: the capsule this flow just created has a server-issued
+# id that the flow has no way to learn, so there is nothing to interpolate the
+# way the repair flow interpolates `CAPSULE_ID`. The library also holds the
+# runner's seeded capsule, and sorts on `is_favorite desc, updated_at desc`, so
+# the just-saved capsule is first only because nothing has favourited the other
+# one.
+#
+# The assertion below is what makes that survivable. `reorder-row-.*` alone
+# passes for ANY capsule with garments, including the seeded one, so opening the
+# wrong card would have read as a pass. Checking the name field pins the tap to
+# the capsule this flow created, and `text:` matches the whole element, so
+# `Maestro seeded capsule` cannot satisfy it.
 - tapOn:
     id: 'edit-capsule-button-.*'
     index: 0
+
+- assertVisible:
+    id: 'capsule-name-input'
+    text: 'Maestro capsule'
+    label: 'The reopened capsule is the one this flow created'
 
 - assertVisible:
     id: 'reorder-row-.*'
@@ -92,6 +300,10 @@ tags:
     id: 'close-modal-button'
 
 # Public-API cleanup: remove the capsule created by this flow.
+#
+# By index for the same reason as the reopen above, and guarded the same way: the
+# `assertNotVisible` at the end of this flow fails if the tap removed the seeded
+# capsule instead, because the capsule this flow created would still be listed.
 - tapOn:
     id: 'delete-capsule-button-.*'
     index: 0

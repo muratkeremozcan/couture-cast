@@ -26,6 +26,7 @@ import { request as httpsRequest } from 'node:https'
 import os from 'node:os'
 import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
+import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
@@ -84,6 +85,12 @@ const MAESTRO_ARTIFACT_DIR = process.env.MAESTRO_ARTIFACT_DIR || 'maestro/artifa
 
 const START_SERVER = process.env.MOBILE_E2E_SKIP_SERVER !== '1'
 const AUTO_BOOT_ANDROID = process.env.MOBILE_E2E_AUTO_BOOT_ANDROID !== '0'
+// How Android addresses Metro and the API on the host. `127.0.0.1` is the
+// starting guess because `adb reverse` maps it and that works on a developer
+// machine; the run replaces it with `10.0.2.2` when the device turns out to be
+// unable to open the reversed port, which is what happens on a GitHub runner.
+// MOBILE_E2E_ANDROID_HOST pins it and skips the probe entirely.
+let androidHost = process.env.MOBILE_E2E_ANDROID_HOST || '127.0.0.1'
 const REQUESTED_PLATFORM = process.env.MOBILE_E2E_PLATFORM || cliPlatform
 const EXPECTED_EXPO_GO_VERSION = process.env.MOBILE_E2E_EXPO_GO_VERSION || '54.0.8'
 
@@ -109,7 +116,59 @@ const IOS_UDIDS = (
   .map((value) => value.trim())
   .filter(Boolean)
 
-const PARALLEL_DEVICES = IOS_UDIDS.length > 1
+/**
+ * The Android emulators this run drives, as adb serials (`emulator-5554`, …).
+ *
+ * The Android equivalent of IOS_UDIDS above, and it feeds the same single
+ * Maestro process through `--udid`, which takes a comma separated list on both
+ * platforms.
+ *
+ * Serials rather than AVD names because adb addresses devices by serial, and
+ * because the AVD name is NOT what the app matches on. `expo-device`'s
+ * `deviceName` reads `Settings.Global.DEVICE_NAME` (API 32+) or the
+ * `bluetooth_name` secure setting below that, and on every emulator image both
+ * default to the product model — `sdk_gphone64_arm64` on all of them, whatever
+ * their AVDs are called. `assignAndroidDeviceName` writes a distinct value per
+ * device so the token map has distinct keys to be keyed by.
+ */
+const ANDROID_SERIALS = (
+  process.env.MOBILE_E2E_ANDROID_SERIALS ||
+  process.env.MOBILE_E2E_ANDROID_SERIAL ||
+  ''
+)
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean)
+
+/**
+ * The devices this run shards across, whichever platform they are.
+ *
+ * Exactly one of the two lists is populated: the shard runner picks a platform
+ * and creates devices for it.
+ */
+const SHARD_DEVICE_IDS = IOS_UDIDS.length > 0 ? IOS_UDIDS : ANDROID_SERIALS
+
+/**
+ * Which platform the shard devices belong to.
+ *
+ * Derived once from the same expression that picks `SHARD_DEVICE_IDS`, rather
+ * than re-tested at each use. Asking `ANDROID_SERIALS.length > 0` separately
+ * would disagree with it if both variables were somehow set, and the two would
+ * then drive the run at cross purposes: iOS UDIDs handed to Maestro while the
+ * Android naming path wrote settings to an emulator nobody was driving.
+ */
+const SHARD_PLATFORM = IOS_UDIDS.length > 0 ? 'ios' : 'android'
+
+/**
+ * The device name each Android shard is given, suffixed with its position.
+ *
+ * This runner owns the names because it owns the token map they key. The shard
+ * launcher only has to hand over serials.
+ */
+const ANDROID_SHARD_NAME_PREFIX =
+  process.env.MOBILE_E2E_ANDROID_DEVICE_PREFIX || 'couture-e2e'
+
+const PARALLEL_DEVICES = SHARD_DEVICE_IDS.length > 1
 
 /**
  * Which simulator single-device operations act on.
@@ -120,6 +179,38 @@ const PARALLEL_DEVICES = IOS_UDIDS.length > 1
  * cleared.
  */
 let iosSimulatorUdid = IOS_UDIDS[0] || 'booted'
+
+/**
+ * Which emulator single-device operations act on, as an adb serial.
+ *
+ * The Android counterpart of `iosSimulatorUdid`. Empty on a serial run, where
+ * adb's own single-device default is correct.
+ */
+let androidSerial = ANDROID_SERIALS[0] || ''
+
+/**
+ * Point every `adb` call in this process at one emulator.
+ *
+ * `adb` resolves its target from `$ANDROID_SERIAL` when no `-s` is given, and
+ * that includes the `adb` calls made by child processes such as
+ * `scripts/install-expo-go.mjs`. Setting the variable is therefore the whole
+ * mechanism, rather than threading a `-s` flag through sixteen call sites.
+ *
+ * With several emulators attached and no serial pinned, an un-flagged `adb`
+ * fails with `more than one device/emulator`, which at least fails loudly. The
+ * quieter fault this prevents is a run that installs Expo Go onto whichever
+ * emulator adb happened to list first and then drives a different one.
+ *
+ * @param {string} serial
+ * @returns {void}
+ */
+const useAndroidDevice = (serial) => {
+  if (!serial) return
+  androidSerial = serial
+  process.env.ANDROID_SERIAL = serial
+}
+
+useAndroidDevice(androidSerial)
 
 /**
  * Prefix every line of this runner's output with its label, so a parallel run
@@ -255,19 +346,355 @@ const chooseMetroPort = async () => {
   return preferred[preferred.length - 1]
 }
 
+/**
+ * Resolve the adb binary the same way everywhere in this script.
+ *
+ * @returns {string}
+ */
+const resolveAdbBinary = () => {
+  const sdkRoot =
+    process.env.ANDROID_HOME ||
+    process.env.ANDROID_SDK_ROOT ||
+    path.join(process.env.HOME ?? '', 'Library', 'Android', 'sdk')
+  if (
+    process.env.ADB_PATH ||
+    (sdkRoot && fs.existsSync(path.join(sdkRoot, 'platform-tools', 'adb')))
+  ) {
+    return process.env.ADB_PATH || path.join(sdkRoot, 'platform-tools', 'adb')
+  }
+  return 'adb'
+}
+
+/**
+ * Map host ports into the Android device's own loopback with `adb reverse`.
+ *
+ * The device has to reach two servers on the machine running this script: Metro
+ * and the local API. Addressing them as `10.0.2.2` works only because that is
+ * QEMU's alias for the host loopback, which makes it emulator-only and, more
+ * to the point, dependent on the guest being able to route there at all. On a
+ * GitHub runner it could not: Expo Go failed the manifest fetch outright and
+ * showed its own error screen, with `expo-updates` logging
+ *
+ *   Remote update request not successful   code=UpdateFailedToLoad
+ *   Failed to launch embedded or launchable update
+ *
+ * which surfaced to the suite as every flow failing on `tab-home` never
+ * appearing. `adb reverse` is the mechanism React Native and Expo CLI use for
+ * exactly this, it works for physical devices as well as emulators, and it lets
+ * the device address both servers as plain `127.0.0.1`.
+ *
+ * Failures here are logged rather than thrown: the `10.0.2.2` route still works
+ * on a developer machine, so a device that refuses the reverse mapping should
+ * degrade to the old behaviour instead of failing the run outright.
+ *
+ * @param {number[]} ports
+ * @returns {Promise<void>}
+ */
+/**
+ * Stop Android putting a system crash dialog in front of the app under test.
+ *
+ * This is what the CI job failed on once the manifest was fixed. The app
+ * launched, Metro bundled for it, and its own logs show a ritual being cached —
+ * and every flow still failed on `tab-home is visible`, because the hierarchy at
+ * the moment of the assertion was
+ *
+ *   android:id/alertTitle   Pixel Launcher isn't responding
+ *   android:id/aerr_wait    Wait
+ *
+ * An ANR dialog takes window focus, so an out-of-process UI driver sees the
+ * dialog and not the app behind it. All three shards showed the identical
+ * dialog. The workflow already carried a comment about the sibling SystemUI
+ * variant of this on API 30 (android-emulator-runner#140); it is not specific to
+ * that level, and a runner under four parallel emulators is exactly where an
+ * unrelated process gets starved enough to trigger it.
+ *
+ * `hide_error_dialogs` suppresses the whole class rather than teaching the flows
+ * to dismiss one dialog by id, which would leave every other crash dialog free
+ * to do the same thing. The setting is read back, because a `settings put` that
+ * silently did nothing would leave the run exposed while reporting it protected.
+ *
+ * @returns {Promise<void>}
+ */
+const suppressAndroidErrorDialogs = async () => {
+  const adbBinary = resolveAdbBinary()
+  try {
+    await captureProcess(
+      adbBinary,
+      ['shell', 'settings', 'put', 'global', 'hide_error_dialogs', '1'],
+      { timeoutMs: 15_000 }
+    )
+    const readBack = await captureProcess(
+      adbBinary,
+      ['shell', 'settings', 'get', 'global', 'hide_error_dialogs'],
+      { timeoutMs: 15_000 }
+    )
+    if (readBack.stdout.trim() === '1') {
+      // Deliberately narrow wording. This establishes that the setting is
+      // written, and NOT that no dialog will appear: `hide_error_dialogs` is
+      // latched into ActivityManager's `mShowDialogs` at boot and on
+      // configuration change, so setting it on a running device does not
+      // necessarily take effect, and a CI run with it set to 1 still met a
+      // `Pixel Launcher isn't responding` dialog. An earlier version of this
+      // line said "suppressed", which claimed the outcome rather than the act.
+      log(`hide_error_dialogs=1 set on ${androidSerial || 'the attached device'}`)
+    } else {
+      log(
+        `Could not suppress system crash dialogs: hide_error_dialogs reads "${readBack.stdout.trim()}". ` +
+          'An ANR dialog will take focus from the app under test.'
+      )
+    }
+  } catch (error) {
+    log(`Could not set hide_error_dialogs: ${error.message}`)
+  }
+}
+
+const reverseAndroidPorts = async (ports) => {
+  const adbBinary = resolveAdbBinary()
+  for (const port of ports) {
+    try {
+      await captureProcess(adbBinary, ['reverse', `tcp:${port}`, `tcp:${port}`], {
+        timeoutMs: 15_000,
+      })
+      log(`Reversed Android port ${port} to the host`)
+    } catch (error) {
+      log(`Could not reverse Android port ${port}: ${error.message}`)
+    }
+  }
+}
+
+/**
+ * Whether `nc -z` actually works on the attached device, checked once.
+ *
+ * `command -v nc` only proves the binary exists. On the GitHub runner's system
+ * image it exists and `nc -z` does not work, and a probe that cannot tell those
+ * apart reports a healthy route as dead. The check establishes ground truth by
+ * reverse-mapping a throwaway port: with the mapping in place the device is
+ * listening on that port locally, so a connect MUST succeed regardless of what
+ * is on the host side. If it does not, netcat is unusable here.
+ *
+ * @param {string} adbBinary
+ * @returns {Promise<boolean>}
+ */
+const checkDeviceNetcat = async (adbBinary) => {
+  try {
+    const present = await captureProcess(
+      adbBinary,
+      ['shell', 'command -v nc >/dev/null 2>&1 && echo __HAS_NC__ || echo __NO_NC__'],
+      { timeoutMs: 15_000 }
+    )
+    if (!`${present.stdout ?? ''}`.includes('__HAS_NC__')) return false
+  } catch {
+    return false
+  }
+
+  return await new Promise((resolve) => {
+    const server = net.createServer()
+    server.on('connection', (socket) => socket.destroy())
+    server.on('error', () => resolve(false))
+    server.listen(0, '0.0.0.0', async () => {
+      const port = server.address().port
+      let works = false
+      try {
+        await captureProcess(adbBinary, ['reverse', `tcp:${port}`, `tcp:${port}`], {
+          timeoutMs: 15_000,
+        })
+        const result = await captureProcess(
+          adbBinary,
+          [
+            'shell',
+            `nc -z -w 3 127.0.0.1 ${port} && echo __NC_WORKS__ || echo __NC_BROKEN__`,
+          ],
+          { timeoutMs: 20_000 }
+        )
+        works = `${result.stdout ?? ''}`.includes('__NC_WORKS__')
+      } catch {
+        works = false
+      }
+      await captureProcess(adbBinary, ['reverse', '--remove', `tcp:${port}`], {
+        timeoutMs: 10_000,
+      }).catch(() => {})
+      server.close(() => resolve(works))
+    })
+  })
+}
+
+/** Memoized result of checkDeviceNetcat; null until measured. */
+let ncUsable = null
+
+/**
+ * Ask the device itself whether it can reach Metro, and say so plainly.
+ *
+ * The runner's own health check proves only that Metro answers on the *host*.
+ * The device is a separate network namespace, and when it cannot get through,
+ * Expo Go fails the manifest fetch and shows its own "Something went wrong."
+ * screen. Maestro then reports every flow as `tab-home` never appearing, which
+ * reads as the app being broken and sends the investigation to the wrong place
+ * entirely. A GitHub runner did exactly this, failing 0.7 seconds after the
+ * deep link, far too fast to be a timeout.
+ *
+ * The result selects the host the run uses, so this is not diagnostic-only.
+ *
+ * @param {string} host - candidate host as the DEVICE would address it
+ * @param {number} port - only used for the log line's context
+ * @returns {Promise<boolean | null>} true/false for a verdict, null if the
+ *   probe could not run at all
+ */
+const probeAndroidMetroReachability = async (host, port) => {
+  const adbBinary = resolveAdbBinary()
+  const url = `http://${host}:${port}/status`
+
+  // The verdict is taken on this side of the connection, not the device's.
+  //
+  // Asking the device to open Metro's own port and calling a successful connect
+  // "reachable" does not work: with `adb reverse` in place the device always has
+  // something listening on that port locally, so the connect succeeds whether or
+  // not anything on the host is behind it. That reports a healthy route over a
+  // dead one, which is the failure mode this probe exists to catch.
+  //
+  // So a throwaway listener is opened here, on a port nobody else is using, and
+  // the device is asked to connect to it by the route under test. If the
+  // connection lands, the route works, and there is nothing to misread: this
+  // process saw the socket. `nc` is the only client available, since Android
+  // system images ship no curl and no wget (`toybox wget` is absent on API 30
+  // and API 36 alike).
+  // Establish that the client WORKS before reading anything into its silence.
+  //
+  // `command -v nc` only proves a binary is present. On the CI system image the
+  // binary exists and `nc -z` does not work, which produced a confident "route
+  // dead" for a host that had never been tested. The control below settles that
+  // once, for both candidate hosts, rather than only for the reverse-mapped one.
+  if (ncUsable === null) {
+    ncUsable = await checkDeviceNetcat(adbBinary)
+  }
+  if (ncUsable === false) {
+    log(`netcat is unusable on this device image, so ${host} cannot be probed`)
+    return null
+  }
+
+  // Establish that the client exists before reading anything into its silence.
+  // Without this, an image with no netcat is indistinguishable from a dead
+  // route: the connect attempt throws, no connection arrives, and the route
+  // gets convicted on the strength of a missing binary. That false negative has
+  // already been reported twice by earlier versions of this probe.
+  try {
+    const ncCheck = await captureProcess(
+      adbBinary,
+      ['shell', 'command -v nc >/dev/null 2>&1 && echo __HAS_NC__ || echo __NO_NC__'],
+      { timeoutMs: 15_000 }
+    )
+    if (!`${ncCheck.stdout ?? ''}`.includes('__HAS_NC__')) {
+      log(
+        `Device has no netcat, so ${host} cannot be probed; not treating that as unreachable`
+      )
+      return null
+    }
+  } catch {
+    log(`Could not check for netcat on the device; not treating ${host} as unreachable`)
+    return null
+  }
+
+  const routeWorks = await new Promise((resolve) => {
+    const server = net.createServer()
+    let sawConnection = false
+    let settled = false
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      server.close(() => resolve(value))
+    }
+
+    server.on('connection', (socket) => {
+      sawConnection = true
+      socket.destroy()
+    })
+    server.on('error', () => finish(null))
+
+    // Loopback is right for both routes: `10.0.2.2` is QEMU's alias for exactly
+    // this interface, and the reverse mapping forwards here too.
+    // Bound on every interface, not just loopback: `10.0.2.2` is documented as
+    // an alias for the host loopback, but binding narrowly makes a probe
+    // failure and a routing failure look identical, and this probe has already
+    // produced three false negatives from exactly that kind of ambiguity.
+    server.listen(0, '0.0.0.0', async () => {
+      const probePort = server.address().port
+      let removeReverse = false
+      try {
+        if (host === '127.0.0.1') {
+          await captureProcess(
+            adbBinary,
+            ['reverse', `tcp:${probePort}`, `tcp:${probePort}`],
+            { timeoutMs: 15_000 }
+          )
+          removeReverse = true
+
+          // Control: with the reverse mapping in place the DEVICE is listening
+          // on this port locally, so a connect must succeed at TCP level even
+          // if nothing on the host answers. If it does not, `nc -z` itself does
+          // not work on this image and a negative result would say nothing
+          // about the network. Verifying the instrument before trusting a
+          // reading it produces.
+          const control = await captureProcess(
+            adbBinary,
+            [
+              'shell',
+              `nc -z -w 3 127.0.0.1 ${probePort} && echo __NC_WORKS__ || echo __NC_BROKEN__`,
+            ],
+            { timeoutMs: 20_000 }
+          ).catch(() => ({ stdout: '' }))
+          if (!`${control.stdout ?? ''}`.includes('__NC_WORKS__')) {
+            log(
+              `nc -z does not work on this device image, so ${host} cannot be probed; ` +
+                `not treating that as unreachable`
+            )
+            await captureProcess(adbBinary, [
+              'reverse',
+              '--remove',
+              `tcp:${probePort}`,
+            ]).catch(() => {})
+            finish(null)
+            return
+          }
+        }
+        await captureProcess(adbBinary, ['shell', `nc -z -w 3 ${host} ${probePort}`], {
+          timeoutMs: 20_000,
+        })
+      } catch {
+        // A refused connect lands here; `sawConnection` stays false and the
+        // route is reported dead, which is the honest read now that the
+        // instrument itself has been checked.
+      }
+      if (removeReverse) {
+        await captureProcess(adbBinary, ['reverse', '--remove', `tcp:${probePort}`], {
+          timeoutMs: 10_000,
+        }).catch(() => {})
+      }
+      finish(sawConnection)
+    })
+  })
+
+  if (routeWorks === true) {
+    log(`Device reached this machine at ${host}, so Metro on ${url} is routable`)
+    return true
+  }
+  if (routeWorks === false) {
+    log(
+      `Device could NOT reach this machine at ${host}. Expo Go cannot load the ` +
+        `project over that route; flows would report tab-home missing.`
+    )
+    return false
+  }
+  log(`Device reachability probe could not run for ${host}`)
+  return null
+}
+
 const getLocalAppUrl = (platform, port) => {
   const host =
-    platform === 'android'
-      ? process.env.MOBILE_E2E_ANDROID_HOST || '10.0.2.2'
-      : process.env.MOBILE_E2E_IOS_HOST || '127.0.0.1'
+    platform === 'android' ? androidHost : process.env.MOBILE_E2E_IOS_HOST || '127.0.0.1'
   return `exp://${host}:${port}/--/`
 }
 
 const getLocalApiUrl = (platform) => {
-  const host =
-    platform === 'android'
-      ? process.env.MOBILE_E2E_ANDROID_HOST || '10.0.2.2'
-      : '127.0.0.1'
+  const host = platform === 'android' ? androidHost : '127.0.0.1'
   return `http://${host}:4000`
 }
 
@@ -383,6 +810,96 @@ process.once('SIGTERM', () => handleTerminationSignal('SIGTERM'))
  * @param {number} [intervalMs=2000]
  * @returns {Promise<void>}
  */
+/**
+ * Fetch the dev server's manifest the way Expo Go actually asks for it, and
+ * report the status and body.
+ *
+ * The plain health check below is not a proxy for this. A bare GET on `/`
+ * returns 200 with the browser interstitial HTML, because the middleware falls
+ * back to a browser response when the Expo Go headers are absent. So the run
+ * could log "Expo dev server reachable" while every request Expo Go makes was
+ * failing, which is exactly what happened on CI: Expo Go showed its own
+ * "Something went wrong." screen and expo-updates logged
+ *
+ *   Remote update request not successful   code=UpdateFailedToLoad
+ *
+ * That message is emitted at one place in expo-updates, behind
+ * `if (!response.isSuccessful)`, so it means the server answered with a
+ * non-2xx. The body carries the reason and is worth having in the log: every
+ * throw in the manifest path is serialized by Expo CLI as
+ * `{"error": "..."}` with status 500.
+ *
+ * @param {string} baseUrl
+ * @param {'android' | 'ios'} platform
+ * @returns {Promise<{ok: boolean, statusCode: number, body: string}>}
+ */
+const fetchExpoGoManifest = (baseUrl, platform) =>
+  new Promise((resolve) => {
+    const urlObj = new URL(baseUrl)
+    const requester = urlObj.protocol === 'https:' ? httpsRequest : httpRequest
+    const req = requester(
+      urlObj,
+      {
+        headers: {
+          // The header set Expo Go actually sends. A partial set gets answered
+          // by the browser interstitial instead of the manifest, which is a 200
+          // that proves nothing.
+          'expo-platform': platform,
+          'expo-protocol-version': '1',
+          'expo-api-version': '1',
+          'expo-updates-environment': 'EXPO_GO',
+          // The header that made this check miss the CI blocker for five runs.
+          //
+          // Expo Go asks for a SIGNED manifest, and the signing branch of
+          // `@expo/cli` is where the CI failure lived: with an `extra.eas.projectId`
+          // in the app config the server fetches a development certificate from
+          // Expo's API, which needs an account, which a runner does not have. A
+          // probe that omitted this header took a different branch through the
+          // middleware than the app under test, so it reported a served manifest
+          // while every request Expo Go made was failing.
+          //
+          // `keyid="expo-root"` is what selects that branch
+          // (`getCodeSigningInfoAsync` in @expo/cli). The check does not verify
+          // the signature it gets back; it only has to ask the same question.
+          'expo-expect-signature': 'sig, keyid="expo-root", alg="rsa-v1_5-sha256"',
+          accept: 'multipart/mixed, application/expo+json, application/json',
+        },
+      },
+      (res) => {
+        let body = ''
+        res.setEncoding('utf8')
+        res.on('data', (chunk) => {
+          // The manifest itself is large and uninteresting when it works; only
+          // an error body needs keeping.
+          if (body.length < 2000) body += chunk
+        })
+        res.on('end', () => {
+          const statusCode = res.statusCode ?? 0
+          const contentType = String(res.headers['content-type'] ?? '')
+          // A 2xx is not enough, and this is the second time that has mattered.
+          // With the wrong headers the dev server answers `/` with the browser
+          // interstitial HTML and a 200, so a status-only check reports a
+          // healthy manifest endpoint while every Expo Go request is being
+          // served a web page. The response has to actually BE a manifest.
+          const looksLikeManifest =
+            /multipart\/mixed|application\/expo\+json|application\/json/.test(contentType)
+          resolve({
+            ok: statusCode >= 200 && statusCode < 300 && looksLikeManifest,
+            statusCode,
+            contentType,
+            body,
+          })
+        })
+      }
+    )
+    req.on('error', (err) => resolve({ ok: false, statusCode: 0, body: err.message }))
+    req.setTimeout(20000, () => {
+      req.destroy()
+      resolve({ ok: false, statusCode: 0, body: 'manifest request timed out' })
+    })
+    req.end()
+  })
+
 const waitForHealth = (url, timeoutMs = 120000, intervalMs = 2000) =>
   new Promise((resolve, reject) => {
     const urlObj = new URL(url)
@@ -939,6 +1456,16 @@ const setupMobileE2EIdentity = async (apiBaseUrl) => {
     const garmentIds = await seedMobileE2EGarments(apiBaseUrl, identity)
     await seedMobileE2ECapsule(identity, garmentIds)
 
+    // Hand two specific garment ids to the flows, the same way WEATHER_ALERT_ID
+    // is handed over. Flows that need "two different garments" were selecting
+    // `garment-checkbox-.*` by `index: 0` and `index: 1`, and `index` resolves
+    // against what is CURRENTLY RENDERED: with ten seeded garments the list is
+    // virtualized, so the second tap was landing somewhere other than the second
+    // garment. Nothing caught it, because the flow asserted no count -- the
+    // builder sat on `Garments (1 of 10 selected)` while the flow believed it
+    // had selected two, and every later step still passed.
+    identity.garmentIds = garmentIds
+
     return identity
   } catch (error) {
     try {
@@ -1283,7 +1810,10 @@ const ensureExpoGoOnAndroid = async () => {
     log('Attempting to install Expo Go on the connected Android target')
     await spawnProcess('node', ['./scripts/install-expo-go.mjs'], {
       cwd: projectRoot,
-      timeoutMs: 180_000,
+      // A cold first device pays a ~180MB download and a streamed install of it,
+      // and 180 seconds was not enough for both. The installer caches the APK
+      // now, so later devices in a sharded run only pay the install.
+      timeoutMs: 480_000,
     })
 
     try {
@@ -1511,6 +2041,26 @@ const resolveTarget = async () => {
   }
 
   if (REQUESTED_PLATFORM === 'android') {
+    if (PARALLEL_DEVICES) {
+      // Maestro is handed the whole device list at once, so every emulator has
+      // to be booted and carrying Expo Go before it starts. Booting is the shard
+      // launcher's job; this checks and installs.
+      for (const serial of ANDROID_SERIALS) {
+        useAndroidDevice(serial)
+        // eslint-disable-next-line no-await-in-loop -- adb is not concurrency safe
+        const status = await ensureExpoGoOnAndroid()
+        if (status !== 'installed') {
+          throw new Error(
+            `Expo Go is not usable on ${serial} (${status}). Every shard device needs it ` +
+              'before Maestro starts, because Maestro is given the whole device list at once.'
+          )
+        }
+      }
+      useAndroidDevice(ANDROID_SERIALS[0])
+      log(`Using ${ANDROID_SERIALS.length} Android emulators for a parallel Maestro run`)
+      return { platform: 'android', appId: 'host.exp.exponent', expoGoReady: true }
+    }
+
     let expoGoStatus = await ensureExpoGoOnAndroid()
     if (expoGoStatus === 'no-device') {
       await bootAndroidTarget()
@@ -1624,6 +2174,71 @@ const getSimulatorName = async (udid) => {
 }
 
 /**
+ * Give one emulator a device name of its own, and prove it took.
+ *
+ * On iOS the shard's name is a property of the simulator and `getSimulatorName`
+ * just reads it. Android has no equivalent: `expo-device`'s `deviceName` reads
+ * `Settings.Global.DEVICE_NAME` on API 32 and above and the `bluetooth_name`
+ * secure setting below that, and on an emulator both default to the product
+ * model. Four emulators created from four differently named AVDs all answer
+ * `sdk_gphone64_arm64`, so the AVD name — the thing it would be natural to key
+ * the token map by — never reaches the app at all. Measured on API 36:
+ * `Medium_Phone_API_36.1` reports `sdk_gphone64_arm64` for both settings.
+ *
+ * So the name is written rather than read, and read back afterwards. A silent
+ * `settings put` would give every shard the same key, the map would hand them
+ * all the same token, and the shards would corrupt each other's data while
+ * every flow still passed — the sharding equivalent of hollow green.
+ *
+ * @param {string} serial
+ * @param {string} name
+ * @returns {Promise<string>}
+ */
+const assignAndroidDeviceName = async (serial, name) => {
+  const adbBinary = resolveAdbBinary()
+  const adb = (args) =>
+    captureProcess(adbBinary, ['-s', serial, ...args], { timeoutMs: 15_000 })
+
+  const sdkResult = await adb(['shell', 'getprop', 'ro.build.version.sdk'])
+  const sdkLevel = Number(sdkResult.stdout.trim())
+  if (!Number.isFinite(sdkLevel)) {
+    throw new Error(`Could not read the API level of ${serial}`)
+  }
+
+  // Match expo-device's own branch exactly. Writing the wrong one of these
+  // succeeds and changes nothing the app can see.
+  const [namespace, key] =
+    sdkLevel > 31 ? ['global', 'device_name'] : ['secure', 'bluetooth_name']
+
+  await adb(['shell', 'settings', 'put', namespace, key, name])
+  const readBack = await adb(['shell', 'settings', 'get', namespace, key])
+  const applied = readBack.stdout.trim()
+  if (applied !== name) {
+    throw new Error(
+      `Could not name ${serial}: set ${namespace}/${key} to "${name}" but it reads "${applied}". ` +
+        'Every shard would share one token map key.'
+    )
+  }
+
+  log(`Named ${serial} "${name}" via ${namespace}/${key} (API ${sdkLevel})`)
+  return applied
+}
+
+/**
+ * The name the app will see for this device, whatever the platform.
+ *
+ * @param {string} deviceId
+ * @param {number} index
+ * @returns {Promise<string>}
+ */
+const resolveShardDeviceName = async (deviceId, index) => {
+  if (SHARD_PLATFORM === 'android') {
+    return assignAndroidDeviceName(deviceId, `${ANDROID_SHARD_NAME_PREFIX}-${index + 1}`)
+  }
+  return getSimulatorName(deviceId)
+}
+
+/**
  * Read which flows a JUnit report recorded as passed and failed.
  *
  * The report is the authority on a sharded run, not the exit code. Maestro
@@ -1638,20 +2253,74 @@ const getSimulatorName = async (udid) => {
  * @returns {{ passed: string[], failed: string[] }}
  */
 const readSuiteReport = (reportPath) => {
+  const absolute = path.resolve(projectRoot, reportPath)
+  let xml
   try {
-    const xml = fs.readFileSync(path.resolve(projectRoot, reportPath), 'utf8')
-    const passed = []
-    const failed = []
-    for (const segment of xml.split('<testcase').slice(1)) {
-      const name = /name="([^"]+)"/.exec(segment)?.[1]
-      if (!name) continue
-      if (segment.includes('<failure')) failed.push(name)
-      else passed.push(name)
-    }
-    return { passed, failed }
-  } catch {
-    return { passed: [], failed: [] }
+    xml = fs.readFileSync(absolute, 'utf8')
+  } catch (error) {
+    // Returning an empty result here used to be indistinguishable from a report
+    // that legitimately recorded nothing, which matters because this report is
+    // the suite's source of truth: a silently empty read reports a green suite.
+    return { passed: [], failed: [], unreadable: `${absolute}: ${error.message}` }
   }
+
+  const passed = []
+  const failed = []
+  const skipped = []
+  // Each `<testcase>` runs to the next one, so a nested `<failure>` or
+  // `<skipped>` can be attributed to the case that owns it. Self-closing cases
+  // (`<testcase ... />`) carry neither and are passes.
+  for (const segment of xml.split('<testcase').slice(1)) {
+    const name = /name="([^"]+)"/.exec(segment)?.[1]
+    if (!name) continue
+    const body = segment.split('</testcase>')[0]
+    if (/<failure[\s>]/.test(body) || /<error[\s>]/.test(body)) {
+      failed.push(name)
+    } else if (/<skipped[\s/>]/.test(body)) {
+      // A skipped flow did not assert anything. Counting it as passed is how a
+      // suite reports success over work it never did.
+      skipped.push(name)
+    } else {
+      passed.push(name)
+    }
+  }
+  return { passed, failed, skipped, unreadable: null }
+}
+
+/**
+ * Locate the JUnit report Maestro wrote, across layouts.
+ *
+ * Maestro 2.8.0 moved its artifacts to `<timestamp>/<Flow Name>/…` and writes
+ * the report at the path given to `--output`. Resolving the requested path
+ * first and falling back to a search keeps this working if the layout moves
+ * again, rather than silently reading nothing.
+ *
+ * @param {string} requestedPath
+ * @returns {string | null}
+ */
+const resolveReportPath = (requestedPath) => {
+  const absolute = path.resolve(projectRoot, requestedPath)
+  if (fs.existsSync(absolute)) return requestedPath
+
+  const artifactRoot = path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR)
+  if (!fs.existsSync(artifactRoot)) return null
+  const wanted = path.basename(requestedPath)
+  const stack = [artifactRoot]
+  while (stack.length > 0) {
+    const dir = stack.pop()
+    let entries
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) stack.push(full)
+      else if (entry.name === wanted) return path.relative(projectRoot, full)
+    }
+  }
+  return null
 }
 
 /**
@@ -1719,8 +2388,23 @@ const warmMetroBundle = async (healthUrl, platform) => {
 }
 
 /**
- * Run Maestro from the local installation when available, otherwise fall back
- * to `npx maestro@latest`.
+ * Run Maestro from the pinned installation, wherever that turns out to be.
+ *
+ * PATH is tried first, then the pinned install, then the pinned npx package.
+ *
+ * The middle step is the one that matters. `npm run maestro:install` puts the
+ * binary in `~/.maestro/bin` and the installer adds that directory to the user's
+ * SHELL PROFILE, which does nothing for the `npm run maestro:install && node
+ * ./scripts/run-maestro.mjs` process that is already running on the PATH it
+ * started with. So on a clean checkout the pinned binary exists, `maestro` is
+ * still not on PATH, and this fell straight through to a floating version --
+ * silently, and in the one place the pin was supposed to hold. The mobile
+ * workflow already fails loudly on exactly this; local runs had nothing.
+ *
+ * The last step is pinned for the same reason. It was `maestro@latest`, which
+ * meant the fallback tested whatever Maestro released that day. On Windows it is
+ * not a fallback at all but the delivery mechanism: `maestro-install.mjs` has no
+ * installer there and verifies the pin through npx.
  *
  * @param {string[]} args
  * @param {SpawnProcessOptions} [options]
@@ -1729,14 +2413,23 @@ const warmMetroBundle = async (healthUrl, platform) => {
 const runMaestroCommand = async (args, options = {}) => {
   try {
     await spawnProcess('maestro', args, options)
+    return
   } catch (err) {
-    if (err.code === 'ENOENT') {
-      log('System maestro command missing, retrying via npx maestro@latest')
-      await spawnProcess('npx', ['--yes', 'maestro@latest', ...args], options)
-    } else {
-      throw err
-    }
+    if (err.code !== 'ENOENT') throw err
   }
+
+  if (fs.existsSync(MAESTRO_BIN)) {
+    log(`maestro is not on PATH; using the pinned install at ${MAESTRO_BIN}`)
+    await spawnProcess(MAESTRO_BIN, args, options)
+    return
+  }
+
+  log(`No installed maestro found, retrying via npx maestro@${MAESTRO_PINNED_VERSION}`)
+  await spawnProcess(
+    'npx',
+    ['--yes', `maestro@${MAESTRO_PINNED_VERSION}`, ...args],
+    options
+  )
 }
 
 /**
@@ -1758,6 +2451,88 @@ const run = async () => {
   const metroPort = await chooseMetroPort()
   process.env.MOBILE_E2E_METRO_PORT = String(metroPort)
   const target = await ensureMaestroTarget()
+
+  // Decide how Android addresses this machine BEFORE anything is derived from
+  // it. `mobileApiBaseUrl` below is baked into the bundle as
+  // EXPO_PUBLIC_API_BASE_URL, so resolving the host later would leave the app
+  // loading over one route while every API call went out over another: with the
+  // host switched to 10.0.2.2 and the API still on 127.0.0.1:4000, the device
+  // would be calling itself. The probe opens its own throwaway listener rather
+  // than fetching Metro, so it does not need the dev server to be up and can
+  // run this early.
+  if (target.platform === 'android') {
+    for (const serial of ANDROID_SERIALS.length > 0 ? ANDROID_SERIALS : ['']) {
+      if (serial) useAndroidDevice(serial)
+      // eslint-disable-next-line no-await-in-loop -- adb is not concurrency safe
+      await suppressAndroidErrorDialogs()
+    }
+    if (SHARD_PLATFORM === 'android') useAndroidDevice(ANDROID_SERIALS[0])
+  }
+
+  if (target.platform === 'android' && !process.env.MOBILE_E2E_ANDROID_HOST) {
+    // Every emulator needs its own mapping: `adb reverse` is per device, so on a
+    // sharded run mapping only the first one leaves the other three with no
+    // route to Metro at all.
+    for (const serial of ANDROID_SERIALS.length > 0 ? ANDROID_SERIALS : ['']) {
+      if (serial) useAndroidDevice(serial)
+      // eslint-disable-next-line no-await-in-loop -- adb is not concurrency safe
+      await reverseAndroidPorts([...new Set([metroPort, 8081, 4000])])
+    }
+    if (SHARD_PLATFORM === 'android') useAndroidDevice(ANDROID_SERIALS[0])
+
+    // The route is a property of the image and the runner, not of the
+    // individual emulator, so it is measured once on the first device.
+    const reachable = []
+    let anyVerdict = false
+    for (const candidate of ['127.0.0.1', '10.0.2.2']) {
+      // eslint-disable-next-line no-await-in-loop -- two candidates, ordered
+      const verdict = await probeAndroidMetroReachability(candidate, metroPort)
+      if (verdict !== null) anyVerdict = true
+      if (verdict === true) reachable.push(candidate)
+    }
+    if (reachable.length > 0) {
+      if (reachable[0] !== androidHost) {
+        log(`Using ${reachable[0]} as the Android host: the device can reach it`)
+        androidHost = reachable[0]
+      }
+    } else if (anyVerdict) {
+      // A real refusal on both routes. 10.0.2.2 is QEMU's own alias and needs no
+      // adb cooperation, so it is the better one to be wrong with.
+      log('Neither host answered; falling back to 10.0.2.2')
+      androidHost = '10.0.2.2'
+    } else {
+      // Nothing was measured. Changing the host on the strength of a probe that
+      // could not run would be guessing with extra steps.
+      log(`Reachability could not be measured; keeping ${androidHost}`)
+    }
+  }
+
+  /**
+   * Feature flags this suite asserts on come from the seeded database, not from
+   * PostHog.
+   *
+   * A suite that asserts on flag-gated behaviour must not depend on a live
+   * remote service evaluating a rollout for a user the run created seconds
+   * earlier. `PostHogService` already treats a missing key as "remote answer
+   * unavailable" rather than throwing, and `getFeatureFlag` then falls back to
+   * the database cache, so clearing the key makes the seeded row authoritative
+   * for the whole run. Verified not to disturb the flags the suite does rely on:
+   * `commerce_affiliate_enabled` and `commerce_subscription_enabled` both still
+   * read `true` after a run, and `commerce-affiliate` passes.
+   *
+   * Recorded honestly: this was introduced while chasing `premium-subscription`,
+   * on the theory that a remote `false` was the cause. That theory was wrong.
+   * The API was later queried directly and answers `purchasesEnabled: true`;
+   * the flow was failing because its assertions required elements that render
+   * below the fold. This is kept because removing a remote dependency from an
+   * E2E run is right on its own terms, not because it fixed anything.
+   *
+   * This does not disable mobile analytics. `maestro/analytics.yaml` asserts on
+   * the client's own diagnostics channel (`MOBILE_ANALYTICS_DIAGNOSTICS`), which
+   * is unrelated to the API's flag provider.
+   */
+  const deterministicFlagEnv = { POSTHOG_API_KEY: '' }
+
   const apiHealthUrl = 'http://127.0.0.1:4000/api/health'
   const apiSetupBaseUrl = 'http://127.0.0.1:4000'
   const mobileApiBaseUrl = getLocalApiUrl(target.platform)
@@ -1793,6 +2568,7 @@ const run = async () => {
                 ...process.env,
                 DATABASE_URL: MOBILE_E2E_DATABASE_URL,
                 GARMENT_TAGGING_ENGINE: 'fixture',
+                ...deterministicFlagEnv,
                 TEST_ENV: 'local',
               },
             }
@@ -1812,6 +2588,7 @@ const run = async () => {
             DATABASE_URL: MOBILE_E2E_DATABASE_URL,
             GUARDIAN_INVITE_WEB_BASE_URL: 'http://127.0.0.1:3005',
             GARMENT_TAGGING_ENGINE: 'fixture',
+            ...deterministicFlagEnv,
             PUBLIC_API_URL: process.env.MOBILE_E2E_PUBLIC_API_URL || mobileApiBaseUrl,
             TEST_ENV: 'local',
           },
@@ -1831,16 +2608,30 @@ const run = async () => {
         // each device selects its own entry in `mobile-auth.ts`, because a
         // single Metro bundle cannot hold a different token per device.
         const tokensByDeviceName = {}
-        for (const udid of IOS_UDIDS) {
-          iosSimulatorUdid = udid
+        for (const [index, deviceId] of SHARD_DEVICE_IDS.entries()) {
+          if (SHARD_PLATFORM === 'android') useAndroidDevice(deviceId)
+          else iosSimulatorUdid = deviceId
+          // eslint-disable-next-line no-await-in-loop -- one device at a time
           await clearMobileE2EDeviceSettings()
+          // eslint-disable-next-line no-await-in-loop -- one device at a time
           const identity = await setupMobileE2EIdentity(apiSetupBaseUrl)
-          const deviceName = await getSimulatorName(udid)
+          // eslint-disable-next-line no-await-in-loop -- one device at a time
+          const deviceName = await resolveShardDeviceName(deviceId, index)
+          // Two devices answering to the same name would silently collapse the
+          // map to one entry, so every shard after the first would sign in as
+          // another shard's user and delete its garments mid-flow.
+          if (tokensByDeviceName[deviceName]) {
+            throw new Error(
+              `Two shard devices both report the name "${deviceName}". ` +
+                'The token map keys on that name, so they would share one fixture user.'
+            )
+          }
           tokensByDeviceName[deviceName] = identity.accessToken
           mobileIdentities.push(identity)
           log(`Created authenticated mobile E2E fixture for ${deviceName}`)
         }
-        iosSimulatorUdid = IOS_UDIDS[0]
+        if (SHARD_PLATFORM === 'android') useAndroidDevice(SHARD_DEVICE_IDS[0])
+        else iosSimulatorUdid = SHARD_DEVICE_IDS[0]
         mobileIdentity = mobileIdentities[0]
         process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE =
           JSON.stringify(tokensByDeviceName)
@@ -1853,6 +2644,19 @@ const run = async () => {
       process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN = mobileIdentity.accessToken
       process.env.EXPO_PUBLIC_API_BASE_URL = mobileApiBaseUrl
       process.env.WEATHER_ALERT_ID = mobileE2EWeatherAlertId(mobileIdentity.userId)
+      process.env.GARMENT_A_ID = mobileIdentity.garmentIds?.[0] ?? ''
+      process.env.GARMENT_B_ID = mobileIdentity.garmentIds?.[1] ?? ''
+      // The seeded capsule by id, so the repair flow stops taking whichever
+      // capsule the library happens to list first. That order is
+      // `is_favorite desc, updated_at desc` (`wardrobe-capsule.repository.ts`),
+      // and this very flow favourites a capsule, so "first" is a property of what
+      // ran before it rather than of the capsule the flow means.
+      process.env.CAPSULE_ID = mobileE2ECapsuleId(mobileIdentity.userId)
+      // A garment the seeded capsule does NOT already hold, so choosing a
+      // replacement adds one rather than deselecting a member.
+      // `seedMobileE2ECapsule` takes the two OLDEST garments, so the newest is
+      // always outside it.
+      process.env.REPLACEMENT_GARMENT_ID = mobileIdentity.garmentIds?.at(-1) ?? ''
     } else if (!process.env.EXPO_PUBLIC_API_BASE_URL) {
       throw new Error(
         'MOBILE_E2E_SKIP_API=1 requires EXPO_PUBLIC_API_BASE_URL and an externally managed test identity.'
@@ -1862,6 +2666,13 @@ const run = async () => {
     await stopManagedProcess(workerProcess, 'Wardrobe worker')
     await stopManagedProcess(apiProcess, 'Local API')
     throw error
+  }
+
+  // Before any URL is handed to the device, give it a route to the host. Both
+  // candidate Metro ports are mapped because the pair list below falls back
+  // from the chosen port to 8081.
+  if (target.platform === 'android') {
+    await reverseAndroidPorts([...new Set([metroPort, 8081, 4000])])
   }
 
   // Maestro needs both an app URL and a health URL. We probe the explicit env
@@ -1926,6 +2737,22 @@ const run = async () => {
           await waitForHealth(pair.health)
           resolvedPair = pair
           log(`Expo dev server reachable on ${pair.health}`)
+          // Reachable is not the same as serving Expo Go. Ask for the manifest
+          // the way the app will, so a 500 here is named now rather than
+          // surfacing later as every flow failing on `tab-home`.
+          const manifest = await fetchExpoGoManifest(pair.health, target.platform)
+          if (manifest.ok) {
+            log(
+              `Expo Go manifest served (HTTP ${manifest.statusCode}, ${manifest.contentType})`
+            )
+          } else {
+            log(
+              `Expo Go manifest request FAILED (HTTP ${manifest.statusCode}, ` +
+                `content-type ${manifest.contentType || 'none'}). Expo Go will show ` +
+                `"Something went wrong." and every flow will report tab-home missing. ` +
+                `Body: ${manifest.body.slice(0, 600) || '(empty)'}`
+            )
+          }
           break
         } catch {
           // try next candidate
@@ -1957,12 +2784,26 @@ const run = async () => {
     process.env.MOBILE_E2E_HEALTH_URL = resolvedPair.health
     process.env.APP_URL = resolvedPair.app
     process.env.WARDROBE_URL = `${resolvedPair.app}wardrobe`
+    // The same `exp://` form on both platforms.
+    //
+    // Android used to build these as `mobile://(tabs)?...`, the app's own
+    // scheme, which Expo Go does not register — `openLink` failed with
+    // `Activity not started, unable to resolve Intent` and the flow was written
+    // off as impossible in the shell. iOS was already using the `exp://.../--/`
+    // form, which Expo Go routes into the app with the query string intact, and
+    // it is exactly how `APP_URL` and `WARDROBE_URL` reach the app on both
+    // platforms. There was never a reason for the two to differ.
+    //
+    // The slots are `am` and `evening` rather than `now` and `next` so the flow
+    // can assert what the link DID. `resolveDeepLinkScenario` maps those two
+    // deterministically to `morning` and `evening`, while `now`/`next` resolve
+    // against the current time and the ritual's forecast, which cannot be
+    // asserted without either freezing the clock or reimplementing the
+    // resolution in the flow. The deep link path under test is identical.
     const widgetUrl = (size, slot) =>
-      target.platform === 'ios'
-        ? `${resolvedPair.app}(tabs)?source=widget&size=${size}&slot=${slot}`
-        : `mobile://(tabs)?source=widget&size=${size}&slot=${slot}`
-    process.env.WIDGET_NOW_URL = widgetUrl('small', 'now')
-    process.env.WIDGET_NEXT_URL = widgetUrl('medium', 'next')
+      `${resolvedPair.app}(tabs)?source=widget&size=${size}&slot=${slot}`
+    process.env.WIDGET_MORNING_URL = widgetUrl('small', 'am')
+    process.env.WIDGET_EVENING_URL = widgetUrl('medium', 'evening')
     if (!process.env.MAESTRO_APP_ID) {
       process.env.MAESTRO_APP_ID = target.appId
     }
@@ -2041,22 +2882,30 @@ const run = async () => {
             '--platform',
             target.platform,
             '--udid',
-            IOS_UDIDS.join(','),
+            SHARD_DEVICE_IDS.join(','),
             'test',
             '--shard-split',
-            String(IOS_UDIDS.length),
+            String(SHARD_DEVICE_IDS.length),
             '-e',
             `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`,
             '-e',
             `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`,
             '-e',
+            `GARMENT_A_ID=${process.env.GARMENT_A_ID ?? ''}`,
+            '-e',
+            `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`,
+            '-e',
+            `CAPSULE_ID=${process.env.CAPSULE_ID ?? ''}`,
+            '-e',
+            `REPLACEMENT_GARMENT_ID=${process.env.REPLACEMENT_GARMENT_ID ?? ''}`,
+            '-e',
             `APP_URL=${process.env.APP_URL}`,
             '-e',
             `WARDROBE_URL=${process.env.WARDROBE_URL}`,
             '-e',
-            `WIDGET_NOW_URL=${process.env.WIDGET_NOW_URL}`,
+            `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`,
             '-e',
-            `WIDGET_NEXT_URL=${process.env.WIDGET_NEXT_URL}`,
+            `WIDGET_EVENING_URL=${process.env.WIDGET_EVENING_URL}`,
           ]
           if (WRITE_ARTIFACTS) {
             fs.mkdirSync(path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR), {
@@ -2076,7 +2925,7 @@ const run = async () => {
           parallelArgs.push(...shardedFlows)
 
           log(
-            `Running ${shardedFlows.length} flows across ${IOS_UDIDS.length} simulators`
+            `Running ${shardedFlows.length} flows across ${SHARD_DEVICE_IDS.length} devices`
           )
           // The exit code is not trusted on its own here. A sharded invocation
           // has been observed exiting 0 while its own summary printed
@@ -2096,16 +2945,26 @@ const run = async () => {
             maestroExitError = error
           }
 
-          const report = readSuiteReport(reportPath)
+          const resolvedReportPath = resolveReportPath(reportPath) ?? reportPath
+          const report = readSuiteReport(resolvedReportPath)
+          if (report.unreadable) {
+            flowFailures.push(`JUnit report unreadable (${report.unreadable})`)
+            log(`FAIL JUnit report could not be read: ${report.unreadable}`)
+          }
           for (const name of report.failed) {
             flowFailures.push(name)
             log(`FAIL ${name}`)
+          }
+          for (const name of report.skipped) {
+            flowFailures.push(`${name} (skipped, asserted nothing)`)
+            log(`FAIL ${name} was skipped and asserted nothing`)
           }
           for (const name of report.passed) {
             log(`PASS ${name}`)
           }
 
-          const accountedFor = report.failed.length + report.passed.length
+          const accountedFor =
+            report.failed.length + report.passed.length + report.skipped.length
           if (accountedFor !== shardedFlows.length) {
             // Every flow handed to Maestro has to appear in the report, or the
             // count this run reports is a guess. Fail loudly instead.
@@ -2127,20 +2986,28 @@ const run = async () => {
             '--platform',
             target.platform,
             '--udid',
-            IOS_UDIDS[0],
+            SHARD_DEVICE_IDS[0],
             'test',
             '-e',
             `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`,
             '-e',
             `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`,
             '-e',
+            `GARMENT_A_ID=${process.env.GARMENT_A_ID ?? ''}`,
+            '-e',
+            `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`,
+            '-e',
+            `CAPSULE_ID=${process.env.CAPSULE_ID ?? ''}`,
+            '-e',
+            `REPLACEMENT_GARMENT_ID=${process.env.REPLACEMENT_GARMENT_ID ?? ''}`,
+            '-e',
             `APP_URL=${process.env.APP_URL}`,
             '-e',
             `WARDROBE_URL=${process.env.WARDROBE_URL}`,
             '-e',
-            `WIDGET_NOW_URL=${process.env.WIDGET_NOW_URL}`,
+            `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`,
             '-e',
-            `WIDGET_NEXT_URL=${process.env.WIDGET_NEXT_URL}`,
+            `WIDGET_EVENING_URL=${process.env.WIDGET_EVENING_URL}`,
           ]
           if (WRITE_ARTIFACTS) {
             serialArgs.push(
@@ -2156,7 +3023,7 @@ const run = async () => {
           }
           serialArgs.push(flowPath)
 
-          log(`Running user-scoped flow on ${IOS_UDIDS[0]}: ${flowPath}`)
+          log(`Running user-scoped flow on ${SHARD_DEVICE_IDS[0]}: ${flowPath}`)
           try {
             await runMaestroCommand(serialArgs, {
               env: maestroEnv,
@@ -2194,10 +3061,17 @@ const run = async () => {
           maestroArgs.push('test')
           maestroArgs.push('-e', `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`)
           maestroArgs.push('-e', `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`)
+          maestroArgs.push('-e', `GARMENT_A_ID=${process.env.GARMENT_A_ID ?? ''}`)
+          maestroArgs.push('-e', `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`)
+          maestroArgs.push('-e', `CAPSULE_ID=${process.env.CAPSULE_ID ?? ''}`)
+          maestroArgs.push(
+            '-e',
+            `REPLACEMENT_GARMENT_ID=${process.env.REPLACEMENT_GARMENT_ID ?? ''}`
+          )
           maestroArgs.push('-e', `APP_URL=${process.env.APP_URL}`)
           maestroArgs.push('-e', `WARDROBE_URL=${process.env.WARDROBE_URL}`)
-          maestroArgs.push('-e', `WIDGET_NOW_URL=${process.env.WIDGET_NOW_URL}`)
-          maestroArgs.push('-e', `WIDGET_NEXT_URL=${process.env.WIDGET_NEXT_URL}`)
+          maestroArgs.push('-e', `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`)
+          maestroArgs.push('-e', `WIDGET_EVENING_URL=${process.env.WIDGET_EVENING_URL}`)
           if (WRITE_ARTIFACTS) {
             fs.mkdirSync(path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR), {
               recursive: true,
@@ -2222,15 +3096,57 @@ const run = async () => {
         }
 
         log(`Running Maestro flow (${maestroArgs.join(' ')})`)
+        let maestroExitError
         try {
           await runMaestroCommand(maestroArgs, {
             env: maestroEnv,
             logFile: maestroLogFile,
           })
-          log(`PASS ${flowPath}`)
         } catch (error) {
+          maestroExitError = error
+        }
+
+        // The report is the evidence on this path too, not just the sharded one.
+        //
+        // This loop used to take the exit code as the whole answer, which is the
+        // opposite of what the sharded path does and the weaker of the two --
+        // and it is the path CI runs on Android, so the stricter rule was being
+        // applied only where it was least needed. The rule is the same in both
+        // places now: a flow that the report records as failed or skipped fails
+        // the run, a flow the report never mentions fails the run, and a
+        // non-zero exit can only ADD a failure the report could not describe,
+        // never clear one.
+        if (WRITE_ARTIFACTS) {
+          const resolvedReportPath =
+            resolveReportPath(getFlowReportPath(flowPath)) ?? getFlowReportPath(flowPath)
+          const report = readSuiteReport(resolvedReportPath)
+          if (report.unreadable) {
+            flowFailures.push(
+              `${flowPath} (JUnit report unreadable: ${report.unreadable})`
+            )
+            log(`FAIL ${flowPath} (JUnit report could not be read)`)
+          } else if (report.failed.length > 0) {
+            flowFailures.push(flowPath)
+            log(`FAIL ${flowPath} (${report.failed.join(', ')})`)
+          } else if (report.skipped.length > 0) {
+            flowFailures.push(`${flowPath} (skipped, asserted nothing)`)
+            log(`FAIL ${flowPath} was skipped and asserted nothing`)
+          } else if (report.passed.length === 0) {
+            flowFailures.push(`${flowPath} (absent from its own JUnit report)`)
+            log(`FAIL ${flowPath} did not appear in its JUnit report`)
+          } else if (maestroExitError) {
+            flowFailures.push(
+              `${flowPath} (Maestro exited non-zero with no failure in the report: ${maestroExitError.message})`
+            )
+            log(`FAIL ${flowPath} (non-zero exit, clean report)`)
+          } else {
+            log(`PASS ${flowPath}`)
+          }
+        } else if (maestroExitError) {
           flowFailures.push(flowPath)
-          log(`FAIL ${flowPath} (${error.message})`)
+          log(`FAIL ${flowPath} (${maestroExitError.message})`)
+        } else {
+          log(`PASS ${flowPath}`)
         }
       }
     } finally {

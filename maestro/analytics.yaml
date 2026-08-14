@@ -8,9 +8,19 @@ env:
   SETTINGS_TITLE: 'Language'
   ALERT_EVENT: 'Analytics event: alert_received'
 ---
+# `clearState: true`, like every other flow in this suite.
+#
+# This was the last flow still inheriting whatever screen its predecessor left
+# behind, and nothing here needs that: it launches, opens the home tab, and
+# navigates to settings on its own. Under the serial run it happened to follow a
+# flow that left a tab screen showing, so it passed. Sharding removed that
+# accident -- any flow can now precede it on a device -- and it failed three
+# times in a row from three different screens: the settings tab unreachable
+# behind a pushed route, then the diagnostics heading, then the button under it.
+# One symptom per run, one cause.
 - launchApp:
     appId: ${MAESTRO_APP_ID}
-    clearState: false
+    clearState: true
     stopApp: false
 
 - runFlow: subflows/open-app.yaml
@@ -35,13 +45,31 @@ env:
 # The diagnostics panel is the last section on the settings screen, below
 # Language, Shopping and Premium, so it is off-screen on a phone until scrolled
 # to. Asserting it directly failed even with diagnostics correctly enabled.
+#
+# `centerElement` and the longer timeout are both about the parallel run. Four
+# simulators share this machine's CPU, so a scroll that finished comfortably
+# inside 15s serially does not always finish in time, and this step failed on
+# two consecutive parallel runs -- once here, once on the button below.
+#
+# `centerElement` is the more important half. Without it the scroll stops as
+# soon as the heading is *partially* on screen, which satisfies this step and
+# leaves the button underneath it still below the fold, so the failure surfaces
+# one step later as a button that "does not exist" on a screen that is rendering
+# perfectly.
 - scrollUntilVisible:
     element:
       text: 'Mobile analytics diagnostics'
     direction: DOWN
-    timeout: 15000
+    centerElement: true
+    timeout: 45000
 - assertVisible: 'Mobile analytics diagnostics'
 
+- scrollUntilVisible:
+    element:
+      text: 'Record weather alert analytics'
+    direction: DOWN
+    centerElement: true
+    timeout: 45000
 - tapOn:
     text: 'Record weather alert analytics'
     retryTapIfNoChange: true

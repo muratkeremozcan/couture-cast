@@ -30,6 +30,40 @@ appId: ${MAESTRO_APP_ID}
     commands:
       - openLink: ${APP_URL}
 
+      # Dismiss an Android system "isn't responding" dialog before anything else.
+      #
+      # This is what kept CI red after the manifest fix. The app launched, Metro
+      # bundled for the device and the app's own code ran, and every flow still
+      # failed on `tab-home is visible` -- because the hierarchy at that moment
+      # was an ANR dialog:
+      #
+      #   android:id/alertTitle   Pixel Launcher isn't responding
+      #   android:id/aerr_wait    Wait
+      #
+      # An ANR dialog takes window focus, so an out-of-process driver sees the
+      # dialog and not the app behind it. All three shards showed the identical
+      # one, and the per-step hierarchies place it at step 9, well before this
+      # subflow's own back presses -- so the harness does not cause it; a starved
+      # launcher on a CI runner does.
+      #
+      # `settings put global hide_error_dialogs 1` is also set per device by the
+      # runner, and is NOT sufficient on its own: ActivityManager latches that
+      # value at boot and on configuration change, so setting it on a running
+      # device did not prevent the dialog. This is the belt to that braces.
+      #
+      # "Wait" rather than "Close app": closing the launcher kills a process the
+      # device immediately restarts, and this suite has no interest in either
+      # outcome beyond getting the dialog off the screen.
+      - runFlow:
+          when:
+            platform: Android
+            visible:
+              id: 'android:id/aerr_wait'
+          commands:
+            - tapOn:
+                id: 'android:id/aerr_wait'
+                label: 'Dismiss an Android application-not-responding dialog'
+
       # iOS asks for confirmation before handing an `exp://` link to Expo Go:
       # a system alert reading `Open in "Expo Go"?` with Cancel and Open. It is
       # per device and it is why a freshly created simulator behaves differently
@@ -75,16 +109,56 @@ appId: ${MAESTRO_APP_ID}
       # a tab screen and never fires a stray gesture at the home screen.
       # Tapping the native `BackButton` rather than issuing `back`.
       #
-      # Maestro's `back` is a left-edge swipe on iOS and it does not pop these
-      # screens: measured on device, two `back` presses both reported COMPLETED
+      # Maestro's `back` does nothing at all on iOS. The command is documented
+      # as Android and Web only, and `IOSDriver.backPress()` is an empty method
+      # in the driver, so it reports COMPLETED without touching the device.
+      # That matches what was measured here: two `back` presses both COMPLETED
       # while the app sat unmoved on `wardrobe-silhouette-screen`. The same
       # hierarchy dump shows `resource-id: BackButton`, which Maestro can
       # address directly, so the header control is used instead.
+      # https://docs.maestro.dev/reference/commands-available/back
       #
       # Two conditional passes rather than a `repeat`/`while`: each is a no-op
       # once the tab bar is showing, and the pair is bounded, so a screen that
       # never reveals the tab bar fails at the wait below with a clear message
       # instead of spinning.
+      # The `back` is Android-only, and guarded on Expo Go not showing one of
+      # its own screens. Both halves were learned from a CI run.
+      #
+      # Android-only because iOS gets nothing from it: `back` is documented as
+      # Android and Web only and its iOS implementation is an empty method, so
+      # there it is a no-op that still reports COMPLETED. That is why the
+      # `BackButton` tap exists. On Android `back` is the system BACK key
+      # (`input keyevent 4`) and does real work, so it is what actually pops the
+      # stack on that platform, where `BackButton` is not in the hierarchy at
+      # all.
+      #
+      # Guarded because `notVisible: tab-home` does not mean "a pushed route is
+      # covering the tab bar". It is equally true when the app has not mounted,
+      # and on a GitHub runner it was: Expo Go could not fetch the manifest and
+      # was sitting on `Something went wrong.`. Both blocks then fired, and two
+      # system BACK presses walked Expo Go out to its own home screen and then
+      # to the Android launcher, so the failure was reported as `tab-home` never
+      # appearing with the launcher on screen -- which points at everything
+      # except the real cause. Without the back presses the run fails at the
+      # wait below, still red, but pointing at the app that would not load.
+      #
+      # The error screen is not the only such state and it is not the common
+      # one, so the guard lists every Expo Go screen measured here so far. The
+      # local run under maestro/artifacts/2026-08-14_120603 has the whole
+      # sequence in its hierarchy dumps: at step 13 the screen was Expo Go's
+      # splash for this project (`Splash Screen Image` and `Couture Cast`, none
+      # of the app yet) because the bundle was still loading, so the first block
+      # fired and BACK landed on Expo Go's own home screen (`Development
+      # servers`, `Enter URL manually`); the error-screen guard had nothing to
+      # say about either, so the second block fired too, and step 20 dumps
+      # `com.google.android.apps.nexuslauncher` -- the Android launcher, exactly
+      # the walk this guard was added to stop. The flow then spent the 45s wait
+      # below and its entire first `retry` attempt recovering.
+      #
+      # `Couture Cast` is the app `name` from apps/mobile/app.json, which Expo
+      # Go paints under the splash image. It cannot collide with a screen of
+      # ours: every user-facing string in the app spells it `CoutureCast`.
       - runFlow:
           when:
             notVisible:
@@ -94,7 +168,19 @@ appId: ${MAESTRO_APP_ID}
                 id: 'BackButton'
                 optional: true
                 label: 'Pop a pushed route left behind by the previous flow'
-            - back
+            - runFlow:
+                when:
+                  platform: Android
+                  notVisible:
+                    text: 'Something went wrong.|Development servers|Couture Cast'
+                commands:
+                  - back
+            # Let the pop finish before the second block asks the same question.
+            # The two blocks are independent evaluations of `notVisible:
+            # tab-home`, and a stack transition still animating answers with the
+            # screen that is on its way out, so the second pop fires on a
+            # hierarchy that is already stale.
+            - waitForAnimationToEnd
       - runFlow:
           when:
             notVisible:
@@ -104,7 +190,13 @@ appId: ${MAESTRO_APP_ID}
                 id: 'BackButton'
                 optional: true
                 label: 'Pop a second pushed route'
-            - back
+            - runFlow:
+                when:
+                  platform: Android
+                  notVisible:
+                    text: 'Something went wrong.|Development servers|Couture Cast'
+                commands:
+                  - back
 
       # The tab bar is the app's own first painted chrome, so a failure to mount
       # is reported here, at the launch step, rather than as a confusing

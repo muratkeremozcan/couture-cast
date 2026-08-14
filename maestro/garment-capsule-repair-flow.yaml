@@ -29,18 +29,48 @@ tags:
     optional: true
     label: 'Repair state is surfaced when seed data provides one'
 
+# The seeded capsule BY ID, not whichever capsule the library lists first.
+#
+# `index` resolves against what is rendered, and the library sorts on
+# `is_favorite desc, updated_at desc` (`wardrobe-capsule.repository.ts`). This
+# flow favourites a capsule further down, and `garment-capsule-create-flow`
+# leaves a second capsule behind whenever it fails before its own cleanup, so
+# "first" describes what ran before this flow rather than the capsule it means.
+# The runner seeds this capsule and now passes its id, the same way it already
+# passes the garment ids.
 - tapOn:
-    id: 'edit-capsule-button-.*'
-    index: 0
+    id: 'edit-capsule-button-${CAPSULE_ID}'
+    label: 'Open the seeded capsule'
 
 - assertVisible:
     id: 'capsule-repair-banner'
     optional: true
     label: 'Repair guidance explains the removed garments'
 
+# A garment the capsule does not already hold, so this adds a replacement.
+#
+# `index: 0` was the newest garment only because the wardrobe list sorts
+# `created_at desc` and nothing else had created one yet. Any flow that uploads a
+# garment first moves that position, and the seeded capsule holds the two OLDEST
+# garments, so a shifted index can land on a member and DESELECT it. The
+# assertion below passes either way -- `.* garments · Ready` is as true of a
+# capsule that lost a garment as of one that gained a replacement -- so the
+# reversal would not have been caught here.
+#
+# Scrolled to for the same reason the create flow scrolls: the builder's garment
+# list grows with the wardrobe, and an element below the fold is not in the
+# hierarchy at all.
+- scrollUntilVisible:
+    element:
+      id: 'garment-checkbox-${REPLACEMENT_GARMENT_ID}'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+    label: 'Bring the replacement garment on screen'
+- waitForAnimationToEnd
+
 - tapOn:
-    id: 'garment-checkbox-.*'
-    index: 0
+    id: 'garment-checkbox-${REPLACEMENT_GARMENT_ID}'
     label: 'Choose a replacement garment'
 
 - tapOn:
@@ -66,13 +96,42 @@ tags:
     label: 'The repaired capsule saved and reports a ready set'
 
 # Favorite the repaired capsule, then confirm the ritual can surface it.
+#
+# By id, so this favourites the capsule the flow just repaired rather than
+# whichever card sits at the top of the library.
 - tapOn:
-    id: 'favorite-button-.*'
-    index: 0
+    id: 'favorite-button-${CAPSULE_ID}'
 
-- back
-
-- assertVisible:
-    text: 'Saved capsule'
+# Leave the capsule library the same way every other flow does.
+#
+# This was a bare `back`, which is documented as Android and Web only and whose
+# iOS implementation is an empty method: on iOS it reported COMPLETED without
+# moving the app. The assertion below was `optional: true`, so it could not fail
+# either, and the pair could never have caught a regression on iOS.
+# https://docs.maestro.dev/reference/commands-available/back
+- tapOn:
+    id: 'BackButton'
     optional: true
-    label: 'Saved-capsule badge appears when a capsule wins a scenario'
+    label: 'Leave the capsule library'
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+
+# The "Saved capsule" badge is deliberately NOT asserted here.
+#
+# It was, as `assertVisible: text: 'Saved capsule'` with `optional: true`, which
+# could not fail and so proved nothing. It could not have passed either: the
+# label is produced by the ritual service (`ritual.service.ts`) and rendered on
+# the Home screen, and this flow ends on the wardrobe hub, which is where the
+# preceding back press lands. The failure hierarchy confirms it: `wardrobe-screen`
+# and `wardrobe-garment-list` on screen, no badge anywhere.
+#
+# The behaviour it was reaching for is asserted where it belongs, against the
+# service that produces it, in `ritual.service.spec.ts` ("Saved capsule"). A
+# mobile flow re-proving it would depend on a ritual refresh picking this
+# capsule, which is not deterministic from here.
+#
+# What this flow does own is that the favourite persisted, which is asserted by
+# the capsule library state above.
