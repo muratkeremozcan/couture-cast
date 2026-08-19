@@ -41,10 +41,37 @@
       "endedNote": "Sua assinatura terminou. Você pode assinar de novo quando quiser.",
       "errorLoad": "Não foi possível carregar o status da assinatura.",
       "errorPurchase": "Não foi possível iniciar o checkout. Tente novamente.",
+      "errorAlreadySubscribed": "Você já tem uma assinatura Premium ativa. Recarregue esta página para vê-la.",
+      "errorNoWebSubscription": "Não há assinatura web nesta conta para gerenciar.",
+      "errorSubscribeDisabled": "As novas assinaturas Premium estão pausadas agora. Tente novamente em breve.",
       "signedOutHint": "Faça login para assinar ou gerenciar o Premium",
       "plannerLocked": {
         "title": "O planejador de 7 dias é um recurso Premium",
         "cta": "Assinar Premium"
+      },
+      "theme": {
+        "sectionTitle": "Paletas da interface",
+        "disclosure": "As paletas da interface são um recurso Premium. Sua escolha é salva na sua conta do CoutureCast e vale em todos os aparelhos em que você fizer login. Uma paleta muda apenas as cores: ela nunca muda quais looks são recomendados. O CoutureCast envia a paleta escolhida ao seu provedor de análise com um identificador pseudônimo; nenhuma foto de peça ou dado pessoal é compartilhado.",
+        "names": {
+          "jewelRadiance": "Jewel Radiance",
+          "autumnUmber": "Autumn Umber",
+          "winterMetallic": "Winter Metallic"
+        },
+        "select": "Aplicar",
+        "selected": "Selecionada",
+        "reset": "Paleta padrão",
+        "preview": {
+          "title": "Prévia ao vivo",
+          "body": "Este cartão usa a paleta que você aplicou. Os cartões acima sempre mostram as próprias cores."
+        },
+        "unavailable": "As paletas estão desativadas por enquanto. Sua escolha salva continua guardada e volta quando elas retornarem.",
+        "locked": {
+          "title": "As paletas da interface são um recurso Premium",
+          "body": "Assine o Premium com os controles acima para desbloquear Jewel Radiance, Autumn Umber e Winter Metallic.",
+          "signedOutBody": "Entre na sua conta e assine o Premium para desbloquear Jewel Radiance, Autumn Umber e Winter Metallic."
+        },
+        "loadError": "Não foi possível carregar sua paleta da interface. A paleta padrão está sendo exibida.",
+        "saveError": "Não foi possível salvar sua paleta da interface. Tente novamente."
       }
     }
   },

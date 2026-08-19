@@ -159,4 +159,19 @@ export {
   type CheckoutSessionResponse,
   type PortalSessionResponse,
   type BillingWebhookResponse,
+  // Story 5.3 premium theme. Same hand-maintained rule as above.
+  // PREMIUM_REQUIRED_MESSAGE is re-exported once, by the 5.2 block: it is the
+  // guard's own 403 message and this story's PUT reuses it rather than
+  // redefining a second copy.
+  premiumThemeKeySchema,
+  premiumThemeSchema,
+  premiumThemeResponseSchema,
+  updatePremiumThemeInputSchema,
+  updatePremiumThemeResponseSchema,
+  PREMIUM_THEMES_DISABLED_MESSAGE,
+  type PremiumThemeKey,
+  type PremiumTheme,
+  type PremiumThemeResponse,
+  type UpdatePremiumThemeInput,
+  type UpdatePremiumThemeResponse,
 } from '@couture/api-client/contracts/http'

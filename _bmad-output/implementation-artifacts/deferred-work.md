@@ -254,3 +254,264 @@ its scope. Each records what was narrowed and why.
   rendering is covered by the mobile screen tests and the Playwright
   seeded-user specs. The harness change (an env-driven token override so flows
   can run as a chosen seed user) is the deferred item.
+
+## Deferred from: story 5.3 premium theme switcher (2026-08-18)
+
+Two kinds of entry sit below. The first five are boundaries story 5.3 drew for
+itself in its own decisions. The last four are the higher test tiers and the
+mobile surface, which were deliberately held back so they could be authored
+separately; none of the four is blocked on a technical unknown, and none was
+forgotten.
+
+- **Watch and complication theming.** Epic AC 2 (`epics.md:443`) and PRD FR5.3
+  (`prd.md:205`) both require the chosen palette to apply across mobile, web,
+  and watch. Decision 5 answers both with the UX spec's wearable rule
+  (`ux-design-specification.md:381`): wearable cards keep the monochrome palette
+  with a gold ring indicator so a 1.5-inch screen stays glanceable whatever
+  palette the wearer picked in the app. That is why no Swift file under
+  `apps/mobile/targets/` and no Android widget Kotlin source was touched. The
+  deferred item is the follow-up product may still want: tinting a
+  complication's accent ring by the selected theme. It is small now that the
+  server-side preference exists to read from, and it would read that preference
+  through `WatchConnectivityManager` and the shared App Group `UserDefaults`,
+  never over HTTP (story 3.4's Watch Isolation Principle). Both citations are
+  recorded here so a later reader sees a requirement that was answered by a
+  cited design decision rather than one that was missed.
+
+- **Broader-UI token adoption beyond the settings surface.** Decision 4. This
+  story builds the token primitive and demonstrates it on exactly one surface:
+  the theme gallery re-colors its own swatch cards, selected-state indicator,
+  and preview card. Hero canvas, Lookbook Prism, the chip system, and the button
+  hierarchy still carry hardcoded brand colors (web Tailwind arbitrary values,
+  e.g. `lookbook-prism-layout.tsx:191,229,251,295-364`; mobile raw hex inside
+  `StyleSheet.create`). Retrofitting them all inside a feature story is the
+  unbounded, high-regression scope CC-5.2 Decision 2 already refused, and
+  ownership sits with each surface. The carrier is in place for whoever takes
+  one: five custom properties under `[data-theme]` in
+  `apps/web/src/app/globals.css`, so a surface adopts the palette by replacing
+  color literals with `var(--theme-*)`. One trap to avoid on mobile:
+  `constants/colors.ts` and `hero-theme.ts` are OS light/dark plumbing, a
+  different axis from premium palettes, and must not be folded into this work.
+
+- **`packages/tokens` consolidation of the duplicated palette hex values.**
+  Decision 12 pins every surface to the same `refs/ux/ux-color-themes.html`
+  values and accepts duplicate copies of them because no shared token package
+  exists; `architecture.md:85-88` describes `packages/tokens` but it was never
+  built, and building it inside a feature story is an unscoped structural
+  change. Today the web copy lives in the `[data-theme]` blocks of
+  `apps/web/src/app/globals.css`, and the audited pairings are re-pinned as
+  regression fixtures in `packages/utils/src/contrast.spec.ts`. The mobile copy
+  (`apps/mobile/src/theme/theme-palettes.ts`) arrives with the deferred mobile
+  surface below, which is the point at which the duplication becomes genuinely
+  cross-surface. Whoever takes it: one exported palette table consumed by the
+  web CSS layer and the mobile StyleSheet, with the contrast specs kept as the
+  drift detector.
+
+- **Winter Metallic's real two-stop gradient.** Decision 2.
+  `ux-color-themes.html:57` renders that card preview as
+  `linear-gradient(135deg,#F7FBFF,#E9EDF6)`. Neither carrier can hold a
+  gradient: web's `--theme-card-bg` is a single custom property, mobile's
+  `cardBg` is a single `StyleSheet` color, and `expo-linear-gradient` is not an
+  installed mobile dependency. The solid Ice `#E9EDF6` end is therefore the
+  value shipped on web today and the value the deferred mobile surface below
+  should carry. That is the darker of the two stops, so it is the worst case for
+  contrast against Gunmetal `#2F333D` text and is the value already audited at
+  10.78:1; the Glacier end `#F7FBFF` would measure 12.15:1, so nothing is lost
+  accessibility-wise. A future story that wants the real gradient owns adding a
+  gradient renderer on mobile and reshaping `cardBg` into a stop list on both
+  surfaces.
+
+- **The last inline `contrastRatio` duplicate in
+  `playwright/tests/accessibility-hardening.spec.ts:131`.** The docblock at
+  `playwright/support/helpers/accessibility.ts:80-82` records why it was left
+  alone before this story: that spec gates every primary route, so it was not
+  refactored in a change that could not run it. The same reason holds here,
+  because the Playwright tier is out of scope for this change (see the adapter
+  entry below). Collapsing it into `@couture/utils` is a Playwright-tier change
+  and belongs with a run of that suite.
+
+### Deliberately deferred so the higher test tiers could be authored separately
+
+- **The entire mobile surface of story 5.3 (Task 6).** Nothing under
+  `apps/mobile` was created or changed. Missing: `src/theme/theme-palettes.ts`,
+  `src/theme/theme-context.tsx` (`AppThemeProvider` / `useAppTheme()`), its
+  mount in `app/_layout.tsx`, `src/lib/premium-theme.ts`, the inline
+  `PremiumThemeSection` in `app/(tabs)/settings.tsx`, the ten mobile locale
+  catalogs' `commerce.premium.theme.*` keys, and
+  `src/i18n/premium-theme-locales.spec.ts`. With it go the mobile halves of
+  AC 4 (instant apply through the context), AC 6 (fallback rendering on the
+  mobile surface), and AC 7 (mobile catalog parity). This is a deliberate
+  narrowing, not an oversight or a blocked task: the server primitive is
+  surface-agnostic and already shipped:
+  `GET`/`PUT /api/v1/commerce/premium/theme` resolves entitlement inline
+  (Decision 7), so the mobile work is a client of an API that exists. Decision 12 holds the exact
+  shape it should take, including the `AppThemeProvider` naming (React
+  Navigation's `ThemeProvider` is already imported in `_layout.tsx:2`) and the
+  mount slot inside `AccessibilityAnnouncerProvider` and outside the navigation
+  `ThemeProvider`.
+
+- **Pact interactions and the Playwright spec (Task 7).** Held back
+  deliberately for separate authoring. No consumer interactions were added to
+  `pact/http/consumer/api-contract-interactions.ts`, no provider states
+  (`'The user has premium theme access'`,
+  `'The user does not have premium theme access'`,
+  `'Premium themes are disabled'`), and no
+  `playwright/tests/premium-theme-switcher.spec.ts`. What exists instead is
+  unit-tier proof: the contract module's own suite
+  (`packages/api-client/testing/premium-theme-contract.spec.ts`) and the
+  supertest specs colocated beside the controller and service in
+  `apps/api/src/modules/commerce/`. What is therefore unproven is
+  consumer-driven compatibility between each client and the provider, and
+  browser-level behavior of the locked state (with axe), the gallery, select
+  then reload persistence, and the Default fallback for a stale or unknown
+  stored key seeded directly.
+
+- **The Maestro locked-state flow.** Held back deliberately for separate
+  authoring, and blocked behind the mobile surface above in any case: there is
+  no mobile UI for a flow to drive yet. When it is written it carries the same
+  reachability limit story 5.2's premium flow already documents.
+  `setupMobileE2EIdentity` in `scripts/run-maestro.mjs` signs up a fresh
+  `mobile-e2e-<uuid>@example.com` account and bakes its token into the Expo
+  bundle through `EXPO_PUBLIC_E2E_ACCESS_TOKEN`, with no override path, so a
+  flow runs as that fresh non-entitled user and the locked state is the only one
+  it reaches for free. Say that plainly in the flow header rather than implying
+  gallery coverage. Reaching the entitled gallery needs a harness change, and
+  there are two candidates rather than one: the env-driven token override 5.2
+  already filed above, or seeding a `PremiumEntitlement` row for the fresh
+  user through the Prisma connection the runner already opens on
+  `MOBILE_E2E_DATABASE_URL` for its garment and location fixtures. Whoever takes
+  it should pick deliberately; the second is narrower but puts entitlement
+  seeding into a shared script every flow runs. Ordering for whoever picks these
+  up: mobile surface first, then the flow.
+
+- **The `playwright/support/helpers/accessibility.ts` adapter rewrite
+  (Decision 3).** Held back deliberately with the rest of the Playwright tier;
+  the file is byte-identical to its state before this story. The planned change
+  is to keep its exported `contrastRatio(left, right)` signature over CSS
+  `rgb()` strings, parse to hex with the `parseRgb` it already has, and delegate
+  to `@couture/utils`, leaving its caller
+  (`playwright/tests/commerce-affiliate-preferences.spec.ts:239`) untouched;
+  plus one test proving both entry points return the same number for the same
+  color, for which `5.3-UTIL-007` is reserved in
+  `packages/utils/src/contrast.spec.ts`. State the consequence plainly: the
+  repository now holds three copies of the WCAG luminance maths rather than the
+  two Decision 3 intended, and this entry together with the
+  `accessibility-hardening.spec.ts` entry above are what close it back to one.
+  The delegation needs no build wiring; `@couture/utils` is symlinked into root
+  `node_modules` and `prepare:playwright` already builds it ahead of
+  `@couture/api-client`.
+
+### Added during the story 5.3 code review (2026-08-18)
+
+Raised by the three review layers (Blind Hunter, Edge Case Hunter, Acceptance
+Auditor) over the whole story diff. Everything the review found that could be
+fixed inside the story's scope was fixed; these are the items that could not,
+each with the reason.
+
+- **`preserveNullableEnumValues` mutates the ZodEnum's shared values array, and
+  nine nodes in the published OpenAPI document are invalid because of it.** The
+  defect predates this branch and is documented in full at
+  `packages/api-client/src/contracts/http/openapi.ts`'s docblock. The pass
+  appends `null` to `schema.enum`, but the array it appends to is the ZodEnum's
+  own `_def.values`, which `zod-to-openapi` hands out by reference, so one
+  nullable publication of an enum leaks `null` into every other publication of
+  that same enum. `ScenarioOutfit`, `RitualResponse` and `ShopThisLook`'s
+  `garmentCategory`, `SuggestGarmentTagsResponse`'s three `suggestions.*.value`
+  nodes, `UpdateGarmentTagsInput`'s `category` and `comfortRange`, and the
+  `comfortRange` query parameter of `GET /api/v1/wardrobe/{ownerUserId}/capsules`
+  each publish as `{"type": "string", "enum": [..., null]}` — a schema that
+  rejects the value its own type permits — and none of those properties has ever
+  accepted `null` at the boundary. The correction is one line,
+  `schema.enum = [...enumValues, null]` in place of `schema.enum.push(null)`.
+  It is not shipped here because it cannot pass the pull-request gate: it
+  rewrites those nine nodes and `optic diff` reads three of them as breaking enum
+  removals, and Optic's documented escape hatch closes only one of the three
+  (`createRequestPropertyResult` in `@useoptic/rulesets-base` 1.0.9 builds its
+  result without copying the `exempted` flag, and 1.0.9 is the last published
+  release). Landing it needs an owner decision this story cannot make: patch or
+  vendor `@useoptic/rulesets-base` so request-body property exemptions survive,
+  or merge the corrected baseline past the gate once. Story 5.3's own contract
+  dodges the hazard rather than relying on the pass —
+  `nullablePremiumThemeKeySchema` publishes a finished `enum` array of its own —
+  so new contracts have a pattern to copy in the meantime.
+
+- **`5.3-INT-001` and `5.3-INT-002` have no test.** The story's coverage matrix
+  names `5.3-INT-001` (persist, reload, same theme, over HTTP) as P0 evidence for
+  AC 3 and `5.3-INT-002` (a web-selected palette visible on a mobile GET) as P1.
+  Both are integration tier, which is outside the unit-only scope this story was
+  narrowed to, so neither exists. What does exist is the service and controller
+  proof at unit tier over an in-memory store, which cannot show a row surviving a
+  reconnect or the real unique index. The follow-up is
+  `apps/api/integration/premium-theme.integration.spec.ts`: PUT a palette, drop
+  the app, re-GET against real PostgreSQL, assert exactly one row with
+  `updated_at` moved. Recorded rather than left implicit because the other four
+  scope cuts below are all named and this one was not.
+
+- **The web section's `load_failed` state has no retry control.** A transient
+  failure on the initial GET leaves an entitled subscriber unable to reach their
+  palettes again without a full page reload: the effect's only dependency is the
+  translated error string, which is fixed for the session. `SubscriptionSection`
+  has exactly the same shape, so this is a convention to change on both surfaces
+  at once rather than a divergence to fix on one, and changing it needs a retry
+  affordance designed and translated across ten catalogs.
+
+- **Two OpenAPI components are registered and referenced by nothing, so the SDK
+  carries four spellings of one palette enum.** `packages/api-client/src/contracts/http/premium-theme.ts`
+  registers `PremiumThemeKey` and `PremiumTheme`, but `PremiumThemeResponse` and
+  `UpdatePremiumThemeResponse` inline their own copy of the object rather than
+  `$ref`-ing the registered handle, so the generated models hold
+  `PremiumThemeThemeEnum`, `PremiumThemeResponseDataThemeEnum`,
+  `UpdatePremiumThemeInputThemeEnum` and a standalone `PremiumThemeKey`. Nothing
+  is wrong on the wire and `5.3-CONTRACT-15` still pins the published enum, but
+  the assertion guards a component no operation consumes. Deferred because the
+  fix regenerates the SDK and reshapes published nodes, which is an `optic diff`
+  conversation of its own and has nothing to do with this story's behaviour.
+
+- **`commerce.premium.theme.locked.body` and `.signedOutBody` hardcode the three
+  palette names inside ten translated sentences.** Adding or retiring a palette
+  now means editing twenty localized strings by hand, and
+  `5.3-I18N-WEB-08` fails until every current name appears in each of them. The
+  catalogs already carry `names.*` keys that could be interpolated as a
+  `{{palettes}}` placeholder built from `PREMIUM_THEME_KEYS`. Deferred because
+  list formatting is locale-specific (serial comma, `und`/`et`/`ve`, conjunction
+  placement) and doing it properly means `Intl.ListFormat`, not string joining.
+
+- **~~`apps/web/src/lib/premium.ts` bakes untranslated English into the errors the
+  subscription section renders.~~ Fixed 2026-08-19, not deferred.** This entry was
+  originally filed as out of scope because it is story 5.2's surface and its own
+  tests pinned the English literals. That is not a reason to leave it: debt gets
+  handled when it is found, whichever story introduced it. `premium.ts` now
+  classifies failures the same way `premium-theme.ts` does
+  (`PremiumFailureReason`), the subscription section maps each reason onto a
+  `commerce.premium.*` key, and the two tests that asserted server English now
+  assert the catalog copy. Three new keys ship in all ten catalogs
+  (`errorAlreadySubscribed`, `errorNoWebSubscription`, `errorSubscribeDisabled`)
+  and the already-translated `manageInStore` finally renders on the path it was
+  written for. Kept here as a record rather than deleted, since the original
+  deferral was the wrong call and the reversal is the useful part.
+
+- **A `PUT` racing account erasure answers 500.** `PremiumThemeService.setTheme`'s
+  upsert violates `PremiumThemePreference_user_id_fkey` (P2003) if the `User` row
+  is deleted while the request is in flight, and nothing catches it. The window
+  is one request wide and the caller is an account that no longer exists, so the
+  500 is survivable; the tidy answer is to map P2003 onto the same not-found
+  shape the other commerce writes use.
+
+- **Two `apps/api` integration runs against one PostgreSQL fail each other.**
+  Recorded in `_bmad-output/project-knowledge/development-guide.md` with the
+  remedy "run one at a time", which leaves a live false-failure source for anyone
+  who forgets. The affected specs (`commerce-affiliate-offers`,
+  `commerce-affiliate-clicks`, `commerce-affiliate-webhook`) assert on rows and
+  counts in shared tables; the durable fix is to scope those assertions to a
+  per-run prefix, the pattern `weather-alert-cooldown.integration.spec.ts`
+  already uses, or to give each run its own schema.
+
+- **`GRANT DELETE` and `authenticated_delete_own_user_data` on
+  `PremiumThemePreference` sit against Decision 8's never-delete rule.** Both
+  review layers raised it. Kept deliberately: the four-verb grant plus the four
+  named policies are the `selfOnlyTables` category contract that
+  `packages/db/test/rls-policies.spec.ts` asserts for every member of the
+  category, so narrowing this one table would fail the shared assertion and make
+  it the only exception in the matrix. Never-deleting is a service-layer
+  invariant, and the API is the only writer any client has. Recorded so the
+  tension is on the record rather than rediscovered.

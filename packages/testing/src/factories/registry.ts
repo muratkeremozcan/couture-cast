@@ -25,6 +25,9 @@ export const DEFAULT_FACTORY_REGISTRY_KEYS = [
   'premiumEntitlements',
   'billingEvents',
   'billingCustomers',
+  // Story 5.3. Owner-only cosmetic preference, reachable by the user filter
+  // like every other user-keyed key above.
+  'premiumThemePreferences',
 ] as const
 
 export type FactoryRegistryKey = (typeof DEFAULT_FACTORY_REGISTRY_KEYS)[number]

@@ -18,12 +18,14 @@ import {
   trackPremiumCheckoutStarted,
   trackPremiumEntitlementActivated,
   trackPremiumEntitlementDeactivated,
+  trackPremiumThemeSelected,
   garmentTaggingCompletedEventSchema,
   affiliateCtaClickedEventSchema,
   affiliateConversionRecordedEventSchema,
   premiumCheckoutStartedEventSchema,
   premiumEntitlementActivatedEventSchema,
   premiumEntitlementDeactivatedEventSchema,
+  premiumThemeSelectedEventSchema,
   type AnalyticsEventName,
   type AffiliateCtaClickedEvent,
   type AffiliateConversionRecordedEvent,
@@ -31,6 +33,7 @@ import {
   type PremiumCheckoutStartedEvent,
   type PremiumEntitlementActivatedEvent,
   type PremiumEntitlementDeactivatedEvent,
+  type PremiumThemeSelectedEvent,
 } from '@couture/api-client'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import { createBaseLogger } from '../../logger/pino.config'
@@ -148,6 +151,11 @@ export interface TelemetryPropertiesMap {
     PremiumEntitlementDeactivatedEvent,
     'analyticsSubjectId'
   >
+  /**
+   * Story 5.3. Same rule again. `theme: null` is the Default palette, so a reset
+   * is a measurable selection rather than a missing event.
+   */
+  premium_theme_selected: Omit<PremiumThemeSelectedEvent, 'analyticsSubjectId'>
 }
 
 /**
@@ -173,6 +181,10 @@ const premiumEntitlementActivatedInputSchema = premiumEntitlementActivatedEventS
   .strict()
 
 const premiumEntitlementDeactivatedInputSchema = premiumEntitlementDeactivatedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const premiumThemeSelectedInputSchema = premiumThemeSelectedEventSchema
   .omit({ analyticsSubjectId: true })
   .strict()
 
@@ -208,6 +220,7 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   premium_checkout_started: premiumCheckoutStartedInputSchema,
   premium_entitlement_activated: premiumEntitlementActivatedInputSchema,
   premium_entitlement_deactivated: premiumEntitlementDeactivatedInputSchema,
+  premium_theme_selected: premiumThemeSelectedInputSchema,
 }
 
 export function requireAnalyticsIdSecret(): string {
@@ -525,6 +538,23 @@ function buildPremiumEntitlementDeactivated(
   })
 }
 
+function buildPremiumThemeSelected(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Premium telemetry requires an authenticated user')
+  }
+  const parsed = premiumThemeSelectedInputSchema.parse(props)
+
+  return trackPremiumThemeSelected({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
 /**
  * Events whose PostHog subject is the HMAC pseudonym rather than a raw user id.
  * Membership here drives three things at once: `TelemetryEvent.user_id` is
@@ -544,6 +574,7 @@ const PSEUDONYMOUS_EVENT_TYPES: ReadonlySet<AnalyticsEventName> = new Set([
   'premium_checkout_started',
   'premium_entitlement_activated',
   'premium_entitlement_deactivated',
+  'premium_theme_selected',
 ])
 
 const pseudonymousEventBuilders: Partial<
@@ -563,6 +594,7 @@ const pseudonymousEventBuilders: Partial<
   premium_checkout_started: buildPremiumCheckoutStarted,
   premium_entitlement_activated: buildPremiumEntitlementActivated,
   premium_entitlement_deactivated: buildPremiumEntitlementDeactivated,
+  premium_theme_selected: buildPremiumThemeSelected,
 }
 
 const eventBuilders: Partial<

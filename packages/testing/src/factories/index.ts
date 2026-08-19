@@ -73,12 +73,15 @@ export {
   buildBillingCustomerCreateInput,
   buildBillingEventCreateInput,
   buildPremiumEntitlementCreateInput,
+  buildPremiumThemePreferenceCreateInput,
   createBillingCustomer,
   createBillingEvent,
   createPremiumEntitlement,
+  createPremiumThemePreference,
   persistBillingCustomer,
   persistBillingEvent,
   persistPremiumEntitlement,
+  persistPremiumThemePreference,
 } from './premium.factory.js'
 export {
   DEFAULT_FACTORY_REGISTRY_KEYS,
@@ -182,4 +185,6 @@ export type {
   BillingEventFixture,
   PremiumEntitlementFactoryOverrides,
   PremiumEntitlementFixture,
+  PremiumThemePreferenceFactoryOverrides,
+  PremiumThemePreferenceFixture,
 } from './premium.factory.js'

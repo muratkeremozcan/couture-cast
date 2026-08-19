@@ -1,3 +1,7 @@
+// Learning path Step 34: Premium subscription lifecycle.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-34-premium-subscription-lifecycle
+// Learning path Step 35: Premium theme switcher.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
 // Story 5.2 Task 7 owner: ten-locale parity for the `commerce.premium.*` tree.
 //
 // The premium namespace lives under `commerce.premium` (Decision 12a), but its
@@ -55,8 +59,13 @@ const APPROVED_COGNATES: Record<string, readonly SupportedLocale[]> = {
 }
 
 function premiumTree(catalog: Catalog): Record<string, unknown> {
+  // Story 5.3 nests its `theme` namespace under `commerce.premium.*` (Decision 13)
+  // but audits it in `premium-theme-locales.spec.ts`; this spec keeps pinning the
+  // 5.2 key set exactly, so the subtree is excluded rather than absorbed. Same
+  // treatment `commerce-locales.spec.ts` gives this tree one level up.
   const commerce = (catalog.commerce ?? {}) as Record<string, unknown>
-  return (commerce.premium ?? {}) as Record<string, unknown>
+  const premium = (commerce.premium ?? {}) as Record<string, unknown>
+  return Object.fromEntries(Object.entries(premium).filter(([key]) => key !== 'theme'))
 }
 
 function flatten(value: unknown, prefix = ''): Map<string, string> {
@@ -110,8 +119,11 @@ describe('5.2 premium locale parity (web)', () => {
       'activating',
       'disclosure',
       'endedNote',
+      'errorAlreadySubscribed',
       'errorLoad',
+      'errorNoWebSubscription',
       'errorPurchase',
+      'errorSubscribeDisabled',
       'graceBanner',
       'manage',
       'manageInStore',

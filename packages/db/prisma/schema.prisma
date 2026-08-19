@@ -181,6 +181,20 @@ enum PremiumEntitlementStatus {
   revoked
 }
 
+/// Story 5.3: the three shipped premium palettes from the UX Color Theme
+/// Explorer (`refs/ux/ux-color-themes.html`). Lowercase members serialize
+/// straight to JSON with no mapping layer.
+///
+/// There is deliberately no `default`/`none` member: an absent selection is
+/// already spelled by a NULL `theme`, and a second spelling of the same fact is
+/// the trap story 5.2 named for PremiumEntitlementStatus. "Spring Bloom" is
+/// marked future in the UX spec and is not a member either.
+enum PremiumThemeKey {
+  jewel_radiance
+  autumn_umber
+  winter_metallic
+}
+
 model User {
   id                            String                   @id @default(cuid())
   email                         String                   @unique
@@ -216,6 +230,7 @@ model User {
   premium_entitlement           PremiumEntitlement?
   billing_events                BillingEvent[]
   billing_customer              BillingCustomer?
+  premium_theme_preference      PremiumThemePreference?
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -986,4 +1001,26 @@ model BillingCustomer {
   updated_at         DateTime @updatedAt
 
   @@map("BillingCustomer")
+}
+
+/// Story 5.3: the signed-in user's premium palette choice, one row per user.
+/// RLS: owner-only (selfOnlyTables), same template as CommercePreference and
+/// deliberately NOT guardian-shared. A cosmetic preference is not
+/// privilege-bearing — unlike PremiumEntitlement, this table is safe for the
+/// authenticated user to read and write directly.
+///
+/// Absent row and `theme = NULL` both mean Default, and nothing may branch on
+/// which of the two it is. Reset is an upsert to NULL, never a DELETE: the row
+/// appears the first time a user opens the gallery and is never removed after,
+/// not on reset and not when entitlement lapses (entitlement is resolved at
+/// read time, so a stale row simply stops rendering).
+model PremiumThemePreference {
+  id         String           @id @default(cuid())
+  user       User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id    String           @unique
+  theme      PremiumThemeKey?
+  created_at DateTime         @default(now())
+  updated_at DateTime         @updatedAt
+
+  @@map("PremiumThemePreference")
 }

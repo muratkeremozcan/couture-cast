@@ -30,6 +30,7 @@ import {
   premiumCheckoutStartedPropertiesSchema,
   premiumEntitlementActivatedPropertiesSchema,
   premiumEntitlementDeactivatedPropertiesSchema,
+  premiumThemeSelectedPropertiesSchema,
   type AnalyticsEventName,
 } from '../types/analytics-events'
 import type { ExpectLike } from './expect-like'
@@ -78,6 +79,7 @@ const analyticsPropertySchemas = {
   premium_checkout_started: premiumCheckoutStartedPropertiesSchema,
   premium_entitlement_activated: premiumEntitlementActivatedPropertiesSchema,
   premium_entitlement_deactivated: premiumEntitlementDeactivatedPropertiesSchema,
+  premium_theme_selected: premiumThemeSelectedPropertiesSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

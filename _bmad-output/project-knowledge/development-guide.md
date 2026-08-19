@@ -274,8 +274,59 @@ npm run verify:changed
 ```
 
 It ignores documentation and environment files and warns about unmapped root changes.
-Run broader checks when root scripts, shared configuration, E2E, Pact, or k6 files
-change.
+
+### What `verify:changed` never covers
+
+The planner maps only `apps/*` and `packages/*` paths
+([`scripts/verify-changed.mjs`](../../scripts/verify-changed.mjs)). Changes in these
+directories are listed as unmapped and need their own explicit run:
+
+| Changed path  | Run instead                                                       |
+| ------------- | ----------------------------------------------------------------- |
+| `playwright/` | `npm run test:pw-local` (or the preview/prod variants)            |
+| `pact/`       | `npm run test:pact`                                               |
+| `k6/`         | `npm run test:k6:local`                                           |
+| `maestro/`    | `npm run test:mobile:e2e:android`, or the per-flow script         |
+| `scripts/`    | `npm run validate`, plus whichever gate the changed script drives |
+
+Three more gaps sit inside workspaces the planner does map. The first two need a
+running database and report the lack of one as something else; the third is about how
+you invoke the gate, not about your working tree.
+
+**`apps/api` and `packages/db` need a reachable, migrated PostgreSQL.** Neither needs
+you to export anything on a machine running local Supabase: both Vitest configs resolve
+the URL themselves and default to
+`postgresql://postgres:postgres@127.0.0.1:54322/postgres`, pinning it into `test.env` so
+the `packages/db/.env` dotenv load cannot redirect a worker mid-run. Export
+`DATABASE_URL` (or `INTEGRATION_TEST_DATABASE_URL` / `RLS_TEST_DATABASE_URL`) only to
+aim them somewhere else. Start the database with `npm run supabase:start` and apply
+migrations with `node scripts/prisma-migrate-deploy.mjs`.
+
+What the two workspaces do when no database answers differs, and only one of them says
+so:
+
+- `apps/api`'s Vitest run includes `integration/**`, and those suites skip themselves
+  when their schema probe fails. Measured on 2026-08-18 against this tree: with the
+  database up, 1773 passed and 5 skipped, coverage 96.03/90.04/96.10/96.14 against the
+  94/88/95/94 ratchet, green. With nothing listening, 1616 passed and 162 skipped,
+  coverage 92.75/86.85/92.79/92.74, and all four thresholds fail. The run is red either
+  way, but the message names coverage, so read a four-threshold failure in this
+  workspace as "no database" before you read it as a regression.
+- `packages/db`'s suites hold the RLS actor matrix and every schema-constraint
+  assertion, and they talk to PostgreSQL directly rather than probing first. With
+  nothing listening the same tree gives 8 failed files, 17 failed, 15 passed, 96
+  skipped. That one is unambiguous: the failures name the connection.
+
+**Run one database-backed suite at a time.** Two Vitest processes against a single
+PostgreSQL cross-talk, because the `apps/api` integration suites assert on rows and row
+counts in shared tables. Two full `apps/api` runs started together on 2026-08-18 both
+went red, on different tests each: six failures in one and two in the other, spread
+across `commerce-affiliate-offers`, `commerce-affiliate-clicks`, and
+`commerce-affiliate-webhook`. Every one of those specs passes alone, and six sequential
+full runs of the same tree were green. So a failure in those files after you have
+started a second run is contention, not a flake to chase; finish one run first, then
+re-run to confirm. CI is unaffected: `pr-checks.yml` gives the job its own ephemeral
+`postgres:16-alpine` service container.
 
 ## Full validation
 

@@ -41,10 +41,37 @@
       "endedNote": "Dein Abonnement ist beendet. Du kannst jederzeit wieder abonnieren.",
       "errorLoad": "Abostatus konnte nicht geladen werden.",
       "errorPurchase": "Checkout konnte nicht gestartet werden. Bitte versuche es erneut.",
+      "errorAlreadySubscribed": "Du hast bereits ein aktives Premium-Abo. Lade diese Seite neu, um es zu sehen.",
+      "errorNoWebSubscription": "Für dieses Konto gibt es kein Web-Abo zum Verwalten.",
+      "errorSubscribeDisabled": "Neue Premium-Abos sind derzeit pausiert. Bitte versuche es in Kürze erneut.",
       "signedOutHint": "Melde dich an, um Premium zu abonnieren oder zu verwalten",
       "plannerLocked": {
         "title": "Der 7-Tage-Planer ist eine Premium-Funktion",
         "cta": "Premium holen"
+      },
+      "theme": {
+        "sectionTitle": "Oberflächenpaletten",
+        "disclosure": "Oberflächenpaletten sind eine Premium-Funktion. Deine Auswahl wird in deinem CoutureCast-Konto gespeichert und gilt auf jedem Gerät, auf dem du dich anmeldest. Eine Palette ändert nur Farben: Sie ändert nie, welche Outfits empfohlen werden. CoutureCast übermittelt die gewählte Palette unter einer pseudonymen Kennung an seinen Analyseanbieter; Kleidungsfotos oder persönliche Daten werden nicht geteilt.",
+        "names": {
+          "jewelRadiance": "Jewel Radiance",
+          "autumnUmber": "Autumn Umber",
+          "winterMetallic": "Winter Metallic"
+        },
+        "select": "Anwenden",
+        "selected": "Ausgewählt",
+        "reset": "Standardpalette",
+        "preview": {
+          "title": "Live-Vorschau",
+          "body": "Diese Karte verwendet die Palette, die du angewendet hast. Die Karten darüber zeigen immer ihre eigenen Farben."
+        },
+        "unavailable": "Paletten sind derzeit abgeschaltet. Deine gespeicherte Auswahl bleibt erhalten und kehrt zurück, sobald sie wieder verfügbar sind.",
+        "locked": {
+          "title": "Oberflächenpaletten sind eine Premium-Funktion",
+          "body": "Schließe oben ein Premium-Abo ab, um Jewel Radiance, Autumn Umber und Winter Metallic freizuschalten.",
+          "signedOutBody": "Melde dich an und schließe ein Premium-Abo ab, um Jewel Radiance, Autumn Umber und Winter Metallic freizuschalten."
+        },
+        "loadError": "Deine Oberflächenpalette konnte nicht geladen werden. Es wird die Standardpalette angezeigt.",
+        "saveError": "Deine Oberflächenpalette konnte nicht gespeichert werden. Bitte versuche es erneut."
       }
     }
   },

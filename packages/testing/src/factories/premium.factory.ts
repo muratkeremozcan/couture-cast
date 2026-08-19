@@ -5,6 +5,8 @@ import type {
   EntitlementStore,
   PremiumEntitlement,
   PremiumEntitlementStatus,
+  PremiumThemeKey,
+  PremiumThemePreference,
   Prisma,
   PrismaClient,
 } from '@prisma/client'
@@ -28,6 +30,10 @@ import { registerCreatedEntity } from './registry.js'
  * Entitlement timestamps default to fixed instants (period end far in the
  * future, event clock in the past) so ordering-guard tests can place events on
  * either side without sleeping.
+ *
+ * Story 5.3 adds PremiumThemePreference to the same file rather than a new one:
+ * it is the same premium domain, and the theme preference only ever appears
+ * beside an entitlement in a fixture graph.
  */
 
 type PremiumPrismaClient = PrismaClient | Prisma.TransactionClient
@@ -262,4 +268,66 @@ export async function persistBillingCustomer(
 
   registerCreatedEntity('billingCustomers', customer.id)
   return customer
+}
+
+// --- PremiumThemePreference --------------------------------------------------
+
+export interface PremiumThemePreferenceFixture {
+  id: string
+  userId: string
+  /** NULL is Default, and it is a real value here, not "unset". */
+  theme: PremiumThemeKey | null
+}
+
+export type PremiumThemePreferenceFactoryOverrides =
+  Partial<PremiumThemePreferenceFixture>
+
+function buildDefaultPremiumThemePreferenceFixture(): PremiumThemePreferenceFixture {
+  return {
+    id: faker.string.uuid(),
+    userId: faker.string.uuid(),
+    // A named palette by default: the interesting fixture is a user who has
+    // actually chosen one, and Default is one explicit `theme: null` away.
+    // Jewel Radiance is the only palette whose primary accent clears the 4.5:1
+    // small-text floor against white, so it is the safest default to render.
+    theme: 'jewel_radiance',
+  }
+}
+
+const mergePremiumThemePreferenceFixture = createFactory<PremiumThemePreferenceFixture>(
+  buildDefaultPremiumThemePreferenceFixture
+)
+
+export function createPremiumThemePreference(
+  overrides: PremiumThemePreferenceFactoryOverrides = {}
+): PremiumThemePreferenceFixture {
+  return mergePremiumThemePreferenceFixture(overrides)
+}
+
+/**
+ * See {@link buildPremiumEntitlementCreateInput}. `theme` is passed through
+ * even when it is null, because null is the Default selection rather than an
+ * omitted field, and letting the column default fill it in would make the two
+ * cases indistinguishable in a fixture.
+ */
+export function buildPremiumThemePreferenceCreateInput(
+  fixture: PremiumThemePreferenceFixture
+): Prisma.PremiumThemePreferenceUncheckedCreateInput {
+  return {
+    id: fixture.id,
+    user_id: fixture.userId,
+    theme: fixture.theme,
+  }
+}
+
+export async function persistPremiumThemePreference(
+  prisma: PremiumPrismaClient,
+  fixture: PremiumThemePreferenceFixture
+): Promise<PremiumThemePreference> {
+  const preference = await prisma.premiumThemePreference.create({
+    data: buildPremiumThemePreferenceCreateInput(fixture),
+  })
+
+  registerCreatedEntity('premiumThemePreferences', preference.id)
+  return preference
 }

@@ -1,3 +1,7 @@
+// Learning path Step 34: Premium subscription lifecycle.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-34-premium-subscription-lifecycle
+// Learning path Step 35: Premium theme switcher.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
 // Story 5.2 Task 7 owner: the web settings Premium section.
 //
 // These go through MSW rather than a mocked `lib/premium`, so the request
@@ -259,7 +263,15 @@ describe('SubscriptionSection', () => {
     ])
   })
 
-  it('5.2-WEB-SEC-09 surfaces the kill-switch message when checkout is disabled', async () => {
+  /**
+   * The kill switch reaches the reader as localized copy, not as the server's
+   * `COMMERCE_SUBSCRIPTION_DISABLED_MESSAGE`. That constant is untranslated English,
+   * so rendering it verbatim showed English to the nine non-`en` catalogs on the one
+   * path `commerce.premium.errorSubscribeDisabled` exists for. The response below
+   * still carries a perfectly readable message and it is deliberately not what the
+   * alert says.
+   */
+  it('5.2-WEB-SEC-09 renders localized copy, not the server text, when checkout is disabled', async () => {
     signIn()
     useMswHandlers(
       http.get(SUBSCRIPTION_PATH, () => HttpResponse.json({ data: NONE_SUBSCRIPTION })),
@@ -281,10 +293,110 @@ describe('SubscriptionSection', () => {
     fireEvent.click(screen.getByTestId('premium-subscribe-monthly'))
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('Premium subscriptions are temporarily unavailable.')
+    expect(alert).toHaveTextContent('New Premium subscriptions are paused right now.')
+    expect(alert).not.toHaveTextContent(
+      'Premium subscriptions are temporarily unavailable.'
+    )
     expect(redirect).not.toHaveBeenCalled()
   })
 
+  /**
+   * The two 409s are the reason the status map is per-operation rather than global:
+   * the same status means "you already have one" on checkout and "manage it in the
+   * store" on the portal, and collapsing either into the generic `errorPurchase`
+   * leaves the reader with no next step. The store-managed case reuses
+   * `commerce.premium.manageInStore`, the sentence the catalogs already carry for it.
+   */
+  it('5.2-WEB-SEC-22 tells an already-subscribed reader so, rather than "try again"', async () => {
+    signIn()
+    useMswHandlers(
+      http.get(SUBSCRIPTION_PATH, () => HttpResponse.json({ data: NONE_SUBSCRIPTION })),
+      http.post(CHECKOUT_PATH, () =>
+        HttpResponse.json(
+          {
+            statusCode: 409,
+            message: 'This account already has an active Premium subscription.',
+            error: 'Conflict',
+          },
+          { status: 409 }
+        )
+      )
+    )
+
+    renderSection()
+    await screen.findByTestId('premium-subscribe-monthly')
+    fireEvent.click(screen.getByTestId('premium-subscribe-monthly'))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('You already have an active Premium subscription.')
+    expect(alert).not.toHaveTextContent('Unable to start checkout')
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  /**
+   * The portal's half of the same 409. `manageInStore` was already translated in all
+   * ten catalogs and rendered nowhere on this path, so the store-managed reader used
+   * to get "Unable to start checkout. Please try again." — wrong instruction and no
+   * next step, for the one failure with a completely clear answer.
+   */
+  it('5.2-WEB-SEC-24 points a store-managed reader at the store, not at checkout', async () => {
+    signIn()
+    useMswHandlers(
+      http.get(SUBSCRIPTION_PATH, () =>
+        HttpResponse.json({ data: entitledSubscription() })
+      ),
+      http.post(PORTAL_PATH, () =>
+        HttpResponse.json(
+          {
+            statusCode: 409,
+            message:
+              'This subscription is managed in the app store it was purchased from.',
+            error: 'Conflict',
+          },
+          { status: 409 }
+        )
+      )
+    )
+
+    renderSection()
+    fireEvent.click(await screen.findByTestId('premium-manage-button'))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('App Store or Play Store')
+    expect(alert).not.toHaveTextContent('Unable to start checkout')
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  it('5.2-WEB-SEC-25 says there is nothing to manage when no web subscription exists', async () => {
+    signIn()
+    useMswHandlers(
+      http.get(SUBSCRIPTION_PATH, () =>
+        HttpResponse.json({ data: entitledSubscription() })
+      ),
+      http.post(PORTAL_PATH, () =>
+        HttpResponse.json(
+          {
+            statusCode: 404,
+            message: 'No web subscription found for this account.',
+            error: 'Not Found',
+          },
+          { status: 404 }
+        )
+      )
+    )
+
+    renderSection()
+    fireEvent.click(await screen.findByTestId('premium-manage-button'))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('no web subscription on this account')
+    expect(redirect).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Same rule on the read path. The 500 below carries its own English sentence and
+   * the alert shows `commerce.premium.errorLoad` instead.
+   */
   it('5.2-WEB-SEC-10 alerts and keeps controls disabled when the status read fails', async () => {
     signIn()
     useMswHandlers(
@@ -303,9 +415,31 @@ describe('SubscriptionSection', () => {
     renderSection()
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('Unable to reach subscriptions.')
+    expect(alert).toHaveTextContent('Unable to load subscription status.')
+    expect(alert).not.toHaveTextContent('Unable to reach subscriptions.')
     expect(screen.queryByTestId('premium-subscribe-monthly')).not.toBeInTheDocument()
     expect(screen.queryByTestId('premium-status-line')).not.toBeInTheDocument()
+  })
+
+  /**
+   * A 401 mid-session is a state change, not an error string. Without this the write
+   * surfaced PREMIUM_SIGNED_OUT_MESSAGE, a developer string with no catalog entry, so
+   * English in all ten locales.
+   */
+  it('5.2-WEB-SEC-23 returns to the signed-out branch when the session ends mid-read', async () => {
+    signIn()
+    useMswHandlers(
+      http.get(SUBSCRIPTION_PATH, () =>
+        HttpResponse.json({ statusCode: 401, message: 'Unauthorized' }, { status: 401 })
+      )
+    )
+
+    renderSection()
+
+    const hint = await screen.findByTestId('premium-signed-out-hint')
+    expect(hint).toHaveTextContent('Sign in to subscribe or manage Premium')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Sign in to manage Premium/)).not.toBeInTheDocument()
   })
 
   it('5.2-WEB-SEC-11 checkout=cancelled returns quietly to the idle status', async () => {

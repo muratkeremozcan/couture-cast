@@ -26,7 +26,8 @@ import {
   createPortalSessionFromWeb,
   getSubscriptionFromWeb,
   hasWebSession,
-  premiumErrorMessage,
+  premiumFailureReason,
+  type PremiumFailureReason,
   redirectToExternalUrl,
   refreshSubscriptionFromWeb,
 } from '../../lib/premium'
@@ -217,6 +218,30 @@ function resolveSectionView(
   }
 }
 
+/**
+ * Which `commerce.premium.*` key each failure reason renders.
+ *
+ * `null` means the call site's own fallback wins, which is already a translated
+ * string picked per operation (`errorLoad` for reads, `errorPurchase` for the two
+ * redirects). Everything else is a distinction the reader can act on differently,
+ * which is the whole reason the reasons exist: an App Store subscriber told
+ * "Unable to start checkout. Please try again." has no next step, and
+ * `manageInStore` is the sentence that gives them one.
+ *
+ * `signed_out` carries no key. A session that ended under the reader is a state
+ * change, not an error string, so the handlers move the section to its signed-out
+ * branch and let the localized hint there do the talking.
+ */
+const FAILURE_MESSAGE_KEYS: Readonly<Record<PremiumFailureReason, string | null>> = {
+  signed_out: null,
+  already_subscribed: 'commerce.premium.errorAlreadySubscribed',
+  store_managed: 'commerce.premium.manageInStore',
+  no_web_subscription: 'commerce.premium.errorNoWebSubscription',
+  subscribe_disabled: 'commerce.premium.errorSubscribeDisabled',
+  status_unavailable: null,
+  unknown: null,
+}
+
 export function SubscriptionSection() {
   const { t } = useTranslation()
   const [sectionState, setSectionState] = useState<SectionState>('checking')
@@ -317,13 +342,41 @@ export function SubscriptionSection() {
         if (controller.signal.aborted) {
           return
         }
-        setError(premiumErrorMessage(loadError, loadErrorMessage))
+        if (premiumFailureReason(loadError) === 'signed_out') {
+          // A token that expired mid-session is not a broken read. Fall back to
+          // the signed-out branch and its localized hint rather than surfacing
+          // PREMIUM_SIGNED_OUT_MESSAGE, which has no catalog entry.
+          setSectionState('signed_out')
+          return
+        }
+        // `status_unavailable` (the 503 ledger pull) and `unknown` both render
+        // `errorLoad`, so no reason lookup is needed here — which is what keeps
+        // `t` out of this effect and the dependency array down to one value.
+        setError(loadErrorMessage)
         setSectionState('load_failed')
       }
     })()
 
     return () => controller.abort()
   }, [loadErrorMessage])
+
+  /**
+   * Turns a rejection into localized copy, or into the signed-out state.
+   *
+   * `fallbackKey` is the operation's own generic string, used whenever the failure
+   * carries no distinction worth a sentence of its own. Nothing here ever renders
+   * the server's `message`: every one of those constants is untranslated English.
+   */
+  function applyFailure(failure: unknown, fallbackKey: string): void {
+    const reason = premiumFailureReason(failure)
+    if (reason === 'signed_out') {
+      setSubscription(null)
+      setError(null)
+      setSectionState('signed_out')
+      return
+    }
+    setError(t(FAILURE_MESSAGE_KEYS[reason] ?? fallbackKey))
+  }
 
   async function handleSubscribe(plan: SubscriptionPlan): Promise<void> {
     if (isRedirecting) {
@@ -348,7 +401,7 @@ export function SubscriptionSection() {
       const url = await createCheckoutSessionFromWeb(plan)
       redirectToExternalUrl(url)
     } catch (checkoutError: unknown) {
-      setError(premiumErrorMessage(checkoutError, t('commerce.premium.errorPurchase')))
+      applyFailure(checkoutError, 'commerce.premium.errorPurchase')
       setIsRedirecting(false)
     }
   }
@@ -363,7 +416,7 @@ export function SubscriptionSection() {
       const url = await createPortalSessionFromWeb()
       redirectToExternalUrl(url)
     } catch (portalError: unknown) {
-      setError(premiumErrorMessage(portalError, t('commerce.premium.errorPurchase')))
+      applyFailure(portalError, 'commerce.premium.errorPurchase')
       setIsRedirecting(false)
     }
   }

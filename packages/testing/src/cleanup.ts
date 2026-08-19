@@ -46,6 +46,7 @@ export interface CleanupPrismaClient {
   premiumEntitlement: CleanupDelegate
   billingEvent: CleanupDelegate
   billingCustomer: CleanupDelegate
+  premiumThemePreference: CleanupDelegate
 }
 
 export interface CleanupConfiguration {
@@ -252,11 +253,13 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const premiumEntitlementIds = uniqueValues(tracked.premiumEntitlements)
   const billingEventIds = uniqueValues(tracked.billingEvents)
   const billingCustomerIds = uniqueValues(tracked.billingCustomers)
+  const premiumThemePreferenceIds = uniqueValues(tracked.premiumThemePreferences)
 
   const commercePreferenceWhere = buildDeleteWhere(commercePreferenceIds, userIds)
   const affiliateClickWhere = buildDeleteWhere(affiliateClickIds, userIds)
   const premiumEntitlementWhere = buildDeleteWhere(premiumEntitlementIds, userIds)
   const billingCustomerWhere = buildDeleteWhere(billingCustomerIds, userIds)
+  const premiumThemePreferenceWhere = buildDeleteWhere(premiumThemePreferenceIds, userIds)
 
   const outfitRecommendationWhere = buildDeleteWhere(ritualIds, userIds)
   const outfitCapsuleGarmentWhere = buildDeleteWhere(outfitCapsuleGarmentIds, userIds)
@@ -305,6 +308,15 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
 
     if (billingCustomerWhere) {
       await prisma.billingCustomer.deleteMany({ where: billingCustomerWhere })
+    }
+
+    // Story 5.3 theme preference. It hangs off the user with ON DELETE CASCADE
+    // and nothing references it, so it only needs to precede the user delete;
+    // it sits beside the billing block because it is the same premium domain.
+    if (premiumThemePreferenceWhere) {
+      await prisma.premiumThemePreference.deleteMany({
+        where: premiumThemePreferenceWhere,
+      })
     }
 
     // Story 5.1 commerce, deleted first and in reverse dependency order:
