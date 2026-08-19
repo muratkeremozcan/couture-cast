@@ -2867,7 +2867,11 @@ describe.concurrent('guardian-aware RLS policies', () => {
           )
           expect(resetInsert.rows).toEqual([{ theme: null }])
 
-          // Back to the seeded value so later tests in this file see what they expect.
+          // Not housekeeping: the scenario fixture seeds and tears down per
+          // test, so no later test reads this row. This is the owner writing a
+          // real palette back over the NULL the reset upsert just left, which is
+          // the one UPDATE shape the block still has to prove the authenticated
+          // role can perform on its own row.
           const restored = await client.query(
             `UPDATE public."PremiumThemePreference"
                SET "theme" = 'jewel_radiance', "updated_at" = NOW()

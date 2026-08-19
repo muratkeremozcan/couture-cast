@@ -254,15 +254,21 @@ describe('premium theme preference schema', () => {
 
     it('5.3-DB-015 enables row level security and carries one policy per verb', async () => {
       await inRolledBackTransaction(async (client) => {
+        // Both catalog lookups are schema-qualified. `pg_class.relname` and
+        // `pg_policies.tablename` are unique per schema, not per database, so an
+        // unqualified name would happily match a same-named relation somewhere
+        // else on the search path and prove the assertion about the wrong table.
         const rls = await client.query<{ relrowsecurity: boolean }>(
           `SELECT "relrowsecurity" FROM pg_class
-           WHERE "relname" = 'PremiumThemePreference'`
+           WHERE "relnamespace" = 'public'::regnamespace
+             AND "relname" = 'PremiumThemePreference'`
         )
         expect(rls.rows).toEqual([{ relrowsecurity: true }])
 
         const policies = await client.query<{ policyname: string; cmd: string }>(
           `SELECT "policyname", "cmd" FROM pg_policies
-           WHERE "tablename" = 'PremiumThemePreference'`
+           WHERE "schemaname" = 'public'
+             AND "tablename" = 'PremiumThemePreference'`
         )
         expect(policies.rows.map((row) => row.cmd).sort()).toEqual([
           'DELETE',

@@ -23,22 +23,34 @@ import {
  * The probe below gives the same courtesy the variable was reaching for — a developer
  * with no database still gets a clean skip with a reason — while a machine that does
  * have one actually runs the tests.
+ *
+ * THE PROBE ERROR IS REPORTED, NEVER SWALLOWED. A bare `catch {}` makes every cause
+ * look alike: no server listening, a server with no migrations applied, and bad
+ * credentials all print the same sentence, so the reader cannot tell which one to fix.
+ * The caught error's message rides along in the warning instead.
  */
+const databaseUrl =
+  process.env.INTEGRATION_TEST_DATABASE_URL ??
+  process.env.DATABASE_URL ??
+  'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+
 const HOUR_MS = 60 * 60 * 1_000
 
 let schemaReady = false
 
 async function probeSchema(): Promise<void> {
-  const probe = new PrismaClient()
+  const probe = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
   try {
     await probe.$queryRaw`SELECT 1 FROM "EventEnvelope" LIMIT 1`
     schemaReady = true
-  } catch {
+  } catch (error) {
     schemaReady = false
+    const cause = error instanceof Error ? error.message : String(error)
     // eslint-disable-next-line no-console
     console.warn(
       '[weather-alert-cooldown.integration] Skipped: no reachable PostgreSQL with the ' +
-        'EventEnvelope schema. Run `npm run db:reset` to execute this suite.'
+        'EventEnvelope schema. Run `npm run db:reset` to execute this suite. ' +
+        `Probe error: ${cause}`
     )
   } finally {
     await probe.$disconnect()
@@ -85,7 +97,9 @@ describe.sequential('Weather alert rolling cooldown Prisma integration', () => {
       return
     }
     testPrefix = `rolling-cooldown-${randomUUID()}`
-    prisma = new PrismaClient()
+    // Same explicitly resolved URL the probe used, so the suite can never assert
+    // against a different database than the one it declared ready.
+    prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
     await prisma.$connect()
     // Every candidate this suite builds carries `${testPrefix}-user` as its
     // `userId`, and `EventEnvelope.user_id` is a real foreign key onto `User`.

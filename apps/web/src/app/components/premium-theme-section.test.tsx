@@ -67,6 +67,28 @@ function activeTheme() {
   return document.documentElement.getAttribute('data-theme')
 }
 
+/** `applyWebThemeAttribute(null)` writes an empty attribute for the Default palette. */
+const DEFAULT_ACTIVE_THEME = ''
+
+/**
+ * Drains everything still queued behind a settled response.
+ *
+ * A save that was *not* cancelled reaches `applyWebThemeAttribute` several hops after
+ * the handler returns: MSW has to hand the response back to `fetch`, and the component's
+ * `await` has to resume. Asserting on `<html>` before those hops run would pass for the
+ * wrong reason, so any test claiming an abandoned request never repainted the document
+ * has to wait here first. Yielding a fixed number of event-loop turns rather than
+ * sleeping a wall-clock interval keeps it stable on a loaded machine: every turn drains
+ * the whole microtask queue, and the real path needs one.
+ */
+async function drainSettledResponses(): Promise<void> {
+  for (let turn = 0; turn < 20; turn += 1) {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0)
+    })
+  }
+}
+
 /*
  * Resolved through `fileURLToPath` on the string form rather than `new URL(...)`.
  * The jsdom environment replaces the global `URL`, and `node:fs` refuses an instance
@@ -732,6 +754,17 @@ describe('PremiumThemeSection', () => {
    * had moved to — from a component that no longer existed. The `<html>` assertion is
    * the load-bearing half: an aborted request that still repainted the document would
    * pass a state-only check.
+   *
+   * Two things about the ending are deliberate. The gate is released immediately after
+   * unmount, before `aborted.promise` is awaited, and the attribute is then read once
+   * through `drainSettledResponses` rather than polled. Awaiting the abort first and
+   * polling for "not winter_metallic" afterwards looks stricter and is in fact vacuous:
+   * the poll succeeds on its first tick, while `<html>` still holds the Default the load
+   * left, long before the abandoned response could have overwritten it. Releasing the
+   * gate first gives the un-cancelled path its full chance to repaint the document, so
+   * the attribute check is the assertion that fails when the abort is removed. The
+   * server-side `aborted.promise` stays as the second half of the proof: the request was
+   * cancelled at the wire rather than discarded on arrival.
    */
   it('5.3-WEB-118 abandons an in-flight save when the section unmounts', async () => {
     signIn()
@@ -754,12 +787,15 @@ describe('PremiumThemeSection', () => {
     )
 
     view.unmount()
-    await aborted.promise
     gate.resolve()
+    await drainSettledResponses()
 
     expect(screen.queryByTestId('premium-theme-section')).not.toBeInTheDocument()
-    // The palette the abandoned save would have applied never reaches the document.
-    await waitFor(() => expect(activeTheme()).not.toBe('winter_metallic'))
+    // `<html>` still carries the Default the load left: the palette the abandoned save
+    // would have applied never reached the document, and never will.
+    expect(activeTheme()).toBe(DEFAULT_ACTIVE_THEME)
+    // And the cancellation reached the wire rather than being discarded on arrival.
+    await aborted.promise
   })
 
   it('5.3-WEB-111 passes axe locked, in the gallery, and after a failed save', async () => {

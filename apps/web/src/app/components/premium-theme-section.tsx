@@ -338,6 +338,13 @@ export function PremiumThemeSection() {
   }, [loadErrorMessage])
 
   /**
+   * The palette the server last confirmed, which is both what the gallery marks
+   * "Selected" and what `handleSelect` compares a press against. Declared here rather
+   * than beside `view` below so it reads before its first use.
+   */
+  const selectedKey = theme?.theme ?? null
+
+  /**
    * Applied on success only, never optimistically.
    *
    * AC 4 is "on successful save, the choice re-colors the surface". Re-coloring the
@@ -432,7 +439,6 @@ export function PremiumThemeSection() {
   }
 
   const view = resolveSectionView(sectionState, theme)
-  const selectedKey = theme?.theme ?? null
 
   return (
     <section

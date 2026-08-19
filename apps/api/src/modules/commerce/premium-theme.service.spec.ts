@@ -151,13 +151,10 @@ describe('getTheme: entitlement and preference resolve together (Decision 7)', (
   it('5.3-API-011c resolves to Default when the stored enum member predates this build', async () => {
     const { service, premiumThemePreference } = build()
     premiumThemePreference.findUnique.mockRejectedValueOnce(
-      Object.assign(
-        new Prisma.PrismaClientKnownRequestError('Inconsistent column data', {
-          code: 'P2023',
-          clientVersion: 'test',
-        }),
-        {}
-      )
+      new Prisma.PrismaClientKnownRequestError('Inconsistent column data', {
+        code: 'P2023',
+        clientVersion: 'test',
+      })
     )
 
     await expect(service.getTheme(USER_ID)).resolves.toEqual({
