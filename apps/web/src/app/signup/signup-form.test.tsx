@@ -54,15 +54,24 @@ describe('SignupForm', () => {
     })
     fireEvent.submit(screen.getByRole('button', { name: 'Create account' }))
 
+    // Both assertions live inside one waitFor, the same way the guardian test
+    // below does it. Splitting them raced: `submitSignup` is recorded as called
+    // the moment the submit handler invokes it, which is before the awaited
+    // response resolves and React commits the success state, so a bare
+    // `getByTestId` after the wait only passed when the microtask happened to
+    // flush first. It lost that race under `--coverage` in a full parallel run
+    // (instrumentation shifts the timing) and rendered the still-pending
+    // "Creating account…" button. The expectation is unchanged; only what the
+    // test waits for is.
     await waitFor(() => {
       expect(submitSignup).toHaveBeenCalledWith({
         email: 'eligible@example.com',
         birthdate: '2010-04-15',
       })
+      expect(screen.getByTestId('signup-success-message')).toHaveTextContent(
+        'Account created. You can continue to onboarding.'
+      )
     })
-    expect(screen.getByTestId('signup-success-message')).toHaveTextContent(
-      'Account created. You can continue to onboarding.'
-    )
   })
 
   it('shows the guardian invitation step after teen signup and sends the invite', async () => {

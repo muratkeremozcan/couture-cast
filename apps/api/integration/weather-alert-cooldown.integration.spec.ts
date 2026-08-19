@@ -2,24 +2,67 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-17-weather-alert-rules-and-notification-pipeline
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   PrismaWeatherAlertProcessingRepository,
   type WeatherAlertEventCandidate,
 } from '../src/modules/alerts/weather-alert-processing.repository'
 
-const describeRealDatabase =
-  process.env.ALERT_COOLDOWN_REAL_DB_INTEGRATION === 'true'
-    ? describe.sequential
-    : describe.skip
+/**
+ * Gated on a reachable schema, the way every sibling suite in this directory is,
+ * rather than on an opt-in environment variable.
+ *
+ * `ALERT_COOLDOWN_REAL_DB_INTEGRATION` was the previous gate and no workflow, npm
+ * script, or documented command ever set it. The suite therefore never executed
+ * anywhere, which is how it came to sit broken: every candidate it builds carries a
+ * `userId` with no `User` row behind it, so the first `createEvents` died on
+ * `EventEnvelope_user_id_fkey` (P2003) before asserting anything. A gate nobody can
+ * satisfy reports the same green as a passing suite, so the breakage was invisible.
+ *
+ * The probe below gives the same courtesy the variable was reaching for — a developer
+ * with no database still gets a clean skip with a reason — while a machine that does
+ * have one actually runs the tests.
+ *
+ * THE PROBE ERROR IS REPORTED, NEVER SWALLOWED. A bare `catch {}` makes every cause
+ * look alike: no server listening, a server with no migrations applied, and bad
+ * credentials all print the same sentence, so the reader cannot tell which one to fix.
+ * The caught error's message rides along in the warning instead.
+ */
+const databaseUrl =
+  process.env.INTEGRATION_TEST_DATABASE_URL ??
+  process.env.DATABASE_URL ??
+  'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 
 const HOUR_MS = 60 * 60 * 1_000
 
-describeRealDatabase('Weather alert rolling cooldown Prisma integration', () => {
+let schemaReady = false
+
+async function probeSchema(): Promise<void> {
+  const probe = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
+  try {
+    await probe.$queryRaw`SELECT 1 FROM "EventEnvelope" LIMIT 1`
+    schemaReady = true
+  } catch (error) {
+    schemaReady = false
+    const cause = error instanceof Error ? error.message : String(error)
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[weather-alert-cooldown.integration] Skipped: no reachable PostgreSQL with the ' +
+        'EventEnvelope schema. Run `npm run db:reset` to execute this suite. ' +
+        `Probe error: ${cause}`
+    )
+  } finally {
+    await probe.$disconnect()
+  }
+}
+
+describe.sequential('Weather alert rolling cooldown Prisma integration', () => {
   let prisma: PrismaClient
   let repository: PrismaWeatherAlertProcessingRepository
   let testPrefix: string
+
+  beforeAll(probeSchema)
 
   function buildCandidate(
     deduplicationKey: string,
@@ -48,10 +91,25 @@ describeRealDatabase('Weather alert rolling cooldown Prisma integration', () => 
     }
   }
 
-  beforeEach(async () => {
+  beforeEach(async (context) => {
+    if (!schemaReady) {
+      context.skip()
+      return
+    }
     testPrefix = `rolling-cooldown-${randomUUID()}`
-    prisma = new PrismaClient()
+    // Same explicitly resolved URL the probe used, so the suite can never assert
+    // against a different database than the one it declared ready.
+    prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
     await prisma.$connect()
+    // Every candidate this suite builds carries `${testPrefix}-user` as its
+    // `userId`, and `EventEnvelope.user_id` is a real foreign key onto `User`.
+    // Without this row the very first `createEvents` call dies on
+    // `EventEnvelope_user_id_fkey` (P2003) and all three tests fail before
+    // asserting anything about cooldown behaviour. Nothing reported it because
+    // nothing ever ran the suite; see the gate note at the top of this file.
+    await prisma.user.create({
+      data: { id: `${testPrefix}-user`, email: `${testPrefix}@couture-cast.test` },
+    })
     repository = new PrismaWeatherAlertProcessingRepository(prisma)
   })
 
@@ -62,6 +120,10 @@ describeRealDatabase('Weather alert rolling cooldown Prisma integration', () => 
     await prisma.alertCooldownReservation.deleteMany({
       where: { deduplication_key: { startsWith: `${testPrefix}-key-` } },
     })
+    // Last, and only after the envelopes above: the outbox rows cascade from the
+    // envelopes and the envelopes cascade from the user, so deleting the user
+    // first would take the rows this cleanup is auditing with it.
+    await prisma.user.deleteMany({ where: { id: `${testPrefix}-user` } })
     await prisma.$disconnect()
   })
 

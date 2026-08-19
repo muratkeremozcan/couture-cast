@@ -8,6 +8,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
+// Learning path Step 35: Premium theme switcher.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createHmac } from 'node:crypto'
 import { TelemetryService } from './telemetry.service'
@@ -670,6 +672,85 @@ describe('TelemetryService', () => {
       })
 
       expect(analyticsCapture).toHaveBeenCalled()
+    })
+  })
+
+  describe('story 5.3 premium theme server event', () => {
+    beforeEach(() => {
+      telemetryCreate.mockResolvedValue({ id: 'event-1' })
+    })
+
+    const subjectFor = (userId: string) =>
+      createHmac('sha256', 'telemetry-test-secret-at-least-32-bytes')
+        .update(userId)
+        .digest('base64url')
+
+    it('emits a palette selection under the acting user pseudonym', async () => {
+      await service.captureEvent('raw-user-1', 'premium_theme_selected', {
+        theme: 'jewel_radiance',
+      })
+
+      expect(analyticsCapture).toHaveBeenCalledWith({
+        distinctId: subjectFor('raw-user-1'),
+        event: 'premium_theme_selected',
+        properties: { theme: 'jewel_radiance', $ip: null },
+      })
+      expect(telemetryCreate).toHaveBeenCalledWith({
+        data: {
+          user_id: null,
+          event_type: 'premium_theme_selected',
+          properties: { theme: 'jewel_radiance' },
+        },
+      })
+    })
+
+    it('records a reset to Default as a null theme rather than skipping the event', async () => {
+      // Null is the single spelling of Default across the schema, the wire, and
+      // here. Dropping the event would make adoption look monotonic.
+      await service.captureEvent('raw-user-1', 'premium_theme_selected', { theme: null })
+
+      const captured = analyticsCapture.mock.calls[0]?.[0] as CapturedEvent
+      expect(captured.properties).toEqual({ theme: null, $ip: null })
+    })
+
+    it('refuses to emit a theme selection with no authenticated user', async () => {
+      // Membership in PSEUDONYMOUS_EVENT_TYPES persists user_id as null, so an
+      // unauthenticated emission would publish an event nobody can attribute.
+      await expect(
+        service.captureEvent(null, 'premium_theme_selected', { theme: 'autumn_umber' })
+      ).rejects.toThrow('Premium telemetry requires an authenticated user')
+      expect(telemetryCreate).not.toHaveBeenCalled()
+      expect(analyticsCapture).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      { name: 'a raw user id', extra: { userId: 'raw-user-1' } },
+      { name: 'a palette hex value', extra: { cardBg: '#E9EDF6' } },
+      { name: 'the previous palette', extra: { previousTheme: 'winter_metallic' } },
+      { name: 'a surface', extra: { surface: 'web_settings' } },
+    ])(
+      'rejects a selection carrying $name before anything is written',
+      async ({ extra }) => {
+        // The allowlist is `.strict()` at the validator, so a disallowed property
+        // fails the capture instead of leaking into PostHog.
+        await expect(
+          service.captureEvent('raw-user-1', 'premium_theme_selected', {
+            theme: 'autumn_umber',
+            ...extra,
+          } as never)
+        ).rejects.toThrow()
+        expect(telemetryCreate).not.toHaveBeenCalled()
+        expect(analyticsCapture).not.toHaveBeenCalled()
+      }
+    )
+
+    it('rejects a palette the contract does not ship', async () => {
+      await expect(
+        service.captureEvent('raw-user-1', 'premium_theme_selected', {
+          theme: 'spring_bloom',
+        } as never)
+      ).rejects.toThrow()
+      expect(analyticsCapture).not.toHaveBeenCalled()
     })
   })
 

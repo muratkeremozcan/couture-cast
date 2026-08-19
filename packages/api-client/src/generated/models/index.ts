@@ -3911,6 +3911,104 @@ export type PrecipPreparedness =
 /**
  *
  * @export
+ * @interface PremiumTheme
+ */
+export interface PremiumTheme {
+  /**
+   * The palette to render, already resolved server-side. null is the Default monochrome-and-gold system, which is also what a non-entitled caller reads regardless of what is stored.
+   * @type {PremiumThemeThemeEnum}
+   * @memberof PremiumTheme
+   */
+  theme: PremiumThemeThemeEnum | null
+  /**
+   * Whether the acting user currently passes the premium entitlement check. False forces theme to null in the same response, so a client never has to combine entitlement with preference itself.
+   * @type {boolean}
+   * @memberof PremiumTheme
+   */
+  isEntitled: boolean
+  /**
+   * Server-evaluated premium_themes_enabled flag. The only flag exposure path: clients render the gallery as selectable only when true. Reading the current theme stays available regardless.
+   * @type {boolean}
+   * @memberof PremiumTheme
+   */
+  themesEnabled: boolean
+}
+
+/**
+ * @export
+ */
+export const PremiumThemeThemeEnum = {
+  jewel_radiance: 'jewel_radiance',
+  autumn_umber: 'autumn_umber',
+  winter_metallic: 'winter_metallic',
+} as const
+export type PremiumThemeThemeEnum =
+  (typeof PremiumThemeThemeEnum)[keyof typeof PremiumThemeThemeEnum]
+
+/**
+ *
+ * @export
+ */
+export const PremiumThemeKey = {
+  jewel_radiance: 'jewel_radiance',
+  autumn_umber: 'autumn_umber',
+  winter_metallic: 'winter_metallic',
+} as const
+export type PremiumThemeKey = (typeof PremiumThemeKey)[keyof typeof PremiumThemeKey]
+
+/**
+ *
+ * @export
+ * @interface PremiumThemeResponse
+ */
+export interface PremiumThemeResponse {
+  /**
+   *
+   * @type {PremiumThemeResponseData}
+   * @memberof PremiumThemeResponse
+   */
+  data: PremiumThemeResponseData
+}
+/**
+ *
+ * @export
+ * @interface PremiumThemeResponseData
+ */
+export interface PremiumThemeResponseData {
+  /**
+   * The palette to render, already resolved server-side. null is the Default monochrome-and-gold system, which is also what a non-entitled caller reads regardless of what is stored.
+   * @type {PremiumThemeResponseDataThemeEnum}
+   * @memberof PremiumThemeResponseData
+   */
+  theme: PremiumThemeResponseDataThemeEnum | null
+  /**
+   * Whether the acting user currently passes the premium entitlement check. False forces theme to null in the same response, so a client never has to combine entitlement with preference itself.
+   * @type {boolean}
+   * @memberof PremiumThemeResponseData
+   */
+  isEntitled: boolean
+  /**
+   * Server-evaluated premium_themes_enabled flag. The only flag exposure path: clients render the gallery as selectable only when true. Reading the current theme stays available regardless.
+   * @type {boolean}
+   * @memberof PremiumThemeResponseData
+   */
+  themesEnabled: boolean
+}
+
+/**
+ * @export
+ */
+export const PremiumThemeResponseDataThemeEnum = {
+  jewel_radiance: 'jewel_radiance',
+  autumn_umber: 'autumn_umber',
+  winter_metallic: 'winter_metallic',
+} as const
+export type PremiumThemeResponseDataThemeEnum =
+  (typeof PremiumThemeResponseDataThemeEnum)[keyof typeof PremiumThemeResponseDataThemeEnum]
+
+/**
+ *
+ * @export
  * @interface QueueHealthResponse
  */
 export interface QueueHealthResponse {
@@ -6049,6 +6147,44 @@ export const UpdateOutfitCapsuleInputOccasionsEnum = {
 export type UpdateOutfitCapsuleInputOccasionsEnum =
   (typeof UpdateOutfitCapsuleInputOccasionsEnum)[keyof typeof UpdateOutfitCapsuleInputOccasionsEnum]
 
+/**
+ *
+ * @export
+ * @interface UpdatePremiumThemeInput
+ */
+export interface UpdatePremiumThemeInput {
+  /**
+   * The palette to store. null resets to Default; it upserts the stored row to null and never deletes it, so reset and downgrade stay distinguishable from "never chose".
+   * @type {UpdatePremiumThemeInputThemeEnum}
+   * @memberof UpdatePremiumThemeInput
+   */
+  theme: UpdatePremiumThemeInputThemeEnum | null
+}
+
+/**
+ * @export
+ */
+export const UpdatePremiumThemeInputThemeEnum = {
+  jewel_radiance: 'jewel_radiance',
+  autumn_umber: 'autumn_umber',
+  winter_metallic: 'winter_metallic',
+} as const
+export type UpdatePremiumThemeInputThemeEnum =
+  (typeof UpdatePremiumThemeInputThemeEnum)[keyof typeof UpdatePremiumThemeInputThemeEnum]
+
+/**
+ *
+ * @export
+ * @interface UpdatePremiumThemeResponse
+ */
+export interface UpdatePremiumThemeResponse {
+  /**
+   *
+   * @type {PremiumThemeResponseData}
+   * @memberof UpdatePremiumThemeResponse
+   */
+  data: PremiumThemeResponseData
+}
 /**
  * Cross-field invariants enforced at runtime and NOT expressible in this schema: (1) at least one property must be present, so an empty patch body is rejected rather than treated as a no-op; (2) locationKey, latitude, longitude, and timezone form one identity group and must be sent all together or not at all, because updating a coordinate without its key would leave the row internally inconsistent.
  * @export

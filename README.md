@@ -109,6 +109,13 @@ npm run typecheck:clear-cache
 > `npm run verify:changed` is implemented in [scripts/verify-changed.mjs](scripts/verify-changed.mjs) and
 > uses `git status` on the working tree. It does not compare your current branch against `main`
 > or another base branch, so committed-only branch diffs are intentionally out of scope.
+> It also maps only `apps/*` and `packages/*`, so changes under `playwright/`, `pact/`, `k6/`,
+> `maestro/`, and `scripts/` need their own explicit run. `apps/api` and `packages/db` additionally
+> need a running, migrated database: without one, `apps/api`'s integration suites skip themselves
+> and the failure reads as a coverage-ratchet miss rather than a missing database. Run one
+> database-backed suite at a time; two at once cross-talk on shared rows. The full list, with the
+> command for each, is in
+> [development-guide.md](_bmad-output/project-knowledge/development-guide.md#what-verifychanged-never-covers).
 
 > Pre-commit guardrails: `.husky/pre-commit` already runs `npm run lint` and `npm run lint:staged`. Extend that file if you need extra checks.
 

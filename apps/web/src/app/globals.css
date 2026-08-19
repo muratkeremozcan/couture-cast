@@ -26,6 +26,65 @@
   --focus-essential: #ffffff;
 }
 
+/*
+ * Story 5.3 Task 5 owner: the premium palette layer.
+ *
+ * These extend the `[data-focus-surface]` precedent directly above: an attribute
+ * selector that redefines custom properties for its subtree. `data-theme` is set on
+ * `<html>` by `lib/premium-theme.ts` when a palette is applied, and independently on
+ * each gallery card in `premium-theme-section.tsx` so a card can show its own palette
+ * while a different one is active. Both uses fall out of the same four rules; there is
+ * no separate "card" variant to keep in sync.
+ *
+ * The values are `refs/ux/ux-color-themes.html`'s, the file the UX spec designates as
+ * the precise-values reference for engineering (Decision 2). This file is the single
+ * web source for them: `premium-theme-section.test.tsx` parses these blocks and proves
+ * every text/background pairing against `meetsWcagAA` from `@couture/utils` rather
+ * than re-declaring the hexes in TypeScript where the two copies could drift.
+ *
+ * Every carrier is a single solid color, `--theme-card-bg` included. Winter Metallic's
+ * reference gradient `linear-gradient(135deg,#f7fbff,#e9edf6)` is flattened to its Ice
+ * end, which is the darker stop and so the worst case for contrast against Gunmetal
+ * text (Decision 2). Keeping one color per property is what lets web and mobile share
+ * one palette table; do not turn this one property into a gradient string on web only.
+ *
+ * `:root` carries the Default monochrome-and-gold system, and `[data-theme='default']`
+ * restates it so the gallery's Default card renders Default even while a palette is
+ * active on `<html>` and would otherwise inherit down into it.
+ */
+:root,
+[data-theme='default'] {
+  --theme-primary: #111111;
+  --theme-secondary: #c9a14a;
+  --theme-card-bg: #f5f5f7;
+  --theme-card-text: #111111;
+  --theme-card-border: rgba(17, 17, 25, 0.2);
+}
+
+[data-theme='jewel_radiance'] {
+  --theme-primary: #0d6f62;
+  --theme-secondary: #6c3aa8;
+  --theme-card-bg: #f4f6fb;
+  --theme-card-text: #1f4e79;
+  --theme-card-border: rgba(31, 78, 121, 0.25);
+}
+
+[data-theme='autumn_umber'] {
+  --theme-primary: #b1683a;
+  --theme-secondary: #d9b38c;
+  --theme-card-bg: #f3ede6;
+  --theme-card-text: #3e2a23;
+  --theme-card-border: rgba(62, 42, 35, 0.2);
+}
+
+[data-theme='winter_metallic'] {
+  --theme-primary: #7e889a;
+  --theme-secondary: #c9cdd8;
+  --theme-card-bg: #e9edf6;
+  --theme-card-text: #2f333d;
+  --theme-card-border: rgba(47, 51, 61, 0.15);
+}
+
 body {
   color: var(--foreground);
   background: var(--background);

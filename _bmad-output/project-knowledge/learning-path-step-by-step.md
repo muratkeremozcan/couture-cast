@@ -1,11 +1,16 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-08-12. Reworked Step 33 for completed Story 5.1 into the full learning format,
-including implementation lessons, traceability, a code-reading sequence, and an architecture
-diagram.
-Story 5.2 is ready for development and is the next learning milestone. Added an authoritative LLM
-update contract so future steps keep the same evidence-backed structure. Added test coverage maps
-and searchable test-file cross-links for Steps 1 through 33.
+Updated: 2026-08-19. Added Step 35 for Story 5.3, the premium theme switcher, from the
+implemented and reviewed change: verified implementation lessons, a code-reading sequence, a task
+owner map, a test coverage map, and an architecture diagram. Story 5.3 shipped its server
+primitive and its web surface only; the mobile surface, Pact, Playwright, and Maestro were
+deliberately cut so the higher test tiers could be authored separately, so the story is still
+`in-progress` and Step 35 states that boundary rather than implying full coverage. Brought the
+`Current position` section and the project table up to date, which had both stopped at Step 33
+while Step 34 was already written. Added searchable `Learning path Step` cross-link comments to
+every test file Step 35 lists, and to the five Step 34 files this change already touches. The
+remaining Step 34 test files, including all three mobile ones, still carry no cross-link comment;
+backfilling them was left out so this change would not touch files outside its own scope.
 
 ## Instructions for LLMs updating this file
 
@@ -58,11 +63,16 @@ This contract is authoritative. Read it before changing or adding a numbered ste
 
 ## Current position
 
-- Latest completed step: Step 33, Story 5.1, Affiliate "Shop this look" CTA.
-- Next implementation story: Story 5.2, Premium subscription lifecycle, status
-  `ready-for-dev`. Its plan is in
-  `_bmad-output/implementation-artifacts/5-2-premium-subscription-lifecycle.md`.
-- Step 34 will capture verified Story 5.2 implementation lessons after the story is completed.
+- Latest completed step: Step 34, Story 5.2, Premium subscription lifecycle, status `done`,
+  merged as `0c34858` (PR #129).
+- Latest written step: Step 35, Story 5.3, Premium theme switcher, status `in-progress`. Its
+  plan is in `_bmad-output/implementation-artifacts/5-3-premium-theme-switcher.md`. The server
+  primitive and the web surface are implemented, reviewed, and green; the mobile surface, Pact,
+  Playwright, and Maestro were deliberately cut for this pass and are recorded in
+  `deferred-work.md`. Step 35 is written because implementation and review produced verified
+  evidence, and its `Evidence boundaries` section names everything that is not proven yet.
+- Next work on Story 5.3: the deferred tiers above. The story moves to `done` once they land.
+- Keep this section aligned with `_bmad-output/implementation-artifacts/sprint-status.yaml`.
 
 ## The whole project in plain English
 
@@ -101,6 +111,8 @@ This contract is authoritative. Read it before changing or adding a numbered ste
 |   31 | Group ready garments into outfit capsules with optimistic UI.    |
 |   32 | Guide a new user through closet setup, then model their body.    |
 |   33 | Add disclosed affiliate links and durable purchase attribution.  |
+|   34 | Take money, keep one entitlement ledger, and never trap a payer. |
+|   35 | Let paying users pick a palette. Prove it is readable first.     |
 
 ## Special feature: AI garment tagging
 
@@ -5419,4 +5431,448 @@ flowchart TD
   Ent --> PGuard["PremiumEntitlementGuard\nactive or grace passes"]
   Flag["commerce_subscription_enabled"] -- "503 on checkout only" --> WCO
   Flag -- "purchasesEnabled" --> Status
+```
+
+## Step 35: Premium theme switcher
+
+User/business impact:
+
+Gives a paying subscriber something to see for the money. A Premium-entitled
+user opens web `/settings` and picks one of three interface palettes, **Jewel
+Radiance**, **Autumn Umber**, or **Winter Metallic**, or reverts to the Default
+monochrome-and-gold system. The choice saves server-side against their account,
+survives reload and re-login, and re-colors the surface immediately without a
+page reload. A non-entitled or signed-out reader sees a locked panel that names
+Premium once and points at the subscribe controls, with no modal, no countdown,
+and no fake urgency. This is the first surface where story 5.2's
+`PremiumEntitlementGuard` gates a real production write path rather than sitting
+dormant. It is also the story where a cosmetic feature carries a hard
+non-cosmetic contract: every text-on-background pairing the gallery renders is
+proven against WCAG 2.2 AA by a unit test that pins the ratio, so a designer
+nudging a hex value breaks a build instead of shipping unreadable copy.
+
+Key takeaways:
+
+1. **Two upstream documents can name a thing that does not exist.** The epic
+   asks for "Midnight Noir" and the PRD adds "Aurora Dawn," and neither name has
+   a hex value anywhere in the repository. That absence is the tell: both are
+   illustrative placeholders written before the UX pass that later named the
+   real palettes. The UX spec and its reference file define three shipped
+   palettes with quoted values, and `epics.md:534` records the complexity bump
+   that confirms the UX pass is the newer source. Decide which document governs,
+   say so in writing, and state that the discarded names appear nowhere in code.
+2. **When prose and a reference file disagree, ship whichever one the spec
+   designates for engineering.** `ux-design-specification.md:78-80` lists a Wine
+   Red and a Chestnut that `refs/ux/ux-color-themes.html` does not use, while the
+   HTML carries the complete card-preview pairings the prose never mentions. The
+   spec names the HTML as the precise-values reference at `:113`, so the HTML
+   wins, and the decision says plainly that the two prose colors must not be
+   "restored" later.
+3. **Contrast is computed and pinned, never eyeballed.** `packages/utils/src/contrast.ts`
+   became the canonical home of the WCAG relative-luminance maths, and its spec
+   pins six ratios with `toBeCloseTo(ratio, 2)` rather than `toBe`, because these
+   are floating-point results. The pinning is what makes the story's own contrast
+   table honest over time. Two of the three primary-accent-plus-white-text combos
+   fail the 4.5:1 floor (Autumn Umber 4.28:1, Winter Metallic 3.57:1) and are
+   restricted to large or bold text and icon-only controls under the 3:1 floor;
+   all body copy uses the card-preview pairings, which clear 8.01:1 to 11.58:1.
+4. **The right move was consolidation, not a greenfield utility.** Two correct
+   copies of this maths already sat in `playwright/`. The mistake available here
+   was adding a third without noticing, so the decision opens by naming both
+   existing copies and their file positions.
+5. **Effective state resolves server-side, in one round trip.** A user can pick a
+   palette and later let Premium lapse. Rather than making every client combine
+   `/subscription` with the theme response, the theme service asks
+   `PremiumEntitlementService.hasPremiumAccess(userId)` inline and returns
+   `{ theme, isEntitled, themesEnabled }` together. One source of truth per
+   client, and no client-side policy to keep in sync across two surfaces.
+6. **The preference row is never deleted; reset is an upsert to `null`.** An
+   absent row and `theme: null` both mean Default, which is exactly the
+   two-spellings-of-one-fact trap the enum design refused. It is tolerable only
+   because one spelling is unreachable by choice: a row appears the first time a
+   user touches the gallery and never goes away. Delete-on-reset passes a
+   single-user unit test and diverges the moment `updated_at` or an adoption
+   count matters.
+7. **Owner-only RLS, because a cosmetic preference is not privilege-bearing.**
+   This is the deliberate opposite of story 5.2's billing tables, which enable
+   row-level security with zero policies and zero grants so that even the owner
+   is denied. A palette choice is safe for the authenticated user to read and
+   write directly, so the table joins `selfOnlyTables` on the same
+   `private.can_manage_self_row` template as `CommercePreference`. Match the
+   posture to what the row can buy.
+8. **Guard precedence is stated once, in the decision, so it is not discovered
+   in review.** `PremiumEntitlementGuard` is a NestJS guard and runs before the
+   handler; the kill-switch check lives in the service body. So a non-entitled
+   caller always gets `403` regardless of the flag, and only an entitled caller
+   can ever observe the `503`. That ordering is intentional: a payer is the only
+   person who needs to know the feature is provisionally switched off.
+9. **Staying inside an existing route prefix inherits its middleware for free.**
+   `CommerceCacheHeadersMiddleware` is bound to `/api/v1/commerce{/*path}`, so
+   mounting at `/api/v1/commerce/premium/theme` picks up `private, no-store` with
+   zero new wiring. A new top-level `/api/v1/premium` namespace would have been
+   the only one of its kind in the repository and would have shipped a per-user
+   response with no cache headers. A supertest assertion pins the header so a
+   later route move cannot drop it silently.
+10. **Ship the primitive plus exactly one demonstration surface.** No design-token
+    package exists in this repository; `architecture.md:85-88` describes
+    `packages/tokens` but it was never built. Retrofitting the hero canvas,
+    Lookbook Prism, the chip system, and the button hierarchy to read new tokens
+    is unbounded, high-regression scope. This story builds the carrier, five
+    custom properties under `[data-theme]` in `globals.css`, and proves it live on
+    the gallery itself. Each other surface owns its own adoption, recorded in
+    `deferred-work.md`.
+11. **The flag ships off, and that is the rollout shape.** `premium_themes_enabled`
+    has a registry `defaultValue` of `false`; the `true` lives only in the
+    database seed. So the feature is on wherever the seed has run and off
+    everywhere else, production included, until someone flips it. Two
+    consequences follow and both are written down: an integration test that skips
+    the seed correctly sees `themesEnabled: false` and a `503`, and the
+    entitled-user `503` is reachable in production and needs AC 6's clean
+    fallback rather than a stack trace.
+12. **A requirement can be answered by a cited design decision instead of code.**
+    Both `epics.md:443` and `prd.md:205` require the palette to apply on the
+    watch. `ux-design-specification.md:381` decides that wearable cards stay
+    monochrome with a gold ring so a 1.5-inch screen stays glanceable whatever
+    the wearer picked. No Swift or Kotlin file was touched, and both citations
+    are recorded in `deferred-work.md` so a later reader sees an answered
+    requirement rather than a missed one.
+
+Hard-won lessons from the implementation and code review of this story:
+
+1. **An attribute with no consumer looks exactly like a working feature.** The
+   web surface wrote `data-theme` onto `<html>` correctly, and selecting a
+   palette re-colored nothing. Every `--theme-*` variable was consumed inside
+   `PaletteCard`, which pins its own `data-theme` so each card can preview its
+   own palette, and that rule beat the inherited value from the root. The card
+   therefore looked identical whether or not the attribute ever reached `<html>`.
+   The fix is structural: `LivePreview` deliberately pins no `data-theme` of its
+   own, so it is the one element on screen whose appearance can only change if
+   the root attribute landed. A demonstration surface has to contain at least one
+   element the mechanism cannot fake.
+2. **A Postgres enum rejects a retired member before application code sees a
+   string.** AC 6's stale-palette fallback was implemented at the Zod layer and
+   verified with unit doubles, which pass a string through. Against a real
+   database, a row holding a since-removed enum member makes the query engine
+   reject it with `P2023` before `normalizeStoredTheme` is ever called, so the
+   settings page would have 500'd on the exact scenario the criterion names.
+   `readStoredTheme` now catches that one code and resolves Default; every other
+   Prisma error still propagates, because swallowing a connection fault would
+   render Default while reporting success.
+3. **A refused save that only prints a line leaves the surface lying.**
+   Entitlement can lapse and the kill switch can flip while `/settings` is open.
+   The catch set error text and nothing else, so `isEntitled` and `themesEnabled`
+   stayed stale at `true`, every card stayed clickable, each further click failed
+   identically, and the locked panel and kill-switch note were unreachable. A
+   failed write has to re-resolve the section's state, not decorate it.
+4. **Baked-in English defeats a ten-catalog localization gate without failing
+   it.** The web lib threw errors whose `message` was an English sentence, so the
+   section's translated fallbacks were dead code and `loadError` and `saveError`
+   shipped unreachable in all ten catalogs. The parity spec stayed green
+   throughout, because it proves keys exist and never that the UI reads from
+   them. The fix is classification: the lib returns a
+   `PremiumThemeFailureReason` and the component chooses the catalog string,
+   leaving `message` developer-facing for logs.
+5. **The same defect was already live in story 5.2, and its own tests were
+   holding it in place.** `subscription-section.test.tsx` asserted the server's
+   English string literally, so the suite passed _because_ of the bug, and the
+   locale parity spec only ever checked key existence. It was first deferred as
+   another story's surface and that call was reversed: debt gets handled when it
+   is found, whichever story introduced it. `apps/web/src/lib/premium.ts` now
+   classifies failures
+   with a per-operation status map, because `409` means "you already have one" on
+   checkout and "manage it in the store" on the portal, and a single global table
+   would have merged the two.
+6. **An RLS actor matrix proves refusal and says nothing about permission.**
+   Every seed insert in that suite goes through the superuser admin pool, which
+   bypasses row-level security, so the `WITH CHECK` clause was only ever
+   demonstrated able to deny. A policy of `WITH CHECK (false)` would have passed
+   the entire matrix while making the feature's very first write impossible.
+   Owner INSERT, owner DELETE, and a `theme = NULL` insert now run through the
+   `authenticated` role.
+7. **Policies and grants fail in opposite directions, so both need pinning.**
+   Correct policies with no `GRANT` deny even the owner; correct grants with no
+   policies expose every row. `rls-policies.spec.ts` owns the actor matrix and
+   proves nothing about the privileges underneath it, so the schema spec pins
+   `authenticated` to exactly the four owner verbs, `anon` to none, and checks the
+   four policy names.
+8. **A hand-copied enum drifts silently and fails open.** `types/` does not
+   import from `contracts/`, so the analytics palette list was copied by hand with
+   nothing making the two agree. A fourth palette would have been accepted and
+   persisted correctly, then failed its analytics parse inside `TelemetryService`
+   where the emit path catches and continues: correct data, zero events,
+   discovered only as an absence in a dashboard weeks later. A set-equality test
+   against the contract enum closes it.
+9. **A suite gated on an environment variable nobody sets is green by absence.**
+   `weather-alert-cooldown.integration.spec.ts` was gated on
+   `ALERT_COOLDOWN_REAL_DB_INTEGRATION`, which no workflow, npm script, or
+   document sets anywhere in the repository, so it had never executed and a
+   foreign-key break inside it was invisible. Replaced with the schema probe every
+   sibling integration suite uses, which runs wherever a database is reachable
+   and skips with a stated reason where one is not. This is Step 34's
+   matched-nothing lesson in a new disguise.
+10. **Re-selecting the value you already have is a real event.** The concurrency
+    guard covered a second click during an in-flight save but not an idle click on
+    the already-selected card, so one real choice could emit several
+    `premium_theme_selected` events and inflate exactly the adoption number the
+    event exists to measure. The server answers `200` for an unchanged value by
+    design, so the client is the only place this can be suppressed.
+11. **`readonly` is erased at runtime.** The exported palette key list aliased the
+    Zod enum's live `options` array, and this repository already contains code
+    that mutates that array by reference. A frozen copy is the fix.
+12. **Duplicate test ids make a failure report ambiguous.** Four ids were each
+    used twice across two tiers. The matrix id stays on the test the story's own
+    wording points at and the sibling takes a new one, so a red build names one
+    test.
+13. **A deliberate scope cut has to be written in both places or the documents
+    contradict each other.** Tasks 6 and 7 were cut so the higher test tiers could
+    be authored separately. They are marked cancelled in the story with pointers
+    to their `deferred-work.md` entries, and the story stays `in-progress` rather
+    than `done`, so nothing reads as forgotten.
+
+Story/Task mapping:
+
+- Story 5.3
+- Task 1 (Prisma enum and model, migration with owner-only RLS, factory, schema spec)
+- Task 2 (`@couture/utils` contrast helper and its pinned ratio fixtures)
+- Task 3 (Premium theme contracts, OpenAPI 1.2.0 to 1.3.0, analytics registries)
+- Task 4 (`PremiumThemeService` and `PremiumThemeController` under the commerce prefix)
+- Task 5 (Web lib, `[data-theme]` custom properties, `PremiumThemeSection`, locale catalogs)
+- Task 6 (Mobile surface) — **cancelled for this pass**, recorded in `deferred-work.md`
+- Task 7 (Pact, Playwright, Maestro, and the Playwright contrast adapter) — **cancelled
+  for this pass**, recorded in `deferred-work.md`
+- Task 8 (Coverage ratchets, `verify:changed` gap list, deferred-work ledger)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/5-3-premium-theme-switcher.md` (including its
+  `Review Findings` section, which records every patched and dismissed finding)
+- `_bmad-output/implementation-artifacts/deferred-work.md`, sections "Deferred from: story
+  5.3 premium theme switcher (2026-08-18)" and "Added during the story 5.3 code review
+  (2026-08-18)"
+- `refs/ux/ux-color-themes.html` — the palette values every surface is pinned to
+- No test-quality review artifact exists for this story, unlike Step 34's.
+
+Cross-links:
+
+- Step 34 provides `PremiumEntitlementService.hasPremiumAccess`, the
+  `PremiumEntitlementGuard` this story gives its first production write path, the commerce
+  module, and the cache-headers middleware binding the new route inherits.
+- Step 3 provides the Prisma modeling, migration, and row-level-security foundation this
+  table extends with an owner-only posture.
+- Step 8 provides the analytics contracts and the pseudonymous-subject discipline
+  `premium_theme_selected` follows.
+- Step 15 provides the canonical contract validation and generated-client flow the new
+  Zod module and the additive OpenAPI minor bump pass through.
+- Step 22 provides the ten-catalog localization infrastructure and the parity-spec
+  convention the new dedicated spec follows.
+- Step 28 provides the accessibility hardening work whose Playwright helper holds the two
+  pre-existing copies of the contrast maths this story consolidates against.
+
+Sequence to follow:
+
+1. Read `packages/db/prisma/schema.prisma` for the `PremiumThemeKey` enum and the
+   `PremiumThemePreference` model, then
+   `packages/db/prisma/migrations/20260818090000_add_premium_theme/migration.sql` for the
+   grant, the `ENABLE ROW LEVEL SECURITY`, and the four owner-only policies. Compare the
+   posture against story 5.2's zero-policy billing tables in the same file.
+2. Read `packages/api-client/src/contracts/http/premium-theme.ts` for the response shape
+   that always serializes `theme`, `isEntitled`, and `themesEnabled`, the `.strict()` input
+   schema where `null` means reset, and `PREMIUM_THEMES_DISABLED_MESSAGE`.
+3. Read `packages/utils/src/contrast.ts` for the luminance maths and the two WCAG
+   thresholds, then `contrast.spec.ts` for the six pinned ratios that keep the story's
+   contrast table honest.
+4. Read `apps/api/src/modules/commerce/premium-theme.service.ts` in this order: the
+   docblock's statement of why the row is never deleted, `getTheme` for the inline
+   entitlement resolution, `readStoredTheme` for the `P2023` catch, and `emitSelection`
+   for the fail-open analytics path.
+5. Read `premium-theme.controller.ts` for the guard stack, the flag assertion that runs
+   before body parsing, and both handlers parsing their return through the published
+   schemas.
+6. Read `apps/web/src/lib/premium-theme.ts` for `PremiumThemeFailureReason`, the frozen key
+   list, and `applyWebThemeAttribute`, then `apps/web/src/app/globals.css` for the four
+   `[data-theme]` blocks and the five custom properties each defines.
+7. Read `apps/web/src/app/components/premium-theme-section.tsx` top to bottom, and read its
+   header comment first: it explains why `PaletteCard` pins its own `data-theme` and why
+   `LivePreview` deliberately does not.
+8. Read the evidence in this order: `packages/utils/src/contrast.spec.ts`,
+   `packages/db/test/premium-theme-schema.spec.ts`,
+   `apps/api/src/modules/commerce/premium-theme.service.spec.ts`, and
+   `apps/web/src/app/components/premium-theme-section.test.tsx`.
+
+Task owner map:
+
+- Story 5.3 Task 1 step 1 owner: define the `PremiumThemeKey` enum, the
+  `PremiumThemePreference` model, and the `User` back-relation in
+  `packages/db/prisma/schema.prisma`.
+- Story 5.3 Task 1 step 2 owner: own the grants, the row-level-security enablement, and the
+  four owner-only policies in
+  `packages/db/prisma/migrations/20260818090000_add_premium_theme/migration.sql`.
+- Story 5.3 Task 1 step 3 owner: build and persist theme fixtures in
+  `packages/testing/src/factories/premium.factory.ts`, registered in
+  `packages/testing/src/factories/registry.ts` and `packages/testing/src/cleanup.ts`.
+- Story 5.3 Task 2 step 1 owner: own the WCAG luminance maths and the two AA thresholds in
+  `packages/utils/src/contrast.ts`.
+- Story 5.3 Task 3 step 1 owner: define the premium theme HTTP contracts and the disabled
+  message constant in `packages/api-client/src/contracts/http/premium-theme.ts`, registered
+  through `packages/api-client/src/contracts/http/openapi.ts`.
+- Story 5.3 Task 3 step 2 owner: register `premium_theme_selected` and its `{ theme }`
+  property allowlist in `packages/api-client/src/types/analytics-events.ts` and
+  `packages/api-client/src/testing/analytics-event-assertions.ts`.
+- Story 5.3 Task 3 step 3 owner: own the server-side pseudonymous emission for the new
+  event in `apps/api/src/modules/telemetry/telemetry.service.ts`.
+- Story 5.3 Task 4 step 1 owner: resolve entitlement, the kill switch, and the stored
+  preference in `apps/api/src/modules/commerce/premium-theme.service.ts`.
+- Story 5.3 Task 4 step 2 owner: own the route, the guard stack, and response parsing in
+  `apps/api/src/modules/commerce/premium-theme.controller.ts`, registered in
+  `apps/api/src/modules/commerce/commerce.module.ts`.
+- Story 5.3 Task 5 step 1 owner: own transport, failure classification, and the root
+  attribute write in `apps/web/src/lib/premium-theme.ts`.
+- Story 5.3 Task 5 step 2 owner: own the palette custom properties in
+  `apps/web/src/app/globals.css`.
+- Story 5.3 Task 5 step 3 owner: own the gallery, locked, loading, unavailable, and error
+  states in `apps/web/src/app/components/premium-theme-section.tsx`, mounted from
+  `apps/web/src/app/settings/page.tsx`.
+- Story 5.3 Task 5 step 4 owner: own the `commerce.premium.theme.*` subtree across the ten
+  catalogs in `apps/web/src/i18n/locales/`.
+
+Tests that cover this step:
+
+Shared utility unit tests:
+
+- [`packages/utils/src/contrast.spec.ts`](../../packages/utils/src/contrast.spec.ts): pins the six audited ratios with
+  `toBeCloseTo(ratio, 2)` (`5.3-UTIL-001` through `5.3-UTIL-006`), proves the flattened
+  Winter Metallic card background is the worse of the two gradient stops
+  (`5.3-UTIL-008`), and rejects eight-digit `#RRGGBBAA` input rather than silently
+  truncating alpha. `5.3-UTIL-007` is deliberately absent and reserved for the deferred
+  Playwright adapter.
+
+Real-PostgreSQL database tests:
+
+- [`packages/db/test/premium-theme-schema.spec.ts`](../../packages/db/test/premium-theme-schema.spec.ts): proves the unique `user_id`,
+  the nullable `theme`, cascade delete with the account, and the privilege breadth the
+  actor matrix cannot see: `authenticated` holds exactly four owner verbs and `anon` none
+  (`5.3-DB-014`, `5.3-DB-015`).
+- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts): runs the full owner-only actor matrix
+  over the new table (`5.3-DB-001` through `5.3-DB-008`), including the INSERT policy's
+  positive half driven through the `authenticated` role rather than the admin pool.
+
+Shared contract and analytics tests:
+
+- [`packages/api-client/testing/premium-theme-contract.spec.ts`](../../packages/api-client/testing/premium-theme-contract.spec.ts): proves the response
+  always serializes all three fields, that `null` is a valid reset rather than an omission,
+  that the input schema is `.strict()`, and that the published enum carries exactly the
+  three shipped palettes (`5.3-CONTRACT-01` through `5.3-CONTRACT-15`).
+- [`packages/api-client/testing/premium-theme-analytics.spec.ts`](../../packages/api-client/testing/premium-theme-analytics.spec.ts): proves the property
+  allowlist rejects anything beyond `{ theme }`, and pins the analytics palette list to the
+  contract enum by set equality so a fourth palette cannot fail open (`5.3-CON-007`).
+
+API unit tests:
+
+- [`apps/api/src/modules/commerce/premium-theme.service.spec.ts`](../../apps/api/src/modules/commerce/premium-theme.service.spec.ts): proves the inline
+  entitlement resolution, that reset upserts `theme = null` and never deletes, and that a
+  stored enum member this build does not know resolves to Default while other Prisma
+  failures still propagate (`5.3-API-011c`, `5.3-API-011d`).
+- [`apps/api/src/modules/commerce/premium-theme.controller.spec.ts`](../../apps/api/src/modules/commerce/premium-theme.controller.spec.ts): proves the guard
+  stack over HTTP, the `403`-before-`503` precedence for a non-entitled caller, the
+  entitled caller's `503` when the kill switch is off, and that the GET response carries
+  the inherited `private, no-store` header.
+- [`apps/api/src/modules/telemetry/telemetry.service.spec.ts`](../../apps/api/src/modules/telemetry/telemetry.service.spec.ts): proves the palette
+  selection emits under the acting user's pseudonym, that a reset records a null theme
+  rather than skipping the event, that no event is emitted without an authenticated user,
+  and that a palette the contract does not ship is rejected.
+
+Fixture and cleanup tests:
+
+- [`packages/testing/test/premium.factory.spec.ts`](../../packages/testing/test/premium.factory.spec.ts): proves the theme preference
+  fixture, its `build*CreateInput` shape, and its cleanup registration
+  (`5.3-FACTORY-01` through `5.3-FACTORY-03`).
+- [`packages/testing/test/cleanup.spec.ts`](../../packages/testing/test/cleanup.spec.ts): proves the new delegate is scoped and
+  ordered correctly in teardown.
+
+Web unit and component tests:
+
+- [`apps/web/src/lib/premium-theme.test.ts`](../../apps/web/src/lib/premium-theme.test.ts): proves failure classification into
+  `PremiumThemeFailureReason`, that the exported key list cannot be mutated through the Zod
+  enum's live options array, that an unknown stored key resolves to Default, and that
+  `applyWebThemeAttribute` writes and clears the root attribute.
+- [`apps/web/src/app/components/premium-theme-section.test.tsx`](../../apps/web/src/app/components/premium-theme-section.test.tsx): proves the gallery,
+  locked, loading, unavailable, and error states; that a refused save re-resolves the
+  section rather than only printing a line (`5.3-WEB-107`, `5.3-WEB-114`); that
+  re-pressing the selected card sends nothing (`5.3-WEB-115`); that the session is re-read
+  before a write (`5.3-WEB-116`); that an in-flight save is aborted on unmount
+  (`5.3-WEB-118`); and that the signed-out panel names the sign-in step rather than
+  controls that are not on the page (`5.3-WEB-101`, `5.3-WEB-117`).
+- [`apps/web/src/app/settings/page.test.tsx`](../../apps/web/src/app/settings/page.test.tsx): proves the section is mounted as the
+  third child of `/settings` alongside the commerce and subscription sections
+  (`5.3-WEB-SETTINGS-01`).
+- [`apps/web/src/i18n/premium-theme-locales.spec.ts`](../../apps/web/src/i18n/premium-theme-locales.spec.ts): proves the
+  `commerce.premium.theme.*` subtree is complete, placeholder-consistent, and non-empty
+  across all ten catalogs, with an `APPROVED_COGNATES` allowlist for the palette proper
+  nouns (`5.3-I18N-WEB-01` through `5.3-I18N-WEB-10`).
+- [`apps/web/src/i18n/premium-locales.spec.ts`](../../apps/web/src/i18n/premium-locales.spec.ts): its pinned `commerce.premium.*` key
+  list now excludes the `theme` subtree that moved into its own spec, the same one-line
+  exclusion `apps/web/src/i18n/commerce-locales.spec.ts` needed when story 5.2 added `commerce.premium.*`.
+- [`apps/web/src/app/components/subscription-section.test.tsx`](../../apps/web/src/app/components/subscription-section.test.tsx): after the story 5.2
+  follow-up, proves the checkout `409`, a mid-session `401`, and the portal's `409` and
+  `404` render catalog copy and that the server's English string is absent
+  (`5.2-WEB-SEC-22` through `5.2-WEB-SEC-25`).
+
+Evidence boundaries at the time of writing:
+
+The mobile surface, the Pact interactions, the Playwright journeys, the Maestro flow, and
+the Decision 3 rewrite of `playwright/support/helpers/accessibility.ts` were deliberately
+held back so the higher test tiers could be authored separately. Each is recorded in
+`deferred-work.md` with the exact shape it should take. What that leaves unproven is named
+rather than implied: consumer-driven compatibility between each client and the provider;
+browser-level behavior of the locked state under axe, the gallery, select-then-reload
+persistence, and the Default fallback for a stale key seeded directly; and everything on
+the mobile surface, including the mobile halves of AC 4, AC 6, and AC 7. The story's own
+coverage matrix names `5.3-INT-001` and `5.3-INT-002` as evidence for AC 3 and neither has
+a test yet. The repository currently holds three copies of the WCAG luminance maths rather
+than the two Decision 3 intended, and the two deferred-work entries that close it back to
+one are recorded. Story 5.3 stays `in-progress` in `sprint-status.yaml` for exactly these
+reasons; it is not `done`. The nine non-English catalogs remain machine-translation drafts
+pending human review, as they have since Step 22.
+
+Gates that did run: `npm run verify:changed` exits 0 across all seven touched workspaces
+with every coverage ratchet holding, 3270 tests passing, run with
+`DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres`. Without that
+variable the database-backed suites skip themselves and the ratchet fails on coverage
+rather than naming the missing database, which is the trap Step 34's gap list now
+documents in `development-guide.md`.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  UX["refs/ux/ux-color-themes.html\nthe pinned hex source"] --> CSS
+  UX --> CONTRAST["packages/utils/src/contrast.ts\ncontrastRatio + meetsWcagAA"]
+  CONTRAST --> SPEC["contrast.spec.ts\nsix ratios pinned toBeCloseTo(x, 2)"]
+
+  subgraph Web
+    SEC["PremiumThemeSection\ngallery / locked / error"]
+    CSS["globals.css\n[data-theme] blocks, 5 custom properties"]
+    LIB["lib/premium-theme.ts\nclassify failure, write root attribute"]
+  end
+
+  SEC --> LIB
+  LIB -- "GET /api/v1/commerce/premium/theme" --> CTRL
+  LIB -- "PUT (entitled only)" --> CTRL
+  LIB -- "document.documentElement.dataset.theme" --> CSS
+  CSS --> PREVIEW["LivePreview\npins no data-theme,\nthe one element the root attribute must reach"]
+
+  CTRL["PremiumThemeController\n@UseGuards(RequestAuthGuard)"] --> GUARD{"PremiumEntitlementGuard\nPUT only, runs pre-handler"}
+  GUARD -- "not entitled" --> F403["403 PREMIUM_REQUIRED_MESSAGE\nregardless of the flag"]
+  GUARD -- "entitled" --> SVC
+  CTRL -- "GET, no guard" --> SVC
+
+  SVC["PremiumThemeService"] --> ENT["PremiumEntitlementService\nhasPremiumAccess, resolved inline"]
+  SVC --> FLAG{"premium_themes_enabled\ndefault false, true only in the seed"}
+  FLAG -- "off, entitled caller" --> F503["503 PREMIUM_THEMES_DISABLED_MESSAGE"]
+  SVC --> ROW["PremiumThemePreference\none row per user, upsert(null) on reset,\nnever deleted"]
+  ROW -- "P2023 on a retired enum member" --> DEFAULT["resolve Default\nother Prisma errors propagate"]
+  SVC -- "on successful PUT" --> TEL["TelemetryService\npremium_theme_selected, pseudonymous, fail-open"]
+  ROW --> RLS["RLS: selfOnlyTables\nprivate.can_manage_self_row, owner-only CRUD"]
+  SVC --> RESP["{ theme, isEntitled, themesEnabled }\nprivate, no-store via CommerceCacheHeadersMiddleware"]
+  RESP --> LIB
 ```

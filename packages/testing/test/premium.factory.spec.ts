@@ -1,3 +1,7 @@
+// Learning path Step 34: Premium subscription lifecycle.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-34-premium-subscription-lifecycle
+// Learning path Step 35: Premium theme switcher.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
 import type { PrismaClient } from '@prisma/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -6,9 +10,11 @@ import {
   createBillingCustomer,
   createBillingEvent,
   createPremiumEntitlement,
+  createPremiumThemePreference,
   persistBillingCustomer,
   persistBillingEvent,
   persistPremiumEntitlement,
+  persistPremiumThemePreference,
 } from '../src/factories/premium.factory.js'
 
 /**
@@ -29,6 +35,7 @@ function stubPrisma(): {
   premiumEntitlement: CreateStub
   billingEvent: CreateStub
   billingCustomer: CreateStub
+  premiumThemePreference: CreateStub
 } {
   const make = (): CreateStub => ({
     create: vi.fn(({ data }: { data: { id: string } }) => Promise.resolve(data)),
@@ -36,16 +43,19 @@ function stubPrisma(): {
   const premiumEntitlement = make()
   const billingEvent = make()
   const billingCustomer = make()
+  const premiumThemePreference = make()
 
   return {
     prisma: {
       premiumEntitlement,
       billingEvent,
       billingCustomer,
+      premiumThemePreference,
     } as unknown as PrismaClient,
     premiumEntitlement,
     billingEvent,
     billingCustomer,
+    premiumThemePreference,
   }
 }
 
@@ -211,6 +221,70 @@ describe('premium factories', () => {
         },
       })
       expect(getTrackedEntityIds('billingCustomers')).toEqual(['customer-1'])
+    })
+  })
+
+  describe('PremiumThemePreference', () => {
+    it('5.3-FACTORY-01 defaults to a chosen palette, not to Default', () => {
+      const preference = createPremiumThemePreference()
+
+      // The interesting fixture is a user who has actually picked a palette;
+      // Default is one explicit `theme: null` away. Jewel Radiance is the only
+      // primary accent that clears 4.5:1 against white text, so a fixture that
+      // renders untouched renders an accessible pairing.
+      expect(preference.theme).toBe('jewel_radiance')
+    })
+
+    it('5.3-FACTORY-02 keeps null as a real selection rather than an omitted field', async () => {
+      const { prisma, premiumThemePreference } = stubPrisma()
+
+      // Reset is an upsert to null, never a delete. If the factory dropped the
+      // key when it is null, the column default would fill it in and a "reset"
+      // fixture would be indistinguishable from a never-touched one.
+      await persistPremiumThemePreference(
+        prisma,
+        createPremiumThemePreference({
+          id: 'theme-preference-reset',
+          userId: 'user-1',
+          theme: null,
+        })
+      )
+
+      expect(premiumThemePreference.create).toHaveBeenCalledWith({
+        data: {
+          id: 'theme-preference-reset',
+          user_id: 'user-1',
+          theme: null,
+        },
+      })
+      const [call] = premiumThemePreference.create.mock.calls as [
+        [{ data: Record<string, unknown> }],
+      ]
+      expect(Object.keys(call[0].data)).toContain('theme')
+    })
+
+    it('5.3-FACTORY-03 maps to snake_case columns and registers for cleanup', async () => {
+      const { prisma, premiumThemePreference } = stubPrisma()
+
+      await persistPremiumThemePreference(
+        prisma,
+        createPremiumThemePreference({
+          id: 'theme-preference-1',
+          userId: 'user-1',
+          theme: 'winter_metallic',
+        })
+      )
+
+      expect(premiumThemePreference.create).toHaveBeenCalledWith({
+        data: {
+          id: 'theme-preference-1',
+          user_id: 'user-1',
+          theme: 'winter_metallic',
+        },
+      })
+      expect(getTrackedEntityIds('premiumThemePreferences')).toEqual([
+        'theme-preference-1',
+      ])
     })
   })
 })

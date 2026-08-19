@@ -4,6 +4,7 @@
 import { I18nextProvider } from 'react-i18next'
 import { getI18n } from '../../i18n'
 import { CommercePreferencesSection } from '../components/commerce-preferences-section'
+import { PremiumThemeSection } from '../components/premium-theme-section'
 import { StickyBottomNav } from '../components/sticky-bottom-nav'
 import { SubscriptionSection } from '../components/subscription-section'
 
@@ -34,6 +35,7 @@ export default function SettingsPage() {
         <h1 className="text-4xl font-semibold">Settings</h1>
         <CommercePreferencesSection />
         <SubscriptionSection />
+        <PremiumThemeSection />
         <StickyBottomNav />
       </main>
     </I18nextProvider>

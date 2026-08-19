@@ -427,7 +427,9 @@ npm run validate
 `verify:changed` maps uncommitted and untracked paths to workspace gates. Documentation is
 ignored by that planner. `validate` runs typecheck, lint, workspace tests, and build, but does
 not include API integration tests, Playwright, Pact, k6, Maestro, Optic diff, or Markdown link
-checking.
+checking. The full gap list, with the command that closes each and the two workspaces that
+need a running database, is in
+[development-guide.md](development-guide.md#what-verifychanged-never-covers).
 
 Boundary-specific checks include:
 

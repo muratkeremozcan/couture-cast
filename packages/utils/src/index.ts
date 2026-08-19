@@ -40,5 +40,13 @@ export {
 } from './accessibility'
 export type { WeatherAltTextInput, AccessibilityAnnouncementEvent } from './accessibility'
 
+export {
+  contrastRatio,
+  meetsWcagAA,
+  WCAG_AA_LARGE_TEXT_RATIO,
+  WCAG_AA_NORMAL_TEXT_RATIO,
+} from './contrast'
+export type { WcagContrastOptions } from './contrast'
+
 export { buildGarmentObjectPath, buildSilhouetteObjectPath } from './wardrobe-object-path'
 export type { GarmentObjectExtension } from './wardrobe-object-path'

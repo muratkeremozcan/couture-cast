@@ -20,9 +20,51 @@ import { registerComfortContracts } from './comfort'
 import { registerWardrobeContracts } from './wardrobe'
 import { registerCommerceContracts } from './commerce'
 import { registerSubscriptionContracts } from './subscription'
+import { registerPremiumThemeContracts } from './premium-theme'
 
 export const HTTP_OPENAPI_OUTPUT_FILENAME = 'http.openapi.json'
 
+/**
+ * zod-to-openapi renders `enum.nullable()` as
+ * `{"type": ["string", "null"], "enum": [...values]}`, dropping the `null`
+ * member and leaving a schema that rejects the value its own type allows. This
+ * pass puts it back.
+ *
+ * KNOWN DEFECT, deliberately not corrected here. The append is in place, and the
+ * array being appended to is the ZodEnum's own `_def.values`, which
+ * zod-to-openapi hands out by reference. So one nullable publication of an enum
+ * leaks `null` into every other publication of that same enum, non-nullable ones
+ * included. Nine nodes in the published spec carry that leak today, each an
+ * invalid `{"type": "string", "enum": [..., null]}`: `ScenarioOutfit`,
+ * `RitualResponse` and `ShopThisLook`'s `garmentCategory`,
+ * `SuggestGarmentTagsResponse`'s three `suggestions.*.value` nodes,
+ * `UpdateGarmentTagsInput`'s `category` and `comfortRange`, and the
+ * `comfortRange` query parameter of
+ * `GET /api/v1/wardrobe/{ownerUserId}/capsules`. None of those properties has
+ * ever accepted `null` at the boundary.
+ *
+ * The correction is one line, `schema.enum = [...enumValues, null]` in place of
+ * `schema.enum.push(null)`, and it cannot ship through the pull-request gate as
+ * things stand. It rewrites those nine nodes, and `optic diff` reads three of
+ * them as breaking enum removals: the capsules query parameter under
+ * `prevent query parameters enum breaking changes`, and
+ * `UpdateGarmentTagsInput.category` / `.comfortRange` under
+ * `request and response property enums`. Optic's documented escape,
+ * `x-optic-exemptions`, closes the first and cannot close the other two:
+ * `createRequestPropertyResult` in `@useoptic/rulesets-base` 1.0.9 builds its
+ * result without copying the `exempted` flag, so request-body property
+ * exemptions are computed and then discarded. Verified by instrumenting
+ * `isExempted`, which returns `true` while the emitted result carries
+ * `exempted: undefined`. 1.0.9 is the last published Optic release, so no
+ * upgrade fixes it.
+ *
+ * Landing the correction therefore needs an owner decision this story cannot
+ * make for it: patch or vendor `@useoptic/rulesets-base` so property exemptions
+ * survive, or merge the corrected baseline past the gate once. Until then this
+ * pass stays byte-compatible with the published spec, and new contracts avoid
+ * the hazard by publishing a finished `enum` array of their own. Copy
+ * `nullablePremiumThemeKeySchema` in `./premium-theme`.
+ */
 function preserveNullableEnumValues(value: unknown): void {
   if (Array.isArray(value)) {
     for (const item of value) preserveNullableEnumValues(item)
@@ -68,6 +110,7 @@ export function createHttpOpenApiRegistry() {
   registerWardrobeContracts(registry, commonSchemas)
   registerCommerceContracts(registry, commonSchemas)
   registerSubscriptionContracts(registry, commonSchemas)
+  registerPremiumThemeContracts(registry, commonSchemas)
 
   return registry
 }
@@ -93,7 +136,10 @@ export function generateHttpOpenApiDocument() {
       // Story 5.2 bumps the minor again: six additive subscription operations
       // (status, refresh, checkout-session, portal-session, two webhooks) and
       // no changes to existing operations.
-      version: '1.2.0',
+      // Story 5.3 bumps the minor again: two additive premium-theme operations
+      // (read and set the palette) under a new tag, and no changes to existing
+      // operations.
+      version: '1.3.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [

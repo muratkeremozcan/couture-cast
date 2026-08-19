@@ -65,6 +65,11 @@ export const analyticsEventNameSchema = z.enum([
   'premium_checkout_started',
   'premium_entitlement_activated',
   'premium_entitlement_deactivated',
+  // Story 5.3. Server-side only: the palette write always goes through
+  // PUT /api/v1/commerce/premium/theme, so there is a natural server emission
+  // point and no client-distinctId variant is needed. The property allowlist is
+  // the palette key and nothing else.
+  'premium_theme_selected',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -560,6 +565,33 @@ export type PremiumEntitlementDeactivatedEvent = z.infer<
   typeof premiumEntitlementDeactivatedEventSchema
 >
 
+// --- Story 5.3: premium theme -----------------------------------------------
+//
+// One server event, fired on a successful PUT /api/v1/commerce/premium/theme.
+// Unlike premium_subscribe_tapped there is no client-distinctId variant: the
+// write always goes through the API, so the server is the only emission point
+// and the HMAC subject is always available.
+
+/**
+ * Mirrors `premiumThemeKeySchema` in `contracts/http/premium-theme.ts`, kept
+ * local for the same reason `premiumStoreAnalyticsEnum` is: `types/` does not
+ * depend on `contracts/`. Null is the Default palette — the same single
+ * spelling the contract uses, so a reset is a measurable selection rather than
+ * a missing event.
+ */
+const premiumThemeAnalyticsEnum = z.enum([
+  'jewel_radiance',
+  'autumn_umber',
+  'winter_metallic',
+])
+
+export const premiumThemeSelectedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  theme: premiumThemeAnalyticsEnum.nullable(),
+})
+
+export type PremiumThemeSelectedEvent = z.infer<typeof premiumThemeSelectedEventSchema>
+
 export const analyticsEventSchemas = {
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
@@ -592,6 +624,7 @@ export const analyticsEventSchemas = {
   premium_checkout_started: premiumCheckoutStartedEventSchema,
   premium_entitlement_activated: premiumEntitlementActivatedEventSchema,
   premium_entitlement_deactivated: premiumEntitlementDeactivatedEventSchema,
+  premium_theme_selected: premiumThemeSelectedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -1506,6 +1539,24 @@ export type PremiumEntitlementDeactivatedProperties = z.infer<
   typeof premiumEntitlementDeactivatedPropertiesSchema
 >
 
+// --- Story 5.3: premium theme property schema and wrapper -------------------
+//
+// The allowlist is one key. A palette choice is a cosmetic preference, so there
+// is nothing else about the write worth publishing: no user id, no surface, no
+// timestamp of the previous choice, and above all no hex values, which live in
+// each app's own styling layer and would make a designer's tweak an analytics
+// schema change.
+
+export const premiumThemeSelectedPropertiesSchema = z
+  .object({
+    theme: premiumThemeAnalyticsEnum.nullable(),
+  })
+  .strict()
+
+export type PremiumThemeSelectedProperties = z.infer<
+  typeof premiumThemeSelectedPropertiesSchema
+>
+
 export function trackPremiumSubscribeTapped(
   event: PremiumSubscribeTappedEvent,
   distinctId: string
@@ -1571,6 +1622,20 @@ export function trackPremiumEntitlementDeactivated(
       store: parsed.store,
       product_id: parsed.productId,
       reason: parsed.reason,
+    }),
+  }
+}
+
+export function trackPremiumThemeSelected(
+  event: PremiumThemeSelectedEvent
+): AnalyticsCapturePayload<'premium_theme_selected', PremiumThemeSelectedProperties> {
+  const parsed = premiumThemeSelectedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'premium_theme_selected',
+    properties: premiumThemeSelectedPropertiesSchema.parse({
+      theme: parsed.theme,
     }),
   }
 }

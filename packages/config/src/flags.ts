@@ -42,6 +42,16 @@ type FeatureFlagDefinition<TValue extends FeatureFlagStoredValue> = {
 }
 
 const FEATURE_FLAG_DEFINITIONS = {
+  // Story 5.3: the kill switch for the premium palette gallery, and this flag's
+  // first real consumer (PremiumThemeService). Same defaults-false reasoning as
+  // the two commerce flags below: a degraded PostHog can never switch a premium
+  // surface ON by accident. The `true` lives only in
+  // packages/db/prisma/seeds/feature-flags.ts, so the feature is on wherever the
+  // seed has run and off everywhere else, production included, until someone
+  // flips it -- the intended rollout shape, not an oversight. Scope: it gates
+  // the PUT write path only. The GET always answers, because a non-entitled or
+  // flag-off caller still needs `themesEnabled` to render the locked upsell or
+  // the Default palette, which is AC 6's clean fallback.
   premium_themes_enabled: {
     kind: 'boolean',
     defaultValue: false,

@@ -46,8 +46,6 @@ npm-debug.log*
 maestro/artifacts
 
 *.tsbuildinfo
-.agents
-.agent
 _bmad/*
 !_bmad/custom/
 _bmad/custom/*
@@ -59,4 +57,21 @@ perf-test-plan.md
 packages/*/src/**/*.js
 packages/*/src/**/*.js.map
 packages/*/src/**/*.d.ts.map
-.claude
+
+# AI coding assistants. BMAD reinstalls and updates regenerate all of these,
+# so they are reproducible on any machine and must never be committed.
+#
+# READ THIS BEFORE ADDING A PATH HERE. Gitignore is only consulted for
+# UNTRACKED files. If a path is already committed the rule does nothing until
+# you run `git rm -r --cached <path>`, which drops it from the index and leaves
+# it on disk. That is exactly why `.claude` sat in this file from 2026-08-12
+# with no effect: its 876 files had been committed on 2026-08-04.
+AGENTS.md
+CLAUDE.md
+.agents/
+.agent/
+.claude/
+.cursor/
+.codex/
+.antigravity/
+.gemini/

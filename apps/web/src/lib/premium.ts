@@ -23,13 +23,52 @@ import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 export { hasWebSession } from './commerce'
 
 /**
+ * Why a call failed, in terms the UI can act on without reading English prose.
+ *
+ * Every message this module can produce is untranslated English: the server's own
+ * `COMMERCE_SUBSCRIPTION_DISABLED_MESSAGE`, `SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE`,
+ * `SUBSCRIPTION_NOT_WEB_MANAGED_MESSAGE`, `SUBSCRIPTION_NOT_FOUND_MESSAGE` and
+ * `SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE`, a transport error's text, and the
+ * signed-out guard string below. Rendering any of them showed English to the nine
+ * non-`en` catalogs on the exact paths those catalogs carry copy for, and left
+ * `commerce.premium.errorLoad` and `errorPurchase` unreachable behind it. So the
+ * reason travels and the words do not: `subscription-section.tsx` maps each member
+ * onto a `commerce.premium.*` key.
+ *
+ * Collapsing everything to one generic string would have been worse than the bug.
+ * Telling an App Store subscriber "Unable to start checkout. Please try again."
+ * when the real answer is "manage it where you bought it" is a dead end, and the
+ * catalogs already carry `manageInStore` for precisely that. The members below are
+ * the distinctions the reader can act on differently, and nothing more.
+ *
+ * 409 appears twice and means two different things — already-subscribed on
+ * checkout, store-managed on the portal — so each wrapper supplies its own status
+ * map rather than sharing one global table.
+ */
+export type PremiumFailureReason =
+  | 'signed_out'
+  | 'already_subscribed'
+  | 'store_managed'
+  | 'no_web_subscription'
+  | 'subscribe_disabled'
+  | 'status_unavailable'
+  | 'unknown'
+
+/**
  * Thrown for every failure these wrappers surface, so a caller can tell an API
  * failure apart from a programming error without matching on message text.
+ *
+ * `message` is developer-facing throughout: it carries the server's own text when
+ * there is one so a log line or a failing assertion names the real cause. UI code
+ * reads {@link PremiumRequestError.reason} instead.
  */
 export class PremiumRequestError extends Error {
-  constructor(message: string) {
+  readonly reason: PremiumFailureReason
+
+  constructor(reason: PremiumFailureReason, message: string) {
     super(message)
     this.name = 'PremiumRequestError'
+    this.reason = reason
   }
 }
 
@@ -37,7 +76,8 @@ export class PremiumRequestError extends Error {
  * Fallback for a call made with no session. The settings UI checks
  * `hasWebSession()` first and renders a localized hint instead, so this string
  * is a guard against a caller that skipped that check rather than user-facing
- * copy.
+ * copy — which is why it has no catalog entry, and why the section reads the
+ * `signed_out` reason rather than this text.
  */
 export const PREMIUM_SIGNED_OUT_MESSAGE = 'Sign in to manage Premium.'
 
@@ -47,7 +87,7 @@ function readAccessToken(): string {
       ? null
       : (window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null)
   if (!token) {
-    throw new PremiumRequestError(PREMIUM_SIGNED_OUT_MESSAGE)
+    throw new PremiumRequestError('signed_out', PREMIUM_SIGNED_OUT_MESSAGE)
   }
   return token
 }
@@ -69,27 +109,48 @@ async function readServerMessage(response: Response, fallback: string): Promise<
   }
 }
 
+/** Statuses every operation shares. 401 is a session that ended under the reader. */
+const SHARED_REASONS: Readonly<Record<number, PremiumFailureReason>> = {
+  401: 'signed_out',
+}
+
 async function premiumError(
   error: unknown,
-  fallback: string
+  fallback: string,
+  statusReasons: Readonly<Record<number, PremiumFailureReason>> = {}
 ): Promise<PremiumRequestError> {
-  if (error instanceof ResponseError) {
-    return new PremiumRequestError(await readServerMessage(error.response, fallback))
+  // `readAccessToken` already threw a classified error; re-wrapping it would lose
+  // the `signed_out` reason and re-open the untranslated-message path.
+  if (error instanceof PremiumRequestError) {
+    return error
   }
-  // Anything else is a transport failure, an abort, or a contract-parse
-  // failure; the message those carry is more useful than the generic fallback.
-  return new PremiumRequestError(premiumErrorMessage(error, fallback))
+  if (error instanceof ResponseError) {
+    const status = error.response.status
+    const reason = statusReasons[status] ?? SHARED_REASONS[status] ?? 'unknown'
+    return new PremiumRequestError(
+      reason,
+      await readServerMessage(error.response, fallback)
+    )
+  }
+  // Anything else is a transport failure, an abort, or a contract-parse failure.
+  // The message those carry is the useful one for a log; the reason stays
+  // `unknown` so the section falls back to its own translated copy.
+  return new PremiumRequestError(
+    'unknown',
+    error instanceof Error ? error.message : fallback
+  )
 }
 
 /**
- * The message to show for a rejection from this module.
+ * The reason behind a rejection from this module, for UI code that has to choose
+ * a translated string.
  *
- * Every wrapper below rejects with a `PremiumRequestError`, so the fallback
- * only covers a caller that re-wrapped the failure into something else. It
- * exists so UI code does not repeat the narrowing at each call site.
+ * Anything that is not one of this module's own errors reads as `unknown`, which
+ * is the conservative answer: the caller shows its generic translated message
+ * rather than guessing at subscription state from a failure it cannot classify.
  */
-export function premiumErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback
+export function premiumFailureReason(error: unknown): PremiumFailureReason {
+  return error instanceof PremiumRequestError ? error.reason : 'unknown'
 }
 
 /**
@@ -110,6 +171,7 @@ export async function getSubscriptionFromWeb(
     }).apiV1CommerceSubscriptionGet({ signal })
     return subscriptionResponseSchema.parse(response).data
   } catch (error: unknown) {
+    // Developer-facing. The section renders `commerce.premium.errorLoad`.
     throw await premiumError(error, 'Unable to load subscription status.')
   }
 }
@@ -129,7 +191,11 @@ export async function refreshSubscriptionFromWeb(
     }).apiV1CommerceSubscriptionRefreshPost({ signal })
     return subscriptionResponseSchema.parse(response).data
   } catch (error: unknown) {
-    throw await premiumError(error, 'Unable to load subscription status.')
+    // 503 is the ledger pull failing rather than the read being broken, and the
+    // server deliberately answers it instead of serving stale-as-fresh.
+    throw await premiumError(error, 'Unable to load subscription status.', {
+      503: 'status_unavailable',
+    })
   }
 }
 
@@ -148,7 +214,10 @@ export async function createCheckoutSessionFromWeb(
     )
     return checkoutSessionResponseSchema.parse(response).data.url
   } catch (error: unknown) {
-    throw await premiumError(error, 'Unable to start checkout. Please try again.')
+    throw await premiumError(error, 'Unable to start checkout. Please try again.', {
+      409: 'already_subscribed',
+      503: 'subscribe_disabled',
+    })
   }
 }
 
@@ -161,6 +230,11 @@ export async function createPortalSessionFromWeb(signal?: AbortSignal): Promise<
     }).apiV1CommerceSubscriptionPortalSessionPost({ signal })
     return portalSessionResponseSchema.parse(response).data.url
   } catch (error: unknown) {
-    throw await premiumError(error, 'Unable to open subscription management.')
+    // The portal's 409 is store-managed, NOT already-subscribed: the same status
+    // on checkout means the opposite thing, which is why the map is per-operation.
+    throw await premiumError(error, 'Unable to open subscription management.', {
+      404: 'no_web_subscription',
+      409: 'store_managed',
+    })
   }
 }

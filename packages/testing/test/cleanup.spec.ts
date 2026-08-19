@@ -1,5 +1,9 @@
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
+// Learning path Step 34: Premium subscription lifecycle.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-34-premium-subscription-lifecycle
+// Learning path Step 35: Premium theme switcher.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { CleanupPrismaClient } from '../src/cleanup.js'
@@ -74,6 +78,7 @@ function createCleanupPrismaStub(
     premiumEntitlement: createDelegate('premiumEntitlement'),
     billingEvent: createDelegate('billingEvent'),
     billingCustomer: createDelegate('billingCustomer'),
+    premiumThemePreference: createDelegate('premiumThemePreference'),
   }
 }
 
@@ -161,6 +166,10 @@ describe('cleanup', () => {
       'billingEvent',
       'premiumEntitlement',
       'billingCustomer',
+      // Story 5.3: the theme preference hangs off the tracked user with
+      // ON DELETE CASCADE and nothing references it, so it only has to precede
+      // the user delete. It sits beside billing because it is the same domain.
+      'premiumThemePreference',
       // Story 5.1: commerce first, and in reverse dependency order.
       // AffiliateClick holds RESTRICT foreign keys onto AffiliateOffer and
       // CommercePartner, so a catalog row cannot go before the clicks that
@@ -257,6 +266,7 @@ describe('cleanup', () => {
       premiumEntitlements: [],
       billingEvents: [],
       billingCustomers: [],
+      premiumThemePreferences: [],
     })
   })
 

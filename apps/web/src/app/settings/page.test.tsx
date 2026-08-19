@@ -1,5 +1,7 @@
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
+// Learning path Step 35: Premium theme switcher.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
 // Story 5.1 Task 7 owner: Web settings page and commerce opt-out section.
 //
 // These go through MSW rather than a mocked `lib/commerce`, so the request
@@ -22,6 +24,7 @@ vi.mock('posthog-js', () => ({
 
 const PREFERENCES_PATH = '/api/v1/commerce/preferences'
 const SUBSCRIPTION_PATH = '/api/v1/commerce/subscription'
+const THEME_PATH = '/api/v1/commerce/premium/theme'
 
 /**
  * Story 5.2 mounts `SubscriptionSection` on this page, so every signed-in
@@ -41,6 +44,21 @@ function subscriptionHandler() {
         syncedAt: null,
         purchasesEnabled: true,
       },
+    })
+  )
+}
+
+/**
+ * Story 5.3 mounts `PremiumThemeSection` on this page, so every signed-in render also
+ * reads the resolved theme. `vitest.setup.ts` throws on any unhandled `/api/` request,
+ * which is why this sits beside `subscriptionHandler()` in every signed-in case rather
+ * than only in the tests that look at palettes. The default is a non-entitled reader
+ * (the locked panel); section-specific states live in `premium-theme-section.test.tsx`.
+ */
+function themeHandler() {
+  return http.get(THEME_PATH, () =>
+    HttpResponse.json({
+      data: { theme: null, isEntitled: false, themesEnabled: true },
     })
   )
 }
@@ -68,6 +86,7 @@ function preferenceHandlers(options: {
   const initial = options.initial ?? true
   return [
     subscriptionHandler(),
+    themeHandler(),
     http.get(PREFERENCES_PATH, () => {
       if (options.getStatus) {
         return HttpResponse.json(
@@ -191,6 +210,7 @@ describe('Web settings page', () => {
     const authorization = vi.fn<(value: string | null) => void>()
     useMswHandlers(
       subscriptionHandler(),
+      themeHandler(),
       http.get(PREFERENCES_PATH, ({ request }) => {
         authorization(request.headers.get('authorization'))
         return HttpResponse.json({ data: { affiliateCtasEnabled: true } })
@@ -303,6 +323,7 @@ describe('Web settings page', () => {
     let putStatus: number | undefined = 500
     useMswHandlers(
       subscriptionHandler(),
+      themeHandler(),
       http.get(PREFERENCES_PATH, () =>
         HttpResponse.json({ data: { affiliateCtasEnabled: true } })
       ),
@@ -378,6 +399,7 @@ describe('Web settings page', () => {
     const aborted = deferred<void>()
     useMswHandlers(
       subscriptionHandler(),
+      themeHandler(),
       http.get(PREFERENCES_PATH, async ({ request }) => {
         request.signal.addEventListener('abort', () => aborted.resolve())
         await gate.promise
@@ -412,6 +434,30 @@ describe('Web settings page', () => {
     const disclosure = screen.getByTestId('premium-disclosure')
     expect(disclosure).toHaveTextContent('RevenueCat')
     expect(disclosure).toHaveTextContent('Stripe')
+  })
+
+  /**
+   * Story 5.3 Decision 11: the theme gallery is the third child section, after the
+   * subscription one, because its locked state points at the subscribe controls that
+   * have to already be above it. All three sections must render signed out, each with
+   * its own disclosure — the unauthenticated axe run loads this page.
+   */
+  it('5.3-WEB-SETTINGS-01 renders the theme section after the Premium section', async () => {
+    render(<SettingsPage />)
+
+    const premium = screen.getByTestId('premium-subscription-section')
+    const theme = screen.getByTestId('premium-theme-section')
+    expect(
+      premium.compareDocumentPosition(theme) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('heading', { name: 'Interface palettes' })
+    ).toBeInTheDocument()
+    expect(screen.getByTestId('premium-theme-disclosure')).toHaveTextContent(
+      'A palette changes colors only'
+    )
+    // Signed out is a locked reader, not a broken one.
+    await screen.findByTestId('premium-theme-locked')
   })
 
   it('5.1-WEB-SETTINGS-11 labels the toggle and describes it with the help text', async () => {

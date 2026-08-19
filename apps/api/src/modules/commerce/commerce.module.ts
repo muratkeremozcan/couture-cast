@@ -24,6 +24,8 @@ import { CommerceRepository } from './commerce.repository.js'
 import { CommerceRetentionService } from './commerce-retention.service.js'
 import { PremiumEntitlementGuard } from './premium-entitlement.guard.js'
 import { PremiumEntitlementService } from './premium-entitlement.service.js'
+import { PremiumThemeController } from './premium-theme.controller.js'
+import { PremiumThemeService } from './premium-theme.service.js'
 import { RevenueCatClient, resolveRevenueCatClient } from './revenuecat-client.js'
 import { StripeBillingClient, resolveStripeClient } from './stripe-client.js'
 import { StripeBillingService } from './stripe-billing.service.js'
@@ -66,6 +68,11 @@ import { SubscriptionService } from './subscription.service.js'
     AffiliateWebhookController,
     // Story 5.2: subscription status/refresh plus the Stripe session routes.
     SubscriptionController,
+    // Story 5.3: the premium palette preference. Its routes stay under the
+    // commerce prefix so they inherit the cache-headers binding below; a
+    // top-level /api/v1/premium namespace would sit outside that binding and
+    // ship a per-user response with no Cache-Control at all.
+    PremiumThemeController,
     // No @UseGuards on this one either: machine-to-machine, authenticated by
     // the provider credential over the raw request body.
     BillingWebhookController,
@@ -96,6 +103,11 @@ import { SubscriptionService } from './subscription.service.js'
     { provide: StripeBillingClient, useFactory: resolveStripeClient },
     StripeBillingService,
     BillingWebhookService,
+    // Story 5.3: PremiumThemePreference's only reader/writer, and the first
+    // consumer of the premium_themes_enabled flag. Its PUT mounts
+    // PremiumEntitlementGuard on a production route -- whether that is the
+    // guard's first such mount depends only on whether CC-5.5 lands earlier.
+    PremiumThemeService,
   ],
   // PremiumEntitlementService and the guard are exported for CC-5.3/5.4/5.5,
   // whose surfaces (themes, palette analysis, planner API) gate on them.

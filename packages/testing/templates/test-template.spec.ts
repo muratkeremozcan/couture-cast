@@ -45,6 +45,8 @@ const prisma = {
   premiumEntitlement: { deleteMany: () => Promise.resolve({ count: 0 }) },
   billingEvent: { deleteMany: () => Promise.resolve({ count: 0 }) },
   billingCustomer: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  // Story 5.3 premium theme preference.
+  premiumThemePreference: { deleteMany: () => Promise.resolve({ count: 0 }) },
 } satisfies Record<string, DeleteManyRecorder>
 
 describe('example factory suite', () => {
