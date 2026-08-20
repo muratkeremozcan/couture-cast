@@ -416,10 +416,15 @@ forgotten.
   relative import reaching out to the Playwright tier would violate that rootDir
   and pull `@playwright/test` types into a package with no reason to depend on
   Playwright. It lives instead in the new
-  `playwright/support/helpers/accessibility.spec.ts`, run directly via
-  `npx vitest run` since `playwright/` is not an npm workspace and has no
+  `playwright/support/helpers/accessibility.spec.ts`, run via the root `vitest`
+  binary since `playwright/` is not an npm workspace and has no
   Playwright-runner-discoverable test tier of its own for pure-logic specs
   (`playwright/config/base.config.ts`'s `testDir` only scans `playwright/tests`).
+  Wired into `npm run test:playwright-unit`, which `prepare:playwright` runs
+  before every Playwright entrypoint, so it isn't a file someone has to
+  remember to invoke by hand: the first version of this entry shipped without
+  that wiring, silently orphaned from every CI job, and only surfaced when
+  asked directly why a spec lived under `helpers/`.
   `contrast.spec.ts`'s own comment reserving the id now points here. The
   repository is back down to two copies of the WCAG luminance maths: the
   canonical one in `@couture/utils`, and the inline duplicate in

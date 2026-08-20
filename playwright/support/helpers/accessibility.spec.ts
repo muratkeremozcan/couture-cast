@@ -7,10 +7,12 @@
  * out to `playwright/support/helpers/accessibility.ts` would both violate that
  * rootDir and pull `@playwright/test` types into a package that has no reason to
  * depend on Playwright. `playwright/` is not an npm workspace at all, so this file
- * runs under the root `vitest` binary directly (`npx vitest run
- * playwright/support/helpers/accessibility.spec.ts`) rather than through the
- * Playwright test runner, which only discovers files under `playwright/tests`
- * (`playwright/config/base.config.ts`'s `testDir`).
+ * runs under the root `vitest` binary directly rather than through the Playwright
+ * test runner, which only discovers files under `playwright/tests`
+ * (`playwright/config/base.config.ts`'s `testDir`) and expects `@playwright/test`'s
+ * `test`/`expect`, not vitest's. Wired into `npm run test:playwright-unit`, which
+ * `prepare:playwright` runs before every Playwright entrypoint (local, preview,
+ * and CI's `test:pw-local`) — not a file someone has to remember to run by hand.
  *
  * The proof itself: `accessibility.ts`'s `contrastRatio` takes CSS `rgb()` strings
  * and is now a thin adapter that converts to hex and delegates to
