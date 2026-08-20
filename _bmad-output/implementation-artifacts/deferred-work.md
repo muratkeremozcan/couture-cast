@@ -309,7 +309,7 @@ its scope. Each records what was narrowed and why.
   reported 112 tests at the time of this entry). Do it as its own change, not
   as a rider on a feature story.
 
-- **Two shared Pact files have grown past the length limit the same way.**
+- _Resolved 2026-08-20._ **Two shared Pact files have grown past the length limit the same way.**
   `pact/http/consumer/api-contract-interactions.ts` is 3589 lines and
   `pact/http/provider/provider-helper.ts` is 1583 lines. Neither is a story-5.2
   artefact: both are cross-story accumulators that every story appends its
@@ -318,6 +318,45 @@ its scope. Each records what was narrowed and why.
   be solved the same way and at the same time — per-domain modules behind one
   registry, with the three-run Pact determinism gate as the proof the split
   changed nothing. Filed together so whoever takes one takes both.
+
+  Both done, together, as this entry asked. The line counts above were stale by
+  the time anyone read them: PR #133 added 533 and 140 lines, so the real
+  starting sizes were 3982 and 1724.
+
+  `api-contract-interactions.ts` is a 33-line barrel over eleven per-domain
+  modules under `interactions/`, largest 738 lines. `provider-helper.ts` is 374
+  lines: its seventeen inline service doubles moved into ten factory modules
+  under `doubles/`, the `PACT_*` identifiers into `fixtures.ts`, and the
+  scenario state into `state.ts`. Nothing under `pact/` exceeds 1000 lines now.
+
+  The doubles used to be consts inside `startLocalPactProvider`, closing over
+  its locals. They read `state.ts`'s exported getters instead, which is why the
+  state had to become its own module rather than staying put and being exported:
+  `provider-helper.ts` imports the doubles, so a double importing state back out
+  of it would be a cycle. Each factory returns only what the Nest fixture
+  registers; the scenario readers and response shapers stay private to their
+  module.
+
+  Both public entry points kept their names and their exports, so
+  `web-api-client.pacttest.ts`, `mobile-api-client.pacttest.ts`,
+  `api-provider.pacttest.ts` and `state-handlers.ts` are untouched, and every
+  `*.md` that references either path still resolves.
+
+  Proof, in increasing order of strength. The determinism gate reports the same
+  68 and 77 interactions, stable across three runs. The generated pact JSON was
+  captured before the split and compared with `diff -r` after: **byte-identical**,
+  which the counts alone could not have shown, because a renamed interaction and
+  a dropped one cancel out in a total. Provider verification passes 547 `(OK)`
+  assertions across both pacts. `tsc -p pact/tsconfig.json` and `eslint pact`
+  are clean, and `npm run test:pact` — the exact command
+  `.github/workflows/contract-testing.yml` runs — exits 0.
+
+  Two notes for whoever splits the next accumulator. Generating each module's
+  imports by scanning its text for referenced names pulls in imports that exist
+  only because a docblock mentions another module's helper; strip comments
+  first. And an owner-anchor comment sitting on a boundary line follows the
+  wrong side of the split — `Story 2.3 Task 3 step 2 owner` landed above the
+  identity doubles instead of the ritual ones and had to be moved back by hand.
 
 - **Locale-parity scaffolding is duplicated across four i18n specs.** The
   `SUPPORTED_LOCALES`/catalog map, flatten, placeholder check, cognate
