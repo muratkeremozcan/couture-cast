@@ -347,7 +347,31 @@
       "endedNote": "Votre abonnement est terminé. Réabonnez-vous à tout moment pour retrouver les fonctions Premium.",
       "errorLoad": "Impossible de charger l'état de votre abonnement. Veuillez réessayer.",
       "errorPurchase": "L'achat n'a pas pu être finalisé. Veuillez réessayer.",
-      "unavailableInBuild": "Les achats ne sont pas disponibles dans cette version de l'application. Utilisez la version App Store ou Play Store de CoutureCast pour vous abonner."
+      "unavailableInBuild": "Les achats ne sont pas disponibles dans cette version de l'application. Utilisez la version App Store ou Play Store de CoutureCast pour vous abonner.",
+      "theme": {
+        "sectionTitle": "Palettes d'interface",
+        "disclosure": "Les palettes d'interface sont une fonctionnalité Premium. Votre choix est enregistré dans votre compte CoutureCast et s'applique sur tous les appareils où vous vous connectez. Une palette ne change que les couleurs : elle ne modifie jamais les tenues recommandées. CoutureCast transmet la palette choisie à son fournisseur d'analyse sous un identifiant pseudonyme ; aucune photo de vêtement ni donnée personnelle n'est partagée.",
+        "names": {
+          "jewelRadiance": "Jewel Radiance",
+          "autumnUmber": "Autumn Umber",
+          "winterMetallic": "Winter Metallic"
+        },
+        "select": "Appliquer",
+        "selected": "Sélectionnée",
+        "reset": "Palette par défaut",
+        "preview": {
+          "title": "Aperçu en direct",
+          "body": "Cette carte utilise la palette que vous avez appliquée. Les cartes ci-dessus affichent toujours leurs propres couleurs."
+        },
+        "unavailable": "Les palettes sont désactivées pour le moment. Votre choix enregistré est conservé et revient dès leur réactivation.",
+        "locked": {
+          "title": "Les palettes d'interface sont une fonctionnalité Premium",
+          "body": "Abonnez-vous à Premium avec les commandes ci-dessus pour débloquer {{palettes}}.",
+          "signedOutBody": "Connectez-vous et abonnez-vous à Premium pour débloquer {{palettes}}."
+        },
+        "loadError": "Impossible de charger votre palette d'interface. La palette par défaut est affichée.",
+        "saveError": "Impossible d'enregistrer votre palette d'interface. Veuillez réessayer."
+      }
     }
   }
 }

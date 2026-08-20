@@ -347,7 +347,31 @@
       "endedNote": "Tu suscripción terminó. Suscríbete de nuevo cuando quieras para recuperar las funciones Premium.",
       "errorLoad": "No se pudo cargar el estado de tu suscripción. Inténtalo de nuevo.",
       "errorPurchase": "No se pudo completar la compra. Inténtalo de nuevo.",
-      "unavailableInBuild": "Las compras no están disponibles en esta versión de la aplicación. Usa la versión de CoutureCast de la App Store o Play Store para suscribirte."
+      "unavailableInBuild": "Las compras no están disponibles en esta versión de la aplicación. Usa la versión de CoutureCast de la App Store o Play Store para suscribirte.",
+      "theme": {
+        "sectionTitle": "Paletas de la interfaz",
+        "disclosure": "Las paletas de la interfaz son una función Premium. Tu elección se guarda en tu cuenta de CoutureCast y se aplica en todos los dispositivos donde inicies sesión. Una paleta solo cambia los colores: nunca cambia qué atuendos se recomiendan. CoutureCast envía la paleta que elegiste a su proveedor de análisis con un identificador seudónimo; no se comparten fotos de prendas ni datos personales.",
+        "names": {
+          "jewelRadiance": "Jewel Radiance",
+          "autumnUmber": "Autumn Umber",
+          "winterMetallic": "Winter Metallic"
+        },
+        "select": "Aplicar",
+        "selected": "Seleccionada",
+        "reset": "Paleta predeterminada",
+        "preview": {
+          "title": "Vista previa en vivo",
+          "body": "Esta tarjeta usa la paleta que aplicaste. Las tarjetas de arriba siempre muestran sus propios colores."
+        },
+        "unavailable": "Las paletas están desactivadas por ahora. Tu elección guardada se conserva y vuelve cuando se reactiven.",
+        "locked": {
+          "title": "Las paletas de la interfaz son una función Premium",
+          "body": "Suscríbete a Premium con los controles de arriba para desbloquear {{palettes}}.",
+          "signedOutBody": "Inicia sesión y suscríbete a Premium para desbloquear {{palettes}}."
+        },
+        "loadError": "No se pudo cargar tu paleta de la interfaz. Se muestra la paleta predeterminada.",
+        "saveError": "No se pudo guardar tu paleta de la interfaz. Inténtalo de nuevo."
+      }
     }
   }
 }

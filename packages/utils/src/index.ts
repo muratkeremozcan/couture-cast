@@ -36,6 +36,7 @@ export type {
 export {
   formatWeatherAltText,
   formatGarmentAltText,
+  formatLocalizedList,
   getAnnouncementUrgency,
 } from './accessibility'
 export type { WeatherAltTextInput, AccessibilityAnnouncementEvent } from './accessibility'

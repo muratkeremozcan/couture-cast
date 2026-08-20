@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
+import { formatLocalizedList } from '@couture/utils'
 import {
   defaultSupportedLocale,
   resolveSupportedLocale,
+  type PremiumThemeKey,
   type Subscription,
   type SubscriptionPlan,
   type SupportedLocale,
@@ -38,9 +40,16 @@ import {
   showManageSubscriptionsInStore,
   type PurchasesAvailability,
 } from '@/src/lib/premium'
+import {
+  premiumThemeFailureReason,
+  setThemeFromMobile,
+  PREMIUM_THEME_KEYS,
+} from '@/src/lib/premium-theme'
 import { getSavedSettings, saveSettings } from '@/src/lib/settings-storage'
 import { updatePreferredLocaleFromMobile } from '@/src/lib/user'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
+import { useAppTheme } from '@/src/theme/theme-context'
+import { resolveThemePalette } from '@/src/theme/theme-palettes'
 
 /** Exported so the screen test advances virtual time by the real bound rather
  *  than by a copy of it that silently stops matching when this changes. */
@@ -424,6 +433,8 @@ export default function SettingsScreen() {
           </View>
 
           <PremiumSettingsSection />
+
+          <PremiumThemeSection />
 
           <Text style={styles.infoText}>{apiHealthMessage}</Text>
           <Text style={styles.infoText}>
@@ -854,6 +865,393 @@ function PremiumFlowMessages({ premiumFlow }: { premiumFlow: PremiumFlowState })
   )
 }
 
+/**
+ * Exhaustive over the contract enum on purpose: a palette added to
+ * `premiumThemeKeySchema` fails to typecheck here until it has a name to
+ * render, so the mobile gallery cannot silently fall behind the contract.
+ */
+const PALETTE_LABEL_KEYS: Record<PremiumThemeKey, string> = {
+  jewel_radiance: 'commerce.premium.theme.names.jewelRadiance',
+  autumn_umber: 'commerce.premium.theme.names.autumnUmber',
+  winter_metallic: 'commerce.premium.theme.names.winterMetallic',
+}
+
+interface ThemeOption {
+  /** `null` is the implicit Default palette, which is also the reset control. */
+  key: PremiumThemeKey | null
+  /** The `testID` suffix and React key for this card. */
+  id: string
+  labelKey: string
+}
+
+/**
+ * The gallery, in render order: the three named palettes then Default.
+ *
+ * Default is a real fourth card rather than a separate "reset" button, so a
+ * subscriber who likes none of the three is not stuck with the last one they
+ * tried. It is never gated — it is the state a non-entitled user already has.
+ */
+const THEME_OPTIONS: readonly ThemeOption[] = [
+  ...PREMIUM_THEME_KEYS.map((key) => ({
+    key,
+    id: key,
+    labelKey: PALETTE_LABEL_KEYS[key],
+  })),
+  { key: null, id: 'default', labelKey: 'commerce.premium.theme.reset' },
+]
+
+/** The `nativeID` the disabled cards point `aria-describedby` at. */
+const THEME_UNAVAILABLE_HINT_ID = 'premium-theme-unavailable-hint'
+
+/**
+ * The palette names, joined the way the reader's language joins a list.
+ *
+ * The names arrive in the locked copy as one `{{palettes}}` interpolation built
+ * from `PREMIUM_THEME_KEYS`, so the gallery and the upsell copy share a source
+ * of truth and adding a palette does not mean hand-editing twenty localized
+ * sentences.
+ *
+ * Locale-aware joining rather than `join(', ')` because the join is not the same
+ * in every language this ships in: German wants "und", French "et", Turkish "ve",
+ * Spanish "y", and English and Canadian English disagree about the serial comma.
+ *
+ * `formatLocalizedList` rather than `Intl.ListFormat` directly. `Intl.ListFormat`
+ * is optional under ECMA-402 and Hermes ships without it, so constructing one here
+ * threw `TypeError: Cannot read property 'prototype' of undefined` on device. That
+ * took `PremiumThemeSection` down, and with it `SettingsScreen` and the whole tab
+ * layout, so every flow that reaches for `tab-settings` failed with a missing
+ * element rather than anything naming the real cause. The shared helper uses
+ * `Intl.ListFormat` where it exists and falls back where it does not, and is
+ * already load-bearing in this bundle through the alt-text helpers.
+ */
+function usePaletteNameList(): string {
+  const { t, i18n } = useTranslation()
+  const language = i18n.language
+
+  return useMemo(
+    () =>
+      formatLocalizedList(
+        PREMIUM_THEME_KEYS.map((key) => t(PALETTE_LABEL_KEYS[key])),
+        language
+      ),
+    [t, language]
+  )
+}
+
+/**
+ * Interface palettes (Story 5.3 Task 6), a sibling section immediately after the
+ * Premium one, which is where its locked copy points: "subscribe with the
+ * controls above" names `PremiumSubscribeControls`, rendered directly above on
+ * this same screen (Decision 12).
+ *
+ * Three things here are load-bearing rather than stylistic, and all three mirror
+ * the web section deliberately so the two surfaces cannot drift:
+ *
+ * - **Each card pins its own palette; the preview pins none.** A card advertises
+ *   the palette it offers, so it looks identical whether or not that palette is
+ *   the applied one. The preview reads `useAppTheme().palette`, which is the
+ *   applied one, so it is the single element on screen that actually changes when
+ *   a save lands — without it, AC 4's instant apply would be provable only in a
+ *   debugger.
+ * - **`primary` and `secondary` never carry text.** Two of the three `primary`
+ *   fills miss the 4.5:1 small-text floor against white (Decision 2), so they
+ *   render as swatch dots ringed in the card's own `cardText`: Autumn Umber's
+ *   Wheat and Winter Metallic's Platinum measure 1.68:1 and 1.36:1 against their
+ *   own card backgrounds, and the fill alone would leave no discernible boundary.
+ *   Every string in a card renders in `cardText` on `cardBg`, the pairing
+ *   measured at 8.01-11.58:1.
+ * - **Selection is never signalled by color alone.** The active card states
+ *   "Selected" in text and carries `accessibilityState.selected`, so the palette
+ *   is decoration on top of a state that is already readable and announced.
+ *
+ * The section owns no fetch of its own: `AppThemeProvider` holds the one read and
+ * this calls `refresh()` on entry, so opening settings costs one round trip and
+ * the applied palette is the same fact here as everywhere else in the app.
+ */
+function PremiumThemeSection() {
+  const { t } = useTranslation()
+  const {
+    themeKey,
+    palette,
+    isEntitled,
+    themesEnabled,
+    status,
+    refresh,
+    applyResolvedTheme,
+    applyFailure,
+  } = useAppTheme()
+  const palettes = usePaletteNameList()
+
+  /** The `id` of the card whose save is in flight, or null when idle. */
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  /**
+   * The in-flight save, so leaving the screen cancels it. Without this a save
+   * started here would run to completion and re-color the app from a section
+   * that no longer exists.
+   */
+  const saveControllerRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    // Entering settings re-reads the preference. The provider's own read happens
+    // once at app launch, and entitlement or the kill switch can have changed in
+    // the hours since. `refresh` is a stable callback, so this runs on entry
+    // rather than on every render.
+    void refresh()
+    return () => saveControllerRef.current?.abort()
+  }, [refresh])
+
+  const showGallery = status === 'ready' && isEntitled
+  const showLocked = status === 'signed-out' || (status === 'ready' && !isEntitled)
+  const isSelectable = showGallery && themesEnabled
+  const showUnavailableNote = showGallery && !themesEnabled
+  const errorMessage =
+    saveError ?? (status === 'failed' ? t('commerce.premium.theme.loadError') : null)
+
+  const handleSelect = async (option: ThemeOption) => {
+    // Re-pressing the active card would issue a full PUT and emit a second
+    // `premium_theme_selected` for one real choice, inflating exactly the
+    // adoption count Decision 14 exists to measure. The server answers 200 for
+    // an unchanged value by design, so the client is the only place this can be
+    // suppressed.
+    if (savingId !== null || option.key === themeKey) {
+      return
+    }
+
+    const controller = new AbortController()
+    saveControllerRef.current = controller
+    setSavingId(option.id)
+    setSaveError(null)
+
+    try {
+      const saved = await setThemeFromMobile(option.key, controller.signal)
+      if (!controller.signal.aborted) {
+        applyResolvedTheme(saved)
+      }
+    } catch (error: unknown) {
+      if (!controller.signal.aborted) {
+        // The rejection re-resolves the section rather than only printing a line:
+        // a 403 means entitlement lapsed and a 503 means the kill switch flipped,
+        // and both are states this section already renders. Only an unclassified
+        // failure has a message, and it is the catalog's rather than the server's
+        // untranslated English (AC 7).
+        if (premiumThemeFailureReason(error) === 'unknown') {
+          setSaveError(t('commerce.premium.theme.saveError'))
+        }
+        applyFailure(error)
+      }
+    } finally {
+      if (saveControllerRef.current === controller) {
+        saveControllerRef.current = null
+      }
+      if (!controller.signal.aborted) {
+        setSavingId(null)
+      }
+    }
+  }
+
+  return (
+    <View style={styles.settingsSection} testID="premium-theme-section">
+      <Text style={styles.sectionTitle} testID="premium-theme-title">
+        {t('commerce.premium.theme.sectionTitle')}
+      </Text>
+      {/*
+        AC 7: what a palette is, where the choice is stored, and what it does not
+        change. A sibling text node in reading order before the gallery, never a
+        tooltip and never only an accessible name.
+      */}
+      <Text style={styles.disclosureText} testID="premium-theme-disclosure">
+        {t('commerce.premium.theme.disclosure')}
+      </Text>
+
+      {/*
+        The kill-switch note precedes the cards it explains and is what their
+        `aria-describedby`/`accessibilityHint` point at, so a disabled card is
+        never disabled without a stated reason.
+      */}
+      {showUnavailableNote ? (
+        <Text
+          style={styles.helpText}
+          nativeID={THEME_UNAVAILABLE_HINT_ID}
+          testID="premium-theme-unavailable"
+        >
+          {t('commerce.premium.theme.unavailable')}
+        </Text>
+      ) : null}
+
+      {showGallery ? (
+        <>
+          <View style={styles.themeGallery} testID="premium-theme-gallery">
+            {THEME_OPTIONS.map((option) => (
+              <PaletteCard
+                key={option.id}
+                option={option}
+                isSelected={themeKey === option.key}
+                isSaving={savingId === option.id}
+                isSelectable={isSelectable}
+                onSelect={() => {
+                  void handleSelect(option)
+                }}
+              />
+            ))}
+          </View>
+          {/*
+            After the cards, not before them: the reader picks a palette and then
+            sees what it does. It reads the APPLIED palette from the context, which
+            is what makes the choice visible at all — every card pins its own.
+          */}
+          <View
+            style={[
+              styles.themePreview,
+              { backgroundColor: palette.cardBg, borderColor: palette.cardBorder },
+            ]}
+            testID="premium-theme-preview"
+          >
+            <View
+              style={[styles.themePreviewAccent, { backgroundColor: palette.primary }]}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              testID="premium-theme-preview-accent"
+            />
+            <Text style={[styles.themePreviewTitle, { color: palette.cardText }]}>
+              {t('commerce.premium.theme.preview.title')}
+            </Text>
+            <Text style={[styles.themePreviewBody, { color: palette.cardText }]}>
+              {t('commerce.premium.theme.preview.body')}
+            </Text>
+          </View>
+        </>
+      ) : null}
+
+      {/*
+        The locked upsell for a signed-out or non-entitled reader: the same panel
+        shape and copy the web section renders, pointing at the subscribe controls
+        directly above rather than carrying a CTA of its own. The body splits by
+        audience because "subscribe with the controls above" is true for a
+        signed-in reader and false for a signed-out one, who has to sign in first.
+      */}
+      {showLocked ? (
+        <View style={styles.themeLockedPanel} testID="premium-theme-locked">
+          <Text style={styles.themeLockedTitle}>
+            {t('commerce.premium.theme.locked.title')}
+          </Text>
+          <Text style={styles.helpText}>
+            {t(
+              status === 'signed-out'
+                ? 'commerce.premium.theme.locked.signedOutBody'
+                : 'commerce.premium.theme.locked.body',
+              { palettes }
+            )}
+          </Text>
+        </View>
+      ) : null}
+
+      {errorMessage ? (
+        <Text
+          style={styles.errorText}
+          testID="premium-theme-error"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+        >
+          {errorMessage}
+        </Text>
+      ) : null}
+    </View>
+  )
+}
+
+/**
+ * One gallery card, painted in the palette it offers rather than the applied one.
+ *
+ * `accessibilityState` carries the real state and the `aria-*` pair rides
+ * alongside it, because react-native-web does not project `accessibilityState`
+ * onto the DOM — the same precedent the commerce toggle and the subscribe
+ * controls above already follow.
+ */
+function PaletteCard({
+  option,
+  isSelected,
+  isSaving,
+  isSelectable,
+  onSelect,
+}: {
+  option: ThemeOption
+  isSelected: boolean
+  isSaving: boolean
+  isSelectable: boolean
+  onSelect: () => void
+}) {
+  const { t } = useTranslation()
+  const palette = resolveThemePalette(option.key)
+  const name = t(option.labelKey)
+
+  return (
+    <Pressable
+      style={[
+        styles.themeCard,
+        { backgroundColor: palette.cardBg, borderColor: palette.cardBorder },
+        isSelected ? styles.themeCardSelected : null,
+        isSelectable ? null : styles.themeCardDisabled,
+      ]}
+      disabled={!isSelectable}
+      onPress={onSelect}
+      testID={`premium-theme-option-${option.id}`}
+      accessibilityRole="button"
+      accessibilityLabel={name}
+      accessibilityState={{
+        selected: isSelected,
+        disabled: !isSelectable,
+        busy: isSaving,
+      }}
+      accessibilityHint={
+        isSelectable ? undefined : t('commerce.premium.theme.unavailable')
+      }
+      aria-pressed={isSelected}
+      aria-disabled={!isSelectable}
+      aria-busy={isSaving}
+      aria-describedby={isSelectable ? undefined : THEME_UNAVAILABLE_HINT_ID}
+    >
+      <View style={styles.themeCardHeader}>
+        {/*
+          The two swatches are the only place `primary` and `secondary` appear.
+          Both are ringed in `cardText` because Autumn Umber's Wheat and Winter
+          Metallic's Platinum measure 1.68:1 and 1.36:1 against their own card
+          backgrounds: the fill alone would leave no discernible boundary. The ring
+          sits at the same 8.01-11.58:1 as the card's text, clearing SC 1.4.11's
+          3:1 non-text floor with room to spare.
+        */}
+        <View
+          style={[
+            styles.themeSwatch,
+            { backgroundColor: palette.primary, borderColor: palette.cardText },
+          ]}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          testID={`premium-theme-swatch-primary-${option.id}`}
+        />
+        <View
+          style={[
+            styles.themeSwatch,
+            { backgroundColor: palette.secondary, borderColor: palette.cardText },
+          ]}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          testID={`premium-theme-swatch-secondary-${option.id}`}
+        />
+        <Text style={[styles.themeCardName, { color: palette.cardText }]}>{name}</Text>
+      </View>
+      <Text
+        style={[styles.themeCardState, { color: palette.cardText }]}
+        testID={`premium-theme-state-${option.id}`}
+      >
+        {isSelected
+          ? t('commerce.premium.theme.selected')
+          : t('commerce.premium.theme.select')}
+      </Text>
+    </Pressable>
+  )
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -991,6 +1389,85 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  themeGallery: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+    backgroundColor: 'transparent',
+  },
+  themeCard: {
+    // Decision 17's 44-by-44 floor, same as every other control on this screen.
+    minHeight: 44,
+    flexGrow: 1,
+    flexBasis: '46%',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  themeCardSelected: {
+    // Selection is stated in words inside the card too; this is the redundant
+    // visual cue, never the only one.
+    borderWidth: 2,
+  },
+  themeCardDisabled: {
+    opacity: 0.7,
+  },
+  themeCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'transparent',
+  },
+  themeSwatch: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  themeCardName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  themeCardState: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  themePreview: {
+    marginTop: 12,
+    gap: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  themePreviewAccent: {
+    width: 64,
+    height: 6,
+    borderRadius: 3,
+  },
+  themePreviewTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  themePreviewBody: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  themeLockedPanel: {
+    marginTop: 12,
+    gap: 4,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e6e6ed',
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  themeLockedTitle: {
     fontSize: 14,
     fontWeight: '600',
   },

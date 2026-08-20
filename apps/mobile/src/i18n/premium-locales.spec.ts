@@ -54,8 +54,14 @@ const APPROVED_COGNATES: Record<string, readonly SupportedLocale[]> = {
 }
 
 function premiumTree(catalog: Catalog): Record<string, unknown> {
+  // Story 5.3 nests its `theme` namespace under `commerce.premium.*` (Decision 13) but
+  // audits it in `premium-theme-locales.spec.ts`; this spec keeps pinning the 5.2 key
+  // set exactly, so the subtree is excluded rather than absorbed. Same treatment
+  // `commerce-locales.spec.ts` gives this tree one level up, and the same one the web
+  // sibling of this file already applies.
   const commerce = (catalog.commerce ?? {}) as Record<string, unknown>
-  return (commerce.premium ?? {}) as Record<string, unknown>
+  const premium = (commerce.premium ?? {}) as Record<string, unknown>
+  return Object.fromEntries(Object.entries(premium).filter(([key]) => key !== 'theme'))
 }
 
 function flatten(value: unknown, prefix = ''): Map<string, string> {

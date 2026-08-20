@@ -26,6 +26,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PremiumTheme, PremiumThemeKey } from '@couture/api-client/contracts/http'
+import { formatLocalizedList } from '@couture/utils'
 import {
   applyWebThemeAttribute,
   DEFAULT_THEME_ATTRIBUTE,
@@ -253,7 +254,7 @@ function LivePreview() {
  * `{{palettes}}` interpolation built from `PREMIUM_THEME_KEYS`, which makes the
  * gallery and the upsell copy the same source of truth.
  *
- * `Intl.ListFormat` rather than `join(', ')` because the join is not the same in
+ * A list formatter rather than `join(', ')` because the join is not the same in
  * every language this ships in: German wants "und", French "et", Turkish "ve",
  * Spanish "y", and English and Canadian English disagree about the serial comma
  * — CLDR gives en-US "A, B, and C" and en-CA "A, B and C". Hand-joining would
@@ -261,18 +262,29 @@ function LivePreview() {
  *
  * Turkish attaches its case suffix to the end of the list ("{{palettes}}'in"),
  * which works because the formatter puts the final name last in every locale.
+ *
+ * `formatLocalizedList` rather than `Intl.ListFormat` directly, even though every
+ * browser this app supports ships `Intl.ListFormat` and the raw call was not
+ * defective here. The mobile section renders the same sentence from the same
+ * `{{palettes}}` interpolation, and it cannot use the raw constructor at all:
+ * Hermes ships no `Intl.ListFormat`, so calling it threw on device and took the
+ * whole settings screen down. Two surfaces joining one list two different ways is
+ * exactly the drift this section is written to avoid, and the shared helper is
+ * also the only copy of the fallback's conjunction table, so a language added
+ * there reaches both surfaces at once.
  */
 function usePaletteNameList(): string {
   const { t, i18n } = useTranslation()
   const language = i18n.language
 
-  return useMemo(() => {
-    const names = PREMIUM_THEME_KEYS.map((key) => t(PALETTE_LABEL_KEYS[key]))
-    return new Intl.ListFormat(language, {
-      style: 'long',
-      type: 'conjunction',
-    }).format(names)
-  }, [t, language])
+  return useMemo(
+    () =>
+      formatLocalizedList(
+        PREMIUM_THEME_KEYS.map((key) => t(PALETTE_LABEL_KEYS[key])),
+        language
+      ),
+    [t, language]
+  )
 }
 
 function LockedPanel({ isSignedOut }: { isSignedOut: boolean }) {

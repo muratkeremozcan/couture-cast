@@ -347,7 +347,31 @@
       "endedNote": "Sua assinatura terminou. Assine de novo quando quiser para recuperar os recursos Premium.",
       "errorLoad": "Não foi possível carregar o estado da assinatura. Tente novamente.",
       "errorPurchase": "Não foi possível concluir a compra. Tente novamente.",
-      "unavailableInBuild": "As compras não estão disponíveis nesta versão do aplicativo. Use a versão da App Store ou da Play Store do CoutureCast para assinar."
+      "unavailableInBuild": "As compras não estão disponíveis nesta versão do aplicativo. Use a versão da App Store ou da Play Store do CoutureCast para assinar.",
+      "theme": {
+        "sectionTitle": "Paletas da interface",
+        "disclosure": "As paletas da interface são um recurso Premium. Sua escolha é salva na sua conta do CoutureCast e vale em todos os aparelhos em que você fizer login. Uma paleta muda apenas as cores: ela nunca muda quais looks são recomendados. O CoutureCast envia a paleta escolhida ao seu provedor de análise com um identificador pseudônimo; nenhuma foto de peça ou dado pessoal é compartilhado.",
+        "names": {
+          "jewelRadiance": "Jewel Radiance",
+          "autumnUmber": "Autumn Umber",
+          "winterMetallic": "Winter Metallic"
+        },
+        "select": "Aplicar",
+        "selected": "Selecionada",
+        "reset": "Paleta padrão",
+        "preview": {
+          "title": "Prévia ao vivo",
+          "body": "Este cartão usa a paleta que você aplicou. Os cartões acima sempre mostram as próprias cores."
+        },
+        "unavailable": "As paletas estão desativadas por enquanto. Sua escolha salva continua guardada e volta quando elas retornarem.",
+        "locked": {
+          "title": "As paletas da interface são um recurso Premium",
+          "body": "Assine o Premium com os controles acima para desbloquear {{palettes}}.",
+          "signedOutBody": "Entre na sua conta e assine o Premium para desbloquear {{palettes}}."
+        },
+        "loadError": "Não foi possível carregar sua paleta da interface. A paleta padrão está sendo exibida.",
+        "saveError": "Não foi possível salvar sua paleta da interface. Tente novamente."
+      }
     }
   }
 }

@@ -347,7 +347,31 @@
       "endedNote": "Dein Abonnement ist beendet. Abonniere jederzeit erneut, um die Premium-Funktionen zurückzubekommen.",
       "errorLoad": "Dein Abonnementstatus konnte nicht geladen werden. Bitte versuche es erneut.",
       "errorPurchase": "Der Kauf konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
-      "unavailableInBuild": "Käufe sind in dieser Version der App nicht verfügbar. Nutze die App-Store- oder Play-Store-Version von CoutureCast, um zu abonnieren."
+      "unavailableInBuild": "Käufe sind in dieser Version der App nicht verfügbar. Nutze die App-Store- oder Play-Store-Version von CoutureCast, um zu abonnieren.",
+      "theme": {
+        "sectionTitle": "Oberflächenpaletten",
+        "disclosure": "Oberflächenpaletten sind eine Premium-Funktion. Deine Auswahl wird in deinem CoutureCast-Konto gespeichert und gilt auf jedem Gerät, auf dem du dich anmeldest. Eine Palette ändert nur Farben: Sie ändert nie, welche Outfits empfohlen werden. CoutureCast übermittelt die gewählte Palette unter einer pseudonymen Kennung an seinen Analyseanbieter; Kleidungsfotos oder persönliche Daten werden nicht geteilt.",
+        "names": {
+          "jewelRadiance": "Jewel Radiance",
+          "autumnUmber": "Autumn Umber",
+          "winterMetallic": "Winter Metallic"
+        },
+        "select": "Anwenden",
+        "selected": "Ausgewählt",
+        "reset": "Standardpalette",
+        "preview": {
+          "title": "Live-Vorschau",
+          "body": "Diese Karte verwendet die Palette, die du angewendet hast. Die Karten darüber zeigen immer ihre eigenen Farben."
+        },
+        "unavailable": "Paletten sind derzeit abgeschaltet. Deine gespeicherte Auswahl bleibt erhalten und kehrt zurück, sobald sie wieder verfügbar sind.",
+        "locked": {
+          "title": "Oberflächenpaletten sind eine Premium-Funktion",
+          "body": "Schließe oben ein Premium-Abo ab, um {{palettes}} freizuschalten.",
+          "signedOutBody": "Melde dich an und schließe ein Premium-Abo ab, um {{palettes}} freizuschalten."
+        },
+        "loadError": "Deine Oberflächenpalette konnte nicht geladen werden. Es wird die Standardpalette angezeigt.",
+        "saveError": "Deine Oberflächenpalette konnte nicht gespeichert werden. Bitte versuche es erneut."
+      }
     }
   }
 }
