@@ -201,23 +201,30 @@ its scope. Each records what was narrowed and why.
 
 ### Added during the story 5.2 test-quality review (2026-08-13)
 
-- **`packages/db/test/rls-policies.spec.ts` is 2868 lines and grows with every
-  story.** The TEA review scored it the only HIGH maintainability violation in
-  the 34-file story-5.2 review set (limit: 1000 lines). It now carries the RLS
-  matrices of stories 4.3, 4.4, 5.1, and 5.2 plus the guardian-consent,
-  telemetry, and alert-delivery suites in a single describe, and its ~110-line
-  `SeededScenario` type and ~410-line `seedScenario`/`cleanupScenario` pair must
-  both grow for each new story, so every story raises the cost of touching any
-  older one. Story 5.2 added roughly 90 lines.
+- **~~`packages/db/test/rls-policies.spec.ts` is 2868 lines and grows with every
+  story.~~ Resolved 2026-08-20.** The TEA review scored it the only HIGH
+  maintainability violation in the 34-file story-5.2 review set (limit: 1000
+  lines). It carried the RLS matrices of stories 4.3, 4.4, 5.1, and 5.2 plus the
+  guardian-consent, telemetry, and alert-delivery suites in a single describe,
+  and its ~110-line `SeededScenario` type and ~410-line
+  `seedScenario`/`cleanupScenario` pair had to grow for each new story, so every
+  story raised the cost of touching any older one.
 
-  Deliberately not fixed inside the billing story: this is the repo's most
-  security-critical test file, and a botched split weakens RLS coverage silently
-  rather than loudly. The safe recipe, for whoever takes it: split into
-  per-story spec files over one shared seeded-scenario harness, and prove the
-  split is behaviour-preserving by asserting the total test count and the full
-  actor matrix are identical before and after (`npm run test -w packages/db`
-  reported 112 tests at the time of this entry). Do it as its own change, not
-  as a rider on a feature story.
+  Split as its own change into `packages/db/test/rls/`: one shared
+  `harness.ts` holding the category arrays, `SeededScenario`, `withRole`,
+  `seedScenario`/`cleanupScenario`, the `scenarioTest` fixture, and a
+  `useRlsDatabase()` that owns the per-file database lifecycle, plus ten
+  per-subject spec files (`policy-matrix`, `guardian-wardrobe`,
+  `identity-and-admin`, `capsules`, `onboarding-silhouette`,
+  `alerts-notifications`, `telemetry`, `commerce`, `premium-theme`, `billing`),
+  the longest 475 lines. Behaviour preservation was proved three ways: 58 test
+  blocks in and 58 out, 57 of them byte-identical and the 58th differing only in
+  a comment that named the old path; `npm run test -w packages/db` reporting 131
+  tests before and 131 after with an identical sorted list of full test names;
+  and a probe confirming Vitest's `isolate: true` gives each spec file its own
+  module registry, and therefore its own `adminPool`, despite the workspace's
+  `fileParallelism: false`. A new story now adds its actor matrix as a new file
+  and touches the harness only for the rows it seeds.
 
 - **Two shared Pact files have grown past the length limit the same way.**
   `pact/http/consumer/api-contract-interactions.ts` is 3589 lines and
@@ -510,7 +517,7 @@ each with the reason.
   `PremiumThemePreference` sit against Decision 8's never-delete rule.** Both
   review layers raised it. Kept deliberately: the four-verb grant plus the four
   named policies are the `selfOnlyTables` category contract that
-  `packages/db/test/rls-policies.spec.ts` asserts for every member of the
+  `packages/db/test/rls/premium-theme.spec.ts` asserts for every member of the
   category, so narrowing this one table would fail the shared assertion and make
   it the only exception in the matrix. Never-deleting is a service-layer
   invariant, and the API is the only writer any client has. Recorded so the
