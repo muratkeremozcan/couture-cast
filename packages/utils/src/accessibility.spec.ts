@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 import { describe, expect, it } from 'vitest'
 import {
+  formatLocalizedList,
   formatGarmentAltText,
   formatWeatherAltText,
   getAnnouncementUrgency,
@@ -209,6 +210,49 @@ describe('accessibility utilities', () => {
       expect(getAnnouncementUrgency('chip_change')).toBe('polite')
       expect(getAnnouncementUrgency('feedback')).toBe('polite')
       expect(getAnnouncementUrgency('error')).toBe('assertive')
+    })
+  })
+
+  describe('formatLocalizedList', () => {
+    it('returns the single part unchanged, and an empty string for nothing', () => {
+      expect(formatLocalizedList(['Jewel Radiance'])).toBe('Jewel Radiance')
+      expect(formatLocalizedList([])).toBe('')
+    })
+
+    it('joins with the reader language rather than a comma', () => {
+      expect(formatLocalizedList(['A', 'B', 'C'], 'en-US')).toBe('A, B, and C')
+      expect(formatLocalizedList(['A', 'B'], 'de-DE')).toBe('A und B')
+    })
+
+    it('falls back to en-US for an unusable locale rather than throwing', () => {
+      expect(formatLocalizedList(['A', 'B'], '   ')).toBe('A and B')
+      expect(formatLocalizedList(['A', 'B'], 'not a locale')).toBe('A and B')
+    })
+
+    /**
+     * The reason this helper is public. Hermes ships no `Intl.ListFormat`, so callers
+     * that construct one directly throw on device. The fallback has to produce the same
+     * string the real thing does, or moving a caller onto the helper changes copy.
+     */
+    it('produces the same string as Intl.ListFormat when Intl.ListFormat is absent', () => {
+      const listFormat = Intl.ListFormat
+      const expected = formatLocalizedList(['A', 'B', 'C'], 'en-US')
+      Object.defineProperty(Intl, 'ListFormat', { configurable: true, value: undefined })
+
+      try {
+        expect(formatLocalizedList(['A', 'B', 'C'], 'en-US')).toBe(expected)
+        expect(formatLocalizedList(['A', 'B'], 'tr-TR')).toBe('A ve B')
+        expect(formatLocalizedList(['A', 'B'], 'fr-FR')).toBe('A et B')
+      } finally {
+        Object.defineProperty(Intl, 'ListFormat', {
+          configurable: true,
+          value: listFormat,
+        })
+      }
+    })
+
+    it('keeps a genuine repeat rather than de-duplicating it', () => {
+      expect(formatLocalizedList(['A', 'A'], 'en-US')).toBe('A and A')
     })
   })
 })

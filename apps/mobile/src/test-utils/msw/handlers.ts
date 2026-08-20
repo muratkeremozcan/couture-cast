@@ -66,6 +66,28 @@ export const mockSubscriptionActive = {
   },
 }
 
+/**
+ * Story 5.3: premium theme fixtures. The default handler serves the state a
+ * non-entitled reader gets — Default palette, gallery locked — because that is
+ * what every suite that does not care about palettes should see. Suites that
+ * need an entitled reader override per test with `server.use(...)`.
+ */
+export const mockPremiumThemeLocked = {
+  data: {
+    theme: null,
+    isEntitled: false,
+    themesEnabled: true,
+  },
+}
+
+export const mockPremiumThemeEntitled = {
+  data: {
+    theme: null,
+    isEntitled: true,
+    themesEnabled: true,
+  },
+}
+
 export const mockRitualResponse = {
   data: {
     weather: {
@@ -345,6 +367,15 @@ export const handlers = [
   http.post('*/api/v1/commerce/subscription/refresh', () =>
     HttpResponse.json(mockSubscriptionNone)
   ),
+  http.get('*/api/v1/commerce/premium/theme', () =>
+    HttpResponse.json(mockPremiumThemeLocked)
+  ),
+  http.put('*/api/v1/commerce/premium/theme', async ({ request }) => {
+    const body = (await request.json()) as { theme?: string | null }
+    return HttpResponse.json({
+      data: { ...mockPremiumThemeEntitled.data, theme: body.theme ?? null },
+    })
+  }),
   http.get('*/api/v1/alerts/preferences', () =>
     HttpResponse.json({
       data: {

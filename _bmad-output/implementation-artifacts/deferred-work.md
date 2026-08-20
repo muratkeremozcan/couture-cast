@@ -468,23 +468,47 @@ forgotten.
 
 ### Deliberately deferred so the higher test tiers could be authored separately
 
-- **The entire mobile surface of story 5.3 (Task 6).** Nothing under
-  `apps/mobile` was created or changed. Missing: `src/theme/theme-palettes.ts`,
-  `src/theme/theme-context.tsx` (`AppThemeProvider` / `useAppTheme()`), its
-  mount in `app/_layout.tsx`, `src/lib/premium-theme.ts`, the inline
-  `PremiumThemeSection` in `app/(tabs)/settings.tsx`, the ten mobile locale
-  catalogs' `commerce.premium.theme.*` keys, and
-  `src/i18n/premium-theme-locales.spec.ts`. With it go the mobile halves of
-  AC 4 (instant apply through the context), AC 6 (fallback rendering on the
-  mobile surface), and AC 7 (mobile catalog parity). This is a deliberate
-  narrowing, not an oversight or a blocked task: the server primitive is
-  surface-agnostic and already shipped:
-  `GET`/`PUT /api/v1/commerce/premium/theme` resolves entitlement inline
-  (Decision 7), so the mobile work is a client of an API that exists. Decision 12 holds the exact
-  shape it should take, including the `AppThemeProvider` naming (React
-  Navigation's `ThemeProvider` is already imported in `_layout.tsx:2`) and the
-  mount slot inside `AccessibilityAnnouncerProvider` and outside the navigation
-  `ThemeProvider`.
+- _Resolved 2026-08-20._ **The entire mobile surface of story 5.3 (Task 6).**
+  Built from this backlog, on the branch `feat/story-5-3-mobile-theme-surface`.
+  `apps/mobile/src/theme/theme-palettes.ts` carries the three palettes plus
+  Default with the same five solid colors the web `[data-theme]` blocks hold,
+  Winter Metallic's `cardBg` flattened to the solid Ice end (Decision 2), and no
+  `expo-linear-gradient` dependency added. `src/theme/theme-context.tsx` exports
+  `AppThemeProvider`/`useAppTheme()`, mounted in `app/_layout.tsx` inside
+  `AccessibilityAnnouncerProvider` and outside React Navigation's
+  `ThemeProvider`. `src/lib/premium-theme.ts` mirrors the web client's failure
+  taxonomy (`signed_out`/`not_entitled`/`themes_disabled`/`unknown`) and its
+  `resolvePremiumThemeKey` fallback over the shared `withRequestTimeout`.
+  `PremiumThemeSection` is inline in `app/(tabs)/settings.tsx` immediately after
+  `PremiumSettingsSection`, which is what its locked copy points at. The sixteen
+  `commerce.premium.theme.*` keys ship in all ten mobile catalogs with the same
+  copy as the web ones, audited by the new
+  `src/i18n/premium-theme-locales.spec.ts`; `premium-locales.spec.ts` gained the
+  one-line `theme`-subtree exclusion its web sibling already had, so its pinned
+  22-key 5.2 list still means what it meant. This closes the mobile halves of
+  AC 4, AC 6 and AC 7.
+
+  Two design points worth keeping. The provider owns the one read and the
+  section calls `refresh()` on entry rather than fetching for itself, so opening
+  settings costs a single round trip and the section can never disagree with the
+  rest of the app about which palette is applied. And the live preview is the
+  only element pinning no palette of its own, which is what makes AC 4's instant
+  apply assertable: `5.3-MOB-010` presses a card and asserts the preview's
+  background changes, rather than asserting a setter was called.
+
+  Evidence: `npm run verify:changed` exit 0 for `apps/mobile` (64 files, 639
+  tests), coverage ratchet green at 92.33 statements / 87.86 branches / 93.53
+  functions / 94.88 lines against thresholds of 90/85/90/92, lint and typecheck
+  clean. New tests: `premium-theme.test.ts` (23, MSW against the real generated
+  client), `settings-premium-theme-section.test.tsx` (11),
+  `theme-context.test.tsx` (7), `premium-theme-locales.spec.ts` (10).
+
+  **Built without `packages/tokens`, deliberately.** The palette hex values are
+  duplicated between `theme-palettes.ts` and `apps/web/src/app/globals.css`, and
+  the consolidation entry above stays open with this file as its second input.
+  `constants/colors.ts` and `hero-theme.ts` were left alone: they are OS
+  light/dark plumbing, a different axis from premium palettes (Decision 4's
+  trap).
 
 - _Resolved 2026-08-19._ **Pact interactions and the Playwright spec (Task
   7).** Both authored, run for real, and green. `pact/http/consumer/api-contract-interactions.ts`
@@ -519,8 +543,9 @@ forgotten.
   locked/gallery/persistence/fallback behavior, are no longer unproven.
 
 - **The Maestro locked-state flow.** Held back deliberately for separate
-  authoring, and blocked behind the mobile surface above in any case: there is
-  no mobile UI for a flow to drive yet. When it is written it carries the same
+  authoring. **No longer blocked** as of 2026-08-20: the mobile surface above
+  shipped, so `premium-theme-section` and `premium-theme-locked` are real
+  testIDs a flow can drive. When it is written it carries the same
   reachability limit story 5.2's premium flow already documents.
   `setupMobileE2EIdentity` in `scripts/run-maestro.mjs` signs up a fresh
   `mobile-e2e-<uuid>@example.com` account and bakes its token into the Expo

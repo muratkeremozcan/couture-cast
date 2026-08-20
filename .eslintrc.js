@@ -160,5 +160,38 @@ module.exports = {
         '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       },
     },
+    {
+      // Hermes ships no `Intl.ListFormat` and no `Intl.Segmenter`; both are optional
+      // under ECMA-402. Constructing either on a device throws
+      // `TypeError: Cannot read property 'prototype' of undefined`, which takes the
+      // whole screen down and surfaces only as a missing element in a Maestro flow.
+      // This has cost the project twice: `Intl.Segmenter` at module scope in the
+      // wardrobe contract, and `Intl.ListFormat` in the settings palette list.
+      // Feature-detecting `Intl.ListFormat` is still allowed, which is how the shared
+      // `formatLocalizedList` helper in @couture/utils works. Only unguarded
+      // construction is banned.
+      files: [
+        'apps/mobile/**/*.{ts,tsx}',
+        // These two ship into the Hermes bundle, so the constraint is theirs as much as
+        // the app's. The Segmenter incident was in api-client, not apps/mobile, so a
+        // guard scoped to the app alone would not have caught the bug it cites.
+        'packages/api-client/src/**/*.ts',
+        'packages/utils/src/**/*.ts',
+      ],
+      // Specs may construct the real API to compute an expected value; they run in Node
+      // or Chromium, never in Hermes.
+      excludedFiles: ['**/*.{spec,test}.{ts,tsx}'],
+      rules: {
+        'no-restricted-syntax': [
+          'error',
+          {
+            selector:
+              "NewExpression[callee.object.name='Intl'][callee.property.name=/^(ListFormat|Segmenter)$/]",
+            message:
+              'Hermes ships no Intl.ListFormat or Intl.Segmenter. Use formatLocalizedList from @couture/utils, or feature-detect before constructing.',
+          },
+        ],
+      },
+    },
   ],
 }
