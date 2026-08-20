@@ -15,6 +15,7 @@
       "optOutHelp": "Tüm iş ortağı ve bağlı kuruluş önerilerini gizlemek için bunu kapatın.",
       "saved": "Alışveriş tercihleri güncellendi",
       "error": "Alışveriş tercihleri güncellenemedi.",
+      "loadError": "Alışveriş tercihleri yüklenemedi.",
       "signedOutHint": "Bunu değiştirmek için oturum açın"
     },
     "premium": {
@@ -67,8 +68,8 @@
         "unavailable": "Paletler şimdilik kapalı. Kaydettiğin seçim saklanıyor ve paletler geri geldiğinde yeniden uygulanacak.",
         "locked": {
           "title": "Arayüz paletleri bir Premium özelliğidir",
-          "body": "Jewel Radiance, Autumn Umber ve Winter Metallic'in kilidini açmak için yukarıdaki kontrollerden Premium'a abone ol.",
-          "signedOutBody": "Jewel Radiance, Autumn Umber ve Winter Metallic'in kilidini açmak için oturum aç ve Premium'a abone ol."
+          "body": "{{palettes}}'in kilidini açmak için yukarıdaki kontrollerden Premium'a abone ol.",
+          "signedOutBody": "{{palettes}}'in kilidini açmak için oturum aç ve Premium'a abone ol."
         },
         "loadError": "Arayüz paletin yüklenemedi. Varsayılan palet gösteriliyor.",
         "saveError": "Arayüz paletin kaydedilemedi. Lütfen tekrar dene."

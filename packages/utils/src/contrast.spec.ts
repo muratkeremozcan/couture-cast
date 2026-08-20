@@ -9,10 +9,15 @@
  * with `toBeCloseTo(ratio, 2)` against the two-decimal figures; `toBe` against a rounded
  * literal fails immediately.
  *
- * `5.3-UTIL-007` is deliberately absent. It is the "both entry points agree" test for
- * `playwright/support/helpers/accessibility.ts`'s `rgb()` signature delegating to this
- * module, and that adapter rewrite is deferred, so the id is left reserved rather than
- * reused for something else.
+ * `5.3-UTIL-007` is deliberately absent from this file. It is the "both entry points
+ * agree" test for `playwright/support/helpers/accessibility.ts`'s `rgb()` signature
+ * delegating to this module, and it lives in
+ * `playwright/support/helpers/accessibility.spec.ts` instead: `packages/utils` is an
+ * isolated npm workspace package whose `tsconfig.typecheck.json` pins `rootDir` to this
+ * package directory, so a relative import reaching out to the Playwright tier would
+ * both violate that rootDir and pull `@playwright/test` types into a package that has
+ * no reason to depend on Playwright. The id is not reused for something else here so a
+ * reader grepping for it lands on the real test rather than a gap.
  */
 import { describe, expect, it } from 'vitest'
 import {

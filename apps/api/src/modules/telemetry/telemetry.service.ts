@@ -1,7 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common'
 import { createHmac } from 'node:crypto'
 import { PrismaClient, Prisma } from '@prisma/client'
-import { Cron, CronExpression } from '@nestjs/schedule'
 import { z } from 'zod'
 import { ANALYTICS_CLIENT, type AnalyticsClient } from '../../analytics/analytics.service'
 import {
@@ -752,7 +751,13 @@ export class TelemetryService {
     }
   }
 
-  @Cron(CronExpression.EVERY_HOUR)
+  /**
+   * Triggered by the `telemetry-event-prune` BullMQ Job Scheduler in the worker
+   * runtime (`workers/maintenance.scheduler.ts`). It used to carry
+   * `@Cron(CronExpression.EVERY_HOUR)`, which never fired in a deployed
+   * environment: the API is a Vercel serverless function with no long-lived
+   * process to hold the timer between ticks.
+   */
   async pruneOldTelemetryEvents(): Promise<void> {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)
     try {

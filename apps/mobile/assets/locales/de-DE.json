@@ -320,7 +320,8 @@
       "optOutLabel": "Vorschläge „Diesen Look shoppen“ anzeigen",
       "optOutHelp": "Deaktiviere dies, um alle Partner- und Affiliate-Vorschläge auszublenden.",
       "saved": "Shopping-Einstellungen aktualisiert",
-      "error": "Die Shopping-Einstellungen konnten nicht aktualisiert werden."
+      "error": "Die Shopping-Einstellungen konnten nicht aktualisiert werden.",
+      "loadError": "Die Shopping-Einstellungen konnten nicht geladen werden."
     },
     "premium": {
       "sectionTitle": "Premium",

@@ -109,6 +109,7 @@ describe('5.1 commerce locale parity', () => {
     expect([...reference.keys()].sort()).toEqual([
       'settings.disclosure',
       'settings.error',
+      'settings.loadError',
       'settings.optOutHelp',
       'settings.optOutLabel',
       'settings.saved',

@@ -3,25 +3,32 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { FeatureFlagsService } from './feature-flags.service'
 
-import { FeatureFlagsCron } from './feature-flags.cron'
+import { FeatureFlagsWarmup } from './feature-flags.warmup'
 
-describe('FeatureFlagsCron', () => {
+describe('FeatureFlagsWarmup', () => {
   it('warms the fallback cache on module init', async () => {
     const syncFlags = vi.fn().mockResolvedValue({ synced: 4, fallbackCount: 0 })
     const service = { syncFlags } as unknown as FeatureFlagsService
-    const cron = new FeatureFlagsCron(service)
+    const warmup = new FeatureFlagsWarmup(service)
 
-    await cron.onModuleInit()
+    await warmup.onModuleInit()
 
     expect(syncFlags).toHaveBeenCalledTimes(1)
   })
 
-  it('runs the fallback sync on the five-minute schedule hook', async () => {
+  /**
+   * There is no schedule behind this method any more. The five-minute refresh
+   * runs as the `feature-flags-sync` BullMQ Job Scheduler in the worker
+   * runtime, and `workers/maintenance.processor.spec.ts` owns that path. What
+   * is left here is an explicit, caller-driven sync, which `onModuleInit` above
+   * is the only production caller of.
+   */
+  it('runs the fallback sync when called explicitly', async () => {
     const syncFlags = vi.fn().mockResolvedValue({ synced: 4, fallbackCount: 0 })
     const service = { syncFlags } as unknown as FeatureFlagsService
-    const cron = new FeatureFlagsCron(service)
+    const warmup = new FeatureFlagsWarmup(service)
 
-    await cron.syncFeatureFlags()
+    await warmup.syncFeatureFlags()
 
     expect(syncFlags).toHaveBeenCalledTimes(1)
   })

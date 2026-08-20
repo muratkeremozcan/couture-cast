@@ -123,6 +123,10 @@ import { CommercePreferencesService } from '../../../apps/api/src/modules/commer
 import { SubscriptionController } from '../../../apps/api/src/modules/commerce/subscription.controller'
 import { SubscriptionService } from '../../../apps/api/src/modules/commerce/subscription.service'
 import { StripeBillingService } from '../../../apps/api/src/modules/commerce/stripe-billing.service'
+import { PremiumThemeController } from '../../../apps/api/src/modules/commerce/premium-theme.controller'
+import { PremiumThemeService } from '../../../apps/api/src/modules/commerce/premium-theme.service'
+import { PremiumEntitlementGuard } from '../../../apps/api/src/modules/commerce/premium-entitlement.guard'
+import { PremiumEntitlementService } from '../../../apps/api/src/modules/commerce/premium-entitlement.service'
 import {
   formatSilhouetteETag,
   parseSilhouetteIfMatchHeader,
@@ -147,6 +151,8 @@ import {
   SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE,
   SUBSCRIPTION_NOT_FOUND_MESSAGE,
   WEBHOOK_SIGNATURE_INVALID_MESSAGE,
+  PREMIUM_THEMES_DISABLED_MESSAGE,
+  PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE,
 } from '@couture/api-client/contracts/http'
 import type {
   EntitlementStore,
@@ -158,6 +164,7 @@ import type {
   UpdateSilhouetteSlidersInput,
   WardrobeOnboardingStep,
   WardrobeOnboardingStateResponse,
+  PremiumThemeKey,
 } from '@couture/api-client/contracts/http'
 import type { ApiRole } from '../../../apps/api/src/modules/auth/security.types'
 
@@ -217,6 +224,7 @@ export function resetProviderState() {
   resetProviderCapsuleState()
   resetProviderCommerceState()
   resetProviderSubscriptionState()
+  resetProviderPremiumThemeState()
 }
 
 export function configureProviderWardrobeState(
@@ -1211,6 +1219,68 @@ export async function startLocalPactProvider({
     },
   } as unknown as StripeBillingService
 
+  /**
+   * Story 5.3 premium theme switcher doubles, wired against the real
+   * `PremiumThemeController` AND the real, un-mocked `PremiumEntitlementGuard`
+   * -- the first Pact provider wiring of that guard (5.2's
+   * `SubscriptionController` never mounted it). The guard's own
+   * `canActivate` runs unmocked below (it is registered as a plain provider,
+   * not overridden); only its dependency, `PremiumEntitlementService`, is a
+   * scenario-driven double, same stance as `mockSubscriptionService` above.
+   * WHEN each field resolves the way it does (Decision 7's entitlement-wins
+   * rule, the P2023 stale-enum fallback, the flag-vs-body-parse precedence)
+   * is proven in `premium-theme.service.spec.ts` and
+   * `premium-theme.controller.spec.ts`; these doubles exist only to produce
+   * the outcome the contract records.
+   */
+  const requirePremiumThemeScenario = () => {
+    const state = getProviderPremiumThemeState()
+    if (!state) {
+      throw new NotFoundException('PREMIUM_THEME_STATE_NOT_CONFIGURED')
+    }
+    return state
+  }
+
+  const mockPremiumEntitlementService = {
+    hasPremiumAccess: () =>
+      Promise.resolve(requirePremiumThemeScenario().scenario !== 'not-entitled'),
+  } as unknown as PremiumEntitlementService
+
+  const mockPremiumThemeService = {
+    getTheme: () => {
+      const state = requirePremiumThemeScenario()
+      const isEntitled = state.scenario !== 'not-entitled'
+      return Promise.resolve({
+        theme: isEntitled ? state.theme : null,
+        isEntitled,
+        themesEnabled: state.scenario !== 'themes-disabled',
+      })
+    },
+    assertThemesEnabled: () => {
+      if (requirePremiumThemeScenario().scenario === 'themes-disabled') {
+        throw new ServiceUnavailableException(PREMIUM_THEMES_DISABLED_MESSAGE)
+      }
+      return Promise.resolve()
+    },
+    setTheme: (_userId: string, theme: PremiumThemeKey | null) => {
+      // Re-asserted here too, mirroring the real service's own defense --
+      // the controller already checked, but this double stays honest on its
+      // own the same way `PremiumThemeService.setTheme` does.
+      if (requirePremiumThemeScenario().scenario === 'themes-disabled') {
+        throw new ServiceUnavailableException(PREMIUM_THEMES_DISABLED_MESSAGE)
+      }
+      // The account erased mid-request. In the real service this is Prisma
+      // `P2003` on the preference table's user foreign key, caught in
+      // `writePreference` and remapped; the double raises the mapped exception
+      // directly because the constraint itself belongs to the database tier and
+      // the contract records only the status and envelope that reach a client.
+      if (requirePremiumThemeScenario().scenario === 'owner-erased') {
+        throw new NotFoundException(PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE)
+      }
+      return Promise.resolve({ theme, isEntitled: true, themesEnabled: true })
+    },
+  } as unknown as PremiumThemeService
+
   const moduleFixture = await Test.createTestingModule({
     controllers: [
       ApiHealthController,
@@ -1227,6 +1297,7 @@ export async function startLocalPactProvider({
       AffiliateClickController,
       AffiliateWebhookController,
       SubscriptionController,
+      PremiumThemeController,
     ],
     providers: [
       EventsService,
@@ -1306,6 +1377,25 @@ export async function startLocalPactProvider({
         provide: StripeBillingService,
         useValue: mockStripeBillingService,
       },
+      {
+        provide: PremiumThemeService,
+        useValue: mockPremiumThemeService,
+      },
+      {
+        provide: PremiumEntitlementService,
+        useValue: mockPremiumEntitlementService,
+      },
+      // Deliberately NOT overridden with a mock/useValue, unlike every
+      // service above: the guard's own `canActivate` logic must actually run
+      // in this fixture, exercised against the mocked
+      // `PremiumEntitlementService` above -- same real-instance stance as
+      // `RequestAuthGuard`, which is likewise never given a fake
+      // implementation (it is overridden below only to hand it its real
+      // constructor args explicitly; here plain Nest DI already has
+      // `PremiumEntitlementService` in this module's providers, so
+      // registering the bare class is enough for DI to construct a real
+      // instance with it wired in).
+      PremiumEntitlementGuard,
     ],
   })
     .overrideGuard(RequestAuthGuard)
@@ -1581,4 +1671,54 @@ export function getProviderSubscriptionState(): ProviderSubscriptionState | null
 
 export function resetProviderSubscriptionState() {
   providerSubscriptionState = null
+}
+
+/* --------------------------------------------------------------------------- *
+ * Story 5.3 premium theme switcher provider states.
+ *
+ * Same design as the 5.2 subscription states above: each scenario names an
+ * arrangement the contract records an outcome for, and the doubles above
+ * decide their answer from it rather than from a real database, flag, or
+ * `PremiumEntitlementService` call to production code -- except for the guard
+ * itself, which is the one piece of production logic this fixture leaves
+ * unmocked (see the `PremiumEntitlementGuard` provider registration above).
+ * The `theme` field is the factory override the entitled-with-no-stored-row
+ * (Default) read interaction needs: 'The user has premium theme access' with
+ * no `theme` param models an absent/NULL row, and with `theme: 'jewel_radiance'`
+ * (or any shipped key) models a stored preference. Both are Decision 8's two
+ * spellings of Default when `theme` is omitted, and a real stored choice when
+ * it isn't.
+ * --------------------------------------------------------------------------- */
+export type ProviderPremiumThemeScenario =
+  | 'entitled'
+  | 'not-entitled'
+  | 'themes-disabled'
+  | 'owner-erased'
+
+export type ProviderPremiumThemeState = {
+  userId: string | null
+  scenario: ProviderPremiumThemeScenario
+  theme: PremiumThemeKey | null
+}
+
+let providerPremiumThemeState: ProviderPremiumThemeState | null = null
+
+export function configureProviderPremiumThemeState(state: {
+  userId?: string
+  scenario: ProviderPremiumThemeScenario
+  theme?: PremiumThemeKey
+}) {
+  providerPremiumThemeState = {
+    userId: state.userId ?? null,
+    scenario: state.scenario,
+    theme: state.theme ?? null,
+  }
+}
+
+export function getProviderPremiumThemeState(): ProviderPremiumThemeState | null {
+  return providerPremiumThemeState
+}
+
+export function resetProviderPremiumThemeState() {
+  providerPremiumThemeState = null
 }

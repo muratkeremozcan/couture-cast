@@ -22,6 +22,7 @@ export type QueueName =
   | 'color-extraction'
   | 'moderation-review'
   | 'billing-reconciliation'
+  | 'maintenance'
 
 export type QueueConfig = {
   name: QueueName
@@ -79,6 +80,19 @@ export const queueConfigs: QueueConfig[] = [
   // fire (the serverless API's @Cron decorators never do).
   {
     name: 'billing-reconciliation',
+    options: {
+      connection,
+      defaultJobOptions,
+    },
+  },
+  // The periodic sweeps that used to be NestJS `@Cron` methods. They sat on
+  // `ScheduleModule` inside a Vercel serverless function, which has no
+  // long-lived process to hold a timer, so none of them ever provably fired
+  // outside a developer's laptop. One queue rather than one per sweep: BullMQ
+  // splits jobs across every Worker subscribed to a name, so extra queues buy
+  // extra connections and no isolation when the consumer runs serially anyway.
+  {
+    name: 'maintenance',
     options: {
       connection,
       defaultJobOptions,

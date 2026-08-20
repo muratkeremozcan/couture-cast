@@ -13,7 +13,7 @@ This ledger tracks items deferred during sprint execution and code reviews.
 ## Deferred from: code review of 2-1-scenario-outfit-generator.md (2026-07-16)
 
 - Database Race Condition on Recommendations: There is no database-level unique constraint or lock on the `OutfitRecommendation` table for `(user_id, forecast_segment_id, scenario)`. Concurrent requests could insert duplicate rows.
-- Tight Coupling and DI Violation on Redis Client: `RitualService` instantiates a new Redis client in the constructor rather than utilizing NestJS Dependency Injection.
+- [x] _Already fixed; entry was stale when checked on 2026-08-20._ Tight Coupling and DI Violation on Redis Client: `RitualService` instantiates a new Redis client in the constructor rather than utilizing NestJS Dependency Injection. The client now arrives through the `RITUAL_REDIS_CLIENT` provider in `personalization.module.ts` and `RitualService` takes it by injection, so the violation described here no longer exists in the code.
 
 ## Deferred from: code review of 2-2-comfort-calibration-settings.md (2026-07-21)
 
@@ -30,7 +30,7 @@ These were identified while drafting and implementing story 5.1 and were
 deliberately left out of its scope. Each records what was narrowed and why, so a
 later story does not have to rediscover the reasoning.
 
-- **Web `Sponsored` disclosure copy defect.**
+- _Resolved 2026-08-20._ **Web `Sponsored` disclosure copy defect.**
   `apps/web/src/app/components/lookbook-prism-layout.tsx:41-47` defines a
   hardcoded `HERO_RECOMMENDATIONS.Sponsored` entry whose `eyebrow` field reads
   `'Sponsored Selection'`. It is reachable in the UI:
@@ -39,6 +39,19 @@ later story does not have to rediscover the reasoning.
   to that chip. It is story 3.5 placeholder copy with no partner behind it.
   Rewriting it inside a commerce story risked implying a sponsorship that does
   not exist, so it was left alone. It should be corrected on its own.
+
+  Corrected. The eyebrow now reads "Brand Picks" over copy that describes
+  brand-forward pairings, which is what the chip's own `Brands` filter selects;
+  nothing in it asserts that anyone paid for the placement. The vocabulary for
+  genuine paid placement stays where story 5.1 put it, in
+  `commerce.shopThisLook.disclosure` and `.partnerLabel`, rendered only beside an
+  offer that exists — `prd.md:192` requires sponsored content to be labeled, and
+  placeholder copy borrowing that language is the inverse failure: a disclosure
+  with nothing to disclose. `lookbook-prism-layout.test.tsx` asserts the negative
+  (no "sponsored", "paid partnership", "presented by", or "commission" anywhere
+  in the hero card), because nothing about the page looks wrong when placeholder
+  copy claims a sponsorship, so only a test that refuses the words catches it
+  returning.
 
 - **No partner-facing admin console.** `CommercePartner` and `AffiliateOffer`
   rows are seed and migration managed. The operator runbook for onboarding a
@@ -105,7 +118,7 @@ later story does not have to rediscover the reasoning.
 
 ### Added during story 5.1 integration (2026-08-11)
 
-- **`api/index.ts` installs no `ApiExceptionFilter`, so `api_error_occurred`
+- _Resolved 2026-08-20._ **`api/index.ts` installs no `ApiExceptionFilter`, so `api_error_occurred`
   telemetry has never been emitted in preview or production.** `NestFactory.create`
   is called in three places and the deployed one is `apps/api/api/index.ts`, which
   installs none of the filter, CORS, or request-context middleware that
@@ -116,11 +129,40 @@ later story does not have to rediscover the reasoning.
   story 5.1 and is much wider than it; it is recorded here because story 5.1's
   webhook work is what surfaced it.
 
-- **Mobile reuses `commerce.settings.error` for a failed preference READ.** The
+  Fixed by extracting the four wirings into `apps/api/src/bootstrap/configure-app.ts`,
+  which both `src/main.ts` and `api/index.ts` now call and neither re-implements.
+  In `api/index.ts` the call sits before `app.init()`, deliberately: Express
+  middleware registered after initialization never joins the stack and fails
+  open, which is the same silent shape as the original defect. The extraction is
+  what makes the fix durable — the previous arrangement let a second entrypoint
+  be written without any of it and nothing looked wrong, because Nest's built-in
+  filter produces the same response envelope. `configure-app.spec.ts` asserts all
+  four wirings and that the filter resolves its dependencies from the container,
+  so a future entrypoint that skips one turns a test red instead of a dashboard
+  empty.
+
+- _Resolved 2026-08-20._ **Mobile reuses `commerce.settings.error` for a failed preference READ.** The
   string reads "Unable to update shopping preferences.", which is slightly wrong
   when the failure was a load rather than a save. Decision 16 locks the key tree
   and web shares it, so adding a `settings.loadError` key is a cross-surface
   change across twenty catalog files. Cosmetic, deferred deliberately.
+
+  Done, across all twenty. `commerce.settings.loadError` mirrors each catalog's
+  own register for the sibling `error` key rather than being translated afresh,
+  so the two strings read as a pair in every locale. Both read paths use it.
+
+  Fixing it surfaced a larger defect on the web side.
+  `commerce-preferences-section.tsx` rendered `commerceErrorMessage(error, fallback)`,
+  and `commerceError` in `lib/commerce.ts` prefers the API's own error body —
+  which is English on every locale — so the catalog string would almost never
+  have shown. This is the same defect `premium.ts` was corrected for on
+  2026-08-19, in the entry further down this file that records the original
+  deferral as the wrong call. Both paths now use catalog copy unconditionally.
+  Nothing is lost by dropping the server text: these two endpoints have no
+  actionable failure to distinguish, a preferences read either worked or did not,
+  and the developer-facing message survives on the thrown `CommerceRequestError`
+  for logs. `5.1-WEB-SETTINGS-07` and `-09` now pin the save and load strings
+  separately.
 
 - **Web carries one commerce key mobile does not.** `commerce.settings.signedOutHint`
   ("Sign in to change this") exists because decision 17 requires a localized
@@ -129,12 +171,20 @@ later story does not have to rediscover the reasoning.
   settings is never reachable without a session, so an unused key there would be
   dead weight added only to satisfy symmetry.
 
-- **The mobile vitest browser run is flaky on a cold `node_modules/.vite`.**
+- _Resolved 2026-08-20._ **The mobile vitest browser run is flaky on a cold `node_modules/.vite`.**
   Roughly 23 suites fail with "does not provide an export named 'default'" while
   the Vite dependency optimizer rebundles; the second run is always green. This
   reproduces on commits that predate story 5.1. The likely fix is widening
   `optimizeDeps.include` in `apps/mobile/vitest.config.ts`, which every surface
   inherits, so it was not changed inside a commerce story.
+
+  Checked on 2026-08-20 and found already fixed: this entry was stale rather than
+  outstanding. `apps/mobile/vitest.config.ts` carries exactly the widening this
+  entry proposed, with a docblock recording that naming `expo-router` removed ten
+  cold-run failures on its own and that `msw` and the native-only Expo modules
+  must never join the list. Two runs against a deleted `node_modules/.vite` came
+  back clean at 61 files and 595 tests, where this entry describes roughly 23
+  suites failing. No change was needed; the verification is the useful part.
 
 - **Pact provider verification has a pre-existing Linux flake at roughly 3 runs
   in 42.** Signature: "request was expected but not received" on any Story 4.2
@@ -152,7 +202,7 @@ later story does not have to rediscover the reasoning.
 These were identified while implementing story 5.2 and deliberately left out of
 its scope. Each records what was narrowed and why.
 
-- **The remaining `@Cron` consumers sit on a substrate that never fires in
+- _Resolved 2026-08-20._ **The remaining `@Cron` consumers sit on a substrate that never fires in
   production.** Story 5.2 verified the deploy-target facts: the API ships as
   one Vercel serverless function (`apps/api/vercel.json`), no Vercel `crons`
   config exists, and `ScheduleModule.forRoot()` lives only in the request app —
@@ -165,6 +215,46 @@ its scope. Each records what was narrowed and why.
   features; unverifiable cross-feature changes do not belong in a billing PR.
   Owner ask: whoever owns flags/admin/guardian operations should re-host these
   onto worker Job Schedulers the same way. Evidence: story 5.2 Decision 4a.
+
+  Done, and the count in the paragraph above was wrong: there were **five**
+  consumers, not three. `wardrobe-retention.service.ts` (hourly garment purge)
+  and `telemetry.service.ts` (hourly telemetry-event prune) also carried
+  `@Cron(CronExpression.EVERY_HOUR)` and are not named anywhere above, so
+  reading this entry alone would have left two dead sweeps behind. All five now
+  run as Job Schedulers on a new `maintenance` queue, registered by
+  `workers/maintenance.scheduler.ts` and dispatched by
+  `workers/maintenance.processor.ts`. `grep -rn "@Cron" apps/api/src` returns
+  comment lines only and `ScheduleModule.forRoot()` is gone from `app.module.ts`.
+
+  Three things worth knowing for anyone touching this next.
+
+  Every cadence is transcribed, not re-chosen, and `maintenance.scheduler.spec.ts`
+  pins each one to the expression its decorator carried, including the UTC
+  timezone on guardian emancipation — a teen turning 16 is evaluated against a
+  UTC calendar day, so a host-local schedule would emancipate on a different date
+  depending on where the worker runs.
+
+  The sweeps are hand-wired in `workers/bootstrap.ts` rather than resolved from a
+  Nest application context, and that is not a style preference. The worker runs
+  under `tsx` (`npm run start:workers`), whose esbuild transform does not emit the
+  `design:paramtypes` metadata Nest's DI reads. A `NestFactory.createApplicationContext`
+  there does not fail — it stalls forever resolving constructor parameters, with
+  no error and no log, while the same code works once `nest build` has run. This
+  was found the expensive way: an earlier revision of this change used a
+  `MaintenanceModule`, and it hung. Anyone reaching for Nest DI inside a
+  tsx-executed entrypoint should expect the same and should not spend the
+  afternoon re-deriving it.
+
+  `AdminCron` and `GuardianCron` swallowed their sweep errors, and their own tests
+  said why: an unhandled rejection inside a `@Cron` handler takes down the
+  process. That reason belonged to the substrate. On BullMQ a thrown error is the
+  correct outcome — it marks the job failed, retries under the queue's
+  `attempts: 3` backoff, and leaves a `JobFailure` row an operator can see — so
+  the processor rethrows after logging. The `*_failed` log event names are
+  unchanged, so any log-based alerting keeps matching. The two sweeps that already
+  swallowed inside their own service bodies (`purgeExpiredAndDeletedGarments`,
+  `pruneOldTelemetryEvents`) were left exactly as they were: this change moved
+  triggers, not service internals.
 
 - **No automated store-purchase E2E.** StoreKit-sandbox / Play-internal-testing
   purchase automation does not exist; the Maestro harness pins Expo Go, where
@@ -350,21 +440,37 @@ forgotten.
   mount slot inside `AccessibilityAnnouncerProvider` and outside the navigation
   `ThemeProvider`.
 
-- **Pact interactions and the Playwright spec (Task 7).** Held back
-  deliberately for separate authoring. No consumer interactions were added to
-  `pact/http/consumer/api-contract-interactions.ts`, no provider states
-  (`'The user has premium theme access'`,
-  `'The user does not have premium theme access'`,
-  `'Premium themes are disabled'`), and no
-  `playwright/tests/premium-theme-switcher.spec.ts`. What exists instead is
-  unit-tier proof: the contract module's own suite
-  (`packages/api-client/testing/premium-theme-contract.spec.ts`) and the
-  supertest specs colocated beside the controller and service in
-  `apps/api/src/modules/commerce/`. What is therefore unproven is
-  consumer-driven compatibility between each client and the provider, and
-  browser-level behavior of the locked state (with axe), the gallery, select
-  then reload persistence, and the Default fallback for a stale or unknown
-  stored key seeded directly.
+- _Resolved 2026-08-19._ **Pact interactions and the Playwright spec (Task
+  7).** Both authored, run for real, and green. `pact/http/consumer/api-contract-interactions.ts`
+  gained a "Story 5.3 premium theme switcher" section (7 interaction
+  functions covering GET entitled/Default/not-entitled, PUT update/reset, and
+  a table-driven 403/503 error pair), wired into both
+  `web-api-client.pacttest.ts` and `mobile-api-client.pacttest.ts` — unlike
+  5.2's asymmetric split, both consumers call both operations here. The three
+  provider states named above are registered in `state-handlers.ts` verbatim,
+  and `provider-helper.ts` gained scenario-driven `mockPremiumThemeService`/
+  `mockPremiumEntitlementService` doubles plus `PremiumThemeController`
+  registered in the verifier's Nest fixture — the first Pact provider wiring
+  of `PremiumEntitlementGuard`, left un-overridden so its real 403-before-503
+  precedence runs for real rather than being asserted only in the API unit
+  tier. `npm run test:pact:consumer` reports both pact files stable across 3
+  determinism runs (67 and 76 interactions); `npm run test:pact:provider`
+  verifies all 14 new interactions `OK`, including the inherited
+  `Cache-Control: private, no-store` header on the error responses too.
+  `playwright/tests/premium-theme-switcher.spec.ts` (4 tests, IDs
+  `5.3-E2E-010` through `5.3-E2E-013`) proves the locked state signed out
+  (+axe) and signed-in-non-entitled, the gallery (exactly 3 named palettes +
+  Default, Spring Bloom absent), select-then-reload persistence via the real
+  `<html data-theme>` attribute, and the Default fallback for an unrecognized
+  stored theme — the last one via a stubbed GET rather than a seeded DB row,
+  because `PremiumThemeKey` is a real Postgres enum with no code path that can
+  insert an out-of-enum value, which makes true DB-level staleness physically
+  unreachable; stubbing is what actually exercises `resolvePremiumThemeKey`'s
+  client-side fallback, the real AC 6 code path at this tier. All four tests
+  passed twice over (`--repeat-each=2`), including the serialized
+  seeded-active-user write journey, with no flakiness. Consumer-driven
+  compatibility between each client and the provider, and browser-level
+  locked/gallery/persistence/fallback behavior, are no longer unproven.
 
 - **The Maestro locked-state flow.** Held back deliberately for separate
   authoring, and blocked behind the mobile surface above in any case: there is
@@ -384,22 +490,36 @@ forgotten.
   seeding into a shared script every flow runs. Ordering for whoever picks these
   up: mobile surface first, then the flow.
 
-- **The `playwright/support/helpers/accessibility.ts` adapter rewrite
-  (Decision 3).** Held back deliberately with the rest of the Playwright tier;
-  the file is byte-identical to its state before this story. The planned change
-  is to keep its exported `contrastRatio(left, right)` signature over CSS
-  `rgb()` strings, parse to hex with the `parseRgb` it already has, and delegate
-  to `@couture/utils`, leaving its caller
-  (`playwright/tests/commerce-affiliate-preferences.spec.ts:239`) untouched;
-  plus one test proving both entry points return the same number for the same
-  color, for which `5.3-UTIL-007` is reserved in
-  `packages/utils/src/contrast.spec.ts`. State the consequence plainly: the
-  repository now holds three copies of the WCAG luminance maths rather than the
-  two Decision 3 intended, and this entry together with the
-  `accessibility-hardening.spec.ts` entry above are what close it back to one.
-  The delegation needs no build wiring; `@couture/utils` is symlinked into root
-  `node_modules` and `prepare:playwright` already builds it ahead of
-  `@couture/api-client`.
+- _Resolved 2026-08-19._ **The `playwright/support/helpers/accessibility.ts`
+  adapter rewrite (Decision 3).** `contrastRatio(left, right)` keeps its exported
+  signature over CSS `rgb()` strings; `parseRgb` still does the parsing, a new
+  `toHex` re-encodes the three channels, and the function delegates to
+  `@couture/utils`'s `contrastRatio`, which now holds the only luminance/gamma
+  maths this helper runs. Its caller
+  (`playwright/tests/commerce-affiliate-preferences.spec.ts:239`) is unchanged
+  and its `[P1] 5.1-E2E-WEB-04` test (the one asserting
+  `contrastRatio(ring.outlineColor, DARK_SURFACE_RGB)`) was run for real against
+  the local stack and still passes. The both-entry-points-agree test could not
+  live at the reserved `5.3-UTIL-007` id in `packages/utils/src/contrast.spec.ts`
+  after all: `packages/utils` is an isolated npm workspace package whose
+  `tsconfig.typecheck.json` pins `rootDir` to the package directory, so a
+  relative import reaching out to the Playwright tier would violate that rootDir
+  and pull `@playwright/test` types into a package with no reason to depend on
+  Playwright. It lives instead in the new
+  `playwright/support/helpers/accessibility.spec.ts`, run via the root `vitest`
+  binary since `playwright/` is not an npm workspace and has no
+  Playwright-runner-discoverable test tier of its own for pure-logic specs
+  (`playwright/config/base.config.ts`'s `testDir` only scans `playwright/tests`).
+  Wired into `npm run test:playwright-unit`, which `prepare:playwright` runs
+  before every Playwright entrypoint, so it isn't a file someone has to
+  remember to invoke by hand: the first version of this entry shipped without
+  that wiring, silently orphaned from every CI job, and only surfaced when
+  asked directly why a spec lived under `helpers/`.
+  `contrast.spec.ts`'s own comment reserving the id now points here. The
+  repository is back down to two copies of the WCAG luminance maths: the
+  canonical one in `@couture/utils`, and the inline duplicate in
+  `accessibility-hardening.spec.ts`, which stays deliberately untouched for the
+  reason given above.
 
 ### Added during the story 5.3 code review (2026-08-18)
 
@@ -435,17 +555,25 @@ each with the reason.
   `nullablePremiumThemeKeySchema` publishes a finished `enum` array of its own —
   so new contracts have a pattern to copy in the meantime.
 
-- **`5.3-INT-001` and `5.3-INT-002` have no test.** The story's coverage matrix
-  names `5.3-INT-001` (persist, reload, same theme, over HTTP) as P0 evidence for
-  AC 3 and `5.3-INT-002` (a web-selected palette visible on a mobile GET) as P1.
-  Both are integration tier, which is outside the unit-only scope this story was
-  narrowed to, so neither exists. What does exist is the service and controller
-  proof at unit tier over an in-memory store, which cannot show a row surviving a
-  reconnect or the real unique index. The follow-up is
-  `apps/api/integration/premium-theme.integration.spec.ts`: PUT a palette, drop
-  the app, re-GET against real PostgreSQL, assert exactly one row with
-  `updated_at` moved. Recorded rather than left implicit because the other four
-  scope cuts below are all named and this one was not.
+- _Resolved 2026-08-19._ **`5.3-INT-001` and `5.3-INT-002` have no test.**
+  Both now exist in `apps/api/integration/premium-theme.integration.spec.ts`
+  (5 tests total), run for real against the local PostgreSQL stack rather than
+  the in-memory doubles the unit tier uses. `5.3-INT-001` PUTs a palette
+  through one Nest app/Prisma connection and re-GETs it through a second,
+  independently-compiled app with its own `PrismaClient`, proving persistence
+  survives a real reconnect. `5.3-INT-002` proves a palette written by one
+  request context is read correctly by a different, independent one for the
+  same user — documented in the test itself as a server-side-consistency
+  proof, not mobile-client wiring, since Task 6 was cancelled and no mobile
+  client exists to actually prove the cross-device half. The suite also pins
+  the reset-never-deletes rule from Decision 8 at the repository level
+  (`PUT { theme: null }` leaves exactly one row with `theme = null`) and
+  confirms `updated_at` moves on every PUT, including one that resubmits the
+  already-stored value — there is no server-side unchanged-value
+  short-circuit; that guard is client-only (`5.3-WEB-115`). Ran in isolation
+  (5/5 passed) and as part of the full `apps/api` integration suite (201
+  passed, 2 pre-existing unrelated skips, no collisions with the sibling
+  `commerce-affiliate-*`/`premium-*` suites sharing the database).
 
 - **The web section's `load_failed` state has no retry control.** A transient
   failure on the initial GET leaves an entitled subscriber unable to reach their
@@ -467,7 +595,7 @@ each with the reason.
   fix regenerates the SDK and reshapes published nodes, which is an `optic diff`
   conversation of its own and has nothing to do with this story's behaviour.
 
-- **`commerce.premium.theme.locked.body` and `.signedOutBody` hardcode the three
+- _Resolved 2026-08-20._ **`commerce.premium.theme.locked.body` and `.signedOutBody` hardcode the three
   palette names inside ten translated sentences.** Adding or retiring a palette
   now means editing twenty localized strings by hand, and
   `5.3-I18N-WEB-08` fails until every current name appears in each of them. The
@@ -475,6 +603,28 @@ each with the reason.
   `{{palettes}}` placeholder built from `PREMIUM_THEME_KEYS`. Deferred because
   list formatting is locale-specific (serial comma, `und`/`et`/`ve`, conjunction
   placement) and doing it properly means `Intl.ListFormat`, not string joining.
+
+  Done with `Intl.ListFormat`, as this entry proposed. A `usePaletteNameList`
+  hook builds the list from `PREMIUM_THEME_KEYS` and the `names.*` catalog keys
+  and passes it as `{{palettes}}`, so the gallery and the upsell copy read from
+  one source and a palette added to the contract appears in twenty sentences
+  without any of them being touched.
+
+  Nine of the ten locales' formatted output is byte-identical to the sentence the
+  catalog previously spelled out, which is what makes this behaviour-preserving.
+  The tenth is a correction worth naming rather than burying: CLDR drops the
+  serial comma in Canadian English, so `en-CA` moves from
+  "Jewel Radiance, Autumn Umber, and Winter Metallic" to
+  "…Autumn Umber and Winter Metallic". The hand-written catalog was following US
+  convention; CLDR is the authority on that punctuation, and deferring to it is
+  the whole reason to use the formatter.
+
+  Turkish keeps working because its case suffix attaches to the end of the list
+  (`{{palettes}}'in`) and the formatter puts the final name last in every locale.
+  `5.3-I18N-WEB-08` now asserts the placeholder is present and that no palette
+  name is hardcoded — the stronger check, because it also catches a translator
+  who resolves the list into their own prose and freezes today's three palettes
+  back into the catalog.
 
 - **~~`apps/web/src/lib/premium.ts` bakes untranslated English into the errors the
   subscription section renders.~~ Fixed 2026-08-19, not deferred.** This entry was
@@ -490,12 +640,38 @@ each with the reason.
   written for. Kept here as a record rather than deleted, since the original
   deferral was the wrong call and the reversal is the useful part.
 
-- **A `PUT` racing account erasure answers 500.** `PremiumThemeService.setTheme`'s
+- _Resolved 2026-08-20._ **A `PUT` racing account erasure answers 500.** `PremiumThemeService.setTheme`'s
   upsert violates `PremiumThemePreference_user_id_fkey` (P2003) if the `User` row
   is deleted while the request is in flight, and nothing catches it. The window
   is one request wide and the caller is an account that no longer exists, so the
   500 is survivable; the tidy answer is to map P2003 onto the same not-found
   shape the other commerce writes use.
+
+  Done as described. The upsert moved into a `writePreference` helper that
+  catches `P2003` and raises `NotFoundException(PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE)`,
+  matching `affiliate-click.service.ts` and `stripe-billing.service.ts`. The guard
+  is narrow on the code for the same reason `isEnumConversionError` next to it is:
+  every other Prisma failure is an infrastructure fault and must keep propagating.
+  Three unit tests pin the mapping, the message, and that a `P1017` still
+  propagates untouched.
+
+  The 404 is documented on the PUT operation and covered by Pact. An earlier
+  revision of this entry said the opposite — that publishing it would reshape
+  nodes and drag an `optic diff` conversation into a defect fix — and a
+  CodeRabbit review on PR #133 pushed back. The review was right and the
+  deferral was wrong on both counts. Adding a response to an operation is
+  additive: `optic diff` against `origin/main` reports
+  `PUT /api/v1/commerce/premium/theme: response 404: added` and passes, the
+  published document grows by ten lines, and the generated SDK does not change
+  at all. Beyond that, a status a client can actually receive belongs in the
+  contract whether or not documenting it is convenient.
+
+  A third error row now sits alongside the 403/503 pair in
+  `pact/http/consumer/api-contract-interactions.ts`, driven by a new
+  `The premium theme owner account no longer exists` provider state and an
+  `owner-erased` scenario on `mockPremiumThemeService`. Both consumer pacts
+  verify it green with the inherited `Cache-Control: private, no-store` header
+  (68 and 77 interactions, stable across the three determinism runs).
 
 - **Two `apps/api` integration runs against one PostgreSQL fail each other.**
   Recorded in `_bmad-output/project-knowledge/development-guide.md` with the
@@ -515,3 +691,145 @@ each with the reason.
   it the only exception in the matrix. Never-deleting is a service-layer
   invariant, and the API is the only writer any client has. Recorded so the
   tension is on the record rather than rediscovered.
+
+### Two local Playwright harness defects, found while proving the story 5.3 tests green locally (2026-08-19), both fixed rather than left as caveats
+
+Neither is caused by story 5.3, neither reaches CI (a fresh CI checkout has no
+`.env.local`, so both dormant code paths never fire there), and both were
+silently making local `npm run test:pw-local` runs of
+`premium-theme-switcher.spec.ts` diverge from what CI would actually see.
+Recorded here because they were found in the course of this story's own local
+verification and fixed on the spot rather than filed as "local env issue,
+someone else's problem."
+
+- **`db:seed`, run bare inside `scripts/start-api-e2e-with-workers.mjs`, silently
+  seeded the wrong local Postgres.** With no `DATABASE_URL` in the child's env,
+  Prisma's own `.env` auto-load resolved it to `packages/db/.env` (a second,
+  unrelated `localhost:5432` database some contributors keep for standalone
+  `prisma studio`/`migrate dev` work), not the `127.0.0.1:54322` Supabase-style
+  instance the rest of the stack (and `scripts/prisma-migrate-deploy.mjs`,
+  which explicitly forces `.env.local`) actually runs against. The seed step
+  reported success and left the real target database on stale fixture data,
+  `premium_themes_enabled` included. Fixed by loading the same root env files
+  `load-env.ts` loads directly into the orchestrator's own `env` object before
+  any child spawns, so `db:seed`, the API process, and the worker process all
+  get one explicit, agreed-upon `DATABASE_URL` instead of three independent
+  resolutions.
+
+- **`load-env.ts`'s `.env.local` override silently re-enabled live PostHog for
+  local E2E runs.** `playwright/config/local.config.ts`'s `webServer.env` sets
+  `POSTHOG_API_KEY: ''` on purpose, to keep feature-flag reads on the
+  deterministic seeded/cached fallback (Decision 9's whole reason
+  `premium_themes_enabled` is seeded `true` rather than flipped on by default).
+  But `load-env.ts` forces every key `.env.local` defines to win, for any
+  `TEST_ENV=local` run, and `.env.local` carries a real `POSTHOG_API_KEY` for
+  ordinary local dev — so it silently overrode the disable, `PostHogService`
+  came back up with a live client, and `premium_themes_enabled` resolved
+  against whatever PostHog's dashboard actually says today (`false`, at the
+  time this was found) instead of the seed, `??`-outranking the correct cached
+  value because a live `false` is not the `undefined` the fallback logic is
+  written to defer to. This is exactly the failure this story's own
+  `5.3-E2E-010` and `5.3-E2E-012` caught locally: `themesEnabled: false` where
+  the seeded fixture said `true`. Fixed by having `load-env.ts` (and the same
+  guard, mirrored, in the orchestrator's own env-loading) snapshot any var a
+  caller already set to the empty string before the `.env.local` override runs,
+  and restore it afterward — an explicit empty string is a deliberate "off,"
+  not an "unset" the file is free to fill in. Covered by a new case in
+  `apps/api/src/load-env.spec.ts`.
+
+## Deferred from: test-review reconciliation on PR #133, story 5.3 (2026-08-20)
+
+Murat (bmad-tea) ran `test-review` against the Story 5.3 Pact/Playwright/integration
+set, then cross-checked it against an independently-run Codex TeA review on the same
+PR. Both real findings each caught that the other missed are fixed on the branch
+(the fixes are in the PR diff, not repeated here). Two items surfaced that are
+deliberately not fixed in this pass, plus one already-flagged item worth
+cross-referencing:
+
+- **`api-contract-interactions.ts` (3985 lines) and `provider-helper.ts` (1711
+  lines) are both well past the 1000-line maintainability ceiling.** Real, and
+  `test-review`'s own H5 finding recommends splitting both along their existing
+  domain-section boundaries (`api-contract-interactions.ts` already carries
+  `/* --- Story X.Y --- */` dividers; `provider-helper.ts`'s ~1150-line
+  `startLocalPactProvider` is dominated by per-domain mock-service literals).
+  Not done here: a second, concurrently-running session (`couture-cast-a9`,
+  working `bmad-build` against this same ledger's backlog) had already claimed
+  exactly this split as a planned later wave on this same branch before this
+  review landed. Splitting it here too would have raced that work rather than
+  helped it. Left for that wave.
+
+- **The `requireSchema()`/`context.skip()` pattern silently turns a missing or
+  unmigrated schema into a green, assertion-free suite.** Codex's review flagged
+  this correctly on `premium-theme.integration.spec.ts:92-98`: `beforeAll` probes
+  the schema, and every test does `if (!requireSchema(context)) return` before
+  its first assertion, so a database that predates a migration reports as
+  passing rather than as blocked. That is a real evidence-integrity gap on its
+  own. Not fixed here because it is not this file's pattern: the identical
+  `probeSchema`/`schemaReady`/`requireSchema`/`context.skip()` shape is already
+  in thirteen other files under `apps/api/integration/` (`commerce-affiliate-*`,
+  `wardrobe-*`, `premium-subscription`, `premium-stripe-rail`,
+  `premium-revenuecat-webhook`, `premium-reconciliation`,
+  `weather-alert-cooldown`), all pre-existing and all sharing the same
+  hollow-green risk. Patching only the newest file would make it the one
+  inconsistent file in the tier; patching all fourteen is a repo-wide behavior
+  change (fail loud on missing schema vs. skip quietly) that deserves its own
+  reviewable decision, not a rider on a test-review reconciliation. Whoever
+  takes it should decide once for the whole `apps/api/integration/` tier and
+  apply it uniformly.
+
+- **Priority markers (`[P#]`) are a Playwright-only convention today, not a
+  Vitest one.** `test-review`'s own L2 finding already covers this (0 of 40
+  sampled Vitest files carry the marker, versus 12 of 40 sampled Playwright
+  files); noted here only so a future reader searching this ledger for the
+  premium-theme test set finds the pointer. Same shape as the two items above:
+  a repo-wide convention question, not a defect in any one file.
+
+## Added during the deferred-backlog burn-down, wave 1 (2026-08-20)
+
+Found while fixing the three API-runtime items above. None is caused by that
+work; each was in the way of verifying it.
+
+- **The wardrobe retention purge depended on the whole `RitualService` to clear a
+  cache key.** `WardrobeRetentionService` called `ritualService.invalidateUserCache(userId)`
+  and nothing else, but taking `RitualService` as a constructor dependency drags
+  in weather, saved locations, commerce and a Redis client, which is why the
+  sweep could not run anywhere the full request graph was not already standing.
+  Fixed rather than deferred, because the `@Cron` migration above could not land
+  without it: the SCAN/DEL and the `ritual:<userId>:*` key prefix moved to
+  `modules/personalization/ritual-cache.ts`, `RitualService.invalidateUserCache`
+  delegates to it and keeps its signature, and `WardrobeRetentionService` now
+  injects the narrow `RITUAL_CACHE_INVALIDATOR` token (`useExisting: RitualService`
+  in `personalization.module.ts`). The key prefix having exactly one definition
+  is the point: a second copy that drifted would leave deleted garments visible
+  in cached outfits, silently, with every other test still green.
+
+- **`FeatureFlagsCron` was renamed to `FeatureFlagsWarmup`.** Once the periodic
+  refresh moved to the worker, the only thing left in that class was
+  `onModuleInit`, which is a cold-start cache warm and not a schedule. It stays
+  registered in `FeatureFlagsModule` and stays in the request app, because a
+  populated fallback cache before the first request is exactly what it is for.
+  The name is the whole change; five `apps/api/integration/*.spec.ts` files that
+  override the provider were updated with it.
+
+- **`npm run start:workers` cannot start from this repository's env files alone.**
+  Three separate values block it, and each has to be discovered by running into
+  it: `ANALYTICS_ID_SECRET` is required at ≥32 characters and appears in
+  `.env.example` only, so a worker outside a `NODE_ENV=test` / `TEST_ENV=local`
+  shell cannot construct `TelemetryService` at all; `WEATHER_REFRESH_MINUTES` is
+  validated `min(1).max(5)` while the value carried locally was `30`; and
+  `WEATHER_INGESTION_TARGETS_JSON` needs a `locationName` per target that the
+  local value omits. The API's own E2E orchestrator never hits these because it
+  supplies its own environment. The fix is a documented worker env contract, or
+  defaults that make a local worker start without a scavenger hunt. Filed rather
+  than fixed because the values live in developer-local files this change should
+  not be reaching into.
+
+- **Nest DI does not work under `tsx`, anywhere in this repository.** Recorded
+  separately from the `@Cron` entry because it is not specific to it: esbuild
+  emits no `design:paramtypes`, so `NestFactory.createApplicationContext` in any
+  tsx-executed entrypoint hangs indefinitely rather than erroring. Verified
+  against unmodified `main` code, on `AppModule` itself, so this is a property of
+  the toolchain and not of any one module. It costs nothing today because both
+  worker entrypoints hand-wire, but it is a trap with no error message, and the
+  cheap guard would be a comment at the top of each tsx-executed entrypoint
+  saying so.

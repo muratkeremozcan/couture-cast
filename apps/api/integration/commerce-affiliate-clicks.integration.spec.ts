@@ -27,7 +27,7 @@ import { AffiliateClickTelemetry } from '../src/modules/commerce/affiliate-click
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
 import { CommerceModule } from '../src/modules/commerce/commerce.module.js'
 import { CommerceRepository } from '../src/modules/commerce/commerce.repository.js'
-import { FeatureFlagsCron } from '../src/modules/feature-flags/feature-flags.cron.js'
+import { FeatureFlagsWarmup } from '../src/modules/feature-flags/feature-flags.warmup.js'
 import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards.js'
 import type { AuthenticatedRequest } from '../src/modules/auth/security.types.js'
@@ -236,7 +236,7 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
       // The cron's startup warmup would otherwise fire against the override and
       // log a failure on every boot of this fixture. It has nothing to do with
       // what this suite proves.
-      .overrideProvider(FeatureFlagsCron)
+      .overrideProvider(FeatureFlagsWarmup)
       .useValue({ onModuleInit: () => Promise.resolve() })
       .overrideGuard(RequestAuthGuard)
       .useValue({

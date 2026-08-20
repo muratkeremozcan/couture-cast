@@ -2,6 +2,7 @@
 import type { Page } from '@playwright/test'
 import { expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
+import { contrastRatio as hexContrastRatio } from '@couture/utils'
 
 export interface CheckA11yOptions {
   includeTags?: string[]
@@ -11,6 +12,15 @@ export interface CheckA11yOptions {
 }
 
 export async function waitForAccessibilityReady(page: Page): Promise<void> {
+  // Deliberately a DOM presence check, not a role query: `AccessibleModal` sets
+  // `aria-hidden="true"` and `inert` on the app shell (and therefore this <main>)
+  // while a modal is open, by design -- see accessible-modal.tsx. `checkA11y` calls
+  // this readiness gate for pages that scan a page WITH an open modal covering it
+  // (e.g. wardrobe-garment-capture.spec.ts), where `getByRole('main')` correctly
+  // finds nothing, but the underlying element is still there and still what the
+  // caller needs to wait for. `#main-content` is a load-bearing, stable id (the
+  // skip-link target on every page, per settings/page.tsx's docblock), not a
+  // fragile accident.
   await page.locator('main#main-content').waitFor({ state: 'visible' })
   await page.evaluate(async () => {
     await document.fonts?.ready
@@ -70,6 +80,13 @@ function parseRgb(value: string): [number, number, number] {
   return channels as [number, number, number]
 }
 
+/** Encodes 0-255 sRGB channels as the `#RRGGBB` shape `@couture/utils` accepts. */
+function toHex(channels: [number, number, number]): string {
+  return `#${channels
+    .map((channel) => Math.round(channel).toString(16).padStart(2, '0'))
+    .join('')}`
+}
+
 /**
  * WCAG relative-contrast ratio between two computed `rgb()` colors.
  *
@@ -77,21 +94,22 @@ function parseRgb(value: string): [number, number, number] {
  * evaluate, so a focus ring can vanish against its surface with a clean axe
  * report. Specs that care assert the ratio directly.
  *
- * `accessibility-hardening.spec.ts` carries its own inline copy that predates
- * this helper. It is the gate for every primary route, so it is deliberately
- * left alone here rather than refactored in a change that cannot run it.
+ * Story 5.3 Decision 3 made `@couture/utils`'s hex-based `contrastRatio` the
+ * one canonical WCAG luminance implementation in the repo. This function is
+ * now an adapter over it rather than a second implementation: `parseRgb`
+ * still does the `rgb()`-string parsing this helper's callers need (
+ * `getComputedStyle` returns that shape, not hex, and
+ * `commerce-affiliate-preferences.spec.ts:239` depends on this exact
+ * signature), `toHex` re-encodes the three channels, and the gamma-correction
+ * and luminance-weighting maths live in `@couture/utils` alone.
+ * `accessibility.spec.ts` beside this file pins both entry points to the same
+ * number for the same color.
+ *
+ * `accessibility-hardening.spec.ts` still carries its own inline copy of the
+ * pre-Decision-3 maths. It gates every primary route and was not touched by
+ * this rewrite, so it remains a second, deliberately-owned duplicate (see
+ * `deferred-work.md`) rather than this file growing a third.
  */
 export function contrastRatio(left: string, right: string): number {
-  const luminance = (color: string) => {
-    const channels = parseRgb(color).map((channel) => {
-      const normalized = channel / 255
-      return normalized <= 0.04045
-        ? normalized / 12.92
-        : ((normalized + 0.055) / 1.055) ** 2.4
-    })
-    return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722
-  }
-  const a = luminance(left)
-  const b = luminance(right)
-  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+  return hexContrastRatio(toHex(parseRgb(left)), toHex(parseRgb(right)))
 }

@@ -127,6 +127,25 @@ export type UpdatePremiumThemeResponse = z.infer<typeof updatePremiumThemeRespon
 export const PREMIUM_THEMES_DISABLED_MESSAGE =
   'Premium themes are temporarily unavailable.'
 
+/**
+ * A theme write whose owning `User` row no longer exists.
+ *
+ * The window is one request wide and only account erasure opens it: the upsert
+ * violates `PremiumThemePreference_user_id_fkey` (Prisma `P2003`) because the
+ * row it would write has nothing left to point at. Left unhandled that answered
+ * 500, which reads as "the server is broken" for what is really "this account
+ * is gone" — the same distinction `COMMERCE_OFFER_NOT_FOUND_MESSAGE` and
+ * `SUBSCRIPTION_NOT_FOUND_MESSAGE` already draw for the other commerce writes.
+ *
+ * Documented as a 404 on the PUT operation below. An earlier revision left it
+ * undocumented on the theory that publishing it would drag an `optic diff`
+ * conversation into a defect fix; that was wrong twice over. Adding a response
+ * to an operation is additive rather than breaking, and a status a client can
+ * actually receive belongs in the contract whether or not documenting it is
+ * convenient.
+ */
+export const PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE = 'Account not found.'
+
 // --- OpenAPI registration --------------------------------------------------
 
 export function registerPremiumThemeContracts(
@@ -222,6 +241,12 @@ export function registerPremiumThemeContracts(
         description: `The acting user has no active Premium entitlement ("${PREMIUM_REQUIRED_MESSAGE}"). Returned before the feature flag is consulted.`,
         content: {
           'application/json': { schema: commonSchemas.forbiddenHttpErrorSchema },
+        },
+      },
+      404: {
+        description: `The acting user's account no longer exists ("${PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE}"). One request wide: the upsert violates the preference table's user foreign key because the User row was deleted while the write was in flight. Documented on the PUT only — the GET reads and cannot hit the constraint.`,
+        content: {
+          'application/json': { schema: commonSchemas.notFoundHttpErrorSchema },
         },
       },
       500: {

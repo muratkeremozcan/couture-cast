@@ -14,6 +14,7 @@ import {
   Prisma,
 } from '@prisma/client'
 import Redis from 'ioredis'
+import { invalidateRitualCacheForUser } from './ritual-cache.js'
 
 export const RITUAL_REDIS_CLIENT = Symbol('RITUAL_REDIS_CLIENT')
 const RITUAL_GARMENT_CANDIDATE_LIMIT = 1_000
@@ -1646,30 +1647,17 @@ export class RitualService implements OnModuleDestroy {
   }
 
   // Story 2.2 Task 2 step 3 owner: implement chunk-based Redis key invalidation
+  /**
+   * Delegates to {@link invalidateRitualCacheForUser} so the key scheme has one
+   * owner. Kept as a method because `RitualService` is the cache's writer and
+   * callers reasonably ask it, not a loose function, to clear one.
+   */
   async invalidateUserCache(userId: string): Promise<boolean> {
-    try {
-      const matchPattern = `ritual:${userId}:*`
-      let cursor = '0'
-      do {
-        const [nextCursor, keys] = await this.redis.scan(
-          cursor,
-          'MATCH',
-          matchPattern,
-          'COUNT',
-          100
-        )
-        cursor = nextCursor
-        if (keys.length > 0) {
-          await this.redis.del(keys)
-        }
-      } while (cursor !== '0')
-      return true
-    } catch (err) {
-      this.logger.warn(
-        `Redis cache invalidation failed: ${err instanceof Error ? err.message : String(err)}`
-      )
-      return false
+    const invalidated = await invalidateRitualCacheForUser(this.redis, userId)
+    if (!invalidated) {
+      this.logger.warn(`Redis cache invalidation failed for user ${userId}`)
     }
+    return invalidated
   }
 
   async onModuleDestroy() {

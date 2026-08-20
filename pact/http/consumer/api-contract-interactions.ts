@@ -1,7 +1,12 @@
 // Step 22 step 5 owner: check Accept-Language header propagation in Pact consumer tests in pact/http/consumer/api-contract-interactions.ts
 import { MatchersV3, type PactV4, type V3MockServer } from '@pact-foundation/pact'
 import { createProviderState, setJsonContent } from '@seontechnologies/pactjs-utils'
-import type { DefaultApi } from '@couture/api-client'
+import type {
+  CommitSilhouettePhotoInput,
+  CreateOutfitCapsuleInput,
+  CreateSilhouetteUploadUrlInput,
+  DefaultApi,
+} from '@couture/api-client'
 import {
   apiHealthResponseSchema,
   eventsPollInvalidSinceResponseSchema,
@@ -25,10 +30,15 @@ import {
   COMMERCE_SUBSCRIPTION_DISABLED_MESSAGE,
   SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE,
   SUBSCRIPTION_NOT_FOUND_MESSAGE,
+  PREMIUM_REQUIRED_MESSAGE,
   subscriptionResponseSchema,
   checkoutSessionResponseSchema,
   portalSessionResponseSchema,
   WEBHOOK_SIGNATURE_INVALID_MESSAGE,
+  premiumThemeResponseSchema,
+  updatePremiumThemeResponseSchema,
+  PREMIUM_THEMES_DISABLED_MESSAGE,
+  PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE,
   wardrobeOnboardingStateResponseSchema,
   silhouetteProfileResponseSchema,
   createSilhouetteUploadUrlResponseSchema,
@@ -101,6 +111,8 @@ type ContractApiClient = Pick<
   | 'apiV1CommerceSubscriptionRefreshPost'
   | 'apiV1CommerceSubscriptionCheckoutSessionPost'
   | 'apiV1CommerceSubscriptionPortalSessionPost'
+  | 'apiV1CommercePremiumThemeGet'
+  | 'apiV1CommercePremiumThemePut'
 >
 type CreateClient = (mockServer: V3MockServer) => ContractApiClient
 
@@ -715,6 +727,9 @@ export async function verifySmartTagErrorInteraction(
       })
     )
     .executeTest(async (mockServer: V3MockServer) => {
+      // The generated SDK throws on these statuses, so the request goes out
+      // directly: the point is to pin the status and error envelope the
+      // clients branch on, not the SDK's error-handling.
       const response = await fetch(`${mockServer.url}${interaction.path}`, {
         method: interaction.method,
         headers: {
@@ -1012,6 +1027,14 @@ const capsuleBody = (revision: number) => ({
   updatedAt: isoTimestamp('2026-08-07T10:00:00.000Z'),
 })
 
+/** Shared by the create interaction and its idempotent-replay counterpart below. */
+const capsuleCreateRequestBody: CreateOutfitCapsuleInput = {
+  name: 'Work capsule',
+  occasions: ['work'],
+  garmentIds: [CAPSULE_GARMENT_A, CAPSULE_GARMENT_B],
+  isFavorite: false,
+}
+
 export async function verifyCreateCapsuleInteraction(
   pact: PactV4,
   createClient: CreateClient
@@ -1030,12 +1053,7 @@ export async function verifyCreateCapsuleInteraction(
       `/api/v1/wardrobe/${CAPSULE_OWNER_ID}/capsules`,
       setJsonContent({
         headers: { ...pactEventHeaders, 'Idempotency-Key': CAPSULE_IDEMPOTENCY_KEY },
-        body: {
-          name: 'Work capsule',
-          occasions: ['work'],
-          garmentIds: [CAPSULE_GARMENT_A, CAPSULE_GARMENT_B],
-          isFavorite: false,
-        },
+        body: capsuleCreateRequestBody,
       })
     )
     .willRespondWith(
@@ -1054,12 +1072,7 @@ export async function verifyCreateCapsuleInteraction(
       ).apiV1WardrobeOwnerUserIdCapsulesPost({
         ownerUserId: CAPSULE_OWNER_ID,
         idempotencyKey: CAPSULE_IDEMPOTENCY_KEY,
-        createOutfitCapsuleInput: {
-          name: 'Work capsule',
-          occasions: ['work'],
-          garmentIds: [CAPSULE_GARMENT_A, CAPSULE_GARMENT_B],
-          isFavorite: false,
-        },
+        createOutfitCapsuleInput: capsuleCreateRequestBody,
       })
 
       expect(outfitCapsuleResponseSchema.parse(response)).toBeDefined()
@@ -1085,12 +1098,7 @@ export async function verifyCapsuleIdempotentReplayInteraction(
       `/api/v1/wardrobe/${CAPSULE_OWNER_ID}/capsules`,
       setJsonContent({
         headers: { ...pactEventHeaders, 'Idempotency-Key': CAPSULE_IDEMPOTENCY_KEY },
-        body: {
-          name: 'Work capsule',
-          occasions: ['work'],
-          garmentIds: [CAPSULE_GARMENT_A, CAPSULE_GARMENT_B],
-          isFavorite: false,
-        },
+        body: capsuleCreateRequestBody,
       })
     )
     .willRespondWith(
@@ -1106,12 +1114,7 @@ export async function verifyCapsuleIdempotentReplayInteraction(
       ).apiV1WardrobeOwnerUserIdCapsulesPost({
         ownerUserId: CAPSULE_OWNER_ID,
         idempotencyKey: CAPSULE_IDEMPOTENCY_KEY,
-        createOutfitCapsuleInput: {
-          name: 'Work capsule',
-          occasions: ['work'],
-          garmentIds: [CAPSULE_GARMENT_A, CAPSULE_GARMENT_B],
-          isFavorite: false,
-        },
+        createOutfitCapsuleInput: capsuleCreateRequestBody,
       })
 
       expect(outfitCapsuleResponseSchema.parse(response)).toBeDefined()
@@ -1875,6 +1878,9 @@ export async function verifyWardrobeErrorInteraction(
       })
     )
     .executeTest(async (mockServer: V3MockServer) => {
+      // The generated SDK throws on these statuses, so the request goes out
+      // directly: the point is to pin the status and error envelope the
+      // clients branch on, not the SDK's error-handling.
       const response = await fetch(`${mockServer.url}${interaction.path}`, {
         method: interaction.method,
         headers: interaction.body
@@ -2136,6 +2142,15 @@ export async function verifySilhouetteStalePreconditionInteraction(pact: PactV4)
 
 // --- "My Form" photo pipeline -----------------------------------------------
 
+/** Shared by the upload-url interaction and its idempotent-replay counterpart below. */
+const myFormUploadUrlRequestBody: CreateSilhouetteUploadUrlInput = {
+  fileSizeBytes: 2048576,
+  mimeType: 'image/png',
+  sha256: SILHOUETTE_SHA256,
+  widthPx: 1024,
+  heightPx: 1536,
+}
+
 export async function verifyMyFormUploadUrlInteraction(
   pact: PactV4,
   createClient: CreateClient
@@ -2157,13 +2172,7 @@ export async function verifyMyFormUploadUrlInteraction(
           ...pactEventHeaders,
           'Idempotency-Key': SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
         },
-        body: {
-          fileSizeBytes: 2048576,
-          mimeType: 'image/png',
-          sha256: SILHOUETTE_SHA256,
-          widthPx: 1024,
-          heightPx: 1536,
-        },
+        body: myFormUploadUrlRequestBody,
       })
     )
     .willRespondWith(
@@ -2187,13 +2196,7 @@ export async function verifyMyFormUploadUrlInteraction(
         mockServer
       ).apiV1WardrobeSilhouetteMyFormUploadUrlPost({
         idempotencyKey: SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
-        createSilhouetteUploadUrlInput: {
-          fileSizeBytes: 2048576,
-          mimeType: 'image/png',
-          sha256: SILHOUETTE_SHA256,
-          widthPx: 1024,
-          heightPx: 1536,
-        },
+        createSilhouetteUploadUrlInput: myFormUploadUrlRequestBody,
       })
 
       expect(
@@ -2233,13 +2236,7 @@ export async function verifyMyFormUploadUrlReplayInteraction(
           ...pactEventHeaders,
           'Idempotency-Key': SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
         },
-        body: {
-          fileSizeBytes: 2048576,
-          mimeType: 'image/png',
-          sha256: SILHOUETTE_SHA256,
-          widthPx: 1024,
-          heightPx: 1536,
-        },
+        body: myFormUploadUrlRequestBody,
       })
     )
     .willRespondWith(
@@ -2263,19 +2260,19 @@ export async function verifyMyFormUploadUrlReplayInteraction(
         mockServer
       ).apiV1WardrobeSilhouetteMyFormUploadUrlPost({
         idempotencyKey: SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
-        createSilhouetteUploadUrlInput: {
-          fileSizeBytes: 2048576,
-          mimeType: 'image/png',
-          sha256: SILHOUETTE_SHA256,
-          widthPx: 1024,
-          heightPx: 1536,
-        },
+        createSilhouetteUploadUrlInput: myFormUploadUrlRequestBody,
       })
 
       expect(
         createSilhouetteUploadUrlResponseSchema.parse(response).data.uploadSessionId
       ).toBe(SILHOUETTE_UPLOAD_SESSION_ID)
     })
+}
+
+/** Shared by the commit interaction and its idempotent-replay counterpart below. */
+const myFormCommitRequestBody: CommitSilhouettePhotoInput = {
+  uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
+  confirmsBasewearGuidance: true,
 }
 
 export async function verifyMyFormCommitInteraction(
@@ -2302,10 +2299,7 @@ export async function verifyMyFormCommitInteraction(
           ...pactEventHeaders,
           'Idempotency-Key': SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
         },
-        body: {
-          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
-          confirmsBasewearGuidance: true,
-        },
+        body: myFormCommitRequestBody,
       })
     )
     .willRespondWith(
@@ -2340,10 +2334,7 @@ export async function verifyMyFormCommitInteraction(
         mockServer
       ).apiV1WardrobeSilhouetteMyFormCommitPost({
         idempotencyKey: SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
-        commitSilhouettePhotoInput: {
-          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
-          confirmsBasewearGuidance: true,
-        },
+        commitSilhouettePhotoInput: myFormCommitRequestBody,
       })
 
       const parsed = silhouetteProfileResponseSchema.parse(response).data
@@ -2384,10 +2375,7 @@ export async function verifyMyFormCommitReplayInteraction(
           ...pactEventHeaders,
           'Idempotency-Key': SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
         },
-        body: {
-          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
-          confirmsBasewearGuidance: true,
-        },
+        body: myFormCommitRequestBody,
       })
     )
     .willRespondWith(
@@ -2416,10 +2404,7 @@ export async function verifyMyFormCommitReplayInteraction(
         mockServer
       ).apiV1WardrobeSilhouetteMyFormCommitPost({
         idempotencyKey: SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
-        commitSilhouettePhotoInput: {
-          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
-          confirmsBasewearGuidance: true,
-        },
+        commitSilhouettePhotoInput: myFormCommitRequestBody,
       })
 
       const parsed = silhouetteProfileResponseSchema.parse(response).data
@@ -3187,6 +3172,9 @@ export async function verifyAffiliateWebhookErrorInteraction(
       })
     )
     .executeTest(async (mockServer: V3MockServer) => {
+      // The generated SDK throws on these statuses, so the request goes out
+      // directly: the point is to pin the status and error envelope the
+      // clients branch on, not the SDK's error-handling.
       const response = await fetch(
         `${mockServer.url}/api/v1/commerce/affiliate/webhook`,
         {
@@ -3573,6 +3561,413 @@ export async function verifySubscriptionErrorInteraction(
         ...(interaction.requestBody
           ? { body: JSON.stringify(interaction.requestBody) }
           : {}),
+      })
+
+      expect(response.status).toBe(interaction.status)
+      expect(response.headers.get('cache-control')).toBe('private, no-store')
+
+      const payload = (await response.json()) as Record<string, unknown>
+      expect(payload.message).toBe(interaction.message)
+      expect(payload.error).toBe(interaction.reason)
+      // There is no machine-readable code to branch on, by design.
+      expect(payload).not.toHaveProperty('code')
+    })
+}
+
+/* ---------------------------------------------------------------------------
+ * Story 5.3 premium theme switcher.
+ *
+ * Unlike 5.2's asymmetric subscription split, both consumers call both
+ * operations here: each surface's settings section reads the resolved
+ * palette on mount and writes a selection or a reset from the same gallery.
+ * WHEN each field resolves the way it does -- Decision 7's
+ * entitlement-wins-over-stored-row rule, the P2023 stale-enum fallback in
+ * `readStoredTheme`, and the flag-vs-body-parse precedence on the PUT -- is
+ * proven in `premium-theme.service.spec.ts` and
+ * `premium-theme.controller.spec.ts`; these interactions record the response
+ * shape and status/error envelope a client must understand.
+ *
+ * Every identifier below is mirrored in `pact/http/provider/provider-helper.ts`.
+ * Both sides must agree or the pinned `string()` matchers fail verification.
+ * ------------------------------------------------------------------------- */
+
+const PREMIUM_THEME_STORED_KEY = 'jewel_radiance' as const
+const PREMIUM_THEME_UPDATE_KEY = 'autumn_umber' as const
+
+const updateThemeRequestBody = { theme: PREMIUM_THEME_UPDATE_KEY }
+const resetThemeRequestBody = { theme: null }
+
+/**
+ * Provider endpoint: /api/v1/commerce/premium/theme -> GET PremiumThemeController.getTheme
+ *
+ * Provider Scrutiny Evidence:
+ * - Handler: apps/api/src/modules/commerce/premium-theme.controller.ts:65-70 (getTheme)
+ * - Response type: PremiumThemeResponse ({ data: { theme, isEntitled, themesEnabled } })
+ * - Status codes: 200 always -- the GET carries `RequestAuthGuard` only, never
+ *   entitlement- or flag-gated (controller docblock :30-34)
+ * - Field names: theme (PremiumThemeKey | null), isEntitled (boolean),
+ *   themesEnabled (boolean) -- premium-theme.ts premiumThemeSchema, `.strict()`
+ *
+ * An entitled user with a stored palette: `theme` carries the stored key,
+ * `isEntitled` and `themesEnabled` both true.
+ */
+export async function verifyEntitledThemeReadInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'The user has premium theme access',
+        params: { userId: pactEventAuth.userId, theme: PREMIUM_THEME_STORED_KEY },
+      })
+    )
+    .uponReceiving(
+      'a request for the resolved premium theme of an entitled user with a stored palette'
+    )
+    .withRequest(
+      'GET',
+      '/api/v1/commerce/premium/theme',
+      setJsonContent({ headers: pactEventHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { 'Cache-Control': string('private, no-store') },
+        body: {
+          data: {
+            theme: string(PREMIUM_THEME_STORED_KEY),
+            isEntitled: like(true),
+            themesEnabled: like(true),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1CommercePremiumThemeGet()
+
+      const parsed = premiumThemeResponseSchema.parse(response)
+      expect(parsed.data.theme).toBe(PREMIUM_THEME_STORED_KEY)
+      expect(parsed.data.isEntitled).toBe(true)
+      expect(parsed.data.themesEnabled).toBe(true)
+    })
+}
+
+/**
+ * Provider endpoint: /api/v1/commerce/premium/theme -> GET PremiumThemeController.getTheme
+ *
+ * Provider Scrutiny Evidence: same handler/response type/status codes as
+ * {@link verifyEntitledThemeReadInteraction} above. `theme` is asserted with
+ * `nullValue()` here, mirroring the 5.2 `never-subscribed` interaction's use
+ * of `nullValue()` for a null member of a nullable union -- Decision 8: an
+ * absent row and a stored NULL both resolve to Default and are
+ * indistinguishable on the wire.
+ *
+ * An entitled user with no stored preference (the never-touched-the-gallery
+ * case, and the state a reset lands on): `theme` is null (Default), both
+ * flags stay true.
+ */
+export async function verifyEntitledThemeReadDefaultInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'The user has premium theme access',
+        params: { userId: pactEventAuth.userId },
+      })
+    )
+    .uponReceiving(
+      'a request for the resolved premium theme of an entitled user with no stored palette'
+    )
+    .withRequest(
+      'GET',
+      '/api/v1/commerce/premium/theme',
+      setJsonContent({ headers: pactEventHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { 'Cache-Control': string('private, no-store') },
+        body: {
+          data: {
+            theme: nullValue(),
+            isEntitled: like(true),
+            themesEnabled: like(true),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1CommercePremiumThemeGet()
+
+      const parsed = premiumThemeResponseSchema.parse(response)
+      expect(parsed.data).toEqual({ theme: null, isEntitled: true, themesEnabled: true })
+    })
+}
+
+/**
+ * Provider endpoint: /api/v1/commerce/premium/theme -> GET PremiumThemeController.getTheme
+ *
+ * Provider Scrutiny Evidence: same handler/response type/status codes as
+ * above. AC 6 / Decision 7 -- entitlement wins over the stored row, always:
+ * a non-entitled caller's `theme` is forced null regardless of what is
+ * stored (premium-theme.service.ts:93-95, `getTheme`).
+ */
+export async function verifyNotEntitledThemeReadInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'The user does not have premium theme access',
+        params: { userId: pactEventAuth.userId },
+      })
+    )
+    .uponReceiving('a request for the resolved premium theme of a non-entitled user')
+    .withRequest(
+      'GET',
+      '/api/v1/commerce/premium/theme',
+      setJsonContent({ headers: pactEventHeaders })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { 'Cache-Control': string('private, no-store') },
+        body: {
+          data: {
+            theme: nullValue(),
+            isEntitled: like(false),
+            themesEnabled: like(true),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1CommercePremiumThemeGet()
+
+      const parsed = premiumThemeResponseSchema.parse(response)
+      expect(parsed.data).toEqual({ theme: null, isEntitled: false, themesEnabled: true })
+    })
+}
+
+/**
+ * Provider endpoint: /api/v1/commerce/premium/theme -> PUT PremiumThemeController.setTheme
+ *
+ * Provider Scrutiny Evidence:
+ * - Handler: apps/api/src/modules/commerce/premium-theme.controller.ts:78-88 (setTheme)
+ * - Response type: UpdatePremiumThemeResponse (same shape as PremiumThemeResponse)
+ * - Status codes: 200 always, including when the submitted palette matches
+ *   the stored one (controller docblock :72-76)
+ * - Field names: `theme` echoes the freshly resolved, persisted value, never
+ *   the raw request body directly -- premium-theme.service.ts:120-142 (setTheme)
+ *
+ * An entitled caller with the flag on selects a named palette.
+ */
+export async function verifyThemeUpdateInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'The user has premium theme access',
+        params: { userId: pactEventAuth.userId },
+      })
+    )
+    .uponReceiving('a request to select a premium theme palette')
+    .withRequest(
+      'PUT',
+      '/api/v1/commerce/premium/theme',
+      setJsonContent({ headers: pactEventHeaders, body: updateThemeRequestBody })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { 'Cache-Control': string('private, no-store') },
+        body: {
+          data: {
+            theme: string(PREMIUM_THEME_UPDATE_KEY),
+            isEntitled: like(true),
+            themesEnabled: like(true),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1CommercePremiumThemePut({
+        updatePremiumThemeInput: updateThemeRequestBody,
+      })
+
+      const parsed = updatePremiumThemeResponseSchema.parse(response)
+      expect(parsed.data.theme).toBe(PREMIUM_THEME_UPDATE_KEY)
+      expect(parsed.data.isEntitled).toBe(true)
+      expect(parsed.data.themesEnabled).toBe(true)
+    })
+}
+
+/**
+ * Provider endpoint: /api/v1/commerce/premium/theme -> PUT PremiumThemeController.setTheme
+ *
+ * Provider Scrutiny Evidence: same handler/response type/status codes as
+ * {@link verifyThemeUpdateInteraction} above. Decision 8: `{ theme: null }`
+ * is a reset, resolved by an upsert to NULL, never a delete. This interaction
+ * proves only the wire contract -- a null request resolves to a null
+ * (Default) response -- not the upsert-vs-delete internal, which
+ * `premium-theme.service.spec.ts` already unit-tests directly against the
+ * repository call.
+ */
+export async function verifyThemeResetInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'The user has premium theme access',
+        params: { userId: pactEventAuth.userId, theme: PREMIUM_THEME_STORED_KEY },
+      })
+    )
+    .uponReceiving('a request to reset the premium theme to Default')
+    .withRequest(
+      'PUT',
+      '/api/v1/commerce/premium/theme',
+      setJsonContent({ headers: pactEventHeaders, body: resetThemeRequestBody })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { 'Cache-Control': string('private, no-store') },
+        body: {
+          data: {
+            theme: nullValue(),
+            isEntitled: like(true),
+            themesEnabled: like(true),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1CommercePremiumThemePut({
+        updatePremiumThemeInput: resetThemeRequestBody,
+      })
+
+      const parsed = updatePremiumThemeResponseSchema.parse(response)
+      expect(parsed.data).toEqual({ theme: null, isEntitled: true, themesEnabled: true })
+    })
+}
+
+/**
+ * Decision 9's status precedence, expressed as table-driven error rows,
+ * mirroring `SubscriptionErrorInteraction`/`verifySubscriptionErrorInteraction`
+ * exactly. The shared error envelopes are `.strict()` over exactly
+ * `{ statusCode, message, error }`, so a client branches on status plus one
+ * of the exported message constants. Each row drives its own `it.each` case:
+ * PactV4's Rust FFI non-deterministically drops an interaction when more than
+ * one `addInteraction()...executeTest()` chain is awaited inside one test
+ * body.
+ *
+ * All three rows are PUT-only: the GET operation is never entitlement- or
+ * flag-gated (Decision 9) and never writes, so it has no error rows of its own
+ * to cover here. 403 outranks 503 because `PremiumEntitlementGuard` runs
+ * pre-handler while the flag check lives in the service body -- a non-entitled
+ * caller can never observe the kill switch. The 404 sits behind both: it is
+ * raised by the write itself, so a caller only reaches it after passing the
+ * guard and the flag.
+ */
+export type PremiumThemeErrorInteraction = {
+  description: string
+  state: string
+  stateParams: Record<string, string>
+  status: number
+  message: string
+  reason: string
+}
+
+export const premiumThemeErrorInteractions: PremiumThemeErrorInteraction[] = [
+  {
+    description: 'rejects a theme write from a non-entitled caller',
+    state: 'The user does not have premium theme access',
+    stateParams: { userId: pactEventAuth.userId },
+    status: 403,
+    message: PREMIUM_REQUIRED_MESSAGE,
+    reason: 'Forbidden',
+  },
+  {
+    description: 'reports the disabled premium themes feature as unavailable',
+    state: 'Premium themes are disabled',
+    stateParams: { userId: pactEventAuth.userId },
+    status: 503,
+    message: PREMIUM_THEMES_DISABLED_MESSAGE,
+    reason: 'Service Unavailable',
+  },
+  {
+    // The account erased between the guard's entitlement check and the write.
+    // In the provider this is Prisma `P2003` on the preference table's user
+    // foreign key, remapped in `PremiumThemeService.writePreference`; before
+    // that remapping the same race answered 500, which named the server as
+    // broken for what is really an account that no longer exists.
+    description: 'reports a write whose owning account was erased mid-request',
+    state: 'The premium theme owner account no longer exists',
+    stateParams: { userId: pactEventAuth.userId },
+    status: 404,
+    message: PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE,
+    reason: 'Not Found',
+  },
+]
+
+/**
+ * Provider endpoint: /api/v1/commerce/premium/theme -> PUT PremiumThemeController.setTheme
+ *
+ * Provider Scrutiny Evidence:
+ * - Handler: apps/api/src/modules/commerce/premium-theme.controller.ts:78-105
+ *   (setTheme / parseThemeRequest)
+ * - Response type: the shared HTTP error envelope, `.strict()` over exactly
+ *   `{ statusCode, message, error }`
+ * - Status codes: 403 (PremiumEntitlementGuard.canActivate,
+ *   premium-entitlement.guard.ts:35-50) outranking 503
+ *   (PremiumThemeService.assertThemesEnabled, premium-theme.service.ts:104-108)
+ */
+export async function verifyPremiumThemeErrorInteraction(
+  pact: PactV4,
+  interaction: PremiumThemeErrorInteraction
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({ name: interaction.state, params: interaction.stateParams })
+    )
+    .uponReceiving(`a premium theme write that ${interaction.description}`)
+    .withRequest(
+      'PUT',
+      '/api/v1/commerce/premium/theme',
+      setJsonContent({ headers: pactEventHeaders, body: updateThemeRequestBody })
+    )
+    .willRespondWith(
+      interaction.status,
+      setJsonContent({
+        headers: { 'Cache-Control': string('private, no-store') },
+        body: {
+          statusCode: like(interaction.status),
+          message: string(interaction.message),
+          error: string(interaction.reason),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      // The generated SDK throws on these statuses, so the request goes out
+      // directly: what matters is the envelope the clients branch on.
+      const response = await fetch(`${mockServer.url}/api/v1/commerce/premium/theme`, {
+        method: 'PUT',
+        headers: { ...pactEventHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateThemeRequestBody),
       })
 
       expect(response.status).toBe(interaction.status)

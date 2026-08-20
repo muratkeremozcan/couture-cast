@@ -15,6 +15,7 @@
       "optOutHelp": "Desactiva esto para ocultar todas las sugerencias de socios y afiliados.",
       "saved": "Preferencias de compra actualizadas",
       "error": "No se pudieron actualizar las preferencias de compra.",
+      "loadError": "No se pudieron cargar las preferencias de compra.",
       "signedOutHint": "Inicia sesión para cambiar esto"
     },
     "premium": {
@@ -67,8 +68,8 @@
         "unavailable": "Las paletas están desactivadas por ahora. Tu elección guardada se conserva y vuelve cuando se reactiven.",
         "locked": {
           "title": "Las paletas de la interfaz son una función Premium",
-          "body": "Suscríbete a Premium con los controles de arriba para desbloquear Jewel Radiance, Autumn Umber y Winter Metallic.",
-          "signedOutBody": "Inicia sesión y suscríbete a Premium para desbloquear Jewel Radiance, Autumn Umber y Winter Metallic."
+          "body": "Suscríbete a Premium con los controles de arriba para desbloquear {{palettes}}.",
+          "signedOutBody": "Inicia sesión y suscríbete a Premium para desbloquear {{palettes}}."
         },
         "loadError": "No se pudo cargar tu paleta de la interfaz. Se muestra la paleta predeterminada.",
         "saveError": "No se pudo guardar tu paleta de la interfaz. Inténtalo de nuevo."

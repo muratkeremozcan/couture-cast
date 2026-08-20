@@ -270,7 +270,7 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     async ({ commerceSession: _commerceSession, page, interceptNetworkCall }) => {
       expect((await openSettings(page, interceptNetworkCall)).status).toBe(200)
 
-      await log.step('Fail the write and assert the app surfaces the server message')
+      await log.step('Fail the write and assert the app surfaces the catalog message')
       const failedSave = interceptNetworkCall({
         method: 'PUT',
         url: PREFERENCES_URL,
@@ -287,8 +287,13 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
       await optOutToggle(page).click()
       expect((await failedSave).status).toBe(503)
 
+      // commerce-preferences-section.tsx shows catalog copy unconditionally on a
+      // failed save, never the server's (English-only) error body -- the same fix
+      // premium.ts got on 2026-08-19, for the same reason: a save and a read have
+      // no actionable failure to distinguish, so there is nothing an untranslated
+      // server string would tell a reader that the catalog string does not.
       await expect(errorMessage(page)).toHaveText(
-        'Affiliate suggestions are temporarily unavailable.'
+        'Unable to update shopping preferences.'
       )
       // Reverted. A consent control that keeps showing a state the server
       // rejected is a broken opt-out, not a cosmetic bug.

@@ -2,6 +2,17 @@ import '../load-env'
 import type { Queue, Worker } from 'bullmq'
 import { Expo } from 'expo-server-sdk'
 import Redis from 'ioredis'
+import { AdminService } from '../admin/admin.service'
+import { GuardianConsentStateService } from '../modules/auth/guardian-consent-state.service'
+import { UserSessionService } from '../modules/auth/user-session.service'
+import { FeatureFlagsRepository } from '../modules/feature-flags/feature-flags.repository'
+import { FeatureFlagsService } from '../modules/feature-flags/feature-flags.service'
+import { GuardianService } from '../modules/guardian/guardian.service'
+import { invalidateRitualCacheForUser } from '../modules/personalization/ritual-cache'
+import { WardrobeRetentionService } from '../modules/wardrobe/wardrobe-retention.service'
+import { SupabaseWardrobeStorageAdapter } from '../modules/wardrobe/wardrobe-storage.adapter'
+import { createMaintenanceProcessor } from './maintenance.processor'
+import { registerMaintenanceSchedulers } from './maintenance.scheduler'
 import { createQueues, queueConfigs } from '../config/queues'
 import { getRedisConfig, redisOptionsFromConfig } from '../config/redis'
 import { AlertFanoutProcessor } from '../modules/alerts/alert-fanout.processor'
@@ -70,15 +81,17 @@ async function startWorkers() {
     const billingReconciliationQueue = startedQueues.find(
       (queue) => queue.name === 'billing-reconciliation'
     )
+    const maintenanceQueue = startedQueues.find((queue) => queue.name === 'maintenance')
 
     if (
       !weatherQueue ||
       !alertFanoutQueue ||
       !colorExtractionQueue ||
-      !billingReconciliationQueue
+      !billingReconciliationQueue ||
+      !maintenanceQueue
     ) {
       throw new Error(
-        'Required weather-ingestion, alert-fanout, color-extraction, and billing-reconciliation queues were not created'
+        'Required weather-ingestion, alert-fanout, color-extraction, billing-reconciliation, and maintenance queues were not created'
       )
     }
 
@@ -202,6 +215,60 @@ async function startWorkers() {
           ...defaultWorkerOptions(1),
         }
       )
+    )
+
+    // The five sweeps that used to be `@Cron` methods on the request app.
+    //
+    // Hand-wired, like every other processor in this file, and deliberately so:
+    // a Nest application context is not an option here. This process runs under
+    // `tsx` (`npm run start:workers`), whose esbuild transform does not emit the
+    // `design:paramtypes` metadata Nest's DI reads, so a container built here
+    // stalls forever resolving constructor parameters while the same code works
+    // once `nest build` has run. A worker that only boots from `dist/` would be
+    // a trap for the next person, so the composition is explicit instead.
+    //
+    // `WardrobeRetentionService` takes the narrow `RITUAL_CACHE_INVALIDATOR`
+    // shape rather than the whole `RitualService`, which is what keeps this
+    // list short: clearing a user's cached outfits is all the purge ever needed.
+    const maintenanceRedis = new Redis(redisConfig.url, {
+      ...redisOptionsFromConfig(redisConfig),
+    })
+    redisClients.push(maintenanceRedis)
+
+    const maintenanceProcessor = createMaintenanceProcessor({
+      admin: new AdminService(),
+      featureFlags: new FeatureFlagsService(
+        new FeatureFlagsRepository(prisma),
+        posthogService
+      ),
+      guardian: new GuardianService(
+        posthogService,
+        prisma,
+        new GuardianConsentStateService(prisma),
+        new UserSessionService()
+      ),
+      telemetry: telemetryService,
+      wardrobeRetention: new WardrobeRetentionService(
+        prisma,
+        new SupabaseWardrobeStorageAdapter(),
+        {
+          invalidateUserCache: (userId: string) =>
+            invalidateRitualCacheForUser(maintenanceRedis, userId),
+        }
+      ),
+      logger: logger.child({ feature: 'maintenance' }),
+    })
+
+    await registerMaintenanceSchedulers(maintenanceQueue)
+
+    workers.push(
+      // Serial on purpose. Every sweep is a batched DB scan and two of them
+      // (retention purge, telemetry prune) share the hourly tick, so
+      // concurrency here would just put two long table scans on the same
+      // connection pool at the same minute for no throughput gain.
+      createWorker('maintenance', maintenanceProcessor, {
+        ...defaultWorkerOptions(1),
+      })
     )
 
     // Story 4.4: the moderation-review consumer moved to

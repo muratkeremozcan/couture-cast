@@ -240,11 +240,20 @@ describe('5.3 premium theme locale parity (web)', () => {
         true
       )
 
-      const lockedBody = catalog.get('locked.body') ?? ''
-      for (const name of ['Jewel Radiance', 'Autumn Umber', 'Winter Metallic']) {
-        expect(lockedBody.includes(name), `${locale} locked body names ${name}`).toBe(
-          true
-        )
+      /*
+       * The palette names arrive through the `{{palettes}}` interpolation now,
+       * built from `PREMIUM_THEME_KEYS` and joined by `Intl.ListFormat`, so the
+       * catalog no longer spells them out. Asserting the placeholder is the
+       * stronger check anyway: it catches a translator who resolved the list
+       * into their own prose and froze today's three palettes into twenty
+       * sentences, which is exactly what this key used to be.
+       */
+      for (const key of ['locked.body', 'locked.signedOutBody'] as const) {
+        const value = catalog.get(key) ?? ''
+        expect(value.includes('{{palettes}}'), `${locale} ${key} interpolates`).toBe(true)
+        for (const name of ['Jewel Radiance', 'Autumn Umber', 'Winter Metallic']) {
+          expect(value.includes(name), `${locale} ${key} hardcodes ${name}`).toBe(false)
+        }
       }
       expect(
         catalog.get('locked.title')?.includes('Premium'),

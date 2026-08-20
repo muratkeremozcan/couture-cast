@@ -320,7 +320,8 @@
       "optOutLabel": "Mostrar sugestões de \"Comprar este visual\"",
       "optOutHelp": "Desative esta opção para ocultar todas as sugestões de parceiros e afiliados.",
       "saved": "Preferências de compra atualizadas",
-      "error": "Não foi possível atualizar as preferências de compra."
+      "error": "Não foi possível atualizar as preferências de compra.",
+      "loadError": "Não foi possível carregar as preferências de compra."
     },
     "premium": {
       "sectionTitle": "Premium",

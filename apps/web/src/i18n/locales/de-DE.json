@@ -15,6 +15,7 @@
       "optOutHelp": "Deaktiviere dies, um alle Partner- und Affiliate-Vorschläge auszublenden.",
       "saved": "Shopping-Einstellungen aktualisiert",
       "error": "Shopping-Einstellungen konnten nicht aktualisiert werden.",
+      "loadError": "Shopping-Einstellungen konnten nicht geladen werden.",
       "signedOutHint": "Melde dich an, um dies zu ändern"
     },
     "premium": {
@@ -67,8 +68,8 @@
         "unavailable": "Paletten sind derzeit abgeschaltet. Deine gespeicherte Auswahl bleibt erhalten und kehrt zurück, sobald sie wieder verfügbar sind.",
         "locked": {
           "title": "Oberflächenpaletten sind eine Premium-Funktion",
-          "body": "Schließe oben ein Premium-Abo ab, um Jewel Radiance, Autumn Umber und Winter Metallic freizuschalten.",
-          "signedOutBody": "Melde dich an und schließe ein Premium-Abo ab, um Jewel Radiance, Autumn Umber und Winter Metallic freizuschalten."
+          "body": "Schließe oben ein Premium-Abo ab, um {{palettes}} freizuschalten.",
+          "signedOutBody": "Melde dich an und schließe ein Premium-Abo ab, um {{palettes}} freizuschalten."
         },
         "loadError": "Deine Oberflächenpalette konnte nicht geladen werden. Es wird die Standardpalette angezeigt.",
         "saveError": "Deine Oberflächenpalette konnte nicht gespeichert werden. Bitte versuche es erneut."

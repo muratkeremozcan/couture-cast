@@ -320,7 +320,8 @@
       "optOutLabel": "\"Bu kombini satın al\" önerilerini göster",
       "optOutHelp": "Tüm iş ortağı ve bağlı kuruluş önerilerini gizlemek için bunu kapatın.",
       "saved": "Alışveriş tercihleri güncellendi",
-      "error": "Alışveriş tercihleri güncellenemedi."
+      "error": "Alışveriş tercihleri güncellenemedi.",
+      "loadError": "Alışveriş tercihleri yüklenemedi."
     },
     "premium": {
       "sectionTitle": "Premium",
