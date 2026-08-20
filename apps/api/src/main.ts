@@ -32,23 +32,17 @@ async function bootstrap() {
   // Delay Nest/app imports until after OTEL starts so HTTP/framework modules are patched before
   // they load; otherwise incoming request instrumentation can be missed.
   const [
-    { NestFactory, HttpAdapterHost },
+    { NestFactory },
     { AppModule },
     { ANALYTICS_CLIENT },
-    { bindRequestContext },
-    { createRequestLoggerMiddleware },
+    { configureApp },
     { configureOpenApi, isOpenApiEnabled },
-    { TelemetryService },
-    { ApiExceptionFilter },
   ] = await Promise.all([
     import('@nestjs/core'),
     import('#app.module'),
     import('#analytics/analytics.service'),
-    import('#logger/request-context'),
-    import('#logger/request-logger.middleware'),
+    import('./bootstrap/configure-app.js'),
     import('#openapi'),
-    import('./modules/telemetry/telemetry.service.js'),
-    import('./filters/api-exception.filter.js'),
   ])
 
   // 2) NestFactory.create(AppModule) builds the route graph from that metadata.
@@ -63,24 +57,13 @@ async function bootstrap() {
   // is the deployed entry and the test suites create their own applications; a
   // bootstrap without it 401s every signed webhook it serves.
   const app = await NestFactory.create(AppModule, { rawBody: true })
-  const httpCorsOrigins = (
-    process.env.HTTP_CORS_ORIGIN ??
-    process.env.GUARDIAN_INVITE_WEB_BASE_URL ??
-    'http://localhost:3000'
-  )
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean)
-  app.enableCors({
-    credentials: true,
-    origin: httpCorsOrigins,
-  })
-  app.use(bindRequestContext)
-  app.use(createRequestLoggerMiddleware())
 
-  const adapterHost = app.get(HttpAdapterHost)
-  const telemetryService = app.get(TelemetryService)
-  app.useGlobalFilters(new ApiExceptionFilter(adapterHost, telemetryService))
+  // CORS, request context, request logging, and ApiExceptionFilter all live in
+  // `configureApp` so this entry and the deployed `api/index.ts` cannot drift.
+  // They drifted before, and the deployed side lost `api_error_occurred`
+  // entirely without any response ever looking wrong.
+  configureApp(app)
+
   const openApiEnabled = isOpenApiEnabled(process.env)
   // Step 13 evidence:
   // this is the API-boundary hook where the OpenAPI surface is attached during bootstrap.

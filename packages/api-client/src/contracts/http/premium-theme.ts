@@ -127,6 +127,23 @@ export type UpdatePremiumThemeResponse = z.infer<typeof updatePremiumThemeRespon
 export const PREMIUM_THEMES_DISABLED_MESSAGE =
   'Premium themes are temporarily unavailable.'
 
+/**
+ * A theme write whose owning `User` row no longer exists.
+ *
+ * The window is one request wide and only account erasure opens it: the upsert
+ * violates `PremiumThemePreference_user_id_fkey` (Prisma `P2003`) because the
+ * row it would write has nothing left to point at. Left unhandled that answered
+ * 500, which reads as "the server is broken" for what is really "this account
+ * is gone" — the same distinction `COMMERCE_OFFER_NOT_FOUND_MESSAGE` and
+ * `SUBSCRIPTION_NOT_FOUND_MESSAGE` already draw for the other commerce writes.
+ *
+ * Not registered as a documented 404 response on the PUT operation: doing so
+ * reshapes published nodes and pulls an `optic diff` conversation into a defect
+ * fix. The response shape is Nest's standard `NotFoundException` envelope, so
+ * nothing about it is novel on the wire.
+ */
+export const PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE = 'Account not found.'
+
 // --- OpenAPI registration --------------------------------------------------
 
 export function registerPremiumThemeContracts(

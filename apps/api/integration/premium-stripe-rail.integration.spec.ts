@@ -34,7 +34,7 @@ import {
   FakeStripeBillingClient,
   StripeBillingClient,
 } from '../src/modules/commerce/stripe-client.js'
-import { FeatureFlagsCron } from '../src/modules/feature-flags/feature-flags.cron.js'
+import { FeatureFlagsWarmup } from '../src/modules/feature-flags/feature-flags.warmup.js'
 import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
 
@@ -200,7 +200,7 @@ describe('5.2 Stripe rail against real PostgreSQL and real HTTP', () => {
       .useValue(prisma)
       .overrideProvider(FeatureFlagsService)
       .useValue(featureFlags)
-      .overrideProvider(FeatureFlagsCron)
+      .overrideProvider(FeatureFlagsWarmup)
       .useValue({ onModuleInit: () => Promise.resolve() })
       .overrideProvider(TelemetryService)
       .useValue(telemetry)

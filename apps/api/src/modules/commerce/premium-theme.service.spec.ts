@@ -1,10 +1,13 @@
 // Learning path Step 35: Premium theme switcher.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
-import { ServiceUnavailableException } from '@nestjs/common'
+import { NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
-import { PREMIUM_THEMES_DISABLED_MESSAGE } from '../../contracts/http.js'
+import {
+  PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE,
+  PREMIUM_THEMES_DISABLED_MESSAGE,
+} from '../../contracts/http.js'
 import type { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import type { PremiumEntitlementService } from './premium-entitlement.service.js'
@@ -308,6 +311,58 @@ describe('setTheme: reset is an upsert to null, never a delete (Decision 8)', ()
     )
     expect(premiumThemePreference.upsert).not.toHaveBeenCalled()
     expect(telemetry.captureEvent).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * The one Prisma failure on this write that is a fact about the caller rather
+ * than about the server. `PremiumThemePreference_user_id_fkey` can only be
+ * violated by the `User` row disappearing while the request is in flight, and
+ * answering 500 to "your account no longer exists" points the reader at the
+ * wrong system. The pair below is the same shape as the P2023/P1017 pair on the
+ * read path: one test for the mapped code, one for the narrowness of the guard.
+ */
+describe('setTheme: a write racing account erasure is a not-found, not a 500', () => {
+  function foreignKeyViolation() {
+    return new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', {
+      code: 'P2003',
+      clientVersion: 'test',
+      meta: { field_name: 'PremiumThemePreference_user_id_fkey (index)' },
+    })
+  }
+
+  it('maps P2003 onto NotFoundException with the shared message', async () => {
+    const { service, premiumThemePreference } = build()
+    premiumThemePreference.upsert.mockRejectedValueOnce(foreignKeyViolation())
+
+    await expect(service.setTheme(USER_ID, 'jewel_radiance')).rejects.toBeInstanceOf(
+      NotFoundException
+    )
+  })
+
+  it('carries PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE and emits no telemetry', async () => {
+    const { service, premiumThemePreference, telemetry } = build()
+    premiumThemePreference.upsert.mockRejectedValueOnce(foreignKeyViolation())
+
+    await expect(service.setTheme(USER_ID, 'jewel_radiance')).rejects.toMatchObject({
+      message: PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE,
+    })
+    // The selection never happened, so there is nothing to report.
+    expect(telemetry.captureEvent).not.toHaveBeenCalled()
+  })
+
+  it('lets any other Prisma failure keep propagating unchanged', async () => {
+    const { service, premiumThemePreference } = build()
+    premiumThemePreference.upsert.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Server has closed the connection', {
+        code: 'P1017',
+        clientVersion: 'test',
+      })
+    )
+
+    await expect(service.setTheme(USER_ID, 'jewel_radiance')).rejects.toMatchObject({
+      code: 'P1017',
+    })
   })
 })
 

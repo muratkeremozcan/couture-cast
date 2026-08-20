@@ -8,6 +8,7 @@ import { LocationPreferencesModule } from '../location-preferences/location-pref
 import { CommerceModule } from '../commerce/commerce.module.js'
 import { RitualController } from './ritual.controller.js'
 import { RitualService, RITUAL_REDIS_CLIENT } from './ritual.service.js'
+import { RITUAL_CACHE_INVALIDATOR } from './ritual-cache.js'
 import { ComfortController } from './comfort.controller.js'
 import { ComfortService } from './comfort.service.js'
 import Redis from 'ioredis'
@@ -28,6 +29,14 @@ import { getRedisConfig, redisOptionsFromConfig } from '../../config/redis.js'
     RitualService,
     ComfortService,
     RequestAuthGuard,
+    // The wardrobe retention purge only ever clears a user's ritual cache, so
+    // it depends on this narrow token instead of the whole `RitualService`.
+    // That is what lets the purge run in the worker runtime, where the full
+    // ritual graph (weather, locations, commerce) has no reason to exist.
+    {
+      provide: RITUAL_CACHE_INVALIDATOR,
+      useExisting: RitualService,
+    },
     {
       provide: RITUAL_REDIS_CLIENT,
       useFactory: () => {
@@ -42,6 +51,6 @@ import { getRedisConfig, redisOptionsFromConfig } from '../../config/redis.js'
       },
     },
   ],
-  exports: [RitualService, ComfortService],
+  exports: [RitualService, ComfortService, RITUAL_CACHE_INVALIDATOR],
 })
 export class PersonalizationModule {}

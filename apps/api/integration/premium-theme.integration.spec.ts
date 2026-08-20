@@ -12,7 +12,7 @@ import {
 import { RequestAuthGuard } from '../src/modules/auth/security.guards.js'
 import type { AuthenticatedRequest } from '../src/modules/auth/security.types.js'
 import { CommerceModule } from '../src/modules/commerce/commerce.module.js'
-import { FeatureFlagsCron } from '../src/modules/feature-flags/feature-flags.cron.js'
+import { FeatureFlagsWarmup } from '../src/modules/feature-flags/feature-flags.warmup.js'
 import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
 
@@ -154,7 +154,7 @@ describe('5.3 premium theme preference against real PostgreSQL and real HTTP', (
       .useValue(prismaClient)
       .overrideProvider(FeatureFlagsService)
       .useValue(featureFlags)
-      .overrideProvider(FeatureFlagsCron)
+      .overrideProvider(FeatureFlagsWarmup)
       .useValue({ onModuleInit: () => Promise.resolve() })
       .overrideProvider(TelemetryService)
       .useValue(telemetry)

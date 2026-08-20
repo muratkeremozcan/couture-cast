@@ -1,9 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { Cron, CronExpression } from '@nestjs/schedule'
 import { Prisma, PrismaClient, type GarmentItem } from '@prisma/client'
 
 import { createBaseLogger } from '../../logger/pino.config'
-import { RitualService } from '../personalization/ritual.service'
+import {
+  RITUAL_CACHE_INVALIDATOR,
+  type RitualCacheInvalidator,
+} from '../personalization/ritual-cache'
 import { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
 import { lockCapsules, lockGarments, lockOwnerProfile } from './wardrobe-capsule.locks'
 
@@ -18,7 +20,8 @@ export class WardrobeRetentionService {
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(SupabaseWardrobeStorageAdapter)
     private readonly storage: SupabaseWardrobeStorageAdapter,
-    private readonly ritualService: RitualService
+    @Inject(RITUAL_CACHE_INVALIDATOR)
+    private readonly ritualCache: RitualCacheInvalidator
   ) {}
 
   async requestDeletion(
@@ -78,7 +81,13 @@ export class WardrobeRetentionService {
     }
   }
 
-  @Cron(CronExpression.EVERY_HOUR)
+  /**
+   * Triggered by the `wardrobe-retention-purge` BullMQ Job Scheduler in the worker
+   * runtime (`workers/maintenance.scheduler.ts`). It used to carry
+   * `@Cron(CronExpression.EVERY_HOUR)`, which never fired in a deployed
+   * environment: the API is a Vercel serverless function with no long-lived
+   * process to hold the timer between ticks.
+   */
   async purgeExpiredAndDeletedGarments(): Promise<void> {
     const now = new Date()
     const abandonedBefore = new Date(now.getTime() - ABANDONED_UPLOAD_RETENTION_MS)
@@ -122,7 +131,7 @@ export class WardrobeRetentionService {
   }
 
   private async invalidateRitualCache(userId: string, garmentId: string): Promise<void> {
-    const invalidated = await this.ritualService.invalidateUserCache(userId)
+    const invalidated = await this.ritualCache.invalidateUserCache(userId)
     if (!invalidated) {
       this.logger.warn(
         { garmentId, userId },

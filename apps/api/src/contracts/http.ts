@@ -168,6 +168,7 @@ export {
   premiumThemeResponseSchema,
   updatePremiumThemeInputSchema,
   updatePremiumThemeResponseSchema,
+  PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE,
   PREMIUM_THEMES_DISABLED_MESSAGE,
   type PremiumThemeKey,
   type PremiumTheme,

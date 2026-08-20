@@ -67,6 +67,10 @@ import { MAX_SILHOUETTE_PHOTO_BYTES } from './wardrobe-silhouette-image-validati
     WardrobeSilhouetteService,
     WardrobeAccessService,
     CapsuleTelemetryOutbox,
+    // Exported for the worker runtime's maintenance context, which owns the
+    // hourly purge sweep now that it is a BullMQ Job Scheduler rather than a
+    // `@Cron` that never fired in a serverless deployment.
+    WardrobeRetentionService,
   ],
 })
 export class WardrobeModule implements NestModule {

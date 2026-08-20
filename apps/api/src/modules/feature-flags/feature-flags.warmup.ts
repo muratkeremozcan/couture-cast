@@ -1,5 +1,4 @@
 import { Injectable, OnModuleInit } from '@nestjs/common'
-import { Cron } from '@nestjs/schedule'
 import { createBaseLogger } from '../../logger/pino.config'
 
 import { FeatureFlagsService } from './feature-flags.service'
@@ -17,7 +16,7 @@ import { FeatureFlagsService } from './feature-flags.service'
  * - S0.7/T8/3: requests fall back to the database cache when the remote provider has no answer.
  */
 @Injectable()
-export class FeatureFlagsCron implements OnModuleInit {
+export class FeatureFlagsWarmup implements OnModuleInit {
   private readonly logger = createBaseLogger().child({ feature: 'feature-flags' })
 
   constructor(private readonly featureFlagsService: FeatureFlagsService) {}
@@ -28,7 +27,17 @@ export class FeatureFlagsCron implements OnModuleInit {
     await this.syncFeatureFlags()
   }
 
-  @Cron('*/5 * * * *')
+  /**
+   * The periodic refresh now fires as the `feature-flags-sync` BullMQ Job
+   * Scheduler in the worker runtime (`workers/maintenance.scheduler.ts`), not
+   * as a `@Cron` here: this class lives in a Vercel serverless function with no
+   * process to hold a timer between ticks, so the decorator never fired outside
+   * local development.
+   *
+   * The startup warmup above stays, and stays here. It is not a schedule — it is
+   * what makes the first requests after a cold start read a populated fallback
+   * cache instead of an empty one, so it belongs to the request app.
+   */
   async syncFeatureFlags() {
     try {
       // Flow ref S0.7/T8/4: periodic refresh keeps rollout changes flowing into

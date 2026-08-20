@@ -1,6 +1,12 @@
-import { Inject, Injectable, ServiceUnavailableException } from '@nestjs/common'
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 import {
+  PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE,
   PREMIUM_THEMES_DISABLED_MESSAGE,
   premiumThemeKeySchema,
   type PremiumTheme,
@@ -19,6 +25,17 @@ import { PremiumEntitlementService } from './premium-entitlement.service.js'
  */
 function isEnumConversionError(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2023'
+}
+
+/**
+ * `P2003` is Prisma's foreign-key constraint violation. On this table it has
+ * exactly one cause: the `User` row the preference points at was deleted while
+ * the write was in flight. Narrow on the code for the same reason
+ * {@link isEnumConversionError} is narrow — every other Prisma failure is an
+ * infrastructure fault and has to keep propagating as one.
+ */
+function isForeignKeyViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003'
 }
 
 /**
@@ -122,13 +139,7 @@ export class PremiumThemeService {
     // its own: no future caller can write a theme with the kill switch off.
     await this.assertThemesEnabled(userId)
 
-    const row = await this.prisma.premiumThemePreference.upsert({
-      where: { user_id: userId },
-      // NEVER a delete on reset, not even for `theme: null` (Decision 8).
-      create: { user_id: userId, theme },
-      update: { theme },
-      select: { theme: true },
-    })
+    const row = await this.writePreference(userId, theme)
 
     await this.emitSelection(userId, theme)
 
@@ -138,6 +149,36 @@ export class PremiumThemeService {
       theme: this.normalizeStoredTheme(row?.theme),
       isEntitled: true,
       themesEnabled: true,
+    }
+  }
+
+  /**
+   * The upsert plus the one failure that is a client fact rather than a server
+   * fault. An account erased mid-request leaves the write with no `User` row to
+   * reference, and 500 is the wrong answer to "this account is gone".
+   */
+  private async writePreference(
+    userId: string,
+    theme: PremiumThemeKey | null
+  ): Promise<{ theme: unknown } | null> {
+    try {
+      return await this.prisma.premiumThemePreference.upsert({
+        where: { user_id: userId },
+        // NEVER a delete on reset, not even for `theme: null` (Decision 8).
+        create: { user_id: userId, theme },
+        update: { theme },
+        select: { theme: true },
+      })
+    } catch (error) {
+      if (!isForeignKeyViolation(error)) {
+        throw error
+      }
+
+      this.logger.warn(
+        { error, userId },
+        'Premium theme write raced account erasure; the owning user no longer exists'
+      )
+      throw new NotFoundException(PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE)
     }
   }
 

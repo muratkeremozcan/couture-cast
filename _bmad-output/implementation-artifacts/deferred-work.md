@@ -13,7 +13,7 @@ This ledger tracks items deferred during sprint execution and code reviews.
 ## Deferred from: code review of 2-1-scenario-outfit-generator.md (2026-07-16)
 
 - Database Race Condition on Recommendations: There is no database-level unique constraint or lock on the `OutfitRecommendation` table for `(user_id, forecast_segment_id, scenario)`. Concurrent requests could insert duplicate rows.
-- Tight Coupling and DI Violation on Redis Client: `RitualService` instantiates a new Redis client in the constructor rather than utilizing NestJS Dependency Injection.
+- [x] _Already fixed; entry was stale when checked on 2026-08-20._ Tight Coupling and DI Violation on Redis Client: `RitualService` instantiates a new Redis client in the constructor rather than utilizing NestJS Dependency Injection. The client now arrives through the `RITUAL_REDIS_CLIENT` provider in `personalization.module.ts` and `RitualService` takes it by injection, so the violation described here no longer exists in the code.
 
 ## Deferred from: code review of 2-2-comfort-calibration-settings.md (2026-07-21)
 
@@ -105,7 +105,7 @@ later story does not have to rediscover the reasoning.
 
 ### Added during story 5.1 integration (2026-08-11)
 
-- **`api/index.ts` installs no `ApiExceptionFilter`, so `api_error_occurred`
+- _Resolved 2026-08-20._ **`api/index.ts` installs no `ApiExceptionFilter`, so `api_error_occurred`
   telemetry has never been emitted in preview or production.** `NestFactory.create`
   is called in three places and the deployed one is `apps/api/api/index.ts`, which
   installs none of the filter, CORS, or request-context middleware that
@@ -115,6 +115,18 @@ later story does not have to rediscover the reasoning.
   since story 1.4 has seen local traffic only, on every route. This predates
   story 5.1 and is much wider than it; it is recorded here because story 5.1's
   webhook work is what surfaced it.
+
+  Fixed by extracting the four wirings into `apps/api/src/bootstrap/configure-app.ts`,
+  which both `src/main.ts` and `api/index.ts` now call and neither re-implements.
+  In `api/index.ts` the call sits before `app.init()`, deliberately: Express
+  middleware registered after initialization never joins the stack and fails
+  open, which is the same silent shape as the original defect. The extraction is
+  what makes the fix durable — the previous arrangement let a second entrypoint
+  be written without any of it and nothing looked wrong, because Nest's built-in
+  filter produces the same response envelope. `configure-app.spec.ts` asserts all
+  four wirings and that the filter resolves its dependencies from the container,
+  so a future entrypoint that skips one turns a test red instead of a dashboard
+  empty.
 
 - **Mobile reuses `commerce.settings.error` for a failed preference READ.** The
   string reads "Unable to update shopping preferences.", which is slightly wrong
@@ -152,7 +164,7 @@ later story does not have to rediscover the reasoning.
 These were identified while implementing story 5.2 and deliberately left out of
 its scope. Each records what was narrowed and why.
 
-- **The remaining `@Cron` consumers sit on a substrate that never fires in
+- _Resolved 2026-08-20._ **The remaining `@Cron` consumers sit on a substrate that never fires in
   production.** Story 5.2 verified the deploy-target facts: the API ships as
   one Vercel serverless function (`apps/api/vercel.json`), no Vercel `crons`
   config exists, and `ScheduleModule.forRoot()` lives only in the request app —
@@ -165,6 +177,46 @@ its scope. Each records what was narrowed and why.
   features; unverifiable cross-feature changes do not belong in a billing PR.
   Owner ask: whoever owns flags/admin/guardian operations should re-host these
   onto worker Job Schedulers the same way. Evidence: story 5.2 Decision 4a.
+
+  Done, and the count in the paragraph above was wrong: there were **five**
+  consumers, not three. `wardrobe-retention.service.ts` (hourly garment purge)
+  and `telemetry.service.ts` (hourly telemetry-event prune) also carried
+  `@Cron(CronExpression.EVERY_HOUR)` and are not named anywhere above, so
+  reading this entry alone would have left two dead sweeps behind. All five now
+  run as Job Schedulers on a new `maintenance` queue, registered by
+  `workers/maintenance.scheduler.ts` and dispatched by
+  `workers/maintenance.processor.ts`. `grep -rn "@Cron" apps/api/src` returns
+  comment lines only and `ScheduleModule.forRoot()` is gone from `app.module.ts`.
+
+  Three things worth knowing for anyone touching this next.
+
+  Every cadence is transcribed, not re-chosen, and `maintenance.scheduler.spec.ts`
+  pins each one to the expression its decorator carried, including the UTC
+  timezone on guardian emancipation — a teen turning 16 is evaluated against a
+  UTC calendar day, so a host-local schedule would emancipate on a different date
+  depending on where the worker runs.
+
+  The sweeps are hand-wired in `workers/bootstrap.ts` rather than resolved from a
+  Nest application context, and that is not a style preference. The worker runs
+  under `tsx` (`npm run start:workers`), whose esbuild transform does not emit the
+  `design:paramtypes` metadata Nest's DI reads. A `NestFactory.createApplicationContext`
+  there does not fail — it stalls forever resolving constructor parameters, with
+  no error and no log, while the same code works once `nest build` has run. This
+  was found the expensive way: an earlier revision of this change used a
+  `MaintenanceModule`, and it hung. Anyone reaching for Nest DI inside a
+  tsx-executed entrypoint should expect the same and should not spend the
+  afternoon re-deriving it.
+
+  `AdminCron` and `GuardianCron` swallowed their sweep errors, and their own tests
+  said why: an unhandled rejection inside a `@Cron` handler takes down the
+  process. That reason belonged to the substrate. On BullMQ a thrown error is the
+  correct outcome — it marks the job failed, retries under the queue's
+  `attempts: 3` backoff, and leaves a `JobFailure` row an operator can see — so
+  the processor rethrows after logging. The `*_failed` log event names are
+  unchanged, so any log-based alerting keeps matching. The two sweeps that already
+  swallowed inside their own service bodies (`purgeExpiredAndDeletedGarments`,
+  `pruneOldTelemetryEvents`) were left exactly as they were: this change moved
+  triggers, not service internals.
 
 - **No automated store-purchase E2E.** StoreKit-sandbox / Play-internal-testing
   purchase automation does not exist; the Maestro harness pins Expo Go, where
@@ -528,12 +580,28 @@ each with the reason.
   written for. Kept here as a record rather than deleted, since the original
   deferral was the wrong call and the reversal is the useful part.
 
-- **A `PUT` racing account erasure answers 500.** `PremiumThemeService.setTheme`'s
+- _Resolved 2026-08-20._ **A `PUT` racing account erasure answers 500.** `PremiumThemeService.setTheme`'s
   upsert violates `PremiumThemePreference_user_id_fkey` (P2003) if the `User` row
   is deleted while the request is in flight, and nothing catches it. The window
   is one request wide and the caller is an account that no longer exists, so the
   500 is survivable; the tidy answer is to map P2003 onto the same not-found
   shape the other commerce writes use.
+
+  Done as described. The upsert moved into a `writePreference` helper that
+  catches `P2003` and raises `NotFoundException(PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE)`,
+  matching `affiliate-click.service.ts` and `stripe-billing.service.ts`. The guard
+  is narrow on the code for the same reason `isEnumConversionError` next to it is:
+  every other Prisma failure is an infrastructure fault and must keep propagating.
+  Three unit tests pin the mapping, the message, and that a `P1017` still
+  propagates untouched.
+
+  One thing deliberately not done: the 404 is **not** registered as a documented
+  response on the PUT operation in
+  `packages/api-client/src/contracts/http/premium-theme.ts`. Adding it reshapes
+  published nodes and drags an `optic diff` conversation into a defect fix. The
+  body is Nest's standard not-found envelope, so nothing on the wire is novel —
+  but the published document does not mention the status, and that gap should be
+  closed by whoever takes the OpenAPI work already filed in this ledger.
 
 - **Two `apps/api` integration runs against one PostgreSQL fail each other.**
   Recorded in `_bmad-output/project-knowledge/development-guide.md` with the
@@ -645,3 +713,53 @@ cross-referencing:
   files); noted here only so a future reader searching this ledger for the
   premium-theme test set finds the pointer. Same shape as the two items above:
   a repo-wide convention question, not a defect in any one file.
+
+## Added during the deferred-backlog burn-down, wave 1 (2026-08-20)
+
+Found while fixing the three API-runtime items above. None is caused by that
+work; each was in the way of verifying it.
+
+- **The wardrobe retention purge depended on the whole `RitualService` to clear a
+  cache key.** `WardrobeRetentionService` called `ritualService.invalidateUserCache(userId)`
+  and nothing else, but taking `RitualService` as a constructor dependency drags
+  in weather, saved locations, commerce and a Redis client, which is why the
+  sweep could not run anywhere the full request graph was not already standing.
+  Fixed rather than deferred, because the `@Cron` migration above could not land
+  without it: the SCAN/DEL and the `ritual:<userId>:*` key prefix moved to
+  `modules/personalization/ritual-cache.ts`, `RitualService.invalidateUserCache`
+  delegates to it and keeps its signature, and `WardrobeRetentionService` now
+  injects the narrow `RITUAL_CACHE_INVALIDATOR` token (`useExisting: RitualService`
+  in `personalization.module.ts`). The key prefix having exactly one definition
+  is the point: a second copy that drifted would leave deleted garments visible
+  in cached outfits, silently, with every other test still green.
+
+- **`FeatureFlagsCron` was renamed to `FeatureFlagsWarmup`.** Once the periodic
+  refresh moved to the worker, the only thing left in that class was
+  `onModuleInit`, which is a cold-start cache warm and not a schedule. It stays
+  registered in `FeatureFlagsModule` and stays in the request app, because a
+  populated fallback cache before the first request is exactly what it is for.
+  The name is the whole change; five `apps/api/integration/*.spec.ts` files that
+  override the provider were updated with it.
+
+- **`npm run start:workers` cannot start from this repository's env files alone.**
+  Three separate values block it, and each has to be discovered by running into
+  it: `ANALYTICS_ID_SECRET` is required at ≥32 characters and appears in
+  `.env.example` only, so a worker outside a `NODE_ENV=test` / `TEST_ENV=local`
+  shell cannot construct `TelemetryService` at all; `WEATHER_REFRESH_MINUTES` is
+  validated `min(1).max(5)` while the value carried locally was `30`; and
+  `WEATHER_INGESTION_TARGETS_JSON` needs a `locationName` per target that the
+  local value omits. The API's own E2E orchestrator never hits these because it
+  supplies its own environment. The fix is a documented worker env contract, or
+  defaults that make a local worker start without a scavenger hunt. Filed rather
+  than fixed because the values live in developer-local files this change should
+  not be reaching into.
+
+- **Nest DI does not work under `tsx`, anywhere in this repository.** Recorded
+  separately from the `@Cron` entry because it is not specific to it: esbuild
+  emits no `design:paramtypes`, so `NestFactory.createApplicationContext` in any
+  tsx-executed entrypoint hangs indefinitely rather than erroring. Verified
+  against unmodified `main` code, on `AppModule` itself, so this is a property of
+  the toolchain and not of any one module. It costs nothing today because both
+  worker entrypoints hand-wire, but it is a trap with no error message, and the
+  cheap guard would be a comment at the top of each tsx-executed entrypoint
+  saying so.
