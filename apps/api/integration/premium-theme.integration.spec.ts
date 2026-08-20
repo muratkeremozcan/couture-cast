@@ -78,12 +78,13 @@ async function probeSchema(): Promise<void> {
     await prisma.$queryRaw`SELECT 1 FROM "PremiumThemePreference" LIMIT 1`
     await prisma.$queryRaw`SELECT 1 FROM "PremiumEntitlement" LIMIT 1`
     schemaReady = true
-  } catch {
+  } catch (error) {
     schemaReady = false
     // eslint-disable-next-line no-console
     console.warn(
-      '[premium-theme.integration] Skipped: PostgreSQL is missing the Story 5.3 theme schema. ' +
-        'Run `npm run db:migrate` to execute this suite.'
+      '[premium-theme.integration] Skipped: could not query the Story 5.3 theme schema. ' +
+        'If the schema is missing, run `npm run db:migrate`. Underlying error:',
+      error
     )
   }
 }

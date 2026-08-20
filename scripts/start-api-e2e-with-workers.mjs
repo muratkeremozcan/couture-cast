@@ -43,14 +43,26 @@ const rootEnvFiles = [
 ]
 const shouldForceLocalEnv = (env.TEST_ENV ?? '').toLowerCase() === 'local'
 
-// `POSTHOG_API_KEY: ''` above is a deliberate disable, mirroring the same
-// guard `load-env.ts` needs: `.env.local` commonly carries a real key for
-// local manual dev, and the override below would otherwise silently win back
-// over this run's explicit choice to keep feature-flag reads on the
-// deterministic seeded/cached fallback rather than live PostHog.
+// Two things a caller may already have decided must survive the `.env.local`
+// override below, both for the same reason: a file default is not allowed to
+// second-guess a deliberate, already-made choice.
+//
+// `POSTHOG_API_KEY: ''` is a deliberate disable, mirroring the same guard
+// `load-env.ts` needs: `.env.local` commonly carries a real key for local
+// manual dev, and the override would otherwise silently win back over this
+// run's explicit choice to keep feature-flag reads on the deterministic
+// seeded/cached fallback rather than live PostHog.
+//
+// A non-empty `DATABASE_URL` a caller already set is the same class of
+// problem for the opposite reason: `applyLocalE2eDatabaseUrl` below documents
+// "an explicit DATABASE_URL always wins", and before this env-loading block
+// existed that was true by construction (nothing here touched it). The
+// override would otherwise silently break that contract whenever `.env.local`
+// also defines one, which it normally does.
 const explicitlyDisabled = Object.fromEntries(
   Object.entries(env).filter(([, value]) => value === '')
 )
+const callerDatabaseUrl = env.DATABASE_URL
 
 for (const file of rootEnvFiles) {
   const fullPath = path.join(repoRoot, file)
@@ -65,6 +77,9 @@ for (const file of rootEnvFiles) {
 }
 
 Object.assign(env, explicitlyDisabled)
+if (callerDatabaseUrl) {
+  env.DATABASE_URL = callerDatabaseUrl
+}
 
 // A fresh clone or a new git worktree has no repo-level env file yet, so the
 // loop above fills nothing in. Only then does the local default apply, same

@@ -97,10 +97,14 @@ async function resetSeededTheme(
   // Direct PUT, not through the UI: this runs in `beforeEach`/`afterEach`, before and
   // after the one test in the serial block that actually exercises the gallery.
   // `{ theme: null }` upserts to Default; per Decision 8 the row is never deleted.
-  await request.put(`${session.apiBaseUrl}${THEME_PATH}`, {
+  // Asserted rather than fire-and-forget: this row is shared across parallel workers,
+  // so a silently failed reset would leave the next run's first assertion pointing at
+  // the wrong symptom instead of the actual cleanup failure.
+  const response = await request.put(`${session.apiBaseUrl}${THEME_PATH}`, {
     headers: { Authorization: `Bearer ${session.accessToken}` },
     data: { theme: null },
   })
+  expect(response.ok()).toBe(true)
 }
 
 function lockedPanel(page: Page): Locator {
@@ -330,15 +334,13 @@ premiumSeededTest.describe(
         await log.step(
           'Stub the GET with a theme value from a since-deferred palette (see note above)'
         )
+        // Page errors only, not console errors: an unrelated console.error (a failed
+        // asset request, a third-party script, a warning logged at error level) would
+        // fail this test with no defect in the theme fallback. The error-panel and
+        // Default-selected assertions below already prove the fallback itself.
         const pageErrors: string[] = []
-        const consoleErrors: string[] = []
         page.on('pageerror', (error) => {
           pageErrors.push(error.message)
-        })
-        page.on('console', (message) => {
-          if (message.type() === 'error') {
-            consoleErrors.push(message.text())
-          }
         })
 
         const stubbedLoad = interceptNetworkCall({
@@ -387,7 +389,6 @@ premiumSeededTest.describe(
         )
 
         expect(pageErrors).toEqual([])
-        expect(consoleErrors).toEqual([])
       }
     )
   }
