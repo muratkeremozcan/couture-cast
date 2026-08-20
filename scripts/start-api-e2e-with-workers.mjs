@@ -1,6 +1,8 @@
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
+import { config as loadEnv } from 'dotenv'
 import { applyLocalE2eDatabaseUrl } from './local-e2e-database.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -20,12 +22,55 @@ const env = {
   PUBLIC_API_URL: process.env.PUBLIC_API_URL || apiBaseUrl,
 }
 
-// Applied after NODE_ENV and TEST_ENV are pinned above, so the local default is
-// evaluated against what this stack actually is rather than against whatever
-// the parent shell happened to be. An explicit DATABASE_URL, as CI supplies,
-// always wins, and `repoRootToScan` makes this stand down entirely when a
-// repo-level env file exists, because the children load those themselves and a
-// value injected here would shadow the file rather than defer to it.
+// Load the same root env files apps/api's own `load-env.ts` loads, into this
+// script's `env` rather than `process.env`: every child this orchestrator
+// spawns (`db:seed`, the API process, the worker process) gets the identical,
+// explicit `DATABASE_URL` this way, instead of each relying on its own
+// resolution. That assumption held for the API and worker processes (they
+// both import `load-env.ts` at bootstrap) but not for `npm run db:seed`:
+// `prisma db seed` has no such loader, so with no `DATABASE_URL` here it fell
+// through to Prisma's own default `.env` auto-load, which resolves relative to
+// its CWD to `packages/db/.env` -- a second, unrelated local Postgres some
+// contributors keep for standalone `prisma studio`/`migrate dev` work, not the
+// Supabase-style 127.0.0.1:54322 instance this whole stack runs against. The
+// seed step ran, reported success, and silently left the real target database
+// on stale fixture data (feature flags included) with nothing in this script's
+// own output to suggest why.
+const rootEnvFiles = [
+  '.env.local',
+  process.env.NODE_ENV === 'production' ? '.env.prod' : '.env.preview',
+  '.env',
+]
+const shouldForceLocalEnv = (env.TEST_ENV ?? '').toLowerCase() === 'local'
+
+// `POSTHOG_API_KEY: ''` above is a deliberate disable, mirroring the same
+// guard `load-env.ts` needs: `.env.local` commonly carries a real key for
+// local manual dev, and the override below would otherwise silently win back
+// over this run's explicit choice to keep feature-flag reads on the
+// deterministic seeded/cached fallback rather than live PostHog.
+const explicitlyDisabled = Object.fromEntries(
+  Object.entries(env).filter(([, value]) => value === '')
+)
+
+for (const file of rootEnvFiles) {
+  const fullPath = path.join(repoRoot, file)
+  if (!existsSync(fullPath)) continue
+
+  loadEnv({
+    path: fullPath,
+    override: shouldForceLocalEnv && file === '.env.local',
+    processEnv: env,
+    quiet: true,
+  })
+}
+
+Object.assign(env, explicitlyDisabled)
+
+// A fresh clone or a new git worktree has no repo-level env file yet, so the
+// loop above fills nothing in. Only then does the local default apply, same
+// gap-filler role `prisma-migrate-deploy.mjs` gives it. An explicit
+// `DATABASE_URL`, as CI supplies, still always wins: `applyLocalE2eDatabaseUrl`
+// declines whenever one is already set.
 if (applyLocalE2eDatabaseUrl(env, { repoRootToScan: repoRoot })) {
   console.log(
     `[start-api-e2e-with-workers] No DATABASE_URL set; using the local end-to-end default ${env.DATABASE_URL}`

@@ -1,6 +1,7 @@
 import type { VerifierOptions } from '@pact-foundation/pact'
 import type {
   EntitlementStore,
+  PremiumThemeKey,
   SilhouettePhotoFailureReason,
 } from '@couture/api-client/contracts/http'
 import {
@@ -11,6 +12,7 @@ import {
   configureProviderOnboardingState,
   configureProviderSilhouetteState,
   configureProviderSubscriptionState,
+  configureProviderPremiumThemeState,
   parsePactEvent,
   type PactEvent,
 } from './provider-helper'
@@ -53,6 +55,16 @@ type SubscriptionStateParams = {
    * 'stripe' in the configurator.
    */
   store?: EntitlementStore
+}
+
+type PremiumThemeStateParams = {
+  userId?: string
+  /**
+   * Factory override for 'The user has premium theme access': the stored
+   * palette to resolve. Omitted models the no-row/Default case; the entitled
+   * read-with-a-stored-palette interaction passes a named key explicitly.
+   */
+  theme?: PremiumThemeKey
 }
 
 export const stateHandlers: StateHandlers = {
@@ -376,5 +388,38 @@ export const stateHandlers: StateHandlers = {
       store: 'stripe',
     })
     return Promise.resolve({ description: 'Configured a Stripe billing profile' })
+  },
+
+  /* ----------------------------------------------------------------------- *
+   * Story 5.3 premium theme switcher.
+   *
+   * Each state names an arrangement the contract records an outcome for, not
+   * the rule that produces it -- same stance as the 5.2 subscription states
+   * above. This is also the first Pact provider wiring of
+   * `PremiumEntitlementGuard` (5.2's `SubscriptionController` never mounted
+   * it): 'The user does not have premium theme access' configures
+   * `PremiumEntitlementService.hasPremiumAccess` to resolve false, and the
+   * real, un-mocked guard is what turns that into the 403 the PUT error
+   * interaction records. `PremiumThemeService` itself stays a scenario-driven
+   * double for both operations, exactly like `mockSubscriptionService` above.
+   * ----------------------------------------------------------------------- */
+  'The user has premium theme access': (parameters?: unknown) => {
+    const { userId, theme } = (parameters ?? {}) as PremiumThemeStateParams
+    configureProviderPremiumThemeState({ userId, scenario: 'entitled', theme })
+    return Promise.resolve({
+      description: `Configured premium theme access with stored theme ${theme ?? 'null (Default)'}`,
+    })
+  },
+  'The user does not have premium theme access': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as PremiumThemeStateParams
+    configureProviderPremiumThemeState({ userId, scenario: 'not-entitled' })
+    return Promise.resolve({ description: 'Configured a non-entitled user' })
+  },
+  'Premium themes are disabled': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as PremiumThemeStateParams
+    configureProviderPremiumThemeState({ userId, scenario: 'themes-disabled' })
+    return Promise.resolve({
+      description: 'Configured the premium themes kill switch as off',
+    })
   },
 }

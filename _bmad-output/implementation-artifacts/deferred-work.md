@@ -350,21 +350,37 @@ forgotten.
   mount slot inside `AccessibilityAnnouncerProvider` and outside the navigation
   `ThemeProvider`.
 
-- **Pact interactions and the Playwright spec (Task 7).** Held back
-  deliberately for separate authoring. No consumer interactions were added to
-  `pact/http/consumer/api-contract-interactions.ts`, no provider states
-  (`'The user has premium theme access'`,
-  `'The user does not have premium theme access'`,
-  `'Premium themes are disabled'`), and no
-  `playwright/tests/premium-theme-switcher.spec.ts`. What exists instead is
-  unit-tier proof: the contract module's own suite
-  (`packages/api-client/testing/premium-theme-contract.spec.ts`) and the
-  supertest specs colocated beside the controller and service in
-  `apps/api/src/modules/commerce/`. What is therefore unproven is
-  consumer-driven compatibility between each client and the provider, and
-  browser-level behavior of the locked state (with axe), the gallery, select
-  then reload persistence, and the Default fallback for a stale or unknown
-  stored key seeded directly.
+- _Resolved 2026-08-19._ **Pact interactions and the Playwright spec (Task
+  7).** Both authored, run for real, and green. `pact/http/consumer/api-contract-interactions.ts`
+  gained a "Story 5.3 premium theme switcher" section (7 interaction
+  functions covering GET entitled/Default/not-entitled, PUT update/reset, and
+  a table-driven 403/503 error pair), wired into both
+  `web-api-client.pacttest.ts` and `mobile-api-client.pacttest.ts` — unlike
+  5.2's asymmetric split, both consumers call both operations here. The three
+  provider states named above are registered in `state-handlers.ts` verbatim,
+  and `provider-helper.ts` gained scenario-driven `mockPremiumThemeService`/
+  `mockPremiumEntitlementService` doubles plus `PremiumThemeController`
+  registered in the verifier's Nest fixture — the first Pact provider wiring
+  of `PremiumEntitlementGuard`, left un-overridden so its real 403-before-503
+  precedence runs for real rather than being asserted only in the API unit
+  tier. `npm run test:pact:consumer` reports both pact files stable across 3
+  determinism runs (67 and 76 interactions); `npm run test:pact:provider`
+  verifies all 14 new interactions `OK`, including the inherited
+  `Cache-Control: private, no-store` header on the error responses too.
+  `playwright/tests/premium-theme-switcher.spec.ts` (4 tests, IDs
+  `5.3-E2E-010` through `5.3-E2E-013`) proves the locked state signed out
+  (+axe) and signed-in-non-entitled, the gallery (exactly 3 named palettes +
+  Default, Spring Bloom absent), select-then-reload persistence via the real
+  `<html data-theme>` attribute, and the Default fallback for an unrecognized
+  stored theme — the last one via a stubbed GET rather than a seeded DB row,
+  because `PremiumThemeKey` is a real Postgres enum with no code path that can
+  insert an out-of-enum value, which makes true DB-level staleness physically
+  unreachable; stubbing is what actually exercises `resolvePremiumThemeKey`'s
+  client-side fallback, the real AC 6 code path at this tier. All four tests
+  passed twice over (`--repeat-each=2`), including the serialized
+  seeded-active-user write journey, with no flakiness. Consumer-driven
+  compatibility between each client and the provider, and browser-level
+  locked/gallery/persistence/fallback behavior, are no longer unproven.
 
 - **The Maestro locked-state flow.** Held back deliberately for separate
   authoring, and blocked behind the mobile surface above in any case: there is
@@ -384,22 +400,31 @@ forgotten.
   seeding into a shared script every flow runs. Ordering for whoever picks these
   up: mobile surface first, then the flow.
 
-- **The `playwright/support/helpers/accessibility.ts` adapter rewrite
-  (Decision 3).** Held back deliberately with the rest of the Playwright tier;
-  the file is byte-identical to its state before this story. The planned change
-  is to keep its exported `contrastRatio(left, right)` signature over CSS
-  `rgb()` strings, parse to hex with the `parseRgb` it already has, and delegate
-  to `@couture/utils`, leaving its caller
-  (`playwright/tests/commerce-affiliate-preferences.spec.ts:239`) untouched;
-  plus one test proving both entry points return the same number for the same
-  color, for which `5.3-UTIL-007` is reserved in
-  `packages/utils/src/contrast.spec.ts`. State the consequence plainly: the
-  repository now holds three copies of the WCAG luminance maths rather than the
-  two Decision 3 intended, and this entry together with the
-  `accessibility-hardening.spec.ts` entry above are what close it back to one.
-  The delegation needs no build wiring; `@couture/utils` is symlinked into root
-  `node_modules` and `prepare:playwright` already builds it ahead of
-  `@couture/api-client`.
+- _Resolved 2026-08-19._ **The `playwright/support/helpers/accessibility.ts`
+  adapter rewrite (Decision 3).** `contrastRatio(left, right)` keeps its exported
+  signature over CSS `rgb()` strings; `parseRgb` still does the parsing, a new
+  `toHex` re-encodes the three channels, and the function delegates to
+  `@couture/utils`'s `contrastRatio`, which now holds the only luminance/gamma
+  maths this helper runs. Its caller
+  (`playwright/tests/commerce-affiliate-preferences.spec.ts:239`) is unchanged
+  and its `[P1] 5.1-E2E-WEB-04` test (the one asserting
+  `contrastRatio(ring.outlineColor, DARK_SURFACE_RGB)`) was run for real against
+  the local stack and still passes. The both-entry-points-agree test could not
+  live at the reserved `5.3-UTIL-007` id in `packages/utils/src/contrast.spec.ts`
+  after all: `packages/utils` is an isolated npm workspace package whose
+  `tsconfig.typecheck.json` pins `rootDir` to the package directory, so a
+  relative import reaching out to the Playwright tier would violate that rootDir
+  and pull `@playwright/test` types into a package with no reason to depend on
+  Playwright. It lives instead in the new
+  `playwright/support/helpers/accessibility.spec.ts`, run directly via
+  `npx vitest run` since `playwright/` is not an npm workspace and has no
+  Playwright-runner-discoverable test tier of its own for pure-logic specs
+  (`playwright/config/base.config.ts`'s `testDir` only scans `playwright/tests`).
+  `contrast.spec.ts`'s own comment reserving the id now points here. The
+  repository is back down to two copies of the WCAG luminance maths: the
+  canonical one in `@couture/utils`, and the inline duplicate in
+  `accessibility-hardening.spec.ts`, which stays deliberately untouched for the
+  reason given above.
 
 ### Added during the story 5.3 code review (2026-08-18)
 
@@ -435,17 +460,25 @@ each with the reason.
   `nullablePremiumThemeKeySchema` publishes a finished `enum` array of its own —
   so new contracts have a pattern to copy in the meantime.
 
-- **`5.3-INT-001` and `5.3-INT-002` have no test.** The story's coverage matrix
-  names `5.3-INT-001` (persist, reload, same theme, over HTTP) as P0 evidence for
-  AC 3 and `5.3-INT-002` (a web-selected palette visible on a mobile GET) as P1.
-  Both are integration tier, which is outside the unit-only scope this story was
-  narrowed to, so neither exists. What does exist is the service and controller
-  proof at unit tier over an in-memory store, which cannot show a row surviving a
-  reconnect or the real unique index. The follow-up is
-  `apps/api/integration/premium-theme.integration.spec.ts`: PUT a palette, drop
-  the app, re-GET against real PostgreSQL, assert exactly one row with
-  `updated_at` moved. Recorded rather than left implicit because the other four
-  scope cuts below are all named and this one was not.
+- _Resolved 2026-08-19._ **`5.3-INT-001` and `5.3-INT-002` have no test.**
+  Both now exist in `apps/api/integration/premium-theme.integration.spec.ts`
+  (5 tests total), run for real against the local PostgreSQL stack rather than
+  the in-memory doubles the unit tier uses. `5.3-INT-001` PUTs a palette
+  through one Nest app/Prisma connection and re-GETs it through a second,
+  independently-compiled app with its own `PrismaClient`, proving persistence
+  survives a real reconnect. `5.3-INT-002` proves a palette written by one
+  request context is read correctly by a different, independent one for the
+  same user — documented in the test itself as a server-side-consistency
+  proof, not mobile-client wiring, since Task 6 was cancelled and no mobile
+  client exists to actually prove the cross-device half. The suite also pins
+  the reset-never-deletes rule from Decision 8 at the repository level
+  (`PUT { theme: null }` leaves exactly one row with `theme = null`) and
+  confirms `updated_at` moves on every PUT, including one that resubmits the
+  already-stored value — there is no server-side unchanged-value
+  short-circuit; that guard is client-only (`5.3-WEB-115`). Ran in isolation
+  (5/5 passed) and as part of the full `apps/api` integration suite (201
+  passed, 2 pre-existing unrelated skips, no collisions with the sibling
+  `commerce-affiliate-*`/`premium-*` suites sharing the database).
 
 - **The web section's `load_failed` state has no retry control.** A transient
   failure on the initial GET leaves an entitled subscriber unable to reach their
@@ -515,3 +548,48 @@ each with the reason.
   it the only exception in the matrix. Never-deleting is a service-layer
   invariant, and the API is the only writer any client has. Recorded so the
   tension is on the record rather than rediscovered.
+
+### Two local Playwright harness defects, found while proving the story 5.3 tests green locally (2026-08-19), both fixed rather than left as caveats
+
+Neither is caused by story 5.3, neither reaches CI (a fresh CI checkout has no
+`.env.local`, so both dormant code paths never fire there), and both were
+silently making local `npm run test:pw-local` runs of
+`premium-theme-switcher.spec.ts` diverge from what CI would actually see.
+Recorded here because they were found in the course of this story's own local
+verification and fixed on the spot rather than filed as "local env issue,
+someone else's problem."
+
+- **`db:seed`, run bare inside `scripts/start-api-e2e-with-workers.mjs`, silently
+  seeded the wrong local Postgres.** With no `DATABASE_URL` in the child's env,
+  Prisma's own `.env` auto-load resolved it to `packages/db/.env` (a second,
+  unrelated `localhost:5432` database some contributors keep for standalone
+  `prisma studio`/`migrate dev` work), not the `127.0.0.1:54322` Supabase-style
+  instance the rest of the stack (and `scripts/prisma-migrate-deploy.mjs`,
+  which explicitly forces `.env.local`) actually runs against. The seed step
+  reported success and left the real target database on stale fixture data,
+  `premium_themes_enabled` included. Fixed by loading the same root env files
+  `load-env.ts` loads directly into the orchestrator's own `env` object before
+  any child spawns, so `db:seed`, the API process, and the worker process all
+  get one explicit, agreed-upon `DATABASE_URL` instead of three independent
+  resolutions.
+
+- **`load-env.ts`'s `.env.local` override silently re-enabled live PostHog for
+  local E2E runs.** `playwright/config/local.config.ts`'s `webServer.env` sets
+  `POSTHOG_API_KEY: ''` on purpose, to keep feature-flag reads on the
+  deterministic seeded/cached fallback (Decision 9's whole reason
+  `premium_themes_enabled` is seeded `true` rather than flipped on by default).
+  But `load-env.ts` forces every key `.env.local` defines to win, for any
+  `TEST_ENV=local` run, and `.env.local` carries a real `POSTHOG_API_KEY` for
+  ordinary local dev — so it silently overrode the disable, `PostHogService`
+  came back up with a live client, and `premium_themes_enabled` resolved
+  against whatever PostHog's dashboard actually says today (`false`, at the
+  time this was found) instead of the seed, `??`-outranking the correct cached
+  value because a live `false` is not the `undefined` the fallback logic is
+  written to defer to. This is exactly the failure this story's own
+  `5.3-E2E-010` and `5.3-E2E-012` caught locally: `themesEnabled: false` where
+  the seeded fixture said `true`. Fixed by having `load-env.ts` (and the same
+  guard, mirrored, in the orchestrator's own env-loading) snapshot any var a
+  caller already set to the empty string before the `.env.local` override runs,
+  and restore it afterward — an explicit empty string is a deliberate "off,"
+  not an "unset" the file is free to fill in. Covered by a new case in
+  `apps/api/src/load-env.spec.ts`.

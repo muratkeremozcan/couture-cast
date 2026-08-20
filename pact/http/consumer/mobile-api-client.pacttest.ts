@@ -73,6 +73,13 @@ import {
   affiliateWebhookErrorInteractions,
   verifyEntitledSubscriptionStatusInteraction,
   verifySubscriptionRefreshInteraction,
+  verifyEntitledThemeReadInteraction,
+  verifyEntitledThemeReadDefaultInteraction,
+  verifyNotEntitledThemeReadInteraction,
+  verifyThemeUpdateInteraction,
+  verifyThemeResetInteraction,
+  verifyPremiumThemeErrorInteraction,
+  premiumThemeErrorInteractions,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -319,4 +326,33 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
   it('refreshes the premium subscription from the entitlement ledger', async () => {
     await verifySubscriptionRefreshInteraction(pact, createMobileClientForMockServer)
   })
+
+  // Story 5.3: unlike 5.2's asymmetric subscription split, mobile reads and
+  // writes the premium theme from the same settings gallery.
+  it('reads the resolved premium theme of an entitled user with a stored palette', async () => {
+    await verifyEntitledThemeReadInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('reads the resolved premium theme of an entitled user with no stored palette', async () => {
+    await verifyEntitledThemeReadDefaultInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('reads the resolved premium theme of a non-entitled user', async () => {
+    await verifyNotEntitledThemeReadInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('selects a premium theme palette', async () => {
+    await verifyThemeUpdateInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('resets the premium theme to Default', async () => {
+    await verifyThemeResetInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it.each(premiumThemeErrorInteractions)(
+    'preserves the documented premium theme error envelope that $description',
+    async (interaction) => {
+      await verifyPremiumThemeErrorInteraction(pact, interaction)
+    }
+  )
 })

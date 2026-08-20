@@ -75,6 +75,13 @@ import {
   verifyPortalSessionInteraction,
   verifySubscriptionErrorInteraction,
   subscriptionErrorInteractions,
+  verifyEntitledThemeReadInteraction,
+  verifyEntitledThemeReadDefaultInteraction,
+  verifyNotEntitledThemeReadInteraction,
+  verifyThemeUpdateInteraction,
+  verifyThemeResetInteraction,
+  verifyPremiumThemeErrorInteraction,
+  premiumThemeErrorInteractions,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -331,6 +338,35 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
     'preserves the documented subscription error envelope that $description',
     async (interaction) => {
       await verifySubscriptionErrorInteraction(pact, interaction)
+    }
+  )
+
+  // Story 5.3: unlike 5.2's asymmetric subscription split, web reads and
+  // writes the premium theme from the same settings gallery.
+  it('reads the resolved premium theme of an entitled user with a stored palette', async () => {
+    await verifyEntitledThemeReadInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('reads the resolved premium theme of an entitled user with no stored palette', async () => {
+    await verifyEntitledThemeReadDefaultInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('reads the resolved premium theme of a non-entitled user', async () => {
+    await verifyNotEntitledThemeReadInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('selects a premium theme palette', async () => {
+    await verifyThemeUpdateInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('resets the premium theme to Default', async () => {
+    await verifyThemeResetInteraction(pact, createWebClientForMockServer)
+  })
+
+  it.each(premiumThemeErrorInteractions)(
+    'preserves the documented premium theme error envelope that $description',
+    async (interaction) => {
+      await verifyPremiumThemeErrorInteraction(pact, interaction)
     }
   )
 })
