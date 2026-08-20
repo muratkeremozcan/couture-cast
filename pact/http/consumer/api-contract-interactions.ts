@@ -1,7 +1,12 @@
 // Step 22 step 5 owner: check Accept-Language header propagation in Pact consumer tests in pact/http/consumer/api-contract-interactions.ts
 import { MatchersV3, type PactV4, type V3MockServer } from '@pact-foundation/pact'
 import { createProviderState, setJsonContent } from '@seontechnologies/pactjs-utils'
-import type { DefaultApi } from '@couture/api-client'
+import type {
+  CommitSilhouettePhotoInput,
+  CreateOutfitCapsuleInput,
+  CreateSilhouetteUploadUrlInput,
+  DefaultApi,
+} from '@couture/api-client'
 import {
   apiHealthResponseSchema,
   eventsPollInvalidSinceResponseSchema,
@@ -721,6 +726,9 @@ export async function verifySmartTagErrorInteraction(
       })
     )
     .executeTest(async (mockServer: V3MockServer) => {
+      // The generated SDK throws on these statuses, so the request goes out
+      // directly: the point is to pin the status and error envelope the
+      // clients branch on, not the SDK's error-handling.
       const response = await fetch(`${mockServer.url}${interaction.path}`, {
         method: interaction.method,
         headers: {
@@ -1018,6 +1026,14 @@ const capsuleBody = (revision: number) => ({
   updatedAt: isoTimestamp('2026-08-07T10:00:00.000Z'),
 })
 
+/** Shared by the create interaction and its idempotent-replay counterpart below. */
+const capsuleCreateRequestBody: CreateOutfitCapsuleInput = {
+  name: 'Work capsule',
+  occasions: ['work'],
+  garmentIds: [CAPSULE_GARMENT_A, CAPSULE_GARMENT_B],
+  isFavorite: false,
+}
+
 export async function verifyCreateCapsuleInteraction(
   pact: PactV4,
   createClient: CreateClient
@@ -1036,12 +1052,7 @@ export async function verifyCreateCapsuleInteraction(
       `/api/v1/wardrobe/${CAPSULE_OWNER_ID}/capsules`,
       setJsonContent({
         headers: { ...pactEventHeaders, 'Idempotency-Key': CAPSULE_IDEMPOTENCY_KEY },
-        body: {
-          name: 'Work capsule',
-          occasions: ['work'],
-          garmentIds: [CAPSULE_GARMENT_A, CAPSULE_GARMENT_B],
-          isFavorite: false,
-        },
+        body: capsuleCreateRequestBody,
       })
     )
     .willRespondWith(
@@ -1060,12 +1071,7 @@ export async function verifyCreateCapsuleInteraction(
       ).apiV1WardrobeOwnerUserIdCapsulesPost({
         ownerUserId: CAPSULE_OWNER_ID,
         idempotencyKey: CAPSULE_IDEMPOTENCY_KEY,
-        createOutfitCapsuleInput: {
-          name: 'Work capsule',
-          occasions: ['work'],
-          garmentIds: [CAPSULE_GARMENT_A, CAPSULE_GARMENT_B],
-          isFavorite: false,
-        },
+        createOutfitCapsuleInput: capsuleCreateRequestBody,
       })
 
       expect(outfitCapsuleResponseSchema.parse(response)).toBeDefined()
@@ -1091,12 +1097,7 @@ export async function verifyCapsuleIdempotentReplayInteraction(
       `/api/v1/wardrobe/${CAPSULE_OWNER_ID}/capsules`,
       setJsonContent({
         headers: { ...pactEventHeaders, 'Idempotency-Key': CAPSULE_IDEMPOTENCY_KEY },
-        body: {
-          name: 'Work capsule',
-          occasions: ['work'],
-          garmentIds: [CAPSULE_GARMENT_A, CAPSULE_GARMENT_B],
-          isFavorite: false,
-        },
+        body: capsuleCreateRequestBody,
       })
     )
     .willRespondWith(
@@ -1112,12 +1113,7 @@ export async function verifyCapsuleIdempotentReplayInteraction(
       ).apiV1WardrobeOwnerUserIdCapsulesPost({
         ownerUserId: CAPSULE_OWNER_ID,
         idempotencyKey: CAPSULE_IDEMPOTENCY_KEY,
-        createOutfitCapsuleInput: {
-          name: 'Work capsule',
-          occasions: ['work'],
-          garmentIds: [CAPSULE_GARMENT_A, CAPSULE_GARMENT_B],
-          isFavorite: false,
-        },
+        createOutfitCapsuleInput: capsuleCreateRequestBody,
       })
 
       expect(outfitCapsuleResponseSchema.parse(response)).toBeDefined()
@@ -1881,6 +1877,9 @@ export async function verifyWardrobeErrorInteraction(
       })
     )
     .executeTest(async (mockServer: V3MockServer) => {
+      // The generated SDK throws on these statuses, so the request goes out
+      // directly: the point is to pin the status and error envelope the
+      // clients branch on, not the SDK's error-handling.
       const response = await fetch(`${mockServer.url}${interaction.path}`, {
         method: interaction.method,
         headers: interaction.body
@@ -2142,6 +2141,15 @@ export async function verifySilhouetteStalePreconditionInteraction(pact: PactV4)
 
 // --- "My Form" photo pipeline -----------------------------------------------
 
+/** Shared by the upload-url interaction and its idempotent-replay counterpart below. */
+const myFormUploadUrlRequestBody: CreateSilhouetteUploadUrlInput = {
+  fileSizeBytes: 2048576,
+  mimeType: 'image/png',
+  sha256: SILHOUETTE_SHA256,
+  widthPx: 1024,
+  heightPx: 1536,
+}
+
 export async function verifyMyFormUploadUrlInteraction(
   pact: PactV4,
   createClient: CreateClient
@@ -2163,13 +2171,7 @@ export async function verifyMyFormUploadUrlInteraction(
           ...pactEventHeaders,
           'Idempotency-Key': SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
         },
-        body: {
-          fileSizeBytes: 2048576,
-          mimeType: 'image/png',
-          sha256: SILHOUETTE_SHA256,
-          widthPx: 1024,
-          heightPx: 1536,
-        },
+        body: myFormUploadUrlRequestBody,
       })
     )
     .willRespondWith(
@@ -2193,13 +2195,7 @@ export async function verifyMyFormUploadUrlInteraction(
         mockServer
       ).apiV1WardrobeSilhouetteMyFormUploadUrlPost({
         idempotencyKey: SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
-        createSilhouetteUploadUrlInput: {
-          fileSizeBytes: 2048576,
-          mimeType: 'image/png',
-          sha256: SILHOUETTE_SHA256,
-          widthPx: 1024,
-          heightPx: 1536,
-        },
+        createSilhouetteUploadUrlInput: myFormUploadUrlRequestBody,
       })
 
       expect(
@@ -2239,13 +2235,7 @@ export async function verifyMyFormUploadUrlReplayInteraction(
           ...pactEventHeaders,
           'Idempotency-Key': SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
         },
-        body: {
-          fileSizeBytes: 2048576,
-          mimeType: 'image/png',
-          sha256: SILHOUETTE_SHA256,
-          widthPx: 1024,
-          heightPx: 1536,
-        },
+        body: myFormUploadUrlRequestBody,
       })
     )
     .willRespondWith(
@@ -2269,19 +2259,19 @@ export async function verifyMyFormUploadUrlReplayInteraction(
         mockServer
       ).apiV1WardrobeSilhouetteMyFormUploadUrlPost({
         idempotencyKey: SILHOUETTE_UPLOAD_IDEMPOTENCY_KEY,
-        createSilhouetteUploadUrlInput: {
-          fileSizeBytes: 2048576,
-          mimeType: 'image/png',
-          sha256: SILHOUETTE_SHA256,
-          widthPx: 1024,
-          heightPx: 1536,
-        },
+        createSilhouetteUploadUrlInput: myFormUploadUrlRequestBody,
       })
 
       expect(
         createSilhouetteUploadUrlResponseSchema.parse(response).data.uploadSessionId
       ).toBe(SILHOUETTE_UPLOAD_SESSION_ID)
     })
+}
+
+/** Shared by the commit interaction and its idempotent-replay counterpart below. */
+const myFormCommitRequestBody: CommitSilhouettePhotoInput = {
+  uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
+  confirmsBasewearGuidance: true,
 }
 
 export async function verifyMyFormCommitInteraction(
@@ -2308,10 +2298,7 @@ export async function verifyMyFormCommitInteraction(
           ...pactEventHeaders,
           'Idempotency-Key': SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
         },
-        body: {
-          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
-          confirmsBasewearGuidance: true,
-        },
+        body: myFormCommitRequestBody,
       })
     )
     .willRespondWith(
@@ -2346,10 +2333,7 @@ export async function verifyMyFormCommitInteraction(
         mockServer
       ).apiV1WardrobeSilhouetteMyFormCommitPost({
         idempotencyKey: SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
-        commitSilhouettePhotoInput: {
-          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
-          confirmsBasewearGuidance: true,
-        },
+        commitSilhouettePhotoInput: myFormCommitRequestBody,
       })
 
       const parsed = silhouetteProfileResponseSchema.parse(response).data
@@ -2390,10 +2374,7 @@ export async function verifyMyFormCommitReplayInteraction(
           ...pactEventHeaders,
           'Idempotency-Key': SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
         },
-        body: {
-          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
-          confirmsBasewearGuidance: true,
-        },
+        body: myFormCommitRequestBody,
       })
     )
     .willRespondWith(
@@ -2422,10 +2403,7 @@ export async function verifyMyFormCommitReplayInteraction(
         mockServer
       ).apiV1WardrobeSilhouetteMyFormCommitPost({
         idempotencyKey: SILHOUETTE_COMMIT_IDEMPOTENCY_KEY,
-        commitSilhouettePhotoInput: {
-          uploadSessionId: SILHOUETTE_UPLOAD_SESSION_ID,
-          confirmsBasewearGuidance: true,
-        },
+        commitSilhouettePhotoInput: myFormCommitRequestBody,
       })
 
       const parsed = silhouetteProfileResponseSchema.parse(response).data
@@ -3193,6 +3171,9 @@ export async function verifyAffiliateWebhookErrorInteraction(
       })
     )
     .executeTest(async (mockServer: V3MockServer) => {
+      // The generated SDK throws on these statuses, so the request goes out
+      // directly: the point is to pin the status and error envelope the
+      // clients branch on, not the SDK's error-handling.
       const response = await fetch(
         `${mockServer.url}/api/v1/commerce/affiliate/webhook`,
         {

@@ -108,11 +108,6 @@ function envelope(response: { body: unknown }): ThemeEnvelope {
   return response.body as ThemeEnvelope
 }
 
-/** Small, real delay so two writes cannot land in the same DB millisecond. */
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 describe('5.3 premium theme preference against real PostgreSQL and real HTTP', () => {
   // File-private namespace: keeps this run's synthetic user distinguishable
   // from any other suite sharing the same database (development-guide.md's
@@ -346,17 +341,21 @@ describe('5.3 premium theme preference against real PostgreSQL and real HTTP', (
       where: { user_id: userId },
     })
 
-    await wait(15)
-
     const second = await putTheme(app, userId, { theme: 'autumn_umber' })
     expect(second.status).toBe(200)
-    const rowAfterSecond = await prisma.premiumThemePreference.findUniqueOrThrow({
-      where: { user_id: userId },
-    })
 
-    expect(rowAfterSecond.updated_at.getTime()).toBeGreaterThan(
-      rowAfterFirst.updated_at.getTime()
-    )
+    // Poll the observable condition -- updated_at actually advancing -- instead of a
+    // fixed sleep before the second write: deterministic across runner speeds, where a
+    // fixed delay is either too short (flaky) or wastes CI time being longer than
+    // strictly needed.
+    await expect
+      .poll(async () => {
+        const row = await prisma.premiumThemePreference.findUniqueOrThrow({
+          where: { user_id: userId },
+        })
+        return row.updated_at.getTime()
+      })
+      .toBeGreaterThan(rowAfterFirst.updated_at.getTime())
   })
 
   it('updated_at also moves on a PUT that resubmits the already-stored value (documents the real Prisma upsert behavior)', async (context) => {
@@ -368,8 +367,6 @@ describe('5.3 premium theme preference against real PostgreSQL and real HTTP', (
       where: { user_id: userId },
     })
 
-    await wait(15)
-
     // Same value resubmitted. premium-theme.service.ts's setTheme always
     // calls upsert's `update: { theme }` branch (there is no early-return
     // "value unchanged" short-circuit at the service/repository level -- that
@@ -380,13 +377,21 @@ describe('5.3 premium theme preference against real PostgreSQL and real HTTP', (
     // than assumed, per this follow-up's brief.
     const second = await putTheme(app, userId, { theme: 'jewel_radiance' })
     expect(second.status).toBe(200)
+
+    // See the previous test: poll the observable condition instead of sleeping a
+    // fixed duration before the second write.
+    await expect
+      .poll(async () => {
+        const row = await prisma.premiumThemePreference.findUniqueOrThrow({
+          where: { user_id: userId },
+        })
+        return row.updated_at.getTime()
+      })
+      .toBeGreaterThan(rowAfterFirst.updated_at.getTime())
+
     const rowAfterSecond = await prisma.premiumThemePreference.findUniqueOrThrow({
       where: { user_id: userId },
     })
-
     expect(rowAfterSecond.theme).toBe('jewel_radiance')
-    expect(rowAfterSecond.updated_at.getTime()).toBeGreaterThan(
-      rowAfterFirst.updated_at.getTime()
-    )
   })
 })

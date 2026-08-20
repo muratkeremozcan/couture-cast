@@ -12,7 +12,7 @@ export interface CheckA11yOptions {
 }
 
 export async function waitForAccessibilityReady(page: Page): Promise<void> {
-  await page.locator('main#main-content').waitFor({ state: 'visible' })
+  await page.getByRole('main').waitFor({ state: 'visible' })
   await page.evaluate(async () => {
     await document.fonts?.ready
     await new Promise<void>((resolve) => {

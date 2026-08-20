@@ -598,3 +598,50 @@ someone else's problem."
   and restore it afterward — an explicit empty string is a deliberate "off,"
   not an "unset" the file is free to fill in. Covered by a new case in
   `apps/api/src/load-env.spec.ts`.
+
+## Deferred from: test-review reconciliation on PR #133, story 5.3 (2026-08-20)
+
+Murat (bmad-tea) ran `test-review` against the Story 5.3 Pact/Playwright/integration
+set, then cross-checked it against an independently-run Codex TeA review on the same
+PR. Both real findings each caught that the other missed are fixed on the branch
+(the fixes are in the PR diff, not repeated here). Two items surfaced that are
+deliberately not fixed in this pass, plus one already-flagged item worth
+cross-referencing:
+
+- **`api-contract-interactions.ts` (3985 lines) and `provider-helper.ts` (1711
+  lines) are both well past the 1000-line maintainability ceiling.** Real, and
+  `test-review`'s own H5 finding recommends splitting both along their existing
+  domain-section boundaries (`api-contract-interactions.ts` already carries
+  `/* --- Story X.Y --- */` dividers; `provider-helper.ts`'s ~1150-line
+  `startLocalPactProvider` is dominated by per-domain mock-service literals).
+  Not done here: a second, concurrently-running session (`couture-cast-a9`,
+  working `bmad-build` against this same ledger's backlog) had already claimed
+  exactly this split as a planned later wave on this same branch before this
+  review landed. Splitting it here too would have raced that work rather than
+  helped it. Left for that wave.
+
+- **The `requireSchema()`/`context.skip()` pattern silently turns a missing or
+  unmigrated schema into a green, assertion-free suite.** Codex's review flagged
+  this correctly on `premium-theme.integration.spec.ts:92-98`: `beforeAll` probes
+  the schema, and every test does `if (!requireSchema(context)) return` before
+  its first assertion, so a database that predates a migration reports as
+  passing rather than as blocked. That is a real evidence-integrity gap on its
+  own. Not fixed here because it is not this file's pattern: the identical
+  `probeSchema`/`schemaReady`/`requireSchema`/`context.skip()` shape is already
+  in thirteen other files under `apps/api/integration/` (`commerce-affiliate-*`,
+  `wardrobe-*`, `premium-subscription`, `premium-stripe-rail`,
+  `premium-revenuecat-webhook`, `premium-reconciliation`,
+  `weather-alert-cooldown`), all pre-existing and all sharing the same
+  hollow-green risk. Patching only the newest file would make it the one
+  inconsistent file in the tier; patching all fourteen is a repo-wide behavior
+  change (fail loud on missing schema vs. skip quietly) that deserves its own
+  reviewable decision, not a rider on a test-review reconciliation. Whoever
+  takes it should decide once for the whole `apps/api/integration/` tier and
+  apply it uniformly.
+
+- **Priority markers (`[P#]`) are a Playwright-only convention today, not a
+  Vitest one.** `test-review`'s own L2 finding already covers this (0 of 40
+  sampled Vitest files carry the marker, versus 12 of 40 sampled Playwright
+  files); noted here only so a future reader searching this ledger for the
+  premium-theme test set finds the pointer. Same shape as the two items above:
+  a repo-wide convention question, not a defect in any one file.

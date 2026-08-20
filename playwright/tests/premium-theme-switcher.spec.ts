@@ -29,7 +29,8 @@
 // direct `PUT { theme: null }` (never a delete — Decision 8), so a run that crashes
 // mid-test still leaves the fixture clean for the next one, and a fresh checkout with
 // no prior run still starts from a known state.
-import type { APIRequestContext, Locator, Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
+import type { ApiRequestFixtureParams } from '@seontechnologies/playwright-utils/api-request'
 import { log } from '@seontechnologies/playwright-utils/log'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
@@ -90,8 +91,17 @@ async function openThemeSettings(
   return exchange
 }
 
+/**
+ * The apiRequest fixture is overloaded (classic and operation-based), so the
+ * classic parameter shape is referenced directly rather than re-declared
+ * (mirrors `capsule-session.ts`'s `ApiRequestFn`).
+ */
+type ApiRequestFn = <T = unknown>(
+  params: ApiRequestFixtureParams
+) => Promise<{ status: number; body: T }>
+
 async function resetSeededTheme(
-  request: APIRequestContext,
+  apiRequest: ApiRequestFn,
   session: PremiumSession
 ): Promise<void> {
   // Direct PUT, not through the UI: this runs in `beforeEach`/`afterEach`, before and
@@ -100,11 +110,14 @@ async function resetSeededTheme(
   // Asserted rather than fire-and-forget: this row is shared across parallel workers,
   // so a silently failed reset would leave the next run's first assertion pointing at
   // the wrong symptom instead of the actual cleanup failure.
-  const response = await request.put(`${session.apiBaseUrl}${THEME_PATH}`, {
+  const response = await apiRequest({
+    method: 'PUT',
+    path: THEME_PATH,
+    baseUrl: session.apiBaseUrl,
     headers: { Authorization: `Bearer ${session.accessToken}` },
-    data: { theme: null },
+    body: { theme: null },
   })
-  expect(response.ok()).toBe(true)
+  expect(response.status).toBe(200)
 }
 
 function lockedPanel(page: Page): Locator {
@@ -138,6 +151,9 @@ anonymousTest.describe('Story 5.3 premium theme switcher, signed out', () => {
     '[P0] 5.3-E2E-011 shows the locked upsell signed out with no theme read, +axe',
     async ({ page }) => {
       let themeRequests = 0
+      // playwright-utils deviation: interceptNetworkCall's promise only resolves on a
+      // matching call, so it cannot structurally prove an absence of one; see the file
+      // header for the full rationale.
       await page.route(THEME_URL, async (route) => {
         themeRequests += 1
         await route.fallback()
@@ -211,12 +227,12 @@ premiumSeededTest.describe(
     // one test in the file that writes to it for real, so it runs alone.
     premiumSeededTest.describe.configure({ mode: 'serial' })
 
-    premiumSeededTest.beforeEach(async ({ premiumSession, request }) => {
-      await resetSeededTheme(request, premiumSession)
+    premiumSeededTest.beforeEach(async ({ premiumSession, apiRequest }) => {
+      await resetSeededTheme(apiRequest, premiumSession)
     })
 
-    premiumSeededTest.afterEach(async ({ premiumSession, request }) => {
-      await resetSeededTheme(request, premiumSession)
+    premiumSeededTest.afterEach(async ({ premiumSession, apiRequest }) => {
+      await resetSeededTheme(apiRequest, premiumSession)
     })
 
     premiumSeededTest(
