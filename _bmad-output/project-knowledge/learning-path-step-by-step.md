@@ -580,16 +580,19 @@ Tests that cover this step:
 
 Real PostgreSQL integration test:
 
-- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts):
+- [`packages/db/test/rls/guardian-wardrobe.spec.ts`](../../packages/db/test/rls/guardian-wardrobe.spec.ts):
   exercises the live Supabase-style claim bridge and the
-  teen, guardian, administrator, and revoked-consent policy boundaries.
+  teen and guardian policy boundaries.
+- [`packages/db/test/rls/identity-and-admin.spec.ts`](../../packages/db/test/rls/identity-and-admin.spec.ts):
+  covers the negative half — spoofed claims, unverified email, revoked consent,
+  and the administrator actor.
 
 Current repo note:
 
 - Step 4 now includes the first real Supabase policy rollout, not only environment scaffolding.
   `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`
   applies guardian-aware access rules across the private wardrobe tables, and
-  `packages/db/test/rls-policies.spec.ts` proves the resulting teen/guardian/admin personas
+  the `packages/db/test/rls/` suite proves the resulting teen/guardian/admin personas
   against a live Postgres policy surface before deploy. Task 6 then extends that model with
   `packages/db/prisma/migrations/20260421090000_block_revoked_teens_from_self_access/migration.sql`,
   which blocks teen self-access again when the last active guardian consent is revoked.
@@ -1938,7 +1941,7 @@ Current repo note:
   including the Supabase-JWT-to-app-user bridge required by the repo's text `User.id` model, plus
   the revoke-specific follow-up in
   `packages/db/prisma/migrations/20260421090000_block_revoked_teens_from_self_access/migration.sql`
-  and persona coverage in `packages/db/test/rls-policies.spec.ts`. The remaining work is to migrate
+  and persona coverage in `packages/db/test/rls/`. The remaining work is to migrate
   later public REST endpoints as they land so every web/mobile-facing API starts in the same
   shared-contract path. Task 6 also reinforced that shared Zod modules are not enough on their
   own: parity tests and runtime guard checks were both needed to make revoked-consent behavior real
@@ -2534,13 +2537,13 @@ Task owner map:
 - Story 1.4 Task 3 step 2 owner: coordinate posthogService cleanup in worker shutdown routine in `apps/api/src/workers/bootstrap.ts`
 - Story 1.4 Task 4 step 1 owner: integrate signup telemetry in `apps/api/src/modules/auth/auth.service.ts`
 - Story 1.4 Task 5 step 1 owner: implement global api exception filter in `apps/api/src/filters/api-exception.filter.ts`
-- Story 1.4 Task 6 step 1 owner: verify telemetry RLS policies for authenticated users and the service role in `packages/db/test/rls-policies.spec.ts`
+- Story 1.4 Task 6 step 1 owner: verify telemetry RLS policies for authenticated users and the service role in `packages/db/test/rls/telemetry.spec.ts`
 
 Tests that cover this step:
 
 Real PostgreSQL security integration tests:
 
-- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts):
+- [`packages/db/test/rls/telemetry.spec.ts`](../../packages/db/test/rls/telemetry.spec.ts):
   proves authenticated-user and service-role telemetry
   policy boundaries against real PostgreSQL.
 - [`packages/db/test/audit-log-immutability.spec.ts`](../../packages/db/test/audit-log-immutability.spec.ts):
@@ -3657,8 +3660,9 @@ Real-PostgreSQL database tests:
 - [`packages/db/test/garment-upload-schema.spec.ts`](../../packages/db/test/garment-upload-schema.spec.ts):
   proves upload lifecycle defaults, constraints, private storage setup, grants, and supporting
   indexes against PostgreSQL.
-- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts):
-  proves owner, guardian, admin, and cross-user wardrobe access rules against PostgreSQL.
+- [`packages/db/test/rls/guardian-wardrobe.spec.ts`](../../packages/db/test/rls/guardian-wardrobe.spec.ts) and
+  [`packages/db/test/rls/identity-and-admin.spec.ts`](../../packages/db/test/rls/identity-and-admin.spec.ts):
+  prove owner, guardian, admin, and cross-user wardrobe access rules against PostgreSQL.
 
 Fixture and shared contract unit tests:
 
@@ -3851,7 +3855,7 @@ Real-PostgreSQL database tests:
 - [`packages/db/test/garment-upload-schema.spec.ts`](../../packages/db/test/garment-upload-schema.spec.ts):
   proves smart-tagging enums, lifecycle columns, JSON constraints, confirmation fields, and
   supporting indexes against PostgreSQL.
-- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts):
+- [`packages/db/test/rls/guardian-wardrobe.spec.ts`](../../packages/db/test/rls/guardian-wardrobe.spec.ts):
   proves tagging metadata remains scoped by the wardrobe row-level security policy.
 
 Shared contract unit tests:
@@ -4084,7 +4088,7 @@ Real-PostgreSQL database tests:
 - [`packages/db/test/outfit-capsule-schema.spec.ts`](../../packages/db/test/outfit-capsule-schema.spec.ts):
   proves capsule defaults, ordered joins, constraints, indexes, cascades, row-level security,
   and grants against PostgreSQL.
-- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts):
+- [`packages/db/test/rls/capsules.spec.ts`](../../packages/db/test/rls/capsules.spec.ts):
   proves owner, guardian, admin, stranger, and spoofing boundaries for capsules and ordered
   garment joins.
 
@@ -4435,7 +4439,7 @@ Real-PostgreSQL database tests:
 - [`packages/db/test/wardrobe-onboarding-schema.spec.ts`](../../packages/db/test/wardrobe-onboarding-schema.spec.ts):
   proves onboarding and silhouette defaults, singleton and upload uniqueness, cascades,
   moderation linkage, indexes, row-level security, and grants against PostgreSQL.
-- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts):
+- [`packages/db/test/rls/onboarding-silhouette.spec.ts`](../../packages/db/test/rls/onboarding-silhouette.spec.ts):
   proves owner, guardian, admin, stranger, spoofing, and service-role boundaries for onboarding
   and silhouette rows.
 
@@ -4910,7 +4914,7 @@ Real-PostgreSQL database tests:
   uniqueness, cascades, indexes, RLS enablement, and client grants.
 - [`packages/db/test/commerce-seed.spec.ts`](../../packages/db/test/commerce-seed.spec.ts): proves the non-production seed creates
   active wildcard offers for four slots and never stores a real secret.
-- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts): proves owner access, guardian denial,
+- [`packages/db/test/rls/commerce.spec.ts`](../../packages/db/test/rls/commerce.spec.ts): proves owner access, guardian denial,
   admin access, spoofing resistance, and server-only catalog/conversion tables.
 
 Shared contract and analytics tests:
@@ -5328,7 +5332,7 @@ Real-PostgreSQL database tests:
 - [`packages/db/test/premium-schema.spec.ts`](../../packages/db/test/premium-schema.spec.ts): proves the idempotency barrier,
   the append-only trigger and its outbox exemption, and that a billing record
   survives account erasure as an unattributed row.
-- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts): proves an authenticated client is
+- [`packages/db/test/rls/billing.spec.ts`](../../packages/db/test/rls/billing.spec.ts): proves an authenticated client is
   denied reads on all three billing tables and cannot forge an entitlement row.
 - [`packages/db/test/commerce-seed.spec.ts`](../../packages/db/test/commerce-seed.spec.ts): proves the premium seed is guarded
   outside non-production and idempotent across repeated runs.
@@ -5591,7 +5595,7 @@ Hard-won lessons from the implementation and code review of this story:
    `authenticated` role.
 7. **Policies and grants fail in opposite directions, so both need pinning.**
    Correct policies with no `GRANT` deny even the owner; correct grants with no
-   policies expose every row. `rls-policies.spec.ts` owns the actor matrix and
+   policies expose every row. The `packages/db/test/rls/` suite owns the actor matrix and
    proves nothing about the privileges underneath it, so the schema spec pins
    `authenticated` to exactly the four owner verbs, `anon` to none, and checks the
    four policy names.
@@ -5752,7 +5756,7 @@ Real-PostgreSQL database tests:
   the nullable `theme`, cascade delete with the account, and the privilege breadth the
   actor matrix cannot see: `authenticated` holds exactly four owner verbs and `anon` none
   (`5.3-DB-014`, `5.3-DB-015`).
-- [`packages/db/test/rls-policies.spec.ts`](../../packages/db/test/rls-policies.spec.ts): runs the full owner-only actor matrix
+- [`packages/db/test/rls/premium-theme.spec.ts`](../../packages/db/test/rls/premium-theme.spec.ts): runs the full owner-only actor matrix
   over the new table (`5.3-DB-001` through `5.3-DB-008`), including the INSERT policy's
   positive half driven through the `authenticated` role rather than the admin pool.
 
