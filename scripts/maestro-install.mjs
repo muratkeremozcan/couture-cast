@@ -59,7 +59,9 @@ try {
   }
 
   if (currentVersion) {
-    log(`Found Maestro ${currentVersion} at ${onPath}, but this repo pins ${PINNED_VERSION}`)
+    log(
+      `Found Maestro ${currentVersion} at ${onPath}, but this repo pins ${PINNED_VERSION}`
+    )
   }
 
   if (process.platform === 'win32') {
@@ -95,12 +97,14 @@ try {
       }
       console.error(
         `[maestro:install] Homebrew cannot provide ${PINNED_VERSION}, and the official ` +
-          `installer refuses to run alongside a brew install. Run \`brew uninstall maestro\` ` +
-          `and re-run this script.`
+          'installer refuses to run alongside a brew install. Run `brew uninstall maestro` ' +
+          'and re-run this script.'
       )
       process.exit(1)
     }
-    run(`curl -Ls "https://get.maestro.mobile.dev" | MAESTRO_VERSION=${PINNED_VERSION} bash`)
+    run(
+      `curl -Ls "https://get.maestro.mobile.dev" | MAESTRO_VERSION=${PINNED_VERSION} bash`
+    )
   }
 
   const installedVersion = versionOf(MAESTRO_BIN)
@@ -121,7 +125,7 @@ try {
     if (shadowVersion !== PINNED_VERSION) {
       log(
         `WARNING: ${stillResolves} (${shadowVersion ?? 'unknown'}) comes first on PATH and ` +
-          `shadows the pinned binary. Remove it (\`brew uninstall maestro\`) or put ` +
+          'shadows the pinned binary. Remove it (`brew uninstall maestro`) or put ' +
           `${path.dirname(MAESTRO_BIN)} ahead of it on PATH.`
       )
     }

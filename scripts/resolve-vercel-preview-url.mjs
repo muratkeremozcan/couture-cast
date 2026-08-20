@@ -10,7 +10,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync, execSync } from 'node:child_process'
-import { setTimeout as delay } from 'node:timers/promises'
 
 // Load env for local Preview runs; CI passes env vars directly.
 try {
@@ -20,7 +19,9 @@ try {
   for (const file of envFiles) {
     const full = path.resolve(process.cwd(), file)
     if (fs.existsSync(full)) {
-      dotenv.config({ path: full })
+      // quiet: dotenv v17 announces itself on stdout, which would corrupt the URL this
+      // script contracts to print there and CI captures by command substitution.
+      dotenv.config({ path: full, quiet: true })
       break
     }
   }
@@ -160,8 +161,8 @@ function slugifyVercelGitRef(value) {
 function getDeploymentStatuses(owner, repo, deploymentId) {
   return runGh([
     `/repos/${owner}/${repo}/deployments/${deploymentId}/statuses`,
-    `-F`,
-    `per_page=5`,
+    '-F',
+    'per_page=5',
   ])
 }
 
@@ -250,13 +251,13 @@ async function fetchVercelDeployments(projectId, teamId, branch, limit = 10) {
   return data?.deployments ?? []
 }
 
-async function findUrlFromVercel(projectSlug, teamSlug, branch) {
-  if (!projectSlug) return undefined
-
-  logDebug(
-    `Querying Vercel API for project: ${projectSlug}, team: ${teamSlug}, branch: ${branch}`
-  )
-
+/**
+ * Resolve a Vercel team slug to its team ID and log the outcome.
+ * A missing team ID is not fatal: personal accounts have no team.
+ * @param {string | undefined} teamSlug
+ * @returns {Promise<string | undefined>}
+ */
+async function resolveVercelTeamId(teamSlug) {
   // Resolve team slug to ID
   const teamId = teamSlug ? await getVercelTeamId(teamSlug) : undefined
   if (teamSlug && !teamId) {
@@ -265,17 +266,19 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
   } else if (teamId) {
     logDebug(`Team ID: ${teamId}`)
   }
+  return teamId
+}
 
-  const projectId = await getVercelProjectId(projectSlug, teamId)
-  if (!projectId) {
-    logDebug(`Could not resolve project ID for ${projectSlug}`)
-    return undefined
-  }
-
-  logDebug(`Project ID: ${projectId}`)
-
-  const branchSlug = slugifyVercelGitRef(branch)
-
+/**
+ * Fetch deployments for a branch, retrying with the slugified branch name and
+ * finally with no branch filter at all when the earlier queries come back empty.
+ * @param {string} projectId
+ * @param {string | undefined} teamId
+ * @param {string} branch
+ * @param {string} branchSlug
+ * @returns {Promise<Array<Record<string, unknown>>>}
+ */
+async function fetchDeploymentsWithFallbacks(projectId, teamId, branch, branchSlug) {
   // Try with original branch name first
   let deployments = await fetchVercelDeployments(projectId, teamId, branch, 10)
 
@@ -291,6 +294,84 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
     deployments = await fetchVercelDeployments(projectId, teamId, undefined, 10)
   }
 
+  return deployments
+}
+
+/**
+ * Emit the debug lines describing a candidate deployment.
+ * @param {Record<string, any>} deployment
+ */
+function logDeploymentDetails(deployment) {
+  logDebug(`Checking deployment: ${deployment.url}`)
+  logDebug(`  State: ${deployment.state || 'unknown'}`)
+  logDebug(`  Created: ${deployment.created || 'unknown'}`)
+  logDebug(`  Git ref: ${deployment.meta?.githubCommitRef || 'unknown'}`)
+  logDebug(`  Git SHA: ${deployment.meta?.githubCommitSha || 'unknown'}`)
+}
+
+/**
+ * Prefix a Vercel hostname with https:// unless it already carries a scheme.
+ * @param {string} hostOrUrl
+ * @returns {string}
+ */
+function toAbsoluteUrl(hostOrUrl) {
+  // Match the scheme exactly: a hostname such as http-api-git-x.vercel.app starts with
+  // "http" without carrying a scheme, and would otherwise be emitted unusable.
+  return /^https?:\/\//i.test(hostOrUrl) ? hostOrUrl : `https://${hostOrUrl}`
+}
+
+/**
+ * Git-branch alias URL for a deployment, when it exposes one.
+ * @param {Record<string, any>} deployment
+ * @returns {string | undefined}
+ */
+function findGitBranchAliasUrl(deployment) {
+  // Check if deployment has alias URLs (git-branch aliases)
+  if (
+    deployment.alias &&
+    Array.isArray(deployment.alias) &&
+    deployment.alias.length > 0
+  ) {
+    // Look for git-branch alias (contains "-git-")
+    const gitBranchAlias = deployment.alias.find(
+      (alias) => alias && alias.includes('-git-')
+    )
+    if (gitBranchAlias) {
+      const url = toAbsoluteUrl(gitBranchAlias)
+      logDebug(`✓ Using git-branch alias URL (auto-updates): ${url}`)
+      return url
+    }
+  }
+
+  return undefined
+}
+
+async function findUrlFromVercel(projectSlug, teamSlug, branch) {
+  if (!projectSlug) return undefined
+
+  logDebug(
+    `Querying Vercel API for project: ${projectSlug}, team: ${teamSlug}, branch: ${branch}`
+  )
+
+  const teamId = await resolveVercelTeamId(teamSlug)
+
+  const projectId = await getVercelProjectId(projectSlug, teamId)
+  if (!projectId) {
+    logDebug(`Could not resolve project ID for ${projectSlug}`)
+    return undefined
+  }
+
+  logDebug(`Project ID: ${projectId}`)
+
+  const branchSlug = slugifyVercelGitRef(branch)
+
+  const deployments = await fetchDeploymentsWithFallbacks(
+    projectId,
+    teamId,
+    branch,
+    branchSlug
+  )
+
   if (deployments.length === 0) {
     logDebug('No deployments found')
     return undefined
@@ -301,35 +382,13 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
   for (const deployment of deployments) {
     if (!deployment?.url) continue
 
-    logDebug(`Checking deployment: ${deployment.url}`)
-    logDebug(`  State: ${deployment.state || 'unknown'}`)
-    logDebug(`  Created: ${deployment.created || 'unknown'}`)
-    logDebug(`  Git ref: ${deployment.meta?.githubCommitRef || 'unknown'}`)
-    logDebug(`  Git SHA: ${deployment.meta?.githubCommitSha || 'unknown'}`)
+    logDeploymentDetails(deployment)
 
-    // Check if deployment has alias URLs (git-branch aliases)
-    if (
-      deployment.alias &&
-      Array.isArray(deployment.alias) &&
-      deployment.alias.length > 0
-    ) {
-      // Look for git-branch alias (contains "-git-")
-      const gitBranchAlias = deployment.alias.find(
-        (alias) => alias && alias.includes('-git-')
-      )
-      if (gitBranchAlias) {
-        const url = gitBranchAlias.startsWith('http')
-          ? gitBranchAlias
-          : `https://${gitBranchAlias}`
-        logDebug(`✓ Using git-branch alias URL (auto-updates): ${url}`)
-        return url
-      }
-    }
+    const aliasUrl = findGitBranchAliasUrl(deployment)
+    if (aliasUrl) return aliasUrl
 
     // Fallback to canonical URL (locked to this specific deployment)
-    const url = deployment.url.startsWith('http')
-      ? deployment.url
-      : `https://${deployment.url}`
+    const url = toAbsoluteUrl(deployment.url)
     logDebug(`Using canonical URL (locked to this deployment): ${url}`)
     return url
   }
@@ -340,12 +399,12 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
 function getPreviewDeploymentsForBranch(owner, repo, branch) {
   const deployments = runGh([
     `/repos/${owner}/${repo}/deployments`,
-    `-F`,
+    '-F',
     `ref=${branch}`,
-    `-F`,
-    `environment=Preview`,
-    `-F`,
-    `per_page=10`,
+    '-F',
+    'environment=Preview',
+    '-F',
+    'per_page=10',
   ])
 
   return Array.isArray(deployments) ? deployments : []
@@ -354,20 +413,106 @@ function getPreviewDeploymentsForBranch(owner, repo, branch) {
 function getAnyPreviewDeployments(owner, repo) {
   const deployments = runGh([
     `/repos/${owner}/${repo}/deployments`,
-    `-F`,
-    `environment=Preview`,
-    `-F`,
-    `per_page=20`,
+    '-F',
+    'environment=Preview',
+    '-F',
+    'per_page=20',
   ])
 
   return Array.isArray(deployments) ? deployments : []
 }
 
-async function main() {
-  const manual =
+/**
+ * URL supplied explicitly through the environment, which wins over any lookup.
+ * @returns {string | undefined}
+ */
+function getManualPreviewUrl() {
+  return (
     env('PREVIEW_WEB_E2E_BASE_URL') ??
     env('VERCEL_PREVIEW_URL') ??
     env('VERCEL_BRANCH_ALIAS_URL')
+  )
+}
+
+/**
+ * Deterministic hostname attempt first (matches Vercel pattern).
+ * These git-branch URLs are aliases that Vercel updates to point to the latest deployment.
+ * Returns undefined when the project/team slugs are absent or nothing is reachable.
+ * @param {string | undefined} projectSlug
+ * @param {string | undefined} teamSlug
+ * @param {string} branchSlug
+ * @returns {Promise<string | undefined>}
+ */
+async function findReachableGitBranchAliasUrl(projectSlug, teamSlug, branchSlug) {
+  if (!projectSlug || !teamSlug) return undefined
+
+  // Try progressively shorter slugs (Vercel truncates long branch names)
+  // Example: "chore/test-preview-prod-deploys" -> "chore-test-preview-prod-deploys" -> "chore-tes" (9 chars)
+  const slugLengths = [branchSlug.length, 15, 12, 10, 9, 8, 7]
+  for (const len of slugLengths) {
+    const trySlug = branchSlug.slice(0, len)
+    if (trySlug.length < 3) break // Too short to be meaningful
+
+    const tryUrl = `https://${projectSlug}-git-${trySlug}-${teamSlug}.vercel.app`
+    logDebug(`Trying git-branch alias (${trySlug.length} chars): ${tryUrl}`)
+
+    if (await isReachable(tryUrl)) {
+      logDebug(
+        '✓ Found reachable git-branch alias URL (auto-updates to latest deployment)'
+      )
+      return tryUrl
+    }
+  }
+
+  logDebug('No git-branch alias URLs reachable, falling back to Vercel API')
+  return undefined
+}
+
+/**
+ * Ask the Vercel API directly, when a project slug and token are configured.
+ * @param {string} branch
+ * @returns {Promise<string | undefined>}
+ */
+async function resolveUrlFromVercelApi(branch) {
+  const vercelProject =
+    env('VERCEL_PROJECT') ?? env('VERCEL_PROJECT_NAME') ?? env('VERCEL_WEB_PROJECT_SLUG')
+  const vercelTeam =
+    env('VERCEL_TEAM') ?? env('VERCEL_TEAM_ID') ?? env('VERCEL_TEAM_SLUG')
+  if (vercelProject && env('VERCEL_TOKEN')) {
+    logDebug(`Attempting Vercel API resolution for project "${vercelProject}"`)
+    return await findUrlFromVercel(vercelProject, vercelTeam, branch)
+  }
+
+  return undefined
+}
+
+/**
+ * Whether VERCEL_PREVIEW_STRICT asks us to refuse cross-branch fallbacks.
+ * @returns {boolean}
+ */
+function isStrictMode() {
+  return env('VERCEL_PREVIEW_STRICT') === '1' || env('VERCEL_PREVIEW_STRICT') === 'true'
+}
+
+/**
+ * Abort with the strict-mode guidance for a branch we could not resolve.
+ * @param {string} branch
+ */
+function failStrict(branch) {
+  fail(
+    [
+      `Strict mode: no URL found in GitHub deployment statuses for branch "${branch}".`,
+      'Provide one of:',
+      '- VERCEL_BRANCH_ALIAS_URL=https://<your-preview>.vercel.app',
+      '- VERCEL_PREVIEW_URL=https://<your-preview>.vercel.app',
+      '- PREVIEW_WEB_E2E_BASE_URL=https://<your-preview>.vercel.app',
+      'Or disable strict mode by unsetting VERCEL_PREVIEW_STRICT.',
+    ].join('\n')
+  )
+}
+
+async function main() {
+  const manual = getManualPreviewUrl()
   if (manual) {
     process.stdout.write(manual)
     return
@@ -379,32 +524,13 @@ async function main() {
   logDebug(`Resolving Preview URL for ${owner}/${repo}@${branch}`)
   ensureBranchExists(owner, repo, branch)
 
-  // Deterministic hostname attempt first (matches Vercel pattern).
-  // These git-branch URLs are aliases that Vercel updates to point to the latest deployment
   const branchSlug = slugifyVercelGitRef(branch)
   const projectSlug = env('VERCEL_WEB_PROJECT_SLUG')
   const teamSlug = env('VERCEL_TEAM_SLUG')
-  if (projectSlug && teamSlug) {
-    // Try progressively shorter slugs (Vercel truncates long branch names)
-    // Example: "chore/test-preview-prod-deploys" -> "chore-test-preview-prod-deploys" -> "chore-tes" (9 chars)
-    const slugLengths = [branchSlug.length, 15, 12, 10, 9, 8, 7]
-    for (const len of slugLengths) {
-      const trySlug = branchSlug.slice(0, len)
-      if (trySlug.length < 3) break // Too short to be meaningful
-
-      const tryUrl = `https://${projectSlug}-git-${trySlug}-${teamSlug}.vercel.app`
-      logDebug(`Trying git-branch alias (${trySlug.length} chars): ${tryUrl}`)
-
-      if (await isReachable(tryUrl)) {
-        logDebug(
-          `✓ Found reachable git-branch alias URL (auto-updates to latest deployment)`
-        )
-        process.stdout.write(tryUrl)
-        return
-      }
-    }
-
-    logDebug(`No git-branch alias URLs reachable, falling back to Vercel API`)
+  const aliasUrl = await findReachableGitBranchAliasUrl(projectSlug, teamSlug, branchSlug)
+  if (aliasUrl) {
+    process.stdout.write(aliasUrl)
+    return
   }
 
   // First, try branch-scoped Preview deployments.
@@ -413,38 +539,19 @@ async function main() {
 
   // If GH lacked URLs, try Vercel API directly.
   if (!url) {
-    const vercelProject =
-      env('VERCEL_PROJECT') ??
-      env('VERCEL_PROJECT_NAME') ??
-      env('VERCEL_WEB_PROJECT_SLUG')
-    const vercelTeam =
-      env('VERCEL_TEAM') ?? env('VERCEL_TEAM_ID') ?? env('VERCEL_TEAM_SLUG')
-    if (vercelProject && env('VERCEL_TOKEN')) {
-      logDebug(`Attempting Vercel API resolution for project "${vercelProject}"`)
-      const vercelUrl = await findUrlFromVercel(vercelProject, vercelTeam, branch)
-      if (vercelUrl) {
-        process.stdout.write(vercelUrl)
-        return
-      }
+    const vercelUrl = await resolveUrlFromVercelApi(branch)
+    if (vercelUrl) {
+      process.stdout.write(vercelUrl)
+      return
     }
   }
 
-  const strict =
-    env('VERCEL_PREVIEW_STRICT') === '1' || env('VERCEL_PREVIEW_STRICT') === 'true'
+  const strict = isStrictMode()
 
   // If we can see deployments for the branch but none of their statuses include a URL,
   // you almost certainly want to provide an explicit alias rather than falling back to some other branch.
   if (!url && strict) {
-    fail(
-      [
-        `Strict mode: no URL found in GitHub deployment statuses for branch "${branch}".`,
-        'Provide one of:',
-        '- VERCEL_BRANCH_ALIAS_URL=https://<your-preview>.vercel.app',
-        '- VERCEL_PREVIEW_URL=https://<your-preview>.vercel.app',
-        '- PREVIEW_WEB_E2E_BASE_URL=https://<your-preview>.vercel.app',
-        'Or disable strict mode by unsetting VERCEL_PREVIEW_STRICT.',
-      ].join('\n')
-    )
+    failStrict(branch)
   }
 
   // Fallback: any latest Preview deployment (e.g., when Vercel truncates branch names or ref differs)

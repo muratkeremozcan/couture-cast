@@ -60,7 +60,7 @@
     "start:dev": "node ../../scripts/start-api-watch.mjs",
     "start:debug": "node ../../scripts/start-api-watch.mjs --inspect",
     "start:prod": "node dist/src/main.js",
-    "lint": "eslint --max-warnings=0 \"{src,api,test,integration}/**/*.ts\" vitest.config.ts",
+    "lint": "cd ../.. && eslint --max-warnings=0 --ext .ts apps/api",
     "pretypecheck": "npm run prepare:shared-deps",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run prepare:shared-deps",
@@ -121,8 +121,6 @@
   },
   "devDependencies": {
     "@couture/testing": "file:../../packages/testing",
-    "@eslint/eslintrc": "2.1.4",
-    "@eslint/js": "8.57.1",
     "@nestjs/cli": "11.0.10",
     "@nestjs/schematics": "11.0.9",
     "@nestjs/testing": "11.1.9",
@@ -130,13 +128,11 @@
     "@types/supertest": "6.0.3",
     "@vitest/coverage-v8": "4.0.9",
     "dotenv": "17.2.3",
-    "globals": "13.24.0",
     "source-map-support": "0.5.21",
     "supertest": "7.1.4",
     "testcontainers": "^11.9.0",
     "ts-loader": "9.5.4",
     "ts-node": "10.9.2",
-    "tsconfig-paths": "3.15.0",
-    "typescript-eslint": "8.46.4"
+    "tsconfig-paths": "3.15.0"
   }
 }

@@ -41,7 +41,8 @@ module.exports = {
     complexity: ['warn', 15],
     'object-curly-spacing': ['error', 'always'],
     'linebreak-style': ['error', 'unix'],
-    quotes: ['error', 'single'],
+    // avoidEscape matches Prettier, which prefers double quotes for strings containing an apostrophe
+    quotes: ['error', 'single', { avoidEscape: true }],
     semi: ['error', 'never'],
     'import/default': 'off',
     '@typescript-eslint/no-require-imports': 'off',

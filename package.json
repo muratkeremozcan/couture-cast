@@ -36,9 +36,9 @@
     "check:web:aliased-runtime-deps": "node scripts/check-web-aliased-runtime-deps.mjs",
     "typecheck:clear-cache": "find . -name \"*.tsbuildinfo\" -delete && rm -rf node_modules/.cache/typescript",
     "prelint": "npm run build:packages",
-    "lint": "npm run --workspaces lint && eslint --max-warnings=0 --ext .ts,.tsx,.mts playwright pact && prettier --ignore-path .prettierignore --check \"**/*.{ts,tsx,mts,js,json,md}\"",
-    "lint:fix": "npm run --workspaces --if-present lint -- --fix && eslint --max-warnings=0 --ext .ts,.tsx,.mts apps playwright pact --fix && npm run format",
-    "format": "prettier --ignore-path .prettierignore --write \"**/*.{ts,tsx,mts,js,json,md}\"",
+    "lint": "npm run --workspaces lint && eslint --max-warnings=0 --ext .ts,.tsx,.mts,.mjs,.cjs,.js playwright pact scripts k6 tools && prettier --ignore-path .prettierignore --check \"**/*.{ts,tsx,mts,js,mjs,cjs,json,md}\"",
+    "lint:fix": "npm run --workspaces --if-present lint -- --fix && eslint --max-warnings=0 --ext .ts,.tsx,.mts,.mjs,.cjs,.js apps playwright pact scripts k6 tools --fix && npm run format",
+    "format": "prettier --ignore-path .prettierignore --write \"**/*.{ts,tsx,mts,js,mjs,cjs,json,md}\"",
     "lint:staged": "lint-staged",
     "test": "npm run --workspaces test",
     "test:coverage": "node scripts/run-workspace-test-coverage.mjs",
@@ -151,6 +151,10 @@
   "lint-staged": {
     "*.{ts,tsx}": [
       "sh -c \"npm run build --workspace @couture/utils && npm run build --workspace @couture/api-client\"",
+      "eslint --max-warnings=0 --cache --cache-location node_modules/.cache/eslint --fix --no-ignore",
+      "prettier --write"
+    ],
+    "*.{mjs,cjs}": [
       "eslint --max-warnings=0 --cache --cache-location node_modules/.cache/eslint --fix --no-ignore",
       "prettier --write"
     ],
