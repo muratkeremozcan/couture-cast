@@ -3356,11 +3356,28 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
 /**
  * Flows that depend on a value seeded for one specific user cannot be
  * sharded: Maestro passes one set of `-e` values to every device, so
- * `WEATHER_ALERT_ID` can only ever match the user of one of them. There is
- * exactly one such flow, and it runs on the first device after the sharded
- * pass rather than being weakened to suit the split.
+ * `WEATHER_ALERT_ID`, `GARMENT_A_ID`/`GARMENT_B_ID`, `CAPSULE_ID` and
+ * `REPLACEMENT_GARMENT_ID` can only ever match the user of one of them. Every
+ * flow here runs on the first device after the sharded pass instead of being
+ * weakened to suit the split.
+ *
+ * Found by grepping `maestro/*.yaml` for `${CAPSULE_ID}` /
+ * `${GARMENT_A_ID}` / `${GARMENT_B_ID}` / `${REPLACEMENT_GARMENT_ID}` /
+ * `${WEATHER_ALERT_ID}` -- keep that grep in sync with this list when a new
+ * flow starts asserting on one of those ids. `garment-capsule-repair-flow`
+ * shipped this same dependency without landing here, and only failed when
+ * `npm run test:mobile:e2e:android`'s local 4-way shard happened to place it
+ * on a device whose seeded user didn't own `CAPSULE_ID`
+ * (`Element not found: Id matching regex: edit-capsule-button-<other user's
+ * capsule>`); `garment-capsule-create-flow` has the identical shape
+ * (`GARMENT_A_ID`/`GARMENT_B_ID`) and simply had not drawn the wrong device
+ * yet.
  */
-const USER_SCOPED_FLOWS = ['maestro/deep-link-handling.yaml']
+const USER_SCOPED_FLOWS = [
+  'maestro/deep-link-handling.yaml',
+  'maestro/garment-capsule-create-flow.yaml',
+  'maestro/garment-capsule-repair-flow.yaml',
+]
 
 /**
  * Run the suite across every shard device: the shardable flows in one Maestro
