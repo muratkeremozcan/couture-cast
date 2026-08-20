@@ -15,6 +15,7 @@
       "optOutHelp": "Deaktiviere dies, um alle Partner- und Affiliate-Vorschläge auszublenden.",
       "saved": "Shopping-Einstellungen aktualisiert",
       "error": "Shopping-Einstellungen konnten nicht aktualisiert werden.",
+      "loadError": "Shopping-Einstellungen konnten nicht geladen werden.",
       "signedOutHint": "Melde dich an, um dies zu ändern"
     },
     "premium": {

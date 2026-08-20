@@ -311,7 +311,9 @@ describe('Web settings page', () => {
     expect(toggle()).not.toBeChecked()
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('Unable to store shopping preferences right now.')
+    // Catalog copy, not the server's English: the API error body is English on
+    // every locale, and this section serves ten.
+    expect(alert).toHaveTextContent('Unable to update shopping preferences.')
     // Reverted: the control must not keep claiming a state the server rejected.
     expect(toggle()).toBeChecked()
     expect(toggle()).toBeEnabled()
@@ -367,7 +369,10 @@ describe('Web settings page', () => {
     render(<SettingsPage />)
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('Unable to reach shopping preferences.')
+    // A failed read says so. It used to reuse the save string ("Unable to
+    // update..."), which names an action the reader never took, and before that
+    // it echoed the server's English whatever locale was selected.
+    expect(alert).toHaveTextContent('Unable to load shopping preferences.')
     // Showing the `true` default would render an opted-out account as opted in.
     expect(toggle()).toBeDisabled()
     expect(screen.queryByTestId('commerce-signed-out-hint')).not.toBeInTheDocument()

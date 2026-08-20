@@ -152,6 +152,7 @@ import {
   SUBSCRIPTION_NOT_FOUND_MESSAGE,
   WEBHOOK_SIGNATURE_INVALID_MESSAGE,
   PREMIUM_THEMES_DISABLED_MESSAGE,
+  PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE,
 } from '@couture/api-client/contracts/http'
 import type {
   EntitlementStore,
@@ -1268,6 +1269,14 @@ export async function startLocalPactProvider({
       if (requirePremiumThemeScenario().scenario === 'themes-disabled') {
         throw new ServiceUnavailableException(PREMIUM_THEMES_DISABLED_MESSAGE)
       }
+      // The account erased mid-request. In the real service this is Prisma
+      // `P2003` on the preference table's user foreign key, caught in
+      // `writePreference` and remapped; the double raises the mapped exception
+      // directly because the constraint itself belongs to the database tier and
+      // the contract records only the status and envelope that reach a client.
+      if (requirePremiumThemeScenario().scenario === 'owner-erased') {
+        throw new NotFoundException(PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE)
+      }
       return Promise.resolve({ theme, isEntitled: true, themesEnabled: true })
     },
   } as unknown as PremiumThemeService
@@ -1680,7 +1689,11 @@ export function resetProviderSubscriptionState() {
  * spellings of Default when `theme` is omitted, and a real stored choice when
  * it isn't.
  * --------------------------------------------------------------------------- */
-export type ProviderPremiumThemeScenario = 'entitled' | 'not-entitled' | 'themes-disabled'
+export type ProviderPremiumThemeScenario =
+  | 'entitled'
+  | 'not-entitled'
+  | 'themes-disabled'
+  | 'owner-erased'
 
 export type ProviderPremiumThemeState = {
   userId: string | null

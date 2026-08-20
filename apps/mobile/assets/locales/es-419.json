@@ -320,7 +320,8 @@
       "optOutLabel": "Mostrar sugerencias de «Compra este look»",
       "optOutHelp": "Desactiva esto para ocultar todas las sugerencias de socios y afiliados.",
       "saved": "Preferencias de compra actualizadas",
-      "error": "No se pudieron actualizar las preferencias de compra."
+      "error": "No se pudieron actualizar las preferencias de compra.",
+      "loadError": "No se pudieron cargar las preferencias de compra."
     },
     "premium": {
       "sectionTitle": "Premium",

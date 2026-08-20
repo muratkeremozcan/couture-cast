@@ -595,13 +595,23 @@ each with the reason.
   Three unit tests pin the mapping, the message, and that a `P1017` still
   propagates untouched.
 
-  One thing deliberately not done: the 404 is **not** registered as a documented
-  response on the PUT operation in
-  `packages/api-client/src/contracts/http/premium-theme.ts`. Adding it reshapes
-  published nodes and drags an `optic diff` conversation into a defect fix. The
-  body is Nest's standard not-found envelope, so nothing on the wire is novel —
-  but the published document does not mention the status, and that gap should be
-  closed by whoever takes the OpenAPI work already filed in this ledger.
+  The 404 is documented on the PUT operation and covered by Pact. An earlier
+  revision of this entry said the opposite — that publishing it would reshape
+  nodes and drag an `optic diff` conversation into a defect fix — and a
+  CodeRabbit review on PR #133 pushed back. The review was right and the
+  deferral was wrong on both counts. Adding a response to an operation is
+  additive: `optic diff` against `origin/main` reports
+  `PUT /api/v1/commerce/premium/theme: response 404: added` and passes, the
+  published document grows by ten lines, and the generated SDK does not change
+  at all. Beyond that, a status a client can actually receive belongs in the
+  contract whether or not documenting it is convenient.
+
+  A third error row now sits alongside the 403/503 pair in
+  `pact/http/consumer/api-contract-interactions.ts`, driven by a new
+  `The premium theme owner account no longer exists` provider state and an
+  `owner-erased` scenario on `mockPremiumThemeService`. Both consumer pacts
+  verify it green with the inherited `Cache-Control: private, no-store` header
+  (68 and 77 interactions, stable across the three determinism runs).
 
 - **Two `apps/api` integration runs against one PostgreSQL fail each other.**
   Recorded in `_bmad-output/project-knowledge/development-guide.md` with the

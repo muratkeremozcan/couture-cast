@@ -209,4 +209,32 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
       'Community'
     )
   })
+
+  /**
+   * The hero card is hardcoded story 3.5 design copy, and the `Sponsored` chip's
+   * entry used to read "Sponsored Selection" over "A clearly labeled brand
+   * selection" — a paid-placement disclosure over content with no partner
+   * behind it. Story 5.1 owns the real vocabulary for that ("Paid partnership",
+   * "Presented by {{partner}}"), and it renders only beside an offer that
+   * exists.
+   *
+   * This asserts the negative because that is the failure mode: nothing about
+   * the page looks wrong when placeholder copy claims a sponsorship, so only a
+   * test that refuses the words will catch it coming back.
+   */
+  it('does not claim a commercial relationship in the Brands hero copy', () => {
+    render(<LookbookPrismLayout />)
+
+    fireEvent.click(screen.getByTestId('chip-sponsored'))
+
+    const heroCard = screen.getByTestId('hero-recommendation-title').closest('div')
+    expect(heroCard).not.toBeNull()
+
+    const heroCopy = heroCard?.textContent ?? ''
+    expect(heroCopy).not.toMatch(/sponsored/i)
+    expect(heroCopy).not.toMatch(/paid partnership/i)
+    expect(heroCopy).not.toMatch(/presented by/i)
+    expect(heroCopy).not.toMatch(/commission/i)
+    expect(heroCopy).toContain('Brand Picks')
+  })
 })

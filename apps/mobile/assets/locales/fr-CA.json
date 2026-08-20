@@ -320,7 +320,8 @@
       "optOutLabel": "Afficher les suggestions « Magasiner ce look »",
       "optOutHelp": "Désactivez cette option pour masquer toutes les suggestions de partenaires et d’affiliation.",
       "saved": "Préférences de magasinage mises à jour",
-      "error": "Impossible de mettre à jour les préférences de magasinage."
+      "error": "Impossible de mettre à jour les préférences de magasinage.",
+      "loadError": "Impossible de charger les préférences de magasinage."
     },
     "premium": {
       "sectionTitle": "Premium",

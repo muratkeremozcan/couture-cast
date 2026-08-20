@@ -320,7 +320,8 @@
       "optOutLabel": "Show \"Shop this look\" suggestions",
       "optOutHelp": "Turn this off to hide all partner and affiliate suggestions.",
       "saved": "Shopping preferences updated",
-      "error": "Unable to update shopping preferences."
+      "error": "Unable to update shopping preferences.",
+      "loadError": "Unable to load shopping preferences."
     },
     "premium": {
       "sectionTitle": "Premium",

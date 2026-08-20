@@ -15,6 +15,7 @@
       "optOutHelp": "Disattiva questa opzione per nascondere tutti i suggerimenti di partner e affiliazione.",
       "saved": "Preferenze di acquisto aggiornate",
       "error": "Impossibile aggiornare le preferenze di acquisto.",
+      "loadError": "Impossibile caricare le preferenze di acquisto.",
       "signedOutHint": "Accedi per modificare questa impostazione"
     },
     "premium": {

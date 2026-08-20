@@ -124,7 +124,11 @@ export default function SettingsScreen() {
             // The catalog always carries this key: `commerce-locales.spec.ts`
             // asserts an exact key tree across all ten locales, which is a
             // stronger guarantee than an inline fallback that can drift.
-            t('commerce.settings.error')
+            //
+            // `loadError`, not `error`: this is the initial read, and `error`
+            // reads "Unable to update shopping preferences.", which names an
+            // action the user did not take and cannot retry from here.
+            t('commerce.settings.loadError')
           )
         }
       })

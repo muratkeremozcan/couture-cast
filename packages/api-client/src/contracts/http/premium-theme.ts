@@ -137,10 +137,12 @@ export const PREMIUM_THEMES_DISABLED_MESSAGE =
  * is gone" — the same distinction `COMMERCE_OFFER_NOT_FOUND_MESSAGE` and
  * `SUBSCRIPTION_NOT_FOUND_MESSAGE` already draw for the other commerce writes.
  *
- * Not registered as a documented 404 response on the PUT operation: doing so
- * reshapes published nodes and pulls an `optic diff` conversation into a defect
- * fix. The response shape is Nest's standard `NotFoundException` envelope, so
- * nothing about it is novel on the wire.
+ * Documented as a 404 on the PUT operation below. An earlier revision left it
+ * undocumented on the theory that publishing it would drag an `optic diff`
+ * conversation into a defect fix; that was wrong twice over. Adding a response
+ * to an operation is additive rather than breaking, and a status a client can
+ * actually receive belongs in the contract whether or not documenting it is
+ * convenient.
  */
 export const PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE = 'Account not found.'
 
@@ -239,6 +241,12 @@ export function registerPremiumThemeContracts(
         description: `The acting user has no active Premium entitlement ("${PREMIUM_REQUIRED_MESSAGE}"). Returned before the feature flag is consulted.`,
         content: {
           'application/json': { schema: commonSchemas.forbiddenHttpErrorSchema },
+        },
+      },
+      404: {
+        description: `The acting user's account no longer exists ("${PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE}"). One request wide: the upsert violates the preference table's user foreign key because the User row was deleted while the write was in flight. Documented on the PUT only — the GET reads and cannot hit the constraint.`,
+        content: {
+          'application/json': { schema: commonSchemas.notFoundHttpErrorSchema },
         },
       },
       500: {

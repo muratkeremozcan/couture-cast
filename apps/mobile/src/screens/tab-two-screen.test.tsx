@@ -416,7 +416,12 @@ describe('SettingsScreen', () => {
 
     await render(<SettingsScreen />)
 
-    await screen.findByTestId('commerce-settings-error')
+    const alert = await screen.findByTestId('commerce-settings-error')
+    // The load string, not the save string. This path reused
+    // `commerce.settings.error` ("Unable to update shopping preferences."),
+    // which names an action the user never took on a screen that had only just
+    // opened.
+    expect(alert.textContent).toBe('Unable to load shopping preferences.')
     const toggle = screen.getByTestId('commerce-opt-out-toggle')
     // A failed read is not an opt-out. Rendering the switch as "off" would show
     // the user a preference they never set.

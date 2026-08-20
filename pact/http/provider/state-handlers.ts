@@ -422,4 +422,14 @@ export const stateHandlers: StateHandlers = {
       description: 'Configured the premium themes kill switch as off',
     })
   },
+  'The premium theme owner account no longer exists': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as PremiumThemeStateParams
+    // Entitled, so the guard lets the request reach the handler -- this state
+    // is about the window between that check and the write, where account
+    // erasure leaves the upsert with no User row to reference.
+    configureProviderPremiumThemeState({ userId, scenario: 'owner-erased' })
+    return Promise.resolve({
+      description: 'Configured an entitled user whose account is erased mid-request',
+    })
+  },
 }

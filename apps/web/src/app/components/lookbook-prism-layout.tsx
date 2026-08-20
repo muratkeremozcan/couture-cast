@@ -21,6 +21,30 @@ const CHIP_DEFAULT_FILTER: Record<ChipCategory, FilterCategory> = {
   Sponsored: 'Brands',
 }
 
+/**
+ * Story 3.5 design copy. Every field here is hardcoded demonstration content —
+ * the garment chips below the card are too — and it is what the hero renders
+ * until a real recommendation feed reaches this surface.
+ *
+ * THE `Sponsored` ENTRY MUST NOT CLAIM A COMMERCIAL RELATIONSHIP. It used to
+ * read `'Sponsored Selection'` over `'A clearly labeled brand selection...'`,
+ * which is a paid-placement disclosure attached to content with no partner
+ * behind it and no `AffiliateOffer` row anywhere near it. It was reachable in
+ * ordinary use: `CHIP_DEFAULT_FILTER.Sponsored` is a real chip, and
+ * `deep-link-handler.ts` routes the `evening` deep link straight to it.
+ *
+ * The vocabulary for genuine paid placement is owned by story 5.1 and lives in
+ * the `commerce.shopThisLook.*` catalog keys — "Paid partnership. CoutureCast
+ * may earn a commission." and "Presented by {{partner}}" — rendered only beside
+ * an offer that exists. `prd.md:192` requires sponsored content to be labeled.
+ * Placeholder copy borrowing that language is the inverse failure: a disclosure
+ * with nothing to disclose, which is a claim rather than a caveat.
+ *
+ * So this entry describes the view a reader selected — brand-oriented looks,
+ * matching the chip's own `Brands` filter — and says nothing about who paid for
+ * it. `lookbook-prism-layout.test.tsx` asserts that, so restoring the old
+ * wording turns a test red rather than shipping quietly.
+ */
 const HERO_RECOMMENDATIONS: Record<
   ChipCategory,
   { eyebrow: string; score: string; title: string; description: string }
@@ -40,11 +64,11 @@ const HERO_RECOMMENDATIONS: Record<
       'Community favorites pair light cashmere with a pleated midi skirt for the breezy forecast.',
   },
   Sponsored: {
-    eyebrow: 'Sponsored Selection',
+    eyebrow: 'Brand Picks',
     score: '90%',
     title: 'Couture House Archive Ensemble',
     description:
-      'A clearly labeled brand selection featuring recycled wool and signature gold details.',
+      'Brand-forward pairings built around recycled wool and signature gold details.',
   },
 }
 

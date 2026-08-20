@@ -104,6 +104,24 @@ type ThemeEnvelope = {
   message?: string
 }
 
+/**
+ * Blocks until the process clock is strictly past `afterMs`.
+ *
+ * `updated_at` is a Prisma `@updatedAt` column, stamped at millisecond
+ * precision, so two writes inside the same millisecond produce the same value.
+ * Polling for the timestamp to advance AFTER issuing the second write cannot
+ * fix that: nothing writes again, so the poll re-reads a value that will never
+ * change and fails on timeout rather than on the thing it meant to assert.
+ *
+ * Waiting for the boundary before the write makes the ordering a fact rather
+ * than a race, which lets the assertion afterwards be a single read.
+ */
+async function waitPastTimestamp(afterMs: number): Promise<void> {
+  while (Date.now() <= afterMs) {
+    await new Promise((resolve) => setTimeout(resolve, 1))
+  }
+}
+
 function envelope(response: { body: unknown }): ThemeEnvelope {
   return response.body as ThemeEnvelope
 }
@@ -341,21 +359,17 @@ describe('5.3 premium theme preference against real PostgreSQL and real HTTP', (
       where: { user_id: userId },
     })
 
+    await waitPastTimestamp(rowAfterFirst.updated_at.getTime())
+
     const second = await putTheme(app, userId, { theme: 'autumn_umber' })
     expect(second.status).toBe(200)
 
-    // Poll the observable condition -- updated_at actually advancing -- instead of a
-    // fixed sleep before the second write: deterministic across runner speeds, where a
-    // fixed delay is either too short (flaky) or wastes CI time being longer than
-    // strictly needed.
-    await expect
-      .poll(async () => {
-        const row = await prisma.premiumThemePreference.findUniqueOrThrow({
-          where: { user_id: userId },
-        })
-        return row.updated_at.getTime()
-      })
-      .toBeGreaterThan(rowAfterFirst.updated_at.getTime())
+    const rowAfterSecondWrite = await prisma.premiumThemePreference.findUniqueOrThrow({
+      where: { user_id: userId },
+    })
+    expect(rowAfterSecondWrite.updated_at.getTime()).toBeGreaterThan(
+      rowAfterFirst.updated_at.getTime()
+    )
   })
 
   it('updated_at also moves on a PUT that resubmits the already-stored value (documents the real Prisma upsert behavior)', async (context) => {
@@ -375,23 +389,17 @@ describe('5.3 premium theme preference against real PostgreSQL and real HTTP', (
     // or not the other column values actually changed, so this row's
     // updated_at moves too. Asserted directly against real Postgres rather
     // than assumed, per this follow-up's brief.
+    await waitPastTimestamp(rowAfterFirst.updated_at.getTime())
+
     const second = await putTheme(app, userId, { theme: 'jewel_radiance' })
     expect(second.status).toBe(200)
-
-    // See the previous test: poll the observable condition instead of sleeping a
-    // fixed duration before the second write.
-    await expect
-      .poll(async () => {
-        const row = await prisma.premiumThemePreference.findUniqueOrThrow({
-          where: { user_id: userId },
-        })
-        return row.updated_at.getTime()
-      })
-      .toBeGreaterThan(rowAfterFirst.updated_at.getTime())
 
     const rowAfterSecond = await prisma.premiumThemePreference.findUniqueOrThrow({
       where: { user_id: userId },
     })
+    expect(rowAfterSecond.updated_at.getTime()).toBeGreaterThan(
+      rowAfterFirst.updated_at.getTime()
+    )
     expect(rowAfterSecond.theme).toBe('jewel_radiance')
   })
 })

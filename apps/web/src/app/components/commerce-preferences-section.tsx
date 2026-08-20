@@ -9,7 +9,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  commerceErrorMessage,
   getCommercePreferenceFromWeb,
   hasWebSession,
   updateCommercePreferenceFromWeb,
@@ -43,6 +42,15 @@ export function CommercePreferencesSection() {
    */
   const genericErrorMessage = t('commerce.settings.error')
 
+  /*
+   * A separate string from the one above, and resolved the same way and for the
+   * same reason. "Unable to update shopping preferences." is what the toggle
+   * says when a save fails; telling someone their preferences could not be
+   * *updated* when the page merely failed to *read* them points at the wrong
+   * action, and the only action available in `load_failed` is a reload.
+   */
+  const loadErrorMessage = t('commerce.settings.loadError')
+
   useEffect(() => {
     if (!hasWebSession()) {
       setSectionState('signed_out')
@@ -60,17 +68,30 @@ export function CommercePreferencesSection() {
         }
         setEnabled(preference.affiliateCtasEnabled)
         setSectionState('ready')
-      } catch (loadError: unknown) {
+      } catch {
         if (controller.signal.aborted) {
           return
         }
-        setError(commerceErrorMessage(loadError, genericErrorMessage))
+        /*
+         * The catalog string, unconditionally — the server's own message is
+         * deliberately NOT shown.
+         *
+         * `commerceError` prefers the API's error body, which is English on
+         * every locale, so routing it here put untranslated text in front of a
+         * reader who had chosen one of nine other languages. `premium.ts` was
+         * corrected the same way on 2026-08-19 for the same reason. These two
+         * endpoints have no actionable failure to distinguish — a preferences
+         * read either worked or did not — so there is nothing the server text
+         * tells the reader that this string does not. The developer-facing
+         * message survives on the thrown `CommerceRequestError` for logs.
+         */
+        setError(loadErrorMessage)
         setSectionState('load_failed')
       }
     })()
 
     return () => controller.abort()
-  }, [genericErrorMessage])
+  }, [loadErrorMessage])
 
   /**
    * Optimistic, and reverted on failure.
@@ -104,9 +125,10 @@ export function CommercePreferencesSection() {
       })
       setEnabled(saved.affiliateCtasEnabled)
       setConfirmation(t('commerce.settings.saved'))
-    } catch (saveError: unknown) {
+    } catch {
       setEnabled(previous)
-      setError(commerceErrorMessage(saveError, genericErrorMessage))
+      // Catalog copy, not the server's English. See the read path above.
+      setError(genericErrorMessage)
     } finally {
       setIsSaving(false)
     }

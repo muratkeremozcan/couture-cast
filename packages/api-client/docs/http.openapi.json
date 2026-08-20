@@ -11305,6 +11305,16 @@
               }
             }
           },
+          "404": {
+            "description": "The acting user's account no longer exists (\"Account not found.\"). One request wide: the upsert violates the preference table's user foreign key because the User row was deleted while the write was in flight. Documented on the PUT only — the GET reads and cannot hit the constraint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error occurred",
             "content": {

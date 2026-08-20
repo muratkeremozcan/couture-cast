@@ -15,6 +15,7 @@
       "optOutHelp": "Desative esta opção para ocultar todas as sugestões de parceiros e afiliados.",
       "saved": "Preferências de compras atualizadas",
       "error": "Não foi possível atualizar as preferências de compras.",
+      "loadError": "Não foi possível carregar as preferências de compras.",
       "signedOutHint": "Inicie sessão para alterar esta definição"
     },
     "premium": {

@@ -38,6 +38,7 @@ import {
   premiumThemeResponseSchema,
   updatePremiumThemeResponseSchema,
   PREMIUM_THEMES_DISABLED_MESSAGE,
+  PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE,
   wardrobeOnboardingStateResponseSchema,
   silhouetteProfileResponseSchema,
   createSilhouetteUploadUrlResponseSchema,
@@ -3873,11 +3874,13 @@ export async function verifyThemeResetInteraction(
  * one `addInteraction()...executeTest()` chain is awaited inside one test
  * body.
  *
- * Both rows are PUT-only: the GET operation is never entitlement- or
- * flag-gated (Decision 9), so it has no error rows of its own to cover here.
- * 403 outranks 503 because `PremiumEntitlementGuard` runs pre-handler while
- * the flag check lives in the service body -- a non-entitled caller can never
- * observe the kill switch.
+ * All three rows are PUT-only: the GET operation is never entitlement- or
+ * flag-gated (Decision 9) and never writes, so it has no error rows of its own
+ * to cover here. 403 outranks 503 because `PremiumEntitlementGuard` runs
+ * pre-handler while the flag check lives in the service body -- a non-entitled
+ * caller can never observe the kill switch. The 404 sits behind both: it is
+ * raised by the write itself, so a caller only reaches it after passing the
+ * guard and the flag.
  */
 export type PremiumThemeErrorInteraction = {
   description: string
@@ -3904,6 +3907,19 @@ export const premiumThemeErrorInteractions: PremiumThemeErrorInteraction[] = [
     status: 503,
     message: PREMIUM_THEMES_DISABLED_MESSAGE,
     reason: 'Service Unavailable',
+  },
+  {
+    // The account erased between the guard's entitlement check and the write.
+    // In the provider this is Prisma `P2003` on the preference table's user
+    // foreign key, remapped in `PremiumThemeService.writePreference`; before
+    // that remapping the same race answered 500, which named the server as
+    // broken for what is really an account that no longer exists.
+    description: 'reports a write whose owning account was erased mid-request',
+    state: 'The premium theme owner account no longer exists',
+    stateParams: { userId: pactEventAuth.userId },
+    status: 404,
+    message: PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE,
+    reason: 'Not Found',
   },
 ]
 
