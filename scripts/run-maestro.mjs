@@ -83,6 +83,37 @@ const WRITE_ARTIFACTS =
   process.env.MOBILE_E2E_ARTIFACTS === '1'
 const MAESTRO_ARTIFACT_DIR = process.env.MAESTRO_ARTIFACT_DIR || 'maestro/artifacts'
 
+/**
+ * Whether this run is CI's own invocation, as opposed to a developer running
+ * the same script locally (including a local `--artifacts` run).
+ *
+ * Scopes `CI_FLOW_TIMEOUT_MS` below to CI. A developer stepping through a flow
+ * with breakpoints, or debugging on a slow machine, should not have their
+ * session killed by a budget sized for an unattended runner.
+ */
+const IS_CI = process.argv.includes('--ci')
+
+/**
+ * The ceiling one flow gets on the CI serial path before it is killed and
+ * reported as a failure, in milliseconds.
+ *
+ * Sized well above every flow's recorded cost in
+ * `scripts/maestro-flow-durations.json` (worst case recorded there is under
+ * three minutes) and well below the job's 45-minute ceiling, so a normal flow
+ * never comes close to it.
+ *
+ * This exists because a flow can silently stall rather than fail: a run on
+ * 2026-08-20 spent 19 minutes between "Waiting for flows to complete" and the
+ * next log line, with the device's manifest fetch simply never resolving, and
+ * Maestro's own step timeouts (15-30s, inside the flow) never fired because
+ * the flow was not mid-assertion, it was never getting the chance to start
+ * one. That run still passed, 24 minutes later, so nothing about it failed
+ * loudly; only the shard's total wall clock said anything was wrong, and nobody
+ * is watching that number on every run. A hard ceiling turns a silent,
+ * wall-clock-consuming stall into a fast, named failure instead.
+ */
+const CI_FLOW_TIMEOUT_MS = Number(process.env.MOBILE_E2E_CI_FLOW_TIMEOUT_MS || 360_000)
+
 const START_SERVER = process.env.MOBILE_E2E_SKIP_SERVER !== '1'
 const AUTO_BOOT_ANDROID = process.env.MOBILE_E2E_AUTO_BOOT_ANDROID !== '0'
 // How Android addresses Metro and the API on the host. `127.0.0.1` is the
@@ -3124,6 +3155,7 @@ const runUserScopedFlows = async (serialFlows, target, maestroEnv, flowFailures)
       await runMaestroCommand(serialArgs, {
         env: maestroEnv,
         logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
+        timeoutMs: IS_CI ? CI_FLOW_TIMEOUT_MS : undefined,
       })
       log(`PASS ${flowPath}`)
     } catch (error) {
@@ -3258,6 +3290,7 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
       await runMaestroCommand(maestroArgs, {
         env: maestroEnv,
         logFile: maestroLogFile,
+        timeoutMs: IS_CI ? CI_FLOW_TIMEOUT_MS : undefined,
       })
     } catch (error) {
       maestroExitError = error
