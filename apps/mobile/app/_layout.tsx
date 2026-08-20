@@ -26,6 +26,7 @@ import { trackMobileAlertReceived } from '@/src/analytics/track-events'
 import { initI18n } from '@/src/lib/i18n'
 import { registerBackgroundFetchAsync } from '@/src/lib/background-fetch'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
+import { AppThemeProvider } from '@/src/theme/theme-context'
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -156,16 +157,26 @@ function RootLayoutNav() {
   return (
     <MobileAnalyticsProvider>
       <AccessibilityAnnouncerProvider>
-        <ThemeProvider value={theme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-            <Stack.Screen
-              name="wardrobe-capsules"
-              options={{ title: 'Outfit capsules' }}
-            />
-          </Stack>
-        </ThemeProvider>
+        {/*
+          Story 5.3 Decision 12: inside the announcer and outside React Navigation's
+          `ThemeProvider`. Analytics and the announcer stay above it, where later work
+          may want to report a palette change, and navigation chrome stays below it.
+          The two providers answer different questions and must not be merged: the
+          navigation one carries the OS light/dark scheme, this one carries the
+          reader's own premium palette.
+        */}
+        <AppThemeProvider>
+          <ThemeProvider value={theme}>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+              <Stack.Screen
+                name="wardrobe-capsules"
+                options={{ title: 'Outfit capsules' }}
+              />
+            </Stack>
+          </ThemeProvider>
+        </AppThemeProvider>
       </AccessibilityAnnouncerProvider>
     </MobileAnalyticsProvider>
   )

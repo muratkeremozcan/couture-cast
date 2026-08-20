@@ -347,7 +347,31 @@
       "endedNote": "Aboneliğiniz sona erdi. Premium özelliklere yeniden kavuşmak için dilediğiniz zaman tekrar abone olun.",
       "errorLoad": "Abonelik durumunuz yüklenemedi. Lütfen tekrar deneyin.",
       "errorPurchase": "Satın alma tamamlanamadı. Lütfen tekrar deneyin.",
-      "unavailableInBuild": "Bu uygulama sürümünde satın alma yapılamıyor. Abone olmak için CoutureCast'in App Store veya Play Store sürümünü kullanın."
+      "unavailableInBuild": "Bu uygulama sürümünde satın alma yapılamıyor. Abone olmak için CoutureCast'in App Store veya Play Store sürümünü kullanın.",
+      "theme": {
+        "sectionTitle": "Arayüz paletleri",
+        "disclosure": "Arayüz paletleri bir Premium özelliğidir. Seçimin CoutureCast hesabına kaydedilir ve giriş yaptığın her cihazda geçerli olur. Palet yalnızca renkleri değiştirir: hangi kombinlerin önerileceğini asla değiştirmez. CoutureCast, seçtiğin paleti takma bir kimlikle analiz sağlayıcısına gönderir; kıyafet fotoğrafları veya kişisel bilgiler paylaşılmaz.",
+        "names": {
+          "jewelRadiance": "Jewel Radiance",
+          "autumnUmber": "Autumn Umber",
+          "winterMetallic": "Winter Metallic"
+        },
+        "select": "Uygula",
+        "selected": "Seçili",
+        "reset": "Varsayılan palet",
+        "preview": {
+          "title": "Canlı önizleme",
+          "body": "Bu kart uyguladığın paleti kullanır. Yukarıdaki kartlar her zaman kendi renklerini gösterir."
+        },
+        "unavailable": "Paletler şimdilik kapalı. Kaydettiğin seçim saklanıyor ve paletler geri geldiğinde yeniden uygulanacak.",
+        "locked": {
+          "title": "Arayüz paletleri bir Premium özelliğidir",
+          "body": "{{palettes}}'in kilidini açmak için yukarıdaki kontrollerden Premium'a abone ol.",
+          "signedOutBody": "{{palettes}}'in kilidini açmak için oturum aç ve Premium'a abone ol."
+        },
+        "loadError": "Arayüz paletin yüklenemedi. Varsayılan palet gösteriliyor.",
+        "saveError": "Arayüz paletin kaydedilemedi. Lütfen tekrar dene."
+      }
     }
   }
 }

@@ -80,6 +80,30 @@ function formatList(parts: readonly string[], locale: string): string {
 }
 
 /**
+ * Joins already-localized parts the way the reader's language joins a list.
+ *
+ * Public because more than accessibility copy needs it: any surface rendering a
+ * list of localized names needs the same punctuation, and `join(', ')` is wrong
+ * in most of the languages this ships in. German wants "und", French "et",
+ * Turkish "ve", Spanish "y", and English and Canadian English disagree about the
+ * serial comma.
+ *
+ * Call this rather than `Intl.ListFormat` directly. `Intl.ListFormat` is optional
+ * under ECMA-402 and Hermes ships without it, so constructing one on a device
+ * throws `TypeError: Cannot read property 'prototype' of undefined`. This helper
+ * uses the real thing where it exists and falls back where it does not.
+ */
+export function formatLocalizedList(
+  parts: readonly string[],
+  locale: string = DEFAULT_LOCALE
+): string {
+  // No normalizing here: this is a plain locale-aware join, so it stays a drop-in
+  // replacement for `Intl.ListFormat`. De-duplicating would silently drop a genuine
+  // repeat that the caller meant to show.
+  return formatList(parts, safeLocale(locale))
+}
+
+/**
  * Formats an already-localized weather description. Empty values are ignored and
  * case-insensitive duplicates are removed. Finite temperatures, including zero and
  * negatives, use Intl unit formatting. Invalid temperatures are omitted. Empty input
