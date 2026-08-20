@@ -139,7 +139,17 @@ module.exports = {
       // Feature-detecting `Intl.ListFormat` is still allowed, which is how the shared
       // `formatLocalizedList` helper in @couture/utils works. Only unguarded
       // construction is banned.
-      files: ['apps/mobile/**/*.{ts,tsx}'],
+      files: [
+        'apps/mobile/**/*.{ts,tsx}',
+        // These two ship into the Hermes bundle, so the constraint is theirs as much as
+        // the app's. The Segmenter incident was in api-client, not apps/mobile, so a
+        // guard scoped to the app alone would not have caught the bug it cites.
+        'packages/api-client/src/**/*.ts',
+        'packages/utils/src/**/*.ts',
+      ],
+      // Specs may construct the real API to compute an expected value; they run in Node
+      // or Chromium, never in Hermes.
+      excludedFiles: ['**/*.{spec,test}.{ts,tsx}'],
       rules: {
         'no-restricted-syntax': [
           'error',
