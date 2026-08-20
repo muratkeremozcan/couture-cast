@@ -32,6 +32,37 @@ module.exports = {
   },
   overrides: [
     {
+      // Repository tooling scripts are plain Node modules outside every tsconfig project,
+      // so they lint without type information.
+      files: ['**/*.mjs'],
+      extends: ['plugin:@typescript-eslint/disable-type-checked'],
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+      },
+      env: {
+        node: true,
+        browser: false,
+      },
+      rules: {
+        // CommonJS packages consumed from ESM (typescript, etc.) are addressed through their
+        // default export by convention; the named-export alternative is not reliable interop.
+        'import/no-named-as-default-member': 'off',
+      },
+    },
+    {
+      files: ['**/*.cjs', 'tools/**/*.js'],
+      extends: ['plugin:@typescript-eslint/disable-type-checked'],
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'commonjs',
+      },
+      env: {
+        node: true,
+        browser: false,
+      },
+    },
+    {
       files: ['**/*.{spec,test}.{ts,tsx}'],
       rules: {
         // Post-task consistency follow-through:

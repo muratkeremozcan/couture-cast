@@ -27,7 +27,9 @@ try {
   for (const file of envFiles) {
     const full = path.resolve(process.cwd(), file)
     if (fs.existsSync(full)) {
-      config({ path: full })
+      // quiet: dotenv v17 announces itself on stdout, which would corrupt the URL this
+      // script contracts to print there and CI captures by command substitution.
+      config({ path: full, quiet: true })
       break
     }
   }

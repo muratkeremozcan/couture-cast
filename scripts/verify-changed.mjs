@@ -9,11 +9,6 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const listOnly = process.argv.includes('--list')
 
-function fail(message) {
-  console.error(message)
-  process.exit(1)
-}
-
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
@@ -63,25 +58,26 @@ function parseChangedPathsNul(output) {
 }
 
 function findWorkspaceDirs() {
-  return ['packages', 'apps']
-    .flatMap((parentDir) => {
-      const absoluteParentDir = path.join(repoRoot, parentDir)
-      if (!fs.existsSync(absoluteParentDir)) {
-        return []
-      }
+  return ['packages', 'apps'].flatMap((parentDir) => {
+    const absoluteParentDir = path.join(repoRoot, parentDir)
+    if (!fs.existsSync(absoluteParentDir)) {
+      return []
+    }
 
-      return fs
-        .readdirSync(absoluteParentDir, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => path.posix.join(parentDir, entry.name))
-        .filter((workspaceDir) =>
-          fs.existsSync(path.join(repoRoot, workspaceDir, 'package.json'))
-        )
-    })
+    return fs
+      .readdirSync(absoluteParentDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => path.posix.join(parentDir, entry.name))
+      .filter((workspaceDir) =>
+        fs.existsSync(path.join(repoRoot, workspaceDir, 'package.json'))
+      )
+  })
 }
 
 function resolveWorkspace(filePath, workspaceDirs) {
-  return workspaceDirs.find((workspaceDir) => filePath === workspaceDir || filePath.startsWith(`${workspaceDir}/`))
+  return workspaceDirs.find(
+    (workspaceDir) => filePath === workspaceDir || filePath.startsWith(`${workspaceDir}/`)
+  )
 }
 
 function isIgnoredNonWorkspaceFile(filePath) {
@@ -156,7 +152,9 @@ if (orderedWorkspaceDirs.length === 0) {
 }
 
 if (unmappedPaths.length > 0) {
-  console.warn('Warning: verify:changed does not automatically verify these non-workspace files:')
+  console.warn(
+    'Warning: verify:changed does not automatically verify these non-workspace files:'
+  )
   for (const unmappedPath of unmappedPaths) {
     console.warn(`- ${unmappedPath}`)
   }
@@ -165,10 +163,14 @@ if (unmappedPaths.length > 0) {
 
 for (const workspaceDir of orderedWorkspaceDirs) {
   console.log(`\n=== verify:changed -> ${workspaceDir} ===`)
-  const result = spawnSync(process.execPath, ['scripts/verify-workspace.mjs', workspaceDir], {
-    cwd: repoRoot,
-    stdio: 'inherit',
-  })
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/verify-workspace.mjs', workspaceDir],
+    {
+      cwd: repoRoot,
+      stdio: 'inherit',
+    }
+  )
 
   if (result.status !== 0) {
     process.exit(result.status ?? 1)

@@ -512,7 +512,9 @@ const checkDeviceNetcat = async (adbBinary) => {
       }
       await captureProcess(adbBinary, ['reverse', '--remove', `tcp:${port}`], {
         timeoutMs: 10_000,
-      }).catch(() => {})
+      }).catch(() => {
+        /* best-effort: failures here are not fatal to the run */
+      })
       server.close(() => resolve(works))
     })
   })
@@ -644,13 +646,13 @@ const probeAndroidMetroReachability = async (host, port) => {
           if (!`${control.stdout ?? ''}`.includes('__NC_WORKS__')) {
             log(
               `nc -z does not work on this device image, so ${host} cannot be probed; ` +
-                `not treating that as unreachable`
+                'not treating that as unreachable'
             )
-            await captureProcess(adbBinary, [
-              'reverse',
-              '--remove',
-              `tcp:${probePort}`,
-            ]).catch(() => {})
+            await captureProcess(adbBinary, ['reverse', '--remove', `tcp:${probePort}`], {
+              timeoutMs: 10_000,
+            }).catch(() => {
+              /* best-effort: failures here are not fatal to the run */
+            })
             finish(null)
             return
           }
@@ -666,7 +668,9 @@ const probeAndroidMetroReachability = async (host, port) => {
       if (removeReverse) {
         await captureProcess(adbBinary, ['reverse', '--remove', `tcp:${probePort}`], {
           timeoutMs: 10_000,
-        }).catch(() => {})
+        }).catch(() => {
+          /* best-effort: failures here are not fatal to the run */
+        })
       }
       finish(sawConnection)
     })
@@ -679,7 +683,7 @@ const probeAndroidMetroReachability = async (host, port) => {
   if (routeWorks === false) {
     log(
       `Device could NOT reach this machine at ${host}. Expo Go cannot load the ` +
-        `project over that route; flows would report tab-home missing.`
+        'project over that route; flows would report tab-home missing.'
     )
     return false
   }
@@ -1740,16 +1744,12 @@ const captureProcess = (command, args, options = {}) =>
   })
 
 /**
- * Check whether an attached Android device/emulator is ready for Expo Go.
+ * Locate the Android SDK, derive the adb binary from it, and put its tools on
+ * PATH for this process and everything it spawns.
  *
- * Return value meaning:
- * - `installed`: Android target exists and Expo Go is already present.
- * - `missing`: Android target exists but Expo Go must be installed first.
- * - `no-device`: no usable Android target was detected, so iOS fallback may run.
- *
- * @returns {Promise<'installed' | 'missing' | 'no-device'>}
+ * @returns {string} the adb binary every Android call in this script should use
  */
-const ensureExpoGoOnAndroid = async () => {
+const prepareAndroidSdkTooling = () => {
   const sdkRoot =
     process.env.ANDROID_HOME ||
     process.env.ANDROID_SDK_ROOT ||
@@ -1764,41 +1764,82 @@ const ensureExpoGoOnAndroid = async () => {
     process.env.PATH = `${path.join(sdkRoot, 'platform-tools')}:${path.join(sdkRoot, 'emulator')}:${process.env.PATH}`
   }
 
+  return adbBinary
+}
+
+/**
+ * Whether adb can see a usable Android target right now.
+ *
+ * Says why it could not on the way out, because "no device" and "no adb" send
+ * an investigation to different places.
+ *
+ * @param {string} adbBinary
+ * @returns {Promise<boolean>}
+ */
+const hasAttachedAndroidDevice = async (adbBinary) => {
   try {
     const devices = await captureProcess(adbBinary, ['devices'])
     if (!/device\s*$/m.test(devices.stdout.trim())) {
       log('No Android device detected for Expo Go install')
-      return 'no-device'
+      return false
     }
   } catch {
     log('adb not available; skipping Expo Go install check')
-    return 'no-device'
+    return false
   }
 
-  try {
-    const packages = await captureProcess(adbBinary, [
+  return true
+}
+
+/**
+ * Ask the attached Android target which Expo Go it carries, if any.
+ *
+ * @param {string} adbBinary
+ * @returns {Promise<{ present: boolean, version: string | undefined }>}
+ */
+const readAndroidExpoGoVersion = async (adbBinary) => {
+  const packages = await captureProcess(adbBinary, [
+    'shell',
+    'pm',
+    'list',
+    'packages',
+    'host.exp.exponent',
+  ])
+  if (packages.stdout.includes('host.exp.exponent')) {
+    const packageInfo = await captureProcess(adbBinary, [
       'shell',
-      'pm',
-      'list',
-      'packages',
+      'dumpsys',
+      'package',
       'host.exp.exponent',
     ])
-    if (packages.stdout.includes('host.exp.exponent')) {
-      const packageInfo = await captureProcess(adbBinary, [
-        'shell',
-        'dumpsys',
-        'package',
-        'host.exp.exponent',
-      ])
-      const installedVersion = packageInfo.stdout.match(/versionName=([^\s]+)/)?.[1]
-      if (installedVersion === EXPECTED_EXPO_GO_VERSION) {
-        log(`Expo Go ${installedVersion} already installed on Android emulator/device`)
-        return 'installed'
+    return {
+      present: true,
+      version: packageInfo.stdout.match(/versionName=([^\s]+)/)?.[1],
+    }
+  }
+
+  return { present: false, version: undefined }
+}
+
+/**
+ * Whether the attached Android target already carries the expected Expo Go.
+ *
+ * A device that cannot be interrogated reports `false` rather than throwing, so
+ * the install attempt still gets its turn.
+ *
+ * @param {string} adbBinary
+ * @returns {Promise<boolean>}
+ */
+const hasExpectedExpoGoOnAndroid = async (adbBinary) => {
+  try {
+    const { present, version } = await readAndroidExpoGoVersion(adbBinary)
+    if (present) {
+      if (version === EXPECTED_EXPO_GO_VERSION) {
+        log(`Expo Go ${version} already installed on Android emulator/device`)
+        return true
       }
 
-      log(
-        `Expo Go ${installedVersion ?? 'unknown'} found; expected ${EXPECTED_EXPO_GO_VERSION}`
-      )
+      log(`Expo Go ${version ?? 'unknown'} found; expected ${EXPECTED_EXPO_GO_VERSION}`)
     } else {
       log('Expo Go not found on Android emulator/device')
     }
@@ -1806,42 +1847,67 @@ const ensureExpoGoOnAndroid = async () => {
     log('Unable to verify Expo Go version on Android emulator/device')
   }
 
-  if (process.env.MOBILE_E2E_AUTO_INSTALL_EXPO_GO !== '0') {
-    log('Attempting to install Expo Go on the connected Android target')
-    await spawnProcess('node', ['./scripts/install-expo-go.mjs'], {
-      cwd: projectRoot,
-      // A cold first device pays a ~180MB download and a streamed install of it,
-      // and 180 seconds was not enough for both. The installer caches the APK
-      // now, so later devices in a sharded run only pay the install.
-      timeoutMs: 480_000,
-    })
+  return false
+}
 
-    try {
-      const packages = await captureProcess(adbBinary, [
-        'shell',
-        'pm',
-        'list',
-        'packages',
-        'host.exp.exponent',
-      ])
-      if (packages.stdout.includes('host.exp.exponent')) {
-        const packageInfo = await captureProcess(adbBinary, [
-          'shell',
-          'dumpsys',
-          'package',
-          'host.exp.exponent',
-        ])
-        const installedVersion = packageInfo.stdout.match(/versionName=([^\s]+)/)?.[1]
-        if (installedVersion === EXPECTED_EXPO_GO_VERSION) {
-          log(`Expo Go ${installedVersion} installed on Android emulator/device`)
-          return 'installed'
-        }
-        log(
-          `Expo Go install finished, but version is ${installedVersion ?? 'unknown'}; expected ${EXPECTED_EXPO_GO_VERSION}`
-        )
+/**
+ * Install Expo Go on the attached Android target and verify what landed.
+ *
+ * @param {string} adbBinary
+ * @returns {Promise<boolean>} true only when the expected version is confirmed present
+ */
+const installExpoGoOnAndroid = async (adbBinary) => {
+  log('Attempting to install Expo Go on the connected Android target')
+  await spawnProcess('node', ['./scripts/install-expo-go.mjs'], {
+    cwd: projectRoot,
+    // A cold first device pays a ~180MB download and a streamed install of it,
+    // and 180 seconds was not enough for both. The installer caches the APK
+    // now, so later devices in a sharded run only pay the install.
+    timeoutMs: 480_000,
+  })
+
+  try {
+    const { present, version } = await readAndroidExpoGoVersion(adbBinary)
+    if (present) {
+      if (version === EXPECTED_EXPO_GO_VERSION) {
+        log(`Expo Go ${version} installed on Android emulator/device`)
+        return true
       }
-    } catch {
-      // fall through to the explicit missing state
+      log(
+        `Expo Go install finished, but version is ${version ?? 'unknown'}; expected ${EXPECTED_EXPO_GO_VERSION}`
+      )
+    }
+  } catch {
+    // fall through to the explicit missing state
+  }
+
+  return false
+}
+
+/**
+ * Check whether an attached Android device/emulator is ready for Expo Go.
+ *
+ * Return value meaning:
+ * - `installed`: Android target exists and Expo Go is already present.
+ * - `missing`: Android target exists but Expo Go must be installed first.
+ * - `no-device`: no usable Android target was detected, so iOS fallback may run.
+ *
+ * @returns {Promise<'installed' | 'missing' | 'no-device'>}
+ */
+const ensureExpoGoOnAndroid = async () => {
+  const adbBinary = prepareAndroidSdkTooling()
+
+  if (!(await hasAttachedAndroidDevice(adbBinary))) {
+    return 'no-device'
+  }
+
+  if (await hasExpectedExpoGoOnAndroid(adbBinary)) {
+    return 'installed'
+  }
+
+  if (process.env.MOBILE_E2E_AUTO_INSTALL_EXPO_GO !== '0') {
+    if (await installExpoGoOnAndroid(adbBinary)) {
+      return 'installed'
     }
   }
 
@@ -2029,89 +2095,86 @@ const ensureExpoGoOnIos = async () => {
 }
 
 /**
- * Resolve the explicit mobile target that Maestro should drive.
+ * Resolve the Android target Maestro should drive, booting and installing as
+ * needed.
  *
- * @returns {Promise<{ platform: 'android' | 'ios', appId: string, expoGoReady: boolean }>}
+ * @returns {Promise<{ platform: 'android', appId: string, expoGoReady: boolean }>}
  */
-const resolveTarget = async () => {
-  if (REQUESTED_PLATFORM !== 'android' && REQUESTED_PLATFORM !== 'ios') {
-    throw new Error(
-      'Choose a mobile platform explicitly: `npm run test:mobile:e2e:android` or `npm run test:mobile:e2e:ios`.'
-    )
-  }
-
-  if (REQUESTED_PLATFORM === 'android') {
-    if (PARALLEL_DEVICES) {
-      // Maestro is handed the whole device list at once, so every emulator has
-      // to be booted and carrying Expo Go before it starts. Booting is the shard
-      // launcher's job; this checks and installs.
-      for (const serial of ANDROID_SERIALS) {
-        useAndroidDevice(serial)
-        // eslint-disable-next-line no-await-in-loop -- adb is not concurrency safe
-        const status = await ensureExpoGoOnAndroid()
-        if (status !== 'installed') {
-          throw new Error(
-            `Expo Go is not usable on ${serial} (${status}). Every shard device needs it ` +
-              'before Maestro starts, because Maestro is given the whole device list at once.'
-          )
-        }
-      }
-      useAndroidDevice(ANDROID_SERIALS[0])
-      log(`Using ${ANDROID_SERIALS.length} Android emulators for a parallel Maestro run`)
-      return { platform: 'android', appId: 'host.exp.exponent', expoGoReady: true }
-    }
-
-    let expoGoStatus = await ensureExpoGoOnAndroid()
-    if (expoGoStatus === 'no-device') {
-      await bootAndroidTarget()
-      expoGoStatus = await ensureExpoGoOnAndroid()
-    }
-
-    if (expoGoStatus === 'installed') {
-      return { platform: 'android', appId: 'host.exp.exponent', expoGoReady: true }
-    }
-
-    if (expoGoStatus === 'missing') {
-      throw new Error(
-        'Expo Go is not installed on the Android emulator/device and automatic install failed. Boot the emulator and run `npm run mobile:expo-go`, then rerun `npm run test:mobile:e2e:android`.'
-      )
-    }
-
-    throw new Error(
-      'No Android emulator/device is available. Create an AVD or set `AVD_NAME`, then rerun `npm run test:mobile:e2e:android`.'
-    )
-  }
-
-  await ensureIosSimulatorTooling()
-
+const resolveAndroidTarget = async () => {
   if (PARALLEL_DEVICES) {
-    // Every device has to be booted and carrying Expo Go before Maestro starts,
-    // because Maestro is handed the whole device list at once.
-    let expoGoReady = true
-    for (const udid of IOS_UDIDS) {
-      iosSimulatorUdid = udid
-      if (!(await hasBootedIosSimulator())) {
-        log(`Booting simulator ${udid}`)
-        await spawnProcess('xcrun', ['simctl', 'boot', udid], {
-          timeoutMs: 120_000,
-        }).catch(() => {
-          // `simctl boot` exits non-zero when the device is already booted.
-        })
-        await waitForCondition(hasBootedIosSimulator, 120_000, 1_000)
+    // Maestro is handed the whole device list at once, so every emulator has
+    // to be booted and carrying Expo Go before it starts. Booting is the shard
+    // launcher's job; this checks and installs.
+    for (const serial of ANDROID_SERIALS) {
+      useAndroidDevice(serial)
+      // eslint-disable-next-line no-await-in-loop -- adb is not concurrency safe
+      const status = await ensureExpoGoOnAndroid()
+      if (status !== 'installed') {
+        throw new Error(
+          `Expo Go is not usable on ${serial} (${status}). Every shard device needs it ` +
+            'before Maestro starts, because Maestro is given the whole device list at once.'
+        )
       }
-      expoGoReady = (await ensureExpoGoOnIos()) && expoGoReady
     }
-    iosSimulatorUdid = IOS_UDIDS[0]
-    log(`Using ${IOS_UDIDS.length} iOS simulators for a parallel Maestro run`)
-    return { platform: 'ios', appId: 'host.exp.Exponent', expoGoReady }
+    useAndroidDevice(ANDROID_SERIALS[0])
+    log(`Using ${ANDROID_SERIALS.length} Android emulators for a parallel Maestro run`)
+    return { platform: 'android', appId: 'host.exp.exponent', expoGoReady: true }
   }
 
-  if (await hasBootedIosSimulator()) {
-    const expoGoReady = await ensureExpoGoOnIos()
-    log('Using booted iOS simulator for Maestro run')
-    return { platform: 'ios', appId: 'host.exp.Exponent', expoGoReady }
+  let expoGoStatus = await ensureExpoGoOnAndroid()
+  if (expoGoStatus === 'no-device') {
+    await bootAndroidTarget()
+    expoGoStatus = await ensureExpoGoOnAndroid()
   }
 
+  if (expoGoStatus === 'installed') {
+    return { platform: 'android', appId: 'host.exp.exponent', expoGoReady: true }
+  }
+
+  if (expoGoStatus === 'missing') {
+    throw new Error(
+      'Expo Go is not installed on the Android emulator/device and automatic install failed. Boot the emulator and run `npm run mobile:expo-go`, then rerun `npm run test:mobile:e2e:android`.'
+    )
+  }
+
+  throw new Error(
+    'No Android emulator/device is available. Create an AVD or set `AVD_NAME`, then rerun `npm run test:mobile:e2e:android`.'
+  )
+}
+
+/**
+ * Boot every simulator in a parallel iOS run and put Expo Go on each of them.
+ *
+ * @returns {Promise<{ platform: 'ios', appId: string, expoGoReady: boolean }>}
+ */
+const resolveParallelIosTarget = async () => {
+  // Every device has to be booted and carrying Expo Go before Maestro starts,
+  // because Maestro is handed the whole device list at once.
+  let expoGoReady = true
+  for (const udid of IOS_UDIDS) {
+    iosSimulatorUdid = udid
+    if (!(await hasBootedIosSimulator())) {
+      log(`Booting simulator ${udid}`)
+      await spawnProcess('xcrun', ['simctl', 'boot', udid], {
+        timeoutMs: 120_000,
+      }).catch(() => {
+        // `simctl boot` exits non-zero when the device is already booted.
+      })
+      await waitForCondition(hasBootedIosSimulator, 120_000, 1_000)
+    }
+    expoGoReady = (await ensureExpoGoOnIos()) && expoGoReady
+  }
+  iosSimulatorUdid = IOS_UDIDS[0]
+  log(`Using ${IOS_UDIDS.length} iOS simulators for a parallel Maestro run`)
+  return { platform: 'ios', appId: 'host.exp.Exponent', expoGoReady }
+}
+
+/**
+ * Boot the one simulator a serial iOS run drives.
+ *
+ * @returns {Promise<void>}
+ */
+const bootSingleIosSimulator = async () => {
   log('No iOS simulator detected. Attempting to boot an iOS simulator.')
   if (iosSimulatorUdid === 'booted') {
     await spawnProcess('bash', ['./scripts/start-ios-simulator.sh'], {
@@ -2128,6 +2191,27 @@ const resolveTarget = async () => {
     })
     await waitForCondition(hasBootedIosSimulator, 120_000, 1_000)
   }
+}
+
+/**
+ * Resolve the iOS target Maestro should drive, booting and installing as needed.
+ *
+ * @returns {Promise<{ platform: 'ios', appId: string, expoGoReady: boolean }>}
+ */
+const resolveIosTarget = async () => {
+  await ensureIosSimulatorTooling()
+
+  if (PARALLEL_DEVICES) {
+    return resolveParallelIosTarget()
+  }
+
+  if (await hasBootedIosSimulator()) {
+    const expoGoReady = await ensureExpoGoOnIos()
+    log('Using booted iOS simulator for Maestro run')
+    return { platform: 'ios', appId: 'host.exp.Exponent', expoGoReady }
+  }
+
+  await bootSingleIosSimulator()
 
   if (await hasBootedIosSimulator()) {
     const expoGoReady = await ensureExpoGoOnIos()
@@ -2138,6 +2222,25 @@ const resolveTarget = async () => {
   throw new Error(
     'No iOS simulator is available. Ensure Xcode Simulator has an installed runtime/device, then rerun `npm run test:mobile:e2e:ios`.'
   )
+}
+
+/**
+ * Resolve the explicit mobile target that Maestro should drive.
+ *
+ * @returns {Promise<{ platform: 'android' | 'ios', appId: string, expoGoReady: boolean }>}
+ */
+const resolveTarget = async () => {
+  if (REQUESTED_PLATFORM !== 'android' && REQUESTED_PLATFORM !== 'ios') {
+    throw new Error(
+      'Choose a mobile platform explicitly: `npm run test:mobile:e2e:android` or `npm run test:mobile:e2e:ios`.'
+    )
+  }
+
+  if (REQUESTED_PLATFORM === 'android') {
+    return resolveAndroidTarget()
+  }
+
+  return resolveIosTarget()
 }
 
 /**
@@ -2250,7 +2353,7 @@ const resolveShardDeviceName = async (deviceId, index) => {
  * Names here are flow titles (the `name:` inside the flow), not file names.
  *
  * @param {string} reportPath
- * @returns {{ passed: string[], failed: string[] }}
+ * @returns {{ passed: string[], failed: string[], skipped: string[], unreadable: string | null }}
  */
 const readSuiteReport = (reportPath) => {
   const absolute = path.resolve(projectRoot, reportPath)
@@ -2261,7 +2364,12 @@ const readSuiteReport = (reportPath) => {
     // Returning an empty result here used to be indistinguishable from a report
     // that legitimately recorded nothing, which matters because this report is
     // the suite's source of truth: a silently empty read reports a green suite.
-    return { passed: [], failed: [], unreadable: `${absolute}: ${error.message}` }
+    return {
+      passed: [],
+      failed: [],
+      skipped: [],
+      unreadable: `${absolute}: ${error.message}`,
+    }
   }
 
   const passed = []
@@ -2433,6 +2541,905 @@ const runMaestroCommand = async (args, options = {}) => {
 }
 
 /**
+ * Run one operation against every Android device this run drives, then leave
+ * the process pointed back at the first of them.
+ *
+ * A serial run has no explicit serials at all, and passes through once with
+ * adb's own single-device default left alone.
+ *
+ * @param {() => Promise<void>} operation
+ * @returns {Promise<void>}
+ */
+const forEachAndroidDevice = async (operation) => {
+  for (const serial of ANDROID_SERIALS.length > 0 ? ANDROID_SERIALS : ['']) {
+    if (serial) useAndroidDevice(serial)
+    // eslint-disable-next-line no-await-in-loop -- adb is not concurrency safe
+    await operation()
+  }
+  if (SHARD_PLATFORM === 'android') useAndroidDevice(ANDROID_SERIALS[0])
+}
+
+/**
+ * Decide which host address the Android devices use to reach this machine.
+ *
+ * The route is a property of the image and the runner, not of the individual
+ * emulator, so it is measured once on the first device.
+ *
+ * @param {number} metroPort
+ * @returns {Promise<void>}
+ */
+const resolveAndroidHostRoute = async (metroPort) => {
+  const reachable = []
+  let anyVerdict = false
+  for (const candidate of ['127.0.0.1', '10.0.2.2']) {
+    // eslint-disable-next-line no-await-in-loop -- two candidates, ordered
+    const verdict = await probeAndroidMetroReachability(candidate, metroPort)
+    if (verdict !== null) anyVerdict = true
+    if (verdict === true) reachable.push(candidate)
+  }
+  if (reachable.length > 0) {
+    if (reachable[0] !== androidHost) {
+      log(`Using ${reachable[0]} as the Android host: the device can reach it`)
+      androidHost = reachable[0]
+    }
+  } else if (anyVerdict) {
+    // A real refusal on both routes. 10.0.2.2 is QEMU's own alias and needs no
+    // adb cooperation, so it is the better one to be wrong with.
+    log('Neither host answered; falling back to 10.0.2.2')
+    androidHost = '10.0.2.2'
+  } else {
+    // Nothing was measured. Changing the host on the strength of a probe that
+    // could not run would be guessing with extra steps.
+    log(`Reachability could not be measured; keeping ${androidHost}`)
+  }
+}
+
+/**
+ * Start the local API, or attach to one that is already serving, and make sure
+ * a wardrobe worker is running against it.
+ *
+ * The child handles are recorded in `children` as each one is spawned rather
+ * than returned at the end, because the steps that wait for readiness can
+ * throw, and the caller still has to be able to stop whatever was started.
+ *
+ * @param {{ apiProcess?: import('node:child_process').ChildProcess, workerProcess?: import('node:child_process').ChildProcess }} children
+ * @param {{ apiHealthUrl: string, mobileApiBaseUrl: string, deterministicFlagEnv: Record<string, string> }} config
+ * @returns {Promise<void>}
+ */
+const startOrReuseLocalApi = async (
+  children,
+  { apiHealthUrl, mobileApiBaseUrl, deterministicFlagEnv }
+) => {
+  let apiAlreadyRunning = false
+  try {
+    await waitForHealth(apiHealthUrl, 2_000, 250)
+    apiAlreadyRunning = true
+  } catch {
+    apiAlreadyRunning = false
+  }
+
+  if (apiAlreadyRunning) {
+    log(`Detected existing local API at ${apiHealthUrl}, reusing it`)
+    if (SKIP_WORKER) {
+      log('Skipping wardrobe worker start (MOBILE_E2E_SKIP_WORKER=1)')
+    } else {
+      children.workerProcess = spawn(
+        'npm',
+        ['run', 'start:workers:wardrobe', '--workspace', 'api'],
+        {
+          cwd: projectRoot,
+          detached: process.platform !== 'win32',
+          stdio: ['inherit', 'pipe', 'pipe'],
+          env: {
+            ...process.env,
+            DATABASE_URL: MOBILE_E2E_DATABASE_URL,
+            GARMENT_TAGGING_ENGINE: 'fixture',
+            ...deterministicFlagEnv,
+            TEST_ENV: 'local',
+          },
+        }
+      )
+      managedProcesses.set(children.workerProcess, 'Wardrobe worker')
+      await waitForProcessOutput(
+        children.workerProcess,
+        'Dedicated wardrobe worker started'
+      )
+    }
+  } else {
+    log('Starting local API for mobile E2E')
+    children.apiProcess = spawn('npm', ['run', 'start:api:e2e-with-workers'], {
+      cwd: projectRoot,
+      detached: process.platform !== 'win32',
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        ALLOW_DEV_GUARDIAN_SECRET: 'true',
+        DATABASE_URL: MOBILE_E2E_DATABASE_URL,
+        GUARDIAN_INVITE_WEB_BASE_URL: 'http://127.0.0.1:3005',
+        GARMENT_TAGGING_ENGINE: 'fixture',
+        ...deterministicFlagEnv,
+        PUBLIC_API_URL: process.env.MOBILE_E2E_PUBLIC_API_URL || mobileApiBaseUrl,
+        TEST_ENV: 'local',
+      },
+    })
+    managedProcesses.set(children.apiProcess, 'Local API')
+    children.apiProcess.on('exit', (code) => {
+      if (code !== null && code !== 0) {
+        console.error(`[maestro:runner] Local API exited early with code ${code}`)
+      }
+    })
+    await waitForHealth(apiHealthUrl, 180_000, 1_000)
+    log(`Local API reachable on ${apiHealthUrl}`)
+  }
+}
+
+/**
+ * Create one authenticated fixture user per shard device and publish the token
+ * map the bundle carries.
+ *
+ * One fixture user per simulator. The bundle carries the whole map and each
+ * device selects its own entry in `mobile-auth.ts`, because a single Metro
+ * bundle cannot hold a different token per device.
+ *
+ * @param {string} apiSetupBaseUrl
+ * @param {{ accessToken: string, userId: string }[]} mobileIdentities collected in place, so a
+ *   failure part way through still leaves the caller holding the ones already created
+ * @returns {Promise<{ accessToken: string, userId: string }>}
+ */
+const createShardedMobileIdentities = async (apiSetupBaseUrl, mobileIdentities) => {
+  const tokensByDeviceName = {}
+  for (const [index, deviceId] of SHARD_DEVICE_IDS.entries()) {
+    if (SHARD_PLATFORM === 'android') useAndroidDevice(deviceId)
+    else iosSimulatorUdid = deviceId
+    // eslint-disable-next-line no-await-in-loop -- one device at a time
+    await clearMobileE2EDeviceSettings()
+    // eslint-disable-next-line no-await-in-loop -- one device at a time
+    const identity = await setupMobileE2EIdentity(apiSetupBaseUrl)
+    // eslint-disable-next-line no-await-in-loop -- one device at a time
+    const deviceName = await resolveShardDeviceName(deviceId, index)
+    // Two devices answering to the same name would silently collapse the
+    // map to one entry, so every shard after the first would sign in as
+    // another shard's user and delete its garments mid-flow.
+    if (tokensByDeviceName[deviceName]) {
+      throw new Error(
+        `Two shard devices both report the name "${deviceName}". ` +
+          'The token map keys on that name, so they would share one fixture user.'
+      )
+    }
+    tokensByDeviceName[deviceName] = identity.accessToken
+    mobileIdentities.push(identity)
+    log(`Created authenticated mobile E2E fixture for ${deviceName}`)
+  }
+  if (SHARD_PLATFORM === 'android') useAndroidDevice(SHARD_DEVICE_IDS[0])
+  else iosSimulatorUdid = SHARD_DEVICE_IDS[0]
+  const mobileIdentity = mobileIdentities[0]
+  process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE = JSON.stringify(tokensByDeviceName)
+  return mobileIdentity
+}
+
+/**
+ * Create the authenticated fixture users this run signs in as.
+ *
+ * @param {string} apiSetupBaseUrl
+ * @param {{ accessToken: string, userId: string }[]} mobileIdentities collected in place
+ * @returns {Promise<{ accessToken: string, userId: string }>} the identity the run's own env points at
+ */
+const createMobileIdentities = async (apiSetupBaseUrl, mobileIdentities) => {
+  if (PARALLEL_DEVICES) {
+    return createShardedMobileIdentities(apiSetupBaseUrl, mobileIdentities)
+  }
+
+  await clearMobileE2EDeviceSettings()
+  const mobileIdentity = await setupMobileE2EIdentity(apiSetupBaseUrl)
+  mobileIdentities.push(mobileIdentity)
+  log('Created authenticated mobile E2E fixture')
+  return mobileIdentity
+}
+
+/**
+ * Publish the fixture identity and the seeded ids the flows assert on.
+ *
+ * @param {{ accessToken: string, userId: string, garmentIds?: string[] }} mobileIdentity
+ * @param {string} mobileApiBaseUrl
+ * @returns {void}
+ */
+const applyMobileFixtureEnv = (mobileIdentity, mobileApiBaseUrl) => {
+  process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN = mobileIdentity.accessToken
+  process.env.EXPO_PUBLIC_API_BASE_URL = mobileApiBaseUrl
+  process.env.WEATHER_ALERT_ID = mobileE2EWeatherAlertId(mobileIdentity.userId)
+  process.env.GARMENT_A_ID = mobileIdentity.garmentIds?.[0] ?? ''
+  process.env.GARMENT_B_ID = mobileIdentity.garmentIds?.[1] ?? ''
+  // The seeded capsule by id, so the repair flow stops taking whichever
+  // capsule the library happens to list first. That order is
+  // `is_favorite desc, updated_at desc` (`wardrobe-capsule.repository.ts`),
+  // and this very flow favourites a capsule, so "first" is a property of what
+  // ran before it rather than of the capsule the flow means.
+  process.env.CAPSULE_ID = mobileE2ECapsuleId(mobileIdentity.userId)
+  // A garment the seeded capsule does NOT already hold, so choosing a
+  // replacement adds one rather than deselecting a member.
+  // `seedMobileE2ECapsule` takes the two OLDEST garments, so the newest is
+  // always outside it.
+  process.env.REPLACEMENT_GARMENT_ID = mobileIdentity.garmentIds?.at(-1) ?? ''
+}
+
+/**
+ * The app/health URL pairs to try, best candidate first.
+ *
+ * Maestro needs both an app URL and a health URL. We probe the explicit env
+ * override first, then the chosen Metro port, then the default Expo port.
+ *
+ * @param {'android' | 'ios'} platform
+ * @param {number} metroPort
+ * @returns {{ app: string, health: string }[]}
+ */
+const buildPortPairs = (platform, metroPort) =>
+  [
+    {
+      app: process.env.MOBILE_E2E_APP_URL,
+      health: process.env.MOBILE_E2E_HEALTH_URL,
+    },
+    {
+      app: getLocalAppUrl(platform, metroPort),
+      health: `http://127.0.0.1:${metroPort}`,
+    },
+    {
+      app: getLocalAppUrl(platform, 8081),
+      health: 'http://127.0.0.1:8081',
+    },
+  ].filter((pair, index, self) => {
+    if (!pair.app || !pair.health) {
+      return false
+    }
+    const key = `${pair.app}-${pair.health}`
+    return self.findIndex((p) => `${p.app}-${p.health}` === key) === index
+  })
+
+/**
+ * Find an Expo dev server that is already serving one of the candidate pairs.
+ *
+ * @param {{ app: string, health: string }[]} portPairs
+ * @returns {Promise<{ app: string, health: string } | undefined>}
+ */
+const findRunningExpoServer = async (portPairs) => {
+  for (const pair of portPairs) {
+    try {
+      await waitForHealth(pair.health, 5_000, 500)
+      log(`Detected existing Expo dev server at ${pair.health}, reusing it`)
+      return pair
+    } catch {
+      // keep checking
+    }
+  }
+
+  return undefined
+}
+
+/**
+ * Start the Expo dev server for this run.
+ *
+ * @param {'android' | 'ios'} platform
+ * @param {number} metroPort
+ * @returns {import('node:child_process').ChildProcess}
+ */
+const startExpoDevServer = (platform, metroPort) => {
+  log(`Starting Expo dev server for mobile smoke (metro port ${metroPort})`)
+  const serverProcess = spawn('npm', ['run', 'start:mobile:server'], {
+    detached: process.platform !== 'win32',
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      MOBILE_E2E_PLATFORM: platform,
+    },
+  })
+  managedProcesses.set(serverProcess, 'Expo dev server')
+  serverProcess.on('exit', (code) => {
+    if (code !== null && code !== 0) {
+      console.error(`[maestro:runner] Expo dev server exited early with code ${code}`)
+    }
+  })
+  return serverProcess
+}
+
+/**
+ * Wait for the Expo dev server to answer on one of the candidate pairs, and
+ * check that it actually serves the Expo Go manifest.
+ *
+ * @param {{ app: string, health: string }[]} portPairs
+ * @param {'android' | 'ios'} platform
+ * @returns {Promise<{ app: string, health: string } | undefined>}
+ */
+const waitForExpoDevServer = async (portPairs, platform) => {
+  let resolvedPair
+  for (const pair of portPairs) {
+    try {
+      await waitForHealth(pair.health)
+      resolvedPair = pair
+      log(`Expo dev server reachable on ${pair.health}`)
+      // Reachable is not the same as serving Expo Go. Ask for the manifest
+      // the way the app will, so a 500 here is named now rather than
+      // surfacing later as every flow failing on `tab-home`.
+      const manifest = await fetchExpoGoManifest(pair.health, platform)
+      if (manifest.ok) {
+        log(
+          `Expo Go manifest served (HTTP ${manifest.statusCode}, ${manifest.contentType})`
+        )
+      } else {
+        log(
+          `Expo Go manifest request FAILED (HTTP ${manifest.statusCode}, ` +
+            `content-type ${manifest.contentType || 'none'}). Expo Go will show ` +
+            '"Something went wrong." and every flow will report tab-home missing. ' +
+            `Body: ${manifest.body.slice(0, 600) || '(empty)'}`
+        )
+      }
+      break
+    } catch {
+      // try next candidate
+    }
+  }
+
+  return resolvedPair
+}
+
+/**
+ * Publish the app URLs the flows are handed once a dev server is resolved.
+ *
+ * @param {{ app: string, health: string }} resolvedPair
+ * @param {string} appId
+ * @returns {void}
+ */
+const applyExpoUrlEnv = (resolvedPair, appId) => {
+  process.env.MOBILE_E2E_APP_URL = resolvedPair.app
+  process.env.MOBILE_E2E_HEALTH_URL = resolvedPair.health
+  process.env.APP_URL = resolvedPair.app
+  process.env.WARDROBE_URL = `${resolvedPair.app}wardrobe`
+  // The same `exp://` form on both platforms.
+  //
+  // Android used to build these as `mobile://(tabs)?...`, the app's own
+  // scheme, which Expo Go does not register — `openLink` failed with
+  // `Activity not started, unable to resolve Intent` and the flow was written
+  // off as impossible in the shell. iOS was already using the `exp://.../--/`
+  // form, which Expo Go routes into the app with the query string intact, and
+  // it is exactly how `APP_URL` and `WARDROBE_URL` reach the app on both
+  // platforms. There was never a reason for the two to differ.
+  //
+  // The slots are `am` and `evening` rather than `now` and `next` so the flow
+  // can assert what the link DID. `resolveDeepLinkScenario` maps those two
+  // deterministically to `morning` and `evening`, while `now`/`next` resolve
+  // against the current time and the ritual's forecast, which cannot be
+  // asserted without either freezing the clock or reimplementing the
+  // resolution in the flow. The deep link path under test is identical.
+  const widgetUrl = (size, slot) =>
+    `${resolvedPair.app}(tabs)?source=widget&size=${size}&slot=${slot}`
+  process.env.WIDGET_MORNING_URL = widgetUrl('small', 'am')
+  process.env.WIDGET_EVENING_URL = widgetUrl('medium', 'evening')
+  if (!process.env.MAESTRO_APP_ID) {
+    process.env.MAESTRO_APP_ID = appId
+  }
+}
+
+/**
+ * The environment Maestro itself runs under, plus the throwaway shim directory
+ * the caller has to delete afterwards.
+ *
+ * @param {'android' | 'ios'} platform
+ * @returns {{ maestroEnv: NodeJS.ProcessEnv, xcrunShimDir: string | undefined }}
+ */
+const createMaestroEnv = (platform) => {
+  let xcrunShimDir
+  const maestroEnv = { ...process.env }
+  if (platform === 'android' && process.env.MAESTRO_DISABLE_ANDROID_XCRUN_SHIM !== '1') {
+    xcrunShimDir = createAndroidXcrunShim()
+    maestroEnv.PATH = `${xcrunShimDir}:${maestroEnv.PATH ?? ''}`
+    log('Using Android-only xcrun shim to avoid broken iOS simulator discovery')
+  }
+  return { maestroEnv, xcrunShimDir }
+}
+
+/**
+ * The `-e` pairs every Maestro invocation in this run is given.
+ *
+ * Identical on the sharded, user-scoped and serial paths, so it is built once
+ * rather than being three lists that have to be kept in step by hand.
+ *
+ * @returns {string[]}
+ */
+const buildMaestroFlowEnvArgs = () => [
+  '-e',
+  `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`,
+  '-e',
+  `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`,
+  '-e',
+  `GARMENT_A_ID=${process.env.GARMENT_A_ID ?? ''}`,
+  '-e',
+  `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`,
+  '-e',
+  `CAPSULE_ID=${process.env.CAPSULE_ID ?? ''}`,
+  '-e',
+  `REPLACEMENT_GARMENT_ID=${process.env.REPLACEMENT_GARMENT_ID ?? ''}`,
+  '-e',
+  `APP_URL=${process.env.APP_URL}`,
+  '-e',
+  `WARDROBE_URL=${process.env.WARDROBE_URL}`,
+  '-e',
+  `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`,
+  '-e',
+  `WIDGET_EVENING_URL=${process.env.WIDGET_EVENING_URL}`,
+]
+
+/**
+ * Turn a sharded run's JUnit report into pass/fail lines and collected failures.
+ *
+ * @param {{ unreadable?: string, failed: string[], passed: string[], skipped: string[] }} report
+ * @param {string} reportPath
+ * @param {string[]} shardedFlows
+ * @param {Error | undefined} maestroExitError
+ * @param {string[]} flowFailures collected in place
+ * @returns {void}
+ */
+const recordShardedSuiteOutcome = (
+  report,
+  reportPath,
+  shardedFlows,
+  maestroExitError,
+  flowFailures
+) => {
+  if (report.unreadable) {
+    flowFailures.push(`JUnit report unreadable (${report.unreadable})`)
+    log(`FAIL JUnit report could not be read: ${report.unreadable}`)
+  }
+  for (const name of report.failed) {
+    flowFailures.push(name)
+    log(`FAIL ${name}`)
+  }
+  for (const name of report.skipped) {
+    flowFailures.push(`${name} (skipped, asserted nothing)`)
+    log(`FAIL ${name} was skipped and asserted nothing`)
+  }
+  for (const name of report.passed) {
+    log(`PASS ${name}`)
+  }
+
+  const accountedFor = report.failed.length + report.passed.length + report.skipped.length
+  if (accountedFor !== shardedFlows.length) {
+    // Every flow handed to Maestro has to appear in the report, or the
+    // count this run reports is a guess. Fail loudly instead.
+    const missing = shardedFlows.length - accountedFor
+    flowFailures.push(
+      `${missing} flow(s) missing from ${reportPath} (ran ${shardedFlows.length}, report described ${accountedFor})`
+    )
+    log(`FAIL ${missing} flow(s) absent from the JUnit report`)
+  } else if (maestroExitError && report.failed.length === 0) {
+    flowFailures.push(
+      `Maestro exited non-zero with no failure in the report: ${maestroExitError.message}`
+    )
+    log('FAIL Maestro exited non-zero while the report recorded no failure')
+  }
+}
+
+/**
+ * Run the shardable flows as one Maestro invocation across every device.
+ *
+ * @param {string[]} shardedFlows
+ * @param {{ platform: 'android' | 'ios' }} target
+ * @param {NodeJS.ProcessEnv} maestroEnv
+ * @param {string[]} flowFailures collected in place
+ * @returns {Promise<void>}
+ */
+const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) => {
+  const reportPath = toPosixPath(
+    path.join(MAESTRO_ARTIFACT_DIR, 'parallel-suite-report.xml')
+  )
+  const parallelArgs = [
+    '--platform',
+    target.platform,
+    '--udid',
+    SHARD_DEVICE_IDS.join(','),
+    'test',
+    '--shard-split',
+    String(SHARD_DEVICE_IDS.length),
+    ...buildMaestroFlowEnvArgs(),
+  ]
+  if (WRITE_ARTIFACTS) {
+    fs.mkdirSync(path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR), {
+      recursive: true,
+    })
+    parallelArgs.push(
+      '--format',
+      'junit',
+      '--output',
+      reportPath,
+      '--test-output-dir',
+      MAESTRO_ARTIFACT_DIR,
+      '--debug-output',
+      MAESTRO_ARTIFACT_DIR
+    )
+  }
+  parallelArgs.push(...shardedFlows)
+
+  log(`Running ${shardedFlows.length} flows across ${SHARD_DEVICE_IDS.length} devices`)
+  // The exit code is not trusted on its own here. A sharded invocation
+  // has been observed exiting 0 while its own summary printed
+  // `Passed: 16/17` and the JUnit report recorded `failures="1"`, so
+  // believing the exit code reported a green suite over a red one. The
+  // report is the evidence; the exit code only adds a failure the
+  // report could not describe.
+  let maestroExitError
+  try {
+    await runMaestroCommand(parallelArgs, {
+      env: maestroEnv,
+      logFile: WRITE_ARTIFACTS
+        ? path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR, 'parallel-suite.log')
+        : undefined,
+    })
+  } catch (error) {
+    maestroExitError = error
+  }
+
+  const resolvedReportPath = resolveReportPath(reportPath) ?? reportPath
+  const report = readSuiteReport(resolvedReportPath)
+  recordShardedSuiteOutcome(
+    report,
+    reportPath,
+    shardedFlows,
+    maestroExitError,
+    flowFailures
+  )
+}
+
+/**
+ * Run the flows that cannot be sharded, one at a time on the first device.
+ *
+ * @param {string[]} serialFlows
+ * @param {{ platform: 'android' | 'ios' }} target
+ * @param {NodeJS.ProcessEnv} maestroEnv
+ * @param {string[]} flowFailures collected in place
+ * @returns {Promise<void>}
+ */
+const runUserScopedFlows = async (serialFlows, target, maestroEnv, flowFailures) => {
+  for (const flowPath of serialFlows) {
+    const serialArgs = [
+      '--platform',
+      target.platform,
+      '--udid',
+      SHARD_DEVICE_IDS[0],
+      'test',
+      ...buildMaestroFlowEnvArgs(),
+    ]
+    if (WRITE_ARTIFACTS) {
+      serialArgs.push(
+        '--format',
+        'junit',
+        '--output',
+        getFlowReportPath(flowPath),
+        '--test-output-dir',
+        MAESTRO_ARTIFACT_DIR,
+        '--debug-output',
+        MAESTRO_ARTIFACT_DIR
+      )
+    }
+    serialArgs.push(flowPath)
+
+    log(`Running user-scoped flow on ${SHARD_DEVICE_IDS[0]}: ${flowPath}`)
+    try {
+      await runMaestroCommand(serialArgs, {
+        env: maestroEnv,
+        logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
+      })
+      log(`PASS ${flowPath}`)
+    } catch (error) {
+      flowFailures.push(flowPath)
+      log(`FAIL ${flowPath} (${error.message})`)
+    }
+  }
+}
+
+/**
+ * Build the Maestro invocation for one flow on the single-device path.
+ *
+ * @param {string} flowPath
+ * @param {{ platform: 'android' | 'ios' }} target
+ * @returns {{ maestroArgs: string[], maestroLogFile: string | undefined }}
+ */
+const buildSingleFlowMaestroArgs = (flowPath, target) => {
+  const maestroArgs = []
+  let maestroLogFile
+  if (process.env.MAESTRO_CLOUD_API_KEY && process.env.MAESTRO_CLOUD_WORKSPACE) {
+    maestroArgs.push(
+      'cloud',
+      '--workspace',
+      process.env.MAESTRO_CLOUD_WORKSPACE,
+      '--apiKey',
+      process.env.MAESTRO_CLOUD_API_KEY,
+      'test',
+      flowPath
+    )
+  } else {
+    maestroArgs.push('--platform', target.platform)
+    if (target.platform === 'ios' && iosSimulatorUdid !== 'booted') {
+      // Without this, concurrent shards all drive whichever simulator
+      // Maestro picks first.
+      maestroArgs.push('--udid', iosSimulatorUdid)
+    }
+    maestroArgs.push('test')
+    maestroArgs.push(...buildMaestroFlowEnvArgs())
+    if (WRITE_ARTIFACTS) {
+      fs.mkdirSync(path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR), {
+        recursive: true,
+      })
+      maestroLogFile = getFlowLogPath(flowPath)
+      maestroArgs.push(
+        '--format',
+        'junit',
+        '--output',
+        getFlowReportPath(flowPath),
+        '--test-output-dir',
+        MAESTRO_ARTIFACT_DIR,
+        '--debug-output',
+        MAESTRO_ARTIFACT_DIR
+      )
+    }
+    maestroArgs.push(flowPath)
+  }
+
+  return { maestroArgs, maestroLogFile }
+}
+
+/**
+ * Turn one flow's own JUnit report into a pass/fail line and a collected failure.
+ *
+ * The report is the evidence on this path too, not just the sharded one.
+ *
+ * This used to take the exit code as the whole answer, which is the opposite of
+ * what the sharded path does and the weaker of the two -- and it is the path CI
+ * runs on Android, so the stricter rule was being applied only where it was
+ * least needed. The rule is the same in both places now: a flow that the report
+ * records as failed or skipped fails the run, a flow the report never mentions
+ * fails the run, and a non-zero exit can only ADD a failure the report could not
+ * describe, never clear one.
+ *
+ * @param {string} flowPath
+ * @param {Error | undefined} maestroExitError
+ * @param {string[]} flowFailures collected in place
+ * @returns {void}
+ */
+const recordSingleFlowOutcome = (flowPath, maestroExitError, flowFailures) => {
+  if (WRITE_ARTIFACTS) {
+    const resolvedReportPath =
+      resolveReportPath(getFlowReportPath(flowPath)) ?? getFlowReportPath(flowPath)
+    const report = readSuiteReport(resolvedReportPath)
+    if (report.unreadable) {
+      flowFailures.push(`${flowPath} (JUnit report unreadable: ${report.unreadable})`)
+      log(`FAIL ${flowPath} (JUnit report could not be read)`)
+    } else if (report.failed.length > 0) {
+      flowFailures.push(flowPath)
+      log(`FAIL ${flowPath} (${report.failed.join(', ')})`)
+    } else if (report.skipped.length > 0) {
+      flowFailures.push(`${flowPath} (skipped, asserted nothing)`)
+      log(`FAIL ${flowPath} was skipped and asserted nothing`)
+    } else if (report.passed.length === 0) {
+      flowFailures.push(`${flowPath} (absent from its own JUnit report)`)
+      log(`FAIL ${flowPath} did not appear in its JUnit report`)
+    } else if (maestroExitError) {
+      flowFailures.push(
+        `${flowPath} (Maestro exited non-zero with no failure in the report: ${maestroExitError.message})`
+      )
+      log(`FAIL ${flowPath} (non-zero exit, clean report)`)
+    } else {
+      log(`PASS ${flowPath}`)
+    }
+  } else if (maestroExitError) {
+    flowFailures.push(flowPath)
+    log(`FAIL ${flowPath} (${maestroExitError.message})`)
+  } else {
+    log(`PASS ${flowPath}`)
+  }
+}
+
+/**
+ * Run every flow one at a time on the single-device path.
+ *
+ * @param {{ platform: 'android' | 'ios' }} target
+ * @param {NodeJS.ProcessEnv} maestroEnv
+ * @param {{ accessToken: string, userId: string } | undefined} mobileIdentity
+ * @param {string[]} flowFailures collected in place
+ * @returns {Promise<void>}
+ */
+const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures) => {
+  for (const flowPath of flowsToRun) {
+    const { maestroArgs, maestroLogFile } = buildSingleFlowMaestroArgs(flowPath, target)
+
+    if (mobileIdentity) {
+      await resetMobileE2EPerFlowState(mobileIdentity)
+    }
+
+    log(`Running Maestro flow (${maestroArgs.join(' ')})`)
+    let maestroExitError
+    try {
+      await runMaestroCommand(maestroArgs, {
+        env: maestroEnv,
+        logFile: maestroLogFile,
+      })
+    } catch (error) {
+      maestroExitError = error
+    }
+
+    recordSingleFlowOutcome(flowPath, maestroExitError, flowFailures)
+  }
+}
+
+/**
+ * Flows that depend on a value seeded for one specific user cannot be
+ * sharded: Maestro passes one set of `-e` values to every device, so
+ * `WEATHER_ALERT_ID` can only ever match the user of one of them. There is
+ * exactly one such flow, and it runs on the first device after the sharded
+ * pass rather than being weakened to suit the split.
+ */
+const USER_SCOPED_FLOWS = ['maestro/deep-link-handling.yaml']
+
+/**
+ * Run the suite across every shard device: the shardable flows in one Maestro
+ * invocation, then the user-scoped ones on the first device.
+ *
+ * @param {{ platform: 'android' | 'ios' }} target
+ * @param {NodeJS.ProcessEnv} maestroEnv
+ * @param {{ accessToken: string, userId: string }[]} mobileIdentities
+ * @param {string[]} flowFailures collected in place
+ * @returns {Promise<void>}
+ */
+const runParallelSuite = async (target, maestroEnv, mobileIdentities, flowFailures) => {
+  const shardedFlows = flowsToRun.filter((flow) => !USER_SCOPED_FLOWS.includes(flow))
+  const serialFlows = flowsToRun.filter((flow) => USER_SCOPED_FLOWS.includes(flow))
+
+  for (const identity of mobileIdentities) {
+    await resetMobileE2EPerFlowState(identity)
+  }
+
+  if (shardedFlows.length > 0) {
+    await runShardedFlows(shardedFlows, target, maestroEnv, flowFailures)
+  }
+
+  await runUserScopedFlows(serialFlows, target, maestroEnv, flowFailures)
+}
+
+/**
+ * Decide whether this run has to start Expo at all, reusing a dev server that
+ * is already serving one of the candidate pairs.
+ *
+ * @param {{ app: string, health: string }[]} portPairs
+ * @returns {Promise<{ resolvedPair: { app: string, health: string } | undefined, startServer: boolean }>}
+ */
+const resolveExpoServerReuse = async (portPairs) => {
+  let resolvedPair
+  let startServer = START_SERVER
+
+  if (startServer) {
+    const runningPair = await findRunningExpoServer(portPairs)
+    if (runningPair) {
+      resolvedPair = runningPair
+      startServer = false
+    }
+  }
+
+  return { resolvedPair, startServer }
+}
+
+/**
+ * Make sure an Expo dev server is serving, and hand back the app/health pair
+ * the rest of the run is built from.
+ *
+ * @param {object} options
+ * @param {boolean} options.startServer
+ * @param {{ app: string, health: string } | undefined} options.resolvedPair
+ * @param {{ app: string, health: string }[]} options.portPairs
+ * @param {'android' | 'ios'} options.platform
+ * @param {number} options.metroPort
+ * @param {{ serverProcess?: import('node:child_process').ChildProcess }} options.children records the spawned server so the caller can stop it
+ * @returns {Promise<{ app: string, health: string }>}
+ */
+const ensureExpoServerPair = async ({
+  startServer,
+  resolvedPair,
+  portPairs,
+  platform,
+  metroPort,
+  children,
+}) => {
+  let pair = resolvedPair
+
+  if (startServer) {
+    children.serverProcess = startExpoDevServer(platform, metroPort)
+    pair = await waitForExpoDevServer(portPairs, platform)
+    if (!pair) {
+      throw new Error(
+        `Expo dev server never became healthy. Tried: ${portPairs.map((p) => p.health).join(', ')}`
+      )
+    }
+  } else {
+    log('Skipping Expo dev server start (MOBILE_E2E_SKIP_SERVER=1)')
+    pair = portPairs[0]
+    if (!pair) {
+      throw new Error(
+        'No MOBILE_E2E_APP_URL / MOBILE_E2E_HEALTH_URL provided while server skip is enabled'
+      )
+    }
+  }
+
+  if (!pair) {
+    pair = portPairs[0]
+    if (!pair) {
+      throw new Error('Unable to resolve Expo dev server port configuration')
+    }
+  }
+
+  return pair
+}
+
+/**
+ * Wait until Expo Go is actually usable on the target, then warm the bundle.
+ *
+ * When Expo CLI has to install Expo Go on iOS, Metro can be healthy before
+ * the app is ready. Poll briefly so Maestro does not race the install.
+ *
+ * @param {{ platform: 'android' | 'ios', expoGoReady: boolean }} target
+ * @param {string} healthUrl
+ * @returns {Promise<void>}
+ */
+const awaitExpoGoAndWarmBundle = async (target, healthUrl) => {
+  const iosExpoGoReady =
+    target.platform !== 'ios' ||
+    (await waitForCondition(
+      async () => (await getInstalledExpoGoVersionOnIos()) !== null,
+      target.expoGoReady ? 10_000 : 90_000,
+      2_000
+    ))
+
+  await warmMetroBundle(healthUrl, target.platform)
+
+  if (!iosExpoGoReady) {
+    throw new Error(
+      'Expo Go is still unavailable on the booted iOS simulator after starting Expo. Verify the simulator is healthy, then rerun `npm run test:mobile:e2e:ios`.'
+    )
+  }
+}
+
+/**
+ * Delete the fixture users this run created and stop everything it started.
+ *
+ * @param {string} apiSetupBaseUrl
+ * @param {{ accessToken: string, userId: string }[]} mobileIdentities
+ * @param {{ apiProcess?: import('node:child_process').ChildProcess, workerProcess?: import('node:child_process').ChildProcess, serverProcess?: import('node:child_process').ChildProcess }} children
+ * @returns {Promise<void>}
+ */
+const cleanupMobileRun = async (apiSetupBaseUrl, mobileIdentities, children) => {
+  for (const identity of mobileIdentities) {
+    log('Cleaning authenticated mobile E2E fixture')
+    try {
+      await cleanupMobileE2EIdentity(apiSetupBaseUrl, identity)
+    } catch (cleanupError) {
+      console.error('[maestro:runner] Failed to clean mobile E2E fixture')
+      console.error(cleanupError)
+    }
+  }
+  const processCleanup = [
+    [children.serverProcess, 'Expo dev server'],
+    [children.workerProcess, 'Wardrobe worker'],
+    [children.apiProcess, 'Local API'],
+  ].filter(([child]) => Boolean(child))
+  const processCleanupResults = await Promise.allSettled(
+    processCleanup.map(([child, label]) => {
+      log(`Stopping ${label}`)
+      return stopManagedProcess(child, label)
+    })
+  )
+  for (const result of processCleanupResults) {
+    if (result.status === 'rejected') {
+      console.error('[maestro:runner] Failed to stop managed process')
+      console.error(result.reason)
+    }
+  }
+}
+
+/**
  * End-to-end runner for the mobile smoke flow.
  *
  * High-level order:
@@ -2461,50 +3468,18 @@ const run = async () => {
   // than fetching Metro, so it does not need the dev server to be up and can
   // run this early.
   if (target.platform === 'android') {
-    for (const serial of ANDROID_SERIALS.length > 0 ? ANDROID_SERIALS : ['']) {
-      if (serial) useAndroidDevice(serial)
-      // eslint-disable-next-line no-await-in-loop -- adb is not concurrency safe
-      await suppressAndroidErrorDialogs()
-    }
-    if (SHARD_PLATFORM === 'android') useAndroidDevice(ANDROID_SERIALS[0])
+    await forEachAndroidDevice(suppressAndroidErrorDialogs)
   }
 
   if (target.platform === 'android' && !process.env.MOBILE_E2E_ANDROID_HOST) {
     // Every emulator needs its own mapping: `adb reverse` is per device, so on a
     // sharded run mapping only the first one leaves the other three with no
     // route to Metro at all.
-    for (const serial of ANDROID_SERIALS.length > 0 ? ANDROID_SERIALS : ['']) {
-      if (serial) useAndroidDevice(serial)
-      // eslint-disable-next-line no-await-in-loop -- adb is not concurrency safe
-      await reverseAndroidPorts([...new Set([metroPort, 8081, 4000])])
-    }
-    if (SHARD_PLATFORM === 'android') useAndroidDevice(ANDROID_SERIALS[0])
+    await forEachAndroidDevice(() =>
+      reverseAndroidPorts([...new Set([metroPort, 8081, 4000])])
+    )
 
-    // The route is a property of the image and the runner, not of the
-    // individual emulator, so it is measured once on the first device.
-    const reachable = []
-    let anyVerdict = false
-    for (const candidate of ['127.0.0.1', '10.0.2.2']) {
-      // eslint-disable-next-line no-await-in-loop -- two candidates, ordered
-      const verdict = await probeAndroidMetroReachability(candidate, metroPort)
-      if (verdict !== null) anyVerdict = true
-      if (verdict === true) reachable.push(candidate)
-    }
-    if (reachable.length > 0) {
-      if (reachable[0] !== androidHost) {
-        log(`Using ${reachable[0]} as the Android host: the device can reach it`)
-        androidHost = reachable[0]
-      }
-    } else if (anyVerdict) {
-      // A real refusal on both routes. 10.0.2.2 is QEMU's own alias and needs no
-      // adb cooperation, so it is the better one to be wrong with.
-      log('Neither host answered; falling back to 10.0.2.2')
-      androidHost = '10.0.2.2'
-    } else {
-      // Nothing was measured. Changing the host on the strength of a probe that
-      // could not run would be guessing with extra steps.
-      log(`Reachability could not be measured; keeping ${androidHost}`)
-    }
+    await resolveAndroidHostRoute(metroPort)
   }
 
   /**
@@ -2536,135 +3511,37 @@ const run = async () => {
   const apiHealthUrl = 'http://127.0.0.1:4000/api/health'
   const apiSetupBaseUrl = 'http://127.0.0.1:4000'
   const mobileApiBaseUrl = getLocalApiUrl(target.platform)
-  let apiProcess
-  let workerProcess
+  /**
+   * The child processes this run may start.
+   *
+   * One object rather than three `let` bindings so a helper can record a child
+   * the moment it is spawned, before the step that waits for it can throw, and
+   * the cleanup below still finds it.
+   *
+   * @type {{ apiProcess?: import('node:child_process').ChildProcess, workerProcess?: import('node:child_process').ChildProcess, serverProcess?: import('node:child_process').ChildProcess }}
+   */
+  const children = {}
   let mobileIdentity
   /** @type {{ accessToken: string, userId: string }[]} */
   const mobileIdentities = []
 
   try {
     if (process.env.MOBILE_E2E_SKIP_API !== '1') {
-      let apiAlreadyRunning = false
-      try {
-        await waitForHealth(apiHealthUrl, 2_000, 250)
-        apiAlreadyRunning = true
-      } catch {
-        apiAlreadyRunning = false
-      }
-
-      if (apiAlreadyRunning) {
-        log(`Detected existing local API at ${apiHealthUrl}, reusing it`)
-        if (SKIP_WORKER) {
-          log('Skipping wardrobe worker start (MOBILE_E2E_SKIP_WORKER=1)')
-        } else {
-          workerProcess = spawn(
-            'npm',
-            ['run', 'start:workers:wardrobe', '--workspace', 'api'],
-            {
-              cwd: projectRoot,
-              detached: process.platform !== 'win32',
-              stdio: ['inherit', 'pipe', 'pipe'],
-              env: {
-                ...process.env,
-                DATABASE_URL: MOBILE_E2E_DATABASE_URL,
-                GARMENT_TAGGING_ENGINE: 'fixture',
-                ...deterministicFlagEnv,
-                TEST_ENV: 'local',
-              },
-            }
-          )
-          managedProcesses.set(workerProcess, 'Wardrobe worker')
-          await waitForProcessOutput(workerProcess, 'Dedicated wardrobe worker started')
-        }
-      } else {
-        log('Starting local API for mobile E2E')
-        apiProcess = spawn('npm', ['run', 'start:api:e2e-with-workers'], {
-          cwd: projectRoot,
-          detached: process.platform !== 'win32',
-          stdio: 'inherit',
-          env: {
-            ...process.env,
-            ALLOW_DEV_GUARDIAN_SECRET: 'true',
-            DATABASE_URL: MOBILE_E2E_DATABASE_URL,
-            GUARDIAN_INVITE_WEB_BASE_URL: 'http://127.0.0.1:3005',
-            GARMENT_TAGGING_ENGINE: 'fixture',
-            ...deterministicFlagEnv,
-            PUBLIC_API_URL: process.env.MOBILE_E2E_PUBLIC_API_URL || mobileApiBaseUrl,
-            TEST_ENV: 'local',
-          },
-        })
-        managedProcesses.set(apiProcess, 'Local API')
-        apiProcess.on('exit', (code) => {
-          if (code !== null && code !== 0) {
-            console.error(`[maestro:runner] Local API exited early with code ${code}`)
-          }
-        })
-        await waitForHealth(apiHealthUrl, 180_000, 1_000)
-        log(`Local API reachable on ${apiHealthUrl}`)
-      }
-
-      if (PARALLEL_DEVICES) {
-        // One fixture user per simulator. The bundle carries the whole map and
-        // each device selects its own entry in `mobile-auth.ts`, because a
-        // single Metro bundle cannot hold a different token per device.
-        const tokensByDeviceName = {}
-        for (const [index, deviceId] of SHARD_DEVICE_IDS.entries()) {
-          if (SHARD_PLATFORM === 'android') useAndroidDevice(deviceId)
-          else iosSimulatorUdid = deviceId
-          // eslint-disable-next-line no-await-in-loop -- one device at a time
-          await clearMobileE2EDeviceSettings()
-          // eslint-disable-next-line no-await-in-loop -- one device at a time
-          const identity = await setupMobileE2EIdentity(apiSetupBaseUrl)
-          // eslint-disable-next-line no-await-in-loop -- one device at a time
-          const deviceName = await resolveShardDeviceName(deviceId, index)
-          // Two devices answering to the same name would silently collapse the
-          // map to one entry, so every shard after the first would sign in as
-          // another shard's user and delete its garments mid-flow.
-          if (tokensByDeviceName[deviceName]) {
-            throw new Error(
-              `Two shard devices both report the name "${deviceName}". ` +
-                'The token map keys on that name, so they would share one fixture user.'
-            )
-          }
-          tokensByDeviceName[deviceName] = identity.accessToken
-          mobileIdentities.push(identity)
-          log(`Created authenticated mobile E2E fixture for ${deviceName}`)
-        }
-        if (SHARD_PLATFORM === 'android') useAndroidDevice(SHARD_DEVICE_IDS[0])
-        else iosSimulatorUdid = SHARD_DEVICE_IDS[0]
-        mobileIdentity = mobileIdentities[0]
-        process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE =
-          JSON.stringify(tokensByDeviceName)
-      } else {
-        await clearMobileE2EDeviceSettings()
-        mobileIdentity = await setupMobileE2EIdentity(apiSetupBaseUrl)
-        mobileIdentities.push(mobileIdentity)
-        log('Created authenticated mobile E2E fixture')
-      }
-      process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN = mobileIdentity.accessToken
-      process.env.EXPO_PUBLIC_API_BASE_URL = mobileApiBaseUrl
-      process.env.WEATHER_ALERT_ID = mobileE2EWeatherAlertId(mobileIdentity.userId)
-      process.env.GARMENT_A_ID = mobileIdentity.garmentIds?.[0] ?? ''
-      process.env.GARMENT_B_ID = mobileIdentity.garmentIds?.[1] ?? ''
-      // The seeded capsule by id, so the repair flow stops taking whichever
-      // capsule the library happens to list first. That order is
-      // `is_favorite desc, updated_at desc` (`wardrobe-capsule.repository.ts`),
-      // and this very flow favourites a capsule, so "first" is a property of what
-      // ran before it rather than of the capsule the flow means.
-      process.env.CAPSULE_ID = mobileE2ECapsuleId(mobileIdentity.userId)
-      // A garment the seeded capsule does NOT already hold, so choosing a
-      // replacement adds one rather than deselecting a member.
-      // `seedMobileE2ECapsule` takes the two OLDEST garments, so the newest is
-      // always outside it.
-      process.env.REPLACEMENT_GARMENT_ID = mobileIdentity.garmentIds?.at(-1) ?? ''
+      await startOrReuseLocalApi(children, {
+        apiHealthUrl,
+        mobileApiBaseUrl,
+        deterministicFlagEnv,
+      })
+      mobileIdentity = await createMobileIdentities(apiSetupBaseUrl, mobileIdentities)
+      applyMobileFixtureEnv(mobileIdentity, mobileApiBaseUrl)
     } else if (!process.env.EXPO_PUBLIC_API_BASE_URL) {
       throw new Error(
         'MOBILE_E2E_SKIP_API=1 requires EXPO_PUBLIC_API_BASE_URL and an externally managed test identity.'
       )
     }
   } catch (error) {
-    await stopManagedProcess(workerProcess, 'Wardrobe worker')
-    await stopManagedProcess(apiProcess, 'Local API')
+    await stopManagedProcess(children.workerProcess, 'Wardrobe worker')
+    await stopManagedProcess(children.apiProcess, 'Local API')
     throw error
   }
 
@@ -2675,167 +3552,25 @@ const run = async () => {
     await reverseAndroidPorts([...new Set([metroPort, 8081, 4000])])
   }
 
-  // Maestro needs both an app URL and a health URL. We probe the explicit env
-  // override first, then the chosen Metro port, then the default Expo port.
-  const portPairs = [
-    {
-      app: process.env.MOBILE_E2E_APP_URL,
-      health: process.env.MOBILE_E2E_HEALTH_URL,
-    },
-    {
-      app: getLocalAppUrl(target.platform, metroPort),
-      health: `http://127.0.0.1:${metroPort}`,
-    },
-    {
-      app: getLocalAppUrl(target.platform, 8081),
-      health: 'http://127.0.0.1:8081',
-    },
-  ].filter((pair, index, self) => {
-    if (!pair.app || !pair.health) {
-      return false
-    }
-    const key = `${pair.app}-${pair.health}`
-    return self.findIndex((p) => `${p.app}-${p.health}` === key) === index
-  })
+  const portPairs = buildPortPairs(target.platform, metroPort)
+  const { resolvedPair: reusedPair, startServer } =
+    await resolveExpoServerReuse(portPairs)
 
-  let serverProcess
-  let resolvedPair
-  let startServer = START_SERVER
-
-  if (startServer) {
-    for (const pair of portPairs) {
-      try {
-        await waitForHealth(pair.health, 5_000, 500)
-        log(`Detected existing Expo dev server at ${pair.health}, reusing it`)
-        resolvedPair = pair
-        startServer = false
-        break
-      } catch {
-        // keep checking
-      }
-    }
-  }
   try {
-    if (startServer) {
-      log(`Starting Expo dev server for mobile smoke (metro port ${metroPort})`)
-      serverProcess = spawn('npm', ['run', 'start:mobile:server'], {
-        detached: process.platform !== 'win32',
-        stdio: 'inherit',
-        env: {
-          ...process.env,
-          MOBILE_E2E_PLATFORM: target.platform,
-        },
-      })
-      managedProcesses.set(serverProcess, 'Expo dev server')
-      serverProcess.on('exit', (code) => {
-        if (code !== null && code !== 0) {
-          console.error(`[maestro:runner] Expo dev server exited early with code ${code}`)
-        }
-      })
-      for (const pair of portPairs) {
-        try {
-          await waitForHealth(pair.health)
-          resolvedPair = pair
-          log(`Expo dev server reachable on ${pair.health}`)
-          // Reachable is not the same as serving Expo Go. Ask for the manifest
-          // the way the app will, so a 500 here is named now rather than
-          // surfacing later as every flow failing on `tab-home`.
-          const manifest = await fetchExpoGoManifest(pair.health, target.platform)
-          if (manifest.ok) {
-            log(
-              `Expo Go manifest served (HTTP ${manifest.statusCode}, ${manifest.contentType})`
-            )
-          } else {
-            log(
-              `Expo Go manifest request FAILED (HTTP ${manifest.statusCode}, ` +
-                `content-type ${manifest.contentType || 'none'}). Expo Go will show ` +
-                `"Something went wrong." and every flow will report tab-home missing. ` +
-                `Body: ${manifest.body.slice(0, 600) || '(empty)'}`
-            )
-          }
-          break
-        } catch {
-          // try next candidate
-        }
-      }
-      if (!resolvedPair) {
-        throw new Error(
-          `Expo dev server never became healthy. Tried: ${portPairs.map((p) => p.health).join(', ')}`
-        )
-      }
-    } else {
-      log('Skipping Expo dev server start (MOBILE_E2E_SKIP_SERVER=1)')
-      resolvedPair = portPairs[0]
-      if (!resolvedPair) {
-        throw new Error(
-          'No MOBILE_E2E_APP_URL / MOBILE_E2E_HEALTH_URL provided while server skip is enabled'
-        )
-      }
-    }
+    const resolvedPair = await ensureExpoServerPair({
+      startServer,
+      resolvedPair: reusedPair,
+      portPairs,
+      platform: target.platform,
+      metroPort,
+      children,
+    })
 
-    if (!resolvedPair) {
-      resolvedPair = portPairs[0]
-      if (!resolvedPair) {
-        throw new Error('Unable to resolve Expo dev server port configuration')
-      }
-    }
+    applyExpoUrlEnv(resolvedPair, target.appId)
 
-    process.env.MOBILE_E2E_APP_URL = resolvedPair.app
-    process.env.MOBILE_E2E_HEALTH_URL = resolvedPair.health
-    process.env.APP_URL = resolvedPair.app
-    process.env.WARDROBE_URL = `${resolvedPair.app}wardrobe`
-    // The same `exp://` form on both platforms.
-    //
-    // Android used to build these as `mobile://(tabs)?...`, the app's own
-    // scheme, which Expo Go does not register — `openLink` failed with
-    // `Activity not started, unable to resolve Intent` and the flow was written
-    // off as impossible in the shell. iOS was already using the `exp://.../--/`
-    // form, which Expo Go routes into the app with the query string intact, and
-    // it is exactly how `APP_URL` and `WARDROBE_URL` reach the app on both
-    // platforms. There was never a reason for the two to differ.
-    //
-    // The slots are `am` and `evening` rather than `now` and `next` so the flow
-    // can assert what the link DID. `resolveDeepLinkScenario` maps those two
-    // deterministically to `morning` and `evening`, while `now`/`next` resolve
-    // against the current time and the ritual's forecast, which cannot be
-    // asserted without either freezing the clock or reimplementing the
-    // resolution in the flow. The deep link path under test is identical.
-    const widgetUrl = (size, slot) =>
-      `${resolvedPair.app}(tabs)?source=widget&size=${size}&slot=${slot}`
-    process.env.WIDGET_MORNING_URL = widgetUrl('small', 'am')
-    process.env.WIDGET_EVENING_URL = widgetUrl('medium', 'evening')
-    if (!process.env.MAESTRO_APP_ID) {
-      process.env.MAESTRO_APP_ID = target.appId
-    }
+    await awaitExpoGoAndWarmBundle(target, resolvedPair.health)
 
-    // When Expo CLI has to install Expo Go on iOS, Metro can be healthy before
-    // the app is ready. Poll briefly so Maestro does not race the install.
-    const iosExpoGoReady =
-      target.platform !== 'ios' ||
-      (await waitForCondition(
-        async () => (await getInstalledExpoGoVersionOnIos()) !== null,
-        target.expoGoReady ? 10_000 : 90_000,
-        2_000
-      ))
-
-    await warmMetroBundle(resolvedPair.health, target.platform)
-
-    if (!iosExpoGoReady) {
-      throw new Error(
-        'Expo Go is still unavailable on the booted iOS simulator after starting Expo. Verify the simulator is healthy, then rerun `npm run test:mobile:e2e:ios`.'
-      )
-    }
-
-    let xcrunShimDir
-    const maestroEnv = { ...process.env }
-    if (
-      target.platform === 'android' &&
-      process.env.MAESTRO_DISABLE_ANDROID_XCRUN_SHIM !== '1'
-    ) {
-      xcrunShimDir = createAndroidXcrunShim()
-      maestroEnv.PATH = `${xcrunShimDir}:${maestroEnv.PATH ?? ''}`
-      log('Using Android-only xcrun shim to avoid broken iOS simulator discovery')
-    }
+    const { maestroEnv, xcrunShimDir } = createMaestroEnv(target.platform)
 
     // A suite runner reports on every flow. Rejecting on the first failure hid
     // the state of the other seventeen and made a full pass take one boot per
@@ -2856,299 +3591,13 @@ const run = async () => {
       }
     }
 
-    // Flows that depend on a value seeded for one specific user cannot be
-    // sharded: Maestro passes one set of `-e` values to every device, so
-    // `WEATHER_ALERT_ID` can only ever match the user of one of them. There is
-    // exactly one such flow, and it runs on the first device after the sharded
-    // pass rather than being weakened to suit the split.
-    const USER_SCOPED_FLOWS = ['maestro/deep-link-handling.yaml']
-
     try {
       if (PARALLEL_DEVICES) {
-        const shardedFlows = flowsToRun.filter(
-          (flow) => !USER_SCOPED_FLOWS.includes(flow)
-        )
-        const serialFlows = flowsToRun.filter((flow) => USER_SCOPED_FLOWS.includes(flow))
-
-        for (const identity of mobileIdentities) {
-          await resetMobileE2EPerFlowState(identity)
-        }
-
-        if (shardedFlows.length > 0) {
-          const reportPath = toPosixPath(
-            path.join(MAESTRO_ARTIFACT_DIR, 'parallel-suite-report.xml')
-          )
-          const parallelArgs = [
-            '--platform',
-            target.platform,
-            '--udid',
-            SHARD_DEVICE_IDS.join(','),
-            'test',
-            '--shard-split',
-            String(SHARD_DEVICE_IDS.length),
-            '-e',
-            `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`,
-            '-e',
-            `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`,
-            '-e',
-            `GARMENT_A_ID=${process.env.GARMENT_A_ID ?? ''}`,
-            '-e',
-            `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`,
-            '-e',
-            `CAPSULE_ID=${process.env.CAPSULE_ID ?? ''}`,
-            '-e',
-            `REPLACEMENT_GARMENT_ID=${process.env.REPLACEMENT_GARMENT_ID ?? ''}`,
-            '-e',
-            `APP_URL=${process.env.APP_URL}`,
-            '-e',
-            `WARDROBE_URL=${process.env.WARDROBE_URL}`,
-            '-e',
-            `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`,
-            '-e',
-            `WIDGET_EVENING_URL=${process.env.WIDGET_EVENING_URL}`,
-          ]
-          if (WRITE_ARTIFACTS) {
-            fs.mkdirSync(path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR), {
-              recursive: true,
-            })
-            parallelArgs.push(
-              '--format',
-              'junit',
-              '--output',
-              reportPath,
-              '--test-output-dir',
-              MAESTRO_ARTIFACT_DIR,
-              '--debug-output',
-              MAESTRO_ARTIFACT_DIR
-            )
-          }
-          parallelArgs.push(...shardedFlows)
-
-          log(
-            `Running ${shardedFlows.length} flows across ${SHARD_DEVICE_IDS.length} devices`
-          )
-          // The exit code is not trusted on its own here. A sharded invocation
-          // has been observed exiting 0 while its own summary printed
-          // `Passed: 16/17` and the JUnit report recorded `failures="1"`, so
-          // believing the exit code reported a green suite over a red one. The
-          // report is the evidence; the exit code only adds a failure the
-          // report could not describe.
-          let maestroExitError
-          try {
-            await runMaestroCommand(parallelArgs, {
-              env: maestroEnv,
-              logFile: WRITE_ARTIFACTS
-                ? path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR, 'parallel-suite.log')
-                : undefined,
-            })
-          } catch (error) {
-            maestroExitError = error
-          }
-
-          const resolvedReportPath = resolveReportPath(reportPath) ?? reportPath
-          const report = readSuiteReport(resolvedReportPath)
-          if (report.unreadable) {
-            flowFailures.push(`JUnit report unreadable (${report.unreadable})`)
-            log(`FAIL JUnit report could not be read: ${report.unreadable}`)
-          }
-          for (const name of report.failed) {
-            flowFailures.push(name)
-            log(`FAIL ${name}`)
-          }
-          for (const name of report.skipped) {
-            flowFailures.push(`${name} (skipped, asserted nothing)`)
-            log(`FAIL ${name} was skipped and asserted nothing`)
-          }
-          for (const name of report.passed) {
-            log(`PASS ${name}`)
-          }
-
-          const accountedFor =
-            report.failed.length + report.passed.length + report.skipped.length
-          if (accountedFor !== shardedFlows.length) {
-            // Every flow handed to Maestro has to appear in the report, or the
-            // count this run reports is a guess. Fail loudly instead.
-            const missing = shardedFlows.length - accountedFor
-            flowFailures.push(
-              `${missing} flow(s) missing from ${reportPath} (ran ${shardedFlows.length}, report described ${accountedFor})`
-            )
-            log(`FAIL ${missing} flow(s) absent from the JUnit report`)
-          } else if (maestroExitError && report.failed.length === 0) {
-            flowFailures.push(
-              `Maestro exited non-zero with no failure in the report: ${maestroExitError.message}`
-            )
-            log('FAIL Maestro exited non-zero while the report recorded no failure')
-          }
-        }
-
-        for (const flowPath of serialFlows) {
-          const serialArgs = [
-            '--platform',
-            target.platform,
-            '--udid',
-            SHARD_DEVICE_IDS[0],
-            'test',
-            '-e',
-            `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`,
-            '-e',
-            `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`,
-            '-e',
-            `GARMENT_A_ID=${process.env.GARMENT_A_ID ?? ''}`,
-            '-e',
-            `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`,
-            '-e',
-            `CAPSULE_ID=${process.env.CAPSULE_ID ?? ''}`,
-            '-e',
-            `REPLACEMENT_GARMENT_ID=${process.env.REPLACEMENT_GARMENT_ID ?? ''}`,
-            '-e',
-            `APP_URL=${process.env.APP_URL}`,
-            '-e',
-            `WARDROBE_URL=${process.env.WARDROBE_URL}`,
-            '-e',
-            `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`,
-            '-e',
-            `WIDGET_EVENING_URL=${process.env.WIDGET_EVENING_URL}`,
-          ]
-          if (WRITE_ARTIFACTS) {
-            serialArgs.push(
-              '--format',
-              'junit',
-              '--output',
-              getFlowReportPath(flowPath),
-              '--test-output-dir',
-              MAESTRO_ARTIFACT_DIR,
-              '--debug-output',
-              MAESTRO_ARTIFACT_DIR
-            )
-          }
-          serialArgs.push(flowPath)
-
-          log(`Running user-scoped flow on ${SHARD_DEVICE_IDS[0]}: ${flowPath}`)
-          try {
-            await runMaestroCommand(serialArgs, {
-              env: maestroEnv,
-              logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
-            })
-            log(`PASS ${flowPath}`)
-          } catch (error) {
-            flowFailures.push(flowPath)
-            log(`FAIL ${flowPath} (${error.message})`)
-          }
-        }
+        await runParallelSuite(target, maestroEnv, mobileIdentities, flowFailures)
         return await finishSuite(flowFailures)
       }
 
-      for (const flowPath of flowsToRun) {
-        const maestroArgs = []
-        let maestroLogFile
-        if (process.env.MAESTRO_CLOUD_API_KEY && process.env.MAESTRO_CLOUD_WORKSPACE) {
-          maestroArgs.push(
-            'cloud',
-            '--workspace',
-            process.env.MAESTRO_CLOUD_WORKSPACE,
-            '--apiKey',
-            process.env.MAESTRO_CLOUD_API_KEY,
-            'test',
-            flowPath
-          )
-        } else {
-          maestroArgs.push('--platform', target.platform)
-          if (target.platform === 'ios' && iosSimulatorUdid !== 'booted') {
-            // Without this, concurrent shards all drive whichever simulator
-            // Maestro picks first.
-            maestroArgs.push('--udid', iosSimulatorUdid)
-          }
-          maestroArgs.push('test')
-          maestroArgs.push('-e', `MAESTRO_APP_ID=${process.env.MAESTRO_APP_ID}`)
-          maestroArgs.push('-e', `WEATHER_ALERT_ID=${process.env.WEATHER_ALERT_ID ?? ''}`)
-          maestroArgs.push('-e', `GARMENT_A_ID=${process.env.GARMENT_A_ID ?? ''}`)
-          maestroArgs.push('-e', `GARMENT_B_ID=${process.env.GARMENT_B_ID ?? ''}`)
-          maestroArgs.push('-e', `CAPSULE_ID=${process.env.CAPSULE_ID ?? ''}`)
-          maestroArgs.push(
-            '-e',
-            `REPLACEMENT_GARMENT_ID=${process.env.REPLACEMENT_GARMENT_ID ?? ''}`
-          )
-          maestroArgs.push('-e', `APP_URL=${process.env.APP_URL}`)
-          maestroArgs.push('-e', `WARDROBE_URL=${process.env.WARDROBE_URL}`)
-          maestroArgs.push('-e', `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`)
-          maestroArgs.push('-e', `WIDGET_EVENING_URL=${process.env.WIDGET_EVENING_URL}`)
-          if (WRITE_ARTIFACTS) {
-            fs.mkdirSync(path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR), {
-              recursive: true,
-            })
-            maestroLogFile = getFlowLogPath(flowPath)
-            maestroArgs.push(
-              '--format',
-              'junit',
-              '--output',
-              getFlowReportPath(flowPath),
-              '--test-output-dir',
-              MAESTRO_ARTIFACT_DIR,
-              '--debug-output',
-              MAESTRO_ARTIFACT_DIR
-            )
-          }
-          maestroArgs.push(flowPath)
-        }
-
-        if (mobileIdentity) {
-          await resetMobileE2EPerFlowState(mobileIdentity)
-        }
-
-        log(`Running Maestro flow (${maestroArgs.join(' ')})`)
-        let maestroExitError
-        try {
-          await runMaestroCommand(maestroArgs, {
-            env: maestroEnv,
-            logFile: maestroLogFile,
-          })
-        } catch (error) {
-          maestroExitError = error
-        }
-
-        // The report is the evidence on this path too, not just the sharded one.
-        //
-        // This loop used to take the exit code as the whole answer, which is the
-        // opposite of what the sharded path does and the weaker of the two --
-        // and it is the path CI runs on Android, so the stricter rule was being
-        // applied only where it was least needed. The rule is the same in both
-        // places now: a flow that the report records as failed or skipped fails
-        // the run, a flow the report never mentions fails the run, and a
-        // non-zero exit can only ADD a failure the report could not describe,
-        // never clear one.
-        if (WRITE_ARTIFACTS) {
-          const resolvedReportPath =
-            resolveReportPath(getFlowReportPath(flowPath)) ?? getFlowReportPath(flowPath)
-          const report = readSuiteReport(resolvedReportPath)
-          if (report.unreadable) {
-            flowFailures.push(
-              `${flowPath} (JUnit report unreadable: ${report.unreadable})`
-            )
-            log(`FAIL ${flowPath} (JUnit report could not be read)`)
-          } else if (report.failed.length > 0) {
-            flowFailures.push(flowPath)
-            log(`FAIL ${flowPath} (${report.failed.join(', ')})`)
-          } else if (report.skipped.length > 0) {
-            flowFailures.push(`${flowPath} (skipped, asserted nothing)`)
-            log(`FAIL ${flowPath} was skipped and asserted nothing`)
-          } else if (report.passed.length === 0) {
-            flowFailures.push(`${flowPath} (absent from its own JUnit report)`)
-            log(`FAIL ${flowPath} did not appear in its JUnit report`)
-          } else if (maestroExitError) {
-            flowFailures.push(
-              `${flowPath} (Maestro exited non-zero with no failure in the report: ${maestroExitError.message})`
-            )
-            log(`FAIL ${flowPath} (non-zero exit, clean report)`)
-          } else {
-            log(`PASS ${flowPath}`)
-          }
-        } else if (maestroExitError) {
-          flowFailures.push(flowPath)
-          log(`FAIL ${flowPath} (${maestroExitError.message})`)
-        } else {
-          log(`PASS ${flowPath}`)
-        }
-      }
+      await runFlowsSerially(target, maestroEnv, mobileIdentity, flowFailures)
     } finally {
       if (xcrunShimDir) {
         fs.rmSync(xcrunShimDir, { recursive: true, force: true })
@@ -3157,32 +3606,7 @@ const run = async () => {
 
     finishSuite(flowFailures)
   } finally {
-    for (const identity of mobileIdentities) {
-      log('Cleaning authenticated mobile E2E fixture')
-      try {
-        await cleanupMobileE2EIdentity(apiSetupBaseUrl, identity)
-      } catch (cleanupError) {
-        console.error('[maestro:runner] Failed to clean mobile E2E fixture')
-        console.error(cleanupError)
-      }
-    }
-    const processCleanup = [
-      [serverProcess, 'Expo dev server'],
-      [workerProcess, 'Wardrobe worker'],
-      [apiProcess, 'Local API'],
-    ].filter(([child]) => Boolean(child))
-    const processCleanupResults = await Promise.allSettled(
-      processCleanup.map(([child, label]) => {
-        log(`Stopping ${label}`)
-        return stopManagedProcess(child, label)
-      })
-    )
-    for (const result of processCleanupResults) {
-      if (result.status === 'rejected') {
-        console.error('[maestro:runner] Failed to stop managed process')
-        console.error(result.reason)
-      }
-    }
+    await cleanupMobileRun(apiSetupBaseUrl, mobileIdentities, children)
   }
 }
 

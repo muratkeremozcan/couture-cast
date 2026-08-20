@@ -598,7 +598,9 @@ const bootShardEmulators = async (avdNames) => {
       await new Promise((resolve) => setTimeout(resolve, 2_000))
     }
     await capture(adbBinary, ['-s', serial, 'shell', 'input', 'keyevent', '82']).catch(
-      () => {}
+      () => {
+        /* best-effort: failures here are not fatal to the run */
+      }
     )
     log(`${serial} ready`)
   }
