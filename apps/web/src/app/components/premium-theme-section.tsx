@@ -23,7 +23,7 @@
 //   that is already readable and announced.
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PremiumTheme, PremiumThemeKey } from '@couture/api-client/contracts/http'
 import {
@@ -244,8 +244,40 @@ function LivePreview() {
  * else, so the same sentence pointed at a control that is not on the page. The
  * signed-out copy names the sign-in step first instead.
  */
+/**
+ * The palette names, joined the way the reader's language joins a list.
+ *
+ * The locked copy used to spell all three names out inside every translated
+ * sentence, so adding or retiring a palette meant hand-editing twenty localized
+ * strings and hoping none was missed. The names now arrive as one
+ * `{{palettes}}` interpolation built from `PREMIUM_THEME_KEYS`, which makes the
+ * gallery and the upsell copy the same source of truth.
+ *
+ * `Intl.ListFormat` rather than `join(', ')` because the join is not the same in
+ * every language this ships in: German wants "und", French "et", Turkish "ve",
+ * Spanish "y", and English and Canadian English disagree about the serial comma
+ * — CLDR gives en-US "A, B, and C" and en-CA "A, B and C". Hand-joining would
+ * have to encode all of that, wrongly, in ten places.
+ *
+ * Turkish attaches its case suffix to the end of the list ("{{palettes}}'in"),
+ * which works because the formatter puts the final name last in every locale.
+ */
+function usePaletteNameList(): string {
+  const { t, i18n } = useTranslation()
+  const language = i18n.language
+
+  return useMemo(() => {
+    const names = PREMIUM_THEME_KEYS.map((key) => t(PALETTE_LABEL_KEYS[key]))
+    return new Intl.ListFormat(language, {
+      style: 'long',
+      type: 'conjunction',
+    }).format(names)
+  }, [t, language])
+}
+
 function LockedPanel({ isSignedOut }: { isSignedOut: boolean }) {
   const { t } = useTranslation()
+  const palettes = usePaletteNameList()
 
   return (
     <div
@@ -259,7 +291,8 @@ function LockedPanel({ isSignedOut }: { isSignedOut: boolean }) {
         {t(
           isSignedOut
             ? 'commerce.premium.theme.locked.signedOutBody'
-            : 'commerce.premium.theme.locked.body'
+            : 'commerce.premium.theme.locked.body',
+          { palettes }
         )}
       </p>
     </div>

@@ -30,7 +30,7 @@ These were identified while drafting and implementing story 5.1 and were
 deliberately left out of its scope. Each records what was narrowed and why, so a
 later story does not have to rediscover the reasoning.
 
-- **Web `Sponsored` disclosure copy defect.**
+- _Resolved 2026-08-20._ **Web `Sponsored` disclosure copy defect.**
   `apps/web/src/app/components/lookbook-prism-layout.tsx:41-47` defines a
   hardcoded `HERO_RECOMMENDATIONS.Sponsored` entry whose `eyebrow` field reads
   `'Sponsored Selection'`. It is reachable in the UI:
@@ -39,6 +39,19 @@ later story does not have to rediscover the reasoning.
   to that chip. It is story 3.5 placeholder copy with no partner behind it.
   Rewriting it inside a commerce story risked implying a sponsorship that does
   not exist, so it was left alone. It should be corrected on its own.
+
+  Corrected. The eyebrow now reads "Brand Picks" over copy that describes
+  brand-forward pairings, which is what the chip's own `Brands` filter selects;
+  nothing in it asserts that anyone paid for the placement. The vocabulary for
+  genuine paid placement stays where story 5.1 put it, in
+  `commerce.shopThisLook.disclosure` and `.partnerLabel`, rendered only beside an
+  offer that exists — `prd.md:192` requires sponsored content to be labeled, and
+  placeholder copy borrowing that language is the inverse failure: a disclosure
+  with nothing to disclose. `lookbook-prism-layout.test.tsx` asserts the negative
+  (no "sponsored", "paid partnership", "presented by", or "commission" anywhere
+  in the hero card), because nothing about the page looks wrong when placeholder
+  copy claims a sponsorship, so only a test that refuses the words catches it
+  returning.
 
 - **No partner-facing admin console.** `CommercePartner` and `AffiliateOffer`
   rows are seed and migration managed. The operator runbook for onboarding a
@@ -128,11 +141,28 @@ later story does not have to rediscover the reasoning.
   so a future entrypoint that skips one turns a test red instead of a dashboard
   empty.
 
-- **Mobile reuses `commerce.settings.error` for a failed preference READ.** The
+- _Resolved 2026-08-20._ **Mobile reuses `commerce.settings.error` for a failed preference READ.** The
   string reads "Unable to update shopping preferences.", which is slightly wrong
   when the failure was a load rather than a save. Decision 16 locks the key tree
   and web shares it, so adding a `settings.loadError` key is a cross-surface
   change across twenty catalog files. Cosmetic, deferred deliberately.
+
+  Done, across all twenty. `commerce.settings.loadError` mirrors each catalog's
+  own register for the sibling `error` key rather than being translated afresh,
+  so the two strings read as a pair in every locale. Both read paths use it.
+
+  Fixing it surfaced a larger defect on the web side.
+  `commerce-preferences-section.tsx` rendered `commerceErrorMessage(error, fallback)`,
+  and `commerceError` in `lib/commerce.ts` prefers the API's own error body —
+  which is English on every locale — so the catalog string would almost never
+  have shown. This is the same defect `premium.ts` was corrected for on
+  2026-08-19, in the entry further down this file that records the original
+  deferral as the wrong call. Both paths now use catalog copy unconditionally.
+  Nothing is lost by dropping the server text: these two endpoints have no
+  actionable failure to distinguish, a preferences read either worked or did not,
+  and the developer-facing message survives on the thrown `CommerceRequestError`
+  for logs. `5.1-WEB-SETTINGS-07` and `-09` now pin the save and load strings
+  separately.
 
 - **Web carries one commerce key mobile does not.** `commerce.settings.signedOutHint`
   ("Sign in to change this") exists because decision 17 requires a localized
@@ -141,12 +171,20 @@ later story does not have to rediscover the reasoning.
   settings is never reachable without a session, so an unused key there would be
   dead weight added only to satisfy symmetry.
 
-- **The mobile vitest browser run is flaky on a cold `node_modules/.vite`.**
+- _Resolved 2026-08-20._ **The mobile vitest browser run is flaky on a cold `node_modules/.vite`.**
   Roughly 23 suites fail with "does not provide an export named 'default'" while
   the Vite dependency optimizer rebundles; the second run is always green. This
   reproduces on commits that predate story 5.1. The likely fix is widening
   `optimizeDeps.include` in `apps/mobile/vitest.config.ts`, which every surface
   inherits, so it was not changed inside a commerce story.
+
+  Checked on 2026-08-20 and found already fixed: this entry was stale rather than
+  outstanding. `apps/mobile/vitest.config.ts` carries exactly the widening this
+  entry proposed, with a docblock recording that naming `expo-router` removed ten
+  cold-run failures on its own and that `msw` and the native-only Expo modules
+  must never join the list. Two runs against a deleted `node_modules/.vite` came
+  back clean at 61 files and 595 tests, where this entry describes roughly 23
+  suites failing. No change was needed; the verification is the useful part.
 
 - **Pact provider verification has a pre-existing Linux flake at roughly 3 runs
   in 42.** Signature: "request was expected but not received" on any Story 4.2
@@ -557,7 +595,7 @@ each with the reason.
   fix regenerates the SDK and reshapes published nodes, which is an `optic diff`
   conversation of its own and has nothing to do with this story's behaviour.
 
-- **`commerce.premium.theme.locked.body` and `.signedOutBody` hardcode the three
+- _Resolved 2026-08-20._ **`commerce.premium.theme.locked.body` and `.signedOutBody` hardcode the three
   palette names inside ten translated sentences.** Adding or retiring a palette
   now means editing twenty localized strings by hand, and
   `5.3-I18N-WEB-08` fails until every current name appears in each of them. The
@@ -565,6 +603,28 @@ each with the reason.
   `{{palettes}}` placeholder built from `PREMIUM_THEME_KEYS`. Deferred because
   list formatting is locale-specific (serial comma, `und`/`et`/`ve`, conjunction
   placement) and doing it properly means `Intl.ListFormat`, not string joining.
+
+  Done with `Intl.ListFormat`, as this entry proposed. A `usePaletteNameList`
+  hook builds the list from `PREMIUM_THEME_KEYS` and the `names.*` catalog keys
+  and passes it as `{{palettes}}`, so the gallery and the upsell copy read from
+  one source and a palette added to the contract appears in twenty sentences
+  without any of them being touched.
+
+  Nine of the ten locales' formatted output is byte-identical to the sentence the
+  catalog previously spelled out, which is what makes this behaviour-preserving.
+  The tenth is a correction worth naming rather than burying: CLDR drops the
+  serial comma in Canadian English, so `en-CA` moves from
+  "Jewel Radiance, Autumn Umber, and Winter Metallic" to
+  "…Autumn Umber and Winter Metallic". The hand-written catalog was following US
+  convention; CLDR is the authority on that punctuation, and deferring to it is
+  the whole reason to use the formatter.
+
+  Turkish keeps working because its case suffix attaches to the end of the list
+  (`{{palettes}}'in`) and the formatter puts the final name last in every locale.
+  `5.3-I18N-WEB-08` now asserts the placeholder is present and that no palette
+  name is hardcoded — the stronger check, because it also catches a translator
+  who resolves the list into their own prose and freezes today's three palettes
+  back into the catalog.
 
 - **~~`apps/web/src/lib/premium.ts` bakes untranslated English into the errors the
   subscription section renders.~~ Fixed 2026-08-19, not deferred.** This entry was

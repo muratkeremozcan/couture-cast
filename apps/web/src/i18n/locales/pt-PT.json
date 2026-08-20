@@ -68,8 +68,8 @@
         "unavailable": "As paletas estão desligadas por agora. A tua escolha guardada mantém-se e regressa quando voltarem a estar disponíveis.",
         "locked": {
           "title": "As paletas da interface são uma funcionalidade Premium",
-          "body": "Subscreve o Premium com os controlos acima para desbloquear Jewel Radiance, Autumn Umber e Winter Metallic.",
-          "signedOutBody": "Inicia sessão e subscreve o Premium para desbloquear Jewel Radiance, Autumn Umber e Winter Metallic."
+          "body": "Subscreve o Premium com os controlos acima para desbloquear {{palettes}}.",
+          "signedOutBody": "Inicia sessão e subscreve o Premium para desbloquear {{palettes}}."
         },
         "loadError": "Não foi possível carregar a tua paleta da interface. Está a ser mostrada a paleta predefinida.",
         "saveError": "Não foi possível guardar a tua paleta da interface. Tenta novamente."

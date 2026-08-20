@@ -68,8 +68,8 @@
         "unavailable": "Palettes are switched off for now. Your saved choice is kept and comes back when they return.",
         "locked": {
           "title": "Interface palettes are a Premium feature",
-          "body": "Subscribe to Premium with the controls above to unlock Jewel Radiance, Autumn Umber, and Winter Metallic.",
-          "signedOutBody": "Sign in and subscribe to Premium to unlock Jewel Radiance, Autumn Umber, and Winter Metallic."
+          "body": "Subscribe to Premium with the controls above to unlock {{palettes}}.",
+          "signedOutBody": "Sign in and subscribe to Premium to unlock {{palettes}}."
         },
         "loadError": "Unable to load your interface palette. Showing the default palette.",
         "saveError": "Unable to save your interface palette. Please try again."

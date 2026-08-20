@@ -234,7 +234,15 @@ describe('PremiumThemeSection', () => {
 
     const locked = await screen.findByTestId('premium-theme-locked')
     expect(locked).toHaveTextContent('Interface palettes are a Premium feature')
-    expect(locked).toHaveTextContent('Jewel Radiance')
+    /*
+     * The names come from the `{{palettes}}` interpolation, built from
+     * `PREMIUM_THEME_KEYS` and joined by `Intl.ListFormat`, so this asserts the
+     * rendered join rather than just that one name survived. A palette added to
+     * the contract appears here automatically; one that failed to interpolate
+     * would render the raw placeholder and fail loudly.
+     */
+    expect(locked).toHaveTextContent('Jewel Radiance, Autumn Umber, and Winter Metallic')
+    expect(locked).not.toHaveTextContent('{{palettes}}')
     expect(screen.queryByTestId('premium-theme-gallery')).not.toBeInTheDocument()
     expect(seen).not.toHaveBeenCalled()
     // AC 6: a signed-out reader gets Default whatever a previous session left behind.
