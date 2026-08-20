@@ -21,8 +21,7 @@ function run(command, args, options = {}) {
   })
 
   if (result.error) {
-    const exitCode =
-      typeof result.error.code === 'number' ? result.error.code : 1
+    const exitCode = typeof result.error.code === 'number' ? result.error.code : 1
     console.error(result.error.stack ?? result.error.message)
     process.exit(exitCode)
   }
@@ -54,14 +53,13 @@ function buildReadonlyApiLintCommand(workspaceDir) {
 }
 
 function buildWorkspaceCommands(workspaceDir, packageJson) {
-  const buildCommand =
-    packageJson.scripts?.build
-      ? {
-          label: 'build',
-          command: 'npm',
-          args: ['run', 'build', '--workspace', workspaceDir],
-        }
-      : null
+  const buildCommand = packageJson.scripts?.build
+    ? {
+        label: 'build',
+        command: 'npm',
+        args: ['run', 'build', '--workspace', workspaceDir],
+      }
+    : null
 
   if (workspaceDir === 'apps/api') {
     const commands = [

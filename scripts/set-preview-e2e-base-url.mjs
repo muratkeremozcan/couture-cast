@@ -12,9 +12,7 @@ function fail(message) {
 }
 
 function resolveWebUrl() {
-  const manual =
-    process.env.PREVIEW_WEB_E2E_BASE_URL ||
-    process.env.PREVIEW_WEB_BASE_URL
+  const manual = process.env.PREVIEW_WEB_E2E_BASE_URL || process.env.PREVIEW_WEB_BASE_URL
   if (manual) return manual
 
   try {
@@ -34,9 +32,7 @@ function resolveWebUrl() {
 }
 
 function resolveApiUrl() {
-  const manual =
-    process.env.PREVIEW_API_BASE_URL ||
-    process.env.VERCEL_API_BASE_URL
+  const manual = process.env.PREVIEW_API_BASE_URL || process.env.VERCEL_API_BASE_URL
   if (manual) return manual
 
   try {

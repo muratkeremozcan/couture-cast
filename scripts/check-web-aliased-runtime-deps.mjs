@@ -75,7 +75,13 @@ function normalizePackageName(specifier) {
 
 function collectExternalRuntimeImports(filePath) {
   const source = fs.readFileSync(filePath, 'utf8')
-  const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  )
   const imports = new Set()
 
   function visit(node) {
@@ -86,7 +92,11 @@ function collectExternalRuntimeImports(filePath) {
     }
 
     if (ts.isExportDeclaration(node)) {
-      if (!node.isTypeOnly && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+      if (
+        !node.isTypeOnly &&
+        node.moduleSpecifier &&
+        ts.isStringLiteral(node.moduleSpecifier)
+      ) {
         imports.add(node.moduleSpecifier.text)
       }
     }
@@ -116,12 +126,14 @@ const aliasTargetEntries = [
   '@couture/api-client/types/*',
 ].flatMap((aliasKey) => (aliasPaths[aliasKey] ?? []).map((target) => [aliasKey, target]))
 
-const usesAliasedApiClientSource = aliasTargetEntries.some(([, target]) =>
-  typeof target === 'string' && target.includes('packages/api-client/src')
+const usesAliasedApiClientSource = aliasTargetEntries.some(
+  ([, target]) => typeof target === 'string' && target.includes('packages/api-client/src')
 )
 
 if (!usesAliasedApiClientSource) {
-  console.log('web alias to packages/api-client/src is not active; dependency isolation check skipped.')
+  console.log(
+    'web alias to packages/api-client/src is not active; dependency isolation check skipped.'
+  )
   process.exit(0)
 }
 
@@ -132,7 +144,10 @@ const declaredRuntimeDeps = new Set([
   ...Object.keys(webPackageJson.peerDependencies ?? {}),
 ])
 
-const builtins = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)])
+const builtins = new Set([
+  ...builtinModules,
+  ...builtinModules.map((name) => `node:${name}`),
+])
 const externalImports = new Set()
 const filesToScan = new Set()
 const filesSeen = new Set()
@@ -182,15 +197,23 @@ while (filesToScan.size > 0) {
   }
 }
 
-const missingRuntimeDeps = [...externalImports].filter((dep) => !declaredRuntimeDeps.has(dep)).sort()
+const missingRuntimeDeps = [...externalImports]
+  .filter((dep) => !declaredRuntimeDeps.has(dep))
+  .sort()
 
 if (missingRuntimeDeps.length > 0) {
-  console.error('apps/web is missing runtime dependencies required by aliased packages/api-client/src:')
+  console.error(
+    'apps/web is missing runtime dependencies required by aliased packages/api-client/src:'
+  )
   for (const dep of missingRuntimeDeps) {
     console.error(`- ${dep}`)
   }
-  console.error('Add them to apps/web/package.json dependencies to keep deployment/runtime isolation explicit.')
+  console.error(
+    'Add them to apps/web/package.json dependencies to keep deployment/runtime isolation explicit.'
+  )
   process.exit(1)
 }
 
-console.log('apps/web dependency isolation check passed for aliased packages/api-client/src imports.')
+console.log(
+  'apps/web dependency isolation check passed for aliased packages/api-client/src imports.'
+)

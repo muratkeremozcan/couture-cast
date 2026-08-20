@@ -35,7 +35,7 @@ function findRepoRoot() {
   for (const start of searchStarts) {
     let current = path.resolve(start)
 
-    while (true) {
+    for (;;) {
       if (
         existsSync(path.join(current, '.env.local')) ||
         existsSync(path.join(current, '.env.preview')) ||
