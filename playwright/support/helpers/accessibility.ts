@@ -12,7 +12,16 @@ export interface CheckA11yOptions {
 }
 
 export async function waitForAccessibilityReady(page: Page): Promise<void> {
-  await page.getByRole('main').waitFor({ state: 'visible' })
+  // Deliberately a DOM presence check, not a role query: `AccessibleModal` sets
+  // `aria-hidden="true"` and `inert` on the app shell (and therefore this <main>)
+  // while a modal is open, by design -- see accessible-modal.tsx. `checkA11y` calls
+  // this readiness gate for pages that scan a page WITH an open modal covering it
+  // (e.g. wardrobe-garment-capture.spec.ts), where `getByRole('main')` correctly
+  // finds nothing, but the underlying element is still there and still what the
+  // caller needs to wait for. `#main-content` is a load-bearing, stable id (the
+  // skip-link target on every page, per settings/page.tsx's docblock), not a
+  // fragile accident.
+  await page.locator('main#main-content').waitFor({ state: 'visible' })
   await page.evaluate(async () => {
     await document.fonts?.ready
     await new Promise<void>((resolve) => {
