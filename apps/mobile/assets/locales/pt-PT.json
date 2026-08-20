@@ -347,7 +347,31 @@
       "endedNote": "A sua subscrição terminou. Subscreva novamente quando quiser para recuperar as funcionalidades Premium.",
       "errorLoad": "Não foi possível carregar o estado da subscrição. Tente novamente.",
       "errorPurchase": "Não foi possível concluir a compra. Tente novamente.",
-      "unavailableInBuild": "As compras não estão disponíveis nesta versão da aplicação. Use a versão da App Store ou da Play Store do CoutureCast para subscrever."
+      "unavailableInBuild": "As compras não estão disponíveis nesta versão da aplicação. Use a versão da App Store ou da Play Store do CoutureCast para subscrever.",
+      "theme": {
+        "sectionTitle": "Paletas da interface",
+        "disclosure": "As paletas da interface são uma funcionalidade Premium. A tua escolha é guardada na tua conta CoutureCast e aplica-se em todos os dispositivos onde inicies sessão. Uma paleta muda apenas as cores: nunca muda que conjuntos são recomendados. O CoutureCast envia a paleta escolhida ao seu fornecedor de análise com um identificador pseudónimo; não são partilhadas fotografias de peças nem dados pessoais.",
+        "names": {
+          "jewelRadiance": "Jewel Radiance",
+          "autumnUmber": "Autumn Umber",
+          "winterMetallic": "Winter Metallic"
+        },
+        "select": "Aplicar",
+        "selected": "Selecionada",
+        "reset": "Paleta predefinida",
+        "preview": {
+          "title": "Pré-visualização em direto",
+          "body": "Este cartão usa a paleta que aplicaste. Os cartões acima mostram sempre as suas próprias cores."
+        },
+        "unavailable": "As paletas estão desligadas por agora. A tua escolha guardada mantém-se e regressa quando voltarem a estar disponíveis.",
+        "locked": {
+          "title": "As paletas da interface são uma funcionalidade Premium",
+          "body": "Subscreve o Premium com os controlos acima para desbloquear {{palettes}}.",
+          "signedOutBody": "Inicia sessão e subscreve o Premium para desbloquear {{palettes}}."
+        },
+        "loadError": "Não foi possível carregar a tua paleta da interface. Está a ser mostrada a paleta predefinida.",
+        "saveError": "Não foi possível guardar a tua paleta da interface. Tenta novamente."
+      }
     }
   }
 }

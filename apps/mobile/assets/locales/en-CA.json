@@ -347,7 +347,31 @@
       "endedNote": "Your subscription ended. Subscribe again anytime to get Premium features back.",
       "errorLoad": "Unable to load your subscription status. Please try again.",
       "errorPurchase": "The purchase could not be completed. Please try again.",
-      "unavailableInBuild": "Purchases aren’t available in this version of the app. Use the App Store or Play Store build of CoutureCast to subscribe."
+      "unavailableInBuild": "Purchases aren’t available in this version of the app. Use the App Store or Play Store build of CoutureCast to subscribe.",
+      "theme": {
+        "sectionTitle": "Interface palettes",
+        "disclosure": "Interface palettes are a Premium feature. Your choice is saved to your CoutureCast account and applies on every device you sign in on. A palette changes colours only: it never changes which outfits are recommended. CoutureCast sends the palette you picked to its analytics provider under a pseudonymous id; no wardrobe photos or personal details are shared.",
+        "names": {
+          "jewelRadiance": "Jewel Radiance",
+          "autumnUmber": "Autumn Umber",
+          "winterMetallic": "Winter Metallic"
+        },
+        "select": "Apply",
+        "selected": "Selected",
+        "reset": "Default palette",
+        "preview": {
+          "title": "Live preview",
+          "body": "This card uses the palette you have applied. The cards above always show their own colours."
+        },
+        "unavailable": "Palettes are switched off for now. Your saved choice is kept and comes back when they return.",
+        "locked": {
+          "title": "Interface palettes are a Premium feature",
+          "body": "Subscribe to Premium with the controls above to unlock {{palettes}}.",
+          "signedOutBody": "Sign in and subscribe to Premium to unlock {{palettes}}."
+        },
+        "loadError": "Unable to load your interface palette. Showing the default palette.",
+        "saveError": "Unable to save your interface palette. Please try again."
+      }
     }
   }
 }
