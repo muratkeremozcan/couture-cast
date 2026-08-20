@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
+import { formatLocalizedList } from '@couture/utils'
 import {
   defaultSupportedLocale,
   resolveSupportedLocale,
@@ -910,23 +911,31 @@ const THEME_UNAVAILABLE_HINT_ID = 'premium-theme-unavailable-hint'
  * of truth and adding a palette does not mean hand-editing twenty localized
  * sentences.
  *
- * `Intl.ListFormat` rather than `join(', ')` because the join is not the same in
- * every language this ships in: German wants "und", French "et", Turkish "ve",
+ * Locale-aware joining rather than `join(', ')` because the join is not the same
+ * in every language this ships in: German wants "und", French "et", Turkish "ve",
  * Spanish "y", and English and Canadian English disagree about the serial comma.
- * Hermes ships full ICU for `Intl.ListFormat` on both platforms in the Expo SDK
- * this app pins, and the same helper is already load-bearing on the web surface.
+ *
+ * `formatLocalizedList` rather than `Intl.ListFormat` directly. `Intl.ListFormat`
+ * is optional under ECMA-402 and Hermes ships without it, so constructing one here
+ * threw `TypeError: Cannot read property 'prototype' of undefined` on device. That
+ * took `PremiumThemeSection` down, and with it `SettingsScreen` and the whole tab
+ * layout, so every flow that reaches for `tab-settings` failed with a missing
+ * element rather than anything naming the real cause. The shared helper uses
+ * `Intl.ListFormat` where it exists and falls back where it does not, and is
+ * already load-bearing in this bundle through the alt-text helpers.
  */
 function usePaletteNameList(): string {
   const { t, i18n } = useTranslation()
   const language = i18n.language
 
-  return useMemo(() => {
-    const names = PREMIUM_THEME_KEYS.map((key) => t(PALETTE_LABEL_KEYS[key]))
-    return new Intl.ListFormat(language, {
-      style: 'long',
-      type: 'conjunction',
-    }).format(names)
-  }, [t, language])
+  return useMemo(
+    () =>
+      formatLocalizedList(
+        PREMIUM_THEME_KEYS.map((key) => t(PALETTE_LABEL_KEYS[key])),
+        language
+      ),
+    [t, language]
+  )
 }
 
 /**

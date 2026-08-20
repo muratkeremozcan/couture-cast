@@ -286,6 +286,56 @@ describe('SettingsScreen interface palettes section', () => {
     })
   })
 
+  /**
+   * `Intl.ListFormat` is optional under ECMA-402 and Hermes ships without it, so a raw
+   * `new Intl.ListFormat(...)` in this section threw on device, took `SettingsScreen`
+   * and the whole tab layout down with it, and reached CI only as a Maestro failure
+   * reading "Element not found: Id matching regex: tab-settings" — a message naming
+   * nothing about the actual cause.
+   *
+   * This suite runs in Chromium, which does ship `Intl.ListFormat`, which is exactly
+   * why the crash passed component tests and had to be found on an emulator. The
+   * device runtime therefore has to be simulated for the regression to be reachable
+   * at this level at all.
+   */
+  describe('runtimes that ship no Intl.ListFormat', () => {
+    const withoutListFormat = async (assertions: () => Promise<void>) => {
+      const listFormat = Intl.ListFormat
+      Object.defineProperty(Intl, 'ListFormat', { configurable: true, value: undefined })
+      try {
+        await assertions()
+      } finally {
+        Object.defineProperty(Intl, 'ListFormat', {
+          configurable: true,
+          value: listFormat,
+        })
+      }
+    }
+
+    it('renders the locked copy, joining the palette names with the locale fallback', async () => {
+      await withoutListFormat(async () => {
+        serveTheme(themeResponse({ isEntitled: false }))
+        await renderSettings()
+
+        const locked = await screen.findByTestId('premium-theme-locked')
+        // Identical to what Intl.ListFormat produces for en-US, so the fallback is a
+        // faithful substitute rather than a degraded one.
+        expect(locked.textContent).toContain(
+          'Jewel Radiance, Autumn Umber, and Winter Metallic'
+        )
+      })
+    })
+
+    it('renders the gallery for an entitled reader', async () => {
+      await withoutListFormat(async () => {
+        serveTheme(themeResponse())
+        await renderSettings()
+
+        expect(await screen.findByTestId('premium-theme-gallery')).toBeTruthy()
+      })
+    })
+  })
+
   describe('degraded states (AC 6)', () => {
     /**
      * The kill switch is reachable by an entitled subscriber, and it disables every card.
