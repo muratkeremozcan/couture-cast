@@ -648,11 +648,9 @@ const probeAndroidMetroReachability = async (host, port) => {
               `nc -z does not work on this device image, so ${host} cannot be probed; ` +
                 'not treating that as unreachable'
             )
-            await captureProcess(adbBinary, [
-              'reverse',
-              '--remove',
-              `tcp:${probePort}`,
-            ]).catch(() => {
+            await captureProcess(adbBinary, ['reverse', '--remove', `tcp:${probePort}`], {
+              timeoutMs: 10_000,
+            }).catch(() => {
               /* best-effort: failures here are not fatal to the run */
             })
             finish(null)
@@ -2355,7 +2353,7 @@ const resolveShardDeviceName = async (deviceId, index) => {
  * Names here are flow titles (the `name:` inside the flow), not file names.
  *
  * @param {string} reportPath
- * @returns {{ passed: string[], failed: string[] }}
+ * @returns {{ passed: string[], failed: string[], skipped: string[], unreadable: string | null }}
  */
 const readSuiteReport = (reportPath) => {
   const absolute = path.resolve(projectRoot, reportPath)
@@ -2366,7 +2364,12 @@ const readSuiteReport = (reportPath) => {
     // Returning an empty result here used to be indistinguishable from a report
     // that legitimately recorded nothing, which matters because this report is
     // the suite's source of truth: a silently empty read reports a green suite.
-    return { passed: [], failed: [], unreadable: `${absolute}: ${error.message}` }
+    return {
+      passed: [],
+      failed: [],
+      skipped: [],
+      unreadable: `${absolute}: ${error.message}`,
+    }
   }
 
   const passed = []

@@ -315,7 +315,9 @@ function logDeploymentDetails(deployment) {
  * @returns {string}
  */
 function toAbsoluteUrl(hostOrUrl) {
-  return hostOrUrl.startsWith('http') ? hostOrUrl : `https://${hostOrUrl}`
+  // Match the scheme exactly: a hostname such as http-api-git-x.vercel.app starts with
+  // "http" without carrying a scheme, and would otherwise be emitted unusable.
+  return /^https?:\/\//i.test(hostOrUrl) ? hostOrUrl : `https://${hostOrUrl}`
 }
 
 /**
