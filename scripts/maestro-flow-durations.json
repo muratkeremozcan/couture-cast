@@ -1,0 +1,21 @@
+{
+  "_comment": "Baseline per-flow duration in seconds, feeding the LPT bin-packing in scripts/resolve-maestro-shard.mjs. Recorded from CI run 32373171812 (mobile-e2e-android, 2026-08-20, all four shards, no stall present) via `gh api repos/muratkeremozcan/couture-cast/actions/jobs/<id>/logs | grep -oE \"\\[(Passed|Failed)\\] .+ \\([0-9hms ]+\\)\"`. A flow with no entry here falls back to the mean of the recorded values; refresh this file when a flow's shape changes enough to move its cost meaningfully, not on every run's natural variance.",
+  "accessibility-hardening.yaml": 135,
+  "analytics.yaml": 77,
+  "chip-navigation-bottom-nav.yaml": 112,
+  "commerce-affiliate.yaml": 168,
+  "deep-link-handling.yaml": 36,
+  "garment-capsule-create-flow.yaml": 117,
+  "garment-capsule-localization-flow.yaml": 97,
+  "garment-capsule-repair-flow.yaml": 100,
+  "garment-capture-flow.yaml": 57,
+  "garment-smart-tagging-flow.yaml": 102,
+  "hero-experience.yaml": 37,
+  "localization.yaml": 64,
+  "premium-subscription.yaml": 57,
+  "sanity.yaml": 37,
+  "wardrobe-onboarding-flow.yaml": 72,
+  "wardrobe-onboarding-localization-flow.yaml": 79,
+  "wardrobe-onboarding-my-form-flow.yaml": 55,
+  "widget-deep-link.yaml": 40
+}

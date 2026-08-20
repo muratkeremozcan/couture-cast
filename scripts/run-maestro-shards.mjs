@@ -2,9 +2,12 @@
 /**
  * Run the Maestro suite across several devices at once, on either platform.
  *
- * The serial suite costs the sum of its eighteen flows: roughly 35 minutes on
- * iOS and 1.5-2 hours on Android, both too slow to gate a pull request beside
- * the ~10 minute Playwright job.
+ * This is what `npm run test:mobile:e2e:ios` / `:android` run by default. The
+ * serial suite (`scripts/run-maestro.mjs` directly, or the `:serial` npm
+ * scripts) costs the sum of its eighteen flows: roughly 35 minutes on iOS and
+ * 1.5-2 hours on Android, both too slow for routine local use, let alone to
+ * gate a pull request beside the ~10 minute Playwright job. `:serial` still
+ * exists for debugging a single device without shard bookkeeping in the way.
  *
  * This script only owns the devices. It creates and boots the simulators or
  * emulators, then hands the whole list to `scripts/run-maestro.mjs`, which
@@ -27,7 +30,8 @@
  * `assignAndroidDeviceName` in `scripts/run-maestro.mjs`.
  *
  * Usage:
- *   node ./scripts/run-maestro-shards.mjs                        # 4 simulators
+ *   npm run test:mobile:e2e:ios                                  # 4 simulators
+ *   npm run test:mobile:e2e:android                              # 4 emulators
  *   node ./scripts/run-maestro-shards.mjs --shards 2
  *   node ./scripts/run-maestro-shards.mjs --platform android
  *   MOBILE_E2E_SHARDS=6 node ./scripts/run-maestro-shards.mjs

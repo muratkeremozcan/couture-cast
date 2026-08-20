@@ -83,6 +83,42 @@ const WRITE_ARTIFACTS =
   process.env.MOBILE_E2E_ARTIFACTS === '1'
 const MAESTRO_ARTIFACT_DIR = process.env.MAESTRO_ARTIFACT_DIR || 'maestro/artifacts'
 
+/**
+ * The ceiling one flow gets on the single-device serial path before it is
+ * killed and reported as a failure, in milliseconds.
+ *
+ * Applies locally as well as in CI. A stalled flow is not a debugging
+ * breakpoint a developer is waiting on; Maestro runs a flow as a black box
+ * either way, so there is no legitimate local reason for one to hang longer
+ * than CI would tolerate, and an unbounded local run is worse than a bounded
+ * CI job: CI at least has the job's own 45-minute ceiling as a backstop,
+ * where a local run has none. Local and CI stay one experience by default;
+ * override with `MOBILE_E2E_CI_FLOW_TIMEOUT_MS` for the rare case (a flow
+ * genuinely growing past this) rather than special-casing either environment.
+ *
+ * Sized well above every flow's recorded cost in
+ * `scripts/maestro-flow-durations.json` (worst case recorded there is under
+ * three minutes) and well below the CI job's 45-minute ceiling, so a normal
+ * flow never comes close to it.
+ *
+ * This exists because a flow can silently stall rather than fail. Observed on
+ * three different flows across three different runs on 2026-08-20, always the
+ * same shape: "Waiting for flows to complete" followed by total silence, the
+ * device's manifest fetch or Metro connection simply never resolving. Maestro's
+ * own step timeouts (15-30s, inside the flow) never fired, because the flow
+ * was not mid-assertion; it never got the chance to start one. The first
+ * occurrence still passed 24 minutes later, so nothing about it failed loudly;
+ * only the shard's total wall clock said anything was wrong, and nobody is
+ * watching that number on every run. A hard ceiling turns a silent, wall-
+ * clock-consuming stall into a fast, named failure instead.
+ *
+ * That alone would turn a transient runner hiccup into a red gate, though,
+ * which is worse than the slow pass it replaces for a flow that was never
+ * really broken. `runMaestroCommandWithWatchdogRetry` below is the other half:
+ * one retry, specifically for a `timedOut` failure, before it counts.
+ */
+const CI_FLOW_TIMEOUT_MS = Number(process.env.MOBILE_E2E_CI_FLOW_TIMEOUT_MS || 360_000)
+
 const START_SERVER = process.env.MOBILE_E2E_SKIP_SERVER !== '1'
 const AUTO_BOOT_ANDROID = process.env.MOBILE_E2E_AUTO_BOOT_ANDROID !== '0'
 // How Android addresses Metro and the API on the host. `127.0.0.1` is the
@@ -1668,7 +1704,9 @@ const spawnProcess = (command, args, options = {}) =>
     child.on('exit', (code) => {
       if (timeout) clearTimeout(timeout)
       if (timedOut) {
-        finish(() => reject(new Error(`${command} timed out after ${timeoutMs}ms`)))
+        const error = new Error(`${command} timed out after ${timeoutMs}ms`)
+        error.timedOut = true
+        finish(() => reject(error))
         return
       }
       if (code === 0) {
@@ -3087,6 +3125,43 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
 }
 
 /**
+ * Run one Maestro command, retrying exactly once if `CI_FLOW_TIMEOUT_MS` is
+ * what killed it.
+ *
+ * Bounded to a single retry: this is not a general flake-retry mechanism. It
+ * exists for one specific, now three-times-observed failure mode -- the
+ * device's manifest fetch or Metro connection stalling completely before the
+ * flow has done anything, the same "Waiting for flows to complete" followed
+ * by total silence, recorded on three different flows across three different
+ * runs on 2026-08-20, never mid-assertion, always before the flow got the
+ * chance to start one. The watchdog alone turns that from a silent 20+ minute
+ * pass into a fast, named failure, which is strictly better but still turns a
+ * transient runner stall into a red gate. One retry keeps the fast failure
+ * for a flow that is genuinely stuck, while giving the transient case -- which
+ * has cleared on rerun every time it has been observed -- the same chance a
+ * human re-running the job would give it. Because the stall has only ever been
+ * seen before the flow starts, retrying is safe: there is nothing for the
+ * killed attempt to have mutated.
+ *
+ * @param {string[]} args
+ * @param {SpawnProcessOptions} options
+ * @param {string} label used in the retry log line
+ * @param {() => Promise<void>} [beforeRetry] re-run any per-flow setup the
+ *   killed attempt would otherwise have skipped on its retry
+ * @returns {Promise<void>}
+ */
+const runMaestroCommandWithWatchdogRetry = async (args, options, label, beforeRetry) => {
+  try {
+    await runMaestroCommand(args, options)
+  } catch (error) {
+    if (!error.timedOut) throw error
+    log(`RETRY ${label} (${error.message})`)
+    if (beforeRetry) await beforeRetry()
+    await runMaestroCommand(args, options)
+  }
+}
+
+/**
  * Run the flows that cannot be sharded, one at a time on the first device.
  *
  * @param {string[]} serialFlows
@@ -3121,10 +3196,15 @@ const runUserScopedFlows = async (serialFlows, target, maestroEnv, flowFailures)
 
     log(`Running user-scoped flow on ${SHARD_DEVICE_IDS[0]}: ${flowPath}`)
     try {
-      await runMaestroCommand(serialArgs, {
-        env: maestroEnv,
-        logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
-      })
+      await runMaestroCommandWithWatchdogRetry(
+        serialArgs,
+        {
+          env: maestroEnv,
+          logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
+          timeoutMs: CI_FLOW_TIMEOUT_MS,
+        },
+        flowPath
+      )
       log(`PASS ${flowPath}`)
     } catch (error) {
       flowFailures.push(flowPath)
@@ -3255,10 +3335,16 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     log(`Running Maestro flow (${maestroArgs.join(' ')})`)
     let maestroExitError
     try {
-      await runMaestroCommand(maestroArgs, {
-        env: maestroEnv,
-        logFile: maestroLogFile,
-      })
+      await runMaestroCommandWithWatchdogRetry(
+        maestroArgs,
+        {
+          env: maestroEnv,
+          logFile: maestroLogFile,
+          timeoutMs: CI_FLOW_TIMEOUT_MS,
+        },
+        flowPath,
+        mobileIdentity ? () => resetMobileE2EPerFlowState(mobileIdentity) : undefined
+      )
     } catch (error) {
       maestroExitError = error
     }

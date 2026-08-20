@@ -173,8 +173,8 @@ runs:
           // failure behind, only a smaller flow count.
           //
           // The exemption is real rather than defensive. `workflow_dispatch`
-          // with `suite: smoke` hands three flows to four shards, and the
-          // workflow's own "Resolve this shard's flow list" step treats an empty
+          // with `suite: smoke` hands three flows to the full shard count, and
+          // the workflow's own "Resolve this shard's flow list" step treats an empty
           // shard as legitimate exactly when there are fewer flows than shards
           // and as a hard error otherwise. Same rule, same shape, applied to the
           // evidence: only demand full coverage of a run big enough to fill
