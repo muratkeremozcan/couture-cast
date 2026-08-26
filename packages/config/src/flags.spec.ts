@@ -39,6 +39,10 @@ describe('feature flag registry', () => {
   it('returns registry defaults for known keys', () => {
     expect(getDefaultFeatureFlagValue('premium_themes_enabled')).toBe(false)
     expect(getDefaultFeatureFlagValue('weather_alerts_enabled')).toBe(true)
+    // Story 5.4 decision 10: flipped from `true` to `false` -- a consent-gated
+    // feature that reads photographs of faces is the last flag in this repo
+    // that should fail open.
+    expect(getDefaultFeatureFlagValue('color_analysis_enabled')).toBe(false)
   })
 
   it('coerces only values that match the declared flag type', () => {
@@ -134,7 +138,9 @@ describe('getFeatureFlag', () => {
   it('resolves to the code default when no adapters are wired at all', async () => {
     // Local, unit-test and pre-PostHog runtimes call this with no adapters. The
     // ritual still has to render, so the code default is the only answer.
-    await expect(getFeatureFlag('color_analysis_enabled', 'user-5')).resolves.toBe(true)
+    // color_analysis_enabled resolves to false here (decision 10): fail-closed
+    // is the point, not a ritual-rendering concern like the flags it sits beside.
+    await expect(getFeatureFlag('color_analysis_enabled', 'user-5')).resolves.toBe(false)
     await expect(getFeatureFlag('community_feed_enabled', 'user-5')).resolves.toBe(false)
   })
 
@@ -173,7 +179,7 @@ describe('getFeatureFlag', () => {
 
     await expect(
       getFeatureFlag('color_analysis_enabled', 'user-8', { readRemoteFlag })
-    ).resolves.toBe(true)
+    ).resolves.toBe(false)
   })
 
   it('ignores a cached value that no longer matches the declared flag kind', async () => {
@@ -229,7 +235,7 @@ describe('getFeatureFlag', () => {
         readRemoteFlag,
         readFallbackFlag,
       })
-    ).resolves.toBe(true)
+    ).resolves.toBe(false)
     expect(readFallbackFlag).toHaveBeenCalledWith('color_analysis_enabled')
   })
 })

@@ -348,6 +348,54 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
     })
   })
 
+  describe("the dedupe key is not the client's to choose", () => {
+    it('5.4-INT-036 creates one row for two forged recommendation ids in the same minute', async (context) => {
+      if (!requireSchema(context)) return
+      cleanupClickArtifacts()
+
+      /*
+       * AGAINST THE REAL UNIQUE INDEX, which is the whole reason this belongs
+       * here rather than only at the unit tier. The dedupe is
+       * `(user_id, offer_id, recommendation_id, minute)`; a caller who can put
+       * anything in the third column defeats it by varying that column, and no
+       * double can prove the index does the collapsing.
+       *
+       * Both ids below are well-formed and neither names a row this user owns,
+       * which is exactly what a forger sends. `findRecommendationScenario` is
+       * user-scoped, so both resolve to nothing and both collapse onto the
+       * sentinel; the second request is then a replay of the first.
+       */
+      const first = await post({ ...validBody(), recommendationId: 'forged-alpha' })
+      const second = await post({ ...validBody(), recommendationId: 'forged-beta' })
+
+      expect(first.status).toBe(201)
+      // 200, not 201: the second was recognised as a replay of the first.
+      expect(second.status).toBe(200)
+
+      const rows = await prismaA.affiliateClick.findMany({ where: { user_id: userId } })
+      expect(rows).toHaveLength(1)
+      expect(rows[0]?.recommendation_id).toBe('unresolved')
+      // Neither forged value reached the attribution row.
+      expect(rows[0]?.recommendation_id).not.toBe('forged-alpha')
+      expect(rows[0]?.recommendation_id).not.toBe('forged-beta')
+    })
+
+    it('5.4-INT-037 keeps the id a caller genuinely owns', async (context) => {
+      if (!requireSchema(context)) return
+      cleanupClickArtifacts()
+
+      // The other side of the same rule: an id that DOES resolve to one of this
+      // user's rows is stored as sent, so the impression-to-click join the PRD's
+      // click-through metric depends on still works.
+      const response = await post(validBody())
+
+      expect(response.status).toBe(201)
+      const rows = await prismaA.affiliateClick.findMany({ where: { user_id: userId } })
+      expect(rows).toHaveLength(1)
+      expect(rows[0]?.recommendation_id).toBe(recommendationId)
+    })
+  })
+
   describe('the 60-second dedupe boundary', () => {
     /**
      * `created_at` is computed by the DATABASE at insert time, not from a

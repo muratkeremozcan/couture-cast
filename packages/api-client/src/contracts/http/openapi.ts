@@ -21,6 +21,7 @@ import { registerWardrobeContracts } from './wardrobe'
 import { registerCommerceContracts } from './commerce'
 import { registerSubscriptionContracts } from './subscription'
 import { registerPremiumThemeContracts } from './premium-theme'
+import { registerPaletteAdvisorContracts } from './palette-advisor'
 
 export const HTTP_OPENAPI_OUTPUT_FILENAME = 'http.openapi.json'
 
@@ -111,6 +112,7 @@ export function createHttpOpenApiRegistry() {
   registerCommerceContracts(registry, commonSchemas)
   registerSubscriptionContracts(registry, commonSchemas)
   registerPremiumThemeContracts(registry, commonSchemas)
+  registerPaletteAdvisorContracts(registry, commonSchemas)
 
   return registry
 }
@@ -139,7 +141,10 @@ export function generateHttpOpenApiDocument() {
       // Story 5.3 bumps the minor again: two additive premium-theme operations
       // (read and set the palette) under a new tag, and no changes to existing
       // operations.
-      version: '1.3.0',
+      // Story 5.4 bumps the minor again: eight additive palette-advisor
+      // operations under a new tag, one additive `palette_advisor` member on
+      // `affiliateSurfaceSchema`, and no changes to existing operations.
+      version: '1.4.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [

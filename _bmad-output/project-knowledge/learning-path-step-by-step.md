@@ -1,16 +1,19 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-08-19. Added Step 35 for Story 5.3, the premium theme switcher, from the
-implemented and reviewed change: verified implementation lessons, a code-reading sequence, a task
-owner map, a test coverage map, and an architecture diagram. Story 5.3 shipped its server
-primitive and its web surface only; the mobile surface, Pact, Playwright, and Maestro were
-deliberately cut so the higher test tiers could be authored separately, so the story is still
-`in-progress` and Step 35 states that boundary rather than implying full coverage. Brought the
-`Current position` section and the project table up to date, which had both stopped at Step 33
-while Step 34 was already written. Added searchable `Learning path Step` cross-link comments to
-every test file Step 35 lists, and to the five Step 34 files this change already touches. The
-remaining Step 34 test files, including all three mobile ones, still carry no cross-link comment;
-backfilling them was left out so this change would not touch files outside its own scope.
+Updated: 2026-08-26. Added Step 36 for Story 5.4, the colour palette, beauty and accessory
+advisor, from the implemented and reviewed change: verified implementation lessons, the review
+pass's own findings, a code-reading sequence, a task owner map, a test coverage map with stated
+evidence boundaries, and an architecture diagram. Story 5.4 shipped both surfaces and all five
+test tiers, so Step 36 states no cancelled-task boundary; what it does state is what no tier
+proves, which is real-world classification accuracy and the native camera path. Brought the
+`Current position` section and the project table up to date. Step 35's own boundary note stands:
+Story 5.3's mobile surface, Pact, Playwright and Maestro were cut for that pass and are recorded
+in `deferred-work.md`.
+
+Earlier (2026-08-19): added Step 35 for Story 5.3, the premium theme switcher, and added
+searchable `Learning path Step` cross-link comments to every test file Step 35 lists, plus the
+five Step 34 files that change already touched. The remaining Step 34 test files, including all
+three mobile ones, still carry no cross-link comment.
 
 ## Instructions for LLMs updating this file
 
@@ -65,13 +68,26 @@ This contract is authoritative. Read it before changing or adding a numbered ste
 
 - Latest completed step: Step 34, Story 5.2, Premium subscription lifecycle, status `done`,
   merged as `0c34858` (PR #129).
-- Latest written step: Step 35, Story 5.3, Premium theme switcher, status `in-progress`. Its
-  plan is in `_bmad-output/implementation-artifacts/5-3-premium-theme-switcher.md`. The server
-  primitive and the web surface are implemented, reviewed, and green; the mobile surface, Pact,
-  Playwright, and Maestro were deliberately cut for this pass and are recorded in
-  `deferred-work.md`. Step 35 is written because implementation and review produced verified
-  evidence, and its `Evidence boundaries` section names everything that is not proven yet.
-- Next work on Story 5.3: the deferred tiers above. The story moves to `done` once they land.
+- Step 35, Story 5.3, Premium theme switcher, status `in-progress`. The server primitive and the
+  web surface are implemented, reviewed and green; the mobile surface, Pact, Playwright and
+  Maestro were deliberately cut for that pass and are recorded in `deferred-work.md`. The story
+  moves to `done` once those tiers land.
+- Latest completed step: Step 36, Story 5.4, Colour palette, beauty and accessory advisor, status
+  `done`, on PR #140. Its plan is in
+  `_bmad-output/implementation-artifacts/5-4-color-palette-beauty-accessory-advisor.md`. All ten
+  tasks are implemented and reviewed across both surfaces and all five test tiers, and the
+  closeable half of its deferred backlog was closed on the same PR: the stale-rules-version
+  explanation, the advisor offer query-plan evidence, the garment click's untrusted dedupe key,
+  and the three planning documents that had gone false about where face images are processed.
+  Step 36's `Evidence boundaries` section names everything that is still not proven.
+- Next work on Story 5.4: what remains in `deferred-work.md` is CI plumbing that needs a runner
+  rather than a checkout — per-attempt Maestro artifacts, the Linux-only Pact consumer flake, and
+  the `open-settings.yaml` emulator flake. Each entry states what a fix needs.
+- Corrected on 2026-08-26: this section previously named "no workflow runs `test:integration`" as
+  the highest-value open item. That was false when written. `apps/api/vitest.config.ts` includes
+  `integration/**/*.spec.ts`, so `quality-gate`'s `test:coverage` step already runs the whole
+  integration tier against its own PostgreSQL service. What was genuinely missing — a silent skip
+  when that database is unreachable — is now closed by `5.4-INT-031`.
 - Keep this section aligned with `_bmad-output/implementation-artifacts/sprint-status.yaml`.
 
 ## The whole project in plain English
@@ -113,6 +129,7 @@ This contract is authoritative. Read it before changing or adding a numbered ste
 |   33 | Add disclosed affiliate links and durable purchase attribution.  |
 |   34 | Take money, keep one entitlement ledger, and never trap a payer. |
 |   35 | Let paying users pick a palette. Prove it is readable first.     |
+|   36 | Read a face or a closet. Keep the answer, delete the photo.      |
 
 ## Special feature: AI garment tagging
 
@@ -1261,7 +1278,7 @@ Task owner map:
 - Story 0.7 Task 8 step 1 owner: shared flag keys, value kinds, and code defaults in `packages/config/src/flags.ts`
 - Story 0.7 Task 8 step 2 owner: remote PostHog flag evaluation in `apps/api/src/posthog/posthog.service.ts`
 - Story 0.7 Task 8 step 3 owner: request-time fallback order in `packages/config/src/flags.ts`
-- Story 0.7 Task 8 step 4 owner: fallback cache warmup and refresh in `apps/api/src/modules/feature-flags/feature-flags.cron.ts`
+- Story 0.7 Task 8 step 4 owner: fallback cache warmup and refresh in `apps/api/src/modules/feature-flags/feature-flags.warmup.ts`
 - Step 8 feature-flag coordination owner: connect the request path and persistence layer in `apps/api/src/modules/feature-flags/feature-flags.service.ts` and `apps/api/src/modules/feature-flags/feature-flags.repository.ts`
 
 Tests that cover this step:
@@ -1283,7 +1300,7 @@ Shared contract and API unit tests:
 - [`apps/api/src/modules/feature-flags/feature-flags.repository.spec.ts`](../../apps/api/src/modules/feature-flags/feature-flags.repository.spec.ts):
   proves cached flag reads,
   missing and null fallback values, and atomic multi-flag synchronization.
-- [`apps/api/src/modules/feature-flags/feature-flags.cron.spec.ts`](../../apps/api/src/modules/feature-flags/feature-flags.cron.spec.ts):
+- [`apps/api/src/modules/feature-flags/feature-flags.warmup.spec.ts`](../../apps/api/src/modules/feature-flags/feature-flags.warmup.spec.ts):
   proves startup warmup and the
   five-minute fallback refresh hook.
 
@@ -5879,4 +5896,596 @@ flowchart TD
   ROW --> RLS["RLS: selfOnlyTables\nprivate.can_manage_self_row, owner-only CRUD"]
   SVC --> RESP["{ theme, isEntitled, themesEnabled }\nprivate, no-store via CommerceCacheHeadersMiddleware"]
   RESP --> LIB
+```
+
+## Step 36: Colour palette, beauty and accessory advisor
+
+User/business impact:
+
+Gives a paying subscriber makeup shades and accessory pairings matched to their
+own tones. A Premium-entitled user opens web `/palette` or the mobile palette
+advisor, grants an explicit consent, and derives an undertone one of two ways:
+from a selfie, which yields **undertone and depth**, or from the colours already
+stored for their wardrobe, which yields **undertone only** and says so rather
+than pretending clothing colour is evidence about skin. The result drives a
+versioned first-party rule table across five slots (foundation, blush, jewelry,
+bag, eyewear), each card saveable or dismissable and each dismissal permanent
+until undone. Zero or one affiliate offer may attach to a slot, disclosed before
+its own control, suppressed by the user's existing global commerce opt-out.
+
+The consent is the product, not the paperwork. It is a persisted, revocable,
+server-enforced fact, every grant and revoke writes an immutable `AuditLog` row,
+withdrawing it erases the derived palette in the same path as `DELETE`, and the
+selfie bytes are purged from storage the moment the analysis terminates —
+success or failure — leaving only four scalars. This is the first surface in the
+repository that reads a photograph of a user's face, and it is the first where
+the retention posture is tighter than the story it was modelled on.
+
+Key takeaways:
+
+1. **Three source documents disagreed, and the ADR plus the shipped code won.**
+   `ux-design-specification.md:409` says the pipeline is on-device;
+   `architecture.md` ADR-014 says server-side in detail and gives its reasons;
+   `prd.md:294` asks to confirm the on-device constraints. ADR-014 is three days
+   newer, was written specifically to close the PRD's open question, and —
+   decisively — the shipped `WardrobeColorProcessor` already runs Sharp inside
+   the API. Building an on-device path would have meant two colour pipelines with
+   different answers. The stale lines are recorded in `deferred-work.md` as
+   documents to amend, not as requirements that were missed.
+2. **Declining part of an ADR is legitimate; doing it silently is not.** ADR-014
+   prescribes "Sharp → ONNX Runtime". This story takes its location decision, its
+   privacy posture and its budget, and declines the ONNX step: the output is one
+   four-way and one five-way classification that closed-form CIELAB colour
+   science settles exactly, while the repository's only ONNX consumer already
+   carries a 50 MB model directory and a prestart verification gate for a
+   genuinely learned task. The divergence is written into the story's Decision 2
+   and into `deferred-work.md` against ADR-014 so the ADR can be amended rather
+   than quietly contradicted.
+3. **Classify undertone on the CIELAB hue angle, never on a `b*/a*` ratio.** A
+   ratio divides by `a*`, which is near zero for neutral skin and genuinely
+   negative for a wardrobe mean pulled green or cyan, so it both blows up and
+   silently inverts the comparison at exactly the inputs the feature has to get
+   right. `atan2(b*, a*)` is defined everywhere except `a* = b* = 0`, which the
+   chroma screen already excludes.
+4. **Averaging gamma-encoded sRGB bytes is not averaging colour.** The mean of
+   two sRGB byte values is not the colour halfway between them, so every pixel is
+   linearized before it is combined. `WardrobeColorProcessor.extractDominantHex`
+   already takes that approximation over `.stats()` channel means; reproducing it
+   here would have biased every derived undertone toward the darker input.
+5. **Reuse before you write the maths a third time.** `contrast.ts` already held
+   the WCAG linearization from Step 35, but `parseHex` and `relativeLuminance`
+   were module-private and the latter collapsed three linearized channels into
+   one 709-weighted scalar — never yielding the per-channel values CIEXYZ needs.
+   Task 2 therefore opens by exporting `srgbChannels` and `linearizeSrgbChannel`
+   and refactoring `relativeLuminance` to compose them, with `contrast.spec.ts`
+   passing unchanged as the proof of no behaviour change. Only then does
+   `skin-tone.ts` get written.
+6. **`no_face` has to mean something a machine can decide.** There is no face
+   detector and no new dependency. Sharp's `.stats()` returns whole-image means,
+   and a selfie is mostly not skin, so the isolation is a centre crop plus the
+   published Chai–Ngan YCbCr chroma bounds, computed on the **gamma-encoded**
+   bytes because those bounds are published against BT.601 over R'G'B'.
+   Linearization comes after the gate, on the survivors only. "No face" is then a
+   precise statement: fewer than 15% of the cropped pixels are skin-chromatic.
+7. **Report confidence; never fake it.** Both sources return a `[0, 1]`
+   confidence, and both refuse to publish below 0.4 rather than shipping a
+   low-confidence answer a user will read as fact about their body. The wardrobe
+   path terminates `insufficient_wardrobe` rather than `low_quality` for that
+   refusal, because the `low_quality` copy is photo-specific in all ten catalogs
+   and showing it to someone who never uploaded a photo is a wrong answer dressed
+   as a helpful one.
+8. **Extend the catalog by two nullable columns; do not fork it.**
+   `AffiliateOffer.garment_category` had no honest value for a foundation offer.
+   Adding a `beauty` member would pollute a wardrobe enum that garments, tagging
+   and capsules all read; a separate `AdvisorOffer` table would make
+   `AffiliateClick.offer_id` polymorphic and duplicate the partner, token,
+   webhook and conversion machinery. Two nullable columns plus a
+   `CHECK (num_nonnulls(garment_category, advisor_slot) = 1)` constraint make a
+   row unambiguously one kind or the other, and make a row that could satisfy
+   both selections unrepresentable.
+9. **SQL NULL semantics are a real guarantee and a fragile one.** The garment
+   query filters `garment_category = $n` and the advisor query filters
+   `advisor_slot = $n`, so neither can ever return the other's rows. That holds
+   exactly until someone adds an `OR ... IS NULL` for a wildcard feature, which
+   is why the guarantee is asserted in both directions at two tiers rather than
+   trusted.
+10. **The click path is where the two genuinely can cross, and NULL semantics do
+    not save it.** `findActiveClickOffer` looks a row up by id plus status and
+    window and deliberately does not re-derive the slot match, so any active
+    offer id is clickable with any `surface` a caller sends. The branch therefore
+    keys on the offer row's `advisor_slot`, never on `input.surface`; keying on
+    the client value would let a caller mint `advisor_offer_clicked` for a
+    garment offer, or route a real advisor click into the scenario-lookup dead
+    end that emits nothing.
+11. **Consent is a persisted server fact, not a `z.literal(true)` the client
+    always sends.** Story 4.4's My Form photo takes the weaker shape and it is
+    adequate for basewear guidance; it is not adequate for image-derived body
+    characteristics, and `epics.md:576` asks for logged opt-ins, which is an
+    audit requirement rather than a telemetry one. One gate, server-side, audited
+    both ways, and revocation erases rather than flipping a flag.
+12. **There are three doors to a terminal status, not two.** A photo reaches
+    `ready` in the processor, reaches a failure in the processor, and reaches
+    `timeout`/`storage_error` from the worker's catch block on the final attempt
+    — which never runs the processor body at all. A purge written only inside
+    `process()` leaks every selfie whose analysis exhausts its retries, which is
+    the same permanent-retention bug the decision exists to prevent, entered
+    through a different door. One private purge method, called from all three.
+13. **Commit the terminal status first, then purge, and make only the purge
+    best-effort.** Purging first means a crash between the two leaves the row in
+    `processing` with no bytes to re-read, and the retry then fails its download
+    for the whole retention window. The status commit is the durable fact.
+14. **A consent-gated feature that reads faces is the last flag that should fail
+    open.** `color_analysis_enabled` had a registry default of `true`, out of step
+    with every other premium and commerce gate. Flipping it to `false` and putting
+    the `true` in the seed makes the feature on wherever the seed has run and off
+    everywhere else, production included. That single flip forces five edits, three
+    of which are breakages in different workspaces — miss the seed and every
+    positive-path test fails looking like a feature bug.
+15. **The erase route is deliberately the one route with no entitlement guard.** A
+    lapsed subscriber must always be able to delete data the product holds about
+    their face. Both surfaces therefore route "withdraw consent" through `DELETE`
+    rather than through `POST /consent { granted: false }`, which mounts the guard
+    and checks the kill switch — routing withdrawal through the guarded one would
+    strand exactly the person who most wants out.
+
+Hard-won lessons from the implementation and code review of this story:
+
+1. **A contract that documents a header in prose does not send it.** The two
+   idempotent POSTs described `Idempotency-Key` handling in their OpenAPI
+   descriptions and declared no `headers` block, so the generated client had no
+   parameter for it while the controller rejects a missing or non-UUID key with
+   `400`. The entire selfie upload lifecycle was uncallable from either surface
+   and every server-side test was green, because the server was never the
+   problem. The bytes route was under-declared the same way: no `security`, no
+   `x-upload-token`, no binary body.
+2. **A response can be complete and still make a feature impossible.** The
+   advisor's sponsored CTA activates through story 5.1's click endpoint, which
+   requires a `recommendationId` that the story defines as the `PaletteProfile.id`
+   — and nothing published that id. Every field the panel rendered was correct;
+   the one field the next request needed was absent.
+3. **A dedupe index is only a rate limit while the client cannot choose its
+   columns.** The advisor click's `recommendation_id` was taken from the request
+   body, and the 60-second dedupe index is `(user_id, offer_id, recommendation_id,
+minute)`, so a caller who varied the third column could mint unlimited
+   attributed clicks for one offer inside one minute. It is now re-resolved from
+   the session. The garment path still trusts its client value, and that
+   asymmetry is recorded rather than left implicit.
+4. **An existence check is not a consent check.** The server-side resolution then
+   answered with a consent message while only proving a row existed — and
+   `erase()` deliberately keeps the row with `consent_revoked_at` stamped, so a
+   user who had erased their palette kept minting attributed clicks. The fix
+   applies the same `hasCurrentConsent` rule the rest of the feature uses, pinned
+   against real SQL.
+5. **Nest's `@Post` default answered 201 against a contract that said 200**, and
+   nothing below the Pact tier could see it: the controller spec asserted 201
+   because that is what the handler did. Provider verification is the tier whose
+   whole job is disagreeing with the implementation, and it did.
+6. **Linear statistics over a circular quantity are wrong in a way that looks
+   like a real refusal.** Hue spread was measured with a linear interquartile
+   range over an angle in `[0, 360)`. A wardrobe of magentas and pinks straddling
+   the wrap measured 341 degrees of disagreement where the true figure is 22, so
+   confidence read 0.00 instead of 0.75 and the derivation was refused
+   `insufficient_wardrobe` while its colours agreed. Deviation from the mean
+   direction is the correct measure, it is translation-invariant so it returns
+   the old value exactly for any non-wrapping sample, and one implementation now
+   serves both pipelines.
+7. **A seeded fixture for one persona is not a seeded fixture for another.**
+   `seedWardrobeItems` writes garments and `PaletteInsights` rows for the seeded
+   teen accounts only, so `premium-active-user` — the account every premium
+   end-to-end test signs in as — reached the analyze route with zero insight rows
+   and always terminated `insufficient_wardrobe`. The wardrobe half of AC 2 was
+   unreachable end to end while every unit test proving the derivation passed.
+8. **A green gate suite can sit on top of a broken seed.** Importing
+   `buildGarmentObjectPath` from `@couture/utils` in `seeds/commerce.ts` could not
+   instantiate under `tsx`: the seed entrypoint loads a factory source first, that
+   source `require`s the package, and Node then builds the ESM facade from the
+   already-cached CommonJS object, so the facade carries only `default`. It threw
+   before a line of seed code ran and took `db:reset`, all seven Maestro shards,
+   the Playwright burn-in and the k6 smoke with it — while lint, typecheck,
+   `verify:changed`, every coverage ratchet, Pact and the whole integration tier
+   were genuinely green, because Vitest resolves through its own bundler and
+   typecheck reads `dist/index.d.ts`. The guard that closes it spawns a real `tsx`
+   subprocess over a probe whose **import order** is the contract.
+9. **A component split for a complexity ceiling moves the code, not the
+   coverage.** Extracting the consent, source, result and status blocks out of
+   both surfaces' panels dropped no prop and no branch, but it made visible that
+   the write-path guards the docblocks argued were load-bearing — signed-out and
+   in-progress rejections, the generic fallback line, the busy guard, the session
+   re-read, the object-URL release, a failed mint, a blocked popup — were all at
+   zero coverage.
+10. **Test ids drift the moment two tiers describe the same behaviour.** Four ids
+    were used twice across tiers and four more were minted as literal placeholder
+    names (`5.4-API-04x`) rather than as ranges. Unit-tier proofs that had been
+    given `INT-` ids now carry `API-`/`CON-` ids; the integration tier keeps
+    `INT-`. This is the identical defect story 5.3's review found, in a story
+    whose own Dev Notes warned about it.
+11. **One suite's fixture is every parallel suite's data.** The integration suite
+    seeded a `locale_region: '*'` garment offer, which matched — and failed — an
+    unrelated 5.1 assertion running against the same database in the same
+    parallel run. Isolating on a locale region no sibling queries is what makes a
+    shared-database integration tier safe.
+12. **A partial index's predicate is the half Prisma cannot express, so it is the
+    half that vanishes silently.** The advisor lookup index carries
+    `WHERE advisor_slot IS NOT NULL`, which lives only in hand-authored SQL; a
+    regenerated migration would drop it and reintroduce the planner ambiguity that
+    regressed an earlier story. It is now asserted directly.
+13. **Declaring a mock for a native-only module resolves it.** Mocking
+    `expo-web-browser` in one mobile suite made Vite resolve the specifier, which
+    wedged the optimizer and took three unrelated suites down with an error from
+    `expo-asset`. The lazy import in `src/lib/commerce.ts` exists precisely to
+    avoid that, and a `vi.mock` defeats it. The load-bearing assertion — the click
+    is minted with the right body before any navigation — needs no mock at all.
+14. **Adding one import to a screen adds it to every suite that renders the
+    screen.** `settings.tsx` gained its first `expo-router` import for the advisor
+    link row, and three suites that had never needed the module started failing on
+    `expo-asset`'s `EventEmitter`.
+15. **A `@ts-expect-error` on the call is not a `@ts-expect-error` on the
+    property.** The argument object is contextually typed, so TypeScript
+    attributes an excess-property error to the property itself; the directive one
+    line higher matched nothing, which made it both a silent no-op and an
+    "unused directive" typecheck failure.
+16. **An assertion can be impossible against its own fixture.** Three test defects
+    only the higher tiers could expose: an end-to-end test asserted the bottom nav
+    visible at a viewport where `min-[768px]:hidden` guarantees it is not; another
+    asserted an empty `<ul>` was visible, which has no bounding box; and a mobile
+    test gated on a synchronously-recorded key while reading the body from an
+    awaited `request.json()`, so the gate could open with the body still
+    undefined — a microtask race that won six local runs and lost on the CI
+    runner.
+
+Story/Task mapping:
+
+- Story 5.4
+- Task 1 (Prisma enums and models, hand-authored migration with owner-only RLS,
+  `AffiliateOffer` columns and check constraint, factories and cleanup)
+- Task 2 (`@couture/utils` colour science: the `contrast.ts` refactor, then
+  `skin-tone.ts`)
+- Task 3 (Palette advisor contracts, `ADVISOR_RULES`, OpenAPI 1.3.0 to 1.4.0,
+  three analytics events across all seven registration points)
+- Task 4 (`color_analysis_enabled` registry default `true` to `false`, and its
+  five follow-on edits)
+- Task 5 (`PaletteAdvisorService` and `PaletteAdvisorController`: consent,
+  wardrobe analysis, recommendations, erase, advisor offer resolution)
+- Task 6 (Selfie lifecycle, the analysis engine, the BullMQ queue and worker
+  registration, and the purge on all three terminal doors)
+- Task 7 (Web lib, `/palette` route and panel, the bottom-nav prefix fix, ten
+  locale catalogs, MSW component tests)
+- Task 8 (Mobile lib, route, screen, settings entry row, ten locale catalogs,
+  MSW screen tests)
+- Task 9 (Pact consumer interactions and provider doubles, Playwright, the
+  real-PostgreSQL integration suite, and the Maestro locked-state flow)
+- Task 10 (`verify:changed`, coverage ratchets, repo-wide lint and typecheck,
+  and the `deferred-work.md` ledger)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/5-4-color-palette-beauty-accessory-advisor.md`
+  (including its `Dev record` section, which lists every defect found in
+  already-`done` work and every deliberate divergence from the plan)
+- `_bmad-output/implementation-artifacts/deferred-work.md`, section "Deferred
+  from: story 5.4 colour palette & beauty/accessory advisor (2026-08-25)"
+- `architecture.md` ADR-014 — the location, privacy and budget decisions this
+  story implements, and the ONNX step it declines
+
+Cross-links:
+
+- Step 34 provides `PremiumEntitlementService.hasPremiumAccess` and the
+  `PremiumEntitlementGuard` every write path here mounts.
+- Step 35 provides `packages/utils/src/contrast.ts`, whose linearization this
+  story exports and reuses rather than copying, and the premium-surface,
+  failure-classification and locale-parity conventions both surfaces follow.
+- Step 33 provides the affiliate partner, offer, click-token and deep-link
+  machinery the sponsored overlay extends by two nullable columns.
+- Step 32 provides the allocate/PUT-bytes/commit photo lifecycle and the
+  `WardrobeUploadGuard` this story mirrors and mounts unchanged.
+- Step 30 provides `WardrobeColorProcessor` and the `PaletteInsights.hex_codes`
+  rows the wardrobe source reads; without it that source has no input.
+- Step 5 provides the BullMQ queue and worker registration this story adds a
+  third queue to.
+- Step 22 provides the ten-catalog localization infrastructure and the
+  parity-spec convention the two new dedicated specs follow.
+- Step 28 provides the accessibility hardening suite whose literal route list
+  `/palette` had to be added to explicitly.
+
+Sequence to follow:
+
+1. Read the story's Decision 1 first. Four of the five subsystems this feature
+   needs already exist, and rebuilding any of them is the primary failure mode
+   available here.
+2. Read `packages/utils/src/skin-tone.ts` for the sRGB to CIELAB conversion, the
+   Individual Typology Angle and its `b* <= 0` null branch, and every named
+   threshold constant, then `skin-tone.spec.ts` for the band boundaries pinned on
+   both sides.
+3. Read `packages/api-client/src/contracts/http/palette-advisor.ts` top to bottom.
+   Its header states the four load-bearing decisions; `paletteAnalysisSchema` is
+   the discriminated union that makes a ready palette with a failure reason
+   unrepresentable; `ADVISOR_RULES` is the versioned rule table and
+   `PALETTE_ADVISOR_LOCALE_KEYS` is the copy it cannot drift from.
+4. Read `packages/db/prisma/migrations/20260825090000_add_palette_advisor/migration.sql`
+   for the two owner-only policy blocks, the `num_nonnulls` check constraint, and
+   the partial advisor index.
+5. Read `apps/api/src/modules/commerce/palette-advisor.service.ts` in this order:
+   `hasCurrentConsent`, `getProfile`, `assertConsent` and `assertAnalysisEnabled`
+   for the precedence, then `erase` for what revocation actually does.
+6. Read `apps/api/src/modules/commerce/palette-analysis.processor.ts` for the
+   wardrobe aggregation, the three terminal branches, and `markFailed` — the third
+   door, called only from the worker's retry-exhaustion catch.
+7. Read `apps/api/src/modules/commerce/affiliate-click.service.ts`'s advisor
+   branch for why it keys on `offer.advisor_slot` and why the attribution id is
+   re-resolved from the session.
+8. Read `apps/web/src/lib/palette-advisor.ts` for the six-member failure-reason
+   union and `reasonForResponse`, which separates the two different 403s by the
+   server's own message constants, then
+   `apps/web/src/app/components/palette-advisor-panel.tsx` and its mobile twin.
+
+Task owner map:
+
+- Story 5.4 Task 1 step 1 owner: define the seven enums, `PaletteProfile`,
+  `AdvisorRecommendationState`, the `AffiliateOffer` columns and the `User`
+  back-relations in `packages/db/prisma/schema.prisma`.
+- Story 5.4 Task 1 step 2 owner: own the grants, row-level-security enablement,
+  the two owner-only policy blocks, the `num_nonnulls` check constraint and the
+  partial advisor index in
+  `packages/db/prisma/migrations/20260825090000_add_palette_advisor/migration.sql`.
+- Story 5.4 Task 1 step 3 owner: build and persist palette fixtures in
+  `packages/testing/src/factories/premium.factory.ts`, registered in
+  `packages/testing/src/factories/registry.ts` and `packages/testing/src/cleanup.ts`.
+- Story 5.4 Task 2 step 1 owner: own the reusable sRGB linearization in
+  `packages/utils/src/contrast.ts`.
+- Story 5.4 Task 2 step 2 owner: own the CIELAB conversion, the Individual
+  Typology Angle, the depth bands, the circular hue statistics and the undertone
+  wedges in `packages/utils/src/skin-tone.ts`.
+- Story 5.4 Task 3 step 1 owner: define the palette advisor HTTP contracts,
+  `ADVISOR_RULES`, `ADVISOR_RULES_VERSION` and the locale-key enumeration in
+  `packages/api-client/src/contracts/http/palette-advisor.ts`, registered through
+  `packages/api-client/src/contracts/http/openapi.ts`.
+- Story 5.4 Task 3 step 2 owner: register the three new events and their
+  `.strict()` property allowlists in
+  `packages/api-client/src/types/analytics-events.ts` and
+  `packages/api-client/src/testing/analytics-event-assertions.ts`.
+- Story 5.4 Task 3 step 3 owner: own the server-side pseudonymous emission for
+  the three new events in `apps/api/src/modules/telemetry/telemetry.service.ts`.
+- Story 5.4 Task 4 step 1 owner: own the `color_analysis_enabled` registry default
+  in `packages/config/src/flags.ts` and its seeded `true` in
+  `packages/db/prisma/seeds/feature-flags.ts`.
+- Story 5.4 Task 5 step 1 owner: own consent, wardrobe analysis, recommendation
+  state, offer resolution and erasure in
+  `apps/api/src/modules/commerce/palette-advisor.service.ts`.
+- Story 5.4 Task 5 step 2 owner: own the routes, the guard stacks and response
+  parsing in `apps/api/src/modules/commerce/palette-advisor.controller.ts`,
+  registered in `apps/api/src/modules/commerce/commerce.module.ts`.
+- Story 5.4 Task 5 step 3 owner: own the advisor offer selection chain in
+  `apps/api/src/modules/commerce/affiliate-offer.service.ts` and the advisor click
+  branch in `apps/api/src/modules/commerce/affiliate-click.service.ts`, over the
+  queries in `apps/api/src/modules/commerce/commerce.repository.ts`.
+- Story 5.4 Task 6 step 1 owner: own the Sharp pipeline, the skin-chroma gate and
+  the confidence terms in
+  `apps/api/src/modules/commerce/heuristic-palette-analysis.engine.ts`, behind the
+  interface in `apps/api/src/modules/commerce/palette-analysis.engine.ts`.
+- Story 5.4 Task 6 step 2 owner: own the terminal branches, the purge and the
+  telemetry in `apps/api/src/modules/commerce/palette-analysis.processor.ts`,
+  enqueued through
+  `apps/api/src/modules/commerce/palette-analysis-processing.queue.ts` and
+  registered in `apps/api/src/config/queues.ts` and
+  `apps/api/src/workers/wardrobe.bootstrap.ts`.
+- Story 5.4 Task 7 step 1 owner: own transport and failure classification in
+  `apps/web/src/lib/palette-advisor.ts`, and the affiliate click mint in
+  `apps/web/src/lib/commerce.ts`.
+- Story 5.4 Task 7 step 2 owner: own the consent, source, status, result and card
+  states in `apps/web/src/app/components/palette-advisor-panel.tsx`, mounted from
+  `apps/web/src/app/palette/page.tsx`.
+- Story 5.4 Task 7 step 3 owner: own the longest-prefix active-tab resolution in
+  `apps/web/src/app/components/sticky-bottom-nav.tsx`.
+- Story 5.4 Task 8 step 1 owner: own transport and failure classification in
+  `apps/mobile/src/lib/palette-advisor.ts`.
+- Story 5.4 Task 8 step 2 owner: own the screen states and the
+  `expo-image-picker` capture in
+  `apps/mobile/src/features/premium/palette-advisor-screen.tsx`, reached from the
+  thin route `apps/mobile/app/palette-advisor.tsx` and the link row in
+  `apps/mobile/app/(tabs)/settings.tsx`.
+- Story 5.4 Task 7/8 step 4 owner: own the `commerce.premium.palette.*` subtree
+  across the ten catalogs in `apps/web/src/i18n/locales/` and
+  `apps/mobile/assets/locales/`.
+
+Tests that cover this step:
+
+Shared utility unit tests:
+
+- [`packages/utils/src/skin-tone.spec.ts`](../../packages/utils/src/skin-tone.spec.ts):
+  pins every ITA° band boundary on both sides (`5.4-UTIL-020`), the `b* <= 0`
+  null branch, a known-hex round trip through `srgbToLab`, `#RGB` acceptance and
+  `#RRGGBBAA` rejection, the olive hue wedge, negative-`a*` inputs a ratio
+  implementation would misclassify, and the circular hue spread that a linear
+  interquartile range gets wrong across the 0/360 wrap
+  (`5.4-UTIL-050` through `5.4-UTIL-054`). Floating-point results use
+  `toBeCloseTo(value, 2)`, never `toBe`.
+
+Contract and analytics unit tests:
+
+- [`packages/api-client/testing/palette-advisor-contract.spec.ts`](../../packages/api-client/testing/palette-advisor-contract.spec.ts):
+  proves the rule table is deterministic and frozen (`5.4-CON-031`), that the
+  status union makes a ready palette with a failure reason unrepresentable, and
+  that every `swatchHex` clears `meetsWcagAA()` against the card background it
+  renders on at SC 1.4.11's non-text floor (`5.4-CON-030`).
+- [`packages/api-client/testing/palette-advisor-analytics.spec.ts`](../../packages/api-client/testing/palette-advisor-analytics.spec.ts):
+  proves set-equality across all three analytics registries, ships a negative
+  fixture per event proving the `.strict()` allowlist rejects anything beyond the
+  named properties, and proves a raw user id is never accepted in place of the
+  pseudonymous subject (`5.4-CON-020` through `5.4-CON-022`).
+
+Real-PostgreSQL database tests:
+
+- [`packages/db/test/palette-advisor-schema.spec.ts`](../../packages/db/test/palette-advisor-schema.spec.ts):
+  pins `authenticated` to exactly the four owner verbs and `anon` to none, the
+  four policy names per table, the nullable/unique/cascade shape, the check
+  constraint rejecting both-null and both-set `AffiliateOffer` rows
+  (`5.4-DB-001` through `5.4-DB-008`), the advisor index staying PARTIAL on
+  `advisor_slot IS NOT NULL` (`5.4-DB-041`).
+- [`packages/db/test/seed-graph-instantiation.spec.ts`](../../packages/db/test/seed-graph-instantiation.spec.ts):
+  spawns a real `tsx` subprocess over a probe whose IMPORT ORDER is the contract,
+  which is the only tier that can see a seed module failing to instantiate
+  (`5.4-DB-040`). Vitest resolves workspace packages through its own bundler, so
+  no other suite in the repository could have caught it.
+- [`packages/db/test/rls/palette-advisor.spec.ts`](../../packages/db/test/rls/palette-advisor.spec.ts):
+  runs the full owner-only actor matrix over both new tables
+  (`5.4-DB-020` through `5.4-DB-030`), including the INSERT policy's positive
+  half driven through the `authenticated` role rather than the admin pool that
+  bypasses row-level security.
+
+API unit tests:
+
+- [`apps/api/src/modules/commerce/palette-advisor.service.spec.ts`](../../apps/api/src/modules/commerce/palette-advisor.service.spec.ts):
+  proves consent is checked before the flag (`5.4-API-010`, `5.4-API-011`), the
+  kill switch is observable only by an entitled consented caller
+  (`5.4-API-061`), dismissed cards are omitted from the next read
+  (`5.4-API-050`), and the full selfie allocate/commit idempotency and
+  compensating-release behaviour.
+- [`apps/api/src/modules/commerce/palette-advisor.controller.spec.ts`](../../apps/api/src/modules/commerce/palette-advisor.controller.spec.ts):
+  proves the guard stack over HTTP, the consent-before-flag precedence
+  (`5.4-API-012`, `5.4-API-060`, `5.4-API-062`), the inherited
+  `Cache-Control: private, no-store`, and that `DELETE` stays reachable for a
+  lapsed subscriber.
+- [`apps/api/src/modules/commerce/palette-analysis.processor.spec.ts`](../../apps/api/src/modules/commerce/palette-analysis.processor.spec.ts):
+  proves the wardrobe classification is deterministic with `depth: null`
+  (`5.4-API-021`), the sample and confidence floors (`5.4-API-022` through
+  `5.4-API-026`), every engine outcome terminating and purging (`5.4-API-033`
+  through `5.4-API-036`), and that a failed purge cannot strand `processing`.
+- [`apps/api/src/modules/commerce/heuristic-palette-analysis.engine.spec.ts`](../../apps/api/src/modules/commerce/heuristic-palette-analysis.engine.spec.ts):
+  proves `no_face` below the skin-pixel floor (`5.4-API-032`), a framed face
+  classifying ready (`5.4-API-031`), and determinism across repeated runs.
+- [`apps/api/src/modules/commerce/affiliate-click.service.spec.ts`](../../apps/api/src/modules/commerce/affiliate-click.service.spec.ts):
+  proves the advisor branch keys on the offer row rather than the client-supplied
+  surface, in both crossed directions (`5.4-INT-022`, `5.4-INT-023`), and that the
+  attribution id is derived server-side (`5.4-INT-024`, `5.4-INT-025`) while the
+  garment path is unchanged (`5.4-INT-026`).
+- [`apps/api/src/modules/commerce/affiliate-offer.service.spec.ts`](../../apps/api/src/modules/commerce/affiliate-offer.service.spec.ts):
+  proves the advisor selection runs the same short-circuit chain as
+  `resolveShopThisLook`, degrades to no offer on a catalog fault, and never calls
+  the other selection's query in either direction (`5.4-API-040` through
+  `5.4-API-045`).
+
+Real-PostgreSQL API integration tests:
+
+- [`apps/api/integration/palette-advisor.integration.spec.ts`](../../apps/api/integration/palette-advisor.integration.spec.ts):
+  proves an immutable `AuditLog` row on both the grant and the revoke
+  (`5.4-INT-001`), that revocation erases the derived scalars while keeping the
+  row (`5.4-INT-002`), the selfie purge on all three terminal doors
+  (`5.4-INT-011` through `5.4-INT-013`), that the two selections cannot cross
+  against real SQL (`5.4-INT-020`, `5.4-INT-021`), the commerce opt-out
+  suppressing the overlay (`5.4-INT-027`), owner-scoped erasure (`5.4-INT-028`),
+  and consent-scoped advisor attribution (`5.4-INT-029`). No workflow runs
+  `test:integration` today, which is recorded in `deferred-work.md`.
+
+Web unit and component tests:
+
+- [`apps/web/src/lib/palette-advisor.test.ts`](../../apps/web/src/lib/palette-advisor.test.ts):
+  proves the two different 403s are separated by the server's own message
+  constants, the 409 and 503 classifications, that an unrecognised 403 falls back
+  to the locked panel rather than inviting a rejected consent grant, and that one
+  idempotency key covers allocate and commit (`5.4-WEB-001` through
+  `5.4-WEB-009`).
+- [`apps/web/src/app/components/palette-advisor-panel.test.tsx`](../../apps/web/src/app/components/palette-advisor-panel.test.tsx):
+  drives every state through MSW rather than a stubbed lib, including the three
+  states reachable only by a rejected write (`5.4-WEB-027` through
+  `5.4-WEB-029`), the sponsored disclosure preceding its control by document
+  position (`5.4-WEB-022`), and an axe scan of the ready state with a sponsored
+  card (`5.4-WEB-033`).
+- [`apps/web/src/app/components/sticky-bottom-nav.test.tsx`](../../apps/web/src/app/components/sticky-bottom-nav.test.tsx):
+  proves the longest-prefix active-tab resolution, including `/wardrobe/capsules`
+  resolving to Wardrobe and `/palette` resolving to no tab at all
+  (`5.4-WEB-030` through `5.4-WEB-032`).
+- [`apps/web/src/i18n/palette-advisor-locales.spec.ts`](../../apps/web/src/i18n/palette-advisor-locales.spec.ts):
+  derives its key set from the contract rather than pinning it by hand, so a
+  shade added to `ADVISOR_RULES` fails here until all ten catalogs carry its
+  label (`5.4-I18N-WEB-01` through `5.4-I18N-WEB-09`), and asserts the `en-CA`
+  spellings in both directions.
+
+Mobile unit and screen tests:
+
+- [`apps/mobile/src/screens/palette-advisor-screen.test.tsx`](../../apps/mobile/src/screens/palette-advisor-screen.test.tsx):
+  drives the consent gate, both sources, the full selfie allocate/bytes/commit
+  lifecycle on one idempotency key, dismissed-item suppression, the locked state,
+  and a stale `analysis_version` rendering rather than crashing
+  (`5.4-MOB-010` through `5.4-MOB-026`).
+- [`apps/mobile/src/i18n/palette-advisor-locales.spec.ts`](../../apps/mobile/src/i18n/palette-advisor-locales.spec.ts):
+  the mobile half of the same contract-derived parity contract
+  (`5.4-I18N-MOB-01` through `5.4-I18N-MOB-09`).
+
+Contract (Pact) tests:
+
+- [`pact/http/consumer/interactions/commerce-palette-advisor.ts`](../../pact/http/consumer/interactions/commerce-palette-advisor.ts):
+  records the profile read for entitled and non-entitled callers, the consent
+  grant, the `202` wardrobe analyze, the dismissal, and the three-row error table
+  whose whole point is that two different 403s carry two different messages that
+  both clients branch on.
+
+End-to-end tests:
+
+- [`playwright/tests/palette-advisor.spec.ts`](../../playwright/tests/palette-advisor.spec.ts):
+  runs the entitled journey for real against the seeded subscriber with the
+  worker live — consent, wardrobe derivation, save, dismiss, reload
+  (`5.4-E2E-010`) — plus the signed-out locked state and axe at both viewports
+  (`5.4-E2E-011`), the signed-in non-entitled locked panel (`5.4-E2E-013`), and
+  the retired `analysis_version` fallback (`5.4-E2E-012`).
+- [`maestro/palette-advisor.yaml`](../../maestro/palette-advisor.yaml): proves the
+  settings entry row and the locked state for the harness's fresh signed-up user.
+  Its docblock states the honest scope: the entitled advisor and the
+  `expo-image-picker` capture are out of a Maestro run's reach.
+
+Evidence boundaries:
+
+- Real-world classification accuracy against human skin is not tested. This story
+  asserts determinism and band boundaries, not that the answer is correct for any
+  particular person; an accuracy study needs labelled data this project does not
+  have.
+- The skin-pixel gate is exercised against fixture images only. The Chai–Ngan
+  bounds are illumination-tolerant, not illumination-invariant, and a heavily
+  warm-lit or filtered selfie is expected to fail `no_face` or `low_quality`
+  rather than answer wrongly — an expectation asserted against fixtures, not
+  photographs.
+- `expo-image-picker`'s native camera path is mocked in unit tests and reached by
+  no automated tier.
+- The advisor offer lookup has no query-plan coverage: the plan suite's 4,000
+  volume rows are all garment offers, so there is no advisor row at volume for a
+  plan to be honest about.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  subgraph Sources
+    SELFIE["selfie\nallocate / PUT bytes / commit"]
+    WARDROBE["wardrobe\nPaletteInsights.hex_codes\nwritten by Step 30"]
+  end
+
+  SELFIE --> CONSENT
+  WARDROBE --> CONSENT
+  CONSENT{"PaletteProfile\nconsent_granted_at / consent_revoked_at\nserver-enforced on every path"} -- "absent" --> F403C["403 PALETTE_CONSENT_REQUIRED"]
+  CONSENT -- "current" --> FLAG{"color_analysis_enabled\ndefault false, true only in the seed"}
+  FLAG -- "off" --> F503["503 PALETTE_ANALYSIS_DISABLED\nonly an entitled consented caller sees this"]
+  FLAG -- "on" --> QUEUE["palette-analysis queue\njob id = profile id + upload session id"]
+
+  QUEUE --> PROC["PaletteAnalysisProcessor"]
+  PROC -- "wardrobe" --> AGG["median a*/b* of chromatic survivors\nlinearize BEFORE averaging\ndepth: null"]
+  PROC -- "selfie" --> ENGINE["Sharp: rotate, 256x256 cover,\ncentre crop, Chai-Ngan YCbCr gate\non gamma-encoded bytes"]
+  ENGINE --> LAB["linearRgbToLab on survivors\nmedian a*/b*"]
+  AGG --> CLASS
+  LAB --> CLASS["skin-tone.ts\nITA° -> depth, atan2 hue -> undertone\ncircular hue spread -> confidence"]
+  CLASS -- "confidence below 0.4" --> FAIL
+  CLASS --> READY["status ready\nundertone, depth, confidence, analysis_version"]
+
+  READY --> PURGE
+  FAIL["status failed\nfailure_reason"] --> PURGE
+  MARK["worker catch, final attempt only\nmarkFailed: timeout or storage_error"] --> PURGE
+  PURGE["purgeSelfie\nstatus commits FIRST, purge is best-effort\nselfie_purged_at stamped"]
+
+  READY --> RULES["ADVISOR_RULES\nversioned, deterministic, itemKey is the identity\nlabelKey is a locale key, never English"]
+  RULES --> CARDS["five slots\nsaved / dismissed in AdvisorRecommendationState\ndismissed omitted from the next GET"]
+  CARDS --> OFFER{"commerce_affiliate_enabled\nthen affiliate_ctas_enabled\nthen findBestAdvisorOffer"}
+  OFFER -- "any fault" --> NOOFFER["no offer\nfirst-party recommendation renders alone"]
+  OFFER --> SPONSORED["sponsored block\ndisclosure BEFORE the control"]
+  SPONSORED -- "click" --> CLICK["AffiliateClickService\nbranches on offer.advisor_slot, never input.surface\nrecommendation_id re-resolved from the session"]
+
+  ERASE["DELETE /palette\nno entitlement guard, by design"] --> WIPE["nulls the scalars, keeps the row,\ndeletes every AdvisorRecommendationState,\npurges any retained object, writes AuditLog"]
+  REVOKE["POST /consent, granted false"] --> WIPE
 ```

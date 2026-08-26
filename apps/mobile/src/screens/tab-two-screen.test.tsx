@@ -11,6 +11,16 @@ import { render } from 'vitest-browser-react'
 import { afterEach, beforeEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type * as PremiumModule from '../lib/premium'
 
+/*
+ * Story 5.4: `settings.tsx` gained an `expo-router` import for the palette advisor
+ * link row. `expo-router` transitively pulls in `expo-asset`, which cannot be
+ * evaluated in this browser test bundle ("Cannot read properties of undefined
+ * (reading 'EventEmitter')"), so every suite that renders the settings screen has to
+ * stub it. Navigation itself is not what these suites are about; the row's own
+ * behaviour is covered by `palette-advisor-screen.test.tsx` and the Maestro flow.
+ */
+vi.mock('expo-router', () => ({ router: { push: vi.fn() } }))
+
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))

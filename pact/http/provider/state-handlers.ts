@@ -13,6 +13,7 @@ import {
   configureProviderSilhouetteState,
   configureProviderSubscriptionState,
   configureProviderPremiumThemeState,
+  configureProviderPaletteAdvisorState,
   parsePactEvent,
   type PactEvent,
 } from './provider-helper'
@@ -55,6 +56,10 @@ type SubscriptionStateParams = {
    * 'stripe' in the configurator.
    */
   store?: EntitlementStore
+}
+
+type PaletteAdvisorStateParams = {
+  userId?: string
 }
 
 type PremiumThemeStateParams = {
@@ -422,6 +427,46 @@ export const stateHandlers: StateHandlers = {
       description: 'Configured the premium themes kill switch as off',
     })
   },
+  /* ----------------------------------------------------------------------- *
+   * Story 5.4 palette advisor.
+   *
+   * Four states, each naming an arrangement the contract records an outcome
+   * for. The two 403 states are the pair that matters most:
+   * `PremiumEntitlementGuard` stays real and un-mocked, so 'The user does not
+   * have palette advisor access' produces `PREMIUM_REQUIRED_MESSAGE`
+   * pre-handler, while 'The user has not granted palette analysis consent'
+   * produces `PALETTE_CONSENT_REQUIRED_MESSAGE` from the service body. Both
+   * are 403, and a client cannot tell them apart from the status alone --
+   * which is exactly why both clients classify on the message and why both
+   * have to be pinned here.
+   * ----------------------------------------------------------------------- */
+  'The user has palette advisor access': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as PaletteAdvisorStateParams
+    configureProviderPaletteAdvisorState({ userId, scenario: 'entitled-consented' })
+    return Promise.resolve({
+      description: 'Configured an entitled, consented user with a ready palette',
+    })
+  },
+  'The user has not granted palette analysis consent': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as PaletteAdvisorStateParams
+    configureProviderPaletteAdvisorState({ userId, scenario: 'entitled-no-consent' })
+    return Promise.resolve({
+      description: 'Configured an entitled user who has not granted consent',
+    })
+  },
+  'The user does not have palette advisor access': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as PaletteAdvisorStateParams
+    configureProviderPaletteAdvisorState({ userId, scenario: 'not-entitled' })
+    return Promise.resolve({ description: 'Configured a non-entitled user' })
+  },
+  'Palette color analysis is disabled': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as PaletteAdvisorStateParams
+    configureProviderPaletteAdvisorState({ userId, scenario: 'analysis-disabled' })
+    return Promise.resolve({
+      description: 'Configured the color analysis kill switch as off',
+    })
+  },
+
   'The premium theme owner account no longer exists': (parameters?: unknown) => {
     const { userId } = (parameters ?? {}) as PremiumThemeStateParams
     // Entitled, so the guard lets the request reach the handler -- this state

@@ -1,4 +1,3 @@
-import type { PremiumEntitlementService } from '../../../../apps/api/src/modules/commerce/premium-entitlement.service'
 import type { PremiumThemeService } from '../../../../apps/api/src/modules/commerce/premium-theme.service'
 import {
   PREMIUM_THEMES_DISABLED_MESSAGE,
@@ -15,6 +14,11 @@ import { getProviderPremiumThemeState } from '../state'
  * seventeen of them across 1164 lines. Only what the Nest fixture actually
  * registers is returned; the scenario readers and response shapers stay private
  * to this module.
+ *
+ * The `PremiumEntitlementService` double used to live here too. Story 5.4
+ * mounts the same guard on the palette advisor routes, so it moved to
+ * `doubles/premium-entitlement.ts` and now reads whichever feature state the
+ * current interaction configured.
  */
 export function createPremiumThemeDoubles() {
   const requirePremiumThemeScenario = () => {
@@ -24,11 +28,6 @@ export function createPremiumThemeDoubles() {
     }
     return state
   }
-
-  const mockPremiumEntitlementService = {
-    hasPremiumAccess: () =>
-      Promise.resolve(requirePremiumThemeScenario().scenario !== 'not-entitled'),
-  } as unknown as PremiumEntitlementService
 
   const mockPremiumThemeService = {
     getTheme: () => {
@@ -65,5 +64,5 @@ export function createPremiumThemeDoubles() {
     },
   } as unknown as PremiumThemeService
 
-  return { mockPremiumEntitlementService, mockPremiumThemeService }
+  return { mockPremiumThemeService }
 }

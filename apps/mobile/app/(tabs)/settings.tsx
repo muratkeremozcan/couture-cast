@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet } from 'react-native'
+import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { formatLocalizedList } from '@couture/utils'
@@ -435,6 +436,8 @@ export default function SettingsScreen() {
           <PremiumSettingsSection />
 
           <PremiumThemeSection />
+
+          <PaletteAdvisorLinkRow />
 
           <Text style={styles.infoText}>{apiHealthMessage}</Text>
           <Text style={styles.infoText}>
@@ -1248,6 +1251,42 @@ function PaletteCard({
           ? t('commerce.premium.theme.selected')
           : t('commerce.premium.theme.select')}
       </Text>
+    </Pressable>
+  )
+}
+
+/**
+ * Story 5.4 Task 8: the entry point to the colour palette & beauty/accessory advisor.
+ *
+ * A link row rather than a fourth inline section (Decision 14). The advisor has an
+ * upload flow, a result state and five recommendation slots, and this file is already
+ * well past a thousand lines with three inline premium sections in it. The row follows
+ * `wardrobe-hub-screen.tsx`'s `Pressable` shape: `accessibilityRole="link"`, an explicit
+ * `accessibilityLabel`, and a `testID`.
+ *
+ * This adds the first `expo-router` import to this screen, which is why the three
+ * suites that render it (`settings-premium-section`, `settings-premium-theme-section`,
+ * `tab-two-screen`) now mock the module: `expo-router` transitively pulls in
+ * `expo-asset`, which cannot be evaluated in the browser test bundle. The `router`
+ * singleton rather than `useRouter`, matching `wardrobe-hub-screen.tsx`.
+ *
+ * The row is NOT entitlement-gated: the destination renders its own locked panel for a
+ * non-entitled or signed-out reader, and hiding the entry point entirely would leave a
+ * lapsed subscriber with no route to the `DELETE` that erases their palette
+ * (Decision 9).
+ */
+function PaletteAdvisorLinkRow() {
+  const { t } = useTranslation()
+
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={t('commerce.premium.palette.sectionTitle')}
+      style={styles.actionButton}
+      testID="palette-advisor-link"
+      onPress={() => router.push('/palette-advisor')}
+    >
+      <Text style={styles.actionText}>{t('commerce.premium.palette.sectionTitle')}</Text>
     </Pressable>
   )
 }

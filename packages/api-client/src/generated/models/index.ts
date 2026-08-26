@@ -8,17 +8,160 @@ export type FixedLengthArray<
 /**
  *
  * @export
+ */
+export const AdvisorAction = {
+  saved: 'saved',
+  dismissed: 'dismissed',
+} as const
+export type AdvisorAction = (typeof AdvisorAction)[keyof typeof AdvisorAction]
+
+/**
+ *
+ * @export
+ * @interface AdvisorRecommendationCard
+ */
+export interface AdvisorRecommendationCard {
+  /**
+   *
+   * @type {AdvisorRecommendationCardSlotEnum}
+   * @memberof AdvisorRecommendationCard
+   */
+  slot: AdvisorRecommendationCardSlotEnum
+  /**
+   *
+   * @type {string}
+   * @memberof AdvisorRecommendationCard
+   */
+  itemKey: string
+  /**
+   *
+   * @type {string}
+   * @memberof AdvisorRecommendationCard
+   */
+  labelKey: string
+  /**
+   *
+   * @type {string}
+   * @memberof AdvisorRecommendationCard
+   */
+  swatchHex: string
+  /**
+   *
+   * @type {boolean}
+   * @memberof AdvisorRecommendationCard
+   */
+  saved: boolean
+  /**
+   *
+   * @type {AdvisorRecommendationCardSponsored}
+   * @memberof AdvisorRecommendationCard
+   */
+  sponsored: AdvisorRecommendationCardSponsored
+}
+
+/**
+ * @export
+ */
+export const AdvisorRecommendationCardSlotEnum = {
+  foundation: 'foundation',
+  blush: 'blush',
+  jewelry: 'jewelry',
+  bag: 'bag',
+  eyewear: 'eyewear',
+} as const
+export type AdvisorRecommendationCardSlotEnum =
+  (typeof AdvisorRecommendationCardSlotEnum)[keyof typeof AdvisorRecommendationCardSlotEnum]
+
+/**
+ *
+ * @export
+ * @interface AdvisorRecommendationCardSponsored
+ */
+export interface AdvisorRecommendationCardSponsored {
+  /**
+   * CommercePartner.slug. Stable, safe to log.
+   * @type {string}
+   * @memberof AdvisorRecommendationCardSponsored
+   */
+  partnerId: string
+  /**
+   *
+   * @type {string}
+   * @memberof AdvisorRecommendationCardSponsored
+   */
+  partnerDisplayName: string
+  /**
+   * Pass back to POST /api/v1/commerce/affiliate/clicks with surface: "palette_advisor".
+   * @type {string}
+   * @memberof AdvisorRecommendationCardSponsored
+   */
+  offerId: string
+  /**
+   *
+   * @type {string}
+   * @memberof AdvisorRecommendationCardSponsored
+   */
+  offerTitle: string
+}
+
+/**
+ *
+ * @export
+ */
+export const AdvisorSlot = {
+  foundation: 'foundation',
+  blush: 'blush',
+  jewelry: 'jewelry',
+  bag: 'bag',
+  eyewear: 'eyewear',
+} as const
+export type AdvisorSlot = (typeof AdvisorSlot)[keyof typeof AdvisorSlot]
+
+/**
+ *
+ * @export
+ * @interface AdvisorSponsoredOffer
+ */
+export interface AdvisorSponsoredOffer {
+  /**
+   * CommercePartner.slug. Stable, safe to log.
+   * @type {string}
+   * @memberof AdvisorSponsoredOffer
+   */
+  partnerId: string
+  /**
+   *
+   * @type {string}
+   * @memberof AdvisorSponsoredOffer
+   */
+  partnerDisplayName: string
+  /**
+   * Pass back to POST /api/v1/commerce/affiliate/clicks with surface: "palette_advisor".
+   * @type {string}
+   * @memberof AdvisorSponsoredOffer
+   */
+  offerId: string
+  /**
+   *
+   * @type {string}
+   * @memberof AdvisorSponsoredOffer
+   */
+  offerTitle: string
+}
+/**
+ *
+ * @export
  * @interface AffiliateClickRequest
  */
 export interface AffiliateClickRequest {
   /**
-   * The offerId returned in the ritual response shopThisLook block.
+   * The offerId returned in the ritual response shopThisLook block, or in a palette advisor recommendation card.
    * @type {string}
    * @memberof AffiliateClickRequest
    */
   offerId: string
   /**
-   * The ScenarioOutfit.id the CTA was rendered on.
+   * The ScenarioOutfit.id the CTA was rendered on, or the PaletteProfile.id for an advisor click.
    * @type {string}
    * @memberof AffiliateClickRequest
    */
@@ -29,6 +172,12 @@ export interface AffiliateClickRequest {
    * @memberof AffiliateClickRequest
    */
   surface: AffiliateClickRequestSurfaceEnum
+  /**
+   * Which client activated the click. Read only for an advisor offer.
+   * @type {AffiliateClickRequestPlatformEnum}
+   * @memberof AffiliateClickRequest
+   */
+  platform?: AffiliateClickRequestPlatformEnum
 }
 
 /**
@@ -36,9 +185,20 @@ export interface AffiliateClickRequest {
  */
 export const AffiliateClickRequestSurfaceEnum = {
   mobile_hero: 'mobile_hero',
+  palette_advisor: 'palette_advisor',
 } as const
 export type AffiliateClickRequestSurfaceEnum =
   (typeof AffiliateClickRequestSurfaceEnum)[keyof typeof AffiliateClickRequestSurfaceEnum]
+
+/**
+ * @export
+ */
+export const AffiliateClickRequestPlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type AffiliateClickRequestPlatformEnum =
+  (typeof AffiliateClickRequestPlatformEnum)[keyof typeof AffiliateClickRequestPlatformEnum]
 
 /**
  *
@@ -85,6 +245,7 @@ export type AffiliateConversionStatus =
  */
 export const AffiliateSurface = {
   mobile_hero: 'mobile_hero',
+  palette_advisor: 'palette_advisor',
 } as const
 export type AffiliateSurface = (typeof AffiliateSurface)[keyof typeof AffiliateSurface]
 
@@ -338,6 +499,42 @@ export const AlertRuleType = {
 } as const
 export type AlertRuleType = (typeof AlertRuleType)[keyof typeof AlertRuleType]
 
+/**
+ *
+ * @export
+ * @interface AnalyzePaletteInput
+ */
+export interface AnalyzePaletteInput {
+  /**
+   *
+   * @type {AnalyzePaletteInputSourceEnum}
+   * @memberof AnalyzePaletteInput
+   */
+  source: AnalyzePaletteInputSourceEnum
+}
+
+/**
+ * @export
+ */
+export const AnalyzePaletteInputSourceEnum = {
+  wardrobe: 'wardrobe',
+} as const
+export type AnalyzePaletteInputSourceEnum =
+  (typeof AnalyzePaletteInputSourceEnum)[keyof typeof AnalyzePaletteInputSourceEnum]
+
+/**
+ *
+ * @export
+ * @interface AnalyzePaletteResponse
+ */
+export interface AnalyzePaletteResponse {
+  /**
+   *
+   * @type {PaletteAdvisorProfileResponseData}
+   * @memberof AnalyzePaletteResponse
+   */
+  data: PaletteAdvisorProfileResponseData
+}
 /**
  *
  * @export
@@ -1167,6 +1364,32 @@ export interface CommercePreferenceResponseData {
 /**
  *
  * @export
+ * @interface CommitPaletteSelfieInput
+ */
+export interface CommitPaletteSelfieInput {
+  /**
+   *
+   * @type {string}
+   * @memberof CommitPaletteSelfieInput
+   */
+  uploadSessionId: string
+}
+/**
+ *
+ * @export
+ * @interface CommitPaletteSelfieResponse
+ */
+export interface CommitPaletteSelfieResponse {
+  /**
+   *
+   * @type {PaletteAdvisorProfileResponseData}
+   * @memberof CommitPaletteSelfieResponse
+   */
+  data: PaletteAdvisorProfileResponseData
+}
+/**
+ *
+ * @export
  * @interface CommitSilhouettePhotoInput
  */
 export interface CommitSilhouettePhotoInput {
@@ -1635,6 +1858,68 @@ export type CreateOutfitCapsuleInputOccasionsEnum =
 /**
  *
  * @export
+ * @interface CreatePaletteSelfieUploadUrlInput
+ */
+export interface CreatePaletteSelfieUploadUrlInput {
+  /**
+   *
+   * @type {number}
+   * @memberof CreatePaletteSelfieUploadUrlInput
+   */
+  fileSizeBytes: number
+  /**
+   *
+   * @type {CreatePaletteSelfieUploadUrlInputMimeTypeEnum}
+   * @memberof CreatePaletteSelfieUploadUrlInput
+   */
+  mimeType: CreatePaletteSelfieUploadUrlInputMimeTypeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CreatePaletteSelfieUploadUrlInput
+   */
+  sha256: string
+  /**
+   *
+   * @type {number}
+   * @memberof CreatePaletteSelfieUploadUrlInput
+   */
+  widthPx: number
+  /**
+   *
+   * @type {number}
+   * @memberof CreatePaletteSelfieUploadUrlInput
+   */
+  heightPx: number
+}
+
+/**
+ * @export
+ */
+export const CreatePaletteSelfieUploadUrlInputMimeTypeEnum = {
+  image_jpeg: 'image/jpeg',
+  image_png: 'image/png',
+  image_webp: 'image/webp',
+} as const
+export type CreatePaletteSelfieUploadUrlInputMimeTypeEnum =
+  (typeof CreatePaletteSelfieUploadUrlInputMimeTypeEnum)[keyof typeof CreatePaletteSelfieUploadUrlInputMimeTypeEnum]
+
+/**
+ *
+ * @export
+ * @interface CreatePaletteSelfieUploadUrlResponse
+ */
+export interface CreatePaletteSelfieUploadUrlResponse {
+  /**
+   *
+   * @type {CreateSilhouetteUploadUrlResponseData}
+   * @memberof CreatePaletteSelfieUploadUrlResponse
+   */
+  data: CreateSilhouetteUploadUrlResponseData
+}
+/**
+ *
+ * @export
  * @interface CreateSavedLocationInput
  */
 export interface CreateSavedLocationInput {
@@ -1798,6 +2083,19 @@ export interface CreateSilhouetteUploadUrlResponseData {
    * @memberof CreateSilhouetteUploadUrlResponseData
    */
   expiresAt: string
+}
+/**
+ *
+ * @export
+ * @interface DeletePaletteAdvisorResponse
+ */
+export interface DeletePaletteAdvisorResponse {
+  /**
+   *
+   * @type {PaletteAdvisorProfileResponseData}
+   * @memberof DeletePaletteAdvisorResponse
+   */
+  data: PaletteAdvisorProfileResponseData
 }
 /**
  *
@@ -3835,6 +4133,618 @@ export type OutfitCapsuleResponseDataGarmentsInnerAvailabilityStatusEnum =
 /**
  *
  * @export
+ * @interface PaletteAdvisorProfile
+ */
+export interface PaletteAdvisorProfile {
+  /**
+   *
+   * @type {string}
+   * @memberof PaletteAdvisorProfile
+   */
+  profileId: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof PaletteAdvisorProfile
+   */
+  isEntitled: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof PaletteAdvisorProfile
+   */
+  analysisEnabled: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof PaletteAdvisorProfile
+   */
+  hasConsent: boolean
+  /**
+   *
+   * @type {PaletteAdvisorProfileAnalysis}
+   * @memberof PaletteAdvisorProfile
+   */
+  analysis: PaletteAdvisorProfileAnalysis | null
+  /**
+   *
+   * @type {Array<PaletteAdvisorProfileRecommendationsInner>}
+   * @memberof PaletteAdvisorProfile
+   */
+  recommendations: Array<PaletteAdvisorProfileRecommendationsInner>
+}
+/**
+ * @type PaletteAdvisorProfileAnalysis
+ * One variant per analysis status. failureReason is present exactly on failed, and the derived scalars are present exactly on ready, with depth nullable within ready for a wardrobe-sourced palette. A combination such as a ready palette with a failureReason is unrepresentable in the generated types.
+ * @export
+ */
+export type PaletteAdvisorProfileAnalysis =
+  | PaletteAnalysisOneOf
+  | PaletteAnalysisOneOf1
+  | PaletteAnalysisOneOf2
+  | PaletteAnalysisOneOf3
+  | PaletteAnalysisOneOf4
+/**
+ *
+ * @export
+ * @interface PaletteAdvisorProfileRecommendationsInner
+ */
+export interface PaletteAdvisorProfileRecommendationsInner {
+  /**
+   *
+   * @type {PaletteAdvisorProfileRecommendationsInnerSlotEnum}
+   * @memberof PaletteAdvisorProfileRecommendationsInner
+   */
+  slot: PaletteAdvisorProfileRecommendationsInnerSlotEnum
+  /**
+   *
+   * @type {string}
+   * @memberof PaletteAdvisorProfileRecommendationsInner
+   */
+  itemKey: string
+  /**
+   *
+   * @type {string}
+   * @memberof PaletteAdvisorProfileRecommendationsInner
+   */
+  labelKey: string
+  /**
+   *
+   * @type {string}
+   * @memberof PaletteAdvisorProfileRecommendationsInner
+   */
+  swatchHex: string
+  /**
+   *
+   * @type {boolean}
+   * @memberof PaletteAdvisorProfileRecommendationsInner
+   */
+  saved: boolean
+  /**
+   *
+   * @type {AdvisorRecommendationCardSponsored}
+   * @memberof PaletteAdvisorProfileRecommendationsInner
+   */
+  sponsored: AdvisorRecommendationCardSponsored
+}
+
+/**
+ * @export
+ */
+export const PaletteAdvisorProfileRecommendationsInnerSlotEnum = {
+  foundation: 'foundation',
+  blush: 'blush',
+  jewelry: 'jewelry',
+  bag: 'bag',
+  eyewear: 'eyewear',
+} as const
+export type PaletteAdvisorProfileRecommendationsInnerSlotEnum =
+  (typeof PaletteAdvisorProfileRecommendationsInnerSlotEnum)[keyof typeof PaletteAdvisorProfileRecommendationsInnerSlotEnum]
+
+/**
+ *
+ * @export
+ * @interface PaletteAdvisorProfileResponse
+ */
+export interface PaletteAdvisorProfileResponse {
+  /**
+   *
+   * @type {PaletteAdvisorProfileResponseData}
+   * @memberof PaletteAdvisorProfileResponse
+   */
+  data: PaletteAdvisorProfileResponseData
+}
+/**
+ *
+ * @export
+ * @interface PaletteAdvisorProfileResponseData
+ */
+export interface PaletteAdvisorProfileResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof PaletteAdvisorProfileResponseData
+   */
+  profileId: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof PaletteAdvisorProfileResponseData
+   */
+  isEntitled: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof PaletteAdvisorProfileResponseData
+   */
+  analysisEnabled: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof PaletteAdvisorProfileResponseData
+   */
+  hasConsent: boolean
+  /**
+   *
+   * @type {PaletteAdvisorProfileAnalysis}
+   * @memberof PaletteAdvisorProfileResponseData
+   */
+  analysis: PaletteAdvisorProfileAnalysis | null
+  /**
+   *
+   * @type {Array<PaletteAdvisorProfileRecommendationsInner>}
+   * @memberof PaletteAdvisorProfileResponseData
+   */
+  recommendations: Array<PaletteAdvisorProfileRecommendationsInner>
+}
+/**
+ * @type PaletteAnalysis
+ * One variant per analysis status. failureReason is present exactly on failed, and the derived scalars are present exactly on ready, with depth nullable within ready for a wardrobe-sourced palette. A combination such as a ready palette with a failureReason is unrepresentable in the generated types.
+ * @export
+ */
+export type PaletteAnalysis =
+  | PaletteAnalysisOneOf
+  | PaletteAnalysisOneOf1
+  | PaletteAnalysisOneOf2
+  | PaletteAnalysisOneOf3
+  | PaletteAnalysisOneOf4
+
+/**
+ *
+ * @export
+ */
+export const PaletteAnalysisFailureReason = {
+  no_face: 'no_face',
+  low_quality: 'low_quality',
+  privacy_violation: 'privacy_violation',
+  insufficient_wardrobe: 'insufficient_wardrobe',
+  timeout: 'timeout',
+  storage_error: 'storage_error',
+} as const
+export type PaletteAnalysisFailureReason =
+  (typeof PaletteAnalysisFailureReason)[keyof typeof PaletteAnalysisFailureReason]
+
+/**
+ *
+ * @export
+ * @interface PaletteAnalysisOneOf
+ */
+export interface PaletteAnalysisOneOf {
+  /**
+   *
+   * @type {PaletteAnalysisOneOfStatusEnum}
+   * @memberof PaletteAnalysisOneOf
+   */
+  status: PaletteAnalysisOneOfStatusEnum
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf
+   */
+  failureReason: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf
+   */
+  source: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf
+   */
+  undertone: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf
+   */
+  depth: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf
+   */
+  confidence: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf
+   */
+  analysisVersion: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf
+   */
+  analyzedAt: null
+}
+
+/**
+ * @export
+ */
+export const PaletteAnalysisOneOfStatusEnum = {
+  pending_upload: 'pending_upload',
+} as const
+export type PaletteAnalysisOneOfStatusEnum =
+  (typeof PaletteAnalysisOneOfStatusEnum)[keyof typeof PaletteAnalysisOneOfStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface PaletteAnalysisOneOf1
+ */
+export interface PaletteAnalysisOneOf1 {
+  /**
+   *
+   * @type {PaletteAnalysisOneOf1StatusEnum}
+   * @memberof PaletteAnalysisOneOf1
+   */
+  status: PaletteAnalysisOneOf1StatusEnum
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf1
+   */
+  failureReason: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf1
+   */
+  source: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf1
+   */
+  undertone: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf1
+   */
+  depth: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf1
+   */
+  confidence: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf1
+   */
+  analysisVersion: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf1
+   */
+  analyzedAt: null
+}
+
+/**
+ * @export
+ */
+export const PaletteAnalysisOneOf1StatusEnum = {
+  bytes_uploaded: 'bytes_uploaded',
+} as const
+export type PaletteAnalysisOneOf1StatusEnum =
+  (typeof PaletteAnalysisOneOf1StatusEnum)[keyof typeof PaletteAnalysisOneOf1StatusEnum]
+
+/**
+ *
+ * @export
+ * @interface PaletteAnalysisOneOf2
+ */
+export interface PaletteAnalysisOneOf2 {
+  /**
+   *
+   * @type {PaletteAnalysisOneOf2StatusEnum}
+   * @memberof PaletteAnalysisOneOf2
+   */
+  status: PaletteAnalysisOneOf2StatusEnum
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf2
+   */
+  failureReason: null
+  /**
+   *
+   * @type {PaletteAnalysisOneOf2SourceEnum}
+   * @memberof PaletteAnalysisOneOf2
+   */
+  source: PaletteAnalysisOneOf2SourceEnum
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf2
+   */
+  undertone: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf2
+   */
+  depth: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf2
+   */
+  confidence: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf2
+   */
+  analysisVersion: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf2
+   */
+  analyzedAt: null
+}
+
+/**
+ * @export
+ */
+export const PaletteAnalysisOneOf2StatusEnum = {
+  processing: 'processing',
+} as const
+export type PaletteAnalysisOneOf2StatusEnum =
+  (typeof PaletteAnalysisOneOf2StatusEnum)[keyof typeof PaletteAnalysisOneOf2StatusEnum]
+
+/**
+ * @export
+ */
+export const PaletteAnalysisOneOf2SourceEnum = {
+  selfie: 'selfie',
+  wardrobe: 'wardrobe',
+} as const
+export type PaletteAnalysisOneOf2SourceEnum =
+  (typeof PaletteAnalysisOneOf2SourceEnum)[keyof typeof PaletteAnalysisOneOf2SourceEnum]
+
+/**
+ *
+ * @export
+ * @interface PaletteAnalysisOneOf3
+ */
+export interface PaletteAnalysisOneOf3 {
+  /**
+   *
+   * @type {PaletteAnalysisOneOf3StatusEnum}
+   * @memberof PaletteAnalysisOneOf3
+   */
+  status: PaletteAnalysisOneOf3StatusEnum
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf3
+   */
+  failureReason: null
+  /**
+   *
+   * @type {PaletteAnalysisOneOf3SourceEnum}
+   * @memberof PaletteAnalysisOneOf3
+   */
+  source: PaletteAnalysisOneOf3SourceEnum
+  /**
+   *
+   * @type {PaletteAnalysisOneOf3UndertoneEnum}
+   * @memberof PaletteAnalysisOneOf3
+   */
+  undertone: PaletteAnalysisOneOf3UndertoneEnum
+  /**
+   *
+   * @type {PaletteAnalysisOneOf3DepthEnum}
+   * @memberof PaletteAnalysisOneOf3
+   */
+  depth: PaletteAnalysisOneOf3DepthEnum | null
+  /**
+   *
+   * @type {number}
+   * @memberof PaletteAnalysisOneOf3
+   */
+  confidence: number
+  /**
+   *
+   * @type {string}
+   * @memberof PaletteAnalysisOneOf3
+   */
+  analysisVersion: string
+  /**
+   *
+   * @type {string}
+   * @memberof PaletteAnalysisOneOf3
+   */
+  analyzedAt: string
+}
+
+/**
+ * @export
+ */
+export const PaletteAnalysisOneOf3StatusEnum = {
+  ready: 'ready',
+} as const
+export type PaletteAnalysisOneOf3StatusEnum =
+  (typeof PaletteAnalysisOneOf3StatusEnum)[keyof typeof PaletteAnalysisOneOf3StatusEnum]
+
+/**
+ * @export
+ */
+export const PaletteAnalysisOneOf3SourceEnum = {
+  selfie: 'selfie',
+  wardrobe: 'wardrobe',
+} as const
+export type PaletteAnalysisOneOf3SourceEnum =
+  (typeof PaletteAnalysisOneOf3SourceEnum)[keyof typeof PaletteAnalysisOneOf3SourceEnum]
+
+/**
+ * @export
+ */
+export const PaletteAnalysisOneOf3UndertoneEnum = {
+  warm: 'warm',
+  cool: 'cool',
+  neutral: 'neutral',
+  olive: 'olive',
+} as const
+export type PaletteAnalysisOneOf3UndertoneEnum =
+  (typeof PaletteAnalysisOneOf3UndertoneEnum)[keyof typeof PaletteAnalysisOneOf3UndertoneEnum]
+
+/**
+ * @export
+ */
+export const PaletteAnalysisOneOf3DepthEnum = {
+  fair: 'fair',
+  light: 'light',
+  medium: 'medium',
+  tan: 'tan',
+  deep: 'deep',
+} as const
+export type PaletteAnalysisOneOf3DepthEnum =
+  (typeof PaletteAnalysisOneOf3DepthEnum)[keyof typeof PaletteAnalysisOneOf3DepthEnum]
+
+/**
+ *
+ * @export
+ * @interface PaletteAnalysisOneOf4
+ */
+export interface PaletteAnalysisOneOf4 {
+  /**
+   *
+   * @type {PaletteAnalysisOneOf4StatusEnum}
+   * @memberof PaletteAnalysisOneOf4
+   */
+  status: PaletteAnalysisOneOf4StatusEnum
+  /**
+   *
+   * @type {PaletteAnalysisOneOf4FailureReasonEnum}
+   * @memberof PaletteAnalysisOneOf4
+   */
+  failureReason: PaletteAnalysisOneOf4FailureReasonEnum
+  /**
+   *
+   * @type {PaletteAnalysisOneOf4SourceEnum}
+   * @memberof PaletteAnalysisOneOf4
+   */
+  source: PaletteAnalysisOneOf4SourceEnum
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf4
+   */
+  undertone: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf4
+   */
+  depth: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf4
+   */
+  confidence: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf4
+   */
+  analysisVersion: null
+  /**
+   *
+   * @type {null}
+   * @memberof PaletteAnalysisOneOf4
+   */
+  analyzedAt: null
+}
+
+/**
+ * @export
+ */
+export const PaletteAnalysisOneOf4StatusEnum = {
+  failed: 'failed',
+} as const
+export type PaletteAnalysisOneOf4StatusEnum =
+  (typeof PaletteAnalysisOneOf4StatusEnum)[keyof typeof PaletteAnalysisOneOf4StatusEnum]
+
+/**
+ * @export
+ */
+export const PaletteAnalysisOneOf4FailureReasonEnum = {
+  no_face: 'no_face',
+  low_quality: 'low_quality',
+  privacy_violation: 'privacy_violation',
+  insufficient_wardrobe: 'insufficient_wardrobe',
+  timeout: 'timeout',
+  storage_error: 'storage_error',
+} as const
+export type PaletteAnalysisOneOf4FailureReasonEnum =
+  (typeof PaletteAnalysisOneOf4FailureReasonEnum)[keyof typeof PaletteAnalysisOneOf4FailureReasonEnum]
+
+/**
+ * @export
+ */
+export const PaletteAnalysisOneOf4SourceEnum = {
+  selfie: 'selfie',
+  wardrobe: 'wardrobe',
+} as const
+export type PaletteAnalysisOneOf4SourceEnum =
+  (typeof PaletteAnalysisOneOf4SourceEnum)[keyof typeof PaletteAnalysisOneOf4SourceEnum]
+
+/**
+ *
+ * @export
+ */
+export const PaletteAnalysisStatus = {
+  pending_upload: 'pending_upload',
+  bytes_uploaded: 'bytes_uploaded',
+  processing: 'processing',
+  ready: 'ready',
+  failed: 'failed',
+} as const
+export type PaletteAnalysisStatus =
+  (typeof PaletteAnalysisStatus)[keyof typeof PaletteAnalysisStatus]
+
+/**
+ *
+ * @export
+ */
+export const PaletteSource = {
+  selfie: 'selfie',
+  wardrobe: 'wardrobe',
+} as const
+export type PaletteSource = (typeof PaletteSource)[keyof typeof PaletteSource]
+
+/**
+ *
+ * @export
  * @interface PolledEvent
  */
 export interface PolledEvent {
@@ -4559,6 +5469,32 @@ export const ServiceUnavailableHttpErrorErrorEnum = {
 export type ServiceUnavailableHttpErrorErrorEnum =
   (typeof ServiceUnavailableHttpErrorErrorEnum)[keyof typeof ServiceUnavailableHttpErrorErrorEnum]
 
+/**
+ *
+ * @export
+ * @interface SetPaletteConsentInput
+ */
+export interface SetPaletteConsentInput {
+  /**
+   * true grants consent; false revokes it and erases the palette.
+   * @type {boolean}
+   * @memberof SetPaletteConsentInput
+   */
+  granted: boolean
+}
+/**
+ *
+ * @export
+ * @interface SetPaletteConsentResponse
+ */
+export interface SetPaletteConsentResponse {
+  /**
+   *
+   * @type {PaletteAdvisorProfileResponseData}
+   * @memberof SetPaletteConsentResponse
+   */
+  data: PaletteAdvisorProfileResponseData
+}
 /**
  *
  * @export
@@ -5356,6 +6292,31 @@ export type SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum =
   (typeof SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum)[keyof typeof SilhouetteProfileResponseDataMyFormOneOf4FailureReasonEnum]
 
 /**
+ *
+ * @export
+ */
+export const SkinDepth = {
+  fair: 'fair',
+  light: 'light',
+  medium: 'medium',
+  tan: 'tan',
+  deep: 'deep',
+} as const
+export type SkinDepth = (typeof SkinDepth)[keyof typeof SkinDepth]
+
+/**
+ *
+ * @export
+ */
+export const SkinUndertone = {
+  warm: 'warm',
+  cool: 'cool',
+  neutral: 'neutral',
+  olive: 'olive',
+} as const
+export type SkinUndertone = (typeof SkinUndertone)[keyof typeof SkinUndertone]
+
+/**
  * @type Subscription
  * One variant per subscription presence. The correlations between status and the entitlement fields are expressed by the variants themselves: a `none` response carries null entitlement fields with the keys still serialized, and an entitled response always carries all of them.
  * @export
@@ -5801,6 +6762,68 @@ export const UnauthorizedHttpErrorErrorEnum = {
 export type UnauthorizedHttpErrorErrorEnum =
   (typeof UnauthorizedHttpErrorErrorEnum)[keyof typeof UnauthorizedHttpErrorErrorEnum]
 
+/**
+ *
+ * @export
+ * @interface UpdateAdvisorRecommendationInput
+ */
+export interface UpdateAdvisorRecommendationInput {
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateAdvisorRecommendationInput
+   */
+  itemKey: string
+  /**
+   *
+   * @type {UpdateAdvisorRecommendationInputSlotEnum}
+   * @memberof UpdateAdvisorRecommendationInput
+   */
+  slot: UpdateAdvisorRecommendationInputSlotEnum
+  /**
+   *
+   * @type {UpdateAdvisorRecommendationInputActionEnum}
+   * @memberof UpdateAdvisorRecommendationInput
+   */
+  action: UpdateAdvisorRecommendationInputActionEnum | null
+}
+
+/**
+ * @export
+ */
+export const UpdateAdvisorRecommendationInputSlotEnum = {
+  foundation: 'foundation',
+  blush: 'blush',
+  jewelry: 'jewelry',
+  bag: 'bag',
+  eyewear: 'eyewear',
+} as const
+export type UpdateAdvisorRecommendationInputSlotEnum =
+  (typeof UpdateAdvisorRecommendationInputSlotEnum)[keyof typeof UpdateAdvisorRecommendationInputSlotEnum]
+
+/**
+ * @export
+ */
+export const UpdateAdvisorRecommendationInputActionEnum = {
+  saved: 'saved',
+  dismissed: 'dismissed',
+} as const
+export type UpdateAdvisorRecommendationInputActionEnum =
+  (typeof UpdateAdvisorRecommendationInputActionEnum)[keyof typeof UpdateAdvisorRecommendationInputActionEnum]
+
+/**
+ *
+ * @export
+ * @interface UpdateAdvisorRecommendationResponse
+ */
+export interface UpdateAdvisorRecommendationResponse {
+  /**
+   *
+   * @type {PaletteAdvisorProfileResponseData}
+   * @memberof UpdateAdvisorRecommendationResponse
+   */
+  data: PaletteAdvisorProfileResponseData
+}
 /**
  * Collection invariant enforced at runtime and NOT expressible in this schema: ruleType must be unique across rules. JSON Schema uniqueItems compares whole items, so two rules sharing a ruleType but differing elsewhere would pass it while being rejected here.
  * @export

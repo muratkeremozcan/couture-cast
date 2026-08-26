@@ -904,3 +904,359 @@ work; each was in the way of verifying it.
   worker entrypoints hand-wire, but it is a trap with no error message, and the
   cheap guard would be a comment at the top of each tsx-executed entrypoint
   saying so.
+
+## Deferred from: story 5.4 colour palette & beauty/accessory advisor (2026-08-25)
+
+Everything below is a deliberate limit of the shipped story, recorded so a later
+reader can tell a decision from an omission. Nothing here is a known defect in
+what shipped.
+
+**Status after the 2026-08-26 closing pass, on the same PR.** Six entries are
+resolved and struck through below, two of them because the entry itself was
+wrong rather than because the work was hard: the integration tier was already
+running in CI, and a retired rules version does not empty the card list. The
+product-scope entries — guardian visibility, moderation records on a flagged
+teen selfie, re-analysis without re-upload, the beauty-partner console, watch
+and widget surfaces, `recommendation_id`'s dual meaning, and Maestro's
+locked-state-only advisor coverage — are decisions rather than debt and are left
+exactly as they were.
+
+What remains open is three CI-plumbing items, and they share a reason: each
+needs a RUNNER rather than a checkout, and the standing rule is that a change to
+shared CI plumbing is proven under `workflow_dispatch` before it gates anything.
+Fixing them from a laptop would mean shipping an unverified guess about
+infrastructure other workstreams depend on. They are the per-attempt Maestro
+artifact fix, the Linux-only Pact consumer flake, and the `open-settings.yaml`
+emulator flake; each entry states what a fix needs and who can do it.
+
+- **A guardian cannot see a teen's derived palette, and no planning document says
+  whether they should.** `PaletteProfile` and `AdvisorRecommendationState` are
+  registered in `selfOnlyTables`, not `guardianSharedTables` (Decision 11), even
+  though the adjacent `PaletteInsights` is guardian-shared. The reasoning: guardian
+  consent already gates **whether** an under-16 account may upload at all, through
+  the unchanged `WardrobeUploadGuard` → `GuardianService.assertWardrobeUploadAllowed`,
+  and exposing a derived body characteristic to a guardian is a different mandate
+  that no PRD, epic or UX line grants. `PaletteInsights` being guardian-shared is
+  about garment colours, not skin. Product should revisit this deliberately; the
+  reversal is a category move in `packages/db/test/rls/harness.ts` plus a
+  migration, not a redesign.
+
+- **A flagged teen selfie notifies nobody and leaves no reviewable record.** Story
+  4.4 writes a `ModerationEvent` plus one guardian `EventEnvelope` per active
+  consent inside its terminal transaction. This story writes neither, and the
+  reason has to be stated rather than discovered: `ModerationEvent` has relations
+  to `LookbookPost`, `GarmentItem` and `SilhouetteProfile` and none to
+  `PaletteProfile`, and a moderation row is a pointer to evidence a human can
+  review — evidence Decision 8 has just deleted on purpose. A selfie that trips
+  the privacy check terminates `failed` / `privacy_violation`, purges, and tells
+  the user. If guardian notification on a flagged teen selfie turns out to be
+  required, it needs either a retention carve-out or a notification that carries
+  no image, and both are policy calls no planning document has made.
+
+- **There is no re-analysis without re-upload.** Decision 8 purges the selfie the
+  moment the analysis terminates, success or failure, so there are no bytes to
+  re-read. A future story that wants "re-run with a better model" owns
+  re-prompting for a photo. This is the direct cost of the retention posture and
+  is worth paying; it is recorded so nobody plans a background re-classification
+  sweep that cannot exist.
+
+- **There is no beauty-partner admin console**, inheriting story 5.1's catalog
+  posture exactly. Advisor offers are seed- and migration-managed
+  (`seedAdvisorOfferCatalog`, `packages/db/prisma/seeds/commerce.ts`), behind the
+  same `allowsCommerceSeeding()` guard that keeps commerce seeding out of
+  production. Onboarding a real beauty partner is an operator task with no UI.
+
+- **The CC-5.4 readiness blocker is discharged, and ADR-014 is deliberately
+  diverged from.** `refs/implementation-readiness-report-2025-11-13.md:242-245`
+  escalated "Architecture defines NestJS worker (server-side), but PRD implies
+  potential on-device option" as a CC-5.4 blocker. ADR-014 is the answer to that
+  question, not another voice in it: processing is server-side, in the API, with
+  Sharp, and the UX specification's on-device line is stale. **The divergence:**
+  ADR-014 prescribes "Sharp (image resize) → ONNX Runtime (color inference using
+  pre-trained model)", and this story declines the ONNX step. The output is one
+  four-way and one five-way classification that closed-form CIELAB colour science
+  settles exactly, while the repo's only ONNX consumer already carries a 50 MB
+  model directory, a `GARMENT_TAGGING_MODEL_DIR` cache and a
+  `verify:tagging-model` prestart gate for a genuinely learned task. ~~**ADR-014
+  should be amended to record this rather than left quietly contradicted.**~~
+
+  _Amended 2026-08-26._ `architecture.md`'s ADR-014 now records the divergence
+  inline, along with two things that ADR did not anticipate and that a reader
+  would otherwise get wrong: the derived palette lands on `PaletteProfile`
+  rather than in `wardrobe_items.color_palette`, and the selfie source is
+  PURGED on every terminal branch rather than left at rest in Supabase Storage
+  as the ADR's privacy paragraph describes. The purge is stricter than the ADR,
+  not a relaxation of it. A future story reintroducing ONNX, or relaxing the
+  purge, is reopening the ADR rather than implementing it.
+
+- **`AffiliateClick.recommendation_id` now has two meanings.** For a garment click
+  it is the `ScenarioOutfit.id` the CTA was rendered on; for an advisor click it
+  is the acting user's `PaletteProfile.id` (Decision 7). The column comment states
+  both. Renaming it would be a migration on a shipped table for no behavioural
+  gain, so the dual meaning stands. One thing was tightened rather than accepted:
+  the advisor value is resolved server-side from the session
+  (`CommerceRepository.findPaletteProfileId`) rather than taken from the request
+  body, because the 60-second dedupe index is `(user_id, offer_id,
+recommendation_id, minute)` and a client that can choose the third column can
+  mint unlimited attributed clicks for one offer inside one minute. ~~The garment
+  path still trusts the client's value, unchanged from 5.1; that asymmetry is
+  worth closing in a follow-up.~~
+
+  _The asymmetry was closed on 2026-08-26._ The garment path now derives its key
+  too, from a lookup it was already making: `findRecommendationScenario` is
+  scoped to `user_id`, so hoisting it above the dedupe check lets its answer
+  gate the key as well as the `scenario` column. An id that resolves is stored
+  as sent, which keeps the impression-to-click join the PRD's click-through
+  metric depends on; an id that does not collapses onto a single sentinel.
+
+  A sentinel rather than a rejection, deliberately. A forged id and one whose
+  `OutfitRecommendation` row rotated behind the Redis and on-device ritual
+  caches are indistinguishable from the service, and Decision 7 forbids failing
+  the second — so the tap still mints, into one bucket, while a forger gets one
+  bucket instead of an unbounded supply. `5.4-INT-036` proves the collapse
+  against the real unique index over HTTP, `5.4-INT-037` proves an owned id
+  survives untouched, and `5.4-INT-034` proves the rotated tap still mints.
+  The `affiliate_cta_clicked` event now reports the STORED id rather than the
+  one sent, so the event and the click row stay joinable (`5.4-INT-035`).
+
+  The column's dual meaning stands, unchanged and still not worth a migration.
+
+- **Two shipped documents still claim on-device colour analysis.**
+  `ux-design-specification.md:409` states the pipeline is "an in-house build using
+  on-device palette detection so user imagery never leaves CoutureCast's
+  boundary", and `prd.md:294` asks to "confirm on-device processing constraints
+  … before CC-5.4". Both predate ADR-014 and both are now false about shipped
+  behaviour. ~~They are left standing because editing planning artifacts was not
+  in this story's scope, but a reader who trusts either will be wrong about
+  where face images are processed. They should be amended alongside ADR-014.~~
+
+  _Corrected 2026-08-26, alongside the ADR-014 amendment._ The UX line no longer
+  says "on-device"; its privacy claim survives the correction and is stronger
+  than it was, because the selfie is purged rather than retained. The PRD's open
+  question is struck through and answered in place — server-side, why on-device
+  was rejected, what is at rest, and where the work runs — rather than deleted,
+  so a reader following a link to it lands on the answer instead of on nothing.
+
+- **Watch and widget advisor surfaces are out of scope**, unchanged from story
+  5.3's Decision 5 and story 5.1's reasoning. No file under `apps/mobile/targets/`
+  or the Android widget sources is touched. Neither surface has room for a
+  sponsorship disclosure, and an undisclosed affiliate tap target would breach the
+  PRD guardrail at `prd.md:47`.
+
+- _Resolved 2026-08-26, and the entry it replaces was factually wrong._
+  **~~No workflow runs `test:integration` in CI.~~** The integration tier has
+  been running in CI the whole time. `apps/api/vitest.config.ts` includes
+  `integration/**/*.spec.ts` alongside `src/**`, so `pr-checks.yml`'s
+  `quality-gate` job runs all 26 suites inside its `test:coverage` step, against
+  the PostgreSQL and Redis service containers it declares and the migrations it
+  applies. The run on this branch's head commit is explicit about it:
+  `✓ integration/palette-advisor.integration.spec.ts (11 tests) 679ms`. The
+  `test:integration` SCRIPT is unused by any workflow, which is what the original
+  entry observed; the evidence it names is not.
+
+  What was genuinely missing is narrower and worth more than another job would
+  have been. Fourteen of those suites open with a `SELECT 1 FROM "Table"` probe
+  and `context.skip()` on failure — right for a laptop with no database, and
+  silent when CI points them at the wrong one. That is not hypothetical:
+  `apps/api/vitest.config.ts` records it happening on 2026-08-18, when
+  `packages/db/.env` repointed `DATABASE_URL` inside the worker and sixty-one
+  tests skipped behind a coverage failure that named coverage. `5.4-INT-031`
+  scrapes the probe set out of the sibling suites and fails the run when `CI` is
+  set and a probed table does not resolve; `5.4-INT-030` guards the scrape
+  against going vacuous. Verified both ways: green against the migrated
+  database, red against a database that does not exist.
+
+- **The advisor's Maestro coverage is the locked state only.** The harness signs
+  up a fresh public-API user, so the entitled advisor, the consent journey and the
+  `expo-image-picker` capture path are all out of a Maestro run's reach. Both
+  limits are stated in `maestro/palette-advisor.yaml`'s own docblock and in the
+  story's "explicitly untested" section, and both are covered at other tiers
+  (`palette-advisor-screen.test.tsx` through MSW,
+  `playwright/tests/palette-advisor.spec.ts` against the seeded entitled user with
+  the worker live).
+
+- _Resolved 2026-08-26._ **~~The advisor offer lookup has no query-plan
+  coverage.~~** `commerce-affiliate-offers-query-plan.integration.spec.ts` now
+  seeds an advisor cohort the same size as the garment one under the same
+  inactive partner, plus ten selectable rows under the active partner carrying
+  both undertone forms, so the lookup's `ORDER BY (advisor_undertone IS NULL)
+ASC` cannot rot unnoticed. `5.4-PLAN-01`/`-02`/`-03`/`-04` mirror
+  `5.1-PLAN-02`/`-04`/`-05`/`-06`.
+
+  Two things the closing pass learned that the original entry did not predict.
+  `5.4-PLAN-01` asserts `advisor_slot` is in the plan's Index Cond rather than
+  merely that the index is named: both indexes lead with
+  `(status, locale_region)`, so a scan pushing only those two columns down and
+  re-checking the slot on every heap row would satisfy a name check while
+  reading the whole region. And it deliberately does NOT assert the garment
+  index is absent — the predicate `locale_region = $3 OR locale_region = '*'`
+  becomes a BitmapOr whose `'*'` branch carries no `advisor_slot` and can be
+  served by either index. That is a choice between two index scans rather than
+  the table scan these tests rule out, and this fixture holds no `'*'` rows to
+  separate them, by design: a `'*'` row matches every request region and would
+  become a candidate offer in the sibling suites.
+
+  The original entry, for the record. **The advisor offer lookup has no
+  query-plan coverage.**
+  `commerce-affiliate-offers-query-plan.integration.spec.ts` seeds 4,000 GARMENT
+  offers and proves `findBestOffer` descends its composite index rather than
+  scanning the catalog. `findBestAdvisorOffer` now runs a second, structurally
+  identical lookup against the same table and has no equivalent proof: the
+  suite's volume rows all carry `garment_category`, so there is no advisor row
+  at volume for a plan to be honest about. Closing it means seeding an advisor
+  cohort alongside the garment one and mirroring `5.1-PLAN-02`/`5.1-PLAN-05` for
+  the advisor predicate, which is a rework of that suite's fixture rather than
+  an added assertion.
+
+  The half that could be closed cheaply was: `5.4-DB-041` asserts the advisor
+  index is PARTIAL on `advisor_slot IS NOT NULL`. That predicate is the one
+  Prisma's DSL cannot express, so a regenerated migration would silently drop it
+  and reintroduce the planner ambiguity that regressed `5.1-PLAN-03`.
+
+- **A pre-existing Pact consumer flake is still unfixed**, and it failed two CI
+  runs on this branch. Both failures are in `web-api-client.pacttest.ts`,
+  reporting `The following request was expected but not received`, and both are
+  on `/api/v1/personalization/comfort` — but on DIFFERENT interactions and
+  different run indices: "updates user comfort preferences" (`PUT`) on run 3 of
+  the three-run determinism check, then "reads user comfort preferences" (`GET`)
+  on run 1. Different test failing each time is the signature of an environment
+  race rather than a code defect, and both interactions belong to story 2's
+  ritual-comfort surface, untouched here.
+
+  What has been ruled out. It did not reproduce in 37 local suite runs: 12
+  direct, 5 full three-run determinism cycles, and 10 more under deliberate CPU
+  saturation (28 busy loops on 14 cores). The consumer config already serialises
+  everything it could race against — `fileParallelism: false`,
+  `singleFork: true` — so parallel mock servers are not the cause. The
+  interactions immediately preceding the failures (`events/poll`, the invalid
+  cursor payload, the ritual read) all `await` their requests inside
+  `executeTest`, so no earlier interaction leaves a request in flight to land on
+  a later mock server.
+
+  The leading hypothesis is undici connection reuse across mock servers. All 161
+  interactions run in ONE process against 161 short-lived servers on ephemeral
+  ports, sharing one global dispatcher; a pooled keep-alive socket to a port the
+  OS has since reassigned to a new mock server would produce exactly this
+  symptom. It would also explain why it is Linux-only in practice: Linux recycles
+  ephemeral ports from a lower, narrower range than macOS, which is likely why
+  saturating a Mac reproduces nothing.
+
+  ~~Testing that means giving the Pact consumer clients a non-pooling dispatcher
+  through `createApiClient`'s existing `fetchApi` option — deliberately NOT a
+  `Connection: close` header, which undici would put on the wire and Pact would
+  record into the contract.~~
+
+  **UPDATE 2026-08-26: it reproduced on macOS, and that reading of it is wrong.**
+  `npm run test:pact` failed on run 3 of the determinism check on an M-series
+  Mac, in `mobile-api-client.pacttest.ts` this time, on `a request to poll
+realtime fallback events` — a third distinct interaction, in a third file, with
+  the identical "The following request was expected but not received" signature.
+  So it is not Linux-only, and the ephemeral-port-range argument for why it
+  should be Linux-only does not survive. It remains rare: 20 further local runs,
+  8 of them beside a full `apps/web` coverage run for realistic I/O load,
+  reproduced nothing.
+
+  **The undici hypothesis is refuted by the failure's own shape, and this is the
+  useful part.** Read `executeTest` in
+  `node_modules/@pact-foundation/pact/src/v4/http/index.js:34-58`: it captures a
+  callback error, and where BOTH a callback error and a mismatch exist it
+  RETHROWS THE CALLBACK ERROR, reaching the "test didn't throw, so we need to
+  ensure the test fails" branch only when the callback succeeded. We got the
+  mismatch error. So the client received a response that parsed against
+  `eventsPollResponseSchema` and satisfied a `toEqual` on the whole body — in
+  14ms — while the mock server being verified reported no request at all. Every
+  transport-level story fails on that: a socket pooled to a closed server throws,
+  and a socket reaching a DIFFERENT pact mock server gets that server's 500 for
+  an unmatched route, which throws too. A successful, correct response is not
+  something the wrong endpoint can produce.
+
+  What can produce it is the verification query resolving to the wrong server.
+  `executeTest` takes `pact.createMockServer(host, 0, false)`'s return value —
+  a PORT — and uses that port as the identity in `mockServerMismatches(port)` and
+  `mockServerMatchedSuccessfully(port)`. Servers are created and torn down once
+  per interaction, 161 times in one process, so port numbers are recycled hard.
+  If a torn-down server has not fully deregistered from the FFI's registry when
+  a new one is handed the same port, the request is received and matched by the
+  right server while the verification reads the stale entry. The position fits:
+  the failing interaction was the SECOND in its file, immediately after a
+  17ms one, which is the tightest create-teardown-create window in the run.
+
+  **What a fix needs now.** Not a dispatcher. Either an explicit distinct
+  `opts.port` per interaction so no two mock servers in a process can share a
+  port number, or an upstream fix in `pact-foundation` if the registry race is
+  confirmed there. Neither should be shipped on this one observation: it is a
+  single failure against a hypothesis formed from it, which is exactly the shape
+  of reasoning that produced the refuted one above. The next person should
+  instrument `createMockServer`'s returned port per interaction, log the
+  sequence, and look for a repeat within one process — that turns the guess into
+  a measurement. Until then, a failed Pact job on this signature should be re-run
+  rather than treated as a regression, and this entry is why it stays visible
+  behind the green tick.
+
+- _Resolved 2026-08-26, with its premise corrected._ **~~A ready palette whose
+  `analysis_version` this build has retired renders no advice and no
+  explanation.~~** The second half was right and is closed;
+  `commerce.premium.palette.staleVersion` now ships in all ten catalogs on both
+  surfaces and renders above the numbers it qualifies, pointing at the
+  `SourceChoice` controls that are already on screen in the `ready` state and
+  are the only refresh there is, because Decision 8 purged the selfie when the
+  last analysis terminated.
+
+  The FIRST half was wrong, and it had been written into three places before
+  anyone checked it. `PaletteAdvisorService.resolveRecommendations` builds its
+  cards from the CURRENT `ADVISOR_RULES`, keyed on the stored `undertone` and
+  `depth`; it never reads `analysis_version`, and no other read path does
+  either. A rules bump therefore resolves the full current card set, not an
+  empty one. `5.4-INT-032` pins that against real SQL. What a bump actually
+  costs the reader is the palette ABOVE the cards — an undertone, a depth and a
+  confidence derived under retired rules, presented exactly like a current
+  result — which is what the note says. `5.4-MOB-023` and `5.4-E2E-012` keep
+  their empty-list fixtures, relabelled as the hostile fixtures they are: a
+  surface that resolves no cards must not crash or error either, and no other
+  tier covers that.
+
+  The original entry, for the record. **A ready palette whose `analysis_version`
+  this build has retired renders no advice and no explanation.** `5.4-E2E-012` pins the state deliberately: the
+  result panel keeps showing undertone, depth and confidence, every stored
+  `item_key` from the retired version resolves to nothing, and the
+  recommendations `<ul>` renders empty. Nothing errors, which is the point —
+  but nothing tells the reader why the advice vanished either, so the panel
+  reads as broken rather than as stale. The state becomes reachable the first
+  time `ADVISOR_RULES_VERSION` is bumped with profiles already stored against
+  the old one, so it is a scheduled problem rather than a hypothetical. The fix
+  is one locale key ("your palette predates the current advice; re-derive it")
+  plus a re-derive affordance, across ten catalogs on two surfaces, which is
+  why it is recorded here rather than folded into a review pass.
+
+- **`gh run rerun --failed` can never turn the Maestro workflow green**, which
+  makes recovering a single flaked shard more expensive than it should be. The
+  `mobile-e2e-report-comment` action ends with an integrity check that refuses a
+  green suite the reports do not support, and one of its conditions is
+  `SHARDS_SEEN < EXPECTED`. That check is correct and worth keeping — it is what
+  stops a matrix from reporting success while half the suite never ran. But
+  `actions/download-artifact@v4` is scoped to the CURRENT run attempt, so after a
+  partial re-run the report job can only see the artifacts of the shards that
+  re-ran. On this PR all seven shards genuinely passed (six on attempt 1, shard 7
+  on attempt 2) and the report job still failed with "only 1 of 3 shards left
+  reports". The only ways out are a FULL re-run of the workflow or a new push.
+
+  A fix would mean naming shard artifacts per attempt and having the report job
+  fetch across attempts through the API rather than through
+  `download-artifact`'s default scope, which is a change to shared CI plumbing
+  and wants its own proving run under `workflow_dispatch` before it gates
+  anything.
+
+- **A pre-existing `open-settings.yaml` Maestro flake cost one shard re-run on
+  this PR.** Shard 7 failed two story-3/4 flows,
+  `garment-capsule-localization-flow` and `sanity`, both with
+  `Assertion is false: id: settings-screen is visible`, then passed both on
+  re-run. The subflow already carries the repair history for exactly this
+  symptom in its own docblock — the Expo Go developer sheet rising over the tab
+  bar and swallowing the tap, and pushed routes leaving the tab bar unreachable —
+  and already wraps tap-plus-assert in `retry: maxRetries: 3` around a 15-second
+  `extendedWaitUntil`. It is not a regression from story 5.4: shard 7 passed on
+  the immediately preceding commit, and the entire diff between the passing and
+  failing runs is two test files and two markdown documents, with no mobile app
+  code, no flow and no subflow touched. Diagnosing it further needs an Android
+  emulator reproducing the CI profile, which is where this repository's mobile
+  E2E lives by decision; there is no local Android path to iterate against.

@@ -231,6 +231,8 @@ model User {
   billing_events                BillingEvent[]
   billing_customer              BillingCustomer?
   premium_theme_preference      PremiumThemePreference?
+  palette_profile               PaletteProfile?
+  advisor_recommendation_states AdvisorRecommendationState[]
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -825,12 +827,21 @@ model CommercePartner {
 /// `comfort_range` NULL is the wildcard. An exact comfort_range match outranks a
 /// wildcard regardless of `priority`, and `id ASC` is the total tie-break, which
 /// is what keeps attribution comparable and end-to-end assertions stable.
+///
+/// Story 5.4: extended, not forked, to also carry beauty/accessory advisor
+/// offers. `garment_category` and `advisor_slot` are mutually exclusive and
+/// exactly one is set (migration check constraint `num_nonnulls(garment_category,
+/// advisor_slot) = 1`), so every row is unambiguously a garment offer or an
+/// advisor offer. `advisor_undertone` NULL is the wildcard, exactly like
+/// `comfort_range` above, and follows the identical ORDER BY ranking rule.
 model AffiliateOffer {
   id                 String               @id @default(cuid())
   partner            CommercePartner      @relation(fields: [partner_id], references: [id], onDelete: Restrict)
   partner_id         String
-  garment_category   GarmentCategory
+  garment_category   GarmentCategory?
   comfort_range      GarmentComfortRange?
+  advisor_slot       AdvisorSlot?
+  advisor_undertone  SkinUndertone?
   /// The uppercased region subtag of the UI language, or the '*' sentinel
   /// meaning "published globally". This is NOT a commerce jurisdiction: a user
   /// in the US reading the app in fr-FR resolves to FR and sees FR offers.
@@ -850,6 +861,13 @@ model AffiliateOffer {
   clicks             AffiliateClick[]
 
   @@index([status, locale_region, garment_category, priority(sort: Desc)])
+  /// The migration makes this index PARTIAL (WHERE advisor_slot IS NOT NULL),
+  /// which Prisma's schema DSL cannot express -- the hand-authored migration
+  /// SQL is authoritative for the predicate. Without it this index and the
+  /// garment one above are structurally tied on a garment-only query and the
+  /// planner can pick either, which is not a hypothetical: it regressed
+  /// commerce-affiliate-offers-query-plan.integration.spec.ts's 5.1-PLAN-03.
+  @@index([status, locale_region, advisor_slot, priority(sort: Desc)])
   @@index([partner_id])
   @@map("AffiliateOffer")
 }
@@ -883,8 +901,13 @@ model AffiliateClick {
   offer_id          String
   partner           CommercePartner       @relation(fields: [partner_id], references: [id], onDelete: Restrict)
   partner_id        String
-  /// The ScenarioOutfit.id the CTA was rendered on. Joins impression to click
-  /// and gives the PRD's click-through metric its denominator.
+  /// For a garment-slot click: the ScenarioOutfit.id the CTA was rendered on,
+  /// joining impression to click for the PRD's click-through metric. Story 5.4:
+  /// for an advisor click (`offer.advisor_slot !== null`) this instead carries
+  /// PaletteProfile.id, which keeps the 60-second dedupe index
+  /// (user_id, offer_id, recommendation_id, minute) meaningful, since an offer
+  /// belongs to exactly one advisor slot and so cannot legitimately be clicked
+  /// twice in a minute from two places.
   recommendation_id String
   scenario          String
   surface           String
@@ -1023,4 +1046,118 @@ model PremiumThemePreference {
   updated_at DateTime         @updatedAt
 
   @@map("PremiumThemePreference")
+}
+
+// ---------------------------------------------------------------------------
+// Story 5.4: Color palette & beauty/accessory advisor
+// ---------------------------------------------------------------------------
+
+enum PaletteSource {
+  selfie
+  wardrobe
+}
+
+enum SkinUndertone {
+  warm
+  cool
+  neutral
+  olive
+}
+
+enum SkinDepth {
+  fair
+  light
+  medium
+  tan
+  deep
+}
+
+/// Mirrors SilhouettePhotoStatus. The wardrobe source jumps straight to
+/// `processing` (there is nothing to upload), which is why the upload statuses
+/// are nullable rather than a required starting state.
+enum PaletteAnalysisStatus {
+  pending_upload
+  bytes_uploaded
+  processing
+  ready
+  failed
+}
+
+enum PaletteAnalysisFailureReason {
+  no_face
+  low_quality
+  privacy_violation
+  insufficient_wardrobe
+  timeout
+  storage_error
+}
+
+enum AdvisorSlot {
+  foundation
+  blush
+  jewelry
+  bag
+  eyewear
+}
+
+enum AdvisorAction {
+  saved
+  dismissed
+}
+
+/// RLS: owner-only (selfOnlyTables). One row per user. Holds the consent fact,
+/// the derived palette scalars, and the transient selfie upload lifecycle.
+/// The selfie BYTES never outlive the analysis (decision 8): selfie_purged_at
+/// is stamped when the object is removed, and nothing here is a signed URL.
+model PaletteProfile {
+  id                            String                        @id @default(cuid())
+  user                          User                          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                       String                        @unique
+  consent_granted_at            DateTime?
+  consent_revoked_at            DateTime?
+  source                        PaletteSource?
+  undertone                     SkinUndertone?
+  depth                         SkinDepth?
+  confidence                    Float?
+  analysis_version              String?
+  analyzed_at                   DateTime?
+  status                        PaletteAnalysisStatus?
+  failure_reason                PaletteAnalysisFailureReason?
+  selfie_object_path            String?                       @unique
+  selfie_upload_session_id      String?                       @unique
+  selfie_upload_idempotency_key String?
+  selfie_commit_idempotency_key String?
+  selfie_commit_payload_hash    String?
+  selfie_file_size_bytes        Int?
+  selfie_mime_type              String?
+  selfie_content_sha256         String?
+  selfie_width_px               Int?
+  selfie_height_px              Int?
+  selfie_upload_expires_at      DateTime?
+  selfie_committed_at           DateTime?
+  selfie_purged_at              DateTime?
+  revision                      Int                           @default(0)
+  created_at                    DateTime                      @default(now())
+  updated_at                    DateTime                      @updatedAt
+
+  @@index([user_id])
+  @@index([user_id, status, selfie_upload_expires_at])
+  @@map("PaletteProfile")
+}
+
+/// RLS: owner-only. One row per saved-or-dismissed suggestion. item_key is the
+/// rule table's stable id (decision 6), never a translated label.
+model AdvisorRecommendationState {
+  id         String        @id @default(cuid())
+  user       User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id    String
+  slot       AdvisorSlot
+  item_key   String
+  action     AdvisorAction
+  created_at DateTime      @default(now())
+  updated_at DateTime      @updatedAt
+
+  @@unique([user_id, slot, item_key])
+  @@index([user_id])
+  @@map("AdvisorRecommendationState")
 }

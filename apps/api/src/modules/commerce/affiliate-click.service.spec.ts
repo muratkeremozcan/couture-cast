@@ -1,3 +1,5 @@
+// Learning path Step 36: Colour palette, beauty and accessory advisor.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import { Prisma } from '@prisma/client'
@@ -21,6 +23,8 @@ const OFFER: CommerceClickOffer = {
   partner_display_name: 'Sample Partner',
   allowed_host: 'partner.couturecast.test',
   deep_link_template: 'https://partner.couturecast.test/shop?cc={clickToken}',
+  // A garment offer: Story 5.4 adds advisor_slot, null on every non-advisor row.
+  advisor_slot: null,
 }
 
 const REQUEST = {
@@ -45,10 +49,11 @@ describe('AffiliateClickService', () => {
     findActiveClickOffer: vi.fn(),
     findRecentClick: vi.fn(),
     findRecommendationScenario: vi.fn(),
+    findPaletteProfileId: vi.fn(),
     createClick: vi.fn(),
     findLatestClick: vi.fn(),
   }
-  const telemetry = { recordCtaClicked: vi.fn() }
+  const telemetry = { recordCtaClicked: vi.fn(), recordAdvisorOfferClicked: vi.fn() }
 
   let service: AffiliateClickService
 
@@ -61,6 +66,7 @@ describe('AffiliateClickService', () => {
     repository.findActiveClickOffer.mockReset().mockResolvedValue(OFFER)
     repository.findRecentClick.mockReset().mockResolvedValue(null)
     repository.findRecommendationScenario.mockReset().mockResolvedValue('morning')
+    repository.findPaletteProfileId.mockReset().mockResolvedValue('palette-profile-1')
     repository.createClick
       .mockReset()
       .mockImplementation(
@@ -69,6 +75,7 @@ describe('AffiliateClickService', () => {
       )
     repository.findLatestClick.mockReset().mockResolvedValue(null)
     telemetry.recordCtaClicked.mockReset().mockResolvedValue(undefined)
+    telemetry.recordAdvisorOfferClicked.mockReset().mockResolvedValue(undefined)
 
     service = new AffiliateClickService(
       featureFlags as unknown as FeatureFlagsService,
@@ -390,6 +397,250 @@ describe('AffiliateClickService', () => {
       repository.createClick.mockRejectedValue(error)
 
       await expect(service.recordClick(REQUEST)).rejects.toBe(error)
+    })
+  })
+
+  describe('story 5.4 advisor branch (Decision 7)', () => {
+    const ADVISOR_OFFER: CommerceClickOffer = {
+      offer_id: 'advisor-offer-1',
+      partner_id: 'partner-1',
+      partner_slug: 'sample-partner',
+      partner_display_name: 'Sample Partner',
+      allowed_host: 'partner.couturecast.test',
+      deep_link_template: 'https://partner.couturecast.test/shop/advisor?cc={clickToken}',
+      advisor_slot: 'foundation',
+    }
+
+    it('5.4-INT-022 branches on the OFFER ROW advisor_slot, not on input.surface: a garment offer id sent with surface "palette_advisor" still emits affiliate_cta_clicked', async () => {
+      // OFFER (module-level fixture) is a garment offer: advisor_slot is null.
+      repository.findActiveClickOffer.mockResolvedValue(OFFER)
+
+      await service.recordClick({ ...REQUEST, surface: 'palette_advisor' })
+
+      expect(telemetry.recordCtaClicked).toHaveBeenCalledTimes(1)
+      expect(telemetry.recordAdvisorOfferClicked).not.toHaveBeenCalled()
+      expect(repository.findRecommendationScenario).toHaveBeenCalled()
+    })
+
+    it('5.4-INT-023 branches on the OFFER ROW advisor_slot, not on input.surface: an advisor offer id sent with surface "mobile_hero" still emits advisor_offer_clicked', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(ADVISOR_OFFER)
+
+      await service.recordClick({
+        ...REQUEST,
+        offerId: ADVISOR_OFFER.offer_id,
+        surface: 'mobile_hero',
+        platform: 'mobile',
+      })
+
+      expect(telemetry.recordAdvisorOfferClicked).toHaveBeenCalledTimes(1)
+      expect(telemetry.recordAdvisorOfferClicked).toHaveBeenCalledWith({
+        userId: REQUEST.userId,
+        partnerId: ADVISOR_OFFER.partner_slug,
+        offerId: ADVISOR_OFFER.offer_id,
+        advisorSlot: 'foundation',
+        platform: 'mobile',
+      })
+      expect(telemetry.recordCtaClicked).not.toHaveBeenCalled()
+      // The garment scenario lookup never runs for an advisor click: it has no
+      // ScenarioOutfit, and a lookup here would either invent a scenario or
+      // route the click into the UNRESOLVED_SCENARIO dead end that emits
+      // nothing.
+      expect(repository.findRecommendationScenario).not.toHaveBeenCalled()
+    })
+
+    it('defaults platform to web when the client omits it', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(ADVISOR_OFFER)
+
+      await service.recordClick({
+        ...REQUEST,
+        offerId: ADVISOR_OFFER.offer_id,
+        surface: 'palette_advisor',
+      })
+
+      expect(telemetry.recordAdvisorOfferClicked).toHaveBeenCalledWith(
+        expect.objectContaining({ platform: 'web' })
+      )
+    })
+
+    it('stores the ADVISOR_SCENARIO sentinel rather than falling into UNRESOLVED_SCENARIO', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(ADVISOR_OFFER)
+
+      await service.recordClick({
+        ...REQUEST,
+        offerId: ADVISOR_OFFER.offer_id,
+      })
+
+      expect(repository.createClick).toHaveBeenCalledWith(
+        expect.objectContaining({ scenario: 'advisor' })
+      )
+    })
+
+    /**
+     * 5.4-INT-024. The dedupe index is `(user_id, offer_id, recommendation_id,
+     * minute)`, so a client that can choose the third column can mint unlimited
+     * attributed clicks for one offer inside one minute. An advisor click's
+     * `recommendation_id` is therefore resolved from the caller's own
+     * `PaletteProfile`, and whatever the request body carried is discarded.
+     */
+    it('5.4-INT-024 derives the advisor recommendation id server-side, ignoring the request body', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(ADVISOR_OFFER)
+      repository.findPaletteProfileId.mockResolvedValue('real-palette-profile')
+
+      await service.recordClick({
+        ...REQUEST,
+        offerId: ADVISOR_OFFER.offer_id,
+        recommendationId: 'forged-by-the-client',
+      })
+
+      expect(repository.findPaletteProfileId).toHaveBeenCalledWith(REQUEST.userId)
+      expect(repository.createClick).toHaveBeenCalledWith(
+        expect.objectContaining({ recommendationId: 'real-palette-profile' })
+      )
+      // The dedupe lookup uses the derived id too, or the derivation would only
+      // protect the insert and leave the replay window client-controlled.
+      expect(repository.findRecentClick).toHaveBeenCalledWith(
+        REQUEST.userId,
+        ADVISOR_OFFER.offer_id,
+        'real-palette-profile'
+      )
+    })
+
+    /**
+     * 5.4-INT-025. A caller with no `PaletteProfile` has never granted consent, so
+     * no advisor card was ever rendered for them and there is nothing to attribute.
+     */
+    it('5.4-INT-025 refuses an advisor click from a caller with no palette profile', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(ADVISOR_OFFER)
+      repository.findPaletteProfileId.mockResolvedValue(null)
+
+      await expect(
+        service.recordClick({ ...REQUEST, offerId: ADVISOR_OFFER.offer_id })
+      ).rejects.toMatchObject({ status: 403 })
+      expect(repository.createClick).not.toHaveBeenCalled()
+      expect(telemetry.recordAdvisorOfferClicked).not.toHaveBeenCalled()
+    })
+
+    /**
+     * A garment click never touches the palette profile lookup, and keeps the
+     * id it was sent -- BECAUSE `findRecommendationScenario` resolved it, which
+     * is the default in `beforeEach`. `5.4-INT-033` is the other half.
+     */
+    it("5.4-INT-026 leaves a resolved garment click's recommendation id exactly as sent", async () => {
+      repository.findActiveClickOffer.mockResolvedValue(OFFER)
+
+      await service.recordClick(REQUEST)
+
+      expect(repository.findPaletteProfileId).not.toHaveBeenCalled()
+      expect(repository.createClick).toHaveBeenCalledWith(
+        expect.objectContaining({ recommendationId: REQUEST.recommendationId })
+      )
+    })
+
+    /*
+     * ------------------------------------------------------------------
+     * The garment half of the asymmetry story 5.4 opened.
+     *
+     * The advisor path derives its `recommendation_id` from the session
+     * (5.4-INT-024) precisely because the dedupe index
+     * `(user_id, offer_id, recommendation_id, minute)` is a rate limit only
+     * while the client cannot choose the third column. The garment path was
+     * left taking the client's value verbatim, so a caller sending a fresh
+     * random string per request minted unlimited attributed clicks for one
+     * offer inside one minute.
+     *
+     * `findRecommendationScenario` already scoped its lookup to `user_id`; the
+     * only change is that its answer now runs BEFORE the dedupe check and gates
+     * the key too.
+     * ------------------------------------------------------------------
+     */
+
+    it('5.4-INT-033 collapses an unownable garment recommendation id onto one dedupe bucket', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(OFFER)
+      // The lookup is user-scoped, so null means "not this caller's row".
+      repository.findRecommendationScenario.mockResolvedValue(null)
+
+      await service.recordClick({ ...REQUEST, recommendationId: 'forged-1' })
+      await service.recordClick({ ...REQUEST, recommendationId: 'forged-2' })
+
+      // THE DEDUPE LOOKUP, not only the stored row: a forger who could still
+      // vary the key on the read would never hit an existing row and the write
+      // would never be reached.
+      expect(repository.findRecentClick).toHaveBeenNthCalledWith(
+        1,
+        REQUEST.userId,
+        REQUEST.offerId,
+        'unresolved'
+      )
+      expect(repository.findRecentClick).toHaveBeenNthCalledWith(
+        2,
+        REQUEST.userId,
+        REQUEST.offerId,
+        'unresolved'
+      )
+      for (const call of repository.createClick.mock.calls) {
+        expect(call[0]).toEqual(
+          expect.objectContaining({ recommendationId: 'unresolved' })
+        )
+      }
+    })
+
+    it('5.4-INT-034 still mints a click whose recommendation rotated behind the cache', async () => {
+      /*
+       * The reason this is a sentinel rather than a rejection. A forged id and
+       * a rotated one are indistinguishable from the service: the ritual
+       * response is cached in Redis and again on the device, so a genuine tap
+       * can carry an id whose `OutfitRecommendation` row is gone. Decision 7
+       * forbids failing that tap, and this is what keeps it working.
+       */
+      repository.findActiveClickOffer.mockResolvedValue(OFFER)
+      repository.findRecommendationScenario.mockResolvedValue(null)
+
+      const result = await service.recordClick(REQUEST)
+
+      expect(result.created).toBe(true)
+      expect(repository.createClick).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recommendationId: 'unresolved',
+          // The scenario sentinel is unchanged and independent: it says the
+          // recommendation could not be read, which is still true.
+          scenario: 'unknown',
+        })
+      )
+    })
+
+    it('5.4-INT-035 reports the stored recommendation id to analytics, not the one sent', async () => {
+      /*
+       * The event and the click row have to be joinable. They stopped being so
+       * the moment an unresolvable id started collapsing onto the sentinel
+       * while the event kept carrying `input.recommendationId`, and an
+       * analytics id that no click row carries is worse than no id at all.
+       */
+      repository.findActiveClickOffer.mockResolvedValue(OFFER)
+      repository.findRecommendationScenario.mockResolvedValue('morning')
+
+      await service.recordClick({ ...REQUEST, recommendationId: 'rec-9' })
+
+      expect(telemetry.recordCtaClicked).toHaveBeenCalledWith(
+        expect.objectContaining({ recommendationId: 'rec-9' })
+      )
+    })
+
+    it('dedupes an advisor click replay the same way as a garment click', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(ADVISOR_OFFER)
+      repository.findRecentClick.mockResolvedValue({
+        id: 'existing-click',
+        token: 'existing-token',
+        offer_id: ADVISOR_OFFER.offer_id,
+      })
+
+      const result = await service.recordClick({
+        ...REQUEST,
+        offerId: ADVISOR_OFFER.offer_id,
+      })
+
+      expect(result.created).toBe(false)
+      expect(repository.createClick).not.toHaveBeenCalled()
+      expect(telemetry.recordAdvisorOfferClicked).not.toHaveBeenCalled()
     })
   })
 })

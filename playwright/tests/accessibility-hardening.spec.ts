@@ -6,7 +6,11 @@ import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
 
-const primaryRoutes = ['/', '/community', '/wardrobe', '/settings'] as const
+// Story 5.4: `/palette` joins the list explicitly. This scan does not discover
+// routes -- it iterates this literal array -- so a destination route that is
+// not listed here is never scanned at either viewport and AC 8's axe evidence
+// for it does not exist.
+const primaryRoutes = ['/', '/community', '/wardrobe', '/settings', '/palette'] as const
 const secondaryRoutes = [
   '/signup',
   '/guardian/accept',

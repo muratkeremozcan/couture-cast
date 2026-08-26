@@ -1,4 +1,29 @@
 import type { PrismaClient } from '@prisma/client'
+// From `@couture/utils`, not from the factory package's source the way
+// `seeds/wardrobe.ts` reaches it. This module is imported by the Playwright
+// helpers (`premium-session.ts` reads `PREMIUM_SEED_USERS` from it), and those
+// are typechecked by the root tsconfig, which has no
+// `allowImportingTsExtensions` -- a `.ts`-suffixed relative import here fails
+// the whole repo typecheck even though the identical line in `wardrobe.ts` is
+// fine, because nothing outside the seed graph reaches that file.
+//
+// It has to be a NAMESPACE import through `unwrapCjsNamespace`, not a named
+// one, and the difference is not cosmetic: `prisma db seed` runs this graph
+// under `tsx`, and `seeds/index.ts` loads
+// `testing/src/factories/factory.ts` first, which `require`s `@couture/utils`
+// and so puts it in the CJS require cache before any ESM import of it runs.
+// Node then builds that module's ESM facade from the cached CommonJS object
+// instead of letting cjs-module-lexer read the source, and the facade carries
+// only `default` and `module.exports` -- so `import { buildGarmentObjectPath }`
+// throws `does not provide an export named` at instantiation time, before a
+// single line of seed code runs. It is invisible to every unit and integration
+// suite, because none of them load the seed graph; it took the whole mobile
+// E2E matrix, the Playwright burn-in and the k6 smoke down at `db:reset`.
+import * as coutureUtils from '@couture/utils'
+
+import { unwrapCjsNamespace } from './interop.js'
+
+const { buildGarmentObjectPath } = unwrapCjsNamespace(coutureUtils)
 
 /**
  * Story 5.1 decision 14: making the affiliate feature reachable.
@@ -163,6 +188,193 @@ export async function seedCommerceCatalog(
  */
 function buildSampleDeepLinkTemplate(category: string): string {
   return `https://${SAMPLE_PARTNER_ALLOWED_HOST}/shop/${category}?cc={clickToken}`
+}
+
+/**
+ * Story 5.4 decision 7/prerequisites: one wildcard-undertone advisor offer per
+ * slot, so the sponsored-overlay positive path is demonstrable on the same
+ * seeded partner the garment catalog uses. There is deliberately no admin
+ * console for advisor offers either — seed- and migration-managed, exactly
+ * like the garment catalog above.
+ */
+const SAMPLE_ADVISOR_OFFERS = [
+  { slot: 'foundation', title: 'Buildable Sheer Foundation', priority: 10 },
+  { slot: 'blush', title: 'Cream Blush Duo', priority: 10 },
+  { slot: 'jewelry', title: 'Layered Chain Necklace', priority: 10 },
+  { slot: 'bag', title: 'Structured Crossbody Bag', priority: 10 },
+  { slot: 'eyewear', title: 'Classic Acetate Frames', priority: 10 },
+] as const
+
+export type SeededAdvisorOfferCatalog = {
+  partnerId: string
+  offerIds: string[]
+}
+
+/**
+ * Reuses the sample partner from {@link seedCommerceCatalog} rather than
+ * standing up a second one: the two selections can never cross (Decision 7's
+ * `num_nonnulls` check constraint plus the disjoint `garment_category` /
+ * `advisor_slot` filters), so sharing a partner introduces no risk of a
+ * garment offer resolving in the advisor or vice versa.
+ */
+export async function seedAdvisorOfferCatalog(
+  prisma: PrismaClient,
+  env: Readonly<NodeJS.ProcessEnv> = process.env
+): Promise<SeededAdvisorOfferCatalog | null> {
+  if (!allowsCommerceSeeding(env)) {
+    return null
+  }
+
+  const partner = await prisma.commercePartner.upsert({
+    where: { slug: SAMPLE_PARTNER_SLUG },
+    update: {
+      display_name: 'Sample Partner',
+      allowed_host: SAMPLE_PARTNER_ALLOWED_HOST,
+      status: 'active',
+      webhook_secret_ref: SAMPLE_PARTNER_WEBHOOK_SECRET_REF,
+    },
+    create: {
+      slug: SAMPLE_PARTNER_SLUG,
+      display_name: 'Sample Partner',
+      allowed_host: SAMPLE_PARTNER_ALLOWED_HOST,
+      status: 'active',
+      webhook_secret_ref: SAMPLE_PARTNER_WEBHOOK_SECRET_REF,
+    },
+  })
+
+  const effectiveFrom = new Date('2020-01-01T00:00:00.000Z')
+  const offerIds: string[] = []
+
+  for (const offer of SAMPLE_ADVISOR_OFFERS) {
+    const existing = await prisma.affiliateOffer.findFirst({
+      where: {
+        partner_id: partner.id,
+        advisor_slot: offer.slot,
+        advisor_undertone: null,
+        locale_region: '*',
+      },
+      select: { id: true },
+    })
+
+    if (existing) {
+      const updated = await prisma.affiliateOffer.update({
+        where: { id: existing.id },
+        data: {
+          title: offer.title,
+          deep_link_template: buildSampleAdvisorDeepLinkTemplate(offer.slot),
+          priority: offer.priority,
+          status: 'active',
+          effective_from: effectiveFrom,
+          effective_to: null,
+        },
+        select: { id: true },
+      })
+      offerIds.push(updated.id)
+      continue
+    }
+
+    const created = await prisma.affiliateOffer.create({
+      data: {
+        partner_id: partner.id,
+        advisor_slot: offer.slot,
+        advisor_undertone: null,
+        locale_region: '*',
+        title: offer.title,
+        deep_link_template: buildSampleAdvisorDeepLinkTemplate(offer.slot),
+        priority: offer.priority,
+        status: 'active',
+        effective_from: effectiveFrom,
+        effective_to: null,
+      },
+      select: { id: true },
+    })
+    offerIds.push(created.id)
+  }
+
+  return { partnerId: partner.id, offerIds }
+}
+
+function buildSampleAdvisorDeepLinkTemplate(slot: string): string {
+  return `https://${SAMPLE_PARTNER_ALLOWED_HOST}/shop/advisor/${slot}?cc={clickToken}`
+}
+
+/**
+ * Story 5.4: the wardrobe source needs a wardrobe, and the entitled seed user
+ * did not have one.
+ *
+ * `seedWardrobeItems` writes garments and `PaletteInsights` for the seeded TEEN
+ * accounts only, so `premium-active-user` -- the account every premium E2E
+ * signs in as -- reached `POST /palette/analyze` with zero insight rows and
+ * always terminated `insufficient_wardrobe`. The wardrobe half of AC 2 was
+ * unreachable end to end.
+ *
+ * Ten garments, every one carrying `#C9A14A` as `hex_codes[0]`, which is the
+ * same value `seedWardrobeItems` uses and which classifies deterministically:
+ * CIELAB hue 84.1 degrees falls inside the olive wedge, so the derived undertone
+ * is `olive` with `depth: null` (garment colour is not evidence of skin depth).
+ * Ten rather than five because the derivation's confidence floor scores five
+ * survivors at 5/15 = 0.33, below the 0.4 gate; ten scores 0.67 with identical
+ * hues. E2E assertions can pin the exact classification rather than a range.
+ */
+export const PALETTE_ADVISOR_SEED_HEX = '#C9A14A'
+export const PALETTE_ADVISOR_SEED_UNDERTONE = 'olive'
+const PALETTE_ADVISOR_SEED_GARMENT_COUNT = 10
+
+export async function seedPaletteAdvisorWardrobe(
+  prisma: PrismaClient,
+  env: Readonly<NodeJS.ProcessEnv> = process.env
+): Promise<{ garmentIds: string[] } | null> {
+  if (!allowsCommerceSeeding(env)) {
+    return null
+  }
+
+  const ownerId = PREMIUM_SEED_USERS.active.id
+  const owner = await prisma.user.findUnique({
+    where: { id: ownerId },
+    select: { id: true },
+  })
+  if (!owner) {
+    // `seedPremiumEntitlements` owns creating this account and runs first. If it
+    // did not (a partial seed, or commerce seeding disabled for it), there is
+    // nothing to attach a wardrobe to and nothing to repair here.
+    return null
+  }
+
+  const garmentIds: string[] = []
+  for (let index = 0; index < PALETTE_ADVISOR_SEED_GARMENT_COUNT; index += 1) {
+    const id = `${ownerId}-palette-garment-${index + 1}`
+    const objectPath = buildGarmentObjectPath(ownerId, id, 'png')
+    const garmentFields = {
+      object_path: objectPath,
+      category: 'top' as const,
+      material: 'cotton' as const,
+      comfort_range: 'mild' as const,
+      color_palette: [PALETTE_ADVISOR_SEED_HEX],
+      image_url: `https://picsum.photos/seed/${id}/640/640`,
+      upload_status: 'ready' as const,
+      retention_status: 'active' as const,
+    }
+    await prisma.garmentItem.upsert({
+      where: { id },
+      update: garmentFields,
+      create: { id, user_id: ownerId, ...garmentFields },
+    })
+
+    const insightFields = {
+      // Deliberately NOT written: `PaletteInsights.undertone` is a four-month-old
+      // free-text placeholder this story neither reads nor writes (Decision 1).
+      hex_codes: [PALETTE_ADVISOR_SEED_HEX, '#0D6F62', '#1F4E79'],
+      confidence_score: 1,
+    }
+    await prisma.paletteInsights.upsert({
+      where: { garment_item_id: id },
+      update: insightFields,
+      create: { garment_item_id: id, user_id: ownerId, ...insightFields },
+    })
+    garmentIds.push(id)
+  }
+
+  return { garmentIds }
 }
 
 /**

@@ -20,11 +20,18 @@ import { nonEmptyStringSchema, type RegisteredCommonHttpSchemas } from './common
 import { garmentCategoryEnum } from './wardrobe'
 
 /**
- * A closed enum with one member today. Keeping it an enum rather than a string
- * means a new surface has to be added to the contract deliberately, and stops
- * the analytics `surface` property from silently becoming free text.
+ * A closed enum, so a new surface has to be added to the contract
+ * deliberately, and the analytics `surface` property can never silently
+ * become free text.
+ *
+ * Story 5.4 adds `palette_advisor`. `analytics-events.ts`'s
+ * `affiliateCtaClickedPropertiesSchema` derives its own `surface` member from
+ * this enum by import rather than hand-copying it a second time: the
+ * hand-copy that existed before this change is exactly what would have made
+ * every advisor click fail a `.strict()` parse silently inside
+ * `TelemetryService` the moment this member was added here and not there.
  */
-export const affiliateSurfaceSchema = z.enum(['mobile_hero'])
+export const affiliateSurfaceSchema = z.enum(['mobile_hero', 'palette_advisor'])
 
 export const affiliateConversionStatusSchema = z.enum([
   'pending',
@@ -87,11 +94,25 @@ export const affiliateClickRequestSchema = z
   .object({
     offerId: nonEmptyStringSchema
       .max(64)
-      .describe('The offerId returned in the ritual response shopThisLook block.'),
+      .describe(
+        'The offerId returned in the ritual response shopThisLook block, or in a palette advisor recommendation card.'
+      ),
     recommendationId: nonEmptyStringSchema
       .max(128)
-      .describe('The ScenarioOutfit.id the CTA was rendered on.'),
+      .describe(
+        'The ScenarioOutfit.id the CTA was rendered on, or the PaletteProfile.id for an advisor click.'
+      ),
     surface: affiliateSurfaceSchema.describe('Where the CTA was activated.'),
+    // Story 5.4: optional, and read only on the advisor branch (Decision 7,
+    // Decision 13). affiliate_cta_clicked has no platform property to lean
+    // on and does not need one -- 'mobile_hero' already says which client
+    // rendered it. 'palette_advisor' covers both clients, so this is the
+    // only way web and mobile advisor clicks stay distinguishable in
+    // reporting.
+    platform: z
+      .enum(['web', 'mobile'])
+      .optional()
+      .describe('Which client activated the click. Read only for an advisor offer.'),
   })
   // `scenario` and `localeRegion` are deliberately absent: both are derived
   // server-side from the recommendation and the resolved locale, never trusted

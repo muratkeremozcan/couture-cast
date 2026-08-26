@@ -1,4 +1,12 @@
 import { z } from 'zod'
+import { affiliateSurfaceSchema } from '../contracts/http/commerce'
+import {
+  advisorSlotSchema,
+  paletteAnalysisFailureReasonSchema,
+  paletteSourceSchema,
+  skinDepthSchema,
+  skinUndertoneSchema,
+} from '../contracts/http/palette-advisor'
 
 /** Story 0.7 owner file: analytics contracts + tracking wrappers.
  * Analytics contract here = canonical event name + validated input shape + provider property shape.
@@ -70,6 +78,13 @@ export const analyticsEventNameSchema = z.enum([
   // point and no client-distinctId variant is needed. The property allowlist is
   // the palette key and nothing else.
   'premium_theme_selected',
+  // Story 5.4. All three server-side only, pseudonymous. No raw hex, no
+  // confidence score, and no image metadata in any of them: undertone and
+  // depth are closed enums, which is analytics-safe; a hex value is closer to
+  // a biometric fingerprint and has no analytics purpose.
+  'palette_analysis_completed',
+  'advisor_offer_clicked',
+  'advisor_recommendation_acted',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -433,7 +448,11 @@ export type WardrobeOnboardingCompletedEvent = z.infer<
 // both are operator-controlled and safe to log. The `analyticsSubjectId` on the
 // two server events is the HMAC pseudonym, never a raw user id.
 
-const affiliateSurfaceAnalyticsEnum = z.enum(['mobile_hero'])
+// Story 5.4: derived from affiliateSurfaceSchema by import, not hand-copied.
+// The hand-copy this replaced is exactly the shape of bug Decision 13 warns
+// about: a surface added to the contract enum and not here fails every
+// affected event's `.strict()` parse silently inside TelemetryService.
+const affiliateSurfaceAnalyticsEnum = affiliateSurfaceSchema
 const affiliateScenarioAnalyticsEnum = z.enum(['morning', 'midday', 'evening'])
 /** Uppercase region subtag, or the '*' sentinel meaning "published globally". */
 const affiliateLocaleRegionSchema = z.union([
@@ -592,6 +611,54 @@ export const premiumThemeSelectedEventSchema = z.object({
 
 export type PremiumThemeSelectedEvent = z.infer<typeof premiumThemeSelectedEventSchema>
 
+/**
+ * Story 5.4: three server-side, pseudonymous events. `undertone` and `depth`
+ * are pinned against the contract enums by import (Decision 13), not
+ * re-listed, for the same reason `affiliateSurfaceAnalyticsEnum` now is.
+ *
+ * No raw hex, no confidence score, and no image metadata in any property: a
+ * hex value is closer to a biometric fingerprint than an analytics
+ * dimension, and `undertone`/`depth` are closed four- and five-member enums.
+ */
+const paletteAnalysisOutcomeAnalyticsEnum = z.union([
+  z.literal('ready'),
+  paletteAnalysisFailureReasonSchema,
+])
+
+export const paletteAnalysisCompletedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  source: paletteSourceSchema,
+  undertone: skinUndertoneSchema.nullable(),
+  depth: skinDepthSchema.nullable(),
+  outcome: paletteAnalysisOutcomeAnalyticsEnum,
+})
+
+export type PaletteAnalysisCompletedEvent = z.infer<
+  typeof paletteAnalysisCompletedEventSchema
+>
+
+const advisorPlatformAnalyticsEnum = z.enum(['web', 'mobile'])
+
+export const advisorOfferClickedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  partnerId: nonEmptyString.max(128),
+  offerId: nonEmptyString.max(128),
+  advisorSlot: advisorSlotSchema,
+  platform: advisorPlatformAnalyticsEnum,
+})
+
+export type AdvisorOfferClickedEvent = z.infer<typeof advisorOfferClickedEventSchema>
+
+export const advisorRecommendationActedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  slot: advisorSlotSchema,
+  action: z.enum(['saved', 'dismissed']),
+})
+
+export type AdvisorRecommendationActedEvent = z.infer<
+  typeof advisorRecommendationActedEventSchema
+>
+
 export const analyticsEventSchemas = {
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
@@ -625,6 +692,9 @@ export const analyticsEventSchemas = {
   premium_entitlement_activated: premiumEntitlementActivatedEventSchema,
   premium_entitlement_deactivated: premiumEntitlementDeactivatedEventSchema,
   premium_theme_selected: premiumThemeSelectedEventSchema,
+  palette_analysis_completed: paletteAnalysisCompletedEventSchema,
+  advisor_offer_clicked: advisorOfferClickedEventSchema,
+  advisor_recommendation_acted: advisorRecommendationActedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -1402,7 +1472,11 @@ export const affiliateCtaClickedPropertiesSchema = z
     partner_id: nonEmptyString.max(128),
     offer_id: nonEmptyString.max(128),
     scenario: z.enum(['morning', 'midday', 'evening']),
-    surface: z.enum(['mobile_hero']),
+    // Derived from affiliateSurfaceSchema by import, not hand-copied: a
+    // hand-copied enum here is exactly what let Story 5.4's advisor click
+    // fail this .strict() parse silently the moment `palette_advisor` was
+    // added to the contract enum and not here.
+    surface: affiliateSurfaceSchema,
     locale_region: z.union([z.literal('*'), z.string().regex(/^[A-Z0-9]{2,3}$/)]),
     recommendation_id: nonEmptyString.max(128),
   })
@@ -1557,6 +1631,47 @@ export type PremiumThemeSelectedProperties = z.infer<
   typeof premiumThemeSelectedPropertiesSchema
 >
 
+// Story 5.4. Three server-side, pseudonymous properties schemas. No raw hex,
+// no confidence score, and no image metadata: see the docblock above the
+// event schemas for why.
+
+export const paletteAnalysisCompletedPropertiesSchema = z
+  .object({
+    source: paletteSourceSchema,
+    undertone: skinUndertoneSchema.nullable(),
+    depth: skinDepthSchema.nullable(),
+    outcome: paletteAnalysisOutcomeAnalyticsEnum,
+  })
+  .strict()
+
+export type PaletteAnalysisCompletedProperties = z.infer<
+  typeof paletteAnalysisCompletedPropertiesSchema
+>
+
+export const advisorOfferClickedPropertiesSchema = z
+  .object({
+    partner_id: nonEmptyString.max(128),
+    offer_id: nonEmptyString.max(128),
+    advisor_slot: advisorSlotSchema,
+    platform: advisorPlatformAnalyticsEnum,
+  })
+  .strict()
+
+export type AdvisorOfferClickedProperties = z.infer<
+  typeof advisorOfferClickedPropertiesSchema
+>
+
+export const advisorRecommendationActedPropertiesSchema = z
+  .object({
+    slot: advisorSlotSchema,
+    action: z.enum(['saved', 'dismissed']),
+  })
+  .strict()
+
+export type AdvisorRecommendationActedProperties = z.infer<
+  typeof advisorRecommendationActedPropertiesSchema
+>
+
 export function trackPremiumSubscribeTapped(
   event: PremiumSubscribeTappedEvent,
   distinctId: string
@@ -1636,6 +1751,61 @@ export function trackPremiumThemeSelected(
     event: 'premium_theme_selected',
     properties: premiumThemeSelectedPropertiesSchema.parse({
       theme: parsed.theme,
+    }),
+  }
+}
+
+export function trackPaletteAnalysisCompleted(
+  event: PaletteAnalysisCompletedEvent
+): AnalyticsCapturePayload<
+  'palette_analysis_completed',
+  PaletteAnalysisCompletedProperties
+> {
+  const parsed = paletteAnalysisCompletedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'palette_analysis_completed',
+    properties: paletteAnalysisCompletedPropertiesSchema.parse({
+      source: parsed.source,
+      undertone: parsed.undertone,
+      depth: parsed.depth,
+      outcome: parsed.outcome,
+    }),
+  }
+}
+
+export function trackAdvisorOfferClicked(
+  event: AdvisorOfferClickedEvent
+): AnalyticsCapturePayload<'advisor_offer_clicked', AdvisorOfferClickedProperties> {
+  const parsed = advisorOfferClickedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'advisor_offer_clicked',
+    properties: advisorOfferClickedPropertiesSchema.parse({
+      partner_id: parsed.partnerId,
+      offer_id: parsed.offerId,
+      advisor_slot: parsed.advisorSlot,
+      platform: parsed.platform,
+    }),
+  }
+}
+
+export function trackAdvisorRecommendationActed(
+  event: AdvisorRecommendationActedEvent
+): AnalyticsCapturePayload<
+  'advisor_recommendation_acted',
+  AdvisorRecommendationActedProperties
+> {
+  const parsed = advisorRecommendationActedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'advisor_recommendation_acted',
+    properties: advisorRecommendationActedPropertiesSchema.parse({
+      slot: parsed.slot,
+      action: parsed.action,
     }),
   }
 }

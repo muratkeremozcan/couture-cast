@@ -23,6 +23,7 @@ export type QueueName =
   | 'moderation-review'
   | 'billing-reconciliation'
   | 'maintenance'
+  | 'palette-analysis'
 
 export type QueueConfig = {
   name: QueueName
@@ -93,6 +94,18 @@ export const queueConfigs: QueueConfig[] = [
   // extra connections and no isolation when the consumer runs serially anyway.
   {
     name: 'maintenance',
+    options: {
+      connection,
+      defaultJobOptions,
+    },
+  },
+  // Story 5.4 Decision 12: palette analysis (selfie and wardrobe undertone/
+  // depth derivation) gets its own queue rather than reusing
+  // 'moderation-review'. That worker unconditionally parses
+  // `silhouettePhotoProcessingJobSchema`, so a palette job on it would throw
+  // before reaching any handler.
+  {
+    name: 'palette-analysis',
     options: {
       connection,
       defaultJobOptions,

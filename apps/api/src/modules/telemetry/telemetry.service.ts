@@ -18,6 +18,9 @@ import {
   trackPremiumEntitlementActivated,
   trackPremiumEntitlementDeactivated,
   trackPremiumThemeSelected,
+  trackPaletteAnalysisCompleted,
+  trackAdvisorOfferClicked,
+  trackAdvisorRecommendationActed,
   garmentTaggingCompletedEventSchema,
   affiliateCtaClickedEventSchema,
   affiliateConversionRecordedEventSchema,
@@ -25,6 +28,9 @@ import {
   premiumEntitlementActivatedEventSchema,
   premiumEntitlementDeactivatedEventSchema,
   premiumThemeSelectedEventSchema,
+  paletteAnalysisCompletedEventSchema,
+  advisorOfferClickedEventSchema,
+  advisorRecommendationActedEventSchema,
   type AnalyticsEventName,
   type AffiliateCtaClickedEvent,
   type AffiliateConversionRecordedEvent,
@@ -33,6 +39,9 @@ import {
   type PremiumEntitlementActivatedEvent,
   type PremiumEntitlementDeactivatedEvent,
   type PremiumThemeSelectedEvent,
+  type PaletteAnalysisCompletedEvent,
+  type AdvisorOfferClickedEvent,
+  type AdvisorRecommendationActedEvent,
 } from '@couture/api-client'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import { createBaseLogger } from '../../logger/pino.config'
@@ -155,6 +164,18 @@ export interface TelemetryPropertiesMap {
    * is a measurable selection rather than a missing event.
    */
   premium_theme_selected: Omit<PremiumThemeSelectedEvent, 'analyticsSubjectId'>
+  /**
+   * Story 5.4. Three server-side, pseudonymous palette advisor events. Same
+   * rule as above: callers pass the raw user id as `captureEvent`'s first
+   * argument and the HMAC subject is derived here. No raw hex, no confidence
+   * score, and no image metadata in any of them.
+   */
+  palette_analysis_completed: Omit<PaletteAnalysisCompletedEvent, 'analyticsSubjectId'>
+  advisor_offer_clicked: Omit<AdvisorOfferClickedEvent, 'analyticsSubjectId'>
+  advisor_recommendation_acted: Omit<
+    AdvisorRecommendationActedEvent,
+    'analyticsSubjectId'
+  >
 }
 
 /**
@@ -184,6 +205,18 @@ const premiumEntitlementDeactivatedInputSchema = premiumEntitlementDeactivatedEv
   .strict()
 
 const premiumThemeSelectedInputSchema = premiumThemeSelectedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const paletteAnalysisCompletedInputSchema = paletteAnalysisCompletedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const advisorOfferClickedInputSchema = advisorOfferClickedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const advisorRecommendationActedInputSchema = advisorRecommendationActedEventSchema
   .omit({ analyticsSubjectId: true })
   .strict()
 
@@ -220,6 +253,9 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   premium_entitlement_activated: premiumEntitlementActivatedInputSchema,
   premium_entitlement_deactivated: premiumEntitlementDeactivatedInputSchema,
   premium_theme_selected: premiumThemeSelectedInputSchema,
+  palette_analysis_completed: paletteAnalysisCompletedInputSchema,
+  advisor_offer_clicked: advisorOfferClickedInputSchema,
+  advisor_recommendation_acted: advisorRecommendationActedInputSchema,
 }
 
 export function requireAnalyticsIdSecret(): string {
@@ -554,6 +590,57 @@ function buildPremiumThemeSelected(
   })
 }
 
+function buildPaletteAnalysisCompleted(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Palette advisor telemetry requires an authenticated user')
+  }
+  const parsed = paletteAnalysisCompletedInputSchema.parse(props)
+
+  return trackPaletteAnalysisCompleted({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildAdvisorOfferClicked(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Palette advisor telemetry requires an authenticated user')
+  }
+  const parsed = advisorOfferClickedInputSchema.parse(props)
+
+  return trackAdvisorOfferClicked({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildAdvisorRecommendationActed(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Palette advisor telemetry requires an authenticated user')
+  }
+  const parsed = advisorRecommendationActedInputSchema.parse(props)
+
+  return trackAdvisorRecommendationActed({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
 /**
  * Events whose PostHog subject is the HMAC pseudonym rather than a raw user id.
  * Membership here drives three things at once: `TelemetryEvent.user_id` is
@@ -574,6 +661,9 @@ const PSEUDONYMOUS_EVENT_TYPES: ReadonlySet<AnalyticsEventName> = new Set([
   'premium_entitlement_activated',
   'premium_entitlement_deactivated',
   'premium_theme_selected',
+  'palette_analysis_completed',
+  'advisor_offer_clicked',
+  'advisor_recommendation_acted',
 ])
 
 const pseudonymousEventBuilders: Partial<
@@ -594,6 +684,9 @@ const pseudonymousEventBuilders: Partial<
   premium_entitlement_activated: buildPremiumEntitlementActivated,
   premium_entitlement_deactivated: buildPremiumEntitlementDeactivated,
   premium_theme_selected: buildPremiumThemeSelected,
+  palette_analysis_completed: buildPaletteAnalysisCompleted,
+  advisor_offer_clicked: buildAdvisorOfferClicked,
+  advisor_recommendation_acted: buildAdvisorRecommendationActed,
 }
 
 const eventBuilders: Partial<

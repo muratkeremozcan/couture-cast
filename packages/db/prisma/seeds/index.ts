@@ -2,7 +2,12 @@
 import { PrismaClient } from '@prisma/client'
 import * as factoryModule from '../../../testing/src/factories/factory.ts'
 
-import { seedCommerceCatalog, seedPremiumEntitlements } from './commerce.js'
+import {
+  seedAdvisorOfferCatalog,
+  seedCommerceCatalog,
+  seedPaletteAdvisorWardrobe,
+  seedPremiumEntitlements,
+} from './commerce.js'
 import { seedFeatureFlags } from './feature-flags.js'
 import { unwrapCjsNamespace } from './interop.js'
 import { seedRituals } from './rituals.js'
@@ -26,6 +31,14 @@ async function main() {
   await seedCommerceCatalog(prisma)
   // Story 5.2 decision 9. Same self-guard.
   await seedPremiumEntitlements(prisma)
+  // Story 5.4 prerequisites. Same self-guard; one wildcard-undertone advisor
+  // offer per slot so the sponsored-overlay positive path is demonstrable.
+  await seedAdvisorOfferCatalog(prisma)
+  // ...and a wardrobe for the entitled seed user to derive a palette FROM.
+  // `seedWardrobeItems` only gives the teen accounts garments, so without this
+  // the wardrobe source is unreachable end to end. Must run after
+  // `seedPremiumEntitlements`, which creates the account it attaches to.
+  await seedPaletteAdvisorWardrobe(prisma)
 }
 
 main()

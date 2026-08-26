@@ -14,6 +14,7 @@ import {
   COMMERCE_OFFER_INVALID_MESSAGE,
   COMMERCE_OFFER_NOT_FOUND_MESSAGE,
   COMMERCE_OPTED_OUT_MESSAGE,
+  PALETTE_CONSENT_REQUIRED_MESSAGE,
   scenarioNameSchema,
   type AffiliateClickRequest,
 } from '../../contracts/http.js'
@@ -54,6 +55,43 @@ export type RecordAffiliateClickResult = {
  * convenience whose `scenario` property is a closed enum.
  */
 const UNRESOLVED_SCENARIO = 'unknown'
+
+/**
+ * Story 5.4 Decision 7: an advisor click has no `ScenarioOutfit`, so without
+ * a dedicated sentinel every advisor click would fall into the
+ * `UNRESOLVED_SCENARIO` path meant for a genuinely-missing garment
+ * recommendation and emit nothing. This sentinel is stored on the click row
+ * (never trusted from the client) and is what the advisor branch below emits
+ * `advisor_offer_clicked` instead of running the garment scenario lookup at
+ * all.
+ */
+const ADVISOR_SCENARIO = 'advisor'
+
+/**
+ * The `recommendation_id` stored on a garment click whose recommendation the
+ * acting user does not own, or which no longer exists.
+ *
+ * WHAT THIS CLOSES. The 60-second dedupe index is
+ * `(user_id, offer_id, recommendation_id, minute)`, so it is a rate limit only
+ * while the client cannot choose the third column. Story 5.4 established that
+ * for the advisor path by deriving the value from the session; the garment path
+ * kept taking `input.recommendationId` verbatim, so a caller sending a fresh
+ * random string per request minted unlimited attributed clicks for one offer
+ * inside one minute, on the index meant to prevent exactly that.
+ *
+ * WHY A SENTINEL RATHER THAN A REJECTION. `findRecommendationScenario` already
+ * scopes its lookup to `user_id`, so an unresolvable id is either forged or
+ * rotated -- and the two are indistinguishable from here. Rejecting would
+ * punish the rotated case, which Decision 7 forbids on purpose: the ritual
+ * response is cached in Redis and again on the device, so a genuine tap can
+ * legitimately carry an id whose `OutfitRecommendation` row is gone. Collapsing
+ * every unresolvable id onto one value keeps that tap working while giving a
+ * forger a single dedupe bucket instead of an unbounded supply of them.
+ *
+ * A caller who sends this string literally lands in the same bucket, which is
+ * the intended outcome rather than a bypass.
+ */
+const UNRESOLVED_RECOMMENDATION_ID = 'unresolved'
 
 /**
  * Story 5.1 Task 4: the attributed click endpoint's rules.
@@ -137,10 +175,46 @@ export class AffiliateClickService {
       throw new NotFoundException(COMMERCE_OFFER_NOT_FOUND_MESSAGE)
     }
 
+    // Decision 7: branch on the OFFER ROW's advisor_slot, never on the
+    // client-supplied `input.surface`. Keying on the client-supplied surface
+    // would let a caller mint `advisor_offer_clicked` for a garment offer, or
+    // route a real advisor click down the scenario-lookup path by sending
+    // `mobile_hero`.
+    const isAdvisorClick = offer.advisor_slot !== null
+
+    /*
+     * NEITHER BRANCH TRUSTS THE CLIENT'S `recommendationId` FOR THE DEDUPE KEY.
+     *
+     * An advisor click's is the acting user's own `PaletteProfile.id`, read
+     * from the session. A garment click's is the id the client sent, but only
+     * once `findRecommendationScenario` has confirmed it names a row that user
+     * owns -- the same lookup that was already being made for `scenario`,
+     * hoisted above the dedupe check so its answer can gate the key as well.
+     * Anything it cannot resolve collapses onto `UNRESOLVED_RECOMMENDATION_ID`.
+     *
+     * The lookup moving earlier is the whole change on the garment side. It was
+     * already running on every click; it just ran after the dedupe check had
+     * already used the untrusted value.
+     */
+    const scenario = isAdvisorClick
+      ? ADVISOR_SCENARIO
+      : await this.repository.findRecommendationScenario(
+          input.userId,
+          input.recommendationId
+        )
+
+    let recommendationId: string
+    if (isAdvisorClick) {
+      recommendationId = await this.resolveAdvisorRecommendationId(input.userId)
+    } else {
+      recommendationId =
+        scenario === null ? UNRESOLVED_RECOMMENDATION_ID : input.recommendationId
+    }
+
     const existing = await this.repository.findRecentClick(
       input.userId,
       input.offerId,
-      input.recommendationId
+      recommendationId
     )
     if (existing) {
       // A deduped replay emits no second analytics event, by design: two taps
@@ -156,11 +230,6 @@ export class AffiliateClickService {
       savedLocale: userContext.locale,
       acceptLanguage: input.acceptLanguage,
     })
-    const scenario = await this.repository.findRecommendationScenario(
-      input.userId,
-      input.recommendationId
-    )
-
     const clickId = randomUUID()
     const token = mintClickToken(clickId, this.getClickTokenSecret())
     // Built and validated BEFORE the insert. An offer whose resolved URL fails
@@ -174,7 +243,7 @@ export class AffiliateClickService {
       userId: input.userId,
       offerId: offer.offer_id,
       partnerId: offer.partner_id,
-      recommendationId: input.recommendationId,
+      recommendationId,
       scenario: scenario ?? UNRESOLVED_SCENARIO,
       surface: input.surface,
       localeRegion,
@@ -189,22 +258,36 @@ export class AffiliateClickService {
     // After the row commits, and fail-open: a degraded PostHog must never drop a
     // commercial click record. There is no telemetry-claim row here and no
     // rollback on telemetry failure.
-    const analyticsScenario = scenarioNameSchema.safeParse(scenario)
-    if (analyticsScenario.success) {
-      await this.telemetry.recordCtaClicked({
+    if (isAdvisorClick && offer.advisor_slot) {
+      await this.telemetry.recordAdvisorOfferClicked({
         userId: input.userId,
         partnerId: offer.partner_slug,
         offerId: offer.offer_id,
-        scenario: analyticsScenario.data,
-        surface: input.surface,
-        localeRegion,
-        recommendationId: input.recommendationId,
+        advisorSlot: offer.advisor_slot,
+        platform: input.platform ?? 'web',
       })
     } else {
-      this.logger.warn(
-        { recommendationId: input.recommendationId },
-        'affiliate_cta_clicked_scenario_unresolved'
-      )
+      const analyticsScenario = scenarioNameSchema.safeParse(scenario)
+      if (analyticsScenario.success) {
+        await this.telemetry.recordCtaClicked({
+          userId: input.userId,
+          partnerId: offer.partner_slug,
+          offerId: offer.offer_id,
+          scenario: analyticsScenario.data,
+          surface: input.surface,
+          localeRegion,
+          // The value that was STORED, so the event and the click row can be
+          // joined. They differed the moment an unresolvable id started
+          // collapsing onto the sentinel, and an analytics id that no click row
+          // carries is worse than no id at all.
+          recommendationId,
+        })
+      } else {
+        this.logger.warn(
+          { recommendationId: input.recommendationId },
+          'affiliate_cta_clicked_scenario_unresolved'
+        )
+      }
     }
 
     return { redirectUrl, created: true }
@@ -240,6 +323,25 @@ export class AffiliateClickService {
     }
 
     return result.url
+  }
+
+  /**
+   * The acting user's own `PaletteProfile.id` for an advisor click.
+   *
+   * `findPaletteProfileId` answers only for a user whose consent is CURRENT, so
+   * this refuses two cases with one message: a caller who never granted consent
+   * (no advisor card was ever rendered for them, so there is nothing to
+   * attribute) and one who granted it and then erased their palette, whose row
+   * survives with `consent_revoked_at` stamped by design. Refusing with the
+   * consent message is accurate for both, and is the same 403 the advisor's own
+   * routes answer, rather than inventing a second vocabulary for one edge.
+   */
+  private async resolveAdvisorRecommendationId(userId: string): Promise<string> {
+    const profileId = await this.repository.findPaletteProfileId(userId)
+    if (!profileId) {
+      throw new ForbiddenException(PALETTE_CONSENT_REQUIRED_MESSAGE)
+    }
+    return profileId
   }
 
   /**

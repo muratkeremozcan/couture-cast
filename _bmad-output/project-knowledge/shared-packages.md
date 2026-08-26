@@ -48,13 +48,16 @@ The only public subpath is the package root. Its
 - `coerceFeatureFlagValue`, `getDefaultFeatureFlagValue`, and `getFeatureFlag`;
 - flag key, value, record, JSON, subject, and adapter types.
 
-The [flag implementation](../../packages/config/src/flags.ts) currently defines four Boolean
+The [flag implementation](../../packages/config/src/flags.ts) currently defines six Boolean
 flags:
 
 - `premium_themes_enabled`, default `false`;
 - `community_feed_enabled`, default `false`;
-- `color_analysis_enabled`, default `true`;
-- `weather_alerts_enabled`, default `true`.
+- `color_analysis_enabled`, default `false` (Story 5.4: flipped from `true` — a
+  consent-gated feature that reads photographs of faces fails closed);
+- `weather_alerts_enabled`, default `true`;
+- `commerce_affiliate_enabled`, default `false`;
+- `commerce_subscription_enabled`, default `false`.
 
 `getFeatureFlag` rejects unknown names. For known names it tries the remote adapter, accepts only
 a value of the declared kind, then tries the fallback adapter, and finally uses the code default.

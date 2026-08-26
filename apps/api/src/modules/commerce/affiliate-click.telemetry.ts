@@ -1,5 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { type AffiliateCtaClickedEvent } from '@couture/api-client'
+import {
+  type AdvisorOfferClickedEvent,
+  type AffiliateCtaClickedEvent,
+} from '@couture/api-client'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
 
@@ -26,6 +29,14 @@ import { TelemetryService } from '../telemetry/telemetry.service.js'
  */
 export type AffiliateCtaClickedInput = Omit<
   AffiliateCtaClickedEvent,
+  'analyticsSubjectId'
+> & {
+  readonly userId: string
+}
+
+/** Story 5.4: the advisor branch's own input shape, same pattern as {@link AffiliateCtaClickedInput}. */
+export type AdvisorOfferClickedInput = Omit<
+  AdvisorOfferClickedEvent,
   'analyticsSubjectId'
 > & {
   readonly userId: string
@@ -60,6 +71,26 @@ export class AffiliateClickTelemetry {
       )
     } catch (error) {
       this.logger.error({ error }, 'affiliate_cta_clicked_emit_failed')
+    }
+  }
+
+  /**
+   * Story 5.4 Decision 7: the advisor branch's own emission, parallel to
+   * {@link recordCtaClicked}. An advisor click has no `ScenarioOutfit`, so it
+   * carries no `scenario`/`localeRegion`/`recommendationId` properties --
+   * `advisorSlot` and `platform` are what make it reportable instead.
+   */
+  async recordAdvisorOfferClicked(input: AdvisorOfferClickedInput): Promise<void> {
+    const { userId, ...properties } = input
+
+    try {
+      await this.telemetryService.captureEvent(
+        userId,
+        'advisor_offer_clicked',
+        properties
+      )
+    } catch (error) {
+      this.logger.error({ error }, 'advisor_offer_clicked_emit_failed')
     }
   }
 }

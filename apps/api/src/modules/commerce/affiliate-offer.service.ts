@@ -1,15 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { garmentCategoryEnum } from '@couture/api-client'
 import {
+  advisorSponsoredOfferSchema,
   resolveAcceptLanguage,
   resolveSupportedLocale,
   shopThisLookSchema,
+  type AdvisorSlot,
+  type AdvisorSponsoredOffer,
   type ShopThisLook,
+  type SkinUndertone,
 } from '../../contracts/http.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import {
   CommerceRepository,
+  type CommerceAdvisorOfferMatch,
   type CommerceGarmentRow,
   type CommerceOfferMatch,
   type CommerceOfferSlot,
@@ -57,6 +62,21 @@ export type AffiliateOutfitSlot = {
 export type ResolveShopThisLookInput = {
   userId: string
   outfits: readonly AffiliateOutfitSlot[]
+  acceptLanguage?: string
+  requestedLocale?: string
+}
+
+/**
+ * Story 5.4 Decision 7: the advisor's own resolution input. `slots` is the
+ * distinct set of advisor slots the current recommendation card list needs
+ * (deduplicated by the caller -- both blush cards share one slot lookup),
+ * and `undertone` is the acting user's already-classified undertone, never
+ * re-derived here.
+ */
+export type ResolveAdvisorOffersInput = {
+  userId: string
+  slots: readonly AdvisorSlot[]
+  undertone: SkinUndertone
   acceptLanguage?: string
   requestedLocale?: string
 }
@@ -242,6 +262,80 @@ export class AffiliateOfferService {
       )
       return ineligible()
     }
+  }
+
+  /**
+   * Story 5.4 Decision 7: the advisor's own offer resolution, running the
+   * IDENTICAL short-circuit chain `resolveShopThisLook` documents above --
+   * the `commerce_affiliate_enabled` flag, then the stored preference (a
+   * missing row means the `true` default), then selection -- with any
+   * failure degrading to "no offer" rather than to an error, so a catalog
+   * fault can never take down the advisor's first-party recommendations.
+   *
+   * `isAffiliateAudienceEligible` is deliberately NOT a step here either, for
+   * the same reason `resolveShopThisLook` omits it: a third posture on the
+   * same catalog is how that policy stops being reversible in one place.
+   */
+  async resolveAdvisorOffers(
+    input: ResolveAdvisorOffersInput
+  ): Promise<ReadonlyMap<AdvisorSlot, AdvisorSponsoredOffer | null>> {
+    const ineligible = (): ReadonlyMap<AdvisorSlot, AdvisorSponsoredOffer | null> =>
+      new Map(input.slots.map((slot) => [slot, null]))
+
+    try {
+      const flagEnabled = await this.featureFlags.getFeatureFlag(
+        'commerce_affiliate_enabled',
+        input.userId
+      )
+      if (!flagEnabled) {
+        return ineligible()
+      }
+
+      const storedPreference = await this.repository.findAffiliateCtasEnabled(
+        input.userId
+      )
+      if (storedPreference === false) {
+        return ineligible()
+      }
+
+      const userContext = await this.repository.findUserCommerceContext(input.userId)
+      const localeRegion = resolveLocaleRegion({
+        requestedLocale: input.requestedLocale,
+        savedLocale: userContext.locale,
+        acceptLanguage: input.acceptLanguage,
+      })
+
+      const resolved = new Map<AdvisorSlot, AdvisorSponsoredOffer | null>()
+      for (const slot of new Set(input.slots)) {
+        const match = await this.repository.findBestAdvisorOffer(
+          slot,
+          input.undertone,
+          localeRegion
+        )
+        resolved.set(slot, match ? this.toAdvisorSponsoredOffer(match) : null)
+      }
+      return resolved
+    } catch (error) {
+      this.logger.error(
+        { error, userId: input.userId },
+        'commerce_advisor_offer_resolution_failed'
+      )
+      return ineligible()
+    }
+  }
+
+  private toAdvisorSponsoredOffer(
+    match: CommerceAdvisorOfferMatch
+  ): AdvisorSponsoredOffer {
+    // Parsed rather than cast, for the same reason `toShopThisLook` parses:
+    // a catalog row with an empty title or display name must degrade to no
+    // offer via the caller's catch, not reach a client with a broken card.
+    return advisorSponsoredOfferSchema.parse({
+      partnerId: match.partner_slug,
+      partnerDisplayName: match.partner_display_name,
+      offerId: match.offer_id,
+      offerTitle: match.offer_title,
+    })
   }
 
   private async selectOffers(

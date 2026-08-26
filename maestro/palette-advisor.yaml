@@ -1,0 +1,124 @@
+# Learning path Step 36: Colour palette, beauty and accessory advisor.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
+# Story 5.4 Task 9: the colour palette & beauty/accessory advisor screen
+# (Decision 14).
+#
+# Honest scope, stated the same way premium-subscription.yaml states its own.
+# `run-maestro.mjs` signs up a FRESH public-API user and bakes that user's token
+# into the Metro bundle via `EXPO_PUBLIC_E2E_ACCESS_TOKEN` before the Expo
+# server starts; no Maestro flow in this repo signs in through the UI, and the
+# app has no runtime token override. The harness user therefore has no Premium
+# entitlement, so this flow can verify exactly one branch of the advisor: the
+# locked upsell, plus the settings entry point that reaches it.
+#
+# It can never exercise the entitled advisor. Reaching that state needs the
+# seeded `premium-active-user` (packages/db/prisma/seeds/commerce.ts), which is
+# out of a Maestro run's reach for the same reason story 5.2 recorded, and the
+# consent -> analysis -> recommendations journey needs the BullMQ worker and a
+# seeded wardrobe besides. That journey is proven at two other tiers instead:
+# `src/screens/palette-advisor-screen.test.tsx` drives every state through MSW,
+# and `playwright/tests/palette-advisor.spec.ts` runs the real thing end to end
+# against the seeded entitled user with the worker live.
+#
+# The selfie path is likewise out of scope here: `expo-image-picker` opens a
+# system picker Maestro cannot drive deterministically across devices, and the
+# story's "explicitly untested" section already records that limit.
+#
+# What IS deterministic and asserted below: the premium settings block carries a
+# link row to the advisor; the row navigates; and the advisor screen renders its
+# localized title, its intro, and the locked panel with the signed-in upsell
+# copy -- never the consent control, which would invite a grant the entitlement
+# guard rejects pre-handler.
+appId: ${MAESTRO_APP_ID}
+name: 'Palette advisor locked state'
+tags:
+  - e2e
+  - commerce
+  - premium
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+- runFlow: subflows/open-settings.yaml
+
+# --- Decision 14: the entry point is a link row, not a fourth inline section --
+
+# The row sits after the premium theme section, well below the fold on a phone,
+# so it is scrolled into view rather than merely waited for. The same viewport
+# lesson `premium-subscription.yaml` records: `extendedWaitUntil: visible`
+# requires the element inside the VIEWPORT, and CI's `pixel_3a` profile is
+# shorter than the local `medium_phone`.
+- scrollUntilVisible:
+    element:
+      id: 'palette-advisor-link'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+    label: 'Palette advisor entry row is reachable from settings'
+
+- tapOn:
+    id: 'palette-advisor-link'
+    retryTapIfNoChange: true
+    label: 'Open the palette advisor'
+
+- extendedWaitUntil:
+    visible:
+      id: 'palette-advisor-screen'
+    timeout: 15000
+    label: 'Palette advisor screen is the one on top'
+
+# --- AC 8: the screen renders from the locale catalogs, not from literals -----
+
+- assertVisible:
+    id: 'palette-advisor-title'
+    text: 'Color palette advisor'
+    label: 'Localized screen title'
+
+- assertVisible:
+    text: 'Find the makeup shades and accessories that suit your tones. Premium reads your wardrobe colors, or one selfie you choose to share, and keeps only the result.'
+    label: 'Intro copy renders in full'
+
+# --- AC 7: a non-entitled reader sees the locked upsell and nothing else ------
+
+- extendedWaitUntil:
+    visible:
+      id: 'palette-advisor-locked'
+    timeout: 15000
+    label: 'Locked panel rendered after the profile read'
+
+- assertVisible:
+    text: 'Color advice is a Premium feature'
+    label: 'Locked title names Premium'
+
+# The signed-in variant, not the signed-out one: the harness user has a session,
+# so the copy points at the subscribe controls that actually exist for them.
+- assertVisible:
+    text: 'Subscribe to Premium from Settings to get makeup shades and accessory pairings matched to your tones.'
+    label: 'Locked body is the signed-in upsell'
+
+# AC 1: consent is entitlement-gated on the way in. Offering the grant control
+# to a reader the guard will reject pre-handler would be a dead control, and
+# every source control lives behind consent besides.
+- assertNotVisible:
+    id: 'palette-advisor-consent'
+- assertNotVisible:
+    id: 'palette-advisor-sources'
+- assertNotVisible:
+    id: 'palette-advisor-error'
+
+- takeScreenshot:
+    path: maestro/artifacts/palette-advisor-locked
+
+# Leave the stack as this flow found it. `open-settings.yaml` can pop a pushed
+# route on Android, but its iOS path cannot, so a flow that pushes has to clean
+# up after itself or the next flow on the same device starts on this screen.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back

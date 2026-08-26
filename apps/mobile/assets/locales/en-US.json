@@ -371,6 +371,159 @@
         },
         "loadError": "Unable to load your interface palette. Showing the default palette.",
         "saveError": "Unable to save your interface palette. Please try again."
+      },
+      "palette": {
+        "sectionTitle": "Color palette advisor",
+        "intro": "Find the makeup shades and accessories that suit your tones. Premium reads your wardrobe colors, or one selfie you choose to share, and keeps only the result.",
+        "consent": {
+          "title": "Color analysis consent",
+          "body": "CoutureCast only reads an image after you say yes here. A selfie is analyzed on CoutureCast's servers and the photo is deleted the moment the analysis finishes, success or failure; only your undertone, your depth and a confidence score are kept. Withdraw consent at any time and everything derived from it is erased too.",
+          "grant": "Grant color analysis consent",
+          "revoke": "Withdraw consent and erase my palette",
+          "granted": "Color analysis consent granted."
+        },
+        "source": {
+          "selfie": "Choose a selfie",
+          "wardrobe": "Use my wardrobe colors",
+          "selfieHint": "One centered, evenly lit, unfiltered photo of your face gives both an undertone and a depth. The photo is deleted as soon as the analysis ends.",
+          "wardrobeHint": "No upload needed. CoutureCast reads the colors already stored for your garments and reports an undertone only."
+        },
+        "status": {
+          "idle": "No palette yet.",
+          "uploading": "Uploading your photo…",
+          "processing": "Analyzing your palette…",
+          "ready": "Your palette is ready.",
+          "failed": "The analysis did not finish."
+        },
+        "failure": {
+          "noFace": "We could not find enough skin tone in that photo. Try a centered, evenly lit shot with your face filling the frame.",
+          "lowQuality": "That photo was too dim, too filtered or too uneven to read confidently. Try again in even daylight without filters.",
+          "privacyViolation": "That photo cannot be analyzed. Choose a different photo of yourself.",
+          "insufficientWardrobe": "Your wardrobe does not have enough colorful garments yet. Add a few more, or use a selfie instead.",
+          "timeout": "The analysis took too long and was stopped. Try again in a moment.",
+          "storageError": "We could not read the uploaded photo. Try again."
+        },
+        "result": {
+          "undertone": "Undertone",
+          "depth": "Depth",
+          "depthUnknown": "Not measured",
+          "confidence": "Confidence"
+        },
+        "undertone": {
+          "warm": "Warm",
+          "cool": "Cool",
+          "neutral": "Neutral",
+          "olive": "Olive"
+        },
+        "depth": {
+          "fair": "Fair",
+          "light": "Light",
+          "medium": "Medium",
+          "tan": "Tan",
+          "deep": "Deep"
+        },
+        "slot": {
+          "foundation": "Foundation",
+          "blush": "Blush",
+          "jewelry": "Jewelry",
+          "bag": "Bags",
+          "eyewear": "Eyewear"
+        },
+        "foundationDepthUnknown": "Wardrobe colors show your undertone but not your skin depth, so foundation is a shade family rather than an exact match. A selfie would narrow it to one shade.",
+        "shades": {
+          "foundation": {
+            "warm": {
+              "fair": "Warm porcelain",
+              "light": "Golden ivory",
+              "medium": "Honey beige",
+              "tan": "Amber caramel",
+              "deep": "Warm espresso",
+              "family": "Warm golden family"
+            },
+            "cool": {
+              "fair": "Cool porcelain",
+              "light": "Rose ivory",
+              "medium": "Rosy beige",
+              "tan": "Cool chestnut",
+              "deep": "Cool espresso",
+              "family": "Cool rose family"
+            },
+            "neutral": {
+              "fair": "Neutral porcelain",
+              "light": "Soft ivory",
+              "medium": "Balanced beige",
+              "tan": "Neutral chestnut",
+              "deep": "Neutral espresso",
+              "family": "Balanced neutral family"
+            },
+            "olive": {
+              "fair": "Olive porcelain",
+              "light": "Green ivory",
+              "medium": "Olive beige",
+              "tan": "Olive chestnut",
+              "deep": "Olive espresso",
+              "family": "Olive green family"
+            }
+          },
+          "blush": {
+            "warm": {
+              "0": "Warm apricot",
+              "1": "Terracotta peach"
+            },
+            "cool": {
+              "0": "Cool berry",
+              "1": "Soft raspberry"
+            },
+            "neutral": {
+              "0": "Muted rose",
+              "1": "Dusty coral"
+            },
+            "olive": {
+              "0": "Warm brick",
+              "1": "Golden bronze"
+            }
+          },
+          "jewelry": {
+            "warm": "Yellow gold",
+            "cool": "Silver and platinum",
+            "neutral": "Champagne gold",
+            "olive": "Antique brass"
+          },
+          "bag": {
+            "warm": "Cognac leather",
+            "cool": "Charcoal navy",
+            "neutral": "Chocolate brown",
+            "olive": "Deep moss"
+          },
+          "eyewear": {
+            "warm": "Tortoiseshell brown",
+            "cool": "Matte black",
+            "neutral": "Smoke gray",
+            "olive": "Olive horn"
+          }
+        },
+        "sponsored": {
+          "disclosure": "Sponsored. CoutureCast earns a commission if you buy through this link. It does not change which shades are recommended, and you can turn sponsored links off in Settings.",
+          "partnerLabel": "From {{partner}}",
+          "cta": "Shop this shade"
+        },
+        "actions": {
+          "save": "Save",
+          "saved": "Saved",
+          "dismiss": "Dismiss",
+          "dismissed": "Dismissed",
+          "undo": "Undo"
+        },
+        "locked": {
+          "title": "Color advice is a Premium feature",
+          "body": "Subscribe to Premium from Settings to get makeup shades and accessory pairings matched to your tones.",
+          "signedOutBody": "Sign in and subscribe to Premium to get makeup shades and accessory pairings matched to your tones."
+        },
+        "staleVersion": "This palette came from an earlier version of our advice. Run the analysis again for an up-to-date result.",
+        "unavailable": "Color analysis is paused right now. Your saved palette stays as it is; new analyses will run again once it is back.",
+        "loadError": "We could not load your palette. Try again.",
+        "saveError": "We could not save that change. Try again.",
+        "deleteConfirm": "This erases your undertone, your depth, every saved and dismissed suggestion, and any photo still held. It cannot be undone."
       }
     }
   }

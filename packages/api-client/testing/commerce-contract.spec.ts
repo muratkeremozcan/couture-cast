@@ -220,7 +220,11 @@ describe('attributed click request', () => {
   })
 
   it('closes the surface enum so it cannot become free text', () => {
-    expect(affiliateSurfaceSchema.options).toEqual(['mobile_hero'])
+    // Story 5.4 adds palette_advisor deliberately (Decision 7). The enum
+    // stays closed either way: a new surface still has to be added here on
+    // purpose, and the assertion below still proves an arbitrary string is
+    // rejected.
+    expect(affiliateSurfaceSchema.options).toEqual(['mobile_hero', 'palette_advisor'])
     expect(() =>
       affiliateClickRequestSchema.parse(
         createAffiliateClickRequestFixture({

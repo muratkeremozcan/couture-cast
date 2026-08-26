@@ -2,8 +2,10 @@ import { Inject, Injectable } from '@nestjs/common'
 import {
   Prisma,
   PrismaClient,
+  type AdvisorSlot,
   type GarmentCategory,
   type GarmentComfortRange,
+  type SkinUndertone,
 } from '@prisma/client'
 
 /**
@@ -67,9 +69,25 @@ export type CommerceOfferMatch = {
 }
 
 /**
+ * Story 5.4: the winning advisor offer for one (slot, undertone), joined to
+ * the partner that owns it. The garment and advisor selections can never
+ * cross: this query filters on `advisor_slot` equality, so a garment row's
+ * NULL `advisor_slot` never matches it (Decision 7).
+ */
+export type CommerceAdvisorOfferMatch = {
+  readonly offer_id: string
+  readonly offer_title: string
+  readonly advisor_slot: AdvisorSlot
+  readonly partner_slug: string
+  readonly partner_display_name: string
+}
+
+/**
  * Everything the click endpoint needs to build and validate an outbound URL.
  * `allowed_host` and `deep_link_template` are loaded together because
- * validating one without the other is meaningless.
+ * validating one without the other is meaningless. `advisor_slot` is what the
+ * click path branches on (Decision 7) -- never the client-supplied `surface`,
+ * which a caller controls.
  */
 export type CommerceClickOffer = {
   readonly offer_id: string
@@ -78,6 +96,7 @@ export type CommerceClickOffer = {
   readonly partner_display_name: string
   readonly allowed_host: string
   readonly deep_link_template: string
+  readonly advisor_slot: AdvisorSlot | null
 }
 
 export type CommerceClickRow = {
@@ -227,6 +246,43 @@ export class CommerceRepository {
     return recommendation?.scenario ?? null
   }
 
+  /**
+   * Story 5.4 Decision 7: the acting user's own `PaletteProfile.id`, or null
+   * when they have none or their consent is not current.
+   *
+   * An advisor click stores this as `AffiliateClick.recommendation_id`, and it
+   * is read here rather than trusted from the request body for the same reason
+   * `scenario` and `locale_region` are derived server-side: the dedupe index
+   * `(user_id, offer_id, recommendation_id, minute)` is only a rate limit while
+   * the client cannot choose the third column.
+   *
+   * CONSENT is part of the lookup, not merely row existence, and the
+   * distinction is real because `erase()` does not delete the row: it nulls the
+   * derived scalars and stamps `consent_revoked_at`, deliberately, so that a
+   * revocation is a fact rather than an absence (Decision 9). An existence-only
+   * check therefore kept minting attributed advisor clicks for a user who had
+   * erased their palette, and answered a caller with
+   * `PALETTE_CONSENT_REQUIRED_MESSAGE` while enforcing something else. The
+   * currency rule is `consentIsCurrent`'s, restated in SQL terms: granted, and
+   * not revoked after that grant.
+   */
+  async findPaletteProfileId(userId: string): Promise<string | null> {
+    const profile = await this.prisma.paletteProfile.findUnique({
+      where: { user_id: userId },
+      select: { id: true, consent_granted_at: true, consent_revoked_at: true },
+    })
+    if (!profile?.consent_granted_at) {
+      return null
+    }
+    if (
+      profile.consent_revoked_at &&
+      profile.consent_revoked_at.getTime() >= profile.consent_granted_at.getTime()
+    ) {
+      return null
+    }
+    return profile.id
+  }
+
   // --- Offer selection -----------------------------------------------------
 
   /**
@@ -298,6 +354,47 @@ export class CommerceRepository {
   }
 
   /**
+   * Story 5.4 Decision 7: the advisor's own offer lookup, parallel to
+   * `findBestOffer` above. `advisor_undertone IS NULL` is the wildcard,
+   * exactly like `comfort_range`, with the identical `ORDER BY` shape: an
+   * exact undertone match outranks a wildcard regardless of priority, and
+   * `id ASC` is the total tie-break. This query filters on `advisor_slot`
+   * equality, so a garment row (whose `advisor_slot` is always NULL) can
+   * never be selected here -- the two selections cannot cross by construction.
+   */
+  async findBestAdvisorOffer(
+    slot: AdvisorSlot,
+    undertone: SkinUndertone,
+    localeRegion: string
+  ): Promise<CommerceAdvisorOfferMatch | null> {
+    const rows = await this.prisma.$queryRaw<CommerceAdvisorOfferMatch[]>(Prisma.sql`
+      SELECT o."id"             AS offer_id,
+             o."title"          AS offer_title,
+             o."advisor_slot"   AS advisor_slot,
+             p."slug"           AS partner_slug,
+             p."display_name"   AS partner_display_name
+      FROM "AffiliateOffer" o
+      JOIN "CommercePartner" p ON p."id" = o."partner_id"
+      WHERE o."status" = 'active'::"AffiliateOfferStatus"
+        AND p."status" = 'active'::"CommercePartnerStatus"
+        AND o."advisor_slot" = ${slot}::"AdvisorSlot"
+        AND (
+          o."advisor_undertone" = ${undertone}::"SkinUndertone"
+          OR o."advisor_undertone" IS NULL
+        )
+        AND (o."locale_region" = ${localeRegion} OR o."locale_region" = '*')
+        AND o."effective_from" <= (now() AT TIME ZONE 'UTC')
+        AND (o."effective_to" IS NULL OR (now() AT TIME ZONE 'UTC') < o."effective_to")
+      ORDER BY (o."advisor_undertone" IS NULL) ASC,
+               o."priority" DESC,
+               o."id" ASC
+      LIMIT 1
+    `)
+
+    return rows[0] ?? null
+  }
+
+  /**
    * The click endpoint's own offer lookup. It re-checks status and window
    * because the recommendation the CTA was rendered on may be minutes old and
    * served from a cache, so the offer that was live at render time may not be
@@ -306,6 +403,9 @@ export class CommerceRepository {
    * It deliberately does NOT re-derive the outfit or re-check the slot match:
    * the recommendation may have rotated behind the cache, and failing a click
    * for that would punish a user for a server-side rotation they cannot see.
+   *
+   * `advisor_slot` rides along so the caller can branch the advisor case on
+   * SERVER data (Decision 7), never on the client-supplied `surface`.
    */
   async findActiveClickOffer(offerId: string): Promise<CommerceClickOffer | null> {
     const rows = await this.prisma.$queryRaw<CommerceClickOffer[]>(Prisma.sql`
@@ -314,7 +414,8 @@ export class CommerceRepository {
              p."slug"           AS partner_slug,
              p."display_name"   AS partner_display_name,
              p."allowed_host"   AS allowed_host,
-             o."deep_link_template" AS deep_link_template
+             o."deep_link_template" AS deep_link_template,
+             o."advisor_slot"   AS advisor_slot
       FROM "AffiliateOffer" o
       JOIN "CommercePartner" p ON p."id" = o."partner_id"
       WHERE o."id" = ${offerId}

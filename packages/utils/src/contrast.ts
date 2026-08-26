@@ -22,6 +22,13 @@
  * Palette hex values live with the surface that renders them (web CSS custom properties,
  * mobile palette table). This module stays pure maths so both surfaces can prove their
  * own pairings against one implementation instead of eyeballing them.
+ *
+ * Story 5.4 Task 2 owner: `srgbChannels` and `linearizeSrgbChannel` are exported
+ * (and `relativeLuminance` refactored to compose them, no behavior change) so
+ * `skin-tone.ts` can reuse the exact same sRGB parsing and gamma-expansion
+ * rather than a third copy. `skin-tone.ts` inherits this module's input
+ * contract exactly: `#RGB`/`#RRGGBB` with or without the leading `#`, and a
+ * thrown error on anything else, including eight-digit `#RRGGBBAA`.
  */
 
 const HEX_COLOR_PATTERN = /^#?(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
@@ -57,7 +64,7 @@ export interface WcagContrastOptions {
  * would report a contrast ratio for a color that is never painted. `--theme-card-border`
  * is declared as `rgba()` for the same reason and is never passed through here.
  */
-function parseHex(value: string): [number, number, number] {
+export function srgbChannels(value: string): [number, number, number] {
   if (typeof value !== 'string') {
     throw new Error(
       `Expected a 3- or 6-digit hex color with no alpha channel, received ${String(value)}`
@@ -82,14 +89,24 @@ function parseHex(value: string): [number, number, number] {
   ]
 }
 
+/**
+ * WCAG/sRGB gamma-expansion of one 0-255 sRGB channel to linear [0, 1].
+ *
+ * Averaging or weighting must happen AFTER this step, never before: the mean
+ * of two gamma-encoded byte values is not the colour halfway between them.
+ * `skin-tone.ts`'s pixel pipeline depends on this ordering (linearize each
+ * channel, then average in linear space or in Lab).
+ */
+export function linearizeSrgbChannel(channel: number): number {
+  const normalized = channel / 255
+  return normalized <= 0.04045
+    ? normalized / 12.92
+    : ((normalized + 0.055) / 1.055) ** 2.4
+}
+
 /** WCAG relative luminance: gamma-correct sRGB linearization, then the 709 weights. */
 function relativeLuminance(hex: string): number {
-  const channels = parseHex(hex).map((channel) => {
-    const normalized = channel / 255
-    return normalized <= 0.04045
-      ? normalized / 12.92
-      : ((normalized + 0.055) / 1.055) ** 2.4
-  })
+  const channels = srgbChannels(hex).map(linearizeSrgbChannel)
   return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722
 }
 

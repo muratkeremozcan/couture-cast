@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -6465,7 +6465,8 @@
       "AffiliateSurface": {
         "type": "string",
         "enum": [
-          "mobile_hero"
+          "mobile_hero",
+          "palette_advisor"
         ]
       },
       "AffiliateConversionStatus": {
@@ -6597,20 +6598,29 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 64,
-            "description": "The offerId returned in the ritual response shopThisLook block."
+            "description": "The offerId returned in the ritual response shopThisLook block, or in a palette advisor recommendation card."
           },
           "recommendationId": {
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "description": "The ScenarioOutfit.id the CTA was rendered on."
+            "description": "The ScenarioOutfit.id the CTA was rendered on, or the PaletteProfile.id for an advisor click."
           },
           "surface": {
             "type": "string",
             "enum": [
-              "mobile_hero"
+              "mobile_hero",
+              "palette_advisor"
             ],
             "description": "Where the CTA was activated."
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "web",
+              "mobile"
+            ],
+            "description": "Which client activated the click. Read only for an advisor offer."
           }
         },
         "required": [
@@ -7166,6 +7176,3234 @@
               "theme",
               "isEntitled",
               "themesEnabled"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PaletteSource": {
+        "type": "string",
+        "enum": [
+          "selfie",
+          "wardrobe"
+        ]
+      },
+      "SkinUndertone": {
+        "type": "string",
+        "enum": [
+          "warm",
+          "cool",
+          "neutral",
+          "olive"
+        ]
+      },
+      "SkinDepth": {
+        "type": "string",
+        "enum": [
+          "fair",
+          "light",
+          "medium",
+          "tan",
+          "deep",
+          null
+        ]
+      },
+      "PaletteAnalysisStatus": {
+        "type": "string",
+        "enum": [
+          "pending_upload",
+          "bytes_uploaded",
+          "processing",
+          "ready",
+          "failed"
+        ]
+      },
+      "PaletteAnalysisFailureReason": {
+        "type": "string",
+        "enum": [
+          "no_face",
+          "low_quality",
+          "privacy_violation",
+          "insufficient_wardrobe",
+          "timeout",
+          "storage_error"
+        ]
+      },
+      "AdvisorSlot": {
+        "type": "string",
+        "enum": [
+          "foundation",
+          "blush",
+          "jewelry",
+          "bag",
+          "eyewear"
+        ]
+      },
+      "AdvisorAction": {
+        "type": "string",
+        "enum": [
+          "saved",
+          "dismissed",
+          null
+        ]
+      },
+      "PaletteAnalysis": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending_upload"
+                ]
+              },
+              "failureReason": {
+                "type": "null"
+              },
+              "source": {
+                "type": "null"
+              },
+              "undertone": {
+                "type": "null"
+              },
+              "depth": {
+                "type": "null"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "analysisVersion": {
+                "type": "null"
+              },
+              "analyzedAt": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "status",
+              "failureReason",
+              "source",
+              "undertone",
+              "depth",
+              "confidence",
+              "analysisVersion",
+              "analyzedAt"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "bytes_uploaded"
+                ]
+              },
+              "failureReason": {
+                "type": "null"
+              },
+              "source": {
+                "type": "null"
+              },
+              "undertone": {
+                "type": "null"
+              },
+              "depth": {
+                "type": "null"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "analysisVersion": {
+                "type": "null"
+              },
+              "analyzedAt": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "status",
+              "failureReason",
+              "source",
+              "undertone",
+              "depth",
+              "confidence",
+              "analysisVersion",
+              "analyzedAt"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "processing"
+                ]
+              },
+              "failureReason": {
+                "type": "null"
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "selfie",
+                  "wardrobe"
+                ]
+              },
+              "undertone": {
+                "type": "null"
+              },
+              "depth": {
+                "type": "null"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "analysisVersion": {
+                "type": "null"
+              },
+              "analyzedAt": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "status",
+              "failureReason",
+              "source",
+              "undertone",
+              "depth",
+              "confidence",
+              "analysisVersion",
+              "analyzedAt"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ready"
+                ]
+              },
+              "failureReason": {
+                "type": "null"
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "selfie",
+                  "wardrobe"
+                ]
+              },
+              "undertone": {
+                "type": "string",
+                "enum": [
+                  "warm",
+                  "cool",
+                  "neutral",
+                  "olive"
+                ]
+              },
+              "depth": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "fair",
+                  "light",
+                  "medium",
+                  "tan",
+                  "deep",
+                  null
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "analysisVersion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "analyzedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "status",
+              "failureReason",
+              "source",
+              "undertone",
+              "depth",
+              "confidence",
+              "analysisVersion",
+              "analyzedAt"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "failed"
+                ]
+              },
+              "failureReason": {
+                "type": "string",
+                "enum": [
+                  "no_face",
+                  "low_quality",
+                  "privacy_violation",
+                  "insufficient_wardrobe",
+                  "timeout",
+                  "storage_error"
+                ]
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "selfie",
+                  "wardrobe"
+                ]
+              },
+              "undertone": {
+                "type": "null"
+              },
+              "depth": {
+                "type": "null"
+              },
+              "confidence": {
+                "type": "null"
+              },
+              "analysisVersion": {
+                "type": "null"
+              },
+              "analyzedAt": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "status",
+              "failureReason",
+              "source",
+              "undertone",
+              "depth",
+              "confidence",
+              "analysisVersion",
+              "analyzedAt"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "description": "One variant per analysis status. failureReason is present exactly on failed, and the derived scalars are present exactly on ready, with depth nullable within ready for a wardrobe-sourced palette. A combination such as a ready palette with a failureReason is unrepresentable in the generated types."
+      },
+      "AdvisorSponsoredOffer": {
+        "type": "object",
+        "properties": {
+          "partnerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "CommercePartner.slug. Stable, safe to log."
+          },
+          "partnerDisplayName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "offerId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pass back to POST /api/v1/commerce/affiliate/clicks with surface: \"palette_advisor\"."
+          },
+          "offerTitle": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "partnerId",
+          "partnerDisplayName",
+          "offerId",
+          "offerTitle"
+        ],
+        "additionalProperties": false
+      },
+      "AdvisorRecommendationCard": {
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "string",
+            "enum": [
+              "foundation",
+              "blush",
+              "jewelry",
+              "bag",
+              "eyewear"
+            ]
+          },
+          "itemKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "labelKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "swatchHex": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "saved": {
+            "type": "boolean"
+          },
+          "sponsored": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "partnerId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "CommercePartner.slug. Stable, safe to log."
+              },
+              "partnerDisplayName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "offerId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Pass back to POST /api/v1/commerce/affiliate/clicks with surface: \"palette_advisor\"."
+              },
+              "offerTitle": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "partnerId",
+              "partnerDisplayName",
+              "offerId",
+              "offerTitle"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "slot",
+          "itemKey",
+          "labelKey",
+          "swatchHex",
+          "saved",
+          "sponsored"
+        ],
+        "additionalProperties": false
+      },
+      "PaletteAdvisorProfile": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "isEntitled": {
+            "type": "boolean"
+          },
+          "analysisEnabled": {
+            "type": "boolean"
+          },
+          "hasConsent": {
+            "type": "boolean"
+          },
+          "analysis": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending_upload"
+                    ]
+                  },
+                  "failureReason": {
+                    "type": "null"
+                  },
+                  "source": {
+                    "type": "null"
+                  },
+                  "undertone": {
+                    "type": "null"
+                  },
+                  "depth": {
+                    "type": "null"
+                  },
+                  "confidence": {
+                    "type": "null"
+                  },
+                  "analysisVersion": {
+                    "type": "null"
+                  },
+                  "analyzedAt": {
+                    "type": "null"
+                  }
+                },
+                "required": [
+                  "status",
+                  "failureReason",
+                  "source",
+                  "undertone",
+                  "depth",
+                  "confidence",
+                  "analysisVersion",
+                  "analyzedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "bytes_uploaded"
+                    ]
+                  },
+                  "failureReason": {
+                    "type": "null"
+                  },
+                  "source": {
+                    "type": "null"
+                  },
+                  "undertone": {
+                    "type": "null"
+                  },
+                  "depth": {
+                    "type": "null"
+                  },
+                  "confidence": {
+                    "type": "null"
+                  },
+                  "analysisVersion": {
+                    "type": "null"
+                  },
+                  "analyzedAt": {
+                    "type": "null"
+                  }
+                },
+                "required": [
+                  "status",
+                  "failureReason",
+                  "source",
+                  "undertone",
+                  "depth",
+                  "confidence",
+                  "analysisVersion",
+                  "analyzedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "processing"
+                    ]
+                  },
+                  "failureReason": {
+                    "type": "null"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "selfie",
+                      "wardrobe"
+                    ]
+                  },
+                  "undertone": {
+                    "type": "null"
+                  },
+                  "depth": {
+                    "type": "null"
+                  },
+                  "confidence": {
+                    "type": "null"
+                  },
+                  "analysisVersion": {
+                    "type": "null"
+                  },
+                  "analyzedAt": {
+                    "type": "null"
+                  }
+                },
+                "required": [
+                  "status",
+                  "failureReason",
+                  "source",
+                  "undertone",
+                  "depth",
+                  "confidence",
+                  "analysisVersion",
+                  "analyzedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ready"
+                    ]
+                  },
+                  "failureReason": {
+                    "type": "null"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "selfie",
+                      "wardrobe"
+                    ]
+                  },
+                  "undertone": {
+                    "type": "string",
+                    "enum": [
+                      "warm",
+                      "cool",
+                      "neutral",
+                      "olive"
+                    ]
+                  },
+                  "depth": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "fair",
+                      "light",
+                      "medium",
+                      "tan",
+                      "deep",
+                      null
+                    ]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "analysisVersion": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "analyzedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "status",
+                  "failureReason",
+                  "source",
+                  "undertone",
+                  "depth",
+                  "confidence",
+                  "analysisVersion",
+                  "analyzedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "failed"
+                    ]
+                  },
+                  "failureReason": {
+                    "type": "string",
+                    "enum": [
+                      "no_face",
+                      "low_quality",
+                      "privacy_violation",
+                      "insufficient_wardrobe",
+                      "timeout",
+                      "storage_error"
+                    ]
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "selfie",
+                      "wardrobe"
+                    ]
+                  },
+                  "undertone": {
+                    "type": "null"
+                  },
+                  "depth": {
+                    "type": "null"
+                  },
+                  "confidence": {
+                    "type": "null"
+                  },
+                  "analysisVersion": {
+                    "type": "null"
+                  },
+                  "analyzedAt": {
+                    "type": "null"
+                  }
+                },
+                "required": [
+                  "status",
+                  "failureReason",
+                  "source",
+                  "undertone",
+                  "depth",
+                  "confidence",
+                  "analysisVersion",
+                  "analyzedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "One variant per analysis status. failureReason is present exactly on failed, and the derived scalars are present exactly on ready, with depth nullable within ready for a wardrobe-sourced palette. A combination such as a ready palette with a failureReason is unrepresentable in the generated types."
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slot": {
+                  "type": "string",
+                  "enum": [
+                    "foundation",
+                    "blush",
+                    "jewelry",
+                    "bag",
+                    "eyewear"
+                  ]
+                },
+                "itemKey": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "labelKey": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "swatchHex": {
+                  "type": "string",
+                  "pattern": "^#[0-9A-Fa-f]{6}$"
+                },
+                "saved": {
+                  "type": "boolean"
+                },
+                "sponsored": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "partnerId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "CommercePartner.slug. Stable, safe to log."
+                    },
+                    "partnerDisplayName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "offerId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Pass back to POST /api/v1/commerce/affiliate/clicks with surface: \"palette_advisor\"."
+                    },
+                    "offerTitle": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "partnerId",
+                    "partnerDisplayName",
+                    "offerId",
+                    "offerTitle"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "slot",
+                "itemKey",
+                "labelKey",
+                "swatchHex",
+                "saved",
+                "sponsored"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "profileId",
+          "isEntitled",
+          "analysisEnabled",
+          "hasConsent",
+          "analysis",
+          "recommendations"
+        ],
+        "additionalProperties": false
+      },
+      "PaletteAdvisorProfileResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "profileId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              },
+              "isEntitled": {
+                "type": "boolean"
+              },
+              "analysisEnabled": {
+                "type": "boolean"
+              },
+              "hasConsent": {
+                "type": "boolean"
+              },
+              "analysis": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending_upload"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "null"
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "bytes_uploaded"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "null"
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "processing"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ready"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "string",
+                        "enum": [
+                          "warm",
+                          "cool",
+                          "neutral",
+                          "olive"
+                        ]
+                      },
+                      "depth": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "fair",
+                          "light",
+                          "medium",
+                          "tan",
+                          "deep",
+                          null
+                        ]
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "analysisVersion": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "analyzedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "failed"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "string",
+                        "enum": [
+                          "no_face",
+                          "low_quality",
+                          "privacy_violation",
+                          "insufficient_wardrobe",
+                          "timeout",
+                          "storage_error"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One variant per analysis status. failureReason is present exactly on failed, and the derived scalars are present exactly on ready, with depth nullable within ready for a wardrobe-sourced palette. A combination such as a ready palette with a failureReason is unrepresentable in the generated types."
+              },
+              "recommendations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "string",
+                      "enum": [
+                        "foundation",
+                        "blush",
+                        "jewelry",
+                        "bag",
+                        "eyewear"
+                      ]
+                    },
+                    "itemKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "labelKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "swatchHex": {
+                      "type": "string",
+                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                    },
+                    "saved": {
+                      "type": "boolean"
+                    },
+                    "sponsored": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "partnerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "CommercePartner.slug. Stable, safe to log."
+                        },
+                        "partnerDisplayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "offerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Pass back to POST /api/v1/commerce/affiliate/clicks with surface: \"palette_advisor\"."
+                        },
+                        "offerTitle": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "partnerId",
+                        "partnerDisplayName",
+                        "offerId",
+                        "offerTitle"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "itemKey",
+                    "labelKey",
+                    "swatchHex",
+                    "saved",
+                    "sponsored"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "profileId",
+              "isEntitled",
+              "analysisEnabled",
+              "hasConsent",
+              "analysis",
+              "recommendations"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SetPaletteConsentInput": {
+        "type": "object",
+        "properties": {
+          "granted": {
+            "type": "boolean",
+            "description": "true grants consent; false revokes it and erases the palette."
+          }
+        },
+        "required": [
+          "granted"
+        ],
+        "additionalProperties": false
+      },
+      "SetPaletteConsentResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "profileId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              },
+              "isEntitled": {
+                "type": "boolean"
+              },
+              "analysisEnabled": {
+                "type": "boolean"
+              },
+              "hasConsent": {
+                "type": "boolean"
+              },
+              "analysis": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending_upload"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "null"
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "bytes_uploaded"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "null"
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "processing"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ready"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "string",
+                        "enum": [
+                          "warm",
+                          "cool",
+                          "neutral",
+                          "olive"
+                        ]
+                      },
+                      "depth": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "fair",
+                          "light",
+                          "medium",
+                          "tan",
+                          "deep",
+                          null
+                        ]
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "analysisVersion": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "analyzedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "failed"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "string",
+                        "enum": [
+                          "no_face",
+                          "low_quality",
+                          "privacy_violation",
+                          "insufficient_wardrobe",
+                          "timeout",
+                          "storage_error"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One variant per analysis status. failureReason is present exactly on failed, and the derived scalars are present exactly on ready, with depth nullable within ready for a wardrobe-sourced palette. A combination such as a ready palette with a failureReason is unrepresentable in the generated types."
+              },
+              "recommendations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "string",
+                      "enum": [
+                        "foundation",
+                        "blush",
+                        "jewelry",
+                        "bag",
+                        "eyewear"
+                      ]
+                    },
+                    "itemKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "labelKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "swatchHex": {
+                      "type": "string",
+                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                    },
+                    "saved": {
+                      "type": "boolean"
+                    },
+                    "sponsored": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "partnerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "CommercePartner.slug. Stable, safe to log."
+                        },
+                        "partnerDisplayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "offerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Pass back to POST /api/v1/commerce/affiliate/clicks with surface: \"palette_advisor\"."
+                        },
+                        "offerTitle": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "partnerId",
+                        "partnerDisplayName",
+                        "offerId",
+                        "offerTitle"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "itemKey",
+                    "labelKey",
+                    "swatchHex",
+                    "saved",
+                    "sponsored"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "profileId",
+              "isEntitled",
+              "analysisEnabled",
+              "hasConsent",
+              "analysis",
+              "recommendations"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AnalyzePaletteInput": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "wardrobe"
+            ]
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "additionalProperties": false
+      },
+      "AnalyzePaletteResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "profileId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              },
+              "isEntitled": {
+                "type": "boolean"
+              },
+              "analysisEnabled": {
+                "type": "boolean"
+              },
+              "hasConsent": {
+                "type": "boolean"
+              },
+              "analysis": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending_upload"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "null"
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "bytes_uploaded"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "null"
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "processing"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ready"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "string",
+                        "enum": [
+                          "warm",
+                          "cool",
+                          "neutral",
+                          "olive"
+                        ]
+                      },
+                      "depth": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "fair",
+                          "light",
+                          "medium",
+                          "tan",
+                          "deep",
+                          null
+                        ]
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "analysisVersion": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "analyzedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "failed"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "string",
+                        "enum": [
+                          "no_face",
+                          "low_quality",
+                          "privacy_violation",
+                          "insufficient_wardrobe",
+                          "timeout",
+                          "storage_error"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One variant per analysis status. failureReason is present exactly on failed, and the derived scalars are present exactly on ready, with depth nullable within ready for a wardrobe-sourced palette. A combination such as a ready palette with a failureReason is unrepresentable in the generated types."
+              },
+              "recommendations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "string",
+                      "enum": [
+                        "foundation",
+                        "blush",
+                        "jewelry",
+                        "bag",
+                        "eyewear"
+                      ]
+                    },
+                    "itemKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "labelKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "swatchHex": {
+                      "type": "string",
+                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                    },
+                    "saved": {
+                      "type": "boolean"
+                    },
+                    "sponsored": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "partnerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "CommercePartner.slug. Stable, safe to log."
+                        },
+                        "partnerDisplayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "offerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Pass back to POST /api/v1/commerce/affiliate/clicks with surface: \"palette_advisor\"."
+                        },
+                        "offerTitle": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "partnerId",
+                        "partnerDisplayName",
+                        "offerId",
+                        "offerTitle"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "itemKey",
+                    "labelKey",
+                    "swatchHex",
+                    "saved",
+                    "sponsored"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "profileId",
+              "isEntitled",
+              "analysisEnabled",
+              "hasConsent",
+              "analysis",
+              "recommendations"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreatePaletteSelfieUploadUrlInput": {
+        "type": "object",
+        "properties": {
+          "fileSizeBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10485760
+          },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64,
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "widthPx": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 4096
+          },
+          "heightPx": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 4096
+          }
+        },
+        "required": [
+          "fileSizeBytes",
+          "mimeType",
+          "sha256",
+          "widthPx",
+          "heightPx"
+        ],
+        "additionalProperties": false
+      },
+      "CreatePaletteSelfieUploadUrlResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "uploadSessionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uploadUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "uploadToken": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requiredHeaders": {
+                "type": "object",
+                "properties": {
+                  "content-type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "content-type"
+                ],
+                "additionalProperties": false
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "uploadSessionId",
+              "uploadUrl",
+              "uploadToken",
+              "requiredHeaders",
+              "expiresAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CommitPaletteSelfieInput": {
+        "type": "object",
+        "properties": {
+          "uploadSessionId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "uploadSessionId"
+        ],
+        "additionalProperties": false
+      },
+      "CommitPaletteSelfieResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "profileId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              },
+              "isEntitled": {
+                "type": "boolean"
+              },
+              "analysisEnabled": {
+                "type": "boolean"
+              },
+              "hasConsent": {
+                "type": "boolean"
+              },
+              "analysis": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending_upload"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "null"
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "bytes_uploaded"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "null"
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "processing"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ready"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "string",
+                        "enum": [
+                          "warm",
+                          "cool",
+                          "neutral",
+                          "olive"
+                        ]
+                      },
+                      "depth": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "fair",
+                          "light",
+                          "medium",
+                          "tan",
+                          "deep",
+                          null
+                        ]
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "analysisVersion": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "analyzedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "failed"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "string",
+                        "enum": [
+                          "no_face",
+                          "low_quality",
+                          "privacy_violation",
+                          "insufficient_wardrobe",
+                          "timeout",
+                          "storage_error"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One variant per analysis status. failureReason is present exactly on failed, and the derived scalars are present exactly on ready, with depth nullable within ready for a wardrobe-sourced palette. A combination such as a ready palette with a failureReason is unrepresentable in the generated types."
+              },
+              "recommendations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "string",
+                      "enum": [
+                        "foundation",
+                        "blush",
+                        "jewelry",
+                        "bag",
+                        "eyewear"
+                      ]
+                    },
+                    "itemKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "labelKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "swatchHex": {
+                      "type": "string",
+                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                    },
+                    "saved": {
+                      "type": "boolean"
+                    },
+                    "sponsored": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "partnerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "CommercePartner.slug. Stable, safe to log."
+                        },
+                        "partnerDisplayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "offerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Pass back to POST /api/v1/commerce/affiliate/clicks with surface: \"palette_advisor\"."
+                        },
+                        "offerTitle": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "partnerId",
+                        "partnerDisplayName",
+                        "offerId",
+                        "offerTitle"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "itemKey",
+                    "labelKey",
+                    "swatchHex",
+                    "saved",
+                    "sponsored"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "profileId",
+              "isEntitled",
+              "analysisEnabled",
+              "hasConsent",
+              "analysis",
+              "recommendations"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdateAdvisorRecommendationInput": {
+        "type": "object",
+        "properties": {
+          "itemKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "slot": {
+            "type": "string",
+            "enum": [
+              "foundation",
+              "blush",
+              "jewelry",
+              "bag",
+              "eyewear"
+            ]
+          },
+          "action": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "saved",
+              "dismissed",
+              null
+            ]
+          }
+        },
+        "required": [
+          "itemKey",
+          "slot",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateAdvisorRecommendationResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "profileId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              },
+              "isEntitled": {
+                "type": "boolean"
+              },
+              "analysisEnabled": {
+                "type": "boolean"
+              },
+              "hasConsent": {
+                "type": "boolean"
+              },
+              "analysis": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending_upload"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "null"
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "bytes_uploaded"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "null"
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "processing"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ready"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "string",
+                        "enum": [
+                          "warm",
+                          "cool",
+                          "neutral",
+                          "olive"
+                        ]
+                      },
+                      "depth": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "fair",
+                          "light",
+                          "medium",
+                          "tan",
+                          "deep",
+                          null
+                        ]
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "analysisVersion": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "analyzedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "failed"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "string",
+                        "enum": [
+                          "no_face",
+                          "low_quality",
+                          "privacy_violation",
+                          "insufficient_wardrobe",
+                          "timeout",
+                          "storage_error"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One variant per analysis status. failureReason is present exactly on failed, and the derived scalars are present exactly on ready, with depth nullable within ready for a wardrobe-sourced palette. A combination such as a ready palette with a failureReason is unrepresentable in the generated types."
+              },
+              "recommendations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "string",
+                      "enum": [
+                        "foundation",
+                        "blush",
+                        "jewelry",
+                        "bag",
+                        "eyewear"
+                      ]
+                    },
+                    "itemKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "labelKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "swatchHex": {
+                      "type": "string",
+                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                    },
+                    "saved": {
+                      "type": "boolean"
+                    },
+                    "sponsored": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "partnerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "CommercePartner.slug. Stable, safe to log."
+                        },
+                        "partnerDisplayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "offerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Pass back to POST /api/v1/commerce/affiliate/clicks with surface: \"palette_advisor\"."
+                        },
+                        "offerTitle": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "partnerId",
+                        "partnerDisplayName",
+                        "offerId",
+                        "offerTitle"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "itemKey",
+                    "labelKey",
+                    "swatchHex",
+                    "saved",
+                    "sponsored"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "profileId",
+              "isEntitled",
+              "analysisEnabled",
+              "hasConsent",
+              "analysis",
+              "recommendations"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "DeletePaletteAdvisorResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "profileId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              },
+              "isEntitled": {
+                "type": "boolean"
+              },
+              "analysisEnabled": {
+                "type": "boolean"
+              },
+              "hasConsent": {
+                "type": "boolean"
+              },
+              "analysis": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending_upload"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "null"
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "bytes_uploaded"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "null"
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "processing"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ready"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "null"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "string",
+                        "enum": [
+                          "warm",
+                          "cool",
+                          "neutral",
+                          "olive"
+                        ]
+                      },
+                      "depth": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "fair",
+                          "light",
+                          "medium",
+                          "tan",
+                          "deep",
+                          null
+                        ]
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "analysisVersion": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "analyzedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "failed"
+                        ]
+                      },
+                      "failureReason": {
+                        "type": "string",
+                        "enum": [
+                          "no_face",
+                          "low_quality",
+                          "privacy_violation",
+                          "insufficient_wardrobe",
+                          "timeout",
+                          "storage_error"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "selfie",
+                          "wardrobe"
+                        ]
+                      },
+                      "undertone": {
+                        "type": "null"
+                      },
+                      "depth": {
+                        "type": "null"
+                      },
+                      "confidence": {
+                        "type": "null"
+                      },
+                      "analysisVersion": {
+                        "type": "null"
+                      },
+                      "analyzedAt": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "failureReason",
+                      "source",
+                      "undertone",
+                      "depth",
+                      "confidence",
+                      "analysisVersion",
+                      "analyzedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "One variant per analysis status. failureReason is present exactly on failed, and the derived scalars are present exactly on ready, with depth nullable within ready for a wardrobe-sourced palette. A combination such as a ready palette with a failureReason is unrepresentable in the generated types."
+              },
+              "recommendations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slot": {
+                      "type": "string",
+                      "enum": [
+                        "foundation",
+                        "blush",
+                        "jewelry",
+                        "bag",
+                        "eyewear"
+                      ]
+                    },
+                    "itemKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "labelKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "swatchHex": {
+                      "type": "string",
+                      "pattern": "^#[0-9A-Fa-f]{6}$"
+                    },
+                    "saved": {
+                      "type": "boolean"
+                    },
+                    "sponsored": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "partnerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "CommercePartner.slug. Stable, safe to log."
+                        },
+                        "partnerDisplayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "offerId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Pass back to POST /api/v1/commerce/affiliate/clicks with surface: \"palette_advisor\"."
+                        },
+                        "offerTitle": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "partnerId",
+                        "partnerDisplayName",
+                        "offerId",
+                        "offerTitle"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "slot",
+                    "itemKey",
+                    "labelKey",
+                    "swatchHex",
+                    "saved",
+                    "sponsored"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "profileId",
+              "isEntitled",
+              "analysisEnabled",
+              "hasConsent",
+              "analysis",
+              "recommendations"
             ],
             "additionalProperties": false
           }
@@ -11331,6 +14569,705 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/premium/palette": {
+      "get": {
+        "tags": [
+          "palette-advisor"
+        ],
+        "summary": "Read the palette advisor profile",
+        "description": "Returns entitlement, consent, the current analysis (if any), and resolved recommendations. Deliberately NOT entitlement- or flag-gated: every signed-in caller needs an answer to render the locked or unavailable state cleanly.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaletteAdvisorProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "palette-advisor"
+        ],
+        "summary": "Erase the palette advisor profile",
+        "description": "Clears derived scalars, revokes consent, deletes AdvisorRecommendationState rows, purges any retained selfie object, and writes an AuditLog row. Deliberately NOT entitlement-gated: a lapsed subscriber must always be able to erase their data.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Erased",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletePaletteAdvisorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/premium/palette/consent": {
+      "post": {
+        "tags": [
+          "palette-advisor"
+        ],
+        "summary": "Grant or revoke palette analysis consent",
+        "description": "Persists a revocable, server-enforced consent fact and writes an AuditLog row on every change. Revoking runs the same erase path as DELETE.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPaletteConsentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Consent updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetPaletteConsentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not entitled (\"A Premium subscription is required for this feature.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "color_analysis_enabled resolved false (\"The color palette advisor is temporarily unavailable.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/premium/palette/analyze": {
+      "post": {
+        "tags": [
+          "palette-advisor"
+        ],
+        "summary": "Derive a palette from the wardrobe",
+        "description": "Aggregates the acting user's PaletteInsights hex codes and enqueues classification. Answers 202 with the current (processing) status.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzePaletteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Analysis enqueued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyzePaletteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not entitled (\"A Premium subscription is required for this feature.\") or no consent (\"Grant palette analysis consent before continuing.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An analysis is already in progress (\"A palette analysis is already in progress.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "color_analysis_enabled resolved false (\"The color palette advisor is temporarily unavailable.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/premium/palette/selfie/upload-url": {
+      "post": {
+        "tags": [
+          "palette-advisor"
+        ],
+        "summary": "Allocate a selfie upload session",
+        "description": "Mirrors the silhouette My Form upload-url allocation, including Idempotency-Key handling. Guardian consent still applies for under-16 accounts through WardrobeUploadGuard.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "idempotency-key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaletteSelfieUploadUrlInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotency-Key replay of an existing session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatePaletteSelfieUploadUrlResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Upload session allocated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatePaletteSelfieUploadUrlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not entitled (\"A Premium subscription is required for this feature.\") or no consent (\"Grant palette analysis consent before continuing.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "color_analysis_enabled resolved false (\"The color palette advisor is temporarily unavailable.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/premium/palette/selfie/uploads/{uploadSessionId}": {
+      "put": {
+        "tags": [
+          "palette-advisor"
+        ],
+        "summary": "Upload selfie bytes",
+        "description": "Raw bytes for the allocated session. Mirrors the silhouette bytes route and its upload-token, size, and MIME validation.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque upload session ID."
+            },
+            "required": true,
+            "description": "Opaque upload session ID.",
+            "name": "uploadSessionId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "x-upload-token",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "image/jpeg",
+                "image/png",
+                "image/webp"
+              ]
+            },
+            "required": true,
+            "name": "content-type",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Bytes accepted"
+          },
+          "400": {
+            "description": "Invalid upload body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid or expired upload token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown upload session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/premium/palette/selfie/commit": {
+      "post": {
+        "tags": [
+          "palette-advisor"
+        ],
+        "summary": "Commit the uploaded selfie and enqueue analysis",
+        "description": "Enqueues analysis for the committed selfie. 201 on a fresh commit, 200 on an Idempotency-Key replay, per the house convention.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "idempotency-key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitPaletteSelfieInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotency-Key replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitPaletteSelfieResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Commit accepted, analysis enqueued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitPaletteSelfieResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not entitled (\"A Premium subscription is required for this feature.\") or no consent (\"Grant palette analysis consent before continuing.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown upload session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "color_analysis_enabled resolved false (\"The color palette advisor is temporarily unavailable.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/premium/palette/recommendations": {
+      "put": {
+        "tags": [
+          "palette-advisor"
+        ],
+        "summary": "Save, dismiss, or clear a recommendation",
+        "description": "action: null clears any prior saved/dismissed state for the item. Not flag-gated: this is a lightweight preference write, not an analysis path.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAdvisorRecommendationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recommendation state updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateAdvisorRecommendationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not entitled (\"A Premium subscription is required for this feature.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
                 }
               }
             }

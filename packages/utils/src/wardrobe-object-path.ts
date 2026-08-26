@@ -18,3 +18,15 @@ export function buildSilhouetteObjectPath(
 ): string {
   return `wardrobe/${userId}/silhouette/${uploadSessionId}.${extension}`
 }
+
+/** Story 5.4: palette advisor selfies, same bucket/user folder convention as
+ * silhouette photos, under a palette/ prefix. The object is purged the
+ * moment analysis terminates (Decision 8) — this path never outlives one
+ * analysis attempt. */
+export function buildPaletteSelfieObjectPath(
+  userId: string,
+  uploadSessionId: string,
+  extension: GarmentObjectExtension
+): string {
+  return `wardrobe/${userId}/palette/${uploadSessionId}.${extension}`
+}

@@ -76,6 +76,13 @@ export type ContractApiClient = Pick<
   | 'apiV1CommerceSubscriptionPortalSessionPost'
   | 'apiV1CommercePremiumThemeGet'
   | 'apiV1CommercePremiumThemePut'
+  // Story 5.4 palette advisor. The selfie upload lifecycle is deliberately
+  // absent: its bytes route carries raw image data rather than a JSON body, and
+  // neither client drives it through the generated SDK.
+  | 'apiV1CommercePremiumPaletteGet'
+  | 'apiV1CommercePremiumPaletteConsentPost'
+  | 'apiV1CommercePremiumPaletteAnalyzePost'
+  | 'apiV1CommercePremiumPaletteRecommendationsPut'
 >
 
 export type CreateClient = (mockServer: V3MockServer) => ContractApiClient

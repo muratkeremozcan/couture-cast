@@ -80,6 +80,13 @@ import {
   verifyThemeResetInteraction,
   verifyPremiumThemeErrorInteraction,
   premiumThemeErrorInteractions,
+  verifyEntitledPaletteReadInteraction,
+  verifyNotEntitledPaletteReadInteraction,
+  verifyPaletteConsentGrantInteraction,
+  verifyWardrobeAnalyzeInteraction,
+  verifyDismissRecommendationInteraction,
+  verifyPaletteAdvisorErrorInteraction,
+  paletteAdvisorErrorInteractions,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -353,6 +360,35 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
     'preserves the documented premium theme error envelope that $description',
     async (interaction) => {
       await verifyPremiumThemeErrorInteraction(pact, interaction)
+    }
+  )
+
+  // Story 5.4: both surfaces read the profile on mount and write consent, an
+  // analysis and a save/dismiss from the same screen.
+  it('reads the palette advisor profile of an entitled user', async () => {
+    await verifyEntitledPaletteReadInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('reads the palette advisor profile of a non-entitled user', async () => {
+    await verifyNotEntitledPaletteReadInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('grants palette analysis consent', async () => {
+    await verifyPaletteConsentGrantInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('derives a palette from the wardrobe', async () => {
+    await verifyWardrobeAnalyzeInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('dismisses an advisor recommendation', async () => {
+    await verifyDismissRecommendationInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it.each(paletteAdvisorErrorInteractions)(
+    'preserves the documented palette advisor error envelope that $description',
+    async (interaction) => {
+      await verifyPaletteAdvisorErrorInteraction(pact, interaction)
     }
   )
 })
