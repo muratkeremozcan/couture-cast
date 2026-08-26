@@ -182,7 +182,7 @@ export default defineConfig({
       // Ratchet: set just under the measured value so a real regression
       // fails the run. Raise these as coverage improves; never lower them
       // to make a red build green.
-      thresholds: { statements: 90, branches: 85, functions: 90, lines: 92 },
+      thresholds: { statements: 92, branches: 87, functions: 93, lines: 94 },
       include: ['app/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}', 'src/**/*.{ts,tsx}'],
       exclude: [
         // Expo Router navigation shells: Stack/Tabs declarations plus font and

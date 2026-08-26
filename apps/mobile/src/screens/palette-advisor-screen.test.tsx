@@ -26,6 +26,7 @@ import {
   ADVISOR_RULES,
   type AdvisorRecommendationCard,
   PALETTE_ANALYSIS_DISABLED_MESSAGE,
+  PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE,
   PALETTE_CONSENT_REQUIRED_MESSAGE,
   PREMIUM_REQUIRED_MESSAGE,
   type PaletteAdvisorProfile,
@@ -577,6 +578,116 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
 
       await screen.findByTestId('palette-advisor-locked')
       expect(document.body.textContent).not.toContain(PREMIUM_REQUIRED_MESSAGE)
+    })
+
+    /**
+     * The three write-path doors the four reason states above leave untouched.
+     * `applyWriteFailure` argues in its own docblock that a rejected write must
+     * re-resolve the screen rather than print a line, and coverage put the
+     * `signed_out` case, the `in_progress` case and the generic fallback all at
+     * zero -- the same gap the web panel had, on the surface where a session can
+     * also expire while the app sits in the background.
+     */
+    it('5.4-MOB-027 drops to the signed-out state when a write is refused as signed out', async () => {
+      servePalette({
+        hasConsent: true,
+        analysis: readyAnalysis('medium'),
+        recommendations: [card(FOUNDATION_WARM_MEDIUM)],
+      })
+      server.use(
+        http.put(`${PALETTE_ROUTE}/recommendations`, () =>
+          errorEnvelope(401, 'Unauthorized')
+        )
+      )
+      await render(<PaletteAdvisorScreen />)
+
+      await press(
+        await screen.findByTestId(
+          `palette-advisor-save-${FOUNDATION_WARM_MEDIUM.itemKey}`
+        )
+      )
+
+      await screen.findByTestId('palette-advisor-locked')
+      expect(
+        screen.queryByTestId('palette-advisor-recommendations')
+      ).not.toBeInTheDocument()
+    })
+
+    it('5.4-MOB-028 re-reads the server rather than erroring when an analysis is already running', async () => {
+      let getCount = 0
+      server.use(
+        http.get(PALETTE_ROUTE, () => {
+          getCount += 1
+          return HttpResponse.json({
+            data: profile(
+              getCount === 1
+                ? { hasConsent: true }
+                : {
+                    hasConsent: true,
+                    analysis: {
+                      status: 'processing' as const,
+                      failureReason: null,
+                      source: 'wardrobe' as const,
+                      undertone: null,
+                      depth: null,
+                      confidence: null,
+                      analysisVersion: null,
+                      analyzedAt: null,
+                    },
+                  }
+            ),
+          })
+        }),
+        http.post(`${PALETTE_ROUTE}/analyze`, () =>
+          errorEnvelope(409, PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE)
+        )
+      )
+      await render(<PaletteAdvisorScreen />)
+
+      await press(await screen.findByTestId('palette-advisor-source-wardrobe'))
+
+      await waitFor(() => expect(getCount).toBeGreaterThan(1))
+      expect(screen.queryByTestId('palette-advisor-error')).not.toBeInTheDocument()
+      expect(document.body.textContent).not.toContain(
+        PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE
+      )
+    })
+
+    it('5.4-MOB-029 shows the translated fallback line for an unclassified write failure', async () => {
+      servePalette({
+        hasConsent: true,
+        analysis: readyAnalysis('medium'),
+        recommendations: [card(FOUNDATION_WARM_MEDIUM)],
+      })
+      server.use(
+        http.put(`${PALETTE_ROUTE}/recommendations`, () =>
+          errorEnvelope(500, 'Internal server error')
+        )
+      )
+      await render(<PaletteAdvisorScreen />)
+
+      await press(
+        await screen.findByTestId(
+          `palette-advisor-save-${FOUNDATION_WARM_MEDIUM.itemKey}`
+        )
+      )
+
+      const error = await screen.findByTestId('palette-advisor-error')
+      expect(error.textContent).not.toContain('Internal server error')
+      // A generic failure is not evidence that entitlement lapsed or consent
+      // was revoked, so the surface is left exactly as it was.
+      expect(screen.getByTestId('palette-advisor-recommendations')).toBeInTheDocument()
+    })
+
+    it('5.4-MOB-030 shows the load-failure state when the first read fails, without leaking the server string', async () => {
+      server.use(
+        http.get(PALETTE_ROUTE, () => errorEnvelope(500, 'Internal server error'))
+      )
+      await render(<PaletteAdvisorScreen />)
+
+      const error = await screen.findByTestId('palette-advisor-error')
+      expect(error.textContent).not.toContain('Internal server error')
+      expect(screen.queryByTestId('palette-advisor-sources')).not.toBeInTheDocument()
     })
 
     it('5.4-MOB-026 shows the kill-switch note on a 503', async () => {
