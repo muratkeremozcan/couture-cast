@@ -1023,23 +1023,44 @@ recommendation_id, minute)` and a client that can choose the third column can
   Prisma's DSL cannot express, so a regenerated migration would silently drop it
   and reintroduce the planner ambiguity that regressed `5.1-PLAN-03`.
 
-- **A pre-existing Pact consumer flake is still unfixed**, and it failed one CI
-  run on this branch. `web-api-client.pacttest.ts` > "updates user comfort
-  preferences" reported `The following request was expected but not received`
-  for `PUT /api/v1/personalization/comfort` on run 3 of the three-run
-  determinism check, then passed on the next CI run of the same commit range.
-  The interaction belongs to story 2's ritual-comfort surface and is untouched
-  here. It did not reproduce in 27 local suite runs (12 direct, plus 5 full
-  three-run determinism cycles), and the consumer config already serialises
-  everything it could race against (`fileParallelism: false`,
-  `singleFork: true`), which rules out parallel mock servers. The leading
-  hypothesis is a stale keep-alive socket in undici's connection pool reaching a
-  port a previous Pact mock server has released, which would be load-dependent
-  and therefore CI-only. Testing that hypothesis means changing the dispatcher
-  the shared `createApiClient` uses under Pact, and shipping that change without
-  a reproduction would be a guess against shared infrastructure. It needs
-  someone who can reproduce it — a loaded runner, or the determinism script
-  looped under CPU pressure — before a fix is written.
+- **A pre-existing Pact consumer flake is still unfixed**, and it failed two CI
+  runs on this branch. Both failures are in `web-api-client.pacttest.ts`,
+  reporting `The following request was expected but not received`, and both are
+  on `/api/v1/personalization/comfort` — but on DIFFERENT interactions and
+  different run indices: "updates user comfort preferences" (`PUT`) on run 3 of
+  the three-run determinism check, then "reads user comfort preferences" (`GET`)
+  on run 1. Different test failing each time is the signature of an environment
+  race rather than a code defect, and both interactions belong to story 2's
+  ritual-comfort surface, untouched here.
+
+  What has been ruled out. It did not reproduce in 37 local suite runs: 12
+  direct, 5 full three-run determinism cycles, and 10 more under deliberate CPU
+  saturation (28 busy loops on 14 cores). The consumer config already serialises
+  everything it could race against — `fileParallelism: false`,
+  `singleFork: true` — so parallel mock servers are not the cause. The
+  interactions immediately preceding the failures (`events/poll`, the invalid
+  cursor payload, the ritual read) all `await` their requests inside
+  `executeTest`, so no earlier interaction leaves a request in flight to land on
+  a later mock server.
+
+  The leading hypothesis is undici connection reuse across mock servers. All 161
+  interactions run in ONE process against 161 short-lived servers on ephemeral
+  ports, sharing one global dispatcher; a pooled keep-alive socket to a port the
+  OS has since reassigned to a new mock server would produce exactly this
+  symptom. It would also explain why it is Linux-only in practice: Linux recycles
+  ephemeral ports from a lower, narrower range than macOS, which is likely why
+  saturating a Mac reproduces nothing.
+
+  Testing that means giving the Pact consumer clients a non-pooling dispatcher
+  through `createApiClient`'s existing `fetchApi` option — deliberately NOT a
+  `Connection: close` header, which undici would put on the wire and Pact would
+  record into the contract. That change is small, but shipping it against 161
+  interactions without a reproduction is a guess about shared infrastructure, so
+  it needs someone who can reproduce it first: a Linux runner, or the determinism
+  script looped there under load. Until then, a failed Pact job on this
+  interaction should be re-run rather than treated as a regression — which is
+  what was done on this PR, and is recorded here so the flake does not stay
+  invisible behind a green tick.
 
 - **A ready palette whose `analysis_version` this build has retired renders no
   advice and no explanation.** `5.4-E2E-012` pins the state deliberately: the
@@ -1053,3 +1074,36 @@ recommendation_id, minute)` and a client that can choose the third column can
   is one locale key ("your palette predates the current advice; re-derive it")
   plus a re-derive affordance, across ten catalogs on two surfaces, which is
   why it is recorded here rather than folded into a review pass.
+
+- **`gh run rerun --failed` can never turn the Maestro workflow green**, which
+  makes recovering a single flaked shard more expensive than it should be. The
+  `mobile-e2e-report-comment` action ends with an integrity check that refuses a
+  green suite the reports do not support, and one of its conditions is
+  `SHARDS_SEEN < EXPECTED`. That check is correct and worth keeping — it is what
+  stops a matrix from reporting success while half the suite never ran. But
+  `actions/download-artifact@v4` is scoped to the CURRENT run attempt, so after a
+  partial re-run the report job can only see the artifacts of the shards that
+  re-ran. On this PR all seven shards genuinely passed (six on attempt 1, shard 7
+  on attempt 2) and the report job still failed with "only 1 of 3 shards left
+  reports". The only ways out are a FULL re-run of the workflow or a new push.
+
+  A fix would mean naming shard artifacts per attempt and having the report job
+  fetch across attempts through the API rather than through
+  `download-artifact`'s default scope, which is a change to shared CI plumbing
+  and wants its own proving run under `workflow_dispatch` before it gates
+  anything.
+
+- **A pre-existing `open-settings.yaml` Maestro flake cost one shard re-run on
+  this PR.** Shard 7 failed two story-3/4 flows,
+  `garment-capsule-localization-flow` and `sanity`, both with
+  `Assertion is false: id: settings-screen is visible`, then passed both on
+  re-run. The subflow already carries the repair history for exactly this
+  symptom in its own docblock — the Expo Go developer sheet rising over the tab
+  bar and swallowing the tap, and pushed routes leaving the tab bar unreachable —
+  and already wraps tap-plus-assert in `retry: maxRetries: 3` around a 15-second
+  `extendedWaitUntil`. It is not a regression from story 5.4: shard 7 passed on
+  the immediately preceding commit, and the entire diff between the passing and
+  failing runs is two test files and two markdown documents, with no mobile app
+  code, no flow and no subflow touched. Diagnosing it further needs an Android
+  emulator reproducing the CI profile, which is where this repository's mobile
+  E2E lives by decision; there is no local Android path to iterate against.
