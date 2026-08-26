@@ -6,7 +6,24 @@ import type { PrismaClient } from '@prisma/client'
 // `allowImportingTsExtensions` -- a `.ts`-suffixed relative import here fails
 // the whole repo typecheck even though the identical line in `wardrobe.ts` is
 // fine, because nothing outside the seed graph reaches that file.
-import { buildGarmentObjectPath } from '@couture/utils'
+//
+// It has to be a NAMESPACE import through `unwrapCjsNamespace`, not a named
+// one, and the difference is not cosmetic: `prisma db seed` runs this graph
+// under `tsx`, and `seeds/index.ts` loads
+// `testing/src/factories/factory.ts` first, which `require`s `@couture/utils`
+// and so puts it in the CJS require cache before any ESM import of it runs.
+// Node then builds that module's ESM facade from the cached CommonJS object
+// instead of letting cjs-module-lexer read the source, and the facade carries
+// only `default` and `module.exports` -- so `import { buildGarmentObjectPath }`
+// throws `does not provide an export named` at instantiation time, before a
+// single line of seed code runs. It is invisible to every unit and integration
+// suite, because none of them load the seed graph; it took the whole mobile
+// E2E matrix, the Playwright burn-in and the k6 smoke down at `db:reset`.
+import * as coutureUtils from '@couture/utils'
+
+import { unwrapCjsNamespace } from './interop.js'
+
+const { buildGarmentObjectPath } = unwrapCjsNamespace(coutureUtils)
 
 /**
  * Story 5.1 decision 14: making the affiliate feature reachable.
