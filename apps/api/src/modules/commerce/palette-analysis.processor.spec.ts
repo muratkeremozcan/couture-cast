@@ -395,14 +395,15 @@ describe('PaletteAnalysisProcessor', () => {
     )
 
     /**
-     * 5.4-API-036. Sharp throws on bytes it cannot decode, and nothing upstream
-     * verifies the client-declared `mimeType`, `widthPx` or `heightPx` against
-     * the object that was actually PUT. Every one of those failures is
-     * deterministic, so letting the throw propagate would retry an input that
-     * can never succeed until the BullMQ budget is exhausted and then terminate
-     * through `markFailed` as `timeout` -- telling the user the service was slow
-     * when their file was unreadable. It terminates here instead, and purges,
-     * because a selfie that cannot be analysed still must not be retained.
+     * 5.4-API-036. The upload route already decoded these bytes through
+     * `verifyGarmentImage`, so this covers the narrower window between that
+     * decode and this one: an object read back truncated or corrupted, or a
+     * codec path `.metadata()` accepts and `.resize().raw()` does not. Narrow,
+     * but deterministic -- letting the throw propagate would retry an input
+     * that can never succeed until the BullMQ budget is exhausted and then
+     * terminate through `markFailed` as `timeout`, telling the user the service
+     * was slow when their photo was unreadable. It terminates here instead, and
+     * purges, because a selfie that cannot be analysed still must not be kept.
      */
     it('5.4-API-036 terminates low_quality and purges when the engine cannot decode the bytes', async () => {
       mockFindUnique.mockResolvedValueOnce({

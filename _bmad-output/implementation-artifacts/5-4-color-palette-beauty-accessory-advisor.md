@@ -778,19 +778,22 @@ jobs were red.
   implementation now serves both pipelines rather than two copies of the same
   arithmetic.
 
-- **A selfie the engine could not decode burned the whole retry budget and then
-  reported the wrong reason.** Sharp throws on a truncated upload, on a file
-  that is not an image, and on one whose real pixel count exceeds
-  `limitInputPixels` — and nothing verifies the client-declared `mimeType`,
-  `widthPx` or `heightPx` against the bytes that were actually PUT. Every one
-  of those failures is deterministic, so the throw propagated, BullMQ retried
-  an input that could never succeed, and `markFailed` terminated it as
-  `timeout` or `storage_error`: the user was told the service was slow when
-  their file was unreadable. It terminates `low_quality` on the first attempt
-  now, and still purges. The DOWNLOAD keeps the opposite posture deliberately,
-  with `5.4-API-037` pinning that too, because catching both at one level would
-  turn a recoverable storage outage into a permanent verdict on a photo that
-  was never read.
+- **A deterministic decode failure in the analysis worker burned the whole
+  retry budget and then reported the wrong reason.** The upload route already
+  decodes these bytes: `verifyGarmentImage` runs `sharp().metadata()` and
+  `.stats()` at PUT time under the same 4096-pixel limit the engine uses, and
+  rejects a file that is not an image, a lying `mimeType` or an oversized frame
+  before any of it is stored. What was unguarded is the narrower window between
+  that decode and the worker's: an object that comes back from storage
+  truncated or corrupted, or a codec path `.metadata()` accepts and
+  `.resize().raw()` does not. Narrow, but deterministic — the throw propagated,
+  BullMQ retried an input that could never succeed, and `markFailed` terminated
+  it as `timeout` or `storage_error`, telling the user the service was slow
+  when their photo was unreadable. It terminates `low_quality` on the first
+  attempt now, and still purges. The DOWNLOAD keeps the opposite posture
+  deliberately, with `5.4-API-037` pinning that too, because catching both at
+  one level would turn a recoverable storage outage into a permanent verdict on
+  a photo that was never read.
 
 - **An advisor click's attribution id was resolved by row existence while
   answering with the consent message.** Decision 9 keeps the `PaletteProfile`

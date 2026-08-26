@@ -199,18 +199,24 @@ export class PaletteAnalysisProcessor {
     // deliberate non-catching of download failures).
     const bytes = await this.storage.download(objectPath)
 
-    // The DECODE, unlike the download above, is caught. Sharp throws on bytes
-    // it cannot decode -- a truncated or corrupt upload, a file that is not an
-    // image at all, or one whose real pixel count exceeds the engine's
-    // `limitInputPixels` -- and the client is what declares `mimeType`,
-    // `widthPx` and `heightPx` at commit, so none of those is verified against
-    // the bytes anywhere upstream. Every one of them is DETERMINISTIC: left to
-    // propagate, it throws identically on every BullMQ attempt, burns the whole
-    // retry budget on an input that can never succeed, and then terminates
-    // through `markFailed` as `timeout` or `storage_error` -- telling the user
-    // the service was slow or the storage broke when in fact their file was
-    // unreadable. `low_quality` is the honest terminal answer and its copy
-    // ("too dim, too filtered or too uneven") already asks for another photo.
+    // The DECODE, unlike the download above, is caught.
+    //
+    // The upload route already decoded these bytes: `verifyGarmentImage` runs
+    // `sharp().metadata()` and `.stats()` at PUT time under the same 4096-pixel
+    // limit and rejects anything that fails, so the common cases -- a file that
+    // is not an image, a lying `mimeType`, an oversized frame -- never reach
+    // here. What remains is the narrower window between the two decodes: an
+    // object that comes back from storage truncated or corrupted, or a codec
+    // path `.metadata()`/`.stats()` accepts and `.resize().raw()` does not.
+    //
+    // Narrow, but DETERMINISTIC, and that is what makes the catch load-bearing.
+    // Left to propagate, such a throw repeats identically on every BullMQ
+    // attempt, burns the whole retry budget on an input that can never succeed,
+    // and then terminates through `markFailed` as `timeout` or `storage_error`
+    // -- telling the user the service was slow or the storage broke when their
+    // photo was in fact unreadable. `low_quality` is the honest terminal
+    // answer, its copy ("too dim, too filtered or too uneven") already asks for
+    // another photo, and the bytes are still purged either way.
     let verdict: SelfieAnalysisOutcome
     try {
       verdict = await this.engine.analyzeSelfie(bytes)
