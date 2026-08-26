@@ -1,3 +1,5 @@
+// Learning path Step 36: Colour palette, beauty and accessory advisor.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'

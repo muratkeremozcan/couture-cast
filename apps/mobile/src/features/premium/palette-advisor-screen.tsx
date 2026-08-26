@@ -25,10 +25,11 @@ import { useTranslation } from 'react-i18next'
 import * as ImagePicker from 'expo-image-picker'
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { File } from 'expo-file-system'
-import type {
-  AdvisorRecommendationCard,
-  PaletteAdvisorProfile,
-  PaletteAnalysisFailureReason,
+import {
+  ADVISOR_RULES_VERSION,
+  type AdvisorRecommendationCard,
+  type PaletteAdvisorProfile,
+  type PaletteAnalysisFailureReason,
 } from '@couture/api-client/contracts/http'
 
 import { Text, View } from '@/components/themed'
@@ -448,6 +449,7 @@ function PaletteResult({
   undertone,
   depth,
   confidenceLabel,
+  isStale,
   isBusy,
   showDismissedNotice,
   recommendations,
@@ -459,6 +461,7 @@ function PaletteResult({
   undertone: string
   depth: string | null
   confidenceLabel: string | null
+  isStale: boolean
   isBusy: boolean
   showDismissedNotice: boolean
   recommendations: readonly AdvisorRecommendationCard[]
@@ -474,6 +477,17 @@ function PaletteResult({
 
   return (
     <>
+      {/*
+        Precedes the numbers it qualifies, the same way the kill-switch note
+        precedes the controls it explains. A caveat printed under a reading the
+        user has already taken as current is a caveat they never see.
+      */}
+      {isStale ? (
+        <Text style={styles.body} testID="palette-advisor-stale-version">
+          {t('commerce.premium.palette.staleVersion')}
+        </Text>
+      ) : null}
+
       <View style={styles.panel} testID="palette-advisor-result">
         <Text style={styles.body}>
           {`${t('commerce.premium.palette.result.undertone')}: `}
@@ -1016,6 +1030,17 @@ export function PaletteAdvisorScreen() {
           undertone={analysis.undertone}
           depth={analysis.depth}
           confidenceLabel={confidenceLabel}
+          /*
+           * WHAT IS STALE IS THE PALETTE, NOT THE CARDS BENEATH IT.
+           * `PaletteAdvisorService.resolveRecommendations` builds every card
+           * from the CURRENT `ADVISOR_RULES` keyed on the stored undertone and
+           * depth, and never consults `analysis_version`, so the shades on
+           * screen are always this build's. What predates a rules bump is the
+           * derivation itself -- undertone, depth, confidence -- and Decision 8
+           * purged the selfie when the last analysis terminated, so the only
+           * way to refresh it is the source choice already on screen above.
+           */
+          isStale={analysis.analysisVersion !== ADVISOR_RULES_VERSION}
           isBusy={busy !== null}
           showDismissedNotice={lastDismissal !== null}
           recommendations={view.recommendations}

@@ -1,3 +1,5 @@
+// Learning path Step 36: Colour palette, beauty and accessory advisor.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
@@ -9,7 +11,11 @@ import {
   buildPremiumEntitlementCreateInput,
   createPremiumEntitlement,
 } from '@couture/testing'
-import { ADVISOR_RULES } from '@couture/api-client/contracts/http'
+import {
+  ADVISOR_RULES,
+  listAdvisorRuleEntries,
+  type PaletteAdvisorProfile,
+} from '@couture/api-client/contracts/http'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards.js'
 import type { AuthenticatedRequest } from '../src/modules/auth/security.types.js'
 import { CommerceModule } from '../src/modules/commerce/commerce.module.js'
@@ -494,6 +500,57 @@ describe('5.4 palette advisor against real PostgreSQL and real HTTP', () => {
     const reread = await getProfile(userId)
     expect(reread.status).toBe(200)
     expect((reread.body as { data: { hasConsent: boolean } }).data.hasConsent).toBe(true)
+  })
+
+  it('5.4-INT-032 still resolves the current cards for a retired analysis_version', async (context) => {
+    if (!requireSchema(context)) return
+
+    /*
+     * WHAT A RULES BUMP ACTUALLY DOES TO A STORED PALETTE, pinned against real
+     * SQL because the belief that it empties the card list drove a deferred-work
+     * entry and the original framing of `5.4-MOB-023` and `5.4-E2E-012`.
+     *
+     * It does not. `resolveRecommendations` keys off the stored `undertone` and
+     * `depth` and reads the CURRENT `ADVISOR_RULES`; `analysis_version` is
+     * written by the processor and never read back on this path. So a profile
+     * stamped with a version this build has never shipped resolves the same six
+     * cards a current one does.
+     *
+     * That is the right behaviour -- advice a build cannot resolve is worse
+     * than advice from the newest table -- but it means the reader is shown a
+     * derived palette from retired rules with nothing marking it as such, which
+     * is the gap `commerce.premium.palette.staleVersion` closes on both
+     * surfaces. The client is the only tier that can see the discrepancy,
+     * because it is the only one holding both the stored version and the
+     * constant.
+     */
+    expect((await setConsent(userId, true)).status).toBe(200)
+    await prisma.paletteProfile.update({
+      where: { user_id: userId },
+      data: {
+        source: 'selfie',
+        status: 'ready',
+        undertone: 'warm',
+        depth: 'medium',
+        confidence: 0.82,
+        analyzed_at: new Date(),
+        analysis_version: 'palette-advisor-v0-retired',
+      },
+    })
+
+    const response = await getProfile(userId)
+    expect(response.status).toBe(200)
+    const data = (response.body as { data: PaletteAdvisorProfile }).data
+    expect(data.analysis?.analysisVersion).toBe('palette-advisor-v0-retired')
+    expect(data.recommendations.length).toBeGreaterThan(0)
+    // Every card comes from THIS build's table, which is what makes the note on
+    // the surfaces a statement about the palette rather than about the cards.
+    const currentItemKeys = new Set(
+      listAdvisorRuleEntries().map((entry) => entry.itemKey)
+    )
+    for (const card of data.recommendations) {
+      expect(currentItemKeys, card.itemKey).toContain(card.itemKey)
+    }
   })
 
   it('5.4-INT-011 purges the selfie and stamps selfie_purged_at on the ready branch', async (context) => {

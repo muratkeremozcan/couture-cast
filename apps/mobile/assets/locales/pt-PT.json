@@ -519,6 +519,7 @@
           "body": "Subscreva o Premium nas Definições para receber tons de maquilhagem e combinações de acessórios de acordo com os seus tons.",
           "signedOutBody": "Inicie sessão e subscreva o Premium para receber tons de maquilhagem e combinações de acessórios de acordo com os seus tons."
         },
+        "staleVersion": "Esta paleta veio de uma versão anterior das nossas recomendações. Repita a análise para obter um resultado atualizado.",
         "unavailable": "A análise de cores está em pausa neste momento. A sua paleta guardada mantém-se; as novas análises voltam quando estiver de novo disponível.",
         "loadError": "Não conseguimos carregar a sua paleta. Tente novamente.",
         "saveError": "Não conseguimos guardar essa alteração. Tente novamente.",

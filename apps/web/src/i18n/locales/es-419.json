@@ -221,6 +221,7 @@
           "body": "Suscríbete a Premium desde Configuración para recibir tonos de maquillaje y combinaciones de accesorios según tus tonos.",
           "signedOutBody": "Inicia sesión y suscríbete a Premium para recibir tonos de maquillaje y combinaciones de accesorios según tus tonos."
         },
+        "staleVersion": "Esta paleta viene de una versión anterior de nuestras recomendaciones. Vuelve a ejecutar el análisis para obtener un resultado actualizado.",
         "unavailable": "El análisis de color está en pausa por ahora. Tu paleta guardada queda igual; los análisis nuevos volverán cuando se reactive.",
         "loadError": "No pudimos cargar tu paleta. Inténtalo de nuevo.",
         "saveError": "No pudimos guardar ese cambio. Inténtalo de nuevo.",

@@ -221,6 +221,7 @@
           "body": "Abonnez-vous à Premium depuis les Réglages pour recevoir des teintes de maquillage et des accords d'accessoires adaptés à vos tons.",
           "signedOutBody": "Connectez-vous et abonnez-vous à Premium pour recevoir des teintes de maquillage et des accords d'accessoires adaptés à vos tons."
         },
+        "staleVersion": "Cette palette provient d'une version antérieure de nos recommandations. Relancez l'analyse pour obtenir un résultat à jour.",
         "unavailable": "L'analyse des couleurs est en pause pour le moment. Votre palette enregistrée reste inchangée ; les nouvelles analyses reprendront dès son retour.",
         "loadError": "Nous n'avons pas pu charger votre palette. Réessayez.",
         "saveError": "Nous n'avons pas pu enregistrer cette modification. Réessayez.",

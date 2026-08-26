@@ -1,3 +1,5 @@
+// Learning path Step 36: Colour palette, beauty and accessory advisor.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 // Story 5.4 Task 9 owner: the Playwright half of the colour palette &
 // beauty/accessory advisor (`/palette`, `palette-advisor-panel.tsx`,
 // `apps/web/src/lib/palette-advisor.ts`).
@@ -423,11 +425,22 @@ premiumSeededTest.describe('Story 5.4 palette advisor, stale analysis version', 
        * out-of-enum `undertone` or `status` to seed. `analysis_version` IS a
        * free-text column, but the only writer is the processor, which always
        * stamps `ADVISOR_RULES_VERSION`; there is no INSERT path in this
-       * codebase that produces a genuinely retired version. Stubbing the GET is
-       * therefore the real client path AC 4 protects: the server skips an
-       * `item_key` it can no longer resolve, so the client receives a `ready`
-       * palette with an empty card list and must render a result rather than a
-       * crash or an error state.
+       * codebase that produces a genuinely retired version, so the GET is
+       * stubbed.
+       *
+       * WHAT THE STUB IS AND IS NOT SAYING. The empty `recommendations` array
+       * below is a deliberately hostile fixture, not the server's behaviour on
+       * a rules bump: `5.4-INT-032` establishes against real SQL that
+       * `resolveRecommendations` reads the CURRENT `ADVISOR_RULES` off the
+       * stored undertone and depth and never consults `analysis_version`, so a
+       * retired version resolves the full card set. This test keeps the empty
+       * list anyway, because a surface that renders no cards must not crash or
+       * error either, and no other tier covers that.
+       *
+       * The retired version's real cost to the reader is the palette ABOVE the
+       * cards -- an undertone, depth and confidence derived under rules this
+       * build has replaced, shown as though current -- which is what the note
+       * asserted below exists to say.
        */
       const pageErrors: string[] = []
       page.on('pageerror', (error) => {
@@ -481,6 +494,15 @@ premiumSeededTest.describe('Story 5.4 palette advisor, stale analysis version', 
       // here asserts something the fixture makes impossible by construction.
       await expect(recommendations(page)).toBeAttached()
       await expect(recommendations(page).getByRole('listitem')).toHaveCount(0)
+
+      await log.step('Assert the palette is marked as predating the current advice')
+      await expect(page.getByTestId('palette-advisor-stale-version')).toContainText(
+        'came from an earlier version'
+      )
+      // The affordance the note points at. Decision 8 purged the selfie when
+      // the last analysis terminated, so re-deriving is the only refresh there
+      // is, and it has to be reachable from this state.
+      await expect(page.getByTestId('palette-advisor-source-wardrobe')).toBeVisible()
 
       expect(pageErrors).toEqual([])
     }

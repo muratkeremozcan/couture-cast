@@ -519,6 +519,7 @@
           "body": "Assine o Premium em Configurações para receber tons de maquiagem e combinações de acessórios de acordo com os seus tons.",
           "signedOutBody": "Entre na sua conta e assine o Premium para receber tons de maquiagem e combinações de acessórios de acordo com os seus tons."
         },
+        "staleVersion": "Esta paleta veio de uma versão anterior das nossas recomendações. Refaça a análise para ter um resultado atualizado.",
         "unavailable": "A análise de cores está pausada no momento. Sua paleta salva continua como está; novas análises voltam quando ela retornar.",
         "loadError": "Não conseguimos carregar sua paleta. Tente de novo.",
         "saveError": "Não conseguimos salvar essa alteração. Tente de novo.",

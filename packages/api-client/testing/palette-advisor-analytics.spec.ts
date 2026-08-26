@@ -1,3 +1,5 @@
+// Learning path Step 36: Colour palette, beauty and accessory advisor.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 import { describe, expect, it } from 'vitest'
 
 import {

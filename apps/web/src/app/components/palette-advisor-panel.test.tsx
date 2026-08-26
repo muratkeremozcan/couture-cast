@@ -1,3 +1,5 @@
+// Learning path Step 36: Colour palette, beauty and accessory advisor.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 // Story 5.4 Task 7 owner: the `/palette` panel.
 //
 // These go through MSW rather than a mocked `lib/palette-advisor`, so the request
@@ -14,6 +16,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   ADVISOR_RULES,
+  ADVISOR_RULES_VERSION,
   type AdvisorRecommendationCard,
   PALETTE_ANALYSIS_DISABLED_MESSAGE,
   PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE,
@@ -54,7 +57,10 @@ function readyAnalysis(depth: 'medium' | null) {
     undertone: 'warm' as const,
     depth,
     confidence: 0.82,
-    analysisVersion: 'palette-advisor-v1',
+    // The contract's own constant, not a copy of its current value: a rules
+    // bump must not silently turn every ready-state fixture here into the
+    // stale-palette case 5.4-WEB-043 owns.
+    analysisVersion: ADVISOR_RULES_VERSION,
     analyzedAt: '2026-08-25T10:00:00.000Z',
   }
 }
@@ -294,6 +300,54 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
       )
       expect(
         screen.queryByTestId('palette-advisor-foundation-depth-unknown')
+      ).not.toBeInTheDocument()
+    })
+
+    it('5.4-WEB-043 explains a palette derived under a retired rules version', async () => {
+      /*
+       * The state deferred-work called "renders no advice and no explanation".
+       * The first half of that was wrong and this test is what establishes it:
+       * `resolveRecommendations` keys off the stored undertone and depth and
+       * never reads `analysis_version`, so the cards below are the CURRENT
+       * table's and the list is NOT empty. What was genuinely missing is the
+       * sentence, and a reader with no sentence has no reason to re-derive a
+       * result that looks current.
+       */
+      signIn()
+      useMswHandlers(
+        getHandler({
+          hasConsent: true,
+          analysis: { ...readyAnalysis('medium'), analysisVersion: 'palette-advisor-v0' },
+          recommendations: [card(FOUNDATION_WARM_MEDIUM)],
+        })
+      )
+      renderPanel()
+
+      expect(
+        await screen.findByTestId('palette-advisor-stale-version')
+      ).toHaveTextContent('came from an earlier version')
+      // The result and its cards stay: this is a stale reading, not an error.
+      expect(screen.getByTestId('palette-advisor-result')).toBeInTheDocument()
+      expect(screen.getByTestId('palette-advisor-recommendations')).toBeInTheDocument()
+      expect(screen.queryByTestId('palette-advisor-error')).not.toBeInTheDocument()
+      // And the affordance the sentence points at is on screen.
+      expect(screen.getByTestId('palette-advisor-source-wardrobe')).toBeInTheDocument()
+    })
+
+    it('5.4-WEB-044 leaves the stale note off a current palette', async () => {
+      signIn()
+      useMswHandlers(
+        getHandler({
+          hasConsent: true,
+          analysis: readyAnalysis('medium'),
+          recommendations: [card(FOUNDATION_WARM_MEDIUM)],
+        })
+      )
+      renderPanel()
+
+      expect(await screen.findByTestId('palette-advisor-result')).toBeInTheDocument()
+      expect(
+        screen.queryByTestId('palette-advisor-stale-version')
       ).not.toBeInTheDocument()
     })
 

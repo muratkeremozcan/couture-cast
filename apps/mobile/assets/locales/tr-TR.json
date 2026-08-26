@@ -519,6 +519,7 @@
           "body": "Tonlarına uygun makyaj tonları ve aksesuar eşleşmeleri için Ayarlar'dan Premium'a abone ol.",
           "signedOutBody": "Tonlarına uygun makyaj tonları ve aksesuar eşleşmeleri için giriş yap ve Premium'a abone ol."
         },
+        "staleVersion": "Bu palet, önerilerimizin daha eski bir sürümünden geliyor. Güncel bir sonuç için analizi yeniden çalıştır.",
         "unavailable": "Renk analizi şu anda duraklatıldı. Kayıtlı paletin olduğu gibi kalır; yeni analizler geri geldiğinde yeniden çalışır.",
         "loadError": "Paletini yükleyemedik. Yeniden dene.",
         "saveError": "Bu değişikliği kaydedemedik. Yeniden dene.",

@@ -221,6 +221,7 @@
           "body": "Subscribe to Premium from Settings to get makeup shades and accessory pairings matched to your tones.",
           "signedOutBody": "Sign in and subscribe to Premium to get makeup shades and accessory pairings matched to your tones."
         },
+        "staleVersion": "This palette came from an earlier version of our advice. Run the analysis again for an up-to-date result.",
         "unavailable": "Color analysis is paused right now. Your saved palette stays as it is; new analyses will run again once it is back.",
         "loadError": "We could not load your palette. Try again.",
         "saveError": "We could not save that change. Try again.",

@@ -1,3 +1,5 @@
+// Learning path Step 36: Colour palette, beauty and accessory advisor.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 // Story 5.4 Task 8 owner: the mobile colour palette & beauty/accessory advisor screen.
 //
 // The mobile counterpart of `apps/web/src/app/components/palette-advisor-panel.test.tsx`.
@@ -24,6 +26,7 @@ import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ADVISOR_RULES,
+  ADVISOR_RULES_VERSION,
   type AdvisorRecommendationCard,
   PALETTE_ANALYSIS_DISABLED_MESSAGE,
   PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE,
@@ -125,7 +128,10 @@ function readyAnalysis(depth: 'medium' | null) {
     undertone: 'warm' as const,
     depth,
     confidence: 0.82,
-    analysisVersion: 'palette-advisor-v1',
+    // The contract's own constant, not a copy of its current value: a rules
+    // bump must not silently turn every ready-state fixture here into the
+    // stale-palette case 5.4-MOB-023 owns.
+    analysisVersion: ADVISOR_RULES_VERSION,
     analyzedAt: '2026-08-25T10:00:00.000Z',
   }
 }
@@ -525,12 +531,23 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
   })
 
   /**
-   * A stored `item_key` from a retired `ADVISOR_RULES_VERSION` resolves to nothing
-   * server-side and is skipped, so the client sees a `ready` analysis whose
-   * `analysisVersion` it has never heard of and an empty card list. That has to render
-   * as a result with no recommendations, not as a crash or an error state.
+   * A `ready` analysis stamped with a version this build has replaced.
+   *
+   * THE ORIGINAL FRAMING OF THIS TEST WAS HALF WRONG and the correction is
+   * worth keeping. It read the empty card list as the consequence of the
+   * retired version -- "every stored `item_key` resolves to nothing" -- but
+   * `PaletteAdvisorService.resolveRecommendations` builds its cards from the
+   * CURRENT `ADVISOR_RULES` keyed on the stored undertone and depth, and never
+   * consults `analysis_version` at all. A version bump therefore yields cards,
+   * not an empty list; the empty list here is simply what the fixture serves,
+   * and it stays because rendering nothing must not crash the surface either.
+   *
+   * What the retired version genuinely costs the reader is the palette above
+   * the cards: an undertone, a depth and a confidence derived under rules this
+   * build has retired, presented as though they were current. That is what the
+   * note asserted below exists to say.
    */
-  it('5.4-MOB-023 renders a ready palette from an unknown analysis version', async () => {
+  it('5.4-MOB-023 explains a ready palette from a retired analysis version', async () => {
     servePalette({
       hasConsent: true,
       analysis: { ...readyAnalysis('medium'), analysisVersion: 'palette-advisor-v99' },
@@ -539,8 +556,26 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
     await render(<PaletteAdvisorScreen />)
 
     await screen.findByTestId('palette-advisor-result')
+    expect(screen.getByTestId('palette-advisor-stale-version').textContent).toContain(
+      'came from an earlier version'
+    )
     expect(screen.getByTestId('palette-advisor-recommendations').textContent).toBe('')
     expect(screen.queryByTestId('palette-advisor-error')).toBeNull()
+    // The affordance the note points at. Nothing else can refresh the palette:
+    // Decision 8 purged the selfie when the last analysis terminated.
+    expect(screen.getByTestId('palette-advisor-source-wardrobe')).toBeTruthy()
+  })
+
+  it('5.4-MOB-031 leaves the stale note off a current palette', async () => {
+    servePalette({
+      hasConsent: true,
+      analysis: readyAnalysis('medium'),
+      recommendations: [card(FOUNDATION_WARM_MEDIUM)],
+    })
+    await render(<PaletteAdvisorScreen />)
+
+    await screen.findByTestId('palette-advisor-result')
+    expect(screen.queryByTestId('palette-advisor-stale-version')).toBeNull()
   })
 
   describe('rejected writes re-resolve the screen', () => {

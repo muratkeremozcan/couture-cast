@@ -1,3 +1,5 @@
+// Learning path Step 36: Colour palette, beauty and accessory advisor.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 // Story 5.4 Task 2/3: every ADVISOR_RULES swatchHex passes meetsWcagAA()
 // against the surface it renders on, exactly as 5.3's Decision 2/3 required
 // for the premium theme accents (which found two of three failing the

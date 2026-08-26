@@ -1,3 +1,5 @@
+// Learning path Step 36: Colour palette, beauty and accessory advisor.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 // Story 5.4 Task 5/6: the palette advisor routes over real HTTP through a
 // Nest `TestingModule`, mirroring premium-theme.controller.spec.ts's shape.
 // RequestAuthGuard is stubbed (real Supabase token validation is proven in

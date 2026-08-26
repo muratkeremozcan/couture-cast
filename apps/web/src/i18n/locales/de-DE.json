@@ -221,6 +221,7 @@
           "body": "Schließe in den Einstellungen ein Premium-Abo ab, um Make-up-Töne und Accessoire-Kombinationen passend zu deinen Farbtönen zu erhalten.",
           "signedOutBody": "Melde dich an und schließe ein Premium-Abo ab, um Make-up-Töne und Accessoire-Kombinationen passend zu deinen Farbtönen zu erhalten."
         },
+        "staleVersion": "Diese Palette stammt aus einer früheren Version unserer Empfehlungen. Starte die Analyse erneut, um ein aktuelles Ergebnis zu erhalten.",
         "unavailable": "Die Farbanalyse pausiert gerade. Deine gespeicherte Palette bleibt erhalten; neue Analysen laufen wieder, sobald sie zurück ist.",
         "loadError": "Wir konnten deine Palette nicht laden. Versuche es erneut.",
         "saveError": "Wir konnten die Änderung nicht speichern. Versuche es erneut.",

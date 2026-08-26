@@ -629,6 +629,12 @@ export const PALETTE_ADVISOR_LOCALE_KEYS = Object.freeze([
   'commerce.premium.palette.locked.title',
   'commerce.premium.palette.locked.body',
   'commerce.premium.palette.locked.signedOutBody',
+  // Shown beside a `ready` palette whose `analysisVersion` is not
+  // ADVISOR_RULES_VERSION. The recommendations beneath it are always resolved
+  // from the CURRENT rule table, so what is stale is the derived palette
+  // itself -- the undertone, depth and confidence the reader is looking at --
+  // and the copy has to say that rather than imply the shades are outdated.
+  'commerce.premium.palette.staleVersion',
   'commerce.premium.palette.unavailable',
   'commerce.premium.palette.loadError',
   'commerce.premium.palette.saveError',

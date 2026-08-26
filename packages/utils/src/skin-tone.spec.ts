@@ -1,3 +1,5 @@
+// Learning path Step 36: Colour palette, beauty and accessory advisor.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 /**
  * Story 5.4 Task 2: pins the closed-form colour science Decision 3 requires.
  * Floating-point results are asserted with `toBeCloseTo(value, 2)`, never

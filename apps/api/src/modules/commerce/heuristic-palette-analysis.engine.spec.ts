@@ -1,3 +1,5 @@
+// Learning path Step 36: Colour palette, beauty and accessory advisor.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 // Story 5.4 Task 6: the real Sharp-backed selfie pipeline, exercised against
 // synthesized test images (sharp `create` + `composite`) rather than real
 // photographs -- exactly the "explicitly untested" boundary the story states:

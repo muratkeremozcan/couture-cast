@@ -1,3 +1,5 @@
+// Learning path Step 36: Colour palette, beauty and accessory advisor.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 // Story 5.4 Task 7 owner: ten-locale parity for the `commerce.premium.palette.*` tree.
 //
 // A new feature area gets its own dedicated parity spec rather than an extension of

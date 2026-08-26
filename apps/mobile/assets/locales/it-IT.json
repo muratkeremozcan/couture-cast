@@ -519,6 +519,7 @@
           "body": "Abbonati a Premium dalle Impostazioni per ricevere tonalità di make-up e abbinamenti di accessori adatti ai tuoi colori.",
           "signedOutBody": "Accedi e abbonati a Premium per ricevere tonalità di make-up e abbinamenti di accessori adatti ai tuoi colori."
         },
+        "staleVersion": "Questa palette proviene da una versione precedente dei nostri consigli. Riavvia l'analisi per ottenere un risultato aggiornato.",
         "unavailable": "L'analisi dei colori è in pausa al momento. La palette salvata resta com'è; le nuove analisi ripartiranno quando tornerà attiva.",
         "loadError": "Non siamo riusciti a caricare la tua palette. Riprova.",
         "saveError": "Non siamo riusciti a salvare la modifica. Riprova.",

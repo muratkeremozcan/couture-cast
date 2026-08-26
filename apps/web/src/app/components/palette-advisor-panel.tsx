@@ -25,10 +25,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type {
-  AdvisorRecommendationCard,
-  PaletteAdvisorProfile,
-  PaletteAnalysisFailureReason,
+import {
+  ADVISOR_RULES_VERSION,
+  type AdvisorRecommendationCard,
+  type PaletteAdvisorProfile,
+  type PaletteAnalysisFailureReason,
 } from '@couture/api-client/contracts/http'
 import { mintAffiliateClickFromWeb, openAffiliatePartnerSite } from '../../lib/commerce'
 import {
@@ -43,6 +44,33 @@ import {
   uploadPaletteSelfieFromWeb,
   type PaletteSelfieUploadState,
 } from '../../lib/palette-advisor'
+
+/**
+ * True when a stored palette was derived under a rule table this build has
+ * replaced.
+ *
+ * WHAT IS STALE IS THE PALETTE, NOT THE CARDS BENEATH IT.
+ * `PaletteAdvisorService.resolveRecommendations` builds every card from the
+ * CURRENT `ADVISOR_RULES` keyed on the stored undertone and depth, and never
+ * consults `analysis_version`, so the shades on screen are always this build's.
+ * What predates a rules bump is the derivation itself -- the undertone, the
+ * depth and the confidence -- and there is no way to refresh those without
+ * re-running an analysis, because Decision 8 purged the selfie the moment the
+ * last one terminated.
+ *
+ * Without the note this returns, the panel is indistinguishable from a current
+ * one: the result reads as fresh, and a reader has no reason to press a source
+ * button they have already used. `SourceChoice` is already on screen in this
+ * state, so the affordance costs nothing beyond the sentence that explains it.
+ *
+ * A module-level function rather than an inline expression because the panel
+ * sits on a complexity ceiling of 15 and this is two more branches.
+ */
+function isPaletteStale(analysis: PaletteAdvisorProfile['analysis']): boolean {
+  return (
+    analysis?.status === 'ready' && analysis.analysisVersion !== ADVISOR_RULES_VERSION
+  )
+}
 
 const UNAVAILABLE_HINT_ID = 'palette-advisor-unavailable-hint'
 const WARDROBE_HINT_ID = 'palette-advisor-wardrobe-hint'
@@ -508,15 +536,31 @@ function PaletteResult({
   undertone,
   depth,
   confidenceLabel,
+  isStale,
 }: {
   undertone: string
   depth: string | null
   confidenceLabel: string | null
+  isStale: boolean
 }) {
   const { t } = useTranslation()
 
   return (
     <>
+      {/*
+        Precedes the numbers it qualifies, the same way the kill-switch note
+        precedes the controls it explains. A caveat printed under a reading the
+        reader has already taken as current is a caveat they never see.
+      */}
+      {isStale && (
+        <p
+          className="mt-4 text-sm text-neutral-300"
+          data-testid="palette-advisor-stale-version"
+        >
+          {t('commerce.premium.palette.staleVersion')}
+        </p>
+      )}
+
       <dl className="mt-6 space-y-2 text-sm" data-testid="palette-advisor-result">
         <div className="flex gap-2">
           <dt className="text-neutral-400">
@@ -891,6 +935,8 @@ export function PaletteAdvisorPanel() {
    * separator differs across the ten catalogs. The value itself is a `[0, 1]`
    * float from the contract.
    */
+  const isStalePalette = isPaletteStale(analysis)
+
   const confidenceLabel = useMemo(() => {
     if (analysis?.status !== 'ready') return null
     return new Intl.NumberFormat(i18n.language, {
@@ -983,6 +1029,7 @@ export function PaletteAdvisorPanel() {
             undertone={analysis.undertone}
             depth={analysis.depth}
             confidenceLabel={confidenceLabel}
+            isStale={isStalePalette}
           />
 
           {lastDismissal && (
