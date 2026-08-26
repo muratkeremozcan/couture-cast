@@ -583,6 +583,41 @@ describe('5.4 palette advisor against real PostgreSQL and real HTTP', () => {
     expect(match?.offer_id).not.toBe(advisorOfferId)
   })
 
+  /**
+   * 5.4-INT-029. `findPaletteProfileId` is what an advisor click's
+   * `recommendation_id` is derived from, and it has to answer on CONSENT, not
+   * on row existence. Decision 9 keeps the `PaletteProfile` row alive through a
+   * revocation on purpose -- nulled scalars, `consent_revoked_at` stamped -- so
+   * an existence-only lookup kept minting attributed advisor clicks for a user
+   * who had erased their palette, and refused callers with
+   * `PALETTE_CONSENT_REQUIRED_MESSAGE` while enforcing something else entirely.
+   * Asserted against real SQL because the surviving row is the whole point.
+   */
+  it('5.4-INT-029 resolves the advisor recommendation id only while consent is current', async (context) => {
+    if (!requireSchema(context)) return
+
+    const repository = app?.get(CommerceRepository)
+
+    // No profile at all: nothing to attribute.
+    expect(await repository?.findPaletteProfileId(userId)).toBeNull()
+
+    expect((await setConsent(userId, true)).status).toBe(200)
+    const granted = await repository?.findPaletteProfileId(userId)
+    const row = await prisma.paletteProfile.findUnique({ where: { user_id: userId } })
+    expect(granted).toBe(row?.id)
+
+    expect((await setConsent(userId, false)).status).toBe(200)
+    // The row is still there, which is exactly why the check cannot be `!== null`.
+    expect(
+      await prisma.paletteProfile.findUnique({ where: { user_id: userId } })
+    ).not.toBeNull()
+    expect(await repository?.findPaletteProfileId(userId)).toBeNull()
+
+    // Re-granting restores it, so this is a consent gate and not a one-way door.
+    expect((await setConsent(userId, true)).status).toBe(200)
+    expect(await repository?.findPaletteProfileId(userId)).toBe(row?.id)
+  })
+
   it('5.4-INT-027 keeps the advisor overlay off when the user opted out of affiliate CTAs', async (context) => {
     if (!requireSchema(context)) return
 

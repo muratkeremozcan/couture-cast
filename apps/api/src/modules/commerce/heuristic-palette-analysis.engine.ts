@@ -8,6 +8,7 @@ import {
   classifyDepth,
   classifyUndertone,
   hueAngleDegrees,
+  hueAngleInterquartileSpread,
   individualTypologyAngle,
   type Lab,
   linearizeSrgbChannel,
@@ -115,26 +116,22 @@ function median(values: readonly number[]): number {
   return sorted[mid] ?? 0
 }
 
-function interquartileRange(values: readonly number[]): number {
-  if (values.length < 4) {
-    return 0
-  }
-  const sorted = [...values].sort((a, b) => a - b)
-  const q1 = sorted[Math.floor(sorted.length * 0.25)] ?? 0
-  const q3 = sorted[Math.floor(sorted.length * 0.75)] ?? 0
-  return q3 - q1
-}
-
 /**
  * Surviving-pixel fraction scaled by the inter-quartile tightness of the
  * survivors' hue angle: broad agreement across many pixels scores high, a
  * handful of scattered pixels scores low (Decision 3).
+ *
+ * The spread is CIRCULAR (`hueAngleInterquartileSpread`), because a hue angle
+ * is a point on a circle. A skin-chroma-gated selfie rarely straddles the
+ * 0/360 wrap, but the wardrobe derivation reads the same formula over garment
+ * colours that do, and one implementation of "how much do these hues
+ * disagree" is the point.
  */
 function computeConfidence(
   survivingFraction: number,
   hueAngles: readonly number[]
 ): number {
-  const iqr = interquartileRange(hueAngles)
+  const iqr = hueAngleInterquartileSpread(hueAngles)
   const tightness = Math.max(0, 1 - iqr / HUE_IQR_ZERO_CONFIDENCE)
   return Math.min(1, Math.max(0, survivingFraction * tightness))
 }

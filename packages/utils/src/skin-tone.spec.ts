@@ -10,6 +10,7 @@ import {
   classifyUndertone,
   COOL_HUE_MAX,
   hueAngleDegrees,
+  hueAngleInterquartileSpread,
   individualTypologyAngle,
   ITA_FAIR_MIN,
   ITA_LIGHT_MIN,
@@ -244,5 +245,49 @@ describe('classifyUndertone: every band, including the boundaries', () => {
   it('5.4-UTIL-047 classifies a near-zero a* (pure yellow-ish) as olive, not a ratio blow-up', () => {
     const lab: Lab = { L: 50, a: 0.01, b: 20 }
     expect(classifyUndertone(lab)).toBe('olive')
+  })
+})
+
+describe('hueAngleInterquartileSpread', () => {
+  /**
+   * The property that makes the circular measure a strict improvement rather
+   * than a recalibration: for any sample that does not straddle the 0/360
+   * wrap, deviations from the mean direction are a pure translation of the
+   * inputs, and the interquartile range is translation-invariant.
+   */
+  it('5.4-UTIL-050 matches a plain interquartile range on a sample that does not wrap', () => {
+    const angles = [40, 44, 48, 52, 56, 60]
+    // Plain IQR over the same order statistics: sorted[1] and sorted[4].
+    expect(hueAngleInterquartileSpread(angles)).toBeCloseTo(56 - 44, 6)
+  })
+
+  it('5.4-UTIL-051 reports a tight spread for hues clustered across the 0/360 wrap', () => {
+    // Magentas and fuchsias sit just below 360 in CIELAB while reds, corals
+    // and pinks sit just above 0. These six agree to within 20 degrees; read
+    // linearly they look 350 apart, which is what refused a wardrobe whose
+    // colours in fact agreed.
+    const angles = [350, 354, 358, 2, 6, 10]
+    expect(hueAngleInterquartileSpread(angles)).toBeCloseTo(12, 6)
+  })
+
+  it('5.4-UTIL-052 still reports a wide spread for hues that genuinely disagree', () => {
+    // The wrap fix must not make disagreement disappear: opposite points on
+    // the circle are the maximum possible separation and must stay wide.
+    const angles = [0, 2, 178, 180, 182, 358]
+    expect(hueAngleInterquartileSpread(angles)).toBeGreaterThan(90)
+  })
+
+  it('5.4-UTIL-053 returns 0 below four samples, which is too few to quartile', () => {
+    expect(hueAngleInterquartileSpread([])).toBe(0)
+    expect(hueAngleInterquartileSpread([10, 200, 300])).toBe(0)
+  })
+
+  it('5.4-UTIL-054 is invariant under rotating every angle by the same amount', () => {
+    const angles = [12, 30, 47, 61, 88, 104]
+    const rotated = angles.map((angle) => (angle + 300) % 360)
+    expect(hueAngleInterquartileSpread(rotated)).toBeCloseTo(
+      hueAngleInterquartileSpread(angles),
+      6
+    )
   })
 })

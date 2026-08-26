@@ -6,6 +6,7 @@ import {
   chroma,
   classifyUndertone,
   hueAngleDegrees,
+  hueAngleInterquartileSpread,
   type Lab,
   linearRgbToLab,
   linearizeSrgbChannel,
@@ -20,7 +21,10 @@ import {
 } from '../../contracts/http.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
-import type { PaletteAnalysisEngine } from './palette-analysis.engine.js'
+import type {
+  PaletteAnalysisEngine,
+  SelfieAnalysisOutcome,
+} from './palette-analysis.engine.js'
 import type { WardrobeStorage } from '../wardrobe/wardrobe-storage.adapter.js'
 
 type ProcessablePaletteProfile = PaletteProfile & { status: 'processing' }
@@ -98,18 +102,16 @@ function median(values: readonly number[]): number {
   return sorted[mid] ?? 0
 }
 
-function interquartileRange(values: readonly number[]): number {
-  if (values.length < 4) {
-    return 0
-  }
-  const sorted = [...values].sort((a, b) => a - b)
-  const q1 = sorted[Math.floor(sorted.length * 0.25)] ?? 0
-  const q3 = sorted[Math.floor(sorted.length * 0.75)] ?? 0
-  return q3 - q1
-}
-
+/**
+ * The spread is CIRCULAR (`hueAngleInterquartileSpread`), which matters more
+ * here than on the selfie path. Garment colours routinely straddle CIELAB's
+ * 0/360 wrap -- magentas and fuchsias sit just below 360, reds, corals and
+ * pinks just above 0 -- and a linear interquartile range reads that tight
+ * cluster as near-total disagreement, refusing a wardrobe whose colours in
+ * fact agree.
+ */
 function hueTightness(hueAngles: readonly number[]): number {
-  const iqr = interquartileRange(hueAngles)
+  const iqr = hueAngleInterquartileSpread(hueAngles)
   return Math.max(0, 1 - iqr / HUE_IQR_ZERO_CONFIDENCE)
 }
 
@@ -196,7 +198,30 @@ export class PaletteAnalysisProcessor {
     // retry/backoff engages (mirrors silhouette-photo.processor.ts's
     // deliberate non-catching of download failures).
     const bytes = await this.storage.download(objectPath)
-    const verdict = await this.engine.analyzeSelfie(bytes)
+
+    // The DECODE, unlike the download above, is caught. Sharp throws on bytes
+    // it cannot decode -- a truncated or corrupt upload, a file that is not an
+    // image at all, or one whose real pixel count exceeds the engine's
+    // `limitInputPixels` -- and the client is what declares `mimeType`,
+    // `widthPx` and `heightPx` at commit, so none of those is verified against
+    // the bytes anywhere upstream. Every one of them is DETERMINISTIC: left to
+    // propagate, it throws identically on every BullMQ attempt, burns the whole
+    // retry budget on an input that can never succeed, and then terminates
+    // through `markFailed` as `timeout` or `storage_error` -- telling the user
+    // the service was slow or the storage broke when in fact their file was
+    // unreadable. `low_quality` is the honest terminal answer and its copy
+    // ("too dim, too filtered or too uneven") already asks for another photo.
+    let verdict: SelfieAnalysisOutcome
+    try {
+      verdict = await this.engine.analyzeSelfie(bytes)
+    } catch (error) {
+      this.logger.warn(
+        { error },
+        'Palette selfie could not be decoded; terminating low_quality'
+      )
+      return { outcome: 'low_quality' }
+    }
+
     if (verdict.outcome === 'ready') {
       return {
         outcome: 'ready',

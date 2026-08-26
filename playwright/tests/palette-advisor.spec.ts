@@ -177,6 +177,12 @@ anonymousTest.describe('Story 5.4 palette advisor, signed out', () => {
   anonymousTest(
     '[P1] 5.4-E2E-014 highlights no bottom-nav tab on /palette',
     async ({ page }) => {
+      // The bottom nav is `min-[768px]:hidden`, so it exists in the DOM at
+      // every width and is only VISIBLE on a phone viewport. Asserting it at
+      // the default 1280-wide viewport resolved the element fourteen times and
+      // read "hidden" every time. 375x812 is the width story 3.6's own
+      // bottom-nav spec uses for exactly this reason.
+      await page.setViewportSize({ width: 375, height: 812 })
       await page.goto('/palette')
       await waitForAccessibilityReady(page)
 

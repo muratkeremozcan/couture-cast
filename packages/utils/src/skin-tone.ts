@@ -167,6 +167,58 @@ export function hueAngleDegrees(lab: Lab): number {
 }
 
 /**
+ * The interquartile spread of a set of hue angles, in degrees, measured
+ * CIRCULARLY: each angle's signed deviation from the sample's mean direction,
+ * wrapped into `(-180, 180]`, and the interquartile range taken over those
+ * deviations. Zero for fewer than four samples, which is too few to quartile.
+ *
+ * Both confidence formulas that consume this — the selfie engine's and the
+ * wardrobe derivation's — read it as "how much do these hues disagree", and a
+ * hue angle is a point on a circle, not a position on a line. Taking the plain
+ * interquartile range of `hueAngleDegrees` output treats 359 degrees and 1
+ * degree as 358 apart when they are 2 apart, so a set that agrees tightly
+ * across the 0/360 wrap scores as total disagreement. That is not a corner
+ * case for a wardrobe: magentas and fuchsias sit just below 360 in CIELAB
+ * while reds, corals and pinks sit just above 0, and a wardrobe holding both
+ * would have been refused with `insufficient_wardrobe` while its colours in
+ * fact agreed.
+ *
+ * Deviations are taken from the mean direction rather than from zero, and the
+ * interquartile range is translation-invariant, so for any sample that does
+ * NOT straddle the wrap this returns exactly what the naive linear range
+ * returned. The fix adds no calibration change to correct data; it only stops
+ * the wrap from manufacturing disagreement.
+ */
+export function hueAngleInterquartileSpread(hueAngles: readonly number[]): number {
+  if (hueAngles.length < 4) {
+    return 0
+  }
+
+  const toRadians = Math.PI / 180
+  let sumSin = 0
+  let sumCos = 0
+  for (const angle of hueAngles) {
+    sumSin += Math.sin(angle * toRadians)
+    sumCos += Math.cos(angle * toRadians)
+  }
+  const meanDirection = (Math.atan2(sumSin, sumCos) * 180) / Math.PI
+
+  const deviations = hueAngles
+    .map((angle) => {
+      // `((x % 360) + 360) % 360` first, because JavaScript's `%` keeps the
+      // sign of the dividend and a negative remainder would land outside the
+      // half-open window this shifts into.
+      const wrapped = (((angle - meanDirection) % 360) + 360) % 360
+      return wrapped > 180 ? wrapped - 360 : wrapped
+    })
+    .sort((a, b) => a - b)
+
+  const q1 = deviations[Math.floor(deviations.length * 0.25)] ?? 0
+  const q3 = deviations[Math.floor(deviations.length * 0.75)] ?? 0
+  return q3 - q1
+}
+
+/**
  * Below this chroma, there is too little colour in the mean to call an
  * undertone at all — the median survivor is effectively grey. Real skin
  * chroma runs well above this floor (roughly 15-45 in typical daylight

@@ -16,6 +16,7 @@ import {
   ADVISOR_RULES,
   type AdvisorRecommendationCard,
   PALETTE_ANALYSIS_DISABLED_MESSAGE,
+  PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE,
   PALETTE_CONSENT_REQUIRED_MESSAGE,
   PREMIUM_REQUIRED_MESSAGE,
   type PaletteAdvisorProfile,
@@ -608,6 +609,338 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
       await screen.findByTestId('palette-advisor-unavailable')
       expect(screen.getByTestId('palette-advisor-source-wardrobe')).toBeDisabled()
       expect(document.body.textContent).not.toContain(PALETTE_ANALYSIS_DISABLED_MESSAGE)
+    })
+  })
+
+  /**
+   * The write path's own guards, as opposed to the four rejection reasons above.
+   *
+   * `applyWriteFailure`'s docblock argues that a rejected write must re-resolve
+   * the surface rather than print a line, and `runWrite`'s argues that the
+   * session must be re-read on every press rather than trusted from mount.
+   * Both arguments were untested: coverage put the `signed_out` case, the
+   * `in_progress` case, the generic fallback, the busy guard and the
+   * `hasWebSession()` guard all at zero, which is how a panel keeps its
+   * comments and loses its behaviour.
+   */
+  describe('write path guards', () => {
+    const readyProfileWithCard: ProfileOverrides = {
+      hasConsent: true,
+      analysis: readyAnalysis('medium'),
+      recommendations: [card(FOUNDATION_WARM_MEDIUM)],
+    }
+
+    it('5.4-WEB-034 drops to the signed-out locked panel when a write is refused as signed out', async () => {
+      signIn()
+      useMswHandlers(
+        getHandler(readyProfileWithCard),
+        http.put(`${PALETTE_PATH}/recommendations`, () =>
+          errorBody(401, 'Unauthorized', 'Unauthorized')
+        )
+      )
+      renderPanel()
+
+      await userEvent.click(
+        await screen.findByTestId(
+          `palette-advisor-save-${FOUNDATION_WARM_MEDIUM.itemKey}`
+        )
+      )
+
+      const locked = await screen.findByTestId('palette-advisor-locked')
+      expect(locked).toHaveTextContent('Sign in and subscribe to Premium')
+      expect(
+        screen.queryByTestId('palette-advisor-recommendations')
+      ).not.toBeInTheDocument()
+    })
+
+    it('5.4-WEB-035 re-reads the server rather than erroring when a write is refused as already in progress', async () => {
+      signIn()
+      let getCount = 0
+      useMswHandlers(
+        http.get(PALETTE_PATH, () => {
+          getCount += 1
+          return HttpResponse.json({
+            data: profile(
+              getCount === 1
+                ? { hasConsent: true }
+                : {
+                    hasConsent: true,
+                    analysis: {
+                      status: 'processing' as const,
+                      failureReason: null,
+                      source: 'wardrobe' as const,
+                      undertone: null,
+                      depth: null,
+                      confidence: null,
+                      analysisVersion: null,
+                      analyzedAt: null,
+                    },
+                  }
+            ),
+          })
+        }),
+        http.post(`${PALETTE_PATH}/analyze`, () =>
+          errorBody(409, PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE, 'Conflict')
+        )
+      )
+      renderPanel()
+
+      await userEvent.click(await screen.findByTestId('palette-advisor-source-wardrobe'))
+
+      // The refusal is not an error: the server already holds a running
+      // analysis, so the status line is the answer.
+      await waitFor(() => expect(getCount).toBeGreaterThan(1))
+      expect(screen.queryByTestId('palette-advisor-error')).not.toBeInTheDocument()
+      expect(document.body.textContent).not.toContain(
+        PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE
+      )
+    })
+
+    it('5.4-WEB-036 shows the translated fallback line for an unclassified write failure', async () => {
+      signIn()
+      useMswHandlers(
+        getHandler(readyProfileWithCard),
+        http.put(`${PALETTE_PATH}/recommendations`, () =>
+          errorBody(500, 'Internal server error', 'Internal Server Error')
+        )
+      )
+      renderPanel()
+
+      await userEvent.click(
+        await screen.findByTestId(
+          `palette-advisor-save-${FOUNDATION_WARM_MEDIUM.itemKey}`
+        )
+      )
+
+      const error = await screen.findByTestId('palette-advisor-error')
+      // The catalog copy, never the server's untranslated English.
+      expect(error).toHaveTextContent(/./)
+      expect(error.textContent).not.toContain('Internal server error')
+      // A generic failure leaves the surface alone: it is not evidence that
+      // entitlement lapsed or consent was revoked.
+      expect(screen.getByTestId('palette-advisor-recommendations')).toBeInTheDocument()
+    })
+
+    it('5.4-WEB-037 re-reads the session on every press instead of trusting it from mount', async () => {
+      signIn()
+      let writeCount = 0
+      useMswHandlers(
+        getHandler(readyProfileWithCard),
+        http.put(`${PALETTE_PATH}/recommendations`, () => {
+          writeCount += 1
+          return HttpResponse.json({ data: profile(readyProfileWithCard) })
+        })
+      )
+      renderPanel()
+
+      const save = await screen.findByTestId(
+        `palette-advisor-save-${FOUNDATION_WARM_MEDIUM.itemKey}`
+      )
+      // Signing out in another tab leaves this panel rendered and interactive.
+      window.sessionStorage.clear()
+      await userEvent.click(save)
+
+      await screen.findByTestId('palette-advisor-locked')
+      // No request was made at all: without the re-read the write would have
+      // reached the lib and surfaced PALETTE_ADVISOR_SIGNED_OUT_MESSAGE, a
+      // developer string with no catalog entry, so English in all ten locales.
+      expect(writeCount).toBe(0)
+      expect(screen.queryByTestId('palette-advisor-error')).not.toBeInTheDocument()
+    })
+
+    it('5.4-WEB-038 ignores a second press while a write is still in flight', async () => {
+      signIn()
+      let writeCount = 0
+      let releaseWrite = (): void => undefined
+      const inFlight = new Promise<void>((resolve) => {
+        releaseWrite = resolve
+      })
+      useMswHandlers(
+        getHandler(readyProfileWithCard),
+        http.put(`${PALETTE_PATH}/recommendations`, async () => {
+          writeCount += 1
+          await inFlight
+          return HttpResponse.json({ data: profile(readyProfileWithCard) })
+        })
+      )
+      renderPanel()
+
+      const save = await screen.findByTestId(
+        `palette-advisor-save-${FOUNDATION_WARM_MEDIUM.itemKey}`
+      )
+      await userEvent.click(save)
+      await waitFor(() => expect(writeCount).toBe(1))
+      await userEvent.click(save)
+      await userEvent.click(
+        screen.getByTestId(`palette-advisor-dismiss-${FOUNDATION_WARM_MEDIUM.itemKey}`)
+      )
+
+      // One write in flight means one write, whichever control is pressed:
+      // the busy guard is shared across every control, not per button.
+      expect(writeCount).toBe(1)
+
+      // Released so the in-flight request settles inside the test rather than
+      // after it, which would leave an unhandled update on a torn-down tree.
+      releaseWrite()
+      await waitFor(() =>
+        expect(
+          screen.getByTestId(`palette-advisor-save-${FOUNDATION_WARM_MEDIUM.itemKey}`)
+        ).toBeEnabled()
+      )
+    })
+
+    it('5.4-WEB-041 releases the object URL whichever way the selfie upload ends', async () => {
+      signIn()
+      const created: string[] = []
+      const revoked: string[] = []
+      const originalCreate = URL.createObjectURL.bind(URL)
+      const originalRevoke = URL.revokeObjectURL.bind(URL)
+      URL.createObjectURL = function stubCreateObjectURL(): string {
+        const url = `blob:selfie-${created.length}`
+        created.push(url)
+        return url
+      } as typeof URL.createObjectURL
+      URL.revokeObjectURL = function stubRevokeObjectURL(url: string): void {
+        revoked.push(url)
+      } as typeof URL.revokeObjectURL
+
+      try {
+        useMswHandlers(
+          getHandler({ hasConsent: true }),
+          // Refused at the first hop, which is the interesting direction: the
+          // object URL is the only local handle on the image, so a failed
+          // upload must release it exactly as a successful one does.
+          http.post(`${PALETTE_PATH}/selfie/upload-url`, () =>
+            errorBody(503, PALETTE_ANALYSIS_DISABLED_MESSAGE, 'Service Unavailable')
+          )
+        )
+        renderPanel()
+
+        const input = await screen.findByTestId('palette-advisor-selfie-input')
+        await userEvent.upload(
+          input,
+          new File(['selfie-bytes'], 'selfie.png', { type: 'image/png' })
+        )
+
+        // Whatever the upload's outcome -- and it is refused here -- the local
+        // handle on the image is released. That is the `finally` this asserts.
+        await waitFor(() => expect(revoked).toEqual(created))
+        expect(created).toHaveLength(1)
+        // Reset immediately, so choosing the same file twice still fires `change`.
+        expect((input as HTMLInputElement).value).toBe('')
+      } finally {
+        URL.createObjectURL = originalCreate
+        URL.revokeObjectURL = originalRevoke
+      }
+    })
+
+    it('5.4-WEB-042 does nothing when the file chooser is dismissed without a file', async () => {
+      signIn()
+      let allocateCount = 0
+      useMswHandlers(
+        getHandler({ hasConsent: true }),
+        http.post(`${PALETTE_PATH}/selfie/upload-url`, () => {
+          allocateCount += 1
+          return errorBody(503, PALETTE_ANALYSIS_DISABLED_MESSAGE, 'Service Unavailable')
+        })
+      )
+      renderPanel()
+
+      const input = await screen.findByTestId('palette-advisor-selfie-input')
+      await userEvent.upload(input, [])
+
+      expect(allocateCount).toBe(0)
+      expect(screen.queryByTestId('palette-advisor-error')).not.toBeInTheDocument()
+    })
+  })
+
+  /**
+   * The sponsored handoff's failure doors. `handleSponsoredActivate` refuses to
+   * navigate unless the click was attributed first -- "traffic the partner
+   * cannot attribute is worth nothing to them and cannot be audited by us" --
+   * and both ways that can fail were untested.
+   */
+  describe('sponsored handoff failures', () => {
+    const sponsoredProfile: ProfileOverrides = {
+      hasConsent: true,
+      analysis: readyAnalysis('medium'),
+      recommendations: [
+        card(FOUNDATION_WARM_MEDIUM, {
+          sponsored: {
+            partnerId: 'lumen-beauty',
+            partnerDisplayName: 'Lumen Beauty',
+            offerId: 'offer-foundation-1',
+            offerTitle: 'Lumen Skin Tint',
+          },
+        }),
+      ],
+    }
+
+    it('5.4-WEB-039 surfaces a failed mint on the card and never opens a partner tab', async () => {
+      signIn()
+      const opened: string[] = []
+      const originalOpen = window.open
+      window.open = function stubOpen(url?: string | URL): Window {
+        opened.push(String(url))
+        return {} as Window
+      } as typeof window.open
+
+      try {
+        useMswHandlers(
+          getHandler(sponsoredProfile),
+          http.post('/api/v1/commerce/affiliate/clicks', () =>
+            errorBody(403, PALETTE_CONSENT_REQUIRED_MESSAGE, 'Forbidden')
+          )
+        )
+        renderPanel()
+
+        await userEvent.click(
+          await screen.findByTestId(
+            `palette-advisor-sponsored-cta-${FOUNDATION_WARM_MEDIUM.itemKey}`
+          )
+        )
+
+        await screen.findByTestId(
+          `palette-advisor-sponsored-error-${FOUNDATION_WARM_MEDIUM.itemKey}`
+        )
+        expect(opened).toEqual([])
+      } finally {
+        window.open = originalOpen
+      }
+    })
+
+    it('5.4-WEB-040 surfaces a blocked popup on the card even though the click was attributed', async () => {
+      signIn()
+      const originalOpen = window.open
+      // A blocked popup returns null, which is a failed handoff rather than a
+      // failed attribution: the click row exists and must not be minted twice.
+      window.open = function blockedOpen(): null {
+        return null
+      } as typeof window.open
+
+      try {
+        useMswHandlers(
+          getHandler(sponsoredProfile),
+          http.post('/api/v1/commerce/affiliate/clicks', () =>
+            HttpResponse.json({
+              data: { redirectUrl: 'https://partner.example.com/offer?click=token' },
+            })
+          )
+        )
+        renderPanel()
+
+        await userEvent.click(
+          await screen.findByTestId(
+            `palette-advisor-sponsored-cta-${FOUNDATION_WARM_MEDIUM.itemKey}`
+          )
+        )
+
+        await screen.findByTestId(
+          `palette-advisor-sponsored-error-${FOUNDATION_WARM_MEDIUM.itemKey}`
+        )
+      } finally {
+        window.open = originalOpen
+      }
     })
   })
 

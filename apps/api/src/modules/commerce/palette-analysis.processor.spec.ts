@@ -215,6 +215,62 @@ describe('PaletteAnalysisProcessor', () => {
       })
     })
 
+    /**
+     * 5.4-API-026. The confidence term reads hue agreement, and a hue angle is
+     * a point on a circle. These six garment colours agree to within about 20
+     * degrees, but they straddle CIELAB's 0/360 wrap -- magentas and fuchsias
+     * sit just below 360, reds, corals and pinks just above 0 -- so a linear
+     * interquartile range read them as roughly 350 degrees apart and refused
+     * the wardrobe with `insufficient_wardrobe`. `hueAngleInterquartileSpread`
+     * measures the deviation from the sample's mean direction instead, so a
+     * wardrobe that agrees is accepted whatever arc it happens to sit on.
+     */
+    it('5.4-API-026 accepts a wardrobe whose agreeing colours straddle the 0/360 hue wrap', async () => {
+      mockFindUnique.mockResolvedValueOnce({
+        id: 'p1',
+        user_id: 'u1',
+        status: 'processing',
+        source: 'wardrobe',
+        selfie_object_path: null,
+      })
+      // Eight magentas/fuchsias (CIELAB hue 348-356) and seven reds/pinks
+      // (hue 10-12), all well clear of ACHROMATIC_CHROMA_MAX. Fifteen samples
+      // saturate the count factor at 1, so the hue term alone decides:
+      // circularly the interquartile spread is 22.2 degrees and confidence is
+      // 0.75; read linearly it was 341.2 degrees and confidence was exactly 0,
+      // which is the refusal this test exists to keep gone.
+      mockPaletteInsightsFindMany.mockResolvedValueOnce(
+        [
+          '#C71585',
+          '#D6218F',
+          '#B3126F',
+          '#FF1493',
+          '#C71585',
+          '#D6218F',
+          '#B3126F',
+          '#FF1493',
+          '#C21E56',
+          '#D42A5E',
+          '#B01A4C',
+          '#E91E63',
+          '#C21E56',
+          '#D42A5E',
+          '#B01A4C',
+        ].map((hex) => ({ hex_codes: [hex] }))
+      )
+
+      await processor.process('p1')
+
+      expect(mockUpdateMany).toHaveBeenCalledWith({
+        where: { id: 'p1', status: 'processing' },
+        data: expect.objectContaining({
+          status: 'ready',
+          undertone: 'cool',
+          depth: null,
+        }),
+      })
+    })
+
     /** The same six-sample count passes once the colours agree. */
     it('5.4-API-025 accepts a small wardrobe whose colours agree', async () => {
       mockFindUnique.mockResolvedValueOnce({
@@ -337,6 +393,67 @@ describe('PaletteAnalysisProcessor', () => {
         )
       }
     )
+
+    /**
+     * 5.4-API-036. Sharp throws on bytes it cannot decode, and nothing upstream
+     * verifies the client-declared `mimeType`, `widthPx` or `heightPx` against
+     * the object that was actually PUT. Every one of those failures is
+     * deterministic, so letting the throw propagate would retry an input that
+     * can never succeed until the BullMQ budget is exhausted and then terminate
+     * through `markFailed` as `timeout` -- telling the user the service was slow
+     * when their file was unreadable. It terminates here instead, and purges,
+     * because a selfie that cannot be analysed still must not be retained.
+     */
+    it('5.4-API-036 terminates low_quality and purges when the engine cannot decode the bytes', async () => {
+      mockFindUnique.mockResolvedValueOnce({
+        id: 'p1',
+        user_id: 'u1',
+        status: 'processing',
+        source: 'selfie',
+        selfie_object_path: 'wardrobe/u1/palette/s1.jpg',
+      })
+      mockDownload.mockResolvedValueOnce(Buffer.from('not-an-image'))
+      mockAnalyzeSelfie.mockRejectedValueOnce(
+        new Error('Input buffer contains unsupported image format')
+      )
+
+      await expect(processor.process('p1')).resolves.toBeUndefined()
+
+      expect(mockUpdateMany).toHaveBeenNthCalledWith(1, {
+        where: { id: 'p1', status: 'processing' },
+        data: { status: 'failed', failure_reason: 'low_quality' },
+      })
+      expect(mockRemove).toHaveBeenCalledWith(['wardrobe/u1/palette/s1.jpg'])
+      expect(mockCaptureEvent).toHaveBeenCalledWith('u1', 'palette_analysis_completed', {
+        source: 'selfie',
+        undertone: null,
+        depth: null,
+        outcome: 'low_quality',
+      })
+    })
+
+    /**
+     * 5.4-API-037. The DOWNLOAD keeps the opposite posture, deliberately: a
+     * storage fault is transient, so it propagates and BullMQ's existing
+     * retry/backoff engages, exactly as `silhouette-photo.processor.ts` does.
+     * Catching both at one level would turn a recoverable outage into a
+     * permanent `low_quality` verdict on a photo that was never read.
+     */
+    it('5.4-API-037 lets a storage download failure propagate for BullMQ to retry', async () => {
+      mockFindUnique.mockResolvedValueOnce({
+        id: 'p1',
+        user_id: 'u1',
+        status: 'processing',
+        source: 'selfie',
+        selfie_object_path: 'wardrobe/u1/palette/s1.jpg',
+      })
+      mockDownload.mockRejectedValueOnce(new Error('storage unavailable'))
+
+      await expect(processor.process('p1')).rejects.toThrow('storage unavailable')
+
+      expect(mockUpdateMany).not.toHaveBeenCalled()
+      expect(mockRemove).not.toHaveBeenCalled()
+    })
 
     it('fails storage_error immediately when the row has no selfie_object_path, without downloading', async () => {
       mockFindUnique.mockResolvedValueOnce({

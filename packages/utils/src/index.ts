@@ -64,6 +64,7 @@ export {
   classifyUndertone,
   COOL_HUE_MAX,
   hueAngleDegrees,
+  hueAngleInterquartileSpread,
   individualTypologyAngle,
   ITA_FAIR_MIN,
   ITA_LIGHT_MIN,

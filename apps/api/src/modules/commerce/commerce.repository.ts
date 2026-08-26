@@ -248,20 +248,39 @@ export class CommerceRepository {
 
   /**
    * Story 5.4 Decision 7: the acting user's own `PaletteProfile.id`, or null
-   * when they have none.
+   * when they have none or their consent is not current.
    *
    * An advisor click stores this as `AffiliateClick.recommendation_id`, and it
    * is read here rather than trusted from the request body for the same reason
    * `scenario` and `locale_region` are derived server-side: the dedupe index
    * `(user_id, offer_id, recommendation_id, minute)` is only a rate limit while
    * the client cannot choose the third column.
+   *
+   * CONSENT is part of the lookup, not merely row existence, and the
+   * distinction is real because `erase()` does not delete the row: it nulls the
+   * derived scalars and stamps `consent_revoked_at`, deliberately, so that a
+   * revocation is a fact rather than an absence (Decision 9). An existence-only
+   * check therefore kept minting attributed advisor clicks for a user who had
+   * erased their palette, and answered a caller with
+   * `PALETTE_CONSENT_REQUIRED_MESSAGE` while enforcing something else. The
+   * currency rule is `consentIsCurrent`'s, restated in SQL terms: granted, and
+   * not revoked after that grant.
    */
   async findPaletteProfileId(userId: string): Promise<string | null> {
     const profile = await this.prisma.paletteProfile.findUnique({
       where: { user_id: userId },
-      select: { id: true },
+      select: { id: true, consent_granted_at: true, consent_revoked_at: true },
     })
-    return profile?.id ?? null
+    if (!profile?.consent_granted_at) {
+      return null
+    }
+    if (
+      profile.consent_revoked_at &&
+      profile.consent_revoked_at.getTime() >= profile.consent_granted_at.getTime()
+    ) {
+      return null
+    }
+    return profile.id
   }
 
   // --- Offer selection -----------------------------------------------------

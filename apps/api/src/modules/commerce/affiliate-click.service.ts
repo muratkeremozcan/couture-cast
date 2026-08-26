@@ -284,22 +284,15 @@ export class AffiliateClickService {
   }
 
   /**
-   * Inserts the click, and on a lost race against
-   * `AffiliateClick_dedupe_minute_key` re-reads the row that won.
-   *
-   * The index is a concurrency backstop rather than the product rule: it buckets
-   * by minute, so 10:00:59 and 10:01:01 land in different buckets and both
-   * insert, which is correct because the service's own 60-second check is what
-   * decides the window. What the index guarantees is that two simultaneous taps
-   * cannot both create a row.
-   */
-  /**
    * The acting user's own `PaletteProfile.id` for an advisor click.
    *
-   * A caller with no palette profile has never granted consent, so no advisor
-   * card was ever rendered for them and there is nothing to attribute. Refusing
-   * with the consent message is both accurate and the same 403 the advisor's
-   * own routes answer, rather than inventing a second vocabulary for one edge.
+   * `findPaletteProfileId` answers only for a user whose consent is CURRENT, so
+   * this refuses two cases with one message: a caller who never granted consent
+   * (no advisor card was ever rendered for them, so there is nothing to
+   * attribute) and one who granted it and then erased their palette, whose row
+   * survives with `consent_revoked_at` stamped by design. Refusing with the
+   * consent message is accurate for both, and is the same 403 the advisor's own
+   * routes answer, rather than inventing a second vocabulary for one edge.
    */
   private async resolveAdvisorRecommendationId(userId: string): Promise<string> {
     const profileId = await this.repository.findPaletteProfileId(userId)
@@ -309,6 +302,16 @@ export class AffiliateClickService {
     return profileId
   }
 
+  /**
+   * Inserts the click, and on a lost race against
+   * `AffiliateClick_dedupe_minute_key` re-reads the row that won.
+   *
+   * The index is a concurrency backstop rather than the product rule: it buckets
+   * by minute, so 10:00:59 and 10:01:01 land in different buckets and both
+   * insert, which is correct because the service's own 60-second check is what
+   * decides the window. What the index guarantees is that two simultaneous taps
+   * cannot both create a row.
+   */
   private async insertClick(
     input: Parameters<CommerceRepository['createClick']>[0]
   ): Promise<CommerceClickRow> {
