@@ -1006,3 +1006,37 @@ recommendation_id, minute)` and a client that can choose the third column can
   (`palette-advisor-screen.test.tsx` through MSW,
   `playwright/tests/palette-advisor.spec.ts` against the seeded entitled user with
   the worker live).
+
+- **The advisor offer lookup has no query-plan coverage.**
+  `commerce-affiliate-offers-query-plan.integration.spec.ts` seeds 4,000 GARMENT
+  offers and proves `findBestOffer` descends its composite index rather than
+  scanning the catalog. `findBestAdvisorOffer` now runs a second, structurally
+  identical lookup against the same table and has no equivalent proof: the
+  suite's volume rows all carry `garment_category`, so there is no advisor row
+  at volume for a plan to be honest about. Closing it means seeding an advisor
+  cohort alongside the garment one and mirroring `5.1-PLAN-02`/`5.1-PLAN-05` for
+  the advisor predicate, which is a rework of that suite's fixture rather than
+  an added assertion.
+
+  The half that could be closed cheaply was: `5.4-DB-041` asserts the advisor
+  index is PARTIAL on `advisor_slot IS NOT NULL`. That predicate is the one
+  Prisma's DSL cannot express, so a regenerated migration would silently drop it
+  and reintroduce the planner ambiguity that regressed `5.1-PLAN-03`.
+
+- **A pre-existing Pact consumer flake is still unfixed**, and it failed one CI
+  run on this branch. `web-api-client.pacttest.ts` > "updates user comfort
+  preferences" reported `The following request was expected but not received`
+  for `PUT /api/v1/personalization/comfort` on run 3 of the three-run
+  determinism check, then passed on the next CI run of the same commit range.
+  The interaction belongs to story 2's ritual-comfort surface and is untouched
+  here. It did not reproduce in 27 local suite runs (12 direct, plus 5 full
+  three-run determinism cycles), and the consumer config already serialises
+  everything it could race against (`fileParallelism: false`,
+  `singleFork: true`), which rules out parallel mock servers. The leading
+  hypothesis is a stale keep-alive socket in undici's connection pool reaching a
+  port a previous Pact mock server has released, which would be load-dependent
+  and therefore CI-only. Testing that hypothesis means changing the dispatcher
+  the shared `createApiClient` uses under Pact, and shipping that change without
+  a reproduction would be a guess against shared infrastructure. It needs
+  someone who can reproduce it — a loaded runner, or the determinism script
+  looped under CPU pressure — before a fix is written.

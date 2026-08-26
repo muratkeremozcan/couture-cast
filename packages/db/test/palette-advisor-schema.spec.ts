@@ -395,4 +395,36 @@ describe('palette advisor schema', () => {
       })
     })
   })
+
+  /**
+   * Decision 7's advisor index, and specifically the half Prisma cannot
+   * express.
+   *
+   * `schema.prisma` declares `@@index([status, locale_region, advisor_slot,
+   * priority(sort: Desc)])`, and the hand-authored migration adds
+   * `WHERE "advisor_slot" IS NOT NULL` to it. That predicate is not decoration:
+   * without it this index and the garment index above are structurally tied on
+   * a garment-only query, the planner may pick either, and
+   * `commerce-affiliate-offers-query-plan.integration.spec.ts`'s `5.1-PLAN-03`
+   * regressed on exactly that. Since the Prisma DSL cannot say `WHERE`, a
+   * regenerated migration would silently drop it and reintroduce the
+   * regression, so the predicate is asserted here rather than assumed.
+   */
+  describe('AffiliateOffer advisor index', () => {
+    it('5.4-DB-041 keeps the advisor index PARTIAL on advisor_slot IS NOT NULL', async () => {
+      await inRolledBackTransaction(async (client) => {
+        const indexes = await client.query<{ indexname: string; indexdef: string }>(
+          `SELECT "indexname", "indexdef" FROM pg_indexes
+           WHERE "schemaname" = 'public' AND "tablename" = 'AffiliateOffer'
+             AND "indexname" = $1`,
+          ['AffiliateOffer_status_locale_region_advisor_slot_priority_idx']
+        )
+
+        expect(indexes.rows).toHaveLength(1)
+        const definition = indexes.rows[0]?.indexdef ?? ''
+        expect(definition).toMatch(/WHERE \("?advisor_slot"? IS NOT NULL\)/)
+        expect(definition).toContain('priority')
+      })
+    })
+  })
 })
