@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { CommerceRepository } from '../src/modules/commerce/commerce.repository.js'
+import type { AdvisorSlot, SkinUndertone } from '@couture/api-client/contracts/http'
 
 /**
  * Story 5.1 Task 9: query-plan evidence for the affiliate offer lookup.
@@ -40,6 +41,18 @@ const prisma = new PrismaClient({
 
 const OFFER_LOOKUP_INDEX =
   'AffiliateOffer_status_locale_region_garment_category_priori_idx'
+
+/**
+ * The advisor lookup's own index, PARTIAL on `advisor_slot IS NOT NULL`.
+ *
+ * The partial predicate is what keeps this index and the garment one above from
+ * being structurally tied on a garment-only query -- the ambiguity that
+ * regressed `5.1-PLAN-03` when the advisor index was first added. `5.4-DB-041`
+ * pins the predicate itself in `packages/db`; what is proven here is that the
+ * planner actually descends it for the advisor predicate at volume.
+ */
+const ADVISOR_LOOKUP_INDEX =
+  'AffiliateOffer_status_locale_region_advisor_slot_priority_idx'
 
 /**
  * How many catalog rows this suite seeds, and why it is not a handful.
@@ -186,6 +199,45 @@ describe('5.1 affiliate offer query plans', () => {
     }
   }
 
+  /**
+   * The advisor twin of `captureOfferLookup`, over `findBestAdvisorOffer`.
+   *
+   * Separate rather than parameterised because the two repository methods take
+   * different arguments and the point of capturing at all is that the SQL under
+   * `EXPLAIN` is the one the application emits. A shared wrapper that took a
+   * thunk would read better and prove exactly as much, but the two call sites
+   * are three lines each and the duplication keeps the arguments visible next
+   * to the plan they produce.
+   */
+  async function captureAdvisorLookup(
+    slot: AdvisorSlot,
+    undertone: SkinUndertone,
+    region: string
+  ): Promise<{ statement: CapturedStatement; matched: boolean }> {
+    captured.length = 0
+    const arrived = new Promise<CapturedStatement>((resolve) => {
+      resolveCapture = resolve
+    })
+
+    const match = await repository.findBestAdvisorOffer(slot, undertone, region)
+
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('The advisor lookup emitted no query event to explain')),
+        5000
+      )
+    })
+
+    try {
+      const statement = await Promise.race([arrived, timedOut])
+      return { statement, matched: match !== null }
+    } finally {
+      clearTimeout(timer)
+      resolveCapture = undefined
+    }
+  }
+
   beforeAll(async () => {
     await probeSchema()
     if (!schemaReady) return
@@ -287,7 +339,65 @@ describe('5.1 affiliate offer query plans', () => {
         }))
     )
 
-    await prisma.affiliateOffer.createMany({ data: [...rows, ...guaranteedMatches] })
+    /*
+     * THE ADVISOR COHORT, and why the garment rows above cannot stand in for it.
+     *
+     * `findBestAdvisorOffer` runs a structurally identical lookup against this
+     * same table, but its predicate is `advisor_slot = $n` and every volume row
+     * above carries `garment_category` instead -- the CHECK constraint
+     * `num_nonnulls(garment_category, advisor_slot) = 1` makes a row that
+     * satisfies both unrepresentable. So without these rows there is no advisor
+     * data at volume for a plan to be honest about: the advisor index would be
+     * empty, the planner would pick it trivially, and the assertion would pass
+     * for the wrong reason.
+     *
+     * Same size as the garment cohort, same inactive partner, and spread across
+     * the same reserved `Z**` region block. The advisor index is PARTIAL on
+     * `advisor_slot IS NOT NULL`, so these are the only rows in it; the garment
+     * index gains 4,000 entries at NULL `garment_category`, which sort together
+     * and never sit between a `garment_category = 'top'` seek and its target.
+     */
+    const advisorSlots = ['foundation', 'blush', 'jewelry', 'bag', 'eyewear'] as const
+    const undertones = [null, 'warm', 'cool', 'neutral', 'olive'] as const
+
+    const advisorRows = Array.from({ length: SEED_COUNT }, (_, index) => ({
+      partner_id: bulkPartnerId,
+      advisor_slot: advisorSlots[index % advisorSlots.length]!,
+      advisor_undertone: undertones[index % undertones.length],
+      locale_region: `Z${String(index % 36).padStart(2, '0')}`.slice(0, 3),
+      title: `Advisor plan offer ${index}`,
+      deep_link_template: 'https://partner.couturecast.test/shop?cc={clickToken}',
+      priority: index % 50,
+      status: index % 5 === 0 ? ('inactive' as const) : ('active' as const),
+      effective_from: new Date('2020-01-01T00:00:00.000Z'),
+      effective_to: null,
+    }))
+
+    /*
+     * Guaranteed advisor matches, under the ACTIVE partner and in `targetRegion`.
+     * Both undertone forms are seeded because the lookup's `ORDER BY
+     * (advisor_undertone IS NULL) ASC` exists to prefer the specific row over the
+     * catch-all, and a fixture carrying only one of them would let that clause
+     * rot unnoticed.
+     */
+    const advisorMatches = advisorSlots.flatMap((slot, position) =>
+      ([null, 'warm'] as const).map((undertone, variant) => ({
+        partner_id: matchPartnerId,
+        advisor_slot: slot,
+        advisor_undertone: undertone,
+        locale_region: targetRegion,
+        title: `Advisor plan match ${slot}-${undertone ?? 'any'}`,
+        deep_link_template: 'https://partner.couturecast.test/shop?cc={clickToken}',
+        priority: 10 + position * 2 + variant,
+        status: 'active' as const,
+        effective_from: new Date('2020-01-01T00:00:00.000Z'),
+        effective_to: null,
+      }))
+    )
+
+    await prisma.affiliateOffer.createMany({
+      data: [...rows, ...guaranteedMatches, ...advisorRows, ...advisorMatches],
+    })
 
     // Without fresh statistics the planner costs this table at its default
     // estimate and the choice below would not reflect the seeded volume.
@@ -445,6 +555,131 @@ describe('5.1 affiliate offer query plans', () => {
     // And the forced scan really is the expensive shape the index avoids. Both
     // plans are resolved above rather than inside the assertion, so the values
     // being compared are visible in the test body.
+    expect(peakBuffers(forcedPlan)).toBeGreaterThan(peakBuffers(indexedPlan))
+  })
+
+  /*
+   * -----------------------------------------------------------------------
+   * Story 5.4: the same evidence for the advisor lookup.
+   *
+   * `findBestAdvisorOffer` was added to this table by story 5.4 and inherited
+   * none of the proof above, because every volume row this suite seeded carried
+   * `garment_category` and the CHECK constraint makes a row that satisfies both
+   * predicates unrepresentable. The advisor cohort seeded in `beforeAll` closes
+   * that: 4,000 advisor rows under the inactive partner, ten selectable ones
+   * under the active partner in `targetRegion`.
+   *
+   * The claims mirror 5.1-PLAN-02/-04/-05/-06 one for one, deliberately. The
+   * advisor lookup is on the palette surface rather than the ritual hot path, so
+   * the latency argument is weaker; the argument that survives is the same one
+   * -- a catalog an operator grows by hand degrades a sequential scan linearly,
+   * and the plan is the property that holds while a threshold does not.
+   * -----------------------------------------------------------------------
+   */
+
+  it('5.4-PLAN-01 serves the advisor lookup from the partial advisor index, unaided', async (context) => {
+    if (!requireSchema(context)) return
+
+    const { statement, matched } = await captureAdvisorLookup(
+      'foundation',
+      'warm',
+      targetRegion
+    )
+    const plan = await explainCaptured(statement)
+
+    expect(matched, 'the fixture must contain a matching advisor offer').toBe(true)
+    // Unaided: `enable_seqscan` is left on, so the planner is choosing the index
+    // on merit at this volume rather than merely being capable of using it.
+    expect(plan, `plan was:\n${plan}`).toContain(ADVISOR_LOOKUP_INDEX)
+    expect(plan, 'the catalog must not be read end to end').not.toMatch(
+      /Seq Scan on "?AffiliateOffer"?/
+    )
+    /*
+     * And `advisor_slot` is IN the index condition, not left to a heap filter.
+     * Mere presence of the index name is the weak claim: both indexes lead with
+     * `(status, locale_region)`, so an index scan that pushed only those two
+     * columns down and re-checked the slot on every heap row would still name
+     * this index while reading the whole region. The seek being three columns
+     * deep is what the partial index actually buys.
+     */
+    expect(plan, `plan was:\n${plan}`).toMatch(
+      new RegExp(
+        `Bitmap Index Scan on "${ADVISOR_LOOKUP_INDEX}"[\\s\\S]*?Index Cond:[^\\n]*advisor_slot`
+      )
+    )
+    /*
+     * THE GARMENT INDEX LEGITIMATELY APPEARS HERE, and this test deliberately
+     * does not forbid it. The predicate is `locale_region = $3 OR locale_region
+     * = '*'`, which the planner splits into a BitmapOr; the `'*'` branch carries
+     * no `advisor_slot` in its condition, so both indexes serve it equally and
+     * either may be picked. That is a choice between two index scans, not the
+     * table scan these assertions exist to rule out, and this fixture holds no
+     * `'*'` rows to separate them -- deliberately, because a `'*'` row matches
+     * every request region and would become a candidate offer in the sibling
+     * suites. An assertion that the garment index is absent would therefore be
+     * pinning an artefact of the fixture rather than a property of the query.
+     */
+  })
+
+  it('5.4-PLAN-02 explains the advisor query the repository actually runs', async (context) => {
+    if (!requireSchema(context)) return
+
+    // Guards the premise of the three assertions around it, the way 5.1-PLAN-04
+    // does for the garment ones. If the repository stops emitting the partner
+    // join, the undertone catch-all or the publication window, the plans would
+    // still pass while proving something about a query nobody runs.
+    const { statement } = await captureAdvisorLookup('foundation', 'warm', targetRegion)
+
+    expect(statement.sql).toContain('"CommercePartner"')
+    expect(statement.sql).toContain('p."status" = \'active\'::"CommercePartnerStatus"')
+    expect(statement.sql).toContain('o."advisor_undertone" IS NULL')
+    expect(statement.sql).toContain('o."locale_region" = $3 OR o."locale_region" = \'*\'')
+    expect(statement.sql).toMatch(/now\(\) AT TIME ZONE 'UTC'/)
+    expect(statement.params).toEqual(['foundation', 'warm', targetRegion])
+  })
+
+  it('5.4-PLAN-03 reads far fewer buffers than the table occupies', async (context) => {
+    if (!requireSchema(context)) return
+
+    // The durable statement of "this does not scan the catalog", independent of
+    // which index the planner names.
+    const { statement } = await captureAdvisorLookup('blush', 'cool', targetRegion)
+    const plan = await explainCaptured(statement)
+
+    const relationPages = await prisma.$queryRaw<{ pages: number }[]>`
+      SELECT relpages::int AS pages FROM pg_class WHERE relname = 'AffiliateOffer'
+    `
+    const totalPages = relationPages[0]?.pages ?? 0
+    const buffers = peakBuffers(plan)
+
+    expect(
+      totalPages,
+      'the fixture must be large enough for this to mean anything'
+    ).toBeGreaterThan(50)
+    // A buffer count was actually read, so neither bound below can hold
+    // trivially against a plan that reports no counters at all.
+    expect(buffers, `no buffer counters found in plan:\n${plan}`).toBeGreaterThan(0)
+    expect(buffers, `plan was:\n${plan}`).toBeLessThan(totalPages)
+    // The absolute cap as well as the relative one: `relpages` counts the
+    // physical file, so a table left bloated by an earlier run would satisfy the
+    // relative bound on its own.
+    expect(buffers, `plan was:\n${plan}`).toBeLessThanOrEqual(40)
+  })
+
+  it('5.4-PLAN-04 proves the advisor assertions can actually fail', async (context) => {
+    if (!requireSchema(context)) return
+
+    // The falsifiability guard, mirroring 5.1-PLAN-06. Forcing the planner off
+    // every index form must trip the very regex the tests above rely on;
+    // otherwise a green run proves the detection works, not the index.
+    const { statement } = await captureAdvisorLookup('foundation', 'warm', targetRegion)
+    const forcedPlan = await explainWithoutIndexes(statement)
+    const indexedPlan = await explainCaptured(statement)
+
+    expect(forcedPlan, `forced plan was:\n${forcedPlan}`).toMatch(
+      /Seq Scan on "?AffiliateOffer"?/
+    )
+    expect(forcedPlan).not.toContain(ADVISOR_LOOKUP_INDEX)
     expect(peakBuffers(forcedPlan)).toBeGreaterThan(peakBuffers(indexedPlan))
   })
 })
