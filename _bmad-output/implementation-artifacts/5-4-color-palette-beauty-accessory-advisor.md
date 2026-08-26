@@ -505,17 +505,17 @@ across tiers, which cost a relabelling pass: three (`5.4-INT-010/012/013`) and
 ranges. Unit-tier proofs that had been given `INT-` ids now carry `API-`/`CON-`
 ids; the integration tier keeps `INT-`.
 
-| AC  | P0 evidence (blocks merge)                                                                                                                                                                                                                                                                                                                                                                    | P1 evidence                                                                                                                                                                                               |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Analyze/allocate/commit all `403` without consent (`5.4-API-010`, `5.4-API-011`, `5.4-API-012`); grant and revoke each write an `AuditLog` row (`5.4-INT-001`); revoke erases derived scalars and every saved item (`5.4-INT-002`); the consent gate hides both sources until granted (`5.4-WEB-014`, `5.4-MOB-013`, `5.4-E2E-010`)                                                           | Consent survives a fresh request context (`5.4-INT-003`); withdrawal is confirmed inline and runs the ungated `DELETE` (`5.4-WEB-016`, `5.4-MOB-014`)                                                     |
-| 2   | Wardrobe derivation classifies a seeded wardrobe deterministically with `depth: null` (`5.4-API-021`); `insufficient_wardrobe` below the sample floor (`5.4-API-022`); the real journey end to end against the seeded entitled user and the live worker (`5.4-E2E-010`)                                                                                                                       | Achromatic-only wardrobe fails rather than guessing (`5.4-API-023`); the confidence floor refuses a scattered wardrobe and accepts an agreeing one (`5.4-API-024`, `5.4-API-025`)                         |
-| 3   | Selfie ready path through the engine (`5.4-API-031`, `5.4-API-034`); **object purged and `selfie_purged_at` set on all three terminal doors — `ready`, in-processor `failed`, retry-exhaustion `markFailed`** (`5.4-INT-011`, `5.4-INT-012`, `5.4-INT-013`); one idempotency key across allocate and commit (`5.4-WEB-008`, `5.4-MOB-016`)                                                    | `no_face` below the skin-pixel floor (`5.4-API-032`); every engine failure outcome is terminal and purges (`5.4-API-033`); a failed purge cannot strand `processing` (`5.4-API-035`)                      |
-| 4   | Rule table determinism and shape, pinned (`5.4-CON-001`–`5.4-CON-005`, `5.4-CON-031`); every `swatchHex` passes `meetsWcagAA()` (`5.4-CON-030`); every ITA° band boundary pinned on both sides and negative-`a*` undertone inputs (`5.4-UTIL-001`–`5.4-UTIL-047`)                                                                                                                             | `depth: null` renders family guidance copy on both surfaces (`5.4-WEB-018`, `5.4-MOB-018`); shade names render from locale keys, never from the server (`5.4-WEB-021`, `5.4-MOB-020`)                     |
-| 5   | Advisor offer resolves per slot with undertone-exact beating wildcard (`5.4-API-040`); **two-way cross-selection regression, at the unit tier by call and at the integration tier against real SQL** (`5.4-API-044`, `5.4-API-045`, `5.4-INT-020`, `5.4-INT-021`); **two-way cross-click regression, branch follows `offer.advisor_slot` not `input.surface`** (`5.4-INT-022`, `5.4-INT-023`) | `affiliate_ctas_enabled = false` suppresses the overlay (`5.4-API-042`, `5.4-INT-027`); `commerce_affiliate_enabled = false` suppresses it and still renders first-party recommendations (`5.4-API-043`)  |
-| 6   | Disclosure precedes its control in the DOM, by document position (`5.4-WEB-022`, `5.4-MOB-021`, and again in `5.4-E2E-010`); dismissed item absent from the next `GET` (`5.4-API-050`); save survives reload (`5.4-E2E-010`)                                                                                                                                                                  | Undo restores a dismissed card (`5.4-WEB-026`, `5.4-MOB-022`); un-saving clears the row rather than storing a third state (`5.4-WEB-025`)                                                                 |
-| 7   | Guard `403` for non-entitled (`5.4-API-060`); locked panel + axe signed out at both viewports (`5.4-E2E-011`); flag-off `503` for an entitled consented caller (`5.4-API-061`); a rejected write re-resolves the surface rather than printing a line (`5.4-WEB-027`–`5.4-WEB-029`, `5.4-MOB-024`–`5.4-MOB-026`)                                                                               | Precedence order asserted explicitly (`5.4-API-062`); the signed-in non-entitled locked panel (`5.4-E2E-013`); the kill-switch note explains every disabled control (`5.4-WEB-012`, `5.4-MOB-012`)        |
-| 8   | Two parity specs across ten catalogs × two surfaces, with the key set derived from the contract rather than hand-pinned (`5.4-I18N-WEB-01`–`09`, `5.4-I18N-MOB-01`–`09`); parent-spec exclusion in place; `/palette` present in `accessibility-hardening.spec.ts`'s route list and axe-clean at both viewports; axe on the ready state with a sponsored card (`5.4-WEB-033`)                  | `en-CA` `-our` spellings asserted in both directions (`5.4-I18N-WEB-09`); `StickyBottomNav` highlights the right tab on nested routes and none on `/palette` (`5.4-WEB-030`–`5.4-WEB-032`, `5.4-E2E-014`) |
-| 9   | RLS actor matrix green including the owner-INSERT positive half (`5.4-DB-020`–`5.4-DB-030`); grant-breadth spec (`5.4-DB-001`–`5.4-DB-008`); three-registry analytics set-equality with negative fixtures (`5.4-CON-010`–`5.4-CON-022`)                                                                                                                                                       | Cleanup and erasure remove both tables' rows, scoped to their owner (`5.4-INT-028`); an advisor click's attribution id is derived server-side rather than trusted (`5.4-INT-024`, `5.4-INT-025`)          |
+| AC  | P0 evidence (blocks merge)                                                                                                                                                                                                                                                                                                                                                                    | P1 evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Analyze/allocate/commit all `403` without consent (`5.4-API-010`, `5.4-API-011`, `5.4-API-012`); grant and revoke each write an `AuditLog` row (`5.4-INT-001`); revoke erases derived scalars and every saved item (`5.4-INT-002`); the consent gate hides both sources until granted (`5.4-WEB-014`, `5.4-MOB-013`, `5.4-E2E-010`)                                                           | Consent survives a fresh request context (`5.4-INT-003`); withdrawal is confirmed inline and runs the ungated `DELETE` (`5.4-WEB-016`, `5.4-MOB-014`)                                                                                                                                                                                                                                                                                                              |
+| 2   | Wardrobe derivation classifies a seeded wardrobe deterministically with `depth: null` (`5.4-API-021`); `insufficient_wardrobe` below the sample floor (`5.4-API-022`); the real journey end to end against the seeded entitled user and the live worker (`5.4-E2E-010`)                                                                                                                       | Achromatic-only wardrobe fails rather than guessing (`5.4-API-023`); the confidence floor refuses a scattered wardrobe and accepts an agreeing one (`5.4-API-024`, `5.4-API-025`); a wardrobe whose agreeing colours straddle the 0/360 hue wrap is accepted rather than refused (`5.4-API-026`, `5.4-UTIL-050`-`5.4-UTIL-054`)                                                                                                                                    |
+| 3   | Selfie ready path through the engine (`5.4-API-031`, `5.4-API-034`); **object purged and `selfie_purged_at` set on all three terminal doors — `ready`, in-processor `failed`, retry-exhaustion `markFailed`** (`5.4-INT-011`, `5.4-INT-012`, `5.4-INT-013`); one idempotency key across allocate and commit (`5.4-WEB-008`, `5.4-MOB-016`)                                                    | `no_face` below the skin-pixel floor (`5.4-API-032`); every engine failure outcome is terminal and purges (`5.4-API-033`); a failed purge cannot strand `processing` (`5.4-API-035`); an undecodable upload terminates `low_quality` at the first attempt and purges, while a storage fault still propagates for BullMQ to retry (`5.4-API-036`, `5.4-API-037`)                                                                                                    |
+| 4   | Rule table determinism and shape, pinned (`5.4-CON-001`–`5.4-CON-005`, `5.4-CON-031`); every `swatchHex` passes `meetsWcagAA()` (`5.4-CON-030`); every ITA° band boundary pinned on both sides and negative-`a*` undertone inputs (`5.4-UTIL-001`–`5.4-UTIL-047`)                                                                                                                             | `depth: null` renders family guidance copy on both surfaces (`5.4-WEB-018`, `5.4-MOB-018`); shade names render from locale keys, never from the server (`5.4-WEB-021`, `5.4-MOB-020`)                                                                                                                                                                                                                                                                              |
+| 5   | Advisor offer resolves per slot with undertone-exact beating wildcard (`5.4-API-040`); **two-way cross-selection regression, at the unit tier by call and at the integration tier against real SQL** (`5.4-API-044`, `5.4-API-045`, `5.4-INT-020`, `5.4-INT-021`); **two-way cross-click regression, branch follows `offer.advisor_slot` not `input.surface`** (`5.4-INT-022`, `5.4-INT-023`) | `affiliate_ctas_enabled = false` suppresses the overlay (`5.4-API-042`, `5.4-INT-027`); `commerce_affiliate_enabled = false` suppresses it and still renders first-party recommendations (`5.4-API-043`)                                                                                                                                                                                                                                                           |
+| 6   | Disclosure precedes its control in the DOM, by document position (`5.4-WEB-022`, `5.4-MOB-021`, and again in `5.4-E2E-010`); dismissed item absent from the next `GET` (`5.4-API-050`); save survives reload (`5.4-E2E-010`)                                                                                                                                                                  | Undo restores a dismissed card (`5.4-WEB-026`, `5.4-MOB-022`); un-saving clears the row rather than storing a third state (`5.4-WEB-025`)                                                                                                                                                                                                                                                                                                                          |
+| 7   | Guard `403` for non-entitled (`5.4-API-060`); locked panel + axe signed out at both viewports (`5.4-E2E-011`); flag-off `503` for an entitled consented caller (`5.4-API-061`); a rejected write re-resolves the surface rather than printing a line (`5.4-WEB-027`–`5.4-WEB-029`, `5.4-MOB-024`–`5.4-MOB-026`)                                                                               | Precedence order asserted explicitly (`5.4-API-062`); the signed-in non-entitled locked panel (`5.4-E2E-013`); the kill-switch note explains every disabled control (`5.4-WEB-012`, `5.4-MOB-012`); the write path's own doors -- the signed-out and in-progress rejections, the generic fallback line, the busy guard, the session re-read, the released object URL, a failed mint and a blocked popup (`5.4-WEB-034`-`5.4-WEB-042`, `5.4-MOB-027`-`5.4-MOB-030`) |
+| 8   | Two parity specs across ten catalogs × two surfaces, with the key set derived from the contract rather than hand-pinned (`5.4-I18N-WEB-01`–`09`, `5.4-I18N-MOB-01`–`09`); parent-spec exclusion in place; `/palette` present in `accessibility-hardening.spec.ts`'s route list and axe-clean at both viewports; axe on the ready state with a sponsored card (`5.4-WEB-033`)                  | `en-CA` `-our` spellings asserted in both directions (`5.4-I18N-WEB-09`); `StickyBottomNav` highlights the right tab on nested routes and none on `/palette` (`5.4-WEB-030`–`5.4-WEB-032`, `5.4-E2E-014`)                                                                                                                                                                                                                                                          |
+| 9   | RLS actor matrix green including the owner-INSERT positive half (`5.4-DB-020`–`5.4-DB-030`); grant-breadth spec (`5.4-DB-001`–`5.4-DB-008`); three-registry analytics set-equality with negative fixtures (`5.4-CON-010`–`5.4-CON-022`)                                                                                                                                                       | Cleanup and erasure remove both tables' rows, scoped to their owner (`5.4-INT-028`); an advisor click's attribution id is derived server-side rather than trusted (`5.4-INT-024`, `5.4-INT-025`), and only while consent is current, against the row a revocation deliberately leaves behind (`5.4-INT-029`); the seed module graph instantiates under `tsx` in `prisma db seed` import order (`5.4-DB-040`)                                                       |
 
 ### Explicitly untested, stated plainly
 
@@ -736,6 +736,99 @@ follows is what the plan did not predict.
   `apps/mobile/vitest.config.ts` documents at length. The load-bearing half (the
   click is minted with the right body before any navigation) is asserted; the
   handoff is shared code story 5.1 owns.
+
+### Defects found and fixed in the adversarial review pass
+
+Five, plus the test gaps around them. The first one was the reason nine CI
+jobs were red.
+
+- **The seed module graph would not instantiate under `tsx`, so `db:reset`
+  failed and took every end-to-end tier with it.** `prisma db seed` runs
+  `tsx prisma/seeds/index.ts`, which imports `testing/src/factories/factory.ts`
+  before `./commerce.js`. That factory source `require`s `@couture/utils`, so
+  the package is in the CommonJS require cache before any ESM import of it
+  runs; Node then builds its ESM facade from the cached CommonJS object rather
+  than letting cjs-module-lexer read the source, and the facade carries only
+  `default` and `module.exports`. This story introduced the first
+  `@couture/utils` import into the seeds, as a named import, and it threw
+  `does not provide an export named 'buildGarmentObjectPath'` at instantiation
+  time. All seven mobile E2E shards, the Playwright burn-in and the k6 smoke
+  failed at `db:reset` while `lint`, `typecheck`, `verify:changed`, every
+  coverage ratchet, Pact and the whole integration tier stayed green — Vitest
+  resolves the package through its own bundler resolution and `typecheck` reads
+  `../utils/dist/index.d.ts`, so neither can see it. Fixed by reaching it
+  through `unwrapCjsNamespace`, the interop shim `seeds/wardrobe.ts` already
+  uses, keeping the bare specifier so the root typecheck still resolves the
+  Playwright helpers that import this module. Guarded by `5.4-DB-040`, which
+  spawns a real `tsx` subprocess over a probe whose import ORDER mirrors the
+  seed entry point; it is red against the defect and green against the fix.
+
+- **Hue spread was measured linearly over a circular quantity, in both
+  confidence formulas.** `hueAngleDegrees` wraps to `[0, 360)`, and a plain
+  interquartile range over its output reads 359 degrees and 1 degree as 358
+  apart when they are 2 apart. That is not a corner case for a wardrobe:
+  magentas and fuchsias sit just below 360 in CIELAB while reds, corals and
+  pinks sit just above 0, so a wardrobe holding both was refused
+  `insufficient_wardrobe` while its colours agreed to within 22 degrees — the
+  measured spread went from 341 to 22 degrees and the confidence from 0.00 to
+  0.75. `hueAngleInterquartileSpread` in `packages/utils` measures each angle's
+  deviation from the sample's mean direction instead, and because the
+  interquartile range is translation-invariant it returns exactly the old value
+  for any sample that does not wrap: no recalibration, only the wrap fixed. One
+  implementation now serves both pipelines rather than two copies of the same
+  arithmetic.
+
+- **A selfie the engine could not decode burned the whole retry budget and then
+  reported the wrong reason.** Sharp throws on a truncated upload, on a file
+  that is not an image, and on one whose real pixel count exceeds
+  `limitInputPixels` — and nothing verifies the client-declared `mimeType`,
+  `widthPx` or `heightPx` against the bytes that were actually PUT. Every one
+  of those failures is deterministic, so the throw propagated, BullMQ retried
+  an input that could never succeed, and `markFailed` terminated it as
+  `timeout` or `storage_error`: the user was told the service was slow when
+  their file was unreadable. It terminates `low_quality` on the first attempt
+  now, and still purges. The DOWNLOAD keeps the opposite posture deliberately,
+  with `5.4-API-037` pinning that too, because catching both at one level would
+  turn a recoverable storage outage into a permanent verdict on a photo that
+  was never read.
+
+- **An advisor click's attribution id was resolved by row existence while
+  answering with the consent message.** Decision 9 keeps the `PaletteProfile`
+  row alive through a revocation on purpose, with nulled scalars and
+  `consent_revoked_at` stamped, so a user who had erased their palette kept
+  minting attributed advisor clicks and `findPaletteProfileId`'s
+  `PALETTE_CONSENT_REQUIRED_MESSAGE` was describing a check it was not making.
+  It applies `hasCurrentConsent`'s rule now, asserted against real SQL in
+  `5.4-INT-029` because the surviving row is the whole point.
+
+- **`5.4-E2E-014` asserted the bottom nav visible at the default 1280-wide
+  viewport**, where `min-[768px]:hidden` guarantees it is not. The locator
+  resolved fourteen times and read `hidden` every time. Fixed with the 375x812
+  viewport story 3.6's own bottom-nav spec uses.
+
+### Test gaps closed in the same pass
+
+The web panel and the mobile screen both had docblocks arguing that a rejected
+write must re-resolve the surface rather than print a line, and coverage put
+several of those cases at zero: the `signed_out` rejection, the `in_progress`
+re-read, the generic fallback line, the busy guard, the session re-read on
+every press, the object URL released whichever way an upload ends, a failed
+click mint and a blocked popup. The web panel goes 77 to 92 percent statements
+and 79 to 96 percent lines; the mobile screen 86 to 93 percent statements; the
+mobile lib's reason classification 61 to 73 percent branches. Both workspace
+ratchets move up with them, so deleting the new tests fails the run.
+
+### Reviewed and found sound
+
+- **The two-way cross-selection guarantee is enforced by the database**, not
+  only by the two queries' `WHERE` clauses:
+  `CHECK (num_nonnulls(garment_category, advisor_slot) = 1)` makes a row that
+  could satisfy both selections unrepresentable.
+- **Every test id claimed in the coverage matrix exists**, and no id is used
+  twice across the 174 in the story.
+- **The locale drafts read idiomatically and match the register each catalog
+  already uses** — `vous` in `fr-FR`, `du` in `de-DE`, the informal imperative
+  in `tr-TR` — consistent with story 5.3's shipped copy in the same files.
 
 ### Gates
 
