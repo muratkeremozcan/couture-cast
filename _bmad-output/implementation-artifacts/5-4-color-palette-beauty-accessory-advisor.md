@@ -858,6 +858,73 @@ ratchets move up with them, so deleting the new tests fails the run.
   already uses** — `vous` in `fr-FR`, `du` in `de-DE`, the informal imperative
   in `tr-TR` — consistent with story 5.3's shipped copy in the same files.
 
+### The deferred backlog, closed on the same PR
+
+A later pass over `deferred-work.md`'s story 5.4 section. Two of the entries
+turned out to be wrong about the code rather than hard to fix, and finding that
+out was most of the value.
+
+- **The integration tier was already running in CI.** The entry called "no
+  workflow runs `test:integration`" the highest-value item in the list.
+  `apps/api/vitest.config.ts` includes `integration/**/*.spec.ts` alongside
+  `src/**`, so `quality-gate`'s `test:coverage` step has been running all 26
+  suites against the PostgreSQL and Redis containers it declares; this branch's
+  own head-commit run logs `✓ integration/palette-advisor.integration.spec.ts
+(11 tests)`. The unused thing is the `test:integration` SCRIPT, not the
+  evidence. What was genuinely missing is the tripwire: fourteen suites skip
+  themselves on a failed schema probe, which is right for a laptop and silent
+  when CI points them at the wrong database — the failure
+  `apps/api/vitest.config.ts` records from 2026-08-18, where sixty-one tests
+  skipped behind a coverage failure that named coverage. `5.4-INT-031` scrapes
+  the probe set out of the sibling suites rather than pinning a list nobody
+  would maintain, and fails the run when `CI` is set and a probed table does not
+  resolve. Verified red against a database that does not exist.
+
+- **A retired `analysis_version` does not empty the card list.** The entry,
+  `5.4-MOB-023`'s docblock and `5.4-E2E-012`'s all said every stored `item_key`
+  resolves to nothing on a rules bump. `resolveRecommendations` builds its cards
+  from the CURRENT `ADVISOR_RULES` keyed on the stored undertone and depth and
+  never reads `analysis_version`; no read path does. `5.4-INT-032` pins that
+  against real SQL. What a bump actually costs the reader is the palette above
+  the cards, shown exactly like a current result, so the fix is the sentence the
+  entry asked for attached to the condition that is actually reachable:
+  `commerce.premium.palette.staleVersion`, ten catalogs, both surfaces, above
+  the numbers it qualifies. The two empty-list fixtures stay, relabelled as the
+  hostile fixtures they are.
+
+- **The garment click's dedupe key is derived now too.** Story 5.4 closed this
+  for the advisor path and scoped the garment half out. The change is one
+  hoist: `findRecommendationScenario` was already user-scoped and already ran on
+  every click, just after the dedupe check had used the untrusted value. Moving
+  it above lets its answer gate the key. A sentinel rather than a rejection,
+  because a forged id and one whose row rotated behind the Redis and on-device
+  ritual caches are indistinguishable here and Decision 7 forbids failing the
+  second. `5.4-INT-036` proves the collapse against the real unique index over
+  HTTP; `5.4-INT-035` moves the analytics id to the stored value, because an
+  event carrying an id no click row has is worse than no id.
+
+- **The advisor offer lookup has query-plan evidence.** An advisor cohort the
+  size of the garment one, and `5.4-PLAN-01`..`-04` mirroring
+  `5.1-PLAN-02`/`-04`/`-05`/`-06`. `5.4-PLAN-01` asserts `advisor_slot` is in
+  the Index Cond rather than that the index is merely named, and deliberately
+  does not forbid the garment index: the `'*'` sentinel branch of the BitmapOr
+  carries no slot predicate and either index serves it, which is a choice
+  between two index scans rather than the table scan being ruled out.
+
+- **Three planning documents no longer contradict shipped behaviour.** ADR-014
+  records the declined ONNX step, and two things it did not anticipate: the
+  derived palette lands on `PaletteProfile` rather than
+  `wardrobe_items.color_palette`, and the selfie is purged rather than left at
+  rest. `ux-design-specification.md`'s "on-device palette detection" is
+  corrected, and `prd.md`'s open question is struck through and answered in
+  place rather than deleted, so a link to it lands on the answer.
+
+Left open: three CI-plumbing items that need a runner rather than a checkout —
+per-attempt Maestro artifacts, the Linux-only Pact consumer flake, and the
+`open-settings.yaml` emulator flake. Each is recorded in `deferred-work.md` with
+what a fix needs. Shipping any of them from here would be an unverified guess
+about shared infrastructure.
+
 ### Gates
 
 `npm run lint`, `npm run typecheck` and `npm run test:pact` (including its

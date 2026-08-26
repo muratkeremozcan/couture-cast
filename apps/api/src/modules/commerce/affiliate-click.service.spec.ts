@@ -520,8 +520,12 @@ describe('AffiliateClickService', () => {
       expect(telemetry.recordAdvisorOfferClicked).not.toHaveBeenCalled()
     })
 
-    /** A garment click never touches the palette profile lookup. */
-    it("5.4-INT-026 leaves a garment click's recommendation id exactly as sent", async () => {
+    /**
+     * A garment click never touches the palette profile lookup, and keeps the
+     * id it was sent -- BECAUSE `findRecommendationScenario` resolved it, which
+     * is the default in `beforeEach`. `5.4-INT-033` is the other half.
+     */
+    it("5.4-INT-026 leaves a resolved garment click's recommendation id exactly as sent", async () => {
       repository.findActiveClickOffer.mockResolvedValue(OFFER)
 
       await service.recordClick(REQUEST)
@@ -529,6 +533,95 @@ describe('AffiliateClickService', () => {
       expect(repository.findPaletteProfileId).not.toHaveBeenCalled()
       expect(repository.createClick).toHaveBeenCalledWith(
         expect.objectContaining({ recommendationId: REQUEST.recommendationId })
+      )
+    })
+
+    /*
+     * ------------------------------------------------------------------
+     * The garment half of the asymmetry story 5.4 opened.
+     *
+     * The advisor path derives its `recommendation_id` from the session
+     * (5.4-INT-024) precisely because the dedupe index
+     * `(user_id, offer_id, recommendation_id, minute)` is a rate limit only
+     * while the client cannot choose the third column. The garment path was
+     * left taking the client's value verbatim, so a caller sending a fresh
+     * random string per request minted unlimited attributed clicks for one
+     * offer inside one minute.
+     *
+     * `findRecommendationScenario` already scoped its lookup to `user_id`; the
+     * only change is that its answer now runs BEFORE the dedupe check and gates
+     * the key too.
+     * ------------------------------------------------------------------
+     */
+
+    it('5.4-INT-033 collapses an unownable garment recommendation id onto one dedupe bucket', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(OFFER)
+      // The lookup is user-scoped, so null means "not this caller's row".
+      repository.findRecommendationScenario.mockResolvedValue(null)
+
+      await service.recordClick({ ...REQUEST, recommendationId: 'forged-1' })
+      await service.recordClick({ ...REQUEST, recommendationId: 'forged-2' })
+
+      // THE DEDUPE LOOKUP, not only the stored row: a forger who could still
+      // vary the key on the read would never hit an existing row and the write
+      // would never be reached.
+      expect(repository.findRecentClick).toHaveBeenNthCalledWith(
+        1,
+        REQUEST.userId,
+        REQUEST.offerId,
+        'unresolved'
+      )
+      expect(repository.findRecentClick).toHaveBeenNthCalledWith(
+        2,
+        REQUEST.userId,
+        REQUEST.offerId,
+        'unresolved'
+      )
+      for (const call of repository.createClick.mock.calls) {
+        expect(call[0]).toEqual(
+          expect.objectContaining({ recommendationId: 'unresolved' })
+        )
+      }
+    })
+
+    it('5.4-INT-034 still mints a click whose recommendation rotated behind the cache', async () => {
+      /*
+       * The reason this is a sentinel rather than a rejection. A forged id and
+       * a rotated one are indistinguishable from the service: the ritual
+       * response is cached in Redis and again on the device, so a genuine tap
+       * can carry an id whose `OutfitRecommendation` row is gone. Decision 7
+       * forbids failing that tap, and this is what keeps it working.
+       */
+      repository.findActiveClickOffer.mockResolvedValue(OFFER)
+      repository.findRecommendationScenario.mockResolvedValue(null)
+
+      const result = await service.recordClick(REQUEST)
+
+      expect(result.created).toBe(true)
+      expect(repository.createClick).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recommendationId: 'unresolved',
+          // The scenario sentinel is unchanged and independent: it says the
+          // recommendation could not be read, which is still true.
+          scenario: 'unknown',
+        })
+      )
+    })
+
+    it('5.4-INT-035 reports the stored recommendation id to analytics, not the one sent', async () => {
+      /*
+       * The event and the click row have to be joinable. They stopped being so
+       * the moment an unresolvable id started collapsing onto the sentinel
+       * while the event kept carrying `input.recommendationId`, and an
+       * analytics id that no click row carries is worse than no id at all.
+       */
+      repository.findActiveClickOffer.mockResolvedValue(OFFER)
+      repository.findRecommendationScenario.mockResolvedValue('morning')
+
+      await service.recordClick({ ...REQUEST, recommendationId: 'rec-9' })
+
+      expect(telemetry.recordCtaClicked).toHaveBeenCalledWith(
+        expect.objectContaining({ recommendationId: 'rec-9' })
       )
     })
 

@@ -68,6 +68,32 @@ const UNRESOLVED_SCENARIO = 'unknown'
 const ADVISOR_SCENARIO = 'advisor'
 
 /**
+ * The `recommendation_id` stored on a garment click whose recommendation the
+ * acting user does not own, or which no longer exists.
+ *
+ * WHAT THIS CLOSES. The 60-second dedupe index is
+ * `(user_id, offer_id, recommendation_id, minute)`, so it is a rate limit only
+ * while the client cannot choose the third column. Story 5.4 established that
+ * for the advisor path by deriving the value from the session; the garment path
+ * kept taking `input.recommendationId` verbatim, so a caller sending a fresh
+ * random string per request minted unlimited attributed clicks for one offer
+ * inside one minute, on the index meant to prevent exactly that.
+ *
+ * WHY A SENTINEL RATHER THAN A REJECTION. `findRecommendationScenario` already
+ * scopes its lookup to `user_id`, so an unresolvable id is either forged or
+ * rotated -- and the two are indistinguishable from here. Rejecting would
+ * punish the rotated case, which Decision 7 forbids on purpose: the ritual
+ * response is cached in Redis and again on the device, so a genuine tap can
+ * legitimately carry an id whose `OutfitRecommendation` row is gone. Collapsing
+ * every unresolvable id onto one value keeps that tap working while giving a
+ * forger a single dedupe bucket instead of an unbounded supply of them.
+ *
+ * A caller who sends this string literally lands in the same bucket, which is
+ * the intended outcome rather than a bypass.
+ */
+const UNRESOLVED_RECOMMENDATION_ID = 'unresolved'
+
+/**
  * Story 5.1 Task 4: the attributed click endpoint's rules.
  *
  * The evaluation order below is fixed by decision 9 and is the reason status
@@ -156,15 +182,34 @@ export class AffiliateClickService {
     // `mobile_hero`.
     const isAdvisorClick = offer.advisor_slot !== null
 
-    // An advisor click's `recommendation_id` is the acting user's own
-    // `PaletteProfile.id`, resolved here rather than taken from the request.
-    // The dedupe index is `(user_id, offer_id, recommendation_id, minute)`, so
-    // a client that can choose the third column can mint unlimited attributed
-    // clicks for one offer inside one minute. Deriving it is the same posture
-    // `scenario` and `locale_region` already take.
-    const recommendationId = isAdvisorClick
-      ? await this.resolveAdvisorRecommendationId(input.userId)
-      : input.recommendationId
+    /*
+     * NEITHER BRANCH TRUSTS THE CLIENT'S `recommendationId` FOR THE DEDUPE KEY.
+     *
+     * An advisor click's is the acting user's own `PaletteProfile.id`, read
+     * from the session. A garment click's is the id the client sent, but only
+     * once `findRecommendationScenario` has confirmed it names a row that user
+     * owns -- the same lookup that was already being made for `scenario`,
+     * hoisted above the dedupe check so its answer can gate the key as well.
+     * Anything it cannot resolve collapses onto `UNRESOLVED_RECOMMENDATION_ID`.
+     *
+     * The lookup moving earlier is the whole change on the garment side. It was
+     * already running on every click; it just ran after the dedupe check had
+     * already used the untrusted value.
+     */
+    const scenario = isAdvisorClick
+      ? ADVISOR_SCENARIO
+      : await this.repository.findRecommendationScenario(
+          input.userId,
+          input.recommendationId
+        )
+
+    let recommendationId: string
+    if (isAdvisorClick) {
+      recommendationId = await this.resolveAdvisorRecommendationId(input.userId)
+    } else {
+      recommendationId =
+        scenario === null ? UNRESOLVED_RECOMMENDATION_ID : input.recommendationId
+    }
 
     const existing = await this.repository.findRecentClick(
       input.userId,
@@ -185,13 +230,6 @@ export class AffiliateClickService {
       savedLocale: userContext.locale,
       acceptLanguage: input.acceptLanguage,
     })
-    const scenario = isAdvisorClick
-      ? ADVISOR_SCENARIO
-      : await this.repository.findRecommendationScenario(
-          input.userId,
-          input.recommendationId
-        )
-
     const clickId = randomUUID()
     const token = mintClickToken(clickId, this.getClickTokenSecret())
     // Built and validated BEFORE the insert. An offer whose resolved URL fails
@@ -238,7 +276,11 @@ export class AffiliateClickService {
           scenario: analyticsScenario.data,
           surface: input.surface,
           localeRegion,
-          recommendationId: input.recommendationId,
+          // The value that was STORED, so the event and the click row can be
+          // joined. They differed the moment an unresolvable id started
+          // collapsing onto the sentinel, and an analytics id that no click row
+          // carries is worse than no id at all.
+          recommendationId,
         })
       } else {
         this.logger.warn(

@@ -72,15 +72,22 @@ This contract is authoritative. Read it before changing or adding a numbered ste
   web surface are implemented, reviewed and green; the mobile surface, Pact, Playwright and
   Maestro were deliberately cut for that pass and are recorded in `deferred-work.md`. The story
   moves to `done` once those tiers land.
-- Latest written step: Step 36, Story 5.4, Colour palette, beauty and accessory advisor, status
-  `review`. Its plan is in
+- Latest completed step: Step 36, Story 5.4, Colour palette, beauty and accessory advisor, status
+  `done`, on PR #140. Its plan is in
   `_bmad-output/implementation-artifacts/5-4-color-palette-beauty-accessory-advisor.md`. All ten
-  tasks are implemented and reviewed across both surfaces and all five test tiers, on PR #140.
-  Step 36 is written because implementation and review produced verified evidence, and its
-  `Evidence boundaries` section names everything that is not proven.
-- Next work on Story 5.4: the deferred backlog in `deferred-work.md`, of which the highest-value
-  item is that no workflow runs `test:integration`, so the selfie-purge, consent-audit and
-  cross-selection proofs run nowhere automated.
+  tasks are implemented and reviewed across both surfaces and all five test tiers, and the
+  closeable half of its deferred backlog was closed on the same PR: the stale-rules-version
+  explanation, the advisor offer query-plan evidence, the garment click's untrusted dedupe key,
+  and the three planning documents that had gone false about where face images are processed.
+  Step 36's `Evidence boundaries` section names everything that is still not proven.
+- Next work on Story 5.4: what remains in `deferred-work.md` is CI plumbing that needs a runner
+  rather than a checkout — per-attempt Maestro artifacts, the Linux-only Pact consumer flake, and
+  the `open-settings.yaml` emulator flake. Each entry states what a fix needs.
+- Corrected on 2026-08-26: this section previously named "no workflow runs `test:integration`" as
+  the highest-value open item. That was false when written. `apps/api/vitest.config.ts` includes
+  `integration/**/*.spec.ts`, so `quality-gate`'s `test:coverage` step already runs the whole
+  integration tier against its own PostgreSQL service. What was genuinely missing — a silent skip
+  when that database is unreachable — is now closed by `5.4-INT-031`.
 - Keep this section aligned with `_bmad-output/implementation-artifacts/sprint-status.yaml`.
 
 ## The whole project in plain English

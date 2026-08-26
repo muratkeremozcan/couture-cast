@@ -911,6 +911,24 @@ Everything below is a deliberate limit of the shipped story, recorded so a later
 reader can tell a decision from an omission. Nothing here is a known defect in
 what shipped.
 
+**Status after the 2026-08-26 closing pass, on the same PR.** Six entries are
+resolved and struck through below, two of them because the entry itself was
+wrong rather than because the work was hard: the integration tier was already
+running in CI, and a retired rules version does not empty the card list. The
+product-scope entries — guardian visibility, moderation records on a flagged
+teen selfie, re-analysis without re-upload, the beauty-partner console, watch
+and widget surfaces, `recommendation_id`'s dual meaning, and Maestro's
+locked-state-only advisor coverage — are decisions rather than debt and are left
+exactly as they were.
+
+What remains open is three CI-plumbing items, and they share a reason: each
+needs a RUNNER rather than a checkout, and the standing rule is that a change to
+shared CI plumbing is proven under `workflow_dispatch` before it gates anything.
+Fixing them from a laptop would mean shipping an unverified guess about
+infrastructure other workstreams depend on. They are the per-attempt Maestro
+artifact fix, the Linux-only Pact consumer flake, and the `open-settings.yaml`
+emulator flake; each entry states what a fix needs and who can do it.
+
 - **A guardian cannot see a teen's derived palette, and no planning document says
   whether they should.** `PaletteProfile` and `AdvisorRecommendationState` are
   registered in `selfOnlyTables`, not `guardianSharedTables` (Decision 11), even
@@ -959,8 +977,17 @@ what shipped.
   four-way and one five-way classification that closed-form CIELAB colour science
   settles exactly, while the repo's only ONNX consumer already carries a 50 MB
   model directory, a `GARMENT_TAGGING_MODEL_DIR` cache and a
-  `verify:tagging-model` prestart gate for a genuinely learned task. **ADR-014
-  should be amended to record this rather than left quietly contradicted.**
+  `verify:tagging-model` prestart gate for a genuinely learned task. ~~**ADR-014
+  should be amended to record this rather than left quietly contradicted.**~~
+
+  _Amended 2026-08-26._ `architecture.md`'s ADR-014 now records the divergence
+  inline, along with two things that ADR did not anticipate and that a reader
+  would otherwise get wrong: the derived palette lands on `PaletteProfile`
+  rather than in `wardrobe_items.color_palette`, and the selfie source is
+  PURGED on every terminal branch rather than left at rest in Supabase Storage
+  as the ADR's privacy paragraph describes. The purge is stricter than the ADR,
+  not a relaxation of it. A future story reintroducing ONNX, or relaxing the
+  purge, is reopening the ADR rather than implementing it.
 
 - **`AffiliateClick.recommendation_id` now has two meanings.** For a garment click
   it is the `ScenarioOutfit.id` the CTA was rendered on; for an advisor click it
@@ -971,18 +998,44 @@ what shipped.
   (`CommerceRepository.findPaletteProfileId`) rather than taken from the request
   body, because the 60-second dedupe index is `(user_id, offer_id,
 recommendation_id, minute)` and a client that can choose the third column can
-  mint unlimited attributed clicks for one offer inside one minute. The garment
+  mint unlimited attributed clicks for one offer inside one minute. ~~The garment
   path still trusts the client's value, unchanged from 5.1; that asymmetry is
-  worth closing in a follow-up.
+  worth closing in a follow-up.~~
+
+  _The asymmetry was closed on 2026-08-26._ The garment path now derives its key
+  too, from a lookup it was already making: `findRecommendationScenario` is
+  scoped to `user_id`, so hoisting it above the dedupe check lets its answer
+  gate the key as well as the `scenario` column. An id that resolves is stored
+  as sent, which keeps the impression-to-click join the PRD's click-through
+  metric depends on; an id that does not collapses onto a single sentinel.
+
+  A sentinel rather than a rejection, deliberately. A forged id and one whose
+  `OutfitRecommendation` row rotated behind the Redis and on-device ritual
+  caches are indistinguishable from the service, and Decision 7 forbids failing
+  the second — so the tap still mints, into one bucket, while a forger gets one
+  bucket instead of an unbounded supply. `5.4-INT-036` proves the collapse
+  against the real unique index over HTTP, `5.4-INT-037` proves an owned id
+  survives untouched, and `5.4-INT-034` proves the rotated tap still mints.
+  The `affiliate_cta_clicked` event now reports the STORED id rather than the
+  one sent, so the event and the click row stay joinable (`5.4-INT-035`).
+
+  The column's dual meaning stands, unchanged and still not worth a migration.
 
 - **Two shipped documents still claim on-device colour analysis.**
   `ux-design-specification.md:409` states the pipeline is "an in-house build using
   on-device palette detection so user imagery never leaves CoutureCast's
   boundary", and `prd.md:294` asks to "confirm on-device processing constraints
   … before CC-5.4". Both predate ADR-014 and both are now false about shipped
-  behaviour. They are left standing because editing planning artifacts was not in
-  this story's scope, but a reader who trusts either will be wrong about where
-  face images are processed. They should be amended alongside ADR-014.
+  behaviour. ~~They are left standing because editing planning artifacts was not
+  in this story's scope, but a reader who trusts either will be wrong about
+  where face images are processed. They should be amended alongside ADR-014.~~
+
+  _Corrected 2026-08-26, alongside the ADR-014 amendment._ The UX line no longer
+  says "on-device"; its privacy claim survives the correction and is stronger
+  than it was, because the selfie is purged rather than retained. The PRD's open
+  question is struck through and answered in place — server-side, why on-device
+  was rejected, what is at rest, and where the work runs — rather than deleted,
+  so a reader following a link to it lands on the answer instead of on nothing.
 
 - **Watch and widget advisor surfaces are out of scope**, unchanged from story
   5.3's Decision 5 and story 5.1's reasoning. No file under `apps/mobile/targets/`
@@ -990,13 +1043,28 @@ recommendation_id, minute)` and a client that can choose the third column can
   sponsorship disclosure, and an undisclosed affiliate tap target would breach the
   PRD guardrail at `prd.md:47`.
 
-- **No workflow runs `test:integration` in CI**, so
-  `apps/api/integration/palette-advisor.integration.spec.ts` — which carries the
-  only proof that the selfie is purged on all three terminal doors, that consent
-  is audited both ways, and that the two offer selections cannot cross — runs
-  only where someone runs it against a live database. This is the pre-existing
-  gap already recorded as deferred item #10 from story 5.2; this story adds ten
-  more tests behind it. It is the single highest-value item in this list.
+- _Resolved 2026-08-26, and the entry it replaces was factually wrong._
+  **~~No workflow runs `test:integration` in CI.~~** The integration tier has
+  been running in CI the whole time. `apps/api/vitest.config.ts` includes
+  `integration/**/*.spec.ts` alongside `src/**`, so `pr-checks.yml`'s
+  `quality-gate` job runs all 26 suites inside its `test:coverage` step, against
+  the PostgreSQL and Redis service containers it declares and the migrations it
+  applies. The run on this branch's head commit is explicit about it:
+  `✓ integration/palette-advisor.integration.spec.ts (11 tests) 679ms`. The
+  `test:integration` SCRIPT is unused by any workflow, which is what the original
+  entry observed; the evidence it names is not.
+
+  What was genuinely missing is narrower and worth more than another job would
+  have been. Fourteen of those suites open with a `SELECT 1 FROM "Table"` probe
+  and `context.skip()` on failure — right for a laptop with no database, and
+  silent when CI points them at the wrong one. That is not hypothetical:
+  `apps/api/vitest.config.ts` records it happening on 2026-08-18, when
+  `packages/db/.env` repointed `DATABASE_URL` inside the worker and sixty-one
+  tests skipped behind a coverage failure that named coverage. `5.4-INT-031`
+  scrapes the probe set out of the sibling suites and fails the run when `CI` is
+  set and a probed table does not resolve; `5.4-INT-030` guards the scrape
+  against going vacuous. Verified both ways: green against the migrated
+  database, red against a database that does not exist.
 
 - **The advisor's Maestro coverage is the locked state only.** The harness signs
   up a fresh public-API user, so the entitled advisor, the consent journey and the
@@ -1007,7 +1075,29 @@ recommendation_id, minute)` and a client that can choose the third column can
   `playwright/tests/palette-advisor.spec.ts` against the seeded entitled user with
   the worker live).
 
-- **The advisor offer lookup has no query-plan coverage.**
+- _Resolved 2026-08-26._ **~~The advisor offer lookup has no query-plan
+  coverage.~~** `commerce-affiliate-offers-query-plan.integration.spec.ts` now
+  seeds an advisor cohort the same size as the garment one under the same
+  inactive partner, plus ten selectable rows under the active partner carrying
+  both undertone forms, so the lookup's `ORDER BY (advisor_undertone IS NULL)
+ASC` cannot rot unnoticed. `5.4-PLAN-01`/`-02`/`-03`/`-04` mirror
+  `5.1-PLAN-02`/`-04`/`-05`/`-06`.
+
+  Two things the closing pass learned that the original entry did not predict.
+  `5.4-PLAN-01` asserts `advisor_slot` is in the plan's Index Cond rather than
+  merely that the index is named: both indexes lead with
+  `(status, locale_region)`, so a scan pushing only those two columns down and
+  re-checking the slot on every heap row would satisfy a name check while
+  reading the whole region. And it deliberately does NOT assert the garment
+  index is absent — the predicate `locale_region = $3 OR locale_region = '*'`
+  becomes a BitmapOr whose `'*'` branch carries no `advisor_slot` and can be
+  served by either index. That is a choice between two index scans rather than
+  the table scan these tests rule out, and this fixture holds no `'*'` rows to
+  separate them, by design: a `'*'` row matches every request region and would
+  become a candidate offer in the sibling suites.
+
+  The original entry, for the record. **The advisor offer lookup has no
+  query-plan coverage.**
   `commerce-affiliate-offers-query-plan.integration.spec.ts` seeds 4,000 GARMENT
   offers and proves `findBestOffer` descends its composite index rather than
   scanning the catalog. `findBestAdvisorOffer` now runs a second, structurally
@@ -1062,8 +1152,30 @@ recommendation_id, minute)` and a client that can choose the third column can
   what was done on this PR, and is recorded here so the flake does not stay
   invisible behind a green tick.
 
-- **A ready palette whose `analysis_version` this build has retired renders no
-  advice and no explanation.** `5.4-E2E-012` pins the state deliberately: the
+- _Resolved 2026-08-26, with its premise corrected._ **~~A ready palette whose
+  `analysis_version` this build has retired renders no advice and no
+  explanation.~~** The second half was right and is closed;
+  `commerce.premium.palette.staleVersion` now ships in all ten catalogs on both
+  surfaces and renders above the numbers it qualifies, pointing at the
+  `SourceChoice` controls that are already on screen in the `ready` state and
+  are the only refresh there is, because Decision 8 purged the selfie when the
+  last analysis terminated.
+
+  The FIRST half was wrong, and it had been written into three places before
+  anyone checked it. `PaletteAdvisorService.resolveRecommendations` builds its
+  cards from the CURRENT `ADVISOR_RULES`, keyed on the stored `undertone` and
+  `depth`; it never reads `analysis_version`, and no other read path does
+  either. A rules bump therefore resolves the full current card set, not an
+  empty one. `5.4-INT-032` pins that against real SQL. What a bump actually
+  costs the reader is the palette ABOVE the cards — an undertone, a depth and a
+  confidence derived under retired rules, presented exactly like a current
+  result — which is what the note says. `5.4-MOB-023` and `5.4-E2E-012` keep
+  their empty-list fixtures, relabelled as the hostile fixtures they are: a
+  surface that resolves no cards must not crash or error either, and no other
+  tier covers that.
+
+  The original entry, for the record. **A ready palette whose `analysis_version`
+  this build has retired renders no advice and no explanation.** `5.4-E2E-012` pins the state deliberately: the
   result panel keeps showing undertone, depth and confidence, every stored
   `item_key` from the retired version resolves to nothing, and the
   recommendations `<ul>` renders empty. Nothing errors, which is the point —
