@@ -293,8 +293,18 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
     const seen: Record<string, unknown> = {}
     server.use(
       http.post(`${PALETTE_ROUTE}/selfie/upload-url`, async ({ request }) => {
-        seen.allocateKey = request.headers.get('idempotency-key')
+        // Body BEFORE key, here and in the commit handler below, and the order
+        // is load-bearing rather than stylistic. The assertions gate on
+        // `waitFor(() => expect(seen.commitKey).toBeTruthy())`; a key recorded
+        // synchronously from the headers is set one microtask before
+        // `await request.json()` resolves, so the gate could open while
+        // `seen.commitBody` was still undefined. Locally that microtask always
+        // won the race and this passed; on a loaded CI runner it lost, and the
+        // suite failed with "expected undefined to deeply equal
+        // { uploadSessionId: 'session-1' }". Recording the body first makes the
+        // key's truthiness mean the whole request was captured.
         seen.declaration = await request.json()
+        seen.allocateKey = request.headers.get('idempotency-key')
         return HttpResponse.json({
           data: {
             uploadSessionId: 'session-1',
@@ -311,8 +321,8 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
         return new HttpResponse(null, { status: 204 })
       }),
       http.post(`${PALETTE_ROUTE}/selfie/commit`, async ({ request }) => {
-        seen.commitKey = request.headers.get('idempotency-key')
         seen.commitBody = await request.json()
+        seen.commitKey = request.headers.get('idempotency-key')
         return HttpResponse.json({
           data: profile({
             hasConsent: true,

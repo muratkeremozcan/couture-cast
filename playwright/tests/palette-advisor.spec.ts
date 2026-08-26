@@ -473,7 +473,13 @@ premiumSeededTest.describe('Story 5.4 palette advisor, stale analysis version', 
       await expect(page.getByTestId('palette-advisor-undertone')).toHaveText('Warm')
       await expect(page.getByTestId('palette-advisor-error')).toHaveCount(0)
       await expect(lockedPanel(page)).toHaveCount(0)
-      await expect(recommendations(page)).toBeVisible()
+      // `toBeAttached`, not `toBeVisible`. The claim is that the list RENDERS
+      // and is empty, which is the whole point of a retired `analysis_version`:
+      // the result panel stays, no card resolves, and nothing errors. An empty
+      // `<ul>` has no content and therefore no bounding box, so Playwright
+      // reports it `hidden` however correct the DOM is -- asserting visibility
+      // here asserts something the fixture makes impossible by construction.
+      await expect(recommendations(page)).toBeAttached()
       await expect(recommendations(page).getByRole('listitem')).toHaveCount(0)
 
       expect(pageErrors).toEqual([])

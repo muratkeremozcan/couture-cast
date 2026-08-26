@@ -1040,3 +1040,16 @@ recommendation_id, minute)` and a client that can choose the third column can
   a reproduction would be a guess against shared infrastructure. It needs
   someone who can reproduce it — a loaded runner, or the determinism script
   looped under CPU pressure — before a fix is written.
+
+- **A ready palette whose `analysis_version` this build has retired renders no
+  advice and no explanation.** `5.4-E2E-012` pins the state deliberately: the
+  result panel keeps showing undertone, depth and confidence, every stored
+  `item_key` from the retired version resolves to nothing, and the
+  recommendations `<ul>` renders empty. Nothing errors, which is the point —
+  but nothing tells the reader why the advice vanished either, so the panel
+  reads as broken rather than as stale. The state becomes reachable the first
+  time `ADVISOR_RULES_VERSION` is bumped with profiles already stored against
+  the old one, so it is a scheduled problem rather than a hypothetical. The fix
+  is one locale key ("your palette predates the current advice; re-derive it")
+  plus a re-derive affordance, across ten catalogs on two surfaces, which is
+  why it is recorded here rather than folded into a review pass.

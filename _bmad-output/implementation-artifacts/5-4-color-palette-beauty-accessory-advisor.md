@@ -809,6 +809,31 @@ jobs were red.
   resolved fourteen times and read `hidden` every time. Fixed with the 375x812
   viewport story 3.6's own bottom-nav spec uses.
 
+### Two more defects, found by running the tiers the branch had never run
+
+Both surfaced once `db:reset` worked and the E2E tiers reached their tests for
+the first time.
+
+- **`5.4-E2E-012` asserted an empty `<ul>` was visible.** The test stubs a
+  retired `analysis_version` so every stored `item_key` resolves to nothing,
+  which is exactly the state it exists to pin — result panel intact, no cards,
+  no error. But an empty list has no content and therefore no bounding box, so
+  Playwright reports it `hidden` however correct the DOM is: the fixture made
+  the assertion impossible to satisfy by construction. `toBeAttached` is the
+  claim that was meant. Burn-in was otherwise 148 passed, 1 failed.
+
+- **`5.4-MOB-016` had a real race, not a flake.** Its MSW handlers recorded
+  `seen.commitKey` synchronously from the request headers and `seen.commitBody`
+  from `await request.json()`, while the assertions gated on
+  `waitFor(() => expect(seen.commitKey).toBeTruthy())`. The key is therefore set
+  one microtask before the body, so the gate could open with `commitBody` still
+  undefined. Locally that microtask always won and the suite passed 678/678
+  across six runs; on a loaded CI runner it lost, and the quality gate failed
+  with `expected undefined to deeply equal { uploadSessionId: 'session-1' }`.
+  Recording the body first makes the key's truthiness mean the whole request was
+  captured. The web equivalent (`5.4-WEB-008`) awaits the upload call directly
+  rather than gating on a spy, so it never had the race.
+
 ### Test gaps closed in the same pass
 
 The web panel and the mobile screen both had docblocks arguing that a rejected
