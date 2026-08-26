@@ -1141,16 +1141,57 @@ ASC` cannot rot unnoticed. `5.4-PLAN-01`/`-02`/`-03`/`-04` mirror
   ephemeral ports from a lower, narrower range than macOS, which is likely why
   saturating a Mac reproduces nothing.
 
-  Testing that means giving the Pact consumer clients a non-pooling dispatcher
+  ~~Testing that means giving the Pact consumer clients a non-pooling dispatcher
   through `createApiClient`'s existing `fetchApi` option — deliberately NOT a
   `Connection: close` header, which undici would put on the wire and Pact would
-  record into the contract. That change is small, but shipping it against 161
-  interactions without a reproduction is a guess about shared infrastructure, so
-  it needs someone who can reproduce it first: a Linux runner, or the determinism
-  script looped there under load. Until then, a failed Pact job on this
-  interaction should be re-run rather than treated as a regression — which is
-  what was done on this PR, and is recorded here so the flake does not stay
-  invisible behind a green tick.
+  record into the contract.~~
+
+  **UPDATE 2026-08-26: it reproduced on macOS, and that reading of it is wrong.**
+  `npm run test:pact` failed on run 3 of the determinism check on an M-series
+  Mac, in `mobile-api-client.pacttest.ts` this time, on `a request to poll
+realtime fallback events` — a third distinct interaction, in a third file, with
+  the identical "The following request was expected but not received" signature.
+  So it is not Linux-only, and the ephemeral-port-range argument for why it
+  should be Linux-only does not survive. It remains rare: 20 further local runs,
+  8 of them beside a full `apps/web` coverage run for realistic I/O load,
+  reproduced nothing.
+
+  **The undici hypothesis is refuted by the failure's own shape, and this is the
+  useful part.** Read `executeTest` in
+  `node_modules/@pact-foundation/pact/src/v4/http/index.js:34-58`: it captures a
+  callback error, and where BOTH a callback error and a mismatch exist it
+  RETHROWS THE CALLBACK ERROR, reaching the "test didn't throw, so we need to
+  ensure the test fails" branch only when the callback succeeded. We got the
+  mismatch error. So the client received a response that parsed against
+  `eventsPollResponseSchema` and satisfied a `toEqual` on the whole body — in
+  14ms — while the mock server being verified reported no request at all. Every
+  transport-level story fails on that: a socket pooled to a closed server throws,
+  and a socket reaching a DIFFERENT pact mock server gets that server's 500 for
+  an unmatched route, which throws too. A successful, correct response is not
+  something the wrong endpoint can produce.
+
+  What can produce it is the verification query resolving to the wrong server.
+  `executeTest` takes `pact.createMockServer(host, 0, false)`'s return value —
+  a PORT — and uses that port as the identity in `mockServerMismatches(port)` and
+  `mockServerMatchedSuccessfully(port)`. Servers are created and torn down once
+  per interaction, 161 times in one process, so port numbers are recycled hard.
+  If a torn-down server has not fully deregistered from the FFI's registry when
+  a new one is handed the same port, the request is received and matched by the
+  right server while the verification reads the stale entry. The position fits:
+  the failing interaction was the SECOND in its file, immediately after a
+  17ms one, which is the tightest create-teardown-create window in the run.
+
+  **What a fix needs now.** Not a dispatcher. Either an explicit distinct
+  `opts.port` per interaction so no two mock servers in a process can share a
+  port number, or an upstream fix in `pact-foundation` if the registry race is
+  confirmed there. Neither should be shipped on this one observation: it is a
+  single failure against a hypothesis formed from it, which is exactly the shape
+  of reasoning that produced the refuted one above. The next person should
+  instrument `createMockServer`'s returned port per interaction, log the
+  sequence, and look for a repeat within one process — that turns the guess into
+  a measurement. Until then, a failed Pact job on this signature should be re-run
+  rather than treated as a regression, and this entry is why it stays visible
+  behind the green tick.
 
 - _Resolved 2026-08-26, with its premise corrected._ **~~A ready palette whose
   `analysis_version` this build has retired renders no advice and no
