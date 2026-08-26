@@ -754,6 +754,170 @@ describe('TelemetryService', () => {
     })
   })
 
+  describe('story 5.4 palette advisor server events', () => {
+    beforeEach(() => {
+      telemetryCreate.mockResolvedValue({ id: 'event-1' })
+    })
+
+    const subjectFor = (userId: string) =>
+      createHmac('sha256', 'telemetry-test-secret-at-least-32-bytes')
+        .update(userId)
+        .digest('base64url')
+
+    it('emits palette_analysis_completed under the acting user pseudonym, exactly once', async () => {
+      await service.captureEvent('raw-user-1', 'palette_analysis_completed', {
+        source: 'selfie',
+        undertone: 'warm',
+        depth: 'medium',
+        outcome: 'ready',
+      })
+
+      expect(analyticsCapture).toHaveBeenCalledTimes(1)
+      expect(analyticsCapture).toHaveBeenCalledWith({
+        distinctId: subjectFor('raw-user-1'),
+        event: 'palette_analysis_completed',
+        properties: {
+          source: 'selfie',
+          undertone: 'warm',
+          depth: 'medium',
+          outcome: 'ready',
+          $ip: null,
+        },
+      })
+      expect(telemetryCreate).toHaveBeenCalledWith({
+        data: {
+          user_id: null,
+          event_type: 'palette_analysis_completed',
+          properties: {
+            source: 'selfie',
+            undertone: 'warm',
+            depth: 'medium',
+            outcome: 'ready',
+          },
+        },
+      })
+    })
+
+    it('records a failed analysis outcome with null undertone/depth rather than skipping the event', async () => {
+      await service.captureEvent('raw-user-1', 'palette_analysis_completed', {
+        source: 'selfie',
+        undertone: null,
+        depth: null,
+        outcome: 'no_face',
+      })
+
+      const captured = analyticsCapture.mock.calls[0]?.[0] as CapturedEvent
+      expect(captured.properties).toEqual({
+        source: 'selfie',
+        undertone: null,
+        depth: null,
+        outcome: 'no_face',
+        $ip: null,
+      })
+    })
+
+    it('emits advisor_offer_clicked with the advisor slot and platform', async () => {
+      await service.captureEvent('raw-user-1', 'advisor_offer_clicked', {
+        partnerId: 'sample-partner',
+        offerId: 'offer-1',
+        advisorSlot: 'foundation',
+        platform: 'web',
+      })
+
+      expect(analyticsCapture).toHaveBeenCalledWith({
+        distinctId: subjectFor('raw-user-1'),
+        event: 'advisor_offer_clicked',
+        properties: {
+          partner_id: 'sample-partner',
+          offer_id: 'offer-1',
+          advisor_slot: 'foundation',
+          platform: 'web',
+          $ip: null,
+        },
+      })
+    })
+
+    it('emits advisor_recommendation_acted for a save and a dismiss', async () => {
+      await service.captureEvent('raw-user-1', 'advisor_recommendation_acted', {
+        slot: 'blush',
+        action: 'saved',
+      })
+      expect(analyticsCapture).toHaveBeenLastCalledWith({
+        distinctId: subjectFor('raw-user-1'),
+        event: 'advisor_recommendation_acted',
+        properties: { slot: 'blush', action: 'saved', $ip: null },
+      })
+
+      await service.captureEvent('raw-user-1', 'advisor_recommendation_acted', {
+        slot: 'blush',
+        action: 'dismissed',
+      })
+      expect(analyticsCapture).toHaveBeenLastCalledWith({
+        distinctId: subjectFor('raw-user-1'),
+        event: 'advisor_recommendation_acted',
+        properties: { slot: 'blush', action: 'dismissed', $ip: null },
+      })
+    })
+
+    it.each([
+      'palette_analysis_completed',
+      'advisor_offer_clicked',
+      'advisor_recommendation_acted',
+    ] as const)('refuses to emit %s with no authenticated user', async (eventType) => {
+      const props =
+        eventType === 'palette_analysis_completed'
+          ? { source: 'selfie', undertone: 'warm', depth: 'medium', outcome: 'ready' }
+          : eventType === 'advisor_offer_clicked'
+            ? {
+                partnerId: 'sample-partner',
+                offerId: 'offer-1',
+                advisorSlot: 'foundation',
+                platform: 'web',
+              }
+            : { slot: 'foundation', action: 'saved' }
+
+      await expect(service.captureEvent(null, eventType, props as never)).rejects.toThrow(
+        'Palette advisor telemetry requires an authenticated user'
+      )
+      expect(telemetryCreate).not.toHaveBeenCalled()
+      expect(analyticsCapture).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      { name: 'a raw hex value', extra: { hex: '#C9A14A' } },
+      { name: 'a confidence score', extra: { confidence: 0.82 } },
+      { name: 'a raw user id', extra: { userId: 'raw-user-1' } },
+      { name: 'an image path', extra: { objectPath: 'palette-selfies/u/s.jpg' } },
+    ])(
+      'rejects a palette_analysis_completed capture carrying $name before anything is written',
+      async ({ extra }) => {
+        await expect(
+          service.captureEvent('raw-user-1', 'palette_analysis_completed', {
+            source: 'selfie',
+            undertone: 'warm',
+            depth: 'medium',
+            outcome: 'ready',
+            ...extra,
+          } as never)
+        ).rejects.toThrow()
+        expect(telemetryCreate).not.toHaveBeenCalled()
+        expect(analyticsCapture).not.toHaveBeenCalled()
+      }
+    )
+
+    it('rejects an out-of-enum outcome the contract does not ship', async () => {
+      await expect(
+        service.captureEvent('raw-user-1', 'palette_analysis_completed', {
+          source: 'selfie',
+          undertone: 'warm',
+          depth: 'medium',
+          outcome: 'not_a_real_outcome',
+        } as never)
+      ).rejects.toThrow()
+      expect(analyticsCapture).not.toHaveBeenCalled()
+    })
+  })
+
   describe('trackOutfitGenerated', () => {
     it('does not re-emit first_outfit_generated when one was already recorded', async () => {
       // Retried ritual generation must not duplicate the funnel event.

@@ -904,3 +904,105 @@ work; each was in the way of verifying it.
   worker entrypoints hand-wire, but it is a trap with no error message, and the
   cheap guard would be a comment at the top of each tsx-executed entrypoint
   saying so.
+
+## Deferred from: story 5.4 colour palette & beauty/accessory advisor (2026-08-25)
+
+Everything below is a deliberate limit of the shipped story, recorded so a later
+reader can tell a decision from an omission. Nothing here is a known defect in
+what shipped.
+
+- **A guardian cannot see a teen's derived palette, and no planning document says
+  whether they should.** `PaletteProfile` and `AdvisorRecommendationState` are
+  registered in `selfOnlyTables`, not `guardianSharedTables` (Decision 11), even
+  though the adjacent `PaletteInsights` is guardian-shared. The reasoning: guardian
+  consent already gates **whether** an under-16 account may upload at all, through
+  the unchanged `WardrobeUploadGuard` → `GuardianService.assertWardrobeUploadAllowed`,
+  and exposing a derived body characteristic to a guardian is a different mandate
+  that no PRD, epic or UX line grants. `PaletteInsights` being guardian-shared is
+  about garment colours, not skin. Product should revisit this deliberately; the
+  reversal is a category move in `packages/db/test/rls/harness.ts` plus a
+  migration, not a redesign.
+
+- **A flagged teen selfie notifies nobody and leaves no reviewable record.** Story
+  4.4 writes a `ModerationEvent` plus one guardian `EventEnvelope` per active
+  consent inside its terminal transaction. This story writes neither, and the
+  reason has to be stated rather than discovered: `ModerationEvent` has relations
+  to `LookbookPost`, `GarmentItem` and `SilhouetteProfile` and none to
+  `PaletteProfile`, and a moderation row is a pointer to evidence a human can
+  review — evidence Decision 8 has just deleted on purpose. A selfie that trips
+  the privacy check terminates `failed` / `privacy_violation`, purges, and tells
+  the user. If guardian notification on a flagged teen selfie turns out to be
+  required, it needs either a retention carve-out or a notification that carries
+  no image, and both are policy calls no planning document has made.
+
+- **There is no re-analysis without re-upload.** Decision 8 purges the selfie the
+  moment the analysis terminates, success or failure, so there are no bytes to
+  re-read. A future story that wants "re-run with a better model" owns
+  re-prompting for a photo. This is the direct cost of the retention posture and
+  is worth paying; it is recorded so nobody plans a background re-classification
+  sweep that cannot exist.
+
+- **There is no beauty-partner admin console**, inheriting story 5.1's catalog
+  posture exactly. Advisor offers are seed- and migration-managed
+  (`seedAdvisorOfferCatalog`, `packages/db/prisma/seeds/commerce.ts`), behind the
+  same `allowsCommerceSeeding()` guard that keeps commerce seeding out of
+  production. Onboarding a real beauty partner is an operator task with no UI.
+
+- **The CC-5.4 readiness blocker is discharged, and ADR-014 is deliberately
+  diverged from.** `refs/implementation-readiness-report-2025-11-13.md:242-245`
+  escalated "Architecture defines NestJS worker (server-side), but PRD implies
+  potential on-device option" as a CC-5.4 blocker. ADR-014 is the answer to that
+  question, not another voice in it: processing is server-side, in the API, with
+  Sharp, and the UX specification's on-device line is stale. **The divergence:**
+  ADR-014 prescribes "Sharp (image resize) → ONNX Runtime (color inference using
+  pre-trained model)", and this story declines the ONNX step. The output is one
+  four-way and one five-way classification that closed-form CIELAB colour science
+  settles exactly, while the repo's only ONNX consumer already carries a 50 MB
+  model directory, a `GARMENT_TAGGING_MODEL_DIR` cache and a
+  `verify:tagging-model` prestart gate for a genuinely learned task. **ADR-014
+  should be amended to record this rather than left quietly contradicted.**
+
+- **`AffiliateClick.recommendation_id` now has two meanings.** For a garment click
+  it is the `ScenarioOutfit.id` the CTA was rendered on; for an advisor click it
+  is the acting user's `PaletteProfile.id` (Decision 7). The column comment states
+  both. Renaming it would be a migration on a shipped table for no behavioural
+  gain, so the dual meaning stands. One thing was tightened rather than accepted:
+  the advisor value is resolved server-side from the session
+  (`CommerceRepository.findPaletteProfileId`) rather than taken from the request
+  body, because the 60-second dedupe index is `(user_id, offer_id,
+recommendation_id, minute)` and a client that can choose the third column can
+  mint unlimited attributed clicks for one offer inside one minute. The garment
+  path still trusts the client's value, unchanged from 5.1; that asymmetry is
+  worth closing in a follow-up.
+
+- **Two shipped documents still claim on-device colour analysis.**
+  `ux-design-specification.md:409` states the pipeline is "an in-house build using
+  on-device palette detection so user imagery never leaves CoutureCast's
+  boundary", and `prd.md:294` asks to "confirm on-device processing constraints
+  … before CC-5.4". Both predate ADR-014 and both are now false about shipped
+  behaviour. They are left standing because editing planning artifacts was not in
+  this story's scope, but a reader who trusts either will be wrong about where
+  face images are processed. They should be amended alongside ADR-014.
+
+- **Watch and widget advisor surfaces are out of scope**, unchanged from story
+  5.3's Decision 5 and story 5.1's reasoning. No file under `apps/mobile/targets/`
+  or the Android widget sources is touched. Neither surface has room for a
+  sponsorship disclosure, and an undisclosed affiliate tap target would breach the
+  PRD guardrail at `prd.md:47`.
+
+- **No workflow runs `test:integration` in CI**, so
+  `apps/api/integration/palette-advisor.integration.spec.ts` — which carries the
+  only proof that the selfie is purged on all three terminal doors, that consent
+  is audited both ways, and that the two offer selections cannot cross — runs
+  only where someone runs it against a live database. This is the pre-existing
+  gap already recorded as deferred item #10 from story 5.2; this story adds ten
+  more tests behind it. It is the single highest-value item in this list.
+
+- **The advisor's Maestro coverage is the locked state only.** The harness signs
+  up a fresh public-API user, so the entitled advisor, the consent journey and the
+  `expo-image-picker` capture path are all out of a Maestro run's reach. Both
+  limits are stated in `maestro/palette-advisor.yaml`'s own docblock and in the
+  story's "explicitly untested" section, and both are covered at other tiers
+  (`palette-advisor-screen.test.tsx` through MSW,
+  `playwright/tests/palette-advisor.spec.ts` against the seeded entitled user with
+  the worker live).

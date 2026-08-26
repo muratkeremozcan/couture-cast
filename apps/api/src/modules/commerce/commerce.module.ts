@@ -8,7 +8,10 @@ import { PrismaModule } from '../../prisma/prisma.module.js'
 import { AuthStateModule } from '../auth/auth-state.module.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module.js'
+import { GuardianModule } from '../guardian/guardian.module.js'
 import { TelemetryModule } from '../telemetry/telemetry.module.js'
+import { SupabaseWardrobeStorageAdapter } from '../wardrobe/wardrobe-storage.adapter.js'
+import { WardrobeUploadGuard } from '../wardrobe/wardrobe.guard.js'
 import { AffiliateClickController } from './affiliate-click.controller.js'
 import { AffiliateClickService } from './affiliate-click.service.js'
 import { AffiliateClickTelemetry } from './affiliate-click.telemetry.js'
@@ -22,6 +25,9 @@ import { CommercePreferencesController } from './commerce-preferences.controller
 import { CommercePreferencesService } from './commerce-preferences.service.js'
 import { CommerceRepository } from './commerce.repository.js'
 import { CommerceRetentionService } from './commerce-retention.service.js'
+import { PaletteAdvisorController } from './palette-advisor.controller.js'
+import { PaletteAdvisorService } from './palette-advisor.service.js'
+import { PaletteAnalysisProcessingQueue } from './palette-analysis-processing.queue.js'
 import { PremiumEntitlementGuard } from './premium-entitlement.guard.js'
 import { PremiumEntitlementService } from './premium-entitlement.service.js'
 import { PremiumThemeController } from './premium-theme.controller.js'
@@ -59,6 +65,10 @@ import { SubscriptionService } from './subscription.service.js'
     // pseudonymous emit path for both server-side commerce events. Nothing here
     // reaches ANALYTICS_CLIENT directly any more.
     TelemetryModule,
+    // Story 5.4: WardrobeUploadGuard needs GuardianService, which this module
+    // otherwise has no path to. GuardianModule exports it rather than this
+    // module re-implementing the guardian-consent check.
+    GuardianModule,
   ],
   controllers: [
     CommercePreferencesController,
@@ -76,6 +86,9 @@ import { SubscriptionService } from './subscription.service.js'
     // No @UseGuards on this one either: machine-to-machine, authenticated by
     // the provider credential over the raw request body.
     BillingWebhookController,
+    // Story 5.4: the palette advisor. Same route-prefix reasoning as
+    // PremiumThemeController above.
+    PaletteAdvisorController,
   ],
   providers: [
     AffiliateOfferService,
@@ -108,6 +121,14 @@ import { SubscriptionService } from './subscription.service.js'
     // PremiumEntitlementGuard on a production route -- whether that is the
     // guard's first such mount depends only on whether CC-5.5 lands earlier.
     PremiumThemeService,
+    // Story 5.4: the palette advisor. WardrobeUploadGuard is registered here
+    // (not imported from a wardrobe module export) the same way it is
+    // wherever else it is consumed -- it is a stateless guard class with a
+    // single GuardianService dependency, which GuardianModule above supplies.
+    WardrobeUploadGuard,
+    SupabaseWardrobeStorageAdapter,
+    PaletteAdvisorService,
+    PaletteAnalysisProcessingQueue,
   ],
   // PremiumEntitlementService and the guard are exported for CC-5.3/5.4/5.5,
   // whose surfaces (themes, palette analysis, planner API) gate on them.

@@ -1,7 +1,11 @@
 # Feature flags
 
-Updated: 2026-03-21
-Reason: documented Story 0.7 PostHog-backed flag usage patterns and
+Updated: 2026-08-25
+Reason: flipped color_analysis_enabled's default from true to false (Story
+5.4 decision 10 — a consent-gated feature reading photographs of faces is the
+last flag that should fail open) and updated its purpose; added the two
+commerce kill switches to the catalog and corrected the renamed warmup file;
+originally documented Story 0.7 PostHog-backed flag usage patterns and
 fallback flow
 
 Status: active
@@ -14,7 +18,7 @@ Flag behavior is split across five files:
 - `apps/api/src/posthog/posthog.service.ts`
 - `apps/api/src/modules/feature-flags/feature-flags.service.ts`
 - `apps/api/src/modules/feature-flags/feature-flags.repository.ts`
-- `apps/api/src/modules/feature-flags/feature-flags.cron.ts`
+- `apps/api/src/modules/feature-flags/feature-flags.warmup.ts`
 
 ## Canonical flag catalog
 
@@ -27,12 +31,26 @@ Flag behavior is split across five files:
   purpose: gates community/social feed exposure
   runtime type: boolean
 - `color_analysis_enabled`
-  default: `true`
-  purpose: keeps wardrobe color extraction enabled by default
+  default: `false`
+  purpose: kill switch for the palette advisor's consent, analysis, selfie
+  upload, and sponsored-overlay write paths; fails closed like the two
+  commerce switches below, since it gates a feature that reads photographs
+  of faces. The `true` override lives only in the seed, so it is on wherever
+  the seed has run and off everywhere else, production included.
   runtime type: boolean
 - `weather_alerts_enabled`
   default: `true`
   purpose: keeps weather alert delivery enabled by default
+  runtime type: boolean
+- `commerce_affiliate_enabled`
+  default: `false`
+  purpose: kill switch for affiliate commerce; fails closed so a degraded
+  PostHog can never switch commerce on by accident
+  runtime type: boolean
+- `commerce_subscription_enabled`
+  default: `false`
+  purpose: kill switch for premium subscription purchasing only; status,
+  refresh, portal and webhooks stay on regardless
   runtime type: boolean
 
 ## Request-time evaluation order
@@ -105,7 +123,7 @@ The flag flow is covered at multiple levels:
 - `packages/config/src/flags.spec.ts`
 - `apps/api/src/posthog/posthog.service.spec.ts`
 - `apps/api/src/modules/feature-flags/feature-flags.service.spec.ts`
-- `apps/api/src/modules/feature-flags/feature-flags.cron.spec.ts`
+- `apps/api/src/modules/feature-flags/feature-flags.warmup.spec.ts`
 
 Those tests verify:
 

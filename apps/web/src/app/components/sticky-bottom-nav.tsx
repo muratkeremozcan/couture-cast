@@ -26,11 +26,48 @@ export interface StickyBottomNavProps {
   isMobilePreview?: boolean
 }
 
+/**
+ * The tab that owns `pathname`, or null when no tab does.
+ *
+ * Story 5.4 replaced an exact-equality match here. `NAV_TABS.find((tab) =>
+ * tab.href === pathname)` meant every nested route fell back to Home:
+ * `/wardrobe/capsules` and `/wardrobe/onboarding` both highlighted Home while
+ * sitting under the Wardrobe tab, which told the reader they were somewhere
+ * they were not.
+ *
+ * Longest-prefix, with `'/'` matching only exactly. Without that carve-out
+ * Home's href is a prefix of every path in the app and would win everywhere.
+ * The boundary check (`/` or end-of-string after the href) is what stops
+ * `/wardrobe-silhouette` from claiming the `/wardrobe` tab.
+ *
+ * Null is a real answer, not a failure: `/palette` is a destination route that
+ * belongs to no tab, and highlighting Home there would be the same lie the
+ * exact match told about `/wardrobe/capsules`.
+ */
+export function resolveActiveNavTab(pathname: string | null): NavTabId | null {
+  if (!pathname) {
+    return null
+  }
+  const matches = NAV_TABS.filter((tab) =>
+    tab.href === '/'
+      ? pathname === '/'
+      : pathname === tab.href || pathname.startsWith(`${tab.href}/`)
+  )
+  return (
+    matches.reduce<NavTabItem | null>(
+      (best, tab) => (best === null || tab.href.length > best.href.length ? tab : best),
+      null
+    )?.id ?? null
+  )
+}
+
 export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProps) {
   const pathname = usePathname()
-  const activeTab = NAV_TABS.find((tab) => tab.href === pathname)?.id ?? 'home'
-  const activeLabel = NAV_TABS.find((tab) => tab.id === activeTab)?.label ?? 'Home'
-  const [announcement, setAnnouncement] = useState(`Navigated to ${activeLabel} tab`)
+  const activeTab = resolveActiveNavTab(pathname)
+  const activeLabel = NAV_TABS.find((tab) => tab.id === activeTab)?.label ?? null
+  const [announcement, setAnnouncement] = useState(
+    activeLabel === null ? '' : `Navigated to ${activeLabel} tab`
+  )
 
   const handleTabClick = (tab: NavTabItem) => {
     setAnnouncement(`Navigated to ${tab.label} tab`)

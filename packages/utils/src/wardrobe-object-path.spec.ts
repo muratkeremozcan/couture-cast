@@ -3,7 +3,11 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 import { describe, expect, it } from 'vitest'
-import { buildGarmentObjectPath, buildSilhouetteObjectPath } from './wardrobe-object-path'
+import {
+  buildGarmentObjectPath,
+  buildPaletteSelfieObjectPath,
+  buildSilhouetteObjectPath,
+} from './wardrobe-object-path'
 
 describe('buildGarmentObjectPath', () => {
   it('constructs correct object path for given user, garment, and extension', () => {
@@ -30,5 +34,17 @@ describe('buildSilhouetteObjectPath', () => {
     const silhouettePath = buildSilhouetteObjectPath('user_9', 'session_9', 'png')
     expect(silhouettePath.startsWith('wardrobe/user_9/')).toBe(true)
     expect(garmentPath.startsWith('wardrobe/user_9/')).toBe(true)
+  })
+})
+
+describe('buildPaletteSelfieObjectPath', () => {
+  it('nests palette selfies under the user folder, in a palette/ prefix', () => {
+    const path = buildPaletteSelfieObjectPath('user_123', 'session_456', 'jpg')
+    expect(path).toBe('wardrobe/user_123/palette/session_456.jpg')
+  })
+
+  it('shares the same wardrobe/<userId>/ prefix so the existing storage RLS policy already authorizes it', () => {
+    const path = buildPaletteSelfieObjectPath('user_9', 'session_9', 'webp')
+    expect(path.startsWith('wardrobe/user_9/')).toBe(true)
   })
 })

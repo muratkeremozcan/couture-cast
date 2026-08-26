@@ -21,6 +21,8 @@ const OFFER: CommerceClickOffer = {
   partner_display_name: 'Sample Partner',
   allowed_host: 'partner.couturecast.test',
   deep_link_template: 'https://partner.couturecast.test/shop?cc={clickToken}',
+  // A garment offer: Story 5.4 adds advisor_slot, null on every non-advisor row.
+  advisor_slot: null,
 }
 
 const REQUEST = {
@@ -45,10 +47,11 @@ describe('AffiliateClickService', () => {
     findActiveClickOffer: vi.fn(),
     findRecentClick: vi.fn(),
     findRecommendationScenario: vi.fn(),
+    findPaletteProfileId: vi.fn(),
     createClick: vi.fn(),
     findLatestClick: vi.fn(),
   }
-  const telemetry = { recordCtaClicked: vi.fn() }
+  const telemetry = { recordCtaClicked: vi.fn(), recordAdvisorOfferClicked: vi.fn() }
 
   let service: AffiliateClickService
 
@@ -61,6 +64,7 @@ describe('AffiliateClickService', () => {
     repository.findActiveClickOffer.mockReset().mockResolvedValue(OFFER)
     repository.findRecentClick.mockReset().mockResolvedValue(null)
     repository.findRecommendationScenario.mockReset().mockResolvedValue('morning')
+    repository.findPaletteProfileId.mockReset().mockResolvedValue('palette-profile-1')
     repository.createClick
       .mockReset()
       .mockImplementation(
@@ -69,6 +73,7 @@ describe('AffiliateClickService', () => {
       )
     repository.findLatestClick.mockReset().mockResolvedValue(null)
     telemetry.recordCtaClicked.mockReset().mockResolvedValue(undefined)
+    telemetry.recordAdvisorOfferClicked.mockReset().mockResolvedValue(undefined)
 
     service = new AffiliateClickService(
       featureFlags as unknown as FeatureFlagsService,
@@ -390,6 +395,157 @@ describe('AffiliateClickService', () => {
       repository.createClick.mockRejectedValue(error)
 
       await expect(service.recordClick(REQUEST)).rejects.toBe(error)
+    })
+  })
+
+  describe('story 5.4 advisor branch (Decision 7)', () => {
+    const ADVISOR_OFFER: CommerceClickOffer = {
+      offer_id: 'advisor-offer-1',
+      partner_id: 'partner-1',
+      partner_slug: 'sample-partner',
+      partner_display_name: 'Sample Partner',
+      allowed_host: 'partner.couturecast.test',
+      deep_link_template: 'https://partner.couturecast.test/shop/advisor?cc={clickToken}',
+      advisor_slot: 'foundation',
+    }
+
+    it('5.4-INT-022 branches on the OFFER ROW advisor_slot, not on input.surface: a garment offer id sent with surface "palette_advisor" still emits affiliate_cta_clicked', async () => {
+      // OFFER (module-level fixture) is a garment offer: advisor_slot is null.
+      repository.findActiveClickOffer.mockResolvedValue(OFFER)
+
+      await service.recordClick({ ...REQUEST, surface: 'palette_advisor' })
+
+      expect(telemetry.recordCtaClicked).toHaveBeenCalledTimes(1)
+      expect(telemetry.recordAdvisorOfferClicked).not.toHaveBeenCalled()
+      expect(repository.findRecommendationScenario).toHaveBeenCalled()
+    })
+
+    it('5.4-INT-023 branches on the OFFER ROW advisor_slot, not on input.surface: an advisor offer id sent with surface "mobile_hero" still emits advisor_offer_clicked', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(ADVISOR_OFFER)
+
+      await service.recordClick({
+        ...REQUEST,
+        offerId: ADVISOR_OFFER.offer_id,
+        surface: 'mobile_hero',
+        platform: 'mobile',
+      })
+
+      expect(telemetry.recordAdvisorOfferClicked).toHaveBeenCalledTimes(1)
+      expect(telemetry.recordAdvisorOfferClicked).toHaveBeenCalledWith({
+        userId: REQUEST.userId,
+        partnerId: ADVISOR_OFFER.partner_slug,
+        offerId: ADVISOR_OFFER.offer_id,
+        advisorSlot: 'foundation',
+        platform: 'mobile',
+      })
+      expect(telemetry.recordCtaClicked).not.toHaveBeenCalled()
+      // The garment scenario lookup never runs for an advisor click: it has no
+      // ScenarioOutfit, and a lookup here would either invent a scenario or
+      // route the click into the UNRESOLVED_SCENARIO dead end that emits
+      // nothing.
+      expect(repository.findRecommendationScenario).not.toHaveBeenCalled()
+    })
+
+    it('defaults platform to web when the client omits it', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(ADVISOR_OFFER)
+
+      await service.recordClick({
+        ...REQUEST,
+        offerId: ADVISOR_OFFER.offer_id,
+        surface: 'palette_advisor',
+      })
+
+      expect(telemetry.recordAdvisorOfferClicked).toHaveBeenCalledWith(
+        expect.objectContaining({ platform: 'web' })
+      )
+    })
+
+    it('stores the ADVISOR_SCENARIO sentinel rather than falling into UNRESOLVED_SCENARIO', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(ADVISOR_OFFER)
+
+      await service.recordClick({
+        ...REQUEST,
+        offerId: ADVISOR_OFFER.offer_id,
+      })
+
+      expect(repository.createClick).toHaveBeenCalledWith(
+        expect.objectContaining({ scenario: 'advisor' })
+      )
+    })
+
+    /**
+     * 5.4-INT-024. The dedupe index is `(user_id, offer_id, recommendation_id,
+     * minute)`, so a client that can choose the third column can mint unlimited
+     * attributed clicks for one offer inside one minute. An advisor click's
+     * `recommendation_id` is therefore resolved from the caller's own
+     * `PaletteProfile`, and whatever the request body carried is discarded.
+     */
+    it('5.4-INT-024 derives the advisor recommendation id server-side, ignoring the request body', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(ADVISOR_OFFER)
+      repository.findPaletteProfileId.mockResolvedValue('real-palette-profile')
+
+      await service.recordClick({
+        ...REQUEST,
+        offerId: ADVISOR_OFFER.offer_id,
+        recommendationId: 'forged-by-the-client',
+      })
+
+      expect(repository.findPaletteProfileId).toHaveBeenCalledWith(REQUEST.userId)
+      expect(repository.createClick).toHaveBeenCalledWith(
+        expect.objectContaining({ recommendationId: 'real-palette-profile' })
+      )
+      // The dedupe lookup uses the derived id too, or the derivation would only
+      // protect the insert and leave the replay window client-controlled.
+      expect(repository.findRecentClick).toHaveBeenCalledWith(
+        REQUEST.userId,
+        ADVISOR_OFFER.offer_id,
+        'real-palette-profile'
+      )
+    })
+
+    /**
+     * 5.4-INT-025. A caller with no `PaletteProfile` has never granted consent, so
+     * no advisor card was ever rendered for them and there is nothing to attribute.
+     */
+    it('5.4-INT-025 refuses an advisor click from a caller with no palette profile', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(ADVISOR_OFFER)
+      repository.findPaletteProfileId.mockResolvedValue(null)
+
+      await expect(
+        service.recordClick({ ...REQUEST, offerId: ADVISOR_OFFER.offer_id })
+      ).rejects.toMatchObject({ status: 403 })
+      expect(repository.createClick).not.toHaveBeenCalled()
+      expect(telemetry.recordAdvisorOfferClicked).not.toHaveBeenCalled()
+    })
+
+    /** A garment click never touches the palette profile lookup. */
+    it("5.4-INT-026 leaves a garment click's recommendation id exactly as sent", async () => {
+      repository.findActiveClickOffer.mockResolvedValue(OFFER)
+
+      await service.recordClick(REQUEST)
+
+      expect(repository.findPaletteProfileId).not.toHaveBeenCalled()
+      expect(repository.createClick).toHaveBeenCalledWith(
+        expect.objectContaining({ recommendationId: REQUEST.recommendationId })
+      )
+    })
+
+    it('dedupes an advisor click replay the same way as a garment click', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(ADVISOR_OFFER)
+      repository.findRecentClick.mockResolvedValue({
+        id: 'existing-click',
+        token: 'existing-token',
+        offer_id: ADVISOR_OFFER.offer_id,
+      })
+
+      const result = await service.recordClick({
+        ...REQUEST,
+        offerId: ADVISOR_OFFER.offer_id,
+      })
+
+      expect(result.created).toBe(false)
+      expect(repository.createClick).not.toHaveBeenCalled()
+      expect(telemetry.recordAdvisorOfferClicked).not.toHaveBeenCalled()
     })
   })
 })

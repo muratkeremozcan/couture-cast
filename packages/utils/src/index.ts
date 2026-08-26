@@ -43,11 +43,37 @@ export type { WeatherAltTextInput, AccessibilityAnnouncementEvent } from './acce
 
 export {
   contrastRatio,
+  linearizeSrgbChannel,
   meetsWcagAA,
+  srgbChannels,
   WCAG_AA_LARGE_TEXT_RATIO,
   WCAG_AA_NORMAL_TEXT_RATIO,
 } from './contrast'
 export type { WcagContrastOptions } from './contrast'
 
-export { buildGarmentObjectPath, buildSilhouetteObjectPath } from './wardrobe-object-path'
+export {
+  buildGarmentObjectPath,
+  buildPaletteSelfieObjectPath,
+  buildSilhouetteObjectPath,
+} from './wardrobe-object-path'
 export type { GarmentObjectExtension } from './wardrobe-object-path'
+
+export {
+  chroma,
+  classifyDepth,
+  classifyUndertone,
+  COOL_HUE_MAX,
+  hueAngleDegrees,
+  individualTypologyAngle,
+  ITA_FAIR_MIN,
+  ITA_LIGHT_MIN,
+  ITA_MEDIUM_MIN,
+  ITA_TAN_MIN,
+  linearRgbToLab,
+  NEUTRAL_CHROMA_MAX,
+  OLIVE_HUE_MAX,
+  OLIVE_HUE_MIN,
+  srgbToLab,
+  WARM_HUE_MAX,
+} from './skin-tone'
+export type { Lab, SkinDepth, SkinUndertone } from './skin-tone'

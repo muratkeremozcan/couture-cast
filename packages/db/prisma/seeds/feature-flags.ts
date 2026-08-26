@@ -20,7 +20,14 @@ const { FEATURE_FLAG_KEYS, getDefaultFeatureFlagValue } = unwrapCjsNamespace(sha
 const canonicalFlagOverrides: Record<FeatureFlagKey, FeatureFlagStoredValue> = {
   premium_themes_enabled: true,
   community_feed_enabled: false,
-  color_analysis_enabled: getDefaultFeatureFlagValue('color_analysis_enabled'),
+  // Story 5.4: the registry default is `false` (fail-closed, decision 10), so
+  // this seed override is what turns the feature on in every seeded test and
+  // local environment; production never runs this seed, so it stays off
+  // there until someone flips it deliberately. Without this override the
+  // seed turns the feature OFF everywhere and every one of this story's
+  // positive-path tests fails looking like a feature bug rather than a seed
+  // gap.
+  color_analysis_enabled: true,
   weather_alerts_enabled: getDefaultFeatureFlagValue('weather_alerts_enabled'),
   // Story 5.1 decision 14: three independent gates default to off, so without
   // this the feature's positive path is not demonstrable anywhere and the

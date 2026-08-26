@@ -73,6 +73,158 @@
         },
         "loadError": "Não foi possível carregar sua paleta da interface. A paleta padrão está sendo exibida.",
         "saveError": "Não foi possível salvar sua paleta da interface. Tente novamente."
+      },
+      "palette": {
+        "sectionTitle": "Consultor de paleta de cores",
+        "intro": "Descubra os tons de maquiagem e os acessórios que combinam com os seus tons. O Premium lê as cores do seu guarda-roupa, ou uma selfie que você escolher, e guarda apenas o resultado.",
+        "consent": {
+          "title": "Consentimento para análise de cores",
+          "body": "O CoutureCast só lê uma imagem depois que você aceitar aqui. A selfie é analisada nos servidores do CoutureCast e a foto é apagada assim que a análise termina, com sucesso ou não; ficam guardados apenas o seu subtom, a profundidade e uma pontuação de confiança. Você pode retirar o consentimento quando quiser e tudo o que foi derivado é apagado junto.",
+          "grant": "Dar consentimento para a análise de cores",
+          "revoke": "Retirar o consentimento e apagar minha paleta",
+          "granted": "Consentimento para a análise de cores concedido."
+        },
+        "source": {
+          "selfie": "Escolher uma selfie",
+          "wardrobe": "Usar as cores do meu guarda-roupa",
+          "selfieHint": "Uma foto do rosto centralizada, com luz uniforme e sem filtros dá subtom e profundidade. A foto é apagada assim que a análise termina.",
+          "wardrobeHint": "Não precisa enviar nada. O CoutureCast lê as cores já salvas das suas peças e informa apenas o subtom."
+        },
+        "status": {
+          "idle": "Ainda não há paleta.",
+          "uploading": "Enviando sua foto…",
+          "processing": "Analisando sua paleta…",
+          "ready": "Sua paleta está pronta.",
+          "failed": "A análise não foi concluída."
+        },
+        "failure": {
+          "noFace": "Não encontramos tom de pele suficiente nessa foto. Tente uma imagem centralizada, com luz uniforme e o rosto preenchendo o quadro.",
+          "lowQuality": "Essa foto estava escura demais, com filtro demais ou muito irregular para ler com confiança. Tente de novo com luz do dia uniforme e sem filtros.",
+          "privacyViolation": "Essa foto não pode ser analisada. Escolha outra foto sua.",
+          "insufficientWardrobe": "Seu guarda-roupa ainda não tem peças coloridas suficientes. Adicione mais algumas ou use uma selfie.",
+          "timeout": "A análise demorou demais e foi interrompida. Tente de novo em instantes.",
+          "storageError": "Não conseguimos ler a foto enviada. Tente de novo."
+        },
+        "result": {
+          "undertone": "Subtom",
+          "depth": "Profundidade",
+          "depthUnknown": "Não medida",
+          "confidence": "Confiança"
+        },
+        "undertone": {
+          "warm": "Quente",
+          "cool": "Frio",
+          "neutral": "Neutro",
+          "olive": "Oliva"
+        },
+        "depth": {
+          "fair": "Muito clara",
+          "light": "Clara",
+          "medium": "Média",
+          "tan": "Bronzeada",
+          "deep": "Profunda"
+        },
+        "slot": {
+          "foundation": "Base",
+          "blush": "Blush",
+          "jewelry": "Joias",
+          "bag": "Bolsas",
+          "eyewear": "Óculos"
+        },
+        "foundationDepthUnknown": "As cores do guarda-roupa mostram o seu subtom, mas não a profundidade da pele, então a base é uma família de tons e não uma correspondência exata. Uma selfie reduziria para um tom só.",
+        "shades": {
+          "foundation": {
+            "warm": {
+              "fair": "Porcelana quente",
+              "light": "Marfim dourado",
+              "medium": "Bege mel",
+              "tan": "Caramelo âmbar",
+              "deep": "Expresso quente",
+              "family": "Família dourada quente"
+            },
+            "cool": {
+              "fair": "Porcelana fria",
+              "light": "Marfim rosado",
+              "medium": "Bege rosado",
+              "tan": "Castanho frio",
+              "deep": "Expresso frio",
+              "family": "Família rosada fria"
+            },
+            "neutral": {
+              "fair": "Porcelana neutra",
+              "light": "Marfim suave",
+              "medium": "Bege equilibrado",
+              "tan": "Castanho neutro",
+              "deep": "Expresso neutro",
+              "family": "Família neutra equilibrada"
+            },
+            "olive": {
+              "fair": "Porcelana oliva",
+              "light": "Marfim esverdeado",
+              "medium": "Bege oliva",
+              "tan": "Castanho oliva",
+              "deep": "Expresso oliva",
+              "family": "Família verde-oliva"
+            }
+          },
+          "blush": {
+            "warm": {
+              "0": "Damasco quente",
+              "1": "Pêssego terracota"
+            },
+            "cool": {
+              "0": "Frutas vermelhas frias",
+              "1": "Framboesa suave"
+            },
+            "neutral": {
+              "0": "Rosa acinzentado",
+              "1": "Coral empoeirado"
+            },
+            "olive": {
+              "0": "Tijolo quente",
+              "1": "Bronze dourado"
+            }
+          },
+          "jewelry": {
+            "warm": "Ouro amarelo",
+            "cool": "Prata e platina",
+            "neutral": "Ouro champanhe",
+            "olive": "Latão envelhecido"
+          },
+          "bag": {
+            "warm": "Couro conhaque",
+            "cool": "Grafite e marinho",
+            "neutral": "Marrom chocolate",
+            "olive": "Musgo profundo"
+          },
+          "eyewear": {
+            "warm": "Tartaruga marrom",
+            "cool": "Preto fosco",
+            "neutral": "Cinza fumê",
+            "olive": "Chifre oliva"
+          }
+        },
+        "sponsored": {
+          "disclosure": "Patrocinado. O CoutureCast recebe comissão se você comprar por este link. Isso não muda quais tons são recomendados, e você pode desativar links patrocinados em Configurações.",
+          "partnerLabel": "De {{partner}}",
+          "cta": "Comprar este tom"
+        },
+        "actions": {
+          "save": "Salvar",
+          "saved": "Salvo",
+          "dismiss": "Dispensar",
+          "dismissed": "Dispensado",
+          "undo": "Desfazer"
+        },
+        "locked": {
+          "title": "A consultoria de cores é um recurso Premium",
+          "body": "Assine o Premium em Configurações para receber tons de maquiagem e combinações de acessórios de acordo com os seus tons.",
+          "signedOutBody": "Entre na sua conta e assine o Premium para receber tons de maquiagem e combinações de acessórios de acordo com os seus tons."
+        },
+        "unavailable": "A análise de cores está pausada no momento. Sua paleta salva continua como está; novas análises voltam quando ela retornar.",
+        "loadError": "Não conseguimos carregar sua paleta. Tente de novo.",
+        "saveError": "Não conseguimos salvar essa alteração. Tente de novo.",
+        "deleteConfirm": "Isso apaga seu subtom, sua profundidade, todas as sugestões salvas e dispensadas e qualquer foto ainda guardada. Não dá para desfazer."
       }
     }
   },

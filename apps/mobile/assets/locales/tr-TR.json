@@ -371,6 +371,158 @@
         },
         "loadError": "Arayüz paletin yüklenemedi. Varsayılan palet gösteriliyor.",
         "saveError": "Arayüz paletin kaydedilemedi. Lütfen tekrar dene."
+      },
+      "palette": {
+        "sectionTitle": "Renk paleti danışmanı",
+        "intro": "Ten tonuna uyan makyaj tonlarını ve aksesuarları bul. Premium, gardırobundaki renkleri veya seçtiğin bir selfie'yi okur ve yalnızca sonucu saklar.",
+        "consent": {
+          "title": "Renk analizi izni",
+          "body": "CoutureCast bir görseli yalnızca burada onay verdikten sonra okur. Selfie, CoutureCast sunucularında analiz edilir ve fotoğraf, analiz biter bitmez başarılı olsun ya da olmasın silinir; yalnızca alt tonun, derinliğin ve bir güven puanı saklanır. İzni istediğin zaman geri çekebilirsin; ondan türetilen her şey de birlikte silinir.",
+          "grant": "Renk analizi iznini ver",
+          "revoke": "İzni geri çek ve paletimi sil",
+          "granted": "Renk analizi izni verildi."
+        },
+        "source": {
+          "selfie": "Selfie seç",
+          "wardrobe": "Gardırobumun renklerini kullan",
+          "selfieHint": "Ortalanmış, eşit ışıklı ve filtresiz bir yüz fotoğrafı hem alt tonu hem derinliği verir. Fotoğraf, analiz biter bitmez silinir.",
+          "wardrobeHint": "Yükleme gerekmez. CoutureCast, parçaların için zaten kayıtlı olan renkleri okur ve yalnızca alt tonu bildirir."
+        },
+        "status": {
+          "idle": "Henüz palet yok.",
+          "uploading": "Fotoğrafın yükleniyor…",
+          "processing": "Paletin analiz ediliyor…",
+          "ready": "Paletin hazır.",
+          "failed": "Analiz tamamlanmadı."
+        },
+        "failure": {
+          "noFace": "Bu fotoğrafta yeterli ten tonu bulamadık. Ortalanmış, eşit ışıklı ve yüzünün kareyi doldurduğu bir çekim dene.",
+          "lowQuality": "Bu fotoğraf güvenle okunamayacak kadar karanlık, filtreli ya da dengesizdi. Eşit gün ışığında ve filtresiz yeniden dene.",
+          "privacyViolation": "Bu fotoğraf analiz edilemiyor. Kendine ait başka bir fotoğraf seç.",
+          "insufficientWardrobe": "Gardırobunda henüz yeterli renkli parça yok. Birkaç tane daha ekle ya da bunun yerine bir selfie kullan.",
+          "timeout": "Analiz çok uzun sürdü ve durduruldu. Birazdan yeniden dene.",
+          "storageError": "Yüklenen fotoğrafı okuyamadık. Yeniden dene."
+        },
+        "result": {
+          "undertone": "Alt ton",
+          "depth": "Derinlik",
+          "depthUnknown": "Ölçülmedi",
+          "confidence": "Güven"
+        },
+        "undertone": {
+          "warm": "Sıcak",
+          "cool": "Soğuk",
+          "neutral": "Nötr",
+          "olive": "Zeytin"
+        },
+        "depth": {
+          "fair": "Çok açık",
+          "light": "Açık",
+          "medium": "Orta",
+          "tan": "Bronz",
+          "deep": "Koyu"
+        },
+        "slot": {
+          "foundation": "Fondöten",
+          "blush": "Allık",
+          "jewelry": "Takı",
+          "bag": "Çanta",
+          "eyewear": "Gözlük"
+        },
+        "foundationDepthUnknown": "Gardırop renkleri alt tonunu gösterir ama ten derinliğini göstermez; bu yüzden fondöten tek bir eşleşme değil, bir ton ailesidir. Bir selfie bunu tek tona indirir.",
+        "shades": {
+          "foundation": {
+            "warm": {
+              "fair": "Sıcak porselen",
+              "light": "Altın fildişi",
+              "medium": "Bal beji",
+              "tan": "Kehribar karamel",
+              "deep": "Sıcak espresso",
+              "family": "Sıcak altın ailesi"
+            },
+            "cool": {
+              "fair": "Soğuk porselen",
+              "light": "Pembe fildişi",
+              "medium": "Pembemsi bej",
+              "tan": "Soğuk kestane",
+              "deep": "Soğuk espresso",
+              "family": "Soğuk pembe ailesi"
+            },
+            "neutral": {
+              "fair": "Nötr porselen",
+              "light": "Yumuşak fildişi",
+              "medium": "Dengeli bej",
+              "tan": "Nötr kestane",
+              "deep": "Nötr espresso",
+              "family": "Dengeli nötr ailesi"
+            },
+            "olive": {
+              "fair": "Zeytin porselen",
+              "light": "Yeşilimsi fildişi",
+              "medium": "Zeytin beji",
+              "tan": "Zeytin kestane",
+              "deep": "Zeytin espresso",
+              "family": "Zeytin yeşili ailesi"
+            }
+          },
+          "blush": {
+            "warm": {
+              "0": "Sıcak kayısı",
+              "1": "Terakota şeftali"
+            },
+            "cool": {
+              "0": "Soğuk böğürtlen",
+              "1": "Yumuşak ahududu"
+            },
+            "neutral": {
+              "0": "Soluk gül",
+              "1": "Tozlu mercan"
+            },
+            "olive": {
+              "0": "Sıcak kiremit",
+              "1": "Altın bronz"
+            }
+          },
+          "jewelry": {
+            "warm": "Sarı altın",
+            "cool": "Gümüş ve platin",
+            "neutral": "Şampanya altını",
+            "olive": "Antik pirinç"
+          },
+          "bag": {
+            "warm": "Konyak deri",
+            "cool": "Antrasit ve lacivert",
+            "neutral": "Çikolata kahvesi",
+            "olive": "Koyu yosun"
+          },
+          "eyewear": {
+            "warm": "Bağa kahverengisi",
+            "cool": "Mat siyah",
+            "neutral": "Duman grisi",
+            "olive": "Zeytin boynuz"
+          }
+        },
+        "sponsored": {
+          "disclosure": "Sponsorlu. Bu bağlantıdan alışveriş yaparsan CoutureCast komisyon kazanır. Bu, önerilen tonları değiştirmez ve sponsorlu bağlantıları Ayarlar'dan kapatabilirsin.",
+          "partnerLabel": "{{partner}} tarafından",
+          "cta": "Bu tonu satın al"
+        },
+        "actions": {
+          "save": "Kaydet",
+          "saved": "Kaydedildi",
+          "dismiss": "Kapat",
+          "dismissed": "Kapatıldı",
+          "undo": "Geri al"
+        },
+        "locked": {
+          "title": "Renk danışmanlığı bir Premium özelliğidir",
+          "body": "Tonlarına uygun makyaj tonları ve aksesuar eşleşmeleri için Ayarlar'dan Premium'a abone ol.",
+          "signedOutBody": "Tonlarına uygun makyaj tonları ve aksesuar eşleşmeleri için giriş yap ve Premium'a abone ol."
+        },
+        "unavailable": "Renk analizi şu anda duraklatıldı. Kayıtlı paletin olduğu gibi kalır; yeni analizler geri geldiğinde yeniden çalışır.",
+        "loadError": "Paletini yükleyemedik. Yeniden dene.",
+        "saveError": "Bu değişikliği kaydedemedik. Yeniden dene.",
+        "deleteConfirm": "Bu işlem alt tonunu, derinliğini, kaydedilen ve kapatılan tüm önerileri ve hâlâ tutulan fotoğrafı siler. Geri alınamaz."
       }
     }
   }

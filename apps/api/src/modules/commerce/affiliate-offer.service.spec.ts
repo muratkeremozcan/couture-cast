@@ -8,13 +8,25 @@ import {
   resolveLocaleRegion,
   type AffiliateOutfitSlot,
 } from './affiliate-offer.service.js'
-import type { CommerceOfferMatch, CommerceRepository } from './commerce.repository.js'
+import type {
+  CommerceAdvisorOfferMatch,
+  CommerceOfferMatch,
+  CommerceRepository,
+} from './commerce.repository.js'
 import type { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 
 const OFFER: CommerceOfferMatch = {
   offer_id: 'offer-1',
   offer_title: 'Merino base layer',
   garment_category: 'top',
+  partner_slug: 'sample-partner',
+  partner_display_name: 'Sample Partner',
+}
+
+const ADVISOR_OFFER: CommerceAdvisorOfferMatch = {
+  offer_id: 'advisor-offer-1',
+  offer_title: 'Buildable Sheer Foundation',
+  advisor_slot: 'foundation',
   partner_slug: 'sample-partner',
   partner_display_name: 'Sample Partner',
 }
@@ -35,6 +47,7 @@ describe('AffiliateOfferService', () => {
     findUserCommerceContext: vi.fn(),
     findGarmentSlots: vi.fn(),
     findBestOffer: vi.fn(),
+    findBestAdvisorOffer: vi.fn(),
   }
 
   let service: AffiliateOfferService
@@ -47,6 +60,7 @@ describe('AffiliateOfferService', () => {
       .mockResolvedValue({ birthdate: null, locale: undefined })
     repository.findGarmentSlots.mockReset().mockResolvedValue([])
     repository.findBestOffer.mockReset().mockResolvedValue(OFFER)
+    repository.findBestAdvisorOffer.mockReset().mockResolvedValue(ADVISOR_OFFER)
 
     service = new AffiliateOfferService(
       featureFlags as unknown as FeatureFlagsService,
@@ -355,6 +369,111 @@ describe('AffiliateOfferService', () => {
       { name: 'no profile at all', profile: null },
     ])('returns true for $name', ({ profile }) => {
       expect(isAffiliateAudienceEligible(profile)).toBe(true)
+    })
+  })
+
+  describe('story 5.4 resolveAdvisorOffers (Decision 7)', () => {
+    it('5.4-API-040 resolves the best offer per distinct slot', async () => {
+      const resolved = await service.resolveAdvisorOffers({
+        userId: 'user-1',
+        slots: ['foundation'],
+        undertone: 'warm',
+      })
+
+      expect(resolved.get('foundation')).toEqual({
+        partnerId: 'sample-partner',
+        partnerDisplayName: 'Sample Partner',
+        offerId: 'advisor-offer-1',
+        offerTitle: 'Buildable Sheer Foundation',
+      })
+      expect(repository.findBestAdvisorOffer).toHaveBeenCalledWith(
+        'foundation',
+        'warm',
+        expect.any(String)
+      )
+    })
+
+    it('deduplicates repeated slots (both blush cards share one lookup)', async () => {
+      await service.resolveAdvisorOffers({
+        userId: 'user-1',
+        slots: ['blush', 'blush'],
+        undertone: 'cool',
+      })
+
+      expect(repository.findBestAdvisorOffer).toHaveBeenCalledTimes(1)
+    })
+
+    it('5.4-API-043 renders no offer for every slot when commerce_affiliate_enabled is off', async () => {
+      featureFlags.getFeatureFlag.mockResolvedValue(false)
+
+      const resolved = await service.resolveAdvisorOffers({
+        userId: 'user-1',
+        slots: ['foundation', 'bag'],
+        undertone: 'warm',
+      })
+
+      expect(resolved.get('foundation')).toBeNull()
+      expect(resolved.get('bag')).toBeNull()
+      expect(repository.findBestAdvisorOffer).not.toHaveBeenCalled()
+    })
+
+    it('5.4-API-042 renders no offer for every slot when affiliate_ctas_enabled is false', async () => {
+      repository.findAffiliateCtasEnabled.mockResolvedValue(false)
+
+      const resolved = await service.resolveAdvisorOffers({
+        userId: 'user-1',
+        slots: ['foundation'],
+        undertone: 'warm',
+      })
+
+      expect(resolved.get('foundation')).toBeNull()
+      expect(repository.findBestAdvisorOffer).not.toHaveBeenCalled()
+    })
+
+    it('degrades to no offer on a catalog fault rather than throwing', async () => {
+      repository.findBestAdvisorOffer.mockRejectedValue(new Error('db down'))
+
+      const resolved = await service.resolveAdvisorOffers({
+        userId: 'user-1',
+        slots: ['foundation'],
+        undertone: 'warm',
+      })
+
+      expect(resolved.get('foundation')).toBeNull()
+    })
+
+    it('degrades a malformed catalog row to no offer rather than publishing a broken card', async () => {
+      repository.findBestAdvisorOffer.mockResolvedValue({
+        ...ADVISOR_OFFER,
+        offer_title: '',
+      })
+
+      const resolved = await service.resolveAdvisorOffers({
+        userId: 'user-1',
+        slots: ['foundation'],
+        undertone: 'warm',
+      })
+
+      expect(resolved.get('foundation')).toBeNull()
+    })
+
+    it('5.4-API-044 never calls the garment offer query: the two selections cannot cross', async () => {
+      await service.resolveAdvisorOffers({
+        userId: 'user-1',
+        slots: ['foundation'],
+        undertone: 'warm',
+      })
+
+      expect(repository.findBestOffer).not.toHaveBeenCalled()
+    })
+
+    it('5.4-API-045 resolveShopThisLook never calls the advisor offer query: the two selections cannot cross', async () => {
+      await service.resolveShopThisLook({
+        userId: 'user-1',
+        outfits: [outfit()],
+      })
+
+      expect(repository.findBestAdvisorOffer).not.toHaveBeenCalled()
     })
   })
 })

@@ -1261,7 +1261,7 @@ Task owner map:
 - Story 0.7 Task 8 step 1 owner: shared flag keys, value kinds, and code defaults in `packages/config/src/flags.ts`
 - Story 0.7 Task 8 step 2 owner: remote PostHog flag evaluation in `apps/api/src/posthog/posthog.service.ts`
 - Story 0.7 Task 8 step 3 owner: request-time fallback order in `packages/config/src/flags.ts`
-- Story 0.7 Task 8 step 4 owner: fallback cache warmup and refresh in `apps/api/src/modules/feature-flags/feature-flags.cron.ts`
+- Story 0.7 Task 8 step 4 owner: fallback cache warmup and refresh in `apps/api/src/modules/feature-flags/feature-flags.warmup.ts`
 - Step 8 feature-flag coordination owner: connect the request path and persistence layer in `apps/api/src/modules/feature-flags/feature-flags.service.ts` and `apps/api/src/modules/feature-flags/feature-flags.repository.ts`
 
 Tests that cover this step:
@@ -1283,7 +1283,7 @@ Shared contract and API unit tests:
 - [`apps/api/src/modules/feature-flags/feature-flags.repository.spec.ts`](../../apps/api/src/modules/feature-flags/feature-flags.repository.spec.ts):
   proves cached flag reads,
   missing and null fallback values, and atomic multi-flag synchronization.
-- [`apps/api/src/modules/feature-flags/feature-flags.cron.spec.ts`](../../apps/api/src/modules/feature-flags/feature-flags.cron.spec.ts):
+- [`apps/api/src/modules/feature-flags/feature-flags.warmup.spec.ts`](../../apps/api/src/modules/feature-flags/feature-flags.warmup.spec.ts):
   proves startup warmup and the
   five-minute fallback refresh hook.
 

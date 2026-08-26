@@ -48,6 +48,13 @@ export const selfOnlyTables = [
   // than with the worker-only billing tables. Guardians are denied for the same
   // reason as above: nothing in this story mandates exposing it.
   'PremiumThemePreference',
+  // Story 5.4: a derived skin-tone/depth characteristic. Guardian consent
+  // already gates WHETHER an under-16 account may upload at all (unchanged
+  // WardrobeUploadGuard); exposing the derived body characteristic itself to
+  // a guardian is a different mandate no planning document grants, unlike the
+  // adjacent guardian-shared PaletteInsights (garment colour, not skin).
+  'PaletteProfile',
+  'AdvisorRecommendationState',
 ] as const
 
 export const ownerOrGlobalReadTables = ['EventEnvelope'] as const
@@ -107,6 +114,10 @@ export type SeededScenario = {
   billingCustomerId: string
   premiumThemePreferenceId: string
   otherPremiumThemePreferenceId: string
+  paletteProfileId: string
+  otherPaletteProfileId: string
+  advisorRecommendationStateId: string
+  otherAdvisorRecommendationStateId: string
 }
 
 export const buildClaims = (email: string, role: string) => ({
@@ -208,6 +219,10 @@ export const seedScenario = async (): Promise<SeededScenario> => {
     billingCustomerId: `billing-customer-${suffix}`,
     premiumThemePreferenceId: `premium-theme-preference-${suffix}`,
     otherPremiumThemePreferenceId: `other-premium-theme-preference-${suffix}`,
+    paletteProfileId: `palette-profile-${suffix}`,
+    otherPaletteProfileId: `other-palette-profile-${suffix}`,
+    advisorRecommendationStateId: `advisor-recommendation-${suffix}`,
+    otherAdvisorRecommendationStateId: `other-advisor-recommendation-${suffix}`,
   }
 
   const client = await adminPool.connect()
@@ -507,6 +522,37 @@ export const seedScenario = async (): Promise<SeededScenario> => {
       ]
     )
 
+    // Story 5.4. The owner's row carries a consented, ready wardrobe-sourced
+    // palette; the unrelated user's row carries no consent at all, so the
+    // actor matrix below proves both a filled and an empty profile are
+    // equally invisible across users.
+    await client.query(
+      `INSERT INTO public."PaletteProfile"
+        ("id", "user_id", "consent_granted_at", "source", "undertone", "depth",
+         "confidence", "analysis_version", "analyzed_at", "status", "updated_at")
+       VALUES ($1, $2, NOW(), 'wardrobe', 'warm', NULL, 0.8, 'v1', NOW(), 'ready', NOW()),
+              ($3, $4, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NOW())`,
+      [
+        seeded.paletteProfileId,
+        seeded.teenId,
+        seeded.otherPaletteProfileId,
+        seeded.otherTeenId,
+      ]
+    )
+
+    await client.query(
+      `INSERT INTO public."AdvisorRecommendationState"
+        ("id", "user_id", "slot", "item_key", "action", "updated_at")
+       VALUES ($1, $2, 'foundation', 'advisor:foundation:warm', 'saved', NOW()),
+              ($3, $4, 'blush', 'advisor:blush:cool', 'dismissed', NOW())`,
+      [
+        seeded.advisorRecommendationStateId,
+        seeded.teenId,
+        seeded.otherAdvisorRecommendationStateId,
+        seeded.otherTeenId,
+      ]
+    )
+
     await client.query(
       `INSERT INTO public."AffiliateClick"
         ("id", "token", "user_id", "offer_id", "partner_id", "recommendation_id",
@@ -619,6 +665,15 @@ export const cleanupScenario = async (seeded: SeededScenario | undefined) => {
       'DELETE FROM public."PremiumThemePreference" WHERE "id" IN ($1, $2)',
       [seeded.premiumThemePreferenceId, seeded.otherPremiumThemePreferenceId]
     )
+    // Story 5.4 palette advisor fixtures, deleted before the users they hang off.
+    await client.query(
+      'DELETE FROM public."AdvisorRecommendationState" WHERE "id" IN ($1, $2)',
+      [seeded.advisorRecommendationStateId, seeded.otherAdvisorRecommendationStateId]
+    )
+    await client.query('DELETE FROM public."PaletteProfile" WHERE "id" IN ($1, $2)', [
+      seeded.paletteProfileId,
+      seeded.otherPaletteProfileId,
+    ])
     await client.query('DELETE FROM public."CommercePreference" WHERE "id" IN ($1, $2)', [
       seeded.commercePreferenceId,
       seeded.otherCommercePreferenceId,

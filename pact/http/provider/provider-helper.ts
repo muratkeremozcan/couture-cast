@@ -47,6 +47,8 @@ import { SubscriptionService } from '../../../apps/api/src/modules/commerce/subs
 import { StripeBillingService } from '../../../apps/api/src/modules/commerce/stripe-billing.service'
 import { PremiumThemeController } from '../../../apps/api/src/modules/commerce/premium-theme.controller'
 import { PremiumThemeService } from '../../../apps/api/src/modules/commerce/premium-theme.service'
+import { PaletteAdvisorController } from '../../../apps/api/src/modules/commerce/palette-advisor.controller'
+import { PaletteAdvisorService } from '../../../apps/api/src/modules/commerce/palette-advisor.service'
 import { PremiumEntitlementGuard } from '../../../apps/api/src/modules/commerce/premium-entitlement.guard'
 import { PremiumEntitlementService } from '../../../apps/api/src/modules/commerce/premium-entitlement.service'
 import { WardrobeSilhouetteService } from '../../../apps/api/src/modules/wardrobe/wardrobe-silhouette.service'
@@ -64,10 +66,13 @@ import { createGuardianDoubles } from './doubles/guardian'
 import { createCommerceAffiliateDoubles } from './doubles/commerce-affiliate'
 import { createSubscriptionDoubles } from './doubles/subscription'
 import { createPremiumThemeDoubles } from './doubles/premium-theme'
+import { createPremiumEntitlementDouble } from './doubles/premium-entitlement'
+import { createPaletteAdvisorDoubles } from './doubles/palette-advisor'
 import {
   resetProviderCapsuleState,
   resetProviderCommerceState,
   resetProviderOnboardingState,
+  resetProviderPaletteAdvisorState,
   resetProviderPremiumThemeState,
   resetProviderSilhouetteState,
   resetProviderSubscriptionState,
@@ -113,6 +118,7 @@ export function resetProviderState() {
   resetProviderCommerceState()
   resetProviderSubscriptionState()
   resetProviderPremiumThemeState()
+  resetProviderPaletteAdvisorState()
 }
 
 export function parsePactEvent(event: PactEvent | string) {
@@ -200,8 +206,9 @@ export async function startLocalPactProvider({
   } = createCommerceAffiliateDoubles()
   const { mockSubscriptionService, mockStripeBillingService } =
     createSubscriptionDoubles()
-  const { mockPremiumEntitlementService, mockPremiumThemeService } =
-    createPremiumThemeDoubles()
+  const { mockPremiumThemeService } = createPremiumThemeDoubles()
+  const { mockPremiumEntitlementService } = createPremiumEntitlementDouble()
+  const { mockPaletteAdvisorService } = createPaletteAdvisorDoubles()
   const moduleFixture = await Test.createTestingModule({
     controllers: [
       ApiHealthController,
@@ -219,6 +226,7 @@ export async function startLocalPactProvider({
       AffiliateWebhookController,
       SubscriptionController,
       PremiumThemeController,
+      PaletteAdvisorController,
     ],
     providers: [
       EventsService,
@@ -301,6 +309,10 @@ export async function startLocalPactProvider({
       {
         provide: PremiumThemeService,
         useValue: mockPremiumThemeService,
+      },
+      {
+        provide: PaletteAdvisorService,
+        useValue: mockPaletteAdvisorService,
       },
       {
         provide: PremiumEntitlementService,

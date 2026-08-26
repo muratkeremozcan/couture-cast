@@ -8,8 +8,10 @@
 'use client'
 
 import {
+  affiliateClickResponseSchema,
   commercePreferenceResponseSchema,
   updateCommercePreferenceResponseSchema,
+  type AffiliateClickRequest,
   type CommercePreference,
   type UpdateCommercePreferenceInput,
 } from '@couture/api-client/contracts/http'
@@ -130,4 +132,45 @@ export async function updateCommercePreferenceFromWeb(
   } catch (error: unknown) {
     throw await commerceError(error, 'Unable to update shopping preferences.')
   }
+}
+
+/**
+ * Story 5.4: mints the attributed click and returns the outbound partner URL.
+ *
+ * The web twin of `mintAffiliateClickFromMobile`. `scenario` and `localeRegion`
+ * are deliberately not sent -- the API derives both server-side, so a client
+ * cannot influence what the attribution record says -- and neither is any URL
+ * received before this call: the outbound link exists only as the response to a
+ * click that has already been recorded.
+ */
+export async function mintAffiliateClickFromWeb(
+  input: AffiliateClickRequest,
+  signal?: AbortSignal
+): Promise<string> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1CommerceAffiliateClicksPost({ affiliateClickRequest: input }, { signal })
+    return affiliateClickResponseSchema.parse(response).data.redirectUrl
+  } catch (error: unknown) {
+    throw await commerceError(error, 'Unable to open this partner offer.')
+  }
+}
+
+/**
+ * Hands the minted URL to a new browsing context.
+ *
+ * `noopener,noreferrer` rather than a bare `window.open`: the partner host is
+ * third-party, and without `noopener` the opened page keeps a live
+ * `window.opener` handle back into this origin's tab. Returns false when the
+ * browser blocked the popup, which the caller surfaces as a failed handoff
+ * rather than silently doing nothing.
+ */
+export function openAffiliatePartnerSite(redirectUrl: string): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+  const opened = window.open(redirectUrl, '_blank', 'noopener,noreferrer')
+  return opened !== null
 }

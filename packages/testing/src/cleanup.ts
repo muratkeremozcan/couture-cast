@@ -47,6 +47,8 @@ export interface CleanupPrismaClient {
   billingEvent: CleanupDelegate
   billingCustomer: CleanupDelegate
   premiumThemePreference: CleanupDelegate
+  paletteProfile: CleanupDelegate
+  advisorRecommendationState: CleanupDelegate
 }
 
 export interface CleanupConfiguration {
@@ -254,12 +256,19 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const billingEventIds = uniqueValues(tracked.billingEvents)
   const billingCustomerIds = uniqueValues(tracked.billingCustomers)
   const premiumThemePreferenceIds = uniqueValues(tracked.premiumThemePreferences)
+  const paletteProfileIds = uniqueValues(tracked.paletteProfiles)
+  const advisorRecommendationStateIds = uniqueValues(tracked.advisorRecommendationStates)
 
   const commercePreferenceWhere = buildDeleteWhere(commercePreferenceIds, userIds)
   const affiliateClickWhere = buildDeleteWhere(affiliateClickIds, userIds)
   const premiumEntitlementWhere = buildDeleteWhere(premiumEntitlementIds, userIds)
   const billingCustomerWhere = buildDeleteWhere(billingCustomerIds, userIds)
   const premiumThemePreferenceWhere = buildDeleteWhere(premiumThemePreferenceIds, userIds)
+  const paletteProfileWhere = buildDeleteWhere(paletteProfileIds, userIds)
+  const advisorRecommendationStateWhere = buildDeleteWhere(
+    advisorRecommendationStateIds,
+    userIds
+  )
 
   const outfitRecommendationWhere = buildDeleteWhere(ritualIds, userIds)
   const outfitCapsuleGarmentWhere = buildDeleteWhere(outfitCapsuleGarmentIds, userIds)
@@ -316,6 +325,21 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
     if (premiumThemePreferenceWhere) {
       await prisma.premiumThemePreference.deleteMany({
         where: premiumThemePreferenceWhere,
+      })
+    }
+
+    // Story 5.4 palette advisor. AdvisorRecommendationState references only
+    // User, so it precedes the user delete like the theme preference above.
+    // PaletteProfile likewise references only User (there is no selfie-object
+    // FK to anything else), so the same single deleteMany suffices here too.
+    if (advisorRecommendationStateWhere) {
+      await prisma.advisorRecommendationState.deleteMany({
+        where: advisorRecommendationStateWhere,
+      })
+    }
+    if (paletteProfileWhere) {
+      await prisma.paletteProfile.deleteMany({
+        where: paletteProfileWhere,
       })
     }
 

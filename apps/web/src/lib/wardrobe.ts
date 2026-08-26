@@ -46,7 +46,7 @@ export interface UploadGarmentImageInput {
   onProgress?: (percentage: number) => void
 }
 
-type PreparedImage = {
+export type PreparedImage = {
   blob: Blob
   heightPx: number
   mimeType: 'image/jpeg' | 'image/png' | 'image/webp'
@@ -162,7 +162,19 @@ function removeCornerMatchedBackground(context: CanvasRenderingContext2D): void 
   context.putImageData(pixels, 0, 0)
 }
 
-async function prepareGarmentImage(
+/**
+ * Exported because `palette-advisor.ts` uploads a selfie through the same
+ * allocate -> PUT bytes -> commit lifecycle and needs the identical
+ * client-side preparation: centre crop to a fixed aspect, cap the long edge at
+ * 2048px, reject anything under the server's 256px floor, and compute the
+ * SHA-256 the allocate call declares. A second copy would be the third
+ * canvas-crop implementation in this app and would drift from the server's
+ * `verifyGarmentImage` checks the moment either side moved.
+ *
+ * The name still says "garment" because that is what every existing caller
+ * uploads; nothing about the function is garment-specific.
+ */
+export async function prepareGarmentImage(
   imagePreview: string,
   aspectRatio: '1:1' | '4:3',
   useBgCleanup: boolean

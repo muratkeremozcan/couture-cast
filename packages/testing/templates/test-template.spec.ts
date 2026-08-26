@@ -47,6 +47,9 @@ const prisma = {
   billingCustomer: { deleteMany: () => Promise.resolve({ count: 0 }) },
   // Story 5.3 premium theme preference.
   premiumThemePreference: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  // Story 5.4 palette advisor.
+  paletteProfile: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  advisorRecommendationState: { deleteMany: () => Promise.resolve({ count: 0 }) },
 } satisfies Record<string, DeleteManyRecorder>
 
 describe('example factory suite', () => {

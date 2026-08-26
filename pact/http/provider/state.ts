@@ -349,3 +349,47 @@ export function getProviderPremiumThemeState(): ProviderPremiumThemeState | null
 export function resetProviderPremiumThemeState() {
   providerPremiumThemeState = null
 }
+
+/* --------------------------------------------------------------------------- *
+ * Story 5.4 palette advisor.
+ *
+ * Four arrangements, and the same stance the 5.2/5.3 states take: each names an
+ * arrangement the contract records an outcome for, not the rule that produces
+ * it. `entitled-consented` is the only one that answers a ready palette with
+ * recommendations; `entitled-no-consent` is what makes the two-403 split
+ * observable on the wire, since it is the ONLY way a client sees
+ * `PALETTE_CONSENT_REQUIRED_MESSAGE` rather than `PREMIUM_REQUIRED_MESSAGE`;
+ * `not-entitled` drives the real, un-mocked `PremiumEntitlementGuard`; and
+ * `analysis-disabled` is the kill switch an entitled, consented caller is the
+ * only one who can ever observe (Decision 10's precedence).
+ * --------------------------------------------------------------------------- */
+export type ProviderPaletteAdvisorScenario =
+  | 'entitled-consented'
+  | 'entitled-no-consent'
+  | 'not-entitled'
+  | 'analysis-disabled'
+
+export type ProviderPaletteAdvisorState = {
+  userId: string | null
+  scenario: ProviderPaletteAdvisorScenario
+}
+
+let providerPaletteAdvisorState: ProviderPaletteAdvisorState | null = null
+
+export function configureProviderPaletteAdvisorState(state: {
+  userId?: string
+  scenario: ProviderPaletteAdvisorScenario
+}) {
+  providerPaletteAdvisorState = {
+    userId: state.userId ?? null,
+    scenario: state.scenario,
+  }
+}
+
+export function getProviderPaletteAdvisorState(): ProviderPaletteAdvisorState | null {
+  return providerPaletteAdvisorState
+}
+
+export function resetProviderPaletteAdvisorState() {
+  providerPaletteAdvisorState = null
+}

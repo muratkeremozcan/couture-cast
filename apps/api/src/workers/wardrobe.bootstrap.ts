@@ -15,6 +15,13 @@ import type { SilhouettePhotoModerationEngine } from '../modules/wardrobe/silhou
 import { silhouettePhotoProcessingJobSchema } from '../modules/wardrobe/silhouette-photo-processing.queue'
 import { SilhouettePhotoProcessor } from '../modules/wardrobe/silhouette-photo.processor'
 import { SupabaseWardrobeStorageAdapter } from '../modules/wardrobe/wardrobe-storage.adapter'
+import { FixturePaletteAnalysisEngine } from '../modules/commerce/fixture-palette-analysis.engine'
+import { HeuristicPaletteAnalysisEngine } from '../modules/commerce/heuristic-palette-analysis.engine'
+import type { PaletteAnalysisEngine } from '../modules/commerce/palette-analysis.engine'
+import { paletteAnalysisProcessingJobSchema } from '../modules/commerce/palette-analysis-processing.queue'
+import { PaletteAnalysisProcessor } from '../modules/commerce/palette-analysis.processor'
+import { TelemetryService } from '../modules/telemetry/telemetry.service'
+import { PostHogService } from '../posthog/posthog.service'
 import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 import { shutdownWorkerResources } from './shutdown-resources'
@@ -102,6 +109,31 @@ export function classifySilhouetteProcessingFailure(
   return 'storage_error'
 }
 
+/** Story 5.4 Task 6: identical shape to {@link classifySilhouetteProcessingFailure}. */
+export function classifyPaletteProcessingFailure(
+  error: unknown
+): 'timeout' | 'storage_error' {
+  return classifySilhouetteProcessingFailure(error)
+}
+
+export function createPaletteAnalysisEngine(): PaletteAnalysisEngine {
+  const requestedEngine = process.env.PALETTE_ANALYSIS_ENGINE?.trim() || 'heuristic'
+  if (requestedEngine === 'fixture') {
+    if (!allowsTestOnlySecrets()) {
+      throw new Error(
+        'PALETTE_ANALYSIS_ENGINE=fixture is forbidden outside test environments'
+      )
+    }
+    logger.info({ engine: requestedEngine }, 'Using palette analysis engine')
+    return new FixturePaletteAnalysisEngine()
+  }
+  if (requestedEngine !== 'heuristic') {
+    throw new Error(`Unsupported PALETTE_ANALYSIS_ENGINE value: ${requestedEngine}`)
+  }
+  logger.info({ engine: requestedEngine }, 'Using palette analysis engine')
+  return new HeuristicPaletteAnalysisEngine()
+}
+
 async function startWardrobeWorker() {
   try {
     const startedQueues = createQueues()
@@ -183,8 +215,52 @@ async function startWardrobeWorker() {
       )
     )
 
+    const paletteAnalysisQueue = startedQueues.find(
+      (queue) => queue.name === 'palette-analysis'
+    )
+    if (!paletteAnalysisQueue) {
+      throw new Error('Required palette-analysis queue was not created')
+    }
+
+    // Nest DI does not work under tsx in this repository, so hand-wire
+    // (Decision 12). This is the process that already owns
+    // SupabaseWardrobeStorageAdapter and the image-processing concurrency
+    // policy, which is why palette analysis is registered here rather than
+    // in bootstrap.ts.
+    const telemetryService = new TelemetryService(prisma, new PostHogService())
+    const paletteProcessor = new PaletteAnalysisProcessor(
+      prisma,
+      new SupabaseWardrobeStorageAdapter(),
+      createPaletteAnalysisEngine(),
+      telemetryService
+    )
+
+    workers.push(
+      createWorker(
+        'palette-analysis',
+        async (job) => {
+          const data = paletteAnalysisProcessingJobSchema.parse(job.data)
+          try {
+            await paletteProcessor.process(data.paletteProfileId)
+          } catch (error) {
+            const maxAttempts = job.opts.attempts ?? 1
+            if (job.attemptsMade + 1 >= maxAttempts) {
+              await paletteProcessor.markFailed(
+                data.paletteProfileId,
+                classifyPaletteProcessingFailure(error)
+              )
+            }
+            throw error
+          }
+        },
+        {
+          ...defaultWorkerOptions(4),
+        }
+      )
+    )
+
     logger.info(
-      'Dedicated wardrobe worker started for color-extraction at concurrency 1 and moderation-review at concurrency 10'
+      'Dedicated wardrobe worker started for color-extraction at concurrency 1, moderation-review at concurrency 10, and palette-analysis at concurrency 4'
     )
   } catch (err) {
     logger.error(err, 'Failed to start dedicated wardrobe worker')

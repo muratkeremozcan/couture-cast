@@ -179,8 +179,11 @@ describe('premium theme published operations', () => {
     // The acting user is the only subject; there is no path, query, or body
     // field naming another user, so cross-user access is unrepresentable rather
     // than merely rejected.
+    // Scoped to the theme path specifically, not the shared
+    // /api/v1/commerce/premium prefix: Story 5.4 published eight more
+    // operations under that same prefix for the palette advisor.
     const premiumThemePaths = Object.keys(document.paths ?? {}).filter((path) =>
-      path.startsWith('/api/v1/commerce/premium')
+      path.startsWith('/api/v1/commerce/premium/theme')
     )
 
     expect(premiumThemePaths).toEqual(['/api/v1/commerce/premium/theme'])

@@ -60,9 +60,20 @@ const FEATURE_FLAG_DEFINITIONS = {
     kind: 'boolean',
     defaultValue: false,
   },
+  // Story 5.4: the kill switch for palette analysis (selfie/wardrobe undertone
+  // and depth derivation) and the sponsored beauty/accessory overlay. Flipped
+  // from its original `true` default to `false` here: a consent-gated feature
+  // that reads photographs of faces is the last flag in this repo that should
+  // fail open. Same defaults-false reasoning as the three flags below -- a
+  // degraded PostHog can never switch it ON by accident -- and the same
+  // seed-overrides-code-default shape as premium_themes_enabled: the `true`
+  // lives only in packages/db/prisma/seeds/feature-flags.ts. Scope: it gates
+  // consent grant, analyze, selfie allocate/commit, and the sponsored overlay.
+  // The GET always answers, carrying `analysisEnabled`, because a flag-off or
+  // non-entitled caller still needs to render the locked or unavailable state.
   color_analysis_enabled: {
     kind: 'boolean',
-    defaultValue: true,
+    defaultValue: false,
   },
   weather_alerts_enabled: {
     kind: 'boolean',

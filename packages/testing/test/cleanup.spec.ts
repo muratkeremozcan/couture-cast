@@ -79,6 +79,8 @@ function createCleanupPrismaStub(
     billingEvent: createDelegate('billingEvent'),
     billingCustomer: createDelegate('billingCustomer'),
     premiumThemePreference: createDelegate('premiumThemePreference'),
+    paletteProfile: createDelegate('paletteProfile'),
+    advisorRecommendationState: createDelegate('advisorRecommendationState'),
   }
 }
 
@@ -170,6 +172,13 @@ describe('cleanup', () => {
       // ON DELETE CASCADE and nothing references it, so it only has to precede
       // the user delete. It sits beside billing because it is the same domain.
       'premiumThemePreference',
+      // Story 5.4: both palette tables reference only the tracked user with
+      // ON DELETE CASCADE and nothing references them, so like the theme
+      // preference they only have to precede the user delete. The per-item
+      // state goes before the profile purely for readability -- neither
+      // references the other.
+      'advisorRecommendationState',
+      'paletteProfile',
       // Story 5.1: commerce first, and in reverse dependency order.
       // AffiliateClick holds RESTRICT foreign keys onto AffiliateOffer and
       // CommercePartner, so a catalog row cannot go before the clicks that
@@ -267,6 +276,9 @@ describe('cleanup', () => {
       billingEvents: [],
       billingCustomers: [],
       premiumThemePreferences: [],
+      // Story 5.4.
+      paletteProfiles: [],
+      advisorRecommendationStates: [],
     })
   })
 

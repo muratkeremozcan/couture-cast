@@ -1,14 +1,23 @@
 import type {
+  AdvisorAction,
+  AdvisorRecommendationState,
+  AdvisorSlot,
   BillingCustomer,
   BillingEvent,
   BillingProvider,
   EntitlementStore,
+  PaletteAnalysisFailureReason,
+  PaletteAnalysisStatus,
+  PaletteProfile,
+  PaletteSource,
   PremiumEntitlement,
   PremiumEntitlementStatus,
   PremiumThemeKey,
   PremiumThemePreference,
   Prisma,
   PrismaClient,
+  SkinDepth,
+  SkinUndertone,
 } from '@prisma/client'
 import { createFactory, faker } from './factory.js'
 import { registerCreatedEntity } from './registry.js'
@@ -34,6 +43,12 @@ import { registerCreatedEntity } from './registry.js'
  * Story 5.3 adds PremiumThemePreference to the same file rather than a new one:
  * it is the same premium domain, and the theme preference only ever appears
  * beside an entitlement in a fixture graph.
+ *
+ * Story 5.4 adds PaletteProfile and AdvisorRecommendationState for the same
+ * reason. PaletteProfile's default fixture is a ready, consented profile
+ * (the interesting case most callers want); `depth: null` is not the default
+ * because most fixtures should look like a completed selfie analysis, and a
+ * wardrobe-sourced (`depth: null`) profile is one explicit override away.
  */
 
 type PremiumPrismaClient = PrismaClient | Prisma.TransactionClient
@@ -330,4 +345,189 @@ export async function persistPremiumThemePreference(
 
   registerCreatedEntity('premiumThemePreferences', preference.id)
   return preference
+}
+
+// --- PaletteProfile -----------------------------------------------------------
+
+export interface PaletteProfileFixture {
+  id: string
+  userId: string
+  consentGrantedAt: Date | null
+  consentRevokedAt: Date | null
+  source: PaletteSource | null
+  undertone: SkinUndertone | null
+  /** NULL for a wardrobe-sourced profile (Decision 3/4) or a not-yet-analyzed one. */
+  depth: SkinDepth | null
+  confidence: number | null
+  analysisVersion: string | null
+  analyzedAt: Date | null
+  status: PaletteAnalysisStatus | null
+  failureReason: PaletteAnalysisFailureReason | null
+  selfieObjectPath: string | null
+  selfieUploadSessionId: string | null
+  selfieUploadIdempotencyKey: string | null
+  selfieCommitIdempotencyKey: string | null
+  selfieCommitPayloadHash: string | null
+  selfieFileSizeBytes: number | null
+  selfieMimeType: string | null
+  selfieContentSha256: string | null
+  selfieWidthPx: number | null
+  selfieHeightPx: number | null
+  selfieUploadExpiresAt: Date | null
+  selfieCommittedAt: Date | null
+  selfiePurgedAt: Date | null
+  revision: number
+}
+
+export type PaletteProfileFactoryOverrides = Partial<PaletteProfileFixture>
+
+function buildDefaultPaletteProfileFixture(): PaletteProfileFixture {
+  return {
+    id: faker.string.uuid(),
+    userId: faker.string.uuid(),
+    consentGrantedAt: new Date('2026-08-01T00:00:00.000Z'),
+    consentRevokedAt: null,
+    // Selfie by default: it is the source that carries a real depth, which is
+    // the more interesting fixture. Wardrobe (depth: null) is one override away.
+    source: 'selfie',
+    undertone: 'warm',
+    depth: 'medium',
+    confidence: 0.82,
+    analysisVersion: 'palette-advisor-v1',
+    analyzedAt: new Date('2026-08-01T00:05:00.000Z'),
+    status: 'ready',
+    failureReason: null,
+    selfieObjectPath: null,
+    selfieUploadSessionId: null,
+    selfieUploadIdempotencyKey: null,
+    selfieCommitIdempotencyKey: null,
+    selfieCommitPayloadHash: null,
+    selfieFileSizeBytes: null,
+    selfieMimeType: null,
+    selfieContentSha256: null,
+    selfieWidthPx: null,
+    selfieHeightPx: null,
+    selfieUploadExpiresAt: null,
+    // The selfie is purged the moment analysis terminates (Decision 8), so a
+    // `ready` fixture's bytes are already gone by default.
+    selfieCommittedAt: new Date('2026-08-01T00:01:00.000Z'),
+    selfiePurgedAt: new Date('2026-08-01T00:05:00.000Z'),
+    revision: 0,
+  }
+}
+
+const mergePaletteProfileFixture = createFactory<PaletteProfileFixture>(
+  buildDefaultPaletteProfileFixture
+)
+
+export function createPaletteProfile(
+  overrides: PaletteProfileFactoryOverrides = {}
+): PaletteProfileFixture {
+  return mergePaletteProfileFixture(overrides)
+}
+
+/** See {@link buildPremiumEntitlementCreateInput}. */
+export function buildPaletteProfileCreateInput(
+  fixture: PaletteProfileFixture
+): Prisma.PaletteProfileUncheckedCreateInput {
+  return {
+    id: fixture.id,
+    user_id: fixture.userId,
+    consent_granted_at: fixture.consentGrantedAt,
+    consent_revoked_at: fixture.consentRevokedAt,
+    source: fixture.source,
+    undertone: fixture.undertone,
+    depth: fixture.depth,
+    confidence: fixture.confidence,
+    analysis_version: fixture.analysisVersion,
+    analyzed_at: fixture.analyzedAt,
+    status: fixture.status,
+    failure_reason: fixture.failureReason,
+    selfie_object_path: fixture.selfieObjectPath,
+    selfie_upload_session_id: fixture.selfieUploadSessionId,
+    selfie_upload_idempotency_key: fixture.selfieUploadIdempotencyKey,
+    selfie_commit_idempotency_key: fixture.selfieCommitIdempotencyKey,
+    selfie_commit_payload_hash: fixture.selfieCommitPayloadHash,
+    selfie_file_size_bytes: fixture.selfieFileSizeBytes,
+    selfie_mime_type: fixture.selfieMimeType,
+    selfie_content_sha256: fixture.selfieContentSha256,
+    selfie_width_px: fixture.selfieWidthPx,
+    selfie_height_px: fixture.selfieHeightPx,
+    selfie_upload_expires_at: fixture.selfieUploadExpiresAt,
+    selfie_committed_at: fixture.selfieCommittedAt,
+    selfie_purged_at: fixture.selfiePurgedAt,
+    revision: fixture.revision,
+  }
+}
+
+export async function persistPaletteProfile(
+  prisma: PremiumPrismaClient,
+  fixture: PaletteProfileFixture
+): Promise<PaletteProfile> {
+  const profile = await prisma.paletteProfile.create({
+    data: buildPaletteProfileCreateInput(fixture),
+  })
+
+  registerCreatedEntity('paletteProfiles', profile.id)
+  return profile
+}
+
+// --- AdvisorRecommendationState -------------------------------------------
+
+export interface AdvisorRecommendationStateFixture {
+  id: string
+  userId: string
+  slot: AdvisorSlot
+  /** The rule table's stable id (Decision 6), never a translated label. */
+  itemKey: string
+  action: AdvisorAction
+}
+
+export type AdvisorRecommendationStateFactoryOverrides =
+  Partial<AdvisorRecommendationStateFixture>
+
+function buildDefaultAdvisorRecommendationStateFixture(): AdvisorRecommendationStateFixture {
+  return {
+    id: faker.string.uuid(),
+    userId: faker.string.uuid(),
+    slot: 'foundation',
+    itemKey: 'advisor:foundation:warm:medium',
+    action: 'saved',
+  }
+}
+
+const mergeAdvisorRecommendationStateFixture =
+  createFactory<AdvisorRecommendationStateFixture>(
+    buildDefaultAdvisorRecommendationStateFixture
+  )
+
+export function createAdvisorRecommendationState(
+  overrides: AdvisorRecommendationStateFactoryOverrides = {}
+): AdvisorRecommendationStateFixture {
+  return mergeAdvisorRecommendationStateFixture(overrides)
+}
+
+/** See {@link buildPremiumEntitlementCreateInput}. */
+export function buildAdvisorRecommendationStateCreateInput(
+  fixture: AdvisorRecommendationStateFixture
+): Prisma.AdvisorRecommendationStateUncheckedCreateInput {
+  return {
+    id: fixture.id,
+    user_id: fixture.userId,
+    slot: fixture.slot,
+    item_key: fixture.itemKey,
+    action: fixture.action,
+  }
+}
+
+export async function persistAdvisorRecommendationState(
+  prisma: PremiumPrismaClient,
+  fixture: AdvisorRecommendationStateFixture
+): Promise<AdvisorRecommendationState> {
+  const state = await prisma.advisorRecommendationState.create({
+    data: buildAdvisorRecommendationStateCreateInput(fixture),
+  })
+
+  registerCreatedEntity('advisorRecommendationStates', state.id)
+  return state
 }

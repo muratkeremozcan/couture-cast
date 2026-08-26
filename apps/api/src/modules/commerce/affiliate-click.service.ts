@@ -14,6 +14,7 @@ import {
   COMMERCE_OFFER_INVALID_MESSAGE,
   COMMERCE_OFFER_NOT_FOUND_MESSAGE,
   COMMERCE_OPTED_OUT_MESSAGE,
+  PALETTE_CONSENT_REQUIRED_MESSAGE,
   scenarioNameSchema,
   type AffiliateClickRequest,
 } from '../../contracts/http.js'
@@ -54,6 +55,17 @@ export type RecordAffiliateClickResult = {
  * convenience whose `scenario` property is a closed enum.
  */
 const UNRESOLVED_SCENARIO = 'unknown'
+
+/**
+ * Story 5.4 Decision 7: an advisor click has no `ScenarioOutfit`, so without
+ * a dedicated sentinel every advisor click would fall into the
+ * `UNRESOLVED_SCENARIO` path meant for a genuinely-missing garment
+ * recommendation and emit nothing. This sentinel is stored on the click row
+ * (never trusted from the client) and is what the advisor branch below emits
+ * `advisor_offer_clicked` instead of running the garment scenario lookup at
+ * all.
+ */
+const ADVISOR_SCENARIO = 'advisor'
 
 /**
  * Story 5.1 Task 4: the attributed click endpoint's rules.
@@ -137,10 +149,27 @@ export class AffiliateClickService {
       throw new NotFoundException(COMMERCE_OFFER_NOT_FOUND_MESSAGE)
     }
 
+    // Decision 7: branch on the OFFER ROW's advisor_slot, never on the
+    // client-supplied `input.surface`. Keying on the client-supplied surface
+    // would let a caller mint `advisor_offer_clicked` for a garment offer, or
+    // route a real advisor click down the scenario-lookup path by sending
+    // `mobile_hero`.
+    const isAdvisorClick = offer.advisor_slot !== null
+
+    // An advisor click's `recommendation_id` is the acting user's own
+    // `PaletteProfile.id`, resolved here rather than taken from the request.
+    // The dedupe index is `(user_id, offer_id, recommendation_id, minute)`, so
+    // a client that can choose the third column can mint unlimited attributed
+    // clicks for one offer inside one minute. Deriving it is the same posture
+    // `scenario` and `locale_region` already take.
+    const recommendationId = isAdvisorClick
+      ? await this.resolveAdvisorRecommendationId(input.userId)
+      : input.recommendationId
+
     const existing = await this.repository.findRecentClick(
       input.userId,
       input.offerId,
-      input.recommendationId
+      recommendationId
     )
     if (existing) {
       // A deduped replay emits no second analytics event, by design: two taps
@@ -156,10 +185,12 @@ export class AffiliateClickService {
       savedLocale: userContext.locale,
       acceptLanguage: input.acceptLanguage,
     })
-    const scenario = await this.repository.findRecommendationScenario(
-      input.userId,
-      input.recommendationId
-    )
+    const scenario = isAdvisorClick
+      ? ADVISOR_SCENARIO
+      : await this.repository.findRecommendationScenario(
+          input.userId,
+          input.recommendationId
+        )
 
     const clickId = randomUUID()
     const token = mintClickToken(clickId, this.getClickTokenSecret())
@@ -174,7 +205,7 @@ export class AffiliateClickService {
       userId: input.userId,
       offerId: offer.offer_id,
       partnerId: offer.partner_id,
-      recommendationId: input.recommendationId,
+      recommendationId,
       scenario: scenario ?? UNRESOLVED_SCENARIO,
       surface: input.surface,
       localeRegion,
@@ -189,22 +220,32 @@ export class AffiliateClickService {
     // After the row commits, and fail-open: a degraded PostHog must never drop a
     // commercial click record. There is no telemetry-claim row here and no
     // rollback on telemetry failure.
-    const analyticsScenario = scenarioNameSchema.safeParse(scenario)
-    if (analyticsScenario.success) {
-      await this.telemetry.recordCtaClicked({
+    if (isAdvisorClick && offer.advisor_slot) {
+      await this.telemetry.recordAdvisorOfferClicked({
         userId: input.userId,
         partnerId: offer.partner_slug,
         offerId: offer.offer_id,
-        scenario: analyticsScenario.data,
-        surface: input.surface,
-        localeRegion,
-        recommendationId: input.recommendationId,
+        advisorSlot: offer.advisor_slot,
+        platform: input.platform ?? 'web',
       })
     } else {
-      this.logger.warn(
-        { recommendationId: input.recommendationId },
-        'affiliate_cta_clicked_scenario_unresolved'
-      )
+      const analyticsScenario = scenarioNameSchema.safeParse(scenario)
+      if (analyticsScenario.success) {
+        await this.telemetry.recordCtaClicked({
+          userId: input.userId,
+          partnerId: offer.partner_slug,
+          offerId: offer.offer_id,
+          scenario: analyticsScenario.data,
+          surface: input.surface,
+          localeRegion,
+          recommendationId: input.recommendationId,
+        })
+      } else {
+        this.logger.warn(
+          { recommendationId: input.recommendationId },
+          'affiliate_cta_clicked_scenario_unresolved'
+        )
+      }
     }
 
     return { redirectUrl, created: true }
@@ -252,6 +293,22 @@ export class AffiliateClickService {
    * decides the window. What the index guarantees is that two simultaneous taps
    * cannot both create a row.
    */
+  /**
+   * The acting user's own `PaletteProfile.id` for an advisor click.
+   *
+   * A caller with no palette profile has never granted consent, so no advisor
+   * card was ever rendered for them and there is nothing to attribute. Refusing
+   * with the consent message is both accurate and the same 403 the advisor's
+   * own routes answer, rather than inventing a second vocabulary for one edge.
+   */
+  private async resolveAdvisorRecommendationId(userId: string): Promise<string> {
+    const profileId = await this.repository.findPaletteProfileId(userId)
+    if (!profileId) {
+      throw new ForbiddenException(PALETTE_CONSENT_REQUIRED_MESSAGE)
+    }
+    return profileId
+  }
+
   private async insertClick(
     input: Parameters<CommerceRepository['createClick']>[0]
   ): Promise<CommerceClickRow> {
