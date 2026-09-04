@@ -429,6 +429,73 @@ describe('PlannerService', () => {
       expect(plannerDayPlanUpdate).toHaveBeenCalledTimes(7)
     })
 
+    // Story 5.5 Decision 2/9 names five independent invalidation triggers --
+    // location, weather snapshot revision, comfort preferences, locale, the
+    // sorted eligible wardrobe, and capsule revision. Only wardrobe was
+    // exercised above; a fingerprint that silently dropped one of the other
+    // four inputs would still pass every other test in this file.
+    it('regenerates a day when the weather snapshot revision changes', async () => {
+      await service.getPlannerWindow('user-1', undefined, undefined, undefined, 'web')
+
+      getLatestWeatherMock.mockResolvedValue({
+        status: 'fresh',
+        data: {
+          ...freshWeatherSnapshot,
+          fetched_at: new Date('2026-07-16T18:00:00.000Z'),
+        },
+      })
+
+      await service.getPlannerWindow('user-1', undefined, undefined, undefined, 'web')
+
+      expect(plannerDayPlanUpdate).toHaveBeenCalledTimes(7)
+    })
+
+    it('regenerates a day when comfort preferences change', async () => {
+      await service.getPlannerWindow('user-1', undefined, undefined, undefined, 'web')
+
+      comfortPreferencesFindUnique.mockResolvedValue({
+        user_id: 'user-1',
+        runs_cold_warm: 'warm',
+        wind_tolerance: 'low',
+        precip_preparedness: 'high',
+      })
+
+      await service.getPlannerWindow('user-1', undefined, undefined, undefined, 'web')
+
+      expect(plannerDayPlanUpdate).toHaveBeenCalledTimes(7)
+    })
+
+    it('regenerates a day when the locale changes', async () => {
+      await service.getPlannerWindow('user-1', undefined, undefined, 'en-US', 'web')
+
+      await service.getPlannerWindow('user-1', undefined, undefined, 'fr-FR', 'web')
+
+      expect(plannerDayPlanUpdate).toHaveBeenCalledTimes(7)
+    })
+
+    it('regenerates a day when eligible capsule content changes', async () => {
+      await service.getPlannerWindow('user-1', undefined, undefined, undefined, 'web')
+
+      outfitCapsuleFindMany.mockResolvedValue([
+        {
+          id: 'capsule-1',
+          user_id: 'user-1',
+          name: 'Weekend',
+          description: null,
+          occasions: [],
+          is_favorite: false,
+          revision: 1,
+          updated_at: new Date('2026-07-15T00:00:00.000Z'),
+          created_at: new Date('2026-07-15T00:00:00.000Z'),
+          garment_joins: [],
+        },
+      ])
+
+      await service.getPlannerWindow('user-1', undefined, undefined, undefined, 'web')
+
+      expect(plannerDayPlanUpdate).toHaveBeenCalledTimes(7)
+    })
+
     it('recovers from a concurrent cold-read race by returning the persisted winner', async () => {
       const winner = seedRow('2026-07-16', {
         dependency_fingerprint: 'winner-fingerprint',

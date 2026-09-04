@@ -873,6 +873,69 @@ claude-sonnet-5 (Tasks 1 through 10)
   WeatherAPI deployed-depth operator step, and the story's own explicit test limits restated outside
   the implementation artifact.
 
+- **2026-09-04, Test Architect review (pre-PR gate).** Applied test-architecture judgment to
+  `git diff origin/main...HEAD` rather than re-deriving from the story's own claims, focused on the
+  areas most likely to hide a gap the story doesn't know it's missing: date/DST/calendar-boundary
+  correctness, the fingerprint-invalidation logic, the reshuffle exclusion/`unchanged` semantics, RLS
+  actor-matrix completeness, concurrency (cold-read races, version conflicts), and web/mobile
+  cross-surface consistency.
+  - **Real gap found and closed:** AC 9 and Decision 2/9 name five independent fingerprint inputs --
+    location, weather snapshot revision, comfort preferences, locale, the sorted eligible wardrobe, and
+    capsule revision -- but `planner.service.spec.ts` exercised invalidation for only one of them
+    (wardrobe). A fingerprint that silently dropped comfort preferences, locale, weather revision, or
+    capsule content from its hash would have passed every other test in the suite and in
+    `apps/api/integration/planner.integration.spec.ts` (which separately proves comfort-preference and
+    garment-eligibility invalidation against real Postgres, but not the other three). Added four unit
+    tests -- `regenerates a day when the weather snapshot revision changes`, `... when comfort
+preferences change`, `... when the locale changes`, `... when eligible capsule content changes` --
+    each changing exactly one dependency and asserting all seven days regenerate
+    (`plannerDayPlanUpdate` called seven times). All four passed against the _existing_ implementation
+    without any production-code change: `computeDependencyFingerprint`'s call sites already pass every
+    field correctly. The fix is the coverage itself -- closing the path by which a future edit to any
+    of those four call sites could regress silently.
+  - **Verified already sufficient, with evidence rather than by trusting the story's prose:**
+    - Date/DST arithmetic (`ritual-generation.engine.ts`): `resolveRitualAnchorDate` uses
+      `Intl.DateTimeFormat` against the real IANA tz database (correct for fractional-offset and
+      southern-hemisphere zones by construction, not just the `America/Chicago` cases the existing spec
+      names), and `resolvePlannerDateWindow`/`toDatabaseDate` do pure UTC date-part arithmetic on a
+      validated date-only string, never a local-timezone `Date` constructor. Read the full 490-line
+      spec directly rather than trusting the Completion Notes' claim that DST/leap/month/year-end are
+      covered: confirmed nine passing tests exercise exactly those boundaries.
+    - Determinism/mutation safety: `selectGenericGarments`/`pickBestGarment` never randomize a tie
+      (deterministic `Array.find` order) and never mutate a caller-owned array; `loadEligibleWardrobe`'s
+      Prisma queries carry an explicit `id: 'asc'` final tiebreaker on both `garmentItem.findMany` and
+      `outfitCapsule.findMany`, so the seven concurrent `resolveOneDay` calls in one `getPlannerWindow`
+      request never see nondeterministic ordering from Postgres.
+    - Capsule-content fingerprint coverage: confirmed in `wardrobe-capsule.repository.ts` that every
+      capsule mutation (garment list, favorite, metadata) explicitly bumps `updated_at`, and that
+      `daily_summaries` can only ever change together with a new `fetched_at` (both written by the same
+      `WeatherSnapshot` row insert) -- so neither a capsule edit nor a daily-weather refresh can change
+      without moving the corresponding fingerprint input.
+    - Reshuffle exclusion/`unchanged` semantics against AC 4: `payloadsEquivalent` compares exactly the
+      three scenarios' garment sets (order-independent) and capsule choices, matching AC 4's literal
+      wording; the soft-exclusion fallback in `selectGenericGarments` reproduces the same garment only
+      when a category has no non-excluded eligible candidate, which is the documented, intentional path
+      to a legitimate `unchanged: true` on a limited wardrobe.
+    - Concurrency: traced the version-gated `updateMany` (reshuffle) and the `P2002`-recovery
+      cold-read-race path (`persistGeneratedDay`) against Postgres's actual `UPDATE ... WHERE version =
+$n` re-evaluation semantics under concurrent writers; re-ran both the unit suite and
+      `planner.integration.spec.ts` (7/7) against a freshly isolated `postgres:16-alpine` +
+      `redis:7-alpine` pair (ports 55432/56379, provisioned to match `.github/workflows/pr-checks.yml`
+      exactly) to confirm the real-Postgres race and conflict tests still pass, not merely trusted from
+      the prior session's notes.
+    - RLS actor matrix (`packages/db/test/rls/planner.spec.ts`): compared line-by-line against
+      `palette-advisor.spec.ts`, the precedent Decision 4 names explicitly -- both carry the identical
+      eight-case matrix (owner read/update, owner insert/delete, both guardian levels denied, unrelated
+      user + anon denied, admin access, spoofed `user_metadata` role denied, unverified email denied,
+      cross-user insert forgery denied). Re-ran both `planner.spec.ts` and `planner-schema.spec.ts`
+      (17/17) against the isolated Postgres instance above.
+    - Web/mobile cross-surface consistency: `apps/mobile/src/lib/planner.ts` and
+      `apps/web/src/lib/planner.ts` classify the same status codes into the same reason enum, and the
+      mobile screen's `AbortController` is wired on both its data-loading effect and its own unmount
+      cleanup, mirroring the web rail's abort-on-close behavior.
+  - Re-ran `npm run verify:changed` (workspace `apps/api`: lint, typecheck, build, and the full
+    165-file/2051-test vitest suite including the four new tests) green.
+
 ### File List
 
 **Task 1 — Daily weather ingestion and persistence**
