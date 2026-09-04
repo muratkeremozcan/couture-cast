@@ -77,8 +77,8 @@ tags:
     label: 'Localized screen title'
 
 - assertVisible:
-    text: 'See a starter outfit for each of the next seven days, built from your saved location'
-    label: 'Intro copy renders'
+    text: "See a starter outfit for each of the next seven days, built from your saved location's weather and wardrobe."
+    label: 'Intro copy renders in full'
 
 # --- AC 5: a non-entitled reader sees the locked upsell and nothing else ------
 
