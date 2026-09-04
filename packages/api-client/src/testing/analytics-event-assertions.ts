@@ -34,6 +34,8 @@ import {
   paletteAnalysisCompletedPropertiesSchema,
   advisorOfferClickedPropertiesSchema,
   advisorRecommendationActedPropertiesSchema,
+  premiumPlannerViewedPropertiesSchema,
+  premiumPlannerDayReshuffledPropertiesSchema,
   type AnalyticsEventName,
 } from '../types/analytics-events'
 import type { ExpectLike } from './expect-like'
@@ -86,6 +88,8 @@ const analyticsPropertySchemas = {
   palette_analysis_completed: paletteAnalysisCompletedPropertiesSchema,
   advisor_offer_clicked: advisorOfferClickedPropertiesSchema,
   advisor_recommendation_acted: advisorRecommendationActedPropertiesSchema,
+  premium_planner_viewed: premiumPlannerViewedPropertiesSchema,
+  premium_planner_day_reshuffled: premiumPlannerDayReshuffledPropertiesSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

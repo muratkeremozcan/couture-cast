@@ -21,6 +21,8 @@ import {
   trackPaletteAnalysisCompleted,
   trackAdvisorOfferClicked,
   trackAdvisorRecommendationActed,
+  trackPremiumPlannerViewed,
+  trackPremiumPlannerDayReshuffled,
   garmentTaggingCompletedEventSchema,
   affiliateCtaClickedEventSchema,
   affiliateConversionRecordedEventSchema,
@@ -31,6 +33,8 @@ import {
   paletteAnalysisCompletedEventSchema,
   advisorOfferClickedEventSchema,
   advisorRecommendationActedEventSchema,
+  premiumPlannerViewedEventSchema,
+  premiumPlannerDayReshuffledEventSchema,
   type AnalyticsEventName,
   type AffiliateCtaClickedEvent,
   type AffiliateConversionRecordedEvent,
@@ -42,6 +46,8 @@ import {
   type PaletteAnalysisCompletedEvent,
   type AdvisorOfferClickedEvent,
   type AdvisorRecommendationActedEvent,
+  type PremiumPlannerViewedEvent,
+  type PremiumPlannerDayReshuffledEvent,
 } from '@couture/api-client'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import { createBaseLogger } from '../../logger/pino.config'
@@ -176,6 +182,17 @@ export interface TelemetryPropertiesMap {
     AdvisorRecommendationActedEvent,
     'analyticsSubjectId'
   >
+  /**
+   * Story 5.5. Two server-side, pseudonymous planner events. Same rule as
+   * above: callers pass the raw user id as `captureEvent`'s first argument
+   * and the HMAC subject is derived here. `platform` comes from the required
+   * `x-couture-platform` header, never client-supplied input.
+   */
+  premium_planner_viewed: Omit<PremiumPlannerViewedEvent, 'analyticsSubjectId'>
+  premium_planner_day_reshuffled: Omit<
+    PremiumPlannerDayReshuffledEvent,
+    'analyticsSubjectId'
+  >
 }
 
 /**
@@ -220,6 +237,14 @@ const advisorRecommendationActedInputSchema = advisorRecommendationActedEventSch
   .omit({ analyticsSubjectId: true })
   .strict()
 
+const premiumPlannerViewedInputSchema = premiumPlannerViewedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const premiumPlannerDayReshuffledInputSchema = premiumPlannerDayReshuffledEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
 const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   profile_completed: z.object({
     age: z.number().int().positive(),
@@ -256,6 +281,8 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   palette_analysis_completed: paletteAnalysisCompletedInputSchema,
   advisor_offer_clicked: advisorOfferClickedInputSchema,
   advisor_recommendation_acted: advisorRecommendationActedInputSchema,
+  premium_planner_viewed: premiumPlannerViewedInputSchema,
+  premium_planner_day_reshuffled: premiumPlannerDayReshuffledInputSchema,
 }
 
 export function requireAnalyticsIdSecret(): string {
@@ -641,6 +668,40 @@ function buildAdvisorRecommendationActed(
   })
 }
 
+function buildPremiumPlannerViewed(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Premium planner telemetry requires an authenticated user')
+  }
+  const parsed = premiumPlannerViewedInputSchema.parse(props)
+
+  return trackPremiumPlannerViewed({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildPremiumPlannerDayReshuffled(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Premium planner telemetry requires an authenticated user')
+  }
+  const parsed = premiumPlannerDayReshuffledInputSchema.parse(props)
+
+  return trackPremiumPlannerDayReshuffled({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
 /**
  * Events whose PostHog subject is the HMAC pseudonym rather than a raw user id.
  * Membership here drives three things at once: `TelemetryEvent.user_id` is
@@ -664,6 +725,8 @@ const PSEUDONYMOUS_EVENT_TYPES: ReadonlySet<AnalyticsEventName> = new Set([
   'palette_analysis_completed',
   'advisor_offer_clicked',
   'advisor_recommendation_acted',
+  'premium_planner_viewed',
+  'premium_planner_day_reshuffled',
 ])
 
 const pseudonymousEventBuilders: Partial<
@@ -687,6 +750,8 @@ const pseudonymousEventBuilders: Partial<
   palette_analysis_completed: buildPaletteAnalysisCompleted,
   advisor_offer_clicked: buildAdvisorOfferClicked,
   advisor_recommendation_acted: buildAdvisorRecommendationActed,
+  premium_planner_viewed: buildPremiumPlannerViewed,
+  premium_planner_day_reshuffled: buildPremiumPlannerDayReshuffled,
 }
 
 const eventBuilders: Partial<

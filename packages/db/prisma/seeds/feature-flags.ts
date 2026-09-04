@@ -37,6 +37,12 @@ const canonicalFlagOverrides: Record<FeatureFlagKey, FeatureFlagStoredValue> = {
   commerce_affiliate_enabled: allowsCommerceSeeding(),
   // Story 5.2 decision 9: same self-guarded lever for premium purchasing.
   commerce_subscription_enabled: allowsCommerceSeeding(),
+  // Story 5.5: the registry default is `false` (fail-closed), so this seed
+  // override is what turns the planner on in every seeded test and local
+  // environment; production never runs this seed, so it stays off there
+  // until someone flips it deliberately. Same reasoning as
+  // color_analysis_enabled above.
+  premium_planner_enabled: true,
 }
 
 const supplementalFeatureFlags: SeededFeatureFlag[] = [

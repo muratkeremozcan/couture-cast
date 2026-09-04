@@ -85,6 +85,12 @@ export const analyticsEventNameSchema = z.enum([
   'palette_analysis_completed',
   'advisor_offer_clicked',
   'advisor_recommendation_acted',
+  // Story 5.5. Both server-side only, pseudonymous. `platform` comes from the
+  // required `x-couture-platform` header (server-trusted, never client
+  // input); `daysReady`/`dayOffset`/`unchanged` carry no wardrobe, weather,
+  // or capsule content.
+  'premium_planner_viewed',
+  'premium_planner_day_reshuffled',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -659,6 +665,29 @@ export type AdvisorRecommendationActedEvent = z.infer<
   typeof advisorRecommendationActedEventSchema
 >
 
+const plannerPlatformAnalyticsEnum = z.enum(['web', 'mobile'])
+
+// Story 5.5 AC 6. `platform` comes from the required `x-couture-platform`
+// header, never client-supplied input.
+export const premiumPlannerViewedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  platform: plannerPlatformAnalyticsEnum,
+  daysReady: z.number().int().min(0).max(7),
+})
+
+export type PremiumPlannerViewedEvent = z.infer<typeof premiumPlannerViewedEventSchema>
+
+export const premiumPlannerDayReshuffledEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  platform: plannerPlatformAnalyticsEnum,
+  dayOffset: z.number().int().min(0).max(6),
+  unchanged: z.boolean(),
+})
+
+export type PremiumPlannerDayReshuffledEvent = z.infer<
+  typeof premiumPlannerDayReshuffledEventSchema
+>
+
 export const analyticsEventSchemas = {
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
@@ -695,6 +724,8 @@ export const analyticsEventSchemas = {
   palette_analysis_completed: paletteAnalysisCompletedEventSchema,
   advisor_offer_clicked: advisorOfferClickedEventSchema,
   advisor_recommendation_acted: advisorRecommendationActedEventSchema,
+  premium_planner_viewed: premiumPlannerViewedEventSchema,
+  premium_planner_day_reshuffled: premiumPlannerDayReshuffledEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -1672,6 +1703,29 @@ export type AdvisorRecommendationActedProperties = z.infer<
   typeof advisorRecommendationActedPropertiesSchema
 >
 
+export const premiumPlannerViewedPropertiesSchema = z
+  .object({
+    platform: plannerPlatformAnalyticsEnum,
+    days_ready: z.number().int().min(0).max(7),
+  })
+  .strict()
+
+export type PremiumPlannerViewedProperties = z.infer<
+  typeof premiumPlannerViewedPropertiesSchema
+>
+
+export const premiumPlannerDayReshuffledPropertiesSchema = z
+  .object({
+    platform: plannerPlatformAnalyticsEnum,
+    day_offset: z.number().int().min(0).max(6),
+    unchanged: z.boolean(),
+  })
+  .strict()
+
+export type PremiumPlannerDayReshuffledProperties = z.infer<
+  typeof premiumPlannerDayReshuffledPropertiesSchema
+>
+
 export function trackPremiumSubscribeTapped(
   event: PremiumSubscribeTappedEvent,
   distinctId: string
@@ -1806,6 +1860,40 @@ export function trackAdvisorRecommendationActed(
     properties: advisorRecommendationActedPropertiesSchema.parse({
       slot: parsed.slot,
       action: parsed.action,
+    }),
+  }
+}
+
+export function trackPremiumPlannerViewed(
+  event: PremiumPlannerViewedEvent
+): AnalyticsCapturePayload<'premium_planner_viewed', PremiumPlannerViewedProperties> {
+  const parsed = premiumPlannerViewedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'premium_planner_viewed',
+    properties: premiumPlannerViewedPropertiesSchema.parse({
+      platform: parsed.platform,
+      days_ready: parsed.daysReady,
+    }),
+  }
+}
+
+export function trackPremiumPlannerDayReshuffled(
+  event: PremiumPlannerDayReshuffledEvent
+): AnalyticsCapturePayload<
+  'premium_planner_day_reshuffled',
+  PremiumPlannerDayReshuffledProperties
+> {
+  const parsed = premiumPlannerDayReshuffledEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'premium_planner_day_reshuffled',
+    properties: premiumPlannerDayReshuffledPropertiesSchema.parse({
+      platform: parsed.platform,
+      day_offset: parsed.dayOffset,
+      unchanged: parsed.unchanged,
     }),
   }
 }

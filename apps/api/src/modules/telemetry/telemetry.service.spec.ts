@@ -918,6 +918,117 @@ describe('TelemetryService', () => {
     })
   })
 
+  describe('story 5.5 planner server events', () => {
+    beforeEach(() => {
+      telemetryCreate.mockResolvedValue({ id: 'event-1' })
+    })
+
+    const subjectFor = (userId: string) =>
+      createHmac('sha256', 'telemetry-test-secret-at-least-32-bytes')
+        .update(userId)
+        .digest('base64url')
+
+    it('emits premium_planner_viewed with the platform and days ready', async () => {
+      await service.captureEvent('raw-user-1', 'premium_planner_viewed', {
+        platform: 'mobile',
+        daysReady: 5,
+      })
+
+      expect(analyticsCapture).toHaveBeenCalledWith({
+        distinctId: subjectFor('raw-user-1'),
+        event: 'premium_planner_viewed',
+        properties: { platform: 'mobile', days_ready: 5, $ip: null },
+      })
+      expect(telemetryCreate).toHaveBeenCalledWith({
+        data: {
+          user_id: null,
+          event_type: 'premium_planner_viewed',
+          properties: { platform: 'mobile', days_ready: 5 },
+        },
+      })
+    })
+
+    it('emits premium_planner_day_reshuffled for a changed and an unchanged reshuffle', async () => {
+      await service.captureEvent('raw-user-1', 'premium_planner_day_reshuffled', {
+        platform: 'web',
+        dayOffset: 0,
+        unchanged: false,
+      })
+      expect(analyticsCapture).toHaveBeenLastCalledWith({
+        distinctId: subjectFor('raw-user-1'),
+        event: 'premium_planner_day_reshuffled',
+        properties: { platform: 'web', day_offset: 0, unchanged: false, $ip: null },
+      })
+
+      await service.captureEvent('raw-user-1', 'premium_planner_day_reshuffled', {
+        platform: 'web',
+        dayOffset: 6,
+        unchanged: true,
+      })
+      expect(analyticsCapture).toHaveBeenLastCalledWith({
+        distinctId: subjectFor('raw-user-1'),
+        event: 'premium_planner_day_reshuffled',
+        properties: { platform: 'web', day_offset: 6, unchanged: true, $ip: null },
+      })
+    })
+
+    it.each(['premium_planner_viewed', 'premium_planner_day_reshuffled'] as const)(
+      'refuses to emit %s with no authenticated user',
+      async (eventType) => {
+        const props =
+          eventType === 'premium_planner_viewed'
+            ? { platform: 'web', daysReady: 7 }
+            : { platform: 'web', dayOffset: 0, unchanged: false }
+
+        await expect(
+          service.captureEvent(null, eventType, props as never)
+        ).rejects.toThrow('Premium planner telemetry requires an authenticated user')
+        expect(telemetryCreate).not.toHaveBeenCalled()
+        expect(analyticsCapture).not.toHaveBeenCalled()
+      }
+    )
+
+    it.each([
+      { name: 'a location id', extra: { locationId: 'saved-location-1' } },
+      { name: 'wardrobe garment ids', extra: { garmentIds: ['garment-1'] } },
+      { name: 'a raw user id', extra: { userId: 'raw-user-1' } },
+    ])(
+      'rejects a premium_planner_viewed capture carrying $name before anything is written',
+      async ({ extra }) => {
+        await expect(
+          service.captureEvent('raw-user-1', 'premium_planner_viewed', {
+            platform: 'web',
+            daysReady: 7,
+            ...extra,
+          } as never)
+        ).rejects.toThrow()
+        expect(telemetryCreate).not.toHaveBeenCalled()
+        expect(analyticsCapture).not.toHaveBeenCalled()
+      }
+    )
+
+    it('rejects a dayOffset outside 0 through 6', async () => {
+      await expect(
+        service.captureEvent('raw-user-1', 'premium_planner_day_reshuffled', {
+          platform: 'web',
+          dayOffset: 7,
+          unchanged: false,
+        } as never)
+      ).rejects.toThrow()
+      expect(analyticsCapture).not.toHaveBeenCalled()
+    })
+
+    it('rejects an out-of-enum platform the contract does not ship', async () => {
+      await expect(
+        service.captureEvent('raw-user-1', 'premium_planner_viewed', {
+          platform: 'desktop',
+          daysReady: 7,
+        } as never)
+      ).rejects.toThrow()
+      expect(analyticsCapture).not.toHaveBeenCalled()
+    })
+  })
+
   describe('trackOutfitGenerated', () => {
     it('does not re-emit first_outfit_generated when one was already recorded', async () => {
       // Retried ritual generation must not duplicate the funnel event.

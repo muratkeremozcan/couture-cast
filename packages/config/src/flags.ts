@@ -98,6 +98,17 @@ const FEATURE_FLAG_DEFINITIONS = {
     kind: 'boolean',
     defaultValue: false,
   },
+  // Story 5.5: the kill switch for the premium 7-day outfit planner. Same
+  // defaults-false reasoning as every premium flag above -- a degraded
+  // PostHog can never switch it ON by accident -- and the same
+  // seed-overrides-code-default shape: the `true` lives only in
+  // packages/db/prisma/seeds/feature-flags.ts. GET and reshuffle both check
+  // it after the entitlement gate (Decision 6/AC 5), so an entitled caller
+  // sees a clean 503 rather than a generated week when it is off.
+  premium_planner_enabled: {
+    kind: 'boolean',
+    defaultValue: false,
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<FeatureFlagStoredValue>>
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAG_DEFINITIONS
