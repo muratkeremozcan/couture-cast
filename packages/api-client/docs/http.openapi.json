@@ -2175,8 +2175,7 @@
           "snow",
           "thunderstorm",
           "wind",
-          "unknown",
-          null
+          "unknown"
         ]
       },
       "WeatherProvider": {
@@ -2205,8 +2204,7 @@
               "snow",
               "thunderstorm",
               "wind",
-              "unknown",
-              null
+              "unknown"
             ]
           }
         },
@@ -2261,8 +2259,7 @@
               "snow",
               "thunderstorm",
               "wind",
-              "unknown",
-              null
+              "unknown"
             ]
           },
           "providerWeatherCode": {
@@ -2372,8 +2369,7 @@
                   "snow",
                   "thunderstorm",
                   "wind",
-                  "unknown",
-                  null
+                  "unknown"
                 ]
               }
             },
@@ -2430,8 +2426,7 @@
                     "snow",
                     "thunderstorm",
                     "wind",
-                    "unknown",
-                    null
+                    "unknown"
                   ]
                 },
                 "providerWeatherCode": {
@@ -2575,8 +2570,7 @@
                               "snow",
                               "thunderstorm",
                               "wind",
-                              "unknown",
-                              null
+                              "unknown"
                             ]
                           }
                         },
@@ -2633,8 +2627,7 @@
                                 "snow",
                                 "thunderstorm",
                                 "wind",
-                                "unknown",
-                                null
+                                "unknown"
                               ]
                             },
                             "providerWeatherCode": {
@@ -2779,8 +2772,7 @@
                               "snow",
                               "thunderstorm",
                               "wind",
-                              "unknown",
-                              null
+                              "unknown"
                             ]
                           }
                         },
@@ -2837,8 +2829,7 @@
                                 "snow",
                                 "thunderstorm",
                                 "wind",
-                                "unknown",
-                                null
+                                "unknown"
                               ]
                             },
                             "providerWeatherCode": {
@@ -2990,8 +2981,7 @@
                               "snow",
                               "thunderstorm",
                               "wind",
-                              "unknown",
-                              null
+                              "unknown"
                             ]
                           }
                         },
@@ -3048,8 +3038,7 @@
                                 "snow",
                                 "thunderstorm",
                                 "wind",
-                                "unknown",
-                                null
+                                "unknown"
                               ]
                             },
                             "providerWeatherCode": {
@@ -3379,8 +3368,7 @@
                           "snow",
                           "thunderstorm",
                           "wind",
-                          "unknown",
-                          null
+                          "unknown"
                         ]
                       }
                     },
@@ -3437,8 +3425,7 @@
                             "snow",
                             "thunderstorm",
                             "wind",
-                            "unknown",
-                            null
+                            "unknown"
                           ]
                         },
                         "providerWeatherCode": {

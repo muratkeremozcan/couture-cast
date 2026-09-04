@@ -24,6 +24,28 @@ export const weatherConditionSchema = z.enum([
   'unknown',
 ])
 
+/**
+ * The nullable publication of `weatherConditionSchema`, for a field where a
+ * missing weather source is a legitimate value (Story 5.5's `confidence:
+ * 'unavailable'` planner day).
+ *
+ * `openapi.ts`'s `preserveNullableEnumValues` post-pass appends `null` into
+ * whichever array a bare `weatherConditionSchema.nullable()` hands it, and
+ * that array is `weatherConditionSchema`'s own shared `_def.values` by
+ * reference -- not a copy. That pollutes every other publication of the same
+ * schema, including the standalone `WeatherCondition` component and the
+ * `current`/`hourly` fields on the existing, unrelated `GET /api/v1/ritual`
+ * and `GET /api/v1/weather/{locationKey}` responses, none of which accept
+ * `null`. Supplying a finished array here (mirroring
+ * `nullablePremiumThemeKeySchema` in `./premium-theme`, the first contract to
+ * trip this) means the post-pass finds `null` already present and leaves the
+ * shared values array untouched.
+ */
+export const nullableWeatherConditionSchema = weatherConditionSchema.nullable().openapi({
+  type: ['string', 'null'],
+  enum: [...weatherConditionSchema.options, null],
+})
+
 export const weatherProviderSchema = z.enum(['openweather', 'weatherapi'])
 export const weatherAlertSeveritySchema = z.enum(['low', 'medium', 'high'])
 

@@ -2,7 +2,7 @@ import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { nonEmptyStringSchema, type RegisteredCommonHttpSchemas } from './common'
 import { supportedLocaleSchema } from './localization'
-import { weatherConditionSchema } from './weather'
+import { nullableWeatherConditionSchema } from './weather'
 import { garmentCategoryEnum, garmentImageAccessSchema } from './wardrobe'
 import { scenarioOutfitSchema } from './ritual'
 import { PREMIUM_REQUIRED_MESSAGE } from './subscription'
@@ -69,7 +69,7 @@ export const plannerWeatherSummarySchema = z
       .describe(
         'Null exactly when confidence is unavailable; there is no snapshot to date.'
       ),
-    condition: weatherConditionSchema.nullable(),
+    condition: nullableWeatherConditionSchema,
     temperatureLow: z.number().finite().nullable(),
     temperatureHigh: z.number().finite().nullable(),
   })
