@@ -452,19 +452,44 @@ describe('PlannerRail', () => {
     document.body.removeChild(opener)
   })
 
-  it('passes an automated accessibility check while entitled', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
-    useMswHandlers(
-      http.get(PLANNER_PATH, () =>
-        HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+  // Story 5.5 Task 9 (AC 7): the axe matrix. `variant` stands in for the two
+  // supported widths -- `rail` is the >=1440px desktop layout, `overlay` is
+  // the narrower phone/tablet layout (Decision 7) -- and each is checked both
+  // signed out (the locked upsell, no request) and entitled (the full ready
+  // week). The two states render structurally different DOM (a locked panel
+  // vs. seven day cards), so a pass on one variant/state combination says
+  // nothing about the others; all four are asserted independently rather than
+  // deduplicated into one "representative" case.
+  describe.each([
+    ['rail' as const, 'desktop'],
+    ['overlay' as const, 'phone'],
+  ])('automated accessibility, %s variant (%s width)', (variant) => {
+    it('passes signed out with the locked upsell', async () => {
+      const { container } = renderRail({ variant })
+      await waitFor(() =>
+        expect(screen.getByTestId('planner-rail-locked')).toBeInTheDocument()
       )
-    )
-    const { container } = renderRail()
-    await waitFor(() => expect(screen.getByTestId('planner-days')).toBeInTheDocument())
 
-    const results = await axe.run(container, {
-      runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+      const results = await axe.run(container, {
+        runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+      })
+      expect(results.violations).toEqual([])
     })
-    expect(results.violations).toEqual([])
+
+    it('passes entitled with a full ready week', async () => {
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+      useMswHandlers(
+        http.get(PLANNER_PATH, () =>
+          HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+        )
+      )
+      const { container } = renderRail({ variant })
+      await waitFor(() => expect(screen.getByTestId('planner-days')).toBeInTheDocument())
+
+      const results = await axe.run(container, {
+        runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+      })
+      expect(results.violations).toEqual([])
+    })
   })
 })

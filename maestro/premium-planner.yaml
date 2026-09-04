@@ -1,0 +1,120 @@
+# Story 5.5 Task 10: the 7-day outfit planner screen (Decision 7).
+#
+# Honest scope, stated the same way premium-subscription.yaml and
+# palette-advisor.yaml state their own. `run-maestro.mjs` signs up a FRESH
+# public-API user and bakes that user's token into the Metro bundle via
+# `EXPO_PUBLIC_E2E_ACCESS_TOKEN` before the Expo server starts; no Maestro flow
+# in this repo signs in through the UI, and the app has no runtime token
+# override. The harness user therefore has no Premium entitlement, so this
+# flow can verify exactly one branch of the planner: the locked upsell
+# (`screenState === 'locked'`, same panel `signed_out` renders), plus the
+# settings entry point and navigation that reach it.
+#
+# It can never exercise the entitled, ready-week, or reshuffle branches.
+# Reaching those needs the seeded `premium-active-user`
+# (packages/db/prisma/seeds/commerce.ts), which is out of a Maestro run's
+# reach for the same reason story 5.2 recorded, and the seven-day generation
+# journey needs a real weather snapshot and wardrobe besides. Those journeys
+# are proven at two other tiers instead: `planner-screen.test.tsx` drives
+# every state (ready week, degraded weather, per-day error, reshuffle,
+# unchanged, conflict, double-tap protection) through MSW, and
+# `playwright/tests/planner.spec.ts` runs the real thing end to end against
+# the seeded entitled user with a live API and database.
+#
+# What IS deterministic and asserted below: the premium settings block carries
+# a link row to the planner; the row navigates; and the planner screen renders
+# its localized title, its intro, and the locked panel with the upsell CTA --
+# never a day card, weather line, or reshuffle control, all of which the
+# entitlement guard rejects pre-handler.
+appId: ${MAESTRO_APP_ID}
+name: '7-day planner locked state'
+tags:
+  - e2e
+  - commerce
+  - premium
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+- runFlow: subflows/open-settings.yaml
+
+# --- Decision 7: the entry point is a link row in Premium settings ------------
+
+# The row sits below the palette advisor row, well below the fold on a phone,
+# so it is scrolled into view rather than merely waited for. Same viewport
+# lesson `premium-subscription.yaml` and `palette-advisor.yaml` record:
+# `extendedWaitUntil: visible` requires the element inside the VIEWPORT, and
+# CI's `pixel_3a` profile is shorter than the local `medium_phone`.
+- scrollUntilVisible:
+    element:
+      id: 'planner-link'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+    label: 'Planner entry row is reachable from settings'
+
+- tapOn:
+    id: 'planner-link'
+    retryTapIfNoChange: true
+    label: 'Open the 7-day planner'
+
+- extendedWaitUntil:
+    visible:
+      id: 'planner-screen'
+    timeout: 15000
+    label: 'Planner screen is the one on top'
+
+# --- AC 7: the screen renders from the locale catalogs, not from literals -----
+
+- assertVisible:
+    id: 'planner-title'
+    text: '7-Day Planner'
+    label: 'Localized screen title'
+
+- assertVisible:
+    text: 'See a starter outfit for each of the next seven days, built from your saved location'
+    label: 'Intro copy renders'
+
+# --- AC 5: a non-entitled reader sees the locked upsell and nothing else ------
+
+- extendedWaitUntil:
+    visible:
+      id: 'planner-locked'
+    timeout: 15000
+    label: 'Locked panel rendered after the entitlement check'
+
+- assertVisible:
+    text: 'The 7-Day Planner is a Premium feature'
+    label: 'Locked title names Premium'
+
+- assertVisible:
+    id: 'planner-locked-cta'
+    text: 'Get Premium'
+    label: 'Locked CTA routes to Settings, not a dead control'
+
+# No day card, weather, or reshuffle control ever renders pre-entitlement --
+# the guard rejects the request before the handler runs.
+- assertNotVisible:
+    id: 'planner-day-error'
+- assertNotVisible:
+    id: 'planner-disabled'
+- assertNotVisible:
+    id: 'planner-load-error'
+
+- takeScreenshot:
+    path: maestro/artifacts/premium-planner-locked
+
+# Leave the stack as this flow found it. `open-settings.yaml` can pop a pushed
+# route on Android, but its iOS path cannot, so a flow that pushes has to
+# clean up after itself or the next flow on the same device starts on this
+# screen.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
