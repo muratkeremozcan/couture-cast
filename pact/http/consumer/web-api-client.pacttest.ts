@@ -89,6 +89,13 @@ import {
   verifyDismissRecommendationInteraction,
   verifyPaletteAdvisorErrorInteraction,
   paletteAdvisorErrorInteractions,
+  verifyPlannerReadyWeekInteraction,
+  verifyPlannerPartialWeekInteraction,
+  verifyPlannerAccessErrorInteraction,
+  plannerAccessErrorInteractions,
+  verifyPlannerReshuffleInteraction,
+  verifyPlannerReshuffleUnchangedInteraction,
+  verifyPlannerReshuffleConflictInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -405,4 +412,33 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
       await verifyPaletteAdvisorErrorInteraction(pact, interaction)
     }
   )
+
+  // Story 5.5: the premium 7-day outfit planner. Both surfaces fetch the
+  // window once per open and reshuffle one day at a time.
+  it('gets a fully ready seven-day outfit planner', async () => {
+    await verifyPlannerReadyWeekInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('gets a seven-day outfit planner with one isolated day failure', async () => {
+    await verifyPlannerPartialWeekInteraction(pact, createWebClientForMockServer)
+  })
+
+  it.each(plannerAccessErrorInteractions)(
+    'preserves the documented planner access error envelope that $description',
+    async (interaction) => {
+      await verifyPlannerAccessErrorInteraction(pact, interaction)
+    }
+  )
+
+  it('reshuffles one planner day', async () => {
+    await verifyPlannerReshuffleInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('reshuffles a planner day with no disjoint result available', async () => {
+    await verifyPlannerReshuffleUnchangedInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('rejects a planner reshuffle at a stale version', async () => {
+    await verifyPlannerReshuffleConflictInteraction(pact)
+  })
 })

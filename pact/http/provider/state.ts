@@ -393,3 +393,56 @@ export function getProviderPaletteAdvisorState(): ProviderPaletteAdvisorState | 
 export function resetProviderPaletteAdvisorState() {
   providerPaletteAdvisorState = null
 }
+
+/* --------------------------------------------------------------------------- *
+ * Story 5.5 premium 7-day outfit planner.
+ *
+ * Same design as the 5.4 palette advisor states above: each scenario names an
+ * arrangement the contract records an outcome for, not the rule that produces
+ * it. `not-entitled` drives the real, un-mocked `PremiumEntitlementGuard`
+ * (through the shared `PremiumEntitlementService` double in
+ * doubles/premium-entitlement.ts, extended to read this state too);
+ * `disabled` reproduces `PlannerService.assertPlannerEnabled`'s flag check,
+ * which runs first in both `getPlannerWindow` and `reshuffleDay`, so it is
+ * reachable from either operation even though only the GET case is pinned as
+ * an interaction. The three `reshuffle-*` scenarios drive
+ * `PlannerService.reshuffleDay`'s three observable outcomes: a changed day, a
+ * day with no disjoint result available (`unchanged: true`), and a stale
+ * `expectedVersion` (409).
+ * --------------------------------------------------------------------------- */
+export type ProviderPlannerScenario =
+  | 'ready-week'
+  | 'partial-week'
+  | 'not-entitled'
+  | 'disabled'
+  | 'reshuffle-success'
+  | 'reshuffle-unchanged'
+  | 'reshuffle-conflict'
+
+export type ProviderPlannerState = {
+  userId: string | null
+  planDate: string | null
+  scenario: ProviderPlannerScenario
+}
+
+let providerPlannerState: ProviderPlannerState | null = null
+
+export function configureProviderPlannerState(state: {
+  userId?: string
+  planDate?: string
+  scenario: ProviderPlannerScenario
+}) {
+  providerPlannerState = {
+    userId: state.userId ?? null,
+    planDate: state.planDate ?? null,
+    scenario: state.scenario,
+  }
+}
+
+export function getProviderPlannerState(): ProviderPlannerState | null {
+  return providerPlannerState
+}
+
+export function resetProviderPlannerState() {
+  providerPlannerState = null
+}

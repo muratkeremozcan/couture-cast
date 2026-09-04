@@ -25,8 +25,17 @@ export default defineConfig({
     environment: 'node',
     include: ['pact/http/provider/**/*.pacttest.ts'],
     globals: true,
-    testTimeout: 60000,
-    hookTimeout: 30000,
+    // The single `it()` in api-provider.pacttest.ts verifies every interaction
+    // from both pact files sequentially against one real (in-memory) Nest app
+    // (fileParallelism/singleFork below keep it that way on purpose, since the
+    // provider doubles' scenario state is process-global). That per-interaction
+    // cost is real, not incidental, and grows every story: this budget was set
+    // once in Story 4.1/4.2 at 60s and never revisited despite the interaction
+    // count climbing every story since (175 total as of Story 5.5). A clean run
+    // already used 48s of that 60s locally; bumped with real headroom rather
+    // than raised just enough to clear the last observed run.
+    testTimeout: 180000,
+    hookTimeout: 60000,
     fileParallelism: false,
     pool: 'forks',
     // @ts-expect-error -- Vitest 4 InlineConfig types omit poolOptions singleFork

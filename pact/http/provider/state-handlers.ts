@@ -14,6 +14,7 @@ import {
   configureProviderSubscriptionState,
   configureProviderPremiumThemeState,
   configureProviderPaletteAdvisorState,
+  configureProviderPlannerState,
   parsePactEvent,
   type PactEvent,
 } from './provider-helper'
@@ -60,6 +61,11 @@ type SubscriptionStateParams = {
 
 type PaletteAdvisorStateParams = {
   userId?: string
+}
+
+type PlannerStateParams = {
+  userId?: string
+  planDate?: string
 }
 
 type PremiumThemeStateParams = {
@@ -464,6 +470,62 @@ export const stateHandlers: StateHandlers = {
     configureProviderPaletteAdvisorState({ userId, scenario: 'analysis-disabled' })
     return Promise.resolve({
       description: 'Configured the color analysis kill switch as off',
+    })
+  },
+
+  /* ----------------------------------------------------------------------- *
+   * Story 5.5 premium 7-day outfit planner.
+   *
+   * Each state names an arrangement the contract records an outcome for, not
+   * the rule that produces it -- same stance as every scenario-driven state
+   * above. 'The user does not have premium planner access' drives the real,
+   * un-mocked `PremiumEntitlementGuard`; 'The premium planner is disabled'
+   * reproduces `PlannerService.assertPlannerEnabled`'s flag check, which runs
+   * first in both GET and reshuffle.
+   * ----------------------------------------------------------------------- */
+  'A ready seven-day planner exists for user': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as PlannerStateParams
+    configureProviderPlannerState({ userId, scenario: 'ready-week' })
+    return Promise.resolve({ description: 'Configured a fully ready seven-day planner' })
+  },
+  'A seven-day planner with one failed day exists for user': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as PlannerStateParams
+    configureProviderPlannerState({ userId, scenario: 'partial-week' })
+    return Promise.resolve({
+      description: 'Configured a seven-day planner with one isolated day failure',
+    })
+  },
+  'The user does not have premium planner access': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as PlannerStateParams
+    configureProviderPlannerState({ userId, scenario: 'not-entitled' })
+    return Promise.resolve({ description: 'Configured a non-entitled user' })
+  },
+  'The premium planner is disabled': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as PlannerStateParams
+    configureProviderPlannerState({ userId, scenario: 'disabled' })
+    return Promise.resolve({
+      description: 'Configured the premium planner kill switch as off',
+    })
+  },
+  'A reshuffleable planner day exists for user': (parameters?: unknown) => {
+    const { userId, planDate } = (parameters ?? {}) as PlannerStateParams
+    configureProviderPlannerState({ userId, planDate, scenario: 'reshuffle-success' })
+    return Promise.resolve({
+      description: `Configured a reshuffleable planner day ${planDate ?? 'default'}`,
+    })
+  },
+  'A reshuffle with no disjoint result exists for user': (parameters?: unknown) => {
+    const { userId, planDate } = (parameters ?? {}) as PlannerStateParams
+    configureProviderPlannerState({ userId, planDate, scenario: 'reshuffle-unchanged' })
+    return Promise.resolve({
+      description: 'Configured a reshuffle with no disjoint result available',
+    })
+  },
+  'A planner day changed since the client last viewed it': (parameters?: unknown) => {
+    const { userId, planDate } = (parameters ?? {}) as PlannerStateParams
+    configureProviderPlannerState({ userId, planDate, scenario: 'reshuffle-conflict' })
+    return Promise.resolve({
+      description: 'Configured a planner day at a stale version',
     })
   },
 
