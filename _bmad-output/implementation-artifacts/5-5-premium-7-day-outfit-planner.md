@@ -1,13 +1,13 @@
 ---
 baseline_commit: e7e94a756051fe3be327818d2244eeb061b15382
-status: in-progress
+status: review
 ---
 
 <!-- markdownlint-disable MD013 MD024 MD036 -->
 
 # Story 5.5: Premium 7-day outfit planner
 
-Status: in-progress
+Status: review
 
 **Story key:** `5-5-premium-7-day-outfit-planner`
 **Epic:** 5, Commerce & Premium Enhancements, Phase 2
@@ -475,19 +475,19 @@ Hardcoded planner colors stay confined to legacy code removed during this story.
   - [x] Add screen tests with MSW for locked, checking, entitlement error, ready week, partial week, retry, reshuffle, unchanged, conflict, and double-tap protection.
   - [x] Update existing settings rendering suites for the new router dependency and row.
 
-- [ ] **Task 9: Localization and accessibility evidence** (AC 7)
-  - [ ] Add the planner and mobile locked keys to all ten catalogs.
-  - [ ] Add subtree parity and placeholder tests on both surfaces.
-  - [ ] Add web axe checks at desktop and phone widths, signed out and entitled.
-  - [ ] Record manual keyboard, VoiceOver, and TalkBack results in the story Dev Agent Record.
+- [x] **Task 9: Localization and accessibility evidence** (AC 7)
+  - [x] Add the planner and mobile locked keys to all ten catalogs.
+  - [x] Add subtree parity and placeholder tests on both surfaces.
+  - [x] Add web axe checks at desktop and phone widths, signed out and entitled.
+  - [x] Record manual keyboard, VoiceOver, and TalkBack results in the story Dev Agent Record.
 
-- [ ] **Task 10: Cross-boundary verification** (all ACs)
-  - [ ] Add web and mobile Pact interactions for GET, partial GET, reshuffle, conflict, entitlement failure, and flag failure.
-  - [ ] Add PostgreSQL integration tests for invalidation, pruning, race winner, location cascade, malformed JSON, and reshuffle conflict.
-  - [ ] Add Playwright flow for open, week load, one-day reshuffle, reload persistence, partial-day retry, focus restore, and axe.
-  - [ ] Add a Maestro locked-state and navigation flow with the established honest-scope header and duration entry.
-  - [ ] Run changed-workspace tests, `npm run verify:changed`, root lint, root typecheck, Optic, Pact, integration, Playwright, and relevant Maestro tiers.
-  - [ ] Record deferred UX features, WeatherAPI deployed depth, lack of planner affiliate CTAs, and explicit test limits in `deferred-work.md`.
+- [x] **Task 10: Cross-boundary verification** (all ACs)
+  - [x] Add web and mobile Pact interactions for GET, partial GET, reshuffle, conflict, entitlement failure, and flag failure.
+  - [x] Add PostgreSQL integration tests for invalidation, pruning, race winner, location cascade, malformed JSON, and reshuffle conflict.
+  - [x] Add Playwright flow for open, week load, one-day reshuffle, reload persistence, partial-day retry, focus restore, and axe.
+  - [x] Add a Maestro locked-state and navigation flow with the established honest-scope header and duration entry.
+  - [x] Run changed-workspace tests, `npm run verify:changed`, root lint, root typecheck, Optic, Pact, integration, Playwright, and relevant Maestro tiers.
+  - [x] Record deferred UX features, WeatherAPI deployed depth, lack of planner affiliate CTAs, and explicit test limits in `deferred-work.md`.
 
 ## Test plan
 
@@ -587,7 +587,7 @@ Record the deployed value and manual native accessibility evidence in the Dev Ag
 
 ### Agent Model Used
 
-claude-sonnet-5 (Tasks 1 through 8)
+claude-sonnet-5 (Tasks 1 through 10)
 
 ### Debug Log References
 
@@ -759,6 +759,120 @@ claude-sonnet-5 (Tasks 1 through 8)
 - `npm run verify:changed` (root) is green: mobile's own 69 files / 699 tests, mobile lint, mobile
   typecheck, and the widget/watchOS prebuild suites all pass.
 
+- **Task 9/10 verification infrastructure.** Neither the web nor mobile session had a live API/DB/web
+  stack; this session provisioned one before writing any evidence. For Pact, PostgreSQL integration,
+  and Playwright: an isolated `postgres:16-alpine` + `redis:7-alpine` pair on non-default ports,
+  provisioned to match `.github/workflows/pr-checks.yml` exactly (the Supabase-compatible roles and
+  `auth.jwt()` shim, full migration history via `scripts/prisma-migrate-deploy.mjs`, then seeded via
+  `npm run db:seed`) -- kept separate from the machine's shared local Supabase instance (port `54322`,
+  already carrying other sessions' state) specifically so nothing here could `db:reset` or otherwise
+  disturb it. For Maestro: the harness's own garment-upload setup needs real Supabase Storage, which a
+  bare Postgres image cannot provide, so that one flow ran against the actual shared local Supabase
+  stack instead -- additive-only (one fresh signed-up user, cleaned up by the harness's own teardown),
+  never `db:reset`. Playwright's own `global-teardown.ts` runs `db:reset` by default under
+  `TEST_ENV=local`; every run here used its documented `PLAYWRIGHT_SKIP_DB_RESET=true` escape hatch
+  rather than that (or, worse, bypassing Prisma's own destructive-action confirmation prompt).
+
+- **The reported "133 pre-existing lint errors" blocker was verified false.** Before starting Task 10,
+  reproduced `npx eslint` directly on the two named files
+  (`playwright/support/helpers/{guardian-consent,user-test-data}.ts`) and got the same 133 errors, all
+  `@typescript-eslint/no-unsafe-*` on `PrismaClient` model delegates (`.guardianConsent`, `.teenId`,
+  etc.). Root cause: this worktree's `node_modules/@prisma/client` had never had `prisma generate` run
+  in it, so `PrismaClient`'s TypeScript type had no generated model delegates at all -- every property
+  access on it fell back to `any`. Running `npx prisma generate` once (`packages/db`) made both files
+  lint clean immediately, and root `npm run lint` is fully green throughout this session's own several
+  reruns. Not a stale-build artifact in the strict sense (nothing was stale; nothing had been built
+  yet) but the same family of defect: a fresh worktree missing a one-time setup step, not real code
+  debt.
+
+- **Task 9's web axe matrix** (`planner-rail.test.tsx`) is a 2x2: both `variant`s (`rail` = >=1440px
+  desktop, `overlay` = narrower/phone, Decision 7) crossed with both entitlement states (signed out ->
+  the locked upsell with zero requests; entitled -> a full rendered ready week), replacing the single
+  entitled-only case Task 7 shipped. The two states render structurally different DOM, so a pass on one
+  combination said nothing about the others. All ten web and all ten mobile locale catalogs' `planner`/
+  `plannerLocked` subtrees, and both platforms' dedicated `planner-locales.spec.ts` parity specs, were
+  independently re-verified green in this session (not merely trusted from the prior sessions' notes),
+  per the requesting session's explicit instruction to re-verify rather than assume completeness.
+
+- **Manual accessibility evidence, stated honestly.** This is a sandboxed CLI environment: the
+  `claude-in-chrome` browser extension reported not connected on every attempt (no real browser to drive
+  by hand), and there is no physical iOS/Android device or real screen reader (VoiceOver/TalkBack)
+  available. Manual VoiceOver and TalkBack passes were **NOT performed** -- recorded honestly rather than
+  fabricated, following the same disclosure pattern stories 4.4 and 5.1 already established for this
+  exact limitation. What this session could and did do instead, as real (not simulated) keyboard
+  evidence: `playwright/tests/planner.spec.ts`'s focus-restore test drives actual `page.keyboard.press
+('Escape')` events through a real Chromium instance against the real rendered page, asserting focus
+  returns to the opener; the same file's two axe scans and the `planner-rail.test.tsx` matrix assert
+  semantic roles, accessible names, and live-region politeness/alert semantics throughout. A genuine
+  physical-device VoiceOver/TalkBack pass -- beyond the semantic-component-assertion coverage already
+  shipped in `planner-screen.test.tsx` and `planner-rail.test.tsx` -- remains open and belongs in the
+  operator runbook or a future session with real hardware, not fabricated here.
+
+- **Two real defects, found only because this was actually run against a live stack, both fixed at
+  their root cause (not worked around):**
+  1. `apps/web/src/app/components/planner-rail.tsx`'s outfit scenario label
+     (`'Morning'`/`'Midday'`/`'Evening'`) used `--theme-secondary` as its text color -- a decorative
+     accent (a button background and a focus-outline color elsewhere in the same file), never
+     calibrated for small text, measuring 2.41:1 against the card's white background in the default
+     theme against WCAG's 4.5:1 minimum, in every one of the four premium themes. The component-level
+     (jsdom) axe test never caught this; only the real-browser Playwright scan did. Fixed by switching
+     to `--theme-card-text`, the token this codebase already defines for legible card text and that the
+     capsule name directly below already uses.
+  2. Task 7's own edit to `playwright/tests/accessibility-hardening.spec.ts` (commit `52861c32`,
+     opening the planner before the reduced-motion assertions) left Chromium's `:focus-visible`
+     heuristic in its pointer-interaction state for a later script-triggered `.focus()` call further
+     down the very same test, so `outlineStyle` came back `'none'` instead of `'solid'` under
+     forced-colors -- a real regression this test caught the first time it actually ran (it was written
+     but never executed). Confirmed causally by reproducing the failure with the fix removed and
+     restoring it; fixed with one real `Tab` keypress before the script-triggered focus, which resets
+     the heuristic the same way a keyboard user reaching that element actually would.
+
+- **Cross-boundary evidence, all newly added and independently verified green in this session (not
+  merely by the subagents that first wrote them):**
+  - **Pact** (`pact/http/consumer/interactions/planner.ts`, `pact/http/provider/doubles/planner.ts`):
+    14 new interactions (7 web + 7 mobile) covering the full ready week, the partial week with one
+    isolated `error` day, the 403/503 access-error pair, and reshuffle success/`unchanged`/409-conflict.
+    Consumer suite stable across 3 determinism runs (83 mobile / 92 web interactions total);
+    provider verification green (175 interactions, all OK, both directions). Provider timeout budget
+    raised 60s->180s / 30s->60s to keep headroom as the interaction count keeps climbing story over
+    story (a clean run was already at 48s of the old 60s before these 14).
+  - **PostgreSQL integration** (`apps/api/integration/planner.integration.spec.ts`): 7 tests
+    (5.5-INT-01 through 07) against a real Nest app and real Postgres, proving what mocked-Prisma tests
+    cannot -- fingerprint invalidation with a concretely different garment selection, pruning,
+    exactly-one-winner cold-read races, location-cascade deletion, malformed-payload and
+    ineligible-garment regeneration, and a real 409 leaving the row byte-identical. Also fixed one
+    unrelated pre-existing timing flake found while verifying the full suite
+    (`wardrobe-silhouette.integration.spec.ts`'s `4.4-INT-15`, a BullMQ round-trip timeout too tight
+    for this suite's real CPU/IO contention once a 30th file joined it) rather than leaving it as
+    found debt. Full `apps/api` integration suite: 29 files / 263 tests, 3 skipped (pre-existing,
+    unrelated), green on two consecutive full runs.
+  - **Playwright** (`playwright/tests/planner.spec.ts`): 5 tests against the real running web+API+DB
+    stack (not MSW) using the seeded `premium-active-user` account -- open at both breakpoints with a
+    real axe scan each, the live seven-day render, one-day reshuffle with its announcement and reload
+    persistence, isolated per-day error recovery via retry, and focus restore on Escape/close. 5/5
+    twice. The two sibling specs Task 7 touched but never ran
+    (`lookbook-prism.spec.ts`, `accessibility-hardening.spec.ts`) : 24/24, including the fix above; all
+    three files together: 29/29 twice more.
+  - **Maestro** (`maestro/premium-planner.yaml`): the honest-scope locked-state and navigation flow
+    (mirroring `palette-advisor.yaml`'s pattern exactly -- see that file's own header for the full
+    reasoning about why only the locked branch is reachable from a Maestro run). Actually executed
+    against a real iOS Simulator (`iPhone 17 Pro`, Expo Go, no Android emulator available in this
+    environment, matching `mobile-ci-is-android-only` -- iOS is the local-only tier by decision): 1/1
+    flow passed (1m 44s) once one assertion was corrected from a truncated intro-copy prefix to the
+    full localized sentence (Maestro's text matcher needs the complete string, matching every other
+    flow's own established pattern). Duration estimate registered in `maestro-flow-durations.json`
+    (55s, same shape as `palette-advisor.yaml`) pending refresh from the first real CI run.
+
+- **Full verification, this session, independently:** root `npm run lint` (workspaces + playwright/
+  pact/scripts/k6/tools + prettier) green; root `npm run typecheck` (every workspace including
+  playwright/pact/k6 tsconfigs) green; `npm run generate:http-openapi` + `npm run optic:lint` valid,
+  no spec drift; `npm run verify:api` (165 files / 2047 tests, 3 skipped, plus lint/typecheck/build)
+  green; `npm run verify:web` (production `next build`, plus lint/typecheck/test) green.
+  `deferred-work.md` carries a new story 5.5 section recording the deferred UX surface (whole-week
+  reshuffle and the rest of the epic's planner scope), the absence of planner affiliate CTAs, the
+  WeatherAPI deployed-depth operator step, and the story's own explicit test limits restated outside
+  the implementation artifact.
+
 ### File List
 
 **Task 1 — Daily weather ingestion and persistence**
@@ -870,3 +984,34 @@ claude-sonnet-5 (Tasks 1 through 8)
   stale "web-only" comment)
 - `apps/mobile/assets/locales/{en-US,en-CA,de-DE,es-419,fr-CA,fr-FR,it-IT,pt-BR,pt-PT,tr-TR}.json` (M —
   `commerce.premium.planner.*` and `commerce.premium.plannerLocked.*`)
+
+**Task 9 — Localization and accessibility evidence**
+
+- `apps/web/src/app/components/planner-rail.test.tsx` (M — expanded the single entitled-only axe test
+  into a 2x2 matrix over `variant` and entitlement state)
+- `apps/web/src/app/components/planner-rail.tsx` (M — a real defect the new matrix found: the scenario
+  label's text color failed WCAG contrast in every premium theme; see Completion Notes)
+
+**Task 10 — Cross-boundary verification**
+
+- `pact/http/consumer/interactions/planner.ts` (A)
+- `pact/http/provider/doubles/planner.ts` (A)
+- `pact/http/consumer/api-contract-interactions.ts` (M)
+- `pact/http/consumer/interactions/shared.ts` (M)
+- `pact/http/consumer/mobile-api-client.pacttest.ts` (M)
+- `pact/http/consumer/web-api-client.pacttest.ts` (M)
+- `pact/http/provider/doubles/premium-entitlement.ts` (M — extended to read planner state)
+- `pact/http/provider/provider-helper.ts` (M)
+- `pact/http/provider/state-handlers.ts` (M)
+- `pact/http/provider/state.ts` (M)
+- `pact/http/vitest.provider.config.mts` (M — testTimeout/hookTimeout raised; see Completion Notes)
+- `apps/api/integration/planner.integration.spec.ts` (A)
+- `apps/api/integration/wardrobe-silhouette.integration.spec.ts` (M — unrelated pre-existing timing
+  flake fixed as a direct consequence of verifying the full suite; see Completion Notes)
+- `playwright/tests/planner.spec.ts` (A)
+- `playwright/tests/accessibility-hardening.spec.ts` (M — a real regression Task 7's own edit caused,
+  found and fixed only because this session actually ran the spec; see Completion Notes)
+- `playwright/support/helpers/premium-session.ts` (M — `ensurePremiumSeedLocation`)
+- `maestro/premium-planner.yaml` (A)
+- `scripts/maestro-flow-durations.json` (M)
+- `_bmad-output/implementation-artifacts/deferred-work.md` (M)
