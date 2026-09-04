@@ -462,12 +462,12 @@ Hardcoded planner colors stay confined to legacy code removed during this story.
   - [x] Parse success payloads through contracts and preserve private no-store headers.
   - [x] Test gate order, flag off, partial success, stable reread, invalidation, cold-read races, transactional rollback, version conflicts, location switching, and cross-user input.
 
-- [ ] **Task 7: Web planner** (AC 3, 5, 7)
-  - [ ] Add generated-client wrapper and failure classification.
-  - [ ] Add the normal Plan week control, closed default, responsive rail or overlay behavior, entitlement state machine, and request abort.
-  - [ ] Render exact seven-date results, starter wardrobe, weather freshness, per-date errors, and per-date reshuffle state.
-  - [ ] Update the existing layout and accessibility tests pinned to the static rail.
-  - [ ] Add component tests with MSW for all access, partial-week, retry, close, focus, and concurrency states.
+- [x] **Task 7: Web planner** (AC 3, 5, 7)
+  - [x] Add generated-client wrapper and failure classification.
+  - [x] Add the normal Plan week control, closed default, responsive rail or overlay behavior, entitlement state machine, and request abort.
+  - [x] Render exact seven-date results, starter wardrobe, weather freshness, per-date errors, and per-date reshuffle state.
+  - [x] Update the existing layout and accessibility tests pinned to the static rail.
+  - [x] Add component tests with MSW for all access, partial-week, retry, close, focus, and concurrency states.
 
 - [ ] **Task 8: Mobile planner** (AC 3, 5, 7)
   - [ ] Add client wrapper, thin route, screen, and Premium settings link.
@@ -587,7 +587,7 @@ Record the deployed value and manual native accessibility evidence in the Dev Ag
 
 ### Agent Model Used
 
-claude-sonnet-5 (Tasks 1 through 6)
+claude-sonnet-5 (Tasks 1 through 7)
 
 ### Debug Log References
 
@@ -626,10 +626,96 @@ claude-sonnet-5 (Tasks 1 through 6)
   container bootstrapped to match `.github/workflows/pr-checks.yml` exactly (roles, `auth.jwt()`,
   full migration history applied via `scripts/prisma-migrate-deploy.mjs`), not against the shared local
   dev database, and not merely asserted from schema text.
-- Out of scope for this session by the requesting session's explicit instruction: Task 7 (web planner),
-  Task 8 (mobile planner), Task 9 (localization/accessibility evidence), and Task 10 (cross-boundary
-  Pact/integration/Playwright/Maestro verification and `deferred-work.md`). Those tasks consume the API
-  surface documented above.
+- Task 7 (web planner) complete: `PlannerRail` (`apps/web/src/app/components/planner-rail.tsx`)
+  replaces the static Story 3.5/5.2 shell with the live seven-day surface. It is
+  self-contained rather than parent-fed -- following `palette-advisor-panel.tsx`'s
+  architecture over the old boolean-`isEntitled`-prop shape -- and owns its own
+  `checking | entitled | locked | error` state (Decision 7's exact literal type) plus the
+  planner data fetch, both driven by a single effect keyed on `isOpen`. One request settles
+  both entitlement and data: the planner `GET` itself carries the 401/403/503
+  classification (via `apps/web/src/lib/planner.ts`'s `plannerFailureReason`), so there is
+  no separate subscription pre-check to keep in sync with it, and no request at all fires
+  for a rail nobody opened (AC 6).
+- `LookbookPrismLayout` (`apps/web/src/app/components/lookbook-prism-layout.tsx`) now
+  defaults the planner closed, adds a persistent "Plan week" control near the hero header
+  (in addition to the existing one inside the severe-weather-alert banner, which now
+  shares the same localized label), and decides `rail` vs `overlay` variant from actual
+  `window.innerWidth` at the 1440px boundary rather than CSS alone, so exactly one
+  `PlannerRail` instance ever mounts (no duplicate fetch). The file now wraps its return in
+  an `I18nextProvider` -- it previously had none, since `/` never has -- but the
+  component's own top-level copy still reads `getI18n().t(...)` directly rather than the
+  `useTranslation()` hook: a component's own render happens before the `I18nextProvider`
+  it returns takes effect for its own hooks, only for descendants'.
+- Focus handling: `rail` variant is ordinary in-page content (no trap, stays in normal Tab
+  order); `overlay` variant traps focus and closes on Escape, mirroring
+  `accessible-modal.tsx`'s `handleKeyDown` exactly, and restores focus to the opener (or
+  the previously active element) on close, mirroring the same file's restore effect.
+- Reshuffle is atomic per date, keyed by `expectedVersion`; a `409` (`PLANNER_DAY_CHANGED_MESSAGE`)
+  shows a per-date alert and silently re-fetches the whole window (there is no single-date
+  `GET`). Busy state is tracked per `planDate`, not globally, so one date's in-flight
+  reshuffle does not block another's, while a second click on the same date's button is a
+  no-op both at the DOM level (a `disabled` button dispatches no click) and in
+  `handleReshuffle`'s own re-entrancy guard.
+- `commerce.premium.planner.*` was added to all ten web locale catalogs (47 leaf keys,
+  covering exactly Decision 8's list: section/day labels, conditions, weather confidence
+  and freshness, scenario labels, starter wardrobe, open, close, loading, retry, reshuffle
+  states, the disabled state, the error state, and live announcements) plus a dedicated
+  `planner-locales.spec.ts` parity spec and the matching `premium-locales.spec.ts`
+  exclusion, following Decision 15's rule and Story 5.4's precedent exactly. `en-CA` is a
+  deliberate literal copy of `en-US` for this subtree: unlike 5.4's "colour"-heavy palette
+  copy, nothing here has a Canadian/American spelling divergence. Non-English values are
+  machine-translation drafts pending human review before release, matching every other
+  parity spec's stated posture.
+- Temperature display has no prior web utility to reuse (mobile has one,
+  `apps/mobile/src/lib/formatters.ts`, never shared into `packages/utils`); `lib/planner.ts`
+  ports its exact `en-US`-sees-Fahrenheit / else-Celsius logic so both platforms show a
+  reader the same number. Weekday/date labels use a local `Intl.DateTimeFormat` helper with
+  `timeZone: 'UTC'`, which is load-bearing: `planDate` is a date-only calendar label, and
+  formatting it in the reader's local zone would roll it back a day for negative UTC
+  offsets.
+- `commerce.premium.planner.*` copy uses Decision 8's existing semantic premium theme
+  tokens (`--theme-card-bg`, `--theme-card-text`, `--theme-card-border`, `--theme-primary`,
+  `--theme-secondary` from `globals.css`) rather than the old component's hardcoded hex
+  values, matching `premium-theme-section.tsx`'s own opt-in pattern.
+- Updated the three pinned tests Decision 7/Dev Notes named for the move from a static
+  shell to live data: `lookbook-prism-layout.test.tsx` (four planner-specific `it` blocks
+  rewritten around the new open-then-assert flow and a real MSW-backed planner fixture, one
+  test renamed from "expired subscription" to "non-entitled caller" since there is no
+  longer a separate subscription check to mock), `playwright/tests/lookbook-prism.spec.ts`
+  (opens the planner explicitly at both the narrow and 1440px+ breakpoints instead of
+  asserting default visibility), and `playwright/tests/accessibility-hardening.spec.ts`
+  (opens the planner before the reduced-motion assertion, and scopes the severe-alert
+  focus-contrast check's `Plan week` locator to the alert panel now that a second control
+  with the same accessible name exists on the page).
+- Added `apps/web/src/app/components/planner-rail.test.tsx`, 17 component tests with MSW
+  covering: closed renders nothing; signed-out locked with zero requests; the checking
+  skeleton; a full ready week (weather, scenarios, starter-wardrobe marker, Fahrenheit
+  conversion at `en-US`); the `unavailable`-confidence weather note; an isolated day error
+  beside otherwise-ready days plus its retry; the not-entitled-vs-disabled 403/503 split;
+  an unclassified failure's retry; reshuffle success, `unchanged`, and `409` conflict paths;
+  double-activation prevention; abort-on-close; overlay focus trap, Escape, and
+  restore-focus; and a full `axe-core` WCAG 2.1/2.2 A/AA pass on the entitled state.
+- `npm run verify:changed` (workspace `apps/web`: lint, typecheck, the full 45-file/644-test
+  vitest suite including the new planner files, and the production `next build`), the
+  workspace's own `lint` and `typecheck` scripts run standalone, and every touched file
+  passed `eslint --max-warnings=0` and `prettier --check` individually. `packages/utils`
+  and `packages/api-client` needed `npm run build` once in this worktree before any of the
+  above would resolve `@couture/utils` / `@couture/api-client/contracts/http` --the
+  worktree had never had its workspace packages built; `packages/testing`'s own build still
+  fails here on missing generated Prisma types, but nothing in this task's scope depends on
+  it. Full command output is not reproduced here; rerun `npm run verify:changed` to
+  reverify.
+- The two updated Playwright specs were not executed in this environment (no running
+  API/DB/web stack), matching `verify:changed`'s own explicit warning that it does not cover
+  non-workspace files under `playwright/`. Task 10 owns running the full Playwright suite;
+  this session verified the edits by reading them against the component's actual runtime
+  behavior and by running every equivalent assertion at the component-test layer instead.
+- Out of scope for this session by the requesting session's explicit instruction: Task 8
+  (mobile planner), Task 9 (localization/accessibility evidence beyond web's own AC 7
+  scope, which Task 7 above already closes -- Task 9's remaining scope is the mobile locked
+  keys, the web axe matrix at desktop/phone widths signed-out and entitled, and manual
+  keyboard/VoiceOver/TalkBack evidence), and Task 10 (cross-boundary
+  Pact/integration/Playwright/Maestro verification and `deferred-work.md`).
 
 ### File List
 
@@ -707,3 +793,25 @@ claude-sonnet-5 (Tasks 1 through 6)
   `weatherConditionSchema` value export)
 - `apps/api/src/modules/feature-flags/feature-flags.service.spec.ts` (M, unrelated pre-existing test
   fixed as a direct consequence of Task 5's new registry key; see Completion Notes)
+
+**Task 7 — Web planner**
+
+- `apps/web/src/lib/planner.ts` (A)
+- `apps/web/src/app/components/planner-rail.tsx` (M, replaced the Story 3.5/5.2 static shell)
+- `apps/web/src/app/components/planner-rail.test.tsx` (A)
+- `apps/web/src/app/components/lookbook-prism-layout.tsx` (M)
+- `apps/web/src/app/components/lookbook-prism-layout.test.tsx` (M)
+- `apps/web/src/i18n/locales/en-US.json` (M)
+- `apps/web/src/i18n/locales/en-CA.json` (M)
+- `apps/web/src/i18n/locales/de-DE.json` (M)
+- `apps/web/src/i18n/locales/es-419.json` (M)
+- `apps/web/src/i18n/locales/fr-CA.json` (M)
+- `apps/web/src/i18n/locales/fr-FR.json` (M)
+- `apps/web/src/i18n/locales/it-IT.json` (M)
+- `apps/web/src/i18n/locales/pt-BR.json` (M)
+- `apps/web/src/i18n/locales/pt-PT.json` (M)
+- `apps/web/src/i18n/locales/tr-TR.json` (M)
+- `apps/web/src/i18n/planner-locales.spec.ts` (A)
+- `apps/web/src/i18n/premium-locales.spec.ts` (M, planner subtree exclusion per Decision 15)
+- `playwright/tests/lookbook-prism.spec.ts` (M)
+- `playwright/tests/accessibility-hardening.spec.ts` (M)
