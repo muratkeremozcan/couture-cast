@@ -1,0 +1,45 @@
+# Dismiss Expo Go's one-time developer-menu sheet before a tab-bar tap.
+#
+# Mirrors the fix already proven in `subflows/open-app.yaml`, which carries
+# the full writeup of why this exists: the sheet is native to Expo Go, is
+# drawn after the app has mounted, and never appears in the hierarchy Maestro
+# queries, so `tapOn: text: 'Continue'` reports it "not found" even while it
+# fills the bottom half of the screen. The only thing that reaches it is a
+# blind coordinate tap on its backdrop; `50%,10%` is the screen's own header,
+# inert whenever no sheet is present.
+#
+# `open-app.yaml` runs this absorb sequence once, right after mount, and that
+# was believed to be the only window the sheet could rise in. PR #141 (story
+# 5.5) proved otherwise: `open-wardrobe-tab.yaml` failed CI with
+# `Assertion is false: id: wardrobe-screen is visible` after `tab-wardrobe`
+# reported its tap COMPLETED four times running. The hierarchy dump at the
+# failure showed `tab-home` and `tab-wardrobe` still present and
+# `wardrobe-screen` never having mounted -- the app never left Home, because
+# every tap landed on the sheet's backdrop instead of the tab bar beneath it.
+# The screenshot confirmed it directly: the same "This is the developer menu"
+# sheet from `open-app.yaml`'s own writeup, still on screen a story-5.5-sized
+# bundle's worth of extra load time after mount -- past the point
+# `open-app.yaml`'s own absorb taps had already run and passed.
+#
+# `open-wardrobe-tab.yaml` and `open-settings.yaml` had each independently
+# grown only the weak half of the fix -- an optional `tapOn: text: 'Continue'`
+# that cannot reach this sheet for the same reason `open-app.yaml`'s writeup
+# gives. This subflow is the strong half, shared, so any tab-bar navigation
+# added later gets the real fix rather than a repeat of this outage.
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    text: 'Continue'
+    optional: true
+    label: 'Dismiss the Expo Go developer sheet if Maestro can reach it'
+- tapOn:
+    text: 'Open app'
+    optional: true
+    label: 'Dismiss the Expo Go developer sheet if Maestro can reach it'
+- tapOn:
+    point: '50%,10%'
+    label: 'Absorb the developer sheet backdrop; inert on the screen itself'
+- waitForAnimationToEnd
+- tapOn:
+    point: '50%,10%'
+    label: 'Absorb a sheet that rose after the first absorb tap'
