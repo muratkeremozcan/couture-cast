@@ -17,6 +17,8 @@ import { EventsRepository } from '../../../apps/api/src/modules/events/events.re
 import { EventsService } from '../../../apps/api/src/modules/events/events.service'
 import { RitualController } from '../../../apps/api/src/modules/personalization/ritual.controller'
 import { RitualService } from '../../../apps/api/src/modules/personalization/ritual.service'
+import { PlannerController } from '../../../apps/api/src/modules/personalization/planner.controller'
+import { PlannerService } from '../../../apps/api/src/modules/personalization/planner.service'
 import { ComfortController } from '../../../apps/api/src/modules/personalization/comfort.controller'
 import { ComfortService } from '../../../apps/api/src/modules/personalization/comfort.service'
 import { UserController } from '../../../apps/api/src/modules/user/user.controller'
@@ -68,11 +70,13 @@ import { createSubscriptionDoubles } from './doubles/subscription'
 import { createPremiumThemeDoubles } from './doubles/premium-theme'
 import { createPremiumEntitlementDouble } from './doubles/premium-entitlement'
 import { createPaletteAdvisorDoubles } from './doubles/palette-advisor'
+import { createPlannerDoubles } from './doubles/planner'
 import {
   resetProviderCapsuleState,
   resetProviderCommerceState,
   resetProviderOnboardingState,
   resetProviderPaletteAdvisorState,
+  resetProviderPlannerState,
   resetProviderPremiumThemeState,
   resetProviderSilhouetteState,
   resetProviderSubscriptionState,
@@ -119,6 +123,7 @@ export function resetProviderState() {
   resetProviderSubscriptionState()
   resetProviderPremiumThemeState()
   resetProviderPaletteAdvisorState()
+  resetProviderPlannerState()
 }
 
 export function parsePactEvent(event: PactEvent | string) {
@@ -209,6 +214,7 @@ export async function startLocalPactProvider({
   const { mockPremiumThemeService } = createPremiumThemeDoubles()
   const { mockPremiumEntitlementService } = createPremiumEntitlementDouble()
   const { mockPaletteAdvisorService } = createPaletteAdvisorDoubles()
+  const { mockPlannerService } = createPlannerDoubles()
   const moduleFixture = await Test.createTestingModule({
     controllers: [
       ApiHealthController,
@@ -227,6 +233,7 @@ export async function startLocalPactProvider({
       SubscriptionController,
       PremiumThemeController,
       PaletteAdvisorController,
+      PlannerController,
     ],
     providers: [
       EventsService,
@@ -313,6 +320,10 @@ export async function startLocalPactProvider({
       {
         provide: PaletteAdvisorService,
         useValue: mockPaletteAdvisorService,
+      },
+      {
+        provide: PlannerService,
+        useValue: mockPlannerService,
       },
       {
         provide: PremiumEntitlementService,

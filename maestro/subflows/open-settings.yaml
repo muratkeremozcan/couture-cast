@@ -10,15 +10,19 @@
 # So the tap is paired with an assertion on the destination screen and the pair
 # is retried. `settings-screen` is the testID on the settings container in
 # `app/(tabs)/settings.tsx`.
+#
+# `subflows/absorb-expo-dev-sheet.yaml` runs before the tap rather than a bare
+# `tapOn: text: 'Continue'`, which PR #141 (story 5.5) proved insufficient on
+# the sibling `open-wardrobe-tab.yaml`: the sheet never appears in the
+# hierarchy Maestro queries, so the text tap cannot dismiss it and only the
+# shared subflow's blind backdrop tap can. Same sheet, same tab bar, so the
+# same gap applied here even though it had not yet flaked this way.
 appId: ${MAESTRO_APP_ID}
 ---
 - retry:
     maxRetries: 3
     commands:
-      - tapOn:
-          text: 'Continue'
-          optional: true
-          label: 'Dismiss an Expo Go sheet covering the tab bar'
+      - runFlow: absorb-expo-dev-sheet.yaml
       # Pop a pushed route first. The tab bar is not reachable from the capsule
       # library or the silhouette editor, and a caller can arrive here with one
       # of those on top -- `garment-capsule-localization-flow` did, and reported

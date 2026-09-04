@@ -32,6 +32,9 @@ export const DEFAULT_FACTORY_REGISTRY_KEYS = [
   // like every other user-keyed key above.
   'paletteProfiles',
   'advisorRecommendationStates',
+  // Story 5.5. Owner-only planner cache rows, reachable by the user filter
+  // like every other user-keyed key above.
+  'plannerDayPlans',
 ] as const
 
 export type FactoryRegistryKey = (typeof DEFAULT_FACTORY_REGISTRY_KEYS)[number]

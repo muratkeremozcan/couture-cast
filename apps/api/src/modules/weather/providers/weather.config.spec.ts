@@ -33,6 +33,7 @@ describe('loadWeatherConfig', () => {
           longitude: -87.6298,
         },
       ],
+      weatherApiForecastDays: 3,
     })
   })
 
@@ -41,6 +42,14 @@ describe('loadWeatherConfig', () => {
       refreshMinutes: 5,
       providerMode: 'openweather',
       ingestionTargets: [],
+      weatherApiForecastDays: 3,
+    })
+  })
+
+  // Story 5.5 Decision 3: validated, capped at 8 (the planner's own window).
+  it('parses a configured WeatherAPI forecast depth', () => {
+    expect(loadWeatherConfig({ WEATHERAPI_FORECAST_DAYS: '8' })).toMatchObject({
+      weatherApiForecastDays: 8,
     })
   })
 
@@ -54,6 +63,7 @@ describe('loadWeatherConfig', () => {
   it.each([
     ['refresh cadence', { WEATHER_REFRESH_MINUTES: '6' }],
     ['provider mode', { WEATHER_PROVIDER_MODE: 'unknown' }],
+    ['WeatherAPI forecast depth', { WEATHERAPI_FORECAST_DAYS: '14' }],
     ['target JSON', { WEATHER_INGESTION_TARGETS_JSON: '{not-json' }],
     [
       'target coordinates',

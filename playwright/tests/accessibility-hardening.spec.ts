@@ -354,6 +354,10 @@ test.describe('Story 3.8 interaction states', () => {
     await page.setViewportSize(viewports[0])
     await openStablePage(page, '/', interceptNetworkCall)
 
+    // Story 5.5 Decision 7: the planner defaults closed and opens from the
+    // "Plan week" control; `viewports[0]` is desktop width, so this opens the
+    // inline rail variant.
+    await page.getByTestId('planner-open-control').click()
     const planner = page.getByRole('complementary', { name: 'Planner Rail' })
     await expect(planner).toBeVisible()
     await expect(planner).toHaveCSS('animation-name', 'none')
@@ -364,6 +368,17 @@ test.describe('Story 3.8 interaction states', () => {
     expect(Number.parseFloat(transitionDuration)).toBeLessThanOrEqual(0.00001)
 
     await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
+    // Story 5.5 Task 10 finding: the `planner-open-control` mouse click above
+    // (added for Decision 7) leaves Chromium's `:focus-visible` heuristic in
+    // its pointer-interaction state, so the plain `chip.focus()` call below
+    // no longer matched `:focus-visible` on its own -- `outlineStyle` came
+    // back `'none'` instead of `'solid'`, a real regression this test caught
+    // the first time it actually ran (5.4's session pinned the edit but
+    // never executed it). One real keyboard event resets that heuristic
+    // before the script-triggered focus, matching how a keyboard user would
+    // actually reach this element; confirmed by removing it and reproducing
+    // the failure.
+    await page.keyboard.press('Tab')
     await chip.focus()
     const forcedStyles = await chip.evaluate((node) => {
       const styles = getComputedStyle(node)
@@ -398,7 +413,14 @@ test.describe('Story 3.8 interaction states', () => {
       '/?source=notification&type=severe_weather&alertId=alert-999',
       interceptNetworkCall
     )
-    const alert = await focusColors(page.getByRole('button', { name: 'Plan week' }))
+    // Scoped to the alert panel itself: the page also carries a persistent
+    // "Plan week" control near the hero actions (Story 5.5 Decision 7) with
+    // the same accessible name, and this assertion is specifically about the
+    // alert's own dark surface.
+    const severeAlert = page.getByTestId('severe-weather-alert-focused')
+    const alert = await focusColors(
+      severeAlert.getByRole('button', { name: 'Plan week' })
+    )
     expect(contrastRatio(alert.outline, 'rgb(54, 31, 31)')).toBeGreaterThanOrEqual(3)
     expect(alert.outlineStyle).toBe('solid')
   })

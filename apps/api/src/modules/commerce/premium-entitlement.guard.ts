@@ -19,11 +19,12 @@ import { PremiumEntitlementService } from './premium-entitlement.service.js'
  * 403 with {@link PREMIUM_REQUIRED_MESSAGE}. Grace period keeps access on
  * purpose — a card hiccup is not a downgrade.
  *
- * SHIPS TESTED BUT DORMANT, deliberately. No production route in story 5.2
- * mounts this guard: the story's live consumers are the exported service (web
- * planner-rail gate) and the supertest fixture proving the guard over HTTP.
- * CC-5.5's planner API is its first production consumer; CC-5.3/5.4 follow.
- * A reviewer flagging this as dead code should read the story's Decision 4a.
+ * SHIPPED TESTED BUT DORMANT in story 5.2, deliberately: no production route
+ * mounted it yet, only the exported service (web planner-rail gate) and the
+ * supertest fixture proving the guard over HTTP. Story 5.3's
+ * `PremiumThemeController` PUT route was its first production consumer,
+ * Story 5.4's palette-advisor routes followed, and CC-5.5's planner API is
+ * the third.
  */
 @Injectable()
 export class PremiumEntitlementGuard implements CanActivate {

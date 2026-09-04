@@ -81,6 +81,7 @@ function createCleanupPrismaStub(
     premiumThemePreference: createDelegate('premiumThemePreference'),
     paletteProfile: createDelegate('paletteProfile'),
     advisorRecommendationState: createDelegate('advisorRecommendationState'),
+    plannerDayPlan: createDelegate('plannerDayPlan'),
   }
 }
 
@@ -179,6 +180,10 @@ describe('cleanup', () => {
       // references the other.
       'advisorRecommendationState',
       'paletteProfile',
+      // Story 5.5: PlannerDayPlan references both the tracked user and
+      // SavedLocation, so it precedes the savedLocation delete below even
+      // though both FKs cascade.
+      'plannerDayPlan',
       // Story 5.1: commerce first, and in reverse dependency order.
       // AffiliateClick holds RESTRICT foreign keys onto AffiliateOffer and
       // CommercePartner, so a catalog row cannot go before the clicks that
@@ -279,6 +284,8 @@ describe('cleanup', () => {
       // Story 5.4.
       paletteProfiles: [],
       advisorRecommendationStates: [],
+      // Story 5.5.
+      plannerDayPlans: [],
     })
   })
 

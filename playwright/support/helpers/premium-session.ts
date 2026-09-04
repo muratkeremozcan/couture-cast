@@ -7,6 +7,7 @@
 // reached through the deterministic seed users from
 // `packages/db/prisma/seeds/commerce.ts` (Story 5.2 Decision 9). The
 // never-subscribed branch is the one state a fresh public-API signup provides.
+import type { APIRequestContext } from '@playwright/test'
 import { PREMIUM_SEED_USERS } from '../../../packages/db/prisma/seeds/commerce'
 import { expect, test } from '../fixtures/merged-fixtures'
 import {
@@ -160,5 +161,54 @@ export const premiumApiTest = test.extend<{ premiumApi: PremiumApiContext }>({
     await use({ userId, apiBaseUrl, headers: authHeaders(userId, 'admin') })
   },
 })
+
+/**
+ * Story 5.5 Task 10 owner: ensures a seeded premium account owns at least one
+ * saved location, so a planner read can resolve one -- AC 1's "the user's
+ * primary or first saved location". None of the seed graph
+ * (`packages/db/prisma/seeds/commerce.ts`) gives `PREMIUM_SEED_USERS` a
+ * `SavedLocation`, and the planner has no location picker to arrange one
+ * through the UI (Task 7's Dev Notes), so this is the setup step.
+ *
+ * Unlike `createLocationForUser` in `commerce-session.ts` -- built for a
+ * fresh, throwaway account asserted to have none yet -- this account is
+ * SHARED and PERSISTENT across every spec file and worker (see the file
+ * header), so this is check-then-create, not create: a location left behind
+ * by an earlier run already satisfies the precondition, and a `400` from a
+ * concurrent worker racing the same create is
+ * `PrismaLocationPreferencesRepository`'s advisory-lock-guarded unique
+ * constraint doing exactly its job, not a failure to surface.
+ */
+export async function ensurePremiumSeedLocation(
+  request: APIRequestContext,
+  apiBaseUrl: string,
+  userId: string
+): Promise<void> {
+  const headers = { Authorization: `Bearer ${commerceAccessToken(userId)}` }
+
+  const existing = await request.get(`${apiBaseUrl}/api/v1/locations`, { headers })
+  if (existing.ok()) {
+    const body = (await existing.json()) as { data?: unknown[] }
+    if (Array.isArray(body.data) && body.data.length > 0) {
+      return
+    }
+  }
+
+  const created = await request.post(`${apiBaseUrl}/api/v1/locations`, {
+    headers,
+    data: {
+      label: 'Chicago',
+      locationKey: 'chicago-il',
+      latitude: 41.878,
+      longitude: -87.63,
+      timezone: 'America/Chicago',
+    },
+  })
+  if (created.status() !== 201 && created.status() !== 400) {
+    throw new Error(
+      `Planner seed-location setup failed: ${created.status()} ${await created.text()}`
+    )
+  }
+}
 
 export { PREMIUM_SEED_USERS, expect }

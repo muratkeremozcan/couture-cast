@@ -549,9 +549,18 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
 
     try {
       await new Promise<void>((resolve, reject) => {
+        // 10s was tight enough to time out under this file's own 15s test
+        // budget purely from CPU/IO contention when the FULL `integration/`
+        // suite runs (every file's own Nest app, Redis connection, and
+        // BullMQ worker competing for the same machine): the job itself
+        // completes in ~1s when this file runs alone (see the isolated
+        // timing note above `it(...)`'s own timeout below). 20s keeps this a
+        // fail-fast safety net -- a genuinely stuck job still fails well
+        // inside a normal test run -- without flaking on load this file does
+        // not control.
         const timeout = setTimeout(
           () => reject(new Error('job did not complete in time')),
-          10_000
+          20_000
         )
         // Both listeners filter on this test's own job. The worker subscribes
         // to the shared `moderation-review` queue name, so an unrelated job
@@ -592,7 +601,7 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
     })
     expect(finalRow.my_form_status).toBe('ready')
     expect(finalRow.mode).toBe('my_form')
-  }, 15_000)
+  }, 25_000)
 
   /**
    * Regression for the BullMQ job-id collision. `SilhouetteProfile` is one row

@@ -6,6 +6,15 @@
 # Without it the failure surfaces much later as `wardrobe-garment-list` or
 # `wardrobe-capsules-link` "not found" on a screen that renders both.
 #
+# `subflows/absorb-expo-dev-sheet.yaml` runs before the tap rather than a bare
+# `tapOn: text: 'Continue'`. PR #141 (story 5.5) found the lone text tap
+# insufficient: CI failed here with `tab-wardrobe` reporting COMPLETED on all
+# four retry attempts while the hierarchy dump showed `tab-home` still on top
+# and `wardrobe-screen` never mounted, and the screenshot showed Expo Go's
+# developer-menu sheet still covering the tab bar. `tapOn: text: 'Continue'`
+# cannot dismiss that sheet -- it never appears in the hierarchy Maestro
+# queries -- only the blind backdrop tap in the shared subflow can.
+#
 # This is the tab-bar route. `subflows/open-wardrobe.yaml` is the deep-link
 # route (`${WARDROBE_URL}`) and is what flows should use when they are not
 # specifically exercising tab navigation.
@@ -14,10 +23,7 @@ appId: ${MAESTRO_APP_ID}
 - retry:
     maxRetries: 3
     commands:
-      - tapOn:
-          text: 'Continue'
-          optional: true
-          label: 'Dismiss an Expo Go sheet covering the tab bar'
+      - runFlow: absorb-expo-dev-sheet.yaml
       - tapOn:
           id: 'tab-wardrobe'
           retryTapIfNoChange: true

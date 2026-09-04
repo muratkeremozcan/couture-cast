@@ -49,13 +49,22 @@ test.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
         return communityBox.x > heroBox.x
       })
       .toBe(true)
-    await expect(page.getByRole('complementary', { name: /planner rail/i })).toBeHidden()
+    // Story 5.5 Decision 7: closed by default. Below 1440px the planner is
+    // reachable as a focus-trapped overlay drawer, not simply hidden.
+    const plannerRail = page.getByRole('complementary', { name: /planner rail/i })
+    const openControl = page.getByTestId('planner-open-control')
+    await expect(plannerRail).toBeHidden()
+    await openControl.click()
+    await expect(plannerRail).toBeVisible()
+    await page.getByRole('button', { name: /close planner/i }).click()
+    await expect(plannerRail).toBeHidden()
 
     await log.step(
       'Set wide desktop viewport (1440x900) and verify planner rail visibility'
     )
     await page.setViewportSize({ width: 1440, height: 900 })
-    await expect(page.getByRole('complementary', { name: /planner rail/i })).toBeVisible()
+    await openControl.click()
+    await expect(plannerRail).toBeVisible()
     await expect
       .poll(async () => {
         const box = await container.boundingBox()

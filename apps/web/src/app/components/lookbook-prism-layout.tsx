@@ -4,8 +4,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
 import posthog from 'posthog-js'
+import { I18nextProvider } from 'react-i18next'
+import { getI18n } from '../../i18n'
 import { processWebDeepLink } from '../lib/deep-link-handler'
-import { getSubscriptionFromWeb, hasWebSession } from '../../lib/premium'
 import { LayoutControls } from './layout-controls'
 import { CommunityLookbookGrid, LookbookFilterNav } from './community-lookbook-grid'
 import type { FilterCategory } from './community-lookbook-grid'
@@ -72,15 +73,110 @@ const HERO_RECOMMENDATIONS: Record<
   },
 }
 
+interface PlannerSlotProps {
+  isMobilePreview: boolean
+  isNarrowViewport: boolean
+  isPlannerRailOpen: boolean
+  onClose: () => void
+  plannerOpenerRef: React.RefObject<HTMLElement | null>
+}
+
+/**
+ * The >=1440px third-column rail slot. Split out of `LookbookPrismLayout`
+ * (alongside {@link PlannerOverlaySlot}) purely to keep that function's
+ * cyclomatic complexity under this repo's ceiling of 15 -- the four
+ * `isMobilePreview`/`isNarrowViewport`/`isPlannerRailOpen` conditions live
+ * here instead, following `palette-advisor-panel.tsx`'s same rationale for
+ * its own extracted blocks.
+ *
+ * Each slot carries its own `I18nextProvider` rather than one wrapping all of
+ * `LookbookPrismLayout`: the `/` route mounts none (unlike `/settings`,
+ * `/palette`, etc.), and scoping it to just the two places that render
+ * `PlannerRail` -- the only consumer of `useTranslation()` on this page --
+ * keeps the rest of this static-English file's indentation untouched.
+ */
+function DesktopPlannerRailSlot({
+  isMobilePreview,
+  isNarrowViewport,
+  isPlannerRailOpen,
+  onClose,
+  plannerOpenerRef,
+}: PlannerSlotProps) {
+  if (isMobilePreview || isNarrowViewport) return null
+  return (
+    <div className="hidden min-[1440px]:block">
+      {isPlannerRailOpen && (
+        <I18nextProvider i18n={getI18n()}>
+          <PlannerRail
+            isOpen
+            onClose={onClose}
+            variant="rail"
+            invokingElementRef={plannerOpenerRef}
+          />
+        </I18nextProvider>
+      )}
+    </div>
+  )
+}
+
+/** The below-1440px focus-trapped overlay drawer, rendered outside the grid entirely. */
+function PlannerOverlaySlot({
+  isMobilePreview,
+  isNarrowViewport,
+  isPlannerRailOpen,
+  onClose,
+  plannerOpenerRef,
+}: PlannerSlotProps) {
+  if (isMobilePreview || !isNarrowViewport || !isPlannerRailOpen) return null
+  return (
+    <I18nextProvider i18n={getI18n()}>
+      <PlannerRail
+        isOpen
+        onClose={onClose}
+        variant="overlay"
+        invokingElementRef={plannerOpenerRef}
+      />
+    </I18nextProvider>
+  )
+}
+
 export function LookbookPrismLayout() {
+  // Not `useTranslation()`: this route (`/`, via `page.tsx`) mounts no
+  // `I18nextProvider` -- unlike `/settings`, `/palette`, etc. -- and the two
+  // providers this file does render are scoped to the planner slots only
+  // (see `DesktopPlannerRailSlot`/`PlannerOverlaySlot` above), not an
+  // ancestor of this component's own render. `getI18n()` directly, matching
+  // the old locked-panel code this replaces, for the two "Plan week" labels
+  // below.
+  const i18n = getI18n()
   const containerRef = useRef<HTMLDivElement>(null)
   const alertRef = useRef<HTMLDivElement>(null)
   const [isComparisonMode, setIsComparisonMode] = useState(false)
   const [isMobilePreview, setIsMobilePreview] = useState(false)
-  const [isPlannerRailOpen, setIsPlannerRailOpen] = useState(true)
-  // Story 5.2 Decision 2: false until a subscription proves otherwise, so the
-  // signed-out, unknown, and failed-load states all render the locked upsell.
-  const [isPlannerEntitled, setIsPlannerEntitled] = useState(false)
+  // Story 5.5 Decision 7: closed by default, opened only by the "Plan week"
+  // control. `PlannerRail` is self-contained below this -- it owns its own
+  // `checking | entitled | locked | error` state and fetches nothing until
+  // this turns true, so there is no separate entitlement effect in this
+  // component any more (Story 5.2's used to live here).
+  const [isPlannerRailOpen, setIsPlannerRailOpen] = useState(false)
+  // >=1440px renders the rail inline as the third grid column (no focus trap,
+  // ordinary page content); narrower renders it as a focus-trapped overlay
+  // drawer. `window.innerWidth` matches this file's own existing posthog
+  // layout-mode check below rather than introducing `matchMedia`, which has
+  // no other user in this codebase.
+  //
+  // The initial value must be a literal, not a `window`-dependent lazy
+  // initializer: SSR has no `window` (`isNarrowViewport` would resolve to
+  // `false`), but React reuses that SAME initializer for the client's first
+  // hydration render too, where `window` DOES exist -- so a real narrow
+  // viewport made the client's first render disagree with the server's,
+  // which is exactly React error #418 ("Minified React error #418",
+  // hydration mismatch). `false` matches the server unconditionally; the
+  // effect below corrects it immediately on mount, one render after
+  // hydration completes, which is the standard fix for viewport-dependent
+  // state in an SSR'd component.
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false)
+  const plannerOpenerRef = useRef<HTMLElement | null>(null)
   const [activeTab, setActiveTab] = useState<FilterCategory>('New')
   const [chipCategory, setChipCategory] = useState<ChipCategory>('Personal')
 
@@ -144,28 +240,15 @@ export function LookbookPrismLayout() {
   }, [])
 
   useEffect(() => {
-    // Entitlement read for the planner rail gate. No session means no request:
-    // the accessibility suite loads this page signed out and must see the
-    // locked state without a network dependency.
-    if (!hasWebSession()) {
-      return
+    function handleResize() {
+      setIsNarrowViewport(window.innerWidth < 1440)
     }
-    const controller = new AbortController()
-    void (async () => {
-      try {
-        const subscription = await getSubscriptionFromWeb(controller.signal)
-        if (controller.signal.aborted) {
-          return
-        }
-        setIsPlannerEntitled(
-          subscription.status === 'active' || subscription.status === 'grace_period'
-        )
-      } catch {
-        // Unknown stays locked; an upsell shown to an entitled user on a
-        // transient failure is recoverable, the reverse is a broken gate.
-      }
-    })()
-    return () => controller.abort()
+    // Correct the SSR-safe `false` default to the real viewport immediately
+    // on mount -- this runs after hydration has already committed with the
+    // matching `false`, so it costs one extra render rather than a mismatch.
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   useEffect(() => {
@@ -218,7 +301,7 @@ export function LookbookPrismLayout() {
           : 'mx-auto max-w-[1440px] px-4 py-8 sm:px-6'
       }`}
     >
-      <div className="mb-8">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
           <span className="lookbook-metrics text-xs uppercase tracking-[0.3em] text-[#8A691F]">
             Lookbook Prism
@@ -231,6 +314,22 @@ export function LookbookPrismLayout() {
             Weather-Aware Wardrobe & Community
           </h2>
         </div>
+        {/*
+          Story 5.5 Decision 7: the "ordinary Plan week control near the hero
+          actions" that opens the planner. Present at every viewport --
+          `PlannerRail` itself decides rail vs overlay chrome below.
+        */}
+        <button
+          type="button"
+          data-testid="planner-open-control"
+          onClick={(event) => {
+            plannerOpenerRef.current = event.currentTarget
+            setIsPlannerRailOpen(true)
+          }}
+          className="min-h-[44px] rounded-lg border border-[#C9A14A] bg-[#FFFFFF] px-4 py-2 text-sm font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
+        >
+          {i18n.t('commerce.premium.planner.openControl')}
+        </button>
       </div>
 
       {isInvalidDeepLink && (
@@ -278,10 +377,13 @@ export function LookbookPrismLayout() {
             </button>
             <button
               type="button"
-              onClick={() => setIsPlannerRailOpen(true)}
+              onClick={(event) => {
+                plannerOpenerRef.current = event.currentTarget
+                setIsPlannerRailOpen(true)
+              }}
               className="rounded-lg border border-[#E6E6ED] bg-transparent px-4 py-2 text-xs font-semibold text-white hover:bg-white/10"
             >
-              Plan week
+              {i18n.t('commerce.premium.planner.openControl')}
             </button>
           </div>
         </div>
@@ -442,27 +544,29 @@ export function LookbookPrismLayout() {
           />
         </section>
 
-        {/* Ultrawide Column / Slot 3: Planner Rail Container */}
-        {!isMobilePreview && (
-          <div className="hidden min-[1440px]:block">
-            {isPlannerRailOpen ? (
-              <PlannerRail
-                isOpen
-                onClose={() => setIsPlannerRailOpen(false)}
-                isEntitled={isPlannerEntitled}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsPlannerRailOpen(true)}
-                className="w-full rounded-[8px] border border-[#C9A14A] bg-[#FFFFFF] px-4 py-3 text-sm font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
-              >
-                Open planner rail
-              </button>
-            )}
-          </div>
-        )}
+        {/*
+        Ultrawide Column / Slot 3: Planner Rail Container.
+        Story 5.5 Decision 7: >=1440px reserves the third grid column and
+        renders the rail inline there when open; below that, the overlay
+        variant renders itself as a fixed drawer outside the grid entirely
+        (see `PlannerOverlaySlot` below), so this slot stays empty.
+      */}
+        <DesktopPlannerRailSlot
+          isMobilePreview={isMobilePreview}
+          isNarrowViewport={isNarrowViewport}
+          isPlannerRailOpen={isPlannerRailOpen}
+          onClose={() => setIsPlannerRailOpen(false)}
+          plannerOpenerRef={plannerOpenerRef}
+        />
       </div>
+
+      <PlannerOverlaySlot
+        isMobilePreview={isMobilePreview}
+        isNarrowViewport={isNarrowViewport}
+        isPlannerRailOpen={isPlannerRailOpen}
+        onClose={() => setIsPlannerRailOpen(false)}
+        plannerOpenerRef={plannerOpenerRef}
+      />
 
       <div className="mt-8 flex justify-end">
         <LayoutControls

@@ -8,6 +8,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
+import { PREMIUM_REQUIRED_MESSAGE } from '@couture/api-client/contracts/http'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
@@ -22,6 +23,56 @@ vi.mock('posthog-js', () => ({
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
 }))
+
+const PLANNER_PATH = '/api/v1/commerce/premium/planner'
+
+/** One valid seven-date, all-ready planner window, mirroring `packages/api-client/testing/planner-contract.spec.ts`'s fixture shape. */
+function buildPlannerResponse() {
+  const dates = [
+    '2026-09-10',
+    '2026-09-11',
+    '2026-09-12',
+    '2026-09-13',
+    '2026-09-14',
+    '2026-09-15',
+    '2026-09-16',
+  ]
+  return {
+    data: {
+      locationId: 'location-1',
+      timezone: 'America/New_York',
+      anchorDate: dates[0],
+      daysReady: 7,
+      days: dates.map((planDate) => ({
+        status: 'ready' as const,
+        planDate,
+        version: 1,
+        weather: {
+          confidence: 'hourly' as const,
+          freshness: 'fresh' as const,
+          condition: 'clear' as const,
+          temperatureLow: 15,
+          temperatureHigh: 22,
+        },
+        isStarterWardrobe: false,
+        outfits: (['morning', 'midday', 'evening'] as const).map((scenario) => ({
+          id: `${planDate}-${scenario}`,
+          scenario,
+          garmentIds: ['garment-1'],
+          reasoningBadges: [],
+          comfortNotes: 'Layer up; it will feel cooler than it reads.',
+          capsuleId: null,
+          capsuleName: null,
+          autoFilledGarmentIds: [],
+          displayGarments: [
+            { id: 'garment-1', category: 'top' as const, imageAccess: null },
+          ],
+          shopThisLook: null,
+        })),
+      })),
+    },
+  }
+}
 
 describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   beforeEach(() => {
@@ -103,27 +154,78 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
     expect(community).toHaveAttribute('tabindex', '-1')
   })
 
+  /**
+   * Story 5.5 Decision 7: the rail defaults closed and opens only from the
+   * "Plan week" control, so every planner test opens it first. Signed out,
+   * `PlannerRail` renders `locked` with no network request at all
+   * (`hasWebSession()` short-circuits before `getPlannerFromWeb`), so this
+   * needs no MSW handler.
+   */
   it('restores the planner after it is closed', () => {
     render(<LookbookPrismLayout />)
 
-    fireEvent.click(screen.getByRole('button', { name: /close planner rail/i }))
-    const openPlanner = screen.getByRole('button', {
-      name: /open planner rail/i,
-    })
-    fireEvent.click(openPlanner)
+    fireEvent.click(screen.getByTestId('planner-open-control'))
+    expect(
+      screen.getByRole('complementary', { name: /planner rail/i })
+    ).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: /close planner/i }))
+    expect(
+      screen.queryByRole('complementary', { name: /planner rail/i })
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('planner-open-control'))
     expect(
       screen.getByRole('complementary', { name: /planner rail/i })
     ).toBeInTheDocument()
   })
 
   /**
-   * Story 5.2 Decision 2: the rail is the story's one real premium gate. With
-   * no session there is no entitlement request at all — the locked upsell is
-   * the default, which is also what the signed-out accessibility run sees.
+   * At >=1440px the rail renders through `DesktopPlannerRailSlot` (the
+   * inline third-column form), not `PlannerOverlaySlot` -- a distinct code
+   * path (and a distinct `onClose` closure) from every other test in this
+   * file, which run at jsdom's default 1024px width and so always exercise
+   * the overlay.
+   */
+  it('opens and closes through the desktop rail slot at 1440px and wider', () => {
+    const originalInnerWidth = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1440,
+    })
+
+    try {
+      render(<LookbookPrismLayout />)
+      fireEvent(window, new Event('resize'))
+
+      fireEvent.click(screen.getByTestId('planner-open-control'))
+      expect(
+        screen.getByRole('complementary', { name: /planner rail/i })
+      ).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: /close planner/i }))
+      expect(
+        screen.queryByRole('complementary', { name: /planner rail/i })
+      ).not.toBeInTheDocument()
+    } finally {
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: originalInnerWidth,
+      })
+    }
+  })
+
+  /**
+   * Story 5.2 Decision 2, extended by 5.5 Decision 7: the rail is the
+   * story's one real premium gate. With no session there is no entitlement
+   * request at all — the locked upsell is the default, which is also what
+   * the signed-out accessibility run sees.
    */
   it('5.2-WEB-RAIL-01 renders the locked upsell signed out, with no request', () => {
     render(<LookbookPrismLayout />)
+    fireEvent.click(screen.getByTestId('planner-open-control'))
 
     const rail = screen.getByRole('complementary', { name: /planner rail/i })
     expect(rail).toBeInTheDocument()
@@ -133,61 +235,40 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
     const cta = screen.getByTestId('planner-rail-get-premium')
     expect(cta).toHaveAttribute('href', '/settings')
     expect(cta).toHaveTextContent('Get Premium')
-    expect(screen.queryByText(/waterproof trench/i)).not.toBeInTheDocument()
   })
 
   it('5.2-WEB-RAIL-02 renders the planner shell for an entitled user', async () => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
     useMswHandlers(
-      http.get('/api/v1/commerce/subscription', () =>
-        HttpResponse.json({
-          data: {
-            status: 'active',
-            store: 'stripe',
-            productId: 'premium_monthly',
-            willRenew: true,
-            currentPeriodEnd: '2026-09-12T00:00:00.000Z',
-            syncedAt: '2026-08-12T00:00:00.000Z',
-            purchasesEnabled: true,
-          },
-        })
-      )
+      http.get(PLANNER_PATH, () => HttpResponse.json(buildPlannerResponse()))
     )
 
     render(<LookbookPrismLayout />)
+    fireEvent.click(screen.getByTestId('planner-open-control'))
 
-    await waitFor(() =>
-      expect(screen.getByText(/waterproof trench/i)).toBeInTheDocument()
-    )
+    await waitFor(() => expect(screen.getByTestId('planner-days')).toBeInTheDocument())
     expect(screen.queryByTestId('planner-rail-locked')).not.toBeInTheDocument()
   })
 
-  /** A non-entitled subscription state must not unlock the rail. */
-  it('5.2-WEB-RAIL-03 keeps the locked upsell for an expired subscription', async () => {
+  /** A non-entitled caller must not unlock the rail. */
+  it('5.2-WEB-RAIL-03 keeps the locked upsell for a non-entitled caller', async () => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
     const requested = vi.fn()
     useMswHandlers(
-      http.get('/api/v1/commerce/subscription', () => {
+      http.get(PLANNER_PATH, () => {
         requested()
-        return HttpResponse.json({
-          data: {
-            status: 'expired',
-            store: 'stripe',
-            productId: 'premium_monthly',
-            willRenew: false,
-            currentPeriodEnd: '2026-07-12T00:00:00.000Z',
-            syncedAt: '2026-08-12T00:00:00.000Z',
-            purchasesEnabled: true,
-          },
-        })
+        return HttpResponse.json(
+          { statusCode: 403, message: PREMIUM_REQUIRED_MESSAGE, error: 'Forbidden' },
+          { status: 403 }
+        )
       })
     )
 
     render(<LookbookPrismLayout />)
+    fireEvent.click(screen.getByTestId('planner-open-control'))
 
     await waitFor(() => expect(requested).toHaveBeenCalled())
-    expect(screen.getByTestId('planner-rail-locked')).toBeInTheDocument()
-    expect(screen.queryByText(/waterproof trench/i)).not.toBeInTheDocument()
+    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
   })
 
   it('synchronizes chip selection across hero and community content', () => {

@@ -524,6 +524,63 @@
         "loadError": "Não conseguimos carregar sua paleta. Tente de novo.",
         "saveError": "Não conseguimos salvar essa alteração. Tente de novo.",
         "deleteConfirm": "Isso apaga seu subtom, sua profundidade, todas as sugestões salvas e dispensadas e qualquer foto ainda guardada. Não dá para desfazer."
+      },
+      "planner": {
+        "sectionTitle": "Planejador de 7 dias",
+        "intro": "Veja um look inicial para cada um dos próximos sete dias, criado a partir do clima e do guarda-roupa da sua localização salva.",
+        "loading": "Carregando seu planejador semanal…",
+        "errorLoad": "Não foi possível carregar seu planejador semanal.",
+        "retry": "Tentar novamente",
+        "disabled": "O planejador de 7 dias está temporariamente indisponível. Sua conta continua funcionando normalmente.",
+        "starterWardrobe": "Criado a partir de um guarda-roupa inicial.",
+        "day": {
+          "error": {
+            "title": "Não foi possível gerar este dia.",
+            "retry": "Tentar novamente para este dia"
+          }
+        },
+        "scenario": {
+          "morning": "Manhã",
+          "midday": "Meio-dia",
+          "evening": "Noite"
+        },
+        "conditions": {
+          "clear": "Céu limpo",
+          "partly_cloudy": "Parcialmente nublado",
+          "cloudy": "Nublado",
+          "fog": "Neblina",
+          "drizzle": "Garoa",
+          "rain": "Chuvoso",
+          "sleet": "Chuva com neve",
+          "snow": "Neve",
+          "thunderstorm": "Tempestade",
+          "wind": "Ventania",
+          "unknown": "Desconhecido"
+        },
+        "weather": {
+          "confidence": {
+            "hourly": "Previsão horária",
+            "daily": "Previsão diária",
+            "unavailable": "Clima indisponível para este dia"
+          },
+          "freshness": {
+            "fresh": "Atualizado",
+            "cached": "Atualizado recentemente",
+            "stale": "Pode estar desatualizado"
+          }
+        },
+        "reshuffle": {
+          "cta": "Reorganizar",
+          "loading": "Reorganizando…",
+          "success": "Este dia foi reorganizado.",
+          "unchanged": "Não havia outros looks disponíveis para este dia.",
+          "conflict": "Este dia mudou desde a última vez que você o viu. Atualizando…",
+          "error": "Não foi possível reorganizar este dia. Tente novamente."
+        }
+      },
+      "plannerLocked": {
+        "title": "O planejador de 7 dias é um recurso Premium",
+        "cta": "Obter Premium"
       }
     }
   }

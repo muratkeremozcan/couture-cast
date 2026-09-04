@@ -4743,6 +4743,498 @@ export const PaletteSource = {
 export type PaletteSource = (typeof PaletteSource)[keyof typeof PaletteSource]
 
 /**
+ * @type PlannerDayResult
+ *
+ * @export
+ */
+export type PlannerDayResult = PlannerDayResultOneOf | PlannerDayResultOneOf1
+/**
+ *
+ * @export
+ * @interface PlannerDayResultOneOf
+ */
+export interface PlannerDayResultOneOf {
+  /**
+   *
+   * @type {PlannerDayResultOneOfStatusEnum}
+   * @memberof PlannerDayResultOneOf
+   */
+  status: PlannerDayResultOneOfStatusEnum
+  /**
+   * Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape.
+   * @type {string}
+   * @memberof PlannerDayResultOneOf
+   */
+  planDate: string
+  /**
+   *
+   * @type {number}
+   * @memberof PlannerDayResultOneOf
+   */
+  version: number
+  /**
+   *
+   * @type {PlannerDayResultOneOfWeather}
+   * @memberof PlannerDayResultOneOf
+   */
+  weather: PlannerDayResultOneOfWeather
+  /**
+   * True when any scenario fell back to a placeholder garment because the eligible wardrobe had nothing for a required category.
+   * @type {boolean}
+   * @memberof PlannerDayResultOneOf
+   */
+  isStarterWardrobe: boolean
+  /**
+   * Collection invariant enforced at runtime and NOT expressible in this schema: the three outfits always cover three distinct scenarios (morning, midday, evening), one each.
+   * @type {Array<PlannerDayResultOneOfOutfitsInner>}
+   * @memberof PlannerDayResultOneOf
+   */
+  outfits: Array<PlannerDayResultOneOfOutfitsInner>
+}
+
+/**
+ * @export
+ */
+export const PlannerDayResultOneOfStatusEnum = {
+  ready: 'ready',
+} as const
+export type PlannerDayResultOneOfStatusEnum =
+  (typeof PlannerDayResultOneOfStatusEnum)[keyof typeof PlannerDayResultOneOfStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface PlannerDayResultOneOf1
+ */
+export interface PlannerDayResultOneOf1 {
+  /**
+   *
+   * @type {PlannerDayResultOneOf1StatusEnum}
+   * @memberof PlannerDayResultOneOf1
+   */
+  status: PlannerDayResultOneOf1StatusEnum
+  /**
+   * Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape.
+   * @type {string}
+   * @memberof PlannerDayResultOneOf1
+   */
+  planDate: string
+  /**
+   *
+   * @type {PlannerDayResultOneOf1ErrorCodeEnum}
+   * @memberof PlannerDayResultOneOf1
+   */
+  errorCode: PlannerDayResultOneOf1ErrorCodeEnum
+  /**
+   *
+   * @type {PlannerDayResultOneOf1RetryableEnum}
+   * @memberof PlannerDayResultOneOf1
+   */
+  retryable: PlannerDayResultOneOf1RetryableEnum
+}
+
+/**
+ * @export
+ */
+export const PlannerDayResultOneOf1StatusEnum = {
+  error: 'error',
+} as const
+export type PlannerDayResultOneOf1StatusEnum =
+  (typeof PlannerDayResultOneOf1StatusEnum)[keyof typeof PlannerDayResultOneOf1StatusEnum]
+
+/**
+ * @export
+ */
+export const PlannerDayResultOneOf1ErrorCodeEnum = {
+  generation_failed: 'generation_failed',
+} as const
+export type PlannerDayResultOneOf1ErrorCodeEnum =
+  (typeof PlannerDayResultOneOf1ErrorCodeEnum)[keyof typeof PlannerDayResultOneOf1ErrorCodeEnum]
+
+/**
+ * @export
+ */
+export const PlannerDayResultOneOf1RetryableEnum = {
+  true: true,
+} as const
+export type PlannerDayResultOneOf1RetryableEnum =
+  (typeof PlannerDayResultOneOf1RetryableEnum)[keyof typeof PlannerDayResultOneOf1RetryableEnum]
+
+/**
+ *
+ * @export
+ * @interface PlannerDayResultOneOfOutfitsInner
+ */
+export interface PlannerDayResultOneOfOutfitsInner {
+  /**
+   * Unique identifier for the recommendation card.
+   * @type {string}
+   * @memberof PlannerDayResultOneOfOutfitsInner
+   */
+  id: string
+  /**
+   * The daily scenario: morning, midday, or evening.
+   * @type {PlannerDayResultOneOfOutfitsInnerScenarioEnum}
+   * @memberof PlannerDayResultOneOfOutfitsInner
+   */
+  scenario: PlannerDayResultOneOfOutfitsInnerScenarioEnum
+  /**
+   * The custom or fallback garment identifiers suggested.
+   * @type {Array<string>}
+   * @memberof PlannerDayResultOneOfOutfitsInner
+   */
+  garmentIds: Array<string>
+  /**
+   * Reasoning badges justifying the garments chosen.
+   * @type {Array<ScenarioOutfitReasoningBadgesInner>}
+   * @memberof PlannerDayResultOneOfOutfitsInner
+   */
+  reasoningBadges: Array<ScenarioOutfitReasoningBadgesInner>
+  /**
+   * Explanation string based on weather and comfort thresholds.
+   * @type {string}
+   * @memberof PlannerDayResultOneOfOutfitsInner
+   */
+  comfortNotes: string
+  /**
+   * Optional capsule ID if recommendation came from an outfit capsule.
+   * @type {string}
+   * @memberof PlannerDayResultOneOfOutfitsInner
+   */
+  capsuleId?: string | null
+  /**
+   * Optional capsule name if recommendation came from an outfit capsule.
+   * @type {string}
+   * @memberof PlannerDayResultOneOfOutfitsInner
+   */
+  capsuleName?: string | null
+  /**
+   * Optional list of garment IDs auto-filled into a partial capsule.
+   * @type {Array<string>}
+   * @memberof PlannerDayResultOneOfOutfitsInner
+   */
+  autoFilledGarmentIds?: Array<string>
+  /**
+   * Always null. Planner cards never carry an affiliate CTA; this preserves the shared scenario contract while keeping planner affiliate behavior out of scope for this story.
+   * @type {null}
+   * @memberof PlannerDayResultOneOfOutfitsInner
+   */
+  shopThisLook: null
+  /**
+   * Category and fresh signed image access for every real garment id in garmentIds, batched in one lookup per Decision 4 rather than resolved per garment. A starter-wardrobe placeholder id has no entry here.
+   * @type {Array<PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner>}
+   * @memberof PlannerDayResultOneOfOutfitsInner
+   */
+  displayGarments: Array<PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner>
+}
+
+/**
+ * @export
+ */
+export const PlannerDayResultOneOfOutfitsInnerScenarioEnum = {
+  morning: 'morning',
+  midday: 'midday',
+  evening: 'evening',
+} as const
+export type PlannerDayResultOneOfOutfitsInnerScenarioEnum =
+  (typeof PlannerDayResultOneOfOutfitsInnerScenarioEnum)[keyof typeof PlannerDayResultOneOfOutfitsInnerScenarioEnum]
+
+/**
+ *
+ * @export
+ * @interface PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner
+ */
+export interface PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner
+   */
+  id: string
+  /**
+   *
+   * @type {PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInnerCategoryEnum}
+   * @memberof PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner
+   */
+  category: PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInnerCategoryEnum | null
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @memberof PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner
+   */
+  imageAccess: CreateGarmentItemResponseDataImageAccess
+}
+
+/**
+ * @export
+ */
+export const PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInnerCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInnerCategoryEnum =
+  (typeof PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInnerCategoryEnum)[keyof typeof PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInnerCategoryEnum]
+
+/**
+ *
+ * @export
+ * @interface PlannerDayResultOneOfWeather
+ */
+export interface PlannerDayResultOneOfWeather {
+  /**
+   * hourly: exact 08:00/13:00/19:00 segments. daily: projected from the provider daily summary. unavailable: no usable weather for this date at all.
+   * @type {PlannerDayResultOneOfWeatherConfidenceEnum}
+   * @memberof PlannerDayResultOneOfWeather
+   */
+  confidence: PlannerDayResultOneOfWeatherConfidenceEnum
+  /**
+   * null exactly when confidence is unavailable; there is no snapshot to date.
+   * @type {PlannerDayResultOneOfWeatherFreshnessEnum}
+   * @memberof PlannerDayResultOneOfWeather
+   */
+  freshness: PlannerDayResultOneOfWeatherFreshnessEnum | null
+  /**
+   *
+   * @type {PlannerDayResultOneOfWeatherConditionEnum}
+   * @memberof PlannerDayResultOneOfWeather
+   */
+  condition: PlannerDayResultOneOfWeatherConditionEnum | null
+  /**
+   *
+   * @type {number}
+   * @memberof PlannerDayResultOneOfWeather
+   */
+  temperatureLow: number | null
+  /**
+   *
+   * @type {number}
+   * @memberof PlannerDayResultOneOfWeather
+   */
+  temperatureHigh: number | null
+}
+
+/**
+ * @export
+ */
+export const PlannerDayResultOneOfWeatherConfidenceEnum = {
+  hourly: 'hourly',
+  daily: 'daily',
+  unavailable: 'unavailable',
+} as const
+export type PlannerDayResultOneOfWeatherConfidenceEnum =
+  (typeof PlannerDayResultOneOfWeatherConfidenceEnum)[keyof typeof PlannerDayResultOneOfWeatherConfidenceEnum]
+
+/**
+ * @export
+ */
+export const PlannerDayResultOneOfWeatherFreshnessEnum = {
+  fresh: 'fresh',
+  cached: 'cached',
+  stale: 'stale',
+} as const
+export type PlannerDayResultOneOfWeatherFreshnessEnum =
+  (typeof PlannerDayResultOneOfWeatherFreshnessEnum)[keyof typeof PlannerDayResultOneOfWeatherFreshnessEnum]
+
+/**
+ * @export
+ */
+export const PlannerDayResultOneOfWeatherConditionEnum = {
+  clear: 'clear',
+  partly_cloudy: 'partly_cloudy',
+  cloudy: 'cloudy',
+  fog: 'fog',
+  drizzle: 'drizzle',
+  rain: 'rain',
+  sleet: 'sleet',
+  snow: 'snow',
+  thunderstorm: 'thunderstorm',
+  wind: 'wind',
+  unknown: 'unknown',
+} as const
+export type PlannerDayResultOneOfWeatherConditionEnum =
+  (typeof PlannerDayResultOneOfWeatherConditionEnum)[keyof typeof PlannerDayResultOneOfWeatherConditionEnum]
+
+/**
+ *
+ * @export
+ * @interface PlannerHeaders
+ */
+export interface PlannerHeaders {
+  /**
+   * Which client is calling. Required on every planner operation; drives the platform property on both planner analytics events.
+   * @type {PlannerHeadersXCouturePlatformEnum}
+   * @memberof PlannerHeaders
+   */
+  xCouturePlatform: PlannerHeadersXCouturePlatformEnum
+}
+
+/**
+ * @export
+ */
+export const PlannerHeadersXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type PlannerHeadersXCouturePlatformEnum =
+  (typeof PlannerHeadersXCouturePlatformEnum)[keyof typeof PlannerHeadersXCouturePlatformEnum]
+
+/**
+ *
+ * @export
+ * @interface PlannerQueryParams
+ */
+export interface PlannerQueryParams {
+  /**
+   * Optional ID of a saved user location. Defaults to the primary or first location.
+   * @type {string}
+   * @memberof PlannerQueryParams
+   */
+  locationId?: string
+  /**
+   * Optional locale override for this localized planner response.
+   * @type {PlannerQueryParamsLocaleEnum}
+   * @memberof PlannerQueryParams
+   */
+  locale?: PlannerQueryParamsLocaleEnum
+}
+
+/**
+ * @export
+ */
+export const PlannerQueryParamsLocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type PlannerQueryParamsLocaleEnum =
+  (typeof PlannerQueryParamsLocaleEnum)[keyof typeof PlannerQueryParamsLocaleEnum]
+
+/**
+ *
+ * @export
+ * @interface PlannerReshuffleInput
+ */
+export interface PlannerReshuffleInput {
+  /**
+   * The version currently displayed by the client. Guards against a stale reshuffle.
+   * @type {number}
+   * @memberof PlannerReshuffleInput
+   */
+  expectedVersion: number
+}
+/**
+ *
+ * @export
+ * @interface PlannerReshufflePathParams
+ */
+export interface PlannerReshufflePathParams {
+  /**
+   * Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape.
+   * @type {string}
+   * @memberof PlannerReshufflePathParams
+   */
+  planDate: string
+}
+/**
+ *
+ * @export
+ * @interface PlannerReshuffleResponse
+ */
+export interface PlannerReshuffleResponse {
+  /**
+   *
+   * @type {PlannerReshuffleResponseData}
+   * @memberof PlannerReshuffleResponse
+   */
+  data: PlannerReshuffleResponseData
+}
+/**
+ *
+ * @export
+ * @interface PlannerReshuffleResponseData
+ */
+export interface PlannerReshuffleResponseData {
+  /**
+   *
+   * @type {PlannerDayResultOneOf}
+   * @memberof PlannerReshuffleResponseData
+   */
+  day: PlannerDayResultOneOf
+  /**
+   * True only when all three scenario garment sets and capsule choices are identical to the displayed result.
+   * @type {boolean}
+   * @memberof PlannerReshuffleResponseData
+   */
+  unchanged: boolean
+}
+/**
+ *
+ * @export
+ * @interface PlannerResponse
+ */
+export interface PlannerResponse {
+  /**
+   *
+   * @type {PlannerResponseData}
+   * @memberof PlannerResponse
+   */
+  data: PlannerResponseData
+}
+/**
+ *
+ * @export
+ * @interface PlannerResponseData
+ */
+export interface PlannerResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof PlannerResponseData
+   */
+  locationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof PlannerResponseData
+   */
+  timezone: string
+  /**
+   * Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape.
+   * @type {string}
+   * @memberof PlannerResponseData
+   */
+  anchorDate: string
+  /**
+   *
+   * @type {number}
+   * @memberof PlannerResponseData
+   */
+  daysReady: number
+  /**
+   * Collection invariant enforced at runtime and NOT expressible in this schema: exactly seven unique, consecutive local dates in chronological order, one entry per date. A failed date is represented as status "error" rather than omitted, so the array is always exactly seven long.
+   * @type {Array<PlannerResponseDataDaysInner>}
+   * @memberof PlannerResponseData
+   */
+  days: Array<PlannerResponseDataDaysInner>
+}
+/**
+ * @type PlannerResponseDataDaysInner
+ *
+ * @export
+ */
+export type PlannerResponseDataDaysInner = PlannerDayResultOneOf | PlannerDayResultOneOf1
+/**
  *
  * @export
  * @interface PolledEvent
@@ -7861,7 +8353,7 @@ export interface WeatherCurrent {
    * @type {WeatherCurrentConditionEnum}
    * @memberof WeatherCurrent
    */
-  condition: WeatherCurrentConditionEnum
+  condition: WeatherCurrentConditionEnum | null
 }
 
 /**
@@ -7936,7 +8428,7 @@ export interface WeatherHourlyEntry {
    * @type {WeatherHourlyEntryConditionEnum}
    * @memberof WeatherHourlyEntry
    */
-  condition: WeatherHourlyEntryConditionEnum
+  condition: WeatherHourlyEntryConditionEnum | null
   /**
    *
    * @type {string}
@@ -8118,7 +8610,7 @@ export interface WeatherSnapshotCurrent {
    * @type {WeatherSnapshotCurrentConditionEnum}
    * @memberof WeatherSnapshotCurrent
    */
-  condition: WeatherSnapshotCurrentConditionEnum
+  condition: WeatherSnapshotCurrentConditionEnum | null
 }
 
 /**
@@ -8193,7 +8685,7 @@ export interface WeatherSnapshotHourlyInner {
    * @type {WeatherSnapshotHourlyInnerConditionEnum}
    * @memberof WeatherSnapshotHourlyInner
    */
-  condition: WeatherSnapshotHourlyInnerConditionEnum
+  condition: WeatherSnapshotHourlyInnerConditionEnum | null
   /**
    *
    * @type {string}

@@ -524,6 +524,63 @@
         "loadError": "Nous n'avons pas pu charger votre palette. Réessayez.",
         "saveError": "Nous n'avons pas pu enregistrer cette modification. Réessayez.",
         "deleteConfirm": "Cela efface votre sous-ton, votre profondeur, chaque suggestion enregistrée ou masquée, et toute photo encore conservée. C'est irréversible."
+      },
+      "planner": {
+        "sectionTitle": "Planificateur sur 7 jours",
+        "intro": "Découvrez une tenue de départ pour chacun des sept prochains jours, créée à partir de la météo et de la garde-robe de votre emplacement enregistré.",
+        "loading": "Chargement de votre planificateur hebdomadaire…",
+        "errorLoad": "Impossible de charger votre planificateur hebdomadaire.",
+        "retry": "Réessayer",
+        "disabled": "Le planificateur sur 7 jours est temporairement indisponible. Votre compte continue de fonctionner normalement.",
+        "starterWardrobe": "Créé à partir d'une garde-robe de départ.",
+        "day": {
+          "error": {
+            "title": "Impossible de générer ce jour.",
+            "retry": "Réessayer pour ce jour"
+          }
+        },
+        "scenario": {
+          "morning": "Matin",
+          "midday": "Midi",
+          "evening": "Soir"
+        },
+        "conditions": {
+          "clear": "Ciel dégagé",
+          "partly_cloudy": "Partiellement nuageux",
+          "cloudy": "Nuageux",
+          "fog": "Brouillard",
+          "drizzle": "Bruine",
+          "rain": "Pluvieux",
+          "sleet": "Neige fondue",
+          "snow": "Neige",
+          "thunderstorm": "Orage",
+          "wind": "Venteux",
+          "unknown": "Inconnu"
+        },
+        "weather": {
+          "confidence": {
+            "hourly": "Prévisions horaires",
+            "daily": "Prévisions journalières",
+            "unavailable": "Météo indisponible pour ce jour"
+          },
+          "freshness": {
+            "fresh": "À jour",
+            "cached": "Mis à jour récemment",
+            "stale": "Peut-être obsolète"
+          }
+        },
+        "reshuffle": {
+          "cta": "Remélanger",
+          "loading": "Remélange en cours…",
+          "success": "Ce jour a été remélangé.",
+          "unchanged": "Aucune autre tenue n'était disponible pour ce jour.",
+          "conflict": "Ce jour a changé depuis votre dernière consultation. Actualisation…",
+          "error": "Impossible de remélanger ce jour. Réessayez."
+        }
+      },
+      "plannerLocked": {
+        "title": "Le planificateur sur 7 jours est une fonctionnalité Premium",
+        "cta": "Obtenir Premium"
       }
     }
   }

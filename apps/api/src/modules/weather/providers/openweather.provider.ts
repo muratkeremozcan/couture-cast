@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import type { z } from 'zod'
 import { mapOpenWeatherCondition } from './weather-condition.mapper.js'
+import { formatLocalDateInTimezone } from './weather-date.util.js'
 import {
   classifyFetchFailure,
   classifyHttpFailure,
@@ -9,11 +10,14 @@ import {
 import type { IWeatherProvider } from './weather-provider.interface.js'
 import type { OpenWeatherHourlySchema } from './weather.schemas.js'
 import {
+  NormalizedDailyWeatherEntrySchema,
   NormalizedWeatherForecastSchema,
+  OpenWeatherDailySchema,
   OpenWeatherResponseSchema,
   WeatherIngestionTargetSchema,
 } from './weather.schemas.js'
 import type {
+  NormalizedDailyWeatherEntry,
   NormalizedWeatherForecast,
   WeatherIngestionTarget,
 } from './weather.types.js'
@@ -154,6 +158,7 @@ export class OpenWeatherProvider implements IWeatherProvider {
           start: new Date(alert.start * 1000),
           end: new Date(alert.end * 1000),
         })),
+      daily: this.extractDaily(data.daily, data.timezone),
     }
 
     const finalValidation = NormalizedWeatherForecastSchema.safeParse(normalizedForecast)
@@ -188,6 +193,53 @@ export class OpenWeatherProvider implements IWeatherProvider {
         }
       )
     }
+  }
+
+  // Story 5.5 Decision 3: each raw entry is validated independently and any
+  // failure is dropped (logged, never thrown), so one malformed day never
+  // takes down the whole forecast -- including the hourly array.
+  private extractDaily(
+    daily: unknown[] | null | undefined,
+    timezone: string
+  ): NormalizedDailyWeatherEntry[] | undefined {
+    if (!daily || daily.length === 0) {
+      return undefined
+    }
+
+    const entries: NormalizedDailyWeatherEntry[] = []
+    for (const rawDay of daily.slice(0, 8)) {
+      const rawResult = OpenWeatherDailySchema.safeParse(rawDay)
+      if (!rawResult.success) {
+        console.warn('Discarding malformed OpenWeather daily entry', {
+          issues: rawResult.error.issues,
+        })
+        continue
+      }
+      const day = rawResult.data
+      const providerCondition = day.weather[0]!
+      const feelsLikeValues = [
+        day.feels_like.day,
+        day.feels_like.night,
+        day.feels_like.eve,
+        day.feels_like.morn,
+      ]
+      const candidate = {
+        localDate: formatLocalDateInTimezone(new Date(day.dt * 1000), timezone),
+        condition: mapOpenWeatherCondition(providerCondition.id),
+        temperatureMin: day.temp.min,
+        temperatureMax: day.temp.max,
+        feelsLikeMin: Math.min(...feelsLikeValues),
+        feelsLikeMax: Math.max(...feelsLikeValues),
+        precipitationProbability: day.pop,
+        precipitationAmount: (day.rain ?? 0) + (day.snow ?? 0),
+        windSpeed: day.wind_speed,
+      }
+      const validated = NormalizedDailyWeatherEntrySchema.safeParse(candidate)
+      if (validated.success) {
+        entries.push(validated.data)
+      }
+    }
+    return entries.length > 0 ? entries : undefined
   }
 
   private extractUniqueHourly(
@@ -229,7 +281,10 @@ export class OpenWeatherProvider implements IWeatherProvider {
     url.searchParams.set('lat', String(latitude))
     url.searchParams.set('lon', String(longitude))
     url.searchParams.set('units', 'metric')
-    url.searchParams.set('exclude', 'minutely,daily')
+    // Story 5.5 Decision 3: `daily` stays out of `exclude` so the response
+    // carries the up-to-eight-day projection alongside the existing hourly
+    // block; `minutely` remains excluded as unused.
+    url.searchParams.set('exclude', 'minutely')
     url.searchParams.set('appid', this.apiKey)
     return url
   }

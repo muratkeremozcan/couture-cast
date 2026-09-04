@@ -3,12 +3,24 @@ import { ConfiguredWeatherIngestionTargetSchema } from './weather.schemas.js'
 
 const WeatherProviderModeSchema = z.enum(['openweather', 'weatherapi'])
 
+// Story 5.5 Decision 3: WeatherAPI's `days` param accepts 1-14, gated by the
+// provisioned plan. Default `3` matches the depth already proven safe in
+// production; deployed environments raise it to `8` (the planner's own cap)
+// only after confirming the plan covers that depth.
+export const WeatherApiForecastDaysSchema = z.coerce
+  .number()
+  .int()
+  .min(1)
+  .max(8)
+  .default(3)
+
 const WeatherEnvironmentSchema = z.object({
   OPENWEATHER_API_KEY: z.string().trim().min(1).optional(),
   WEATHERAPI_API_KEY: z.string().trim().min(1).optional(),
   WEATHER_REFRESH_MINUTES: z.coerce.number().int().min(1).max(5).default(5),
   WEATHER_PROVIDER_MODE: WeatherProviderModeSchema.default('openweather'),
   WEATHER_INGESTION_TARGETS_JSON: z.string().default('[]'),
+  WEATHERAPI_FORECAST_DAYS: WeatherApiForecastDaysSchema,
 })
 
 export interface WeatherConfig {
@@ -17,6 +29,7 @@ export interface WeatherConfig {
   refreshMinutes: number
   providerMode: z.infer<typeof WeatherProviderModeSchema>
   ingestionTargets: z.infer<typeof ConfiguredWeatherIngestionTargetSchema>[]
+  weatherApiForecastDays: number
 }
 
 export class WeatherConfigError extends Error {
@@ -73,5 +86,6 @@ export function loadWeatherConfig(env: NodeJS.ProcessEnv = process.env): Weather
     refreshMinutes: environmentResult.data.WEATHER_REFRESH_MINUTES,
     providerMode: environmentResult.data.WEATHER_PROVIDER_MODE,
     ingestionTargets: targetResult.data,
+    weatherApiForecastDays: environmentResult.data.WEATHERAPI_FORECAST_DAYS,
   }
 }

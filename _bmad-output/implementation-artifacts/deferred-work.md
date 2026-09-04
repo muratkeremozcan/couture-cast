@@ -1260,3 +1260,50 @@ realtime fallback events` — a third distinct interaction, in a third file, wit
   code, no flow and no subflow touched. Diagnosing it further needs an Android
   emulator reproducing the CI profile, which is where this repository's mobile
   E2E lives by decision; there is no local Android path to iterate against.
+
+## Deferred from: story 5.5 premium 7-day outfit planner (2026-09-04)
+
+These were identified while drafting and implementing story 5.5 and were
+deliberately left out of its scope, or are limits the story's own test plan
+already names. Each records what was narrowed and why, so a later story does
+not have to rediscover the reasoning.
+
+- **Whole-week reshuffle, and the rest of the epic's planner surface beyond
+  this story.** The story's own scope line is explicit: it delivers the
+  generated seven-day planner, per-day reshuffle, the web drawer, and the
+  mobile screen; calendar sync, manual slot editing, share/export, planner
+  widgets, watch surfaces, whole-week reshuffle, occasion selection, and
+  planner affiliate CTAs all remain deferred. Each reshuffle control (Decision
+  7, AC 4) regenerates exactly one date; there is no "reshuffle the whole
+  week" control anywhere in the contract or either surface.
+
+- **No planner affiliate CTAs.** Decision 4 is explicit: the stored payload
+  omits affiliate offers, and every planner scenario returns
+  `shopThisLook: null` at the response layer regardless of what a real
+  `ritual`/`palette-advisor` scenario would carry. This preserves the shared
+  scenario contract shape while keeping planner affiliate behavior out of this
+  story. Wiring real offers into planner cards is new product surface, not a
+  test-plan gap.
+
+- **WeatherAPI deployed forecast depth is an operator verification, not a
+  test.** Decision 3 adds a validated `WEATHERAPI_FORECAST_DAYS` config,
+  defaulting to `3` and capped at `8`; the story's open questions and its own
+  "Explicit test limits" section both say the deployed value should only move
+  to `8` after confirming the provisioned WeatherAPI plan actually supports
+  that depth. Provider plan depth itself is covered by configured fixtures in
+  the provider mapper specs (Task 1); nothing in this codebase's automated
+  suite can prove what a _production_ WeatherAPI subscription is entitled to
+  return, so that confirmation stays an operator step, recorded here rather
+  than simulated.
+
+- **The story's own explicit test limits, restated.** From the story's Test
+  plan section, so they are not only inside the implementation artifact: the
+  Maestro harness proves the planner's locked state and navigation, because
+  its standard account has no Premium entitlement (`maestro/premium-planner.yaml`
+  is the same honest-scope shape as `palette-advisor.yaml` and
+  `premium-subscription.yaml` — see that file's own header for the full
+  reasoning); long-term pruning is tested at the window boundary and through
+  cascades (`apps/api/integration/planner.integration.spec.ts`), not by
+  advancing real wall-clock time across a retention period; and the story adds
+  no k6 scenario because planner reads are Premium-only, user-scoped, and
+  outside the existing hot-path performance budget.

@@ -20,7 +20,14 @@ describe('feature flag registry', () => {
       'weather_alerts_enabled',
       'commerce_affiliate_enabled',
       'commerce_subscription_enabled',
+      'premium_planner_enabled',
     ])
+  })
+
+  it('defaults the premium planner kill switch to off', () => {
+    // Story 5.5: same fail-closed reasoning as every premium flag above -- a
+    // degraded PostHog can never switch it on by accident.
+    expect(getDefaultFeatureFlagValue('premium_planner_enabled')).toBe(false)
   })
 
   it('defaults the commerce kill switch to off', () => {

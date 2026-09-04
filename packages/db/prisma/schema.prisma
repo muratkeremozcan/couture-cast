@@ -196,10 +196,10 @@ enum PremiumThemeKey {
 }
 
 model User {
-  id                            String                   @id @default(cuid())
-  email                         String                   @unique
-  created_at                    DateTime                 @default(now())
-  updated_at                    DateTime                 @updatedAt
+  id                            String                       @id @default(cuid())
+  email                         String                       @unique
+  created_at                    DateTime                     @default(now())
+  updated_at                    DateTime                     @updatedAt
   profile                       UserProfile?
   comfort_profile               ComfortPreferences?
   garments                      GarmentItem[]
@@ -208,12 +208,12 @@ model User {
   lookbook_posts                LookbookPost[]
   engagement                    EngagementEvent[]
   audit_logs                    AuditLog[]
-  guardian_roles                GuardianConsent[]        @relation("GuardianRole")
-  teen_roles                    GuardianConsent[]        @relation("TeenRole")
-  sent_guardian_invitations     GuardianInvitation[]     @relation("TeenGuardianInvitations")
-  accepted_guardian_invitations GuardianInvitation[]     @relation("AcceptedGuardianInvitations")
-  moderation_flags              ModerationEvent[]        @relation("FlaggedByRelation")
-  moderation_reviews            ModerationEvent[]        @relation("ReviewedByRelation")
+  guardian_roles                GuardianConsent[]            @relation("GuardianRole")
+  teen_roles                    GuardianConsent[]            @relation("TeenRole")
+  sent_guardian_invitations     GuardianInvitation[]         @relation("TeenGuardianInvitations")
+  accepted_guardian_invitations GuardianInvitation[]         @relation("AcceptedGuardianInvitations")
+  moderation_flags              ModerationEvent[]            @relation("FlaggedByRelation")
+  moderation_reviews            ModerationEvent[]            @relation("ReviewedByRelation")
   push_tokens                   PushToken[]
   saved_locations               SavedLocation[]
   alert_rules                   AlertRule[]
@@ -233,6 +233,7 @@ model User {
   premium_theme_preference      PremiumThemePreference?
   palette_profile               PaletteProfile?
   advisor_recommendation_states AdvisorRecommendationState[]
+  planner_day_plans             PlannerDayPlan[]
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -299,6 +300,9 @@ model WeatherSnapshot {
   temperature         Float
   condition           String
   alerts              Json?
+  // Story 5.5 Decision 3: at most eight NormalizedDailyWeatherEntry rows,
+  // parsed with the canonical Zod schema on every read.
+  daily_summaries     Json?
   fetched_at          DateTime          @default(now())
   created_at          DateTime          @default(now())
   segments            ForecastSegment[]
@@ -337,23 +341,28 @@ model WeatherIngestionState {
 
 /// RLS: saved weather location preferences are scoped to the owning user_id
 model SavedLocation {
-  id           String   @id @default(cuid())
-  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  user_id      String
-  label        String
-  location_key String
-  latitude     Float
-  longitude    Float
-  timezone     String
-  city         String?
-  region       String?
-  country      String?
-  is_primary   Boolean  @default(false)
-  sort_order   Int      @default(0)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  id                String           @id @default(cuid())
+  user              User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id           String
+  label             String
+  location_key      String
+  latitude          Float
+  longitude         Float
+  timezone          String
+  city              String?
+  region            String?
+  country           String?
+  is_primary        Boolean          @default(false)
+  sort_order        Int              @default(0)
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
+  // Story 5.5 Decision 4: lets PlannerDayPlan carry a composite FK to
+  // (location_id, user_id), so a planner row can never reference another
+  // user's saved location.
+  planner_day_plans PlannerDayPlan[]
 
   @@unique([user_id, location_key])
+  @@unique([id, user_id])
   @@index([user_id, sort_order, created_at, id])
   @@index([location_key])
 }
@@ -1160,4 +1169,36 @@ model AdvisorRecommendationState {
   @@unique([user_id, slot, item_key])
   @@index([user_id])
   @@map("AdvisorRecommendationState")
+}
+
+enum PlannerOutfitSource {
+  generated
+  reshuffled
+}
+
+/// RLS: owner-only (selfOnlyTables). One disposable cache row per user,
+/// saved location, and calendar date -- Decision 4. `plan_payload` is
+/// validated with an internal strict Zod schema on every read; a garment or
+/// capsule id referenced inside it is re-checked for ownership and
+/// eligibility at read time, never trusted from the stored JSON alone.
+model PlannerDayPlan {
+  id                     String              @id @default(cuid())
+  user                   User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                String
+  location               SavedLocation       @relation(fields: [location_id, user_id], references: [id, user_id], onDelete: Cascade, onUpdate: NoAction)
+  location_id            String
+  plan_date              DateTime            @db.Date
+  locale                 String
+  dependency_fingerprint String
+  plan_payload           Json
+  source                 PlannerOutfitSource @default(generated)
+  version                Int                 @default(1)
+  reshuffle_count        Int                 @default(0)
+  generated_at           DateTime            @default(now())
+  created_at             DateTime            @default(now())
+  updated_at             DateTime            @updatedAt
+
+  @@unique([user_id, location_id, plan_date])
+  @@index([user_id, plan_date])
+  @@map("PlannerDayPlan")
 }

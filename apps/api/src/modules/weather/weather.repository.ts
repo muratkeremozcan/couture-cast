@@ -1,7 +1,36 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 
-import type { NormalizedWeatherForecast } from './providers/weather.types.js'
+import { NormalizedDailyWeatherEntrySchema } from './providers/weather.schemas.js'
+import type {
+  NormalizedDailyWeatherEntry,
+  NormalizedWeatherForecast,
+} from './providers/weather.types.js'
+
+// Story 5.5 Decision 3: `WeatherSnapshot.daily_summaries` is parsed with this
+// schema on every read. A malformed entry is discarded and logged rather
+// than failing the read, so hourly weather is never taken down by it.
+export function parseDailySummaries(
+  raw: Prisma.JsonValue | null | undefined,
+  logger: { warn: (message: string, meta?: unknown) => void } = console
+): NormalizedDailyWeatherEntry[] {
+  if (!Array.isArray(raw)) {
+    return []
+  }
+
+  const parsed: NormalizedDailyWeatherEntry[] = []
+  for (const entry of raw) {
+    const result = NormalizedDailyWeatherEntrySchema.safeParse(entry)
+    if (result.success) {
+      parsed.push(result.data)
+    } else {
+      logger.warn('Discarding malformed WeatherSnapshot.daily_summaries entry', {
+        issues: result.error.issues,
+      })
+    }
+  }
+  return parsed
+}
 
 export type WeatherSnapshotWithSegments = Prisma.WeatherSnapshotGetPayload<{
   include: { segments: true }
@@ -144,6 +173,14 @@ export class WeatherRepository {
       temperature: forecast.current.temperature,
       condition: forecast.current.condition,
       alerts: forecast.alerts as unknown as Prisma.InputJsonArray,
+      // Story 5.5 Decision 3: nullable, so an absent/empty daily projection
+      // stores as `null` rather than an empty array, matching the "daily
+      // projection unavailable for this snapshot" reading on the way back
+      // out through `parseDailySummaries`.
+      daily_summaries:
+        forecast.daily && forecast.daily.length > 0
+          ? (forecast.daily as unknown as Prisma.InputJsonArray)
+          : Prisma.JsonNull,
       segments: {
         create: forecast.hourly.map((hour, index) => ({
           forecast_at: hour.forecastAt,

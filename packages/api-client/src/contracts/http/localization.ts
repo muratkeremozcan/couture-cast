@@ -72,11 +72,20 @@ export function resolveAcceptLanguage(acceptLanguage: string | null | undefined)
         return undefined
       }
 
-      const qualityParameter = parameters.find((parameter) =>
-        parameter.trim().toLowerCase().startsWith('q=')
-      )
+      // Trim once and reuse the trimmed form for both the match and the
+      // slice, rather than `parameters.find(...)` + `.split('=')[1]`: a
+      // matched parameter is guaranteed (by the `startsWith('q=')` check
+      // itself) to contain a `=`, so `.split('=')[1]` could never actually be
+      // `undefined` -- but `noUncheckedIndexedAccess` cannot see that, which
+      // left an unreachable `?? ''` fallback that no input could ever
+      // exercise. `.slice(2)` drops exactly the two `q=` characters and
+      // types as a plain `string`, so there is no fallback branch to leave
+      // untested.
+      const qualityParameter = parameters
+        .map((parameter) => parameter.trim())
+        .find((parameter) => parameter.toLowerCase().startsWith('q='))
       const parsedQuality = qualityParameter
-        ? Number.parseFloat(qualityParameter.split('=')[1] ?? '')
+        ? Number.parseFloat(qualityParameter.slice(2))
         : 1
       const quality = Number.isFinite(parsedQuality)
         ? Math.min(1, Math.max(0, parsedQuality))

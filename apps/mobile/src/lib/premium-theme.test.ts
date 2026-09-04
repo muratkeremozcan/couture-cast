@@ -253,4 +253,80 @@ describe('mobile premium theme boundary', () => {
       }
     )
   })
+
+  describe('premiumThemeFailureReason', () => {
+    it("reads 'unknown' from anything this module didn't throw", () => {
+      expect(premiumThemeFailureReason(new Error('bare'))).toBe('unknown')
+      expect(premiumThemeFailureReason('nope')).toBe('unknown')
+    })
+  })
+
+  /**
+   * TEA coverage-gate follow-up: `readServerMessage`'s own two branches and the
+   * transport-failure catch-all, none of which the status-code table above
+   * reaches -- every case there replies with a well-formed JSON error body.
+   */
+  describe('malformed and transport failures', () => {
+    it('falls back to a generic message when the error body is not JSON', async () => {
+      server.use(
+        http.get(THEME_ROUTE, () =>
+          HttpResponse.text('<html>down</html>', { status: 500 })
+        )
+      )
+
+      await getThemeFromMobile().then(
+        () => expect.unreachable('the read should have rejected'),
+        (error: unknown) => {
+          expect((error as Error).message).toBe('Unable to load your interface palette.')
+        }
+      )
+    })
+
+    it('falls back to a generic message when the error body has no message field', async () => {
+      server.use(
+        http.get(THEME_ROUTE, () =>
+          HttpResponse.json({ statusCode: 500 }, { status: 500 })
+        )
+      )
+
+      await getThemeFromMobile().then(
+        () => expect.unreachable('the read should have rejected'),
+        (error: unknown) => {
+          expect((error as Error).message).toBe('Unable to load your interface palette.')
+        }
+      )
+    })
+
+    /**
+     * A network-level failure never reaches the generated client's status-code
+     * handling: `fetch` itself rejects, with whatever `AbortSignal.reason` is in
+     * play, distinct from every case above (all of which reject with a
+     * `ResponseError` wrapping a real HTTP response).
+     */
+    it('classifies a transport failure as unknown and keeps an Error message', async () => {
+      server.use(http.get(THEME_ROUTE, () => HttpResponse.error()))
+
+      await getThemeFromMobile().then(
+        () => expect.unreachable('the read should have rejected'),
+        (error: unknown) => {
+          expect(premiumThemeFailureReason(error)).toBe('unknown')
+          expect(typeof (error as Error).message).toBe('string')
+        }
+      )
+    })
+
+    /** The same catch-all path, but the rejection value itself is not an `Error`. */
+    it('falls back to the caller message when the thrown value is not an Error', async () => {
+      const controller = new AbortController()
+      controller.abort('a plain string reason')
+
+      await getThemeFromMobile(controller.signal).then(
+        () => expect.unreachable('the read should have rejected'),
+        (error: unknown) => {
+          expect(premiumThemeFailureReason(error)).toBe('unknown')
+          expect((error as Error).message).toBe('Unable to load your interface palette.')
+        }
+      )
+    })
+  })
 })

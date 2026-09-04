@@ -22,6 +22,7 @@ import { registerCommerceContracts } from './commerce'
 import { registerSubscriptionContracts } from './subscription'
 import { registerPremiumThemeContracts } from './premium-theme'
 import { registerPaletteAdvisorContracts } from './palette-advisor'
+import { registerPlannerContracts } from './planner'
 
 export const HTTP_OPENAPI_OUTPUT_FILENAME = 'http.openapi.json'
 
@@ -113,6 +114,7 @@ export function createHttpOpenApiRegistry() {
   registerSubscriptionContracts(registry, commonSchemas)
   registerPremiumThemeContracts(registry, commonSchemas)
   registerPaletteAdvisorContracts(registry, commonSchemas)
+  registerPlannerContracts(registry, commonSchemas)
 
   return registry
 }
@@ -144,7 +146,10 @@ export function generateHttpOpenApiDocument() {
       // Story 5.4 bumps the minor again: eight additive palette-advisor
       // operations under a new tag, one additive `palette_advisor` member on
       // `affiliateSurfaceSchema`, and no changes to existing operations.
-      version: '1.4.0',
+      // Story 5.5 bumps the minor again: two additive planner operations
+      // (GET the seven-day window, POST a per-day reshuffle) under a new tag,
+      // and no changes to existing operations.
+      version: '1.5.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [

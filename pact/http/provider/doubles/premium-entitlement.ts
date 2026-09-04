@@ -1,6 +1,10 @@
 import type { PremiumEntitlementService } from '../../../../apps/api/src/modules/commerce/premium-entitlement.service'
 import { NotFoundException } from '@nestjs/common'
-import { getProviderPaletteAdvisorState, getProviderPremiumThemeState } from '../state'
+import {
+  getProviderPaletteAdvisorState,
+  getProviderPlannerState,
+  getProviderPremiumThemeState,
+} from '../state'
 
 /**
  * The one `PremiumEntitlementService` double, shared by every feature whose
@@ -28,6 +32,10 @@ export function createPremiumEntitlementDouble() {
       const paletteState = getProviderPaletteAdvisorState()
       if (paletteState) {
         return Promise.resolve(paletteState.scenario !== 'not-entitled')
+      }
+      const plannerState = getProviderPlannerState()
+      if (plannerState) {
+        return Promise.resolve(plannerState.scenario !== 'not-entitled')
       }
       throw new NotFoundException('PREMIUM_ENTITLEMENT_STATE_NOT_CONFIGURED')
     },

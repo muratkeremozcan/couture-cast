@@ -524,6 +524,63 @@
         "loadError": "Paletini yükleyemedik. Yeniden dene.",
         "saveError": "Bu değişikliği kaydedemedik. Yeniden dene.",
         "deleteConfirm": "Bu işlem alt tonunu, derinliğini, kaydedilen ve kapatılan tüm önerileri ve hâlâ tutulan fotoğrafı siler. Geri alınamaz."
+      },
+      "planner": {
+        "sectionTitle": "7 Günlük Planlayıcı",
+        "intro": "Kayıtlı konumunuzun hava durumuna ve gardırobunuza göre oluşturulan, önümüzdeki yedi günün her biri için bir başlangıç kombini görün.",
+        "loading": "Haftalık planlayıcınız yükleniyor…",
+        "errorLoad": "Haftalık planlayıcınız yüklenemedi.",
+        "retry": "Tekrar dene",
+        "disabled": "7 günlük planlayıcı geçici olarak kullanılamıyor. Hesabınız normal şekilde çalışmaya devam ediyor.",
+        "starterWardrobe": "Başlangıç gardırobundan oluşturuldu.",
+        "day": {
+          "error": {
+            "title": "Bu gün oluşturulamadı.",
+            "retry": "Bu günü tekrar dene"
+          }
+        },
+        "scenario": {
+          "morning": "Sabah",
+          "midday": "Öğlen",
+          "evening": "Akşam"
+        },
+        "conditions": {
+          "clear": "Açık gökyüzü",
+          "partly_cloudy": "Parçalı bulutlu",
+          "cloudy": "Bulutlu",
+          "fog": "Sisli",
+          "drizzle": "Çisenti",
+          "rain": "Yağmurlu",
+          "sleet": "Sulu kar",
+          "snow": "Karlı",
+          "thunderstorm": "Gök gürültülü fırtına",
+          "wind": "Rüzgarlı",
+          "unknown": "Bilinmiyor"
+        },
+        "weather": {
+          "confidence": {
+            "hourly": "Saatlik tahmin",
+            "daily": "Günlük tahmin",
+            "unavailable": "Bu gün için hava durumu yok"
+          },
+          "freshness": {
+            "fresh": "Güncel",
+            "cached": "Yakın zamanda güncellendi",
+            "stale": "Güncel olmayabilir"
+          }
+        },
+        "reshuffle": {
+          "cta": "Yeniden karıştır",
+          "loading": "Yeniden karıştırılıyor…",
+          "success": "Bu gün yeniden karıştırıldı.",
+          "unchanged": "Bu gün için başka kombin bulunamadı.",
+          "conflict": "Bu gün son görüntülemenizden bu yana değişti. Yenileniyor…",
+          "error": "Bu gün yeniden karıştırılamadı. Tekrar deneyin."
+        }
+      },
+      "plannerLocked": {
+        "title": "7 günlük planlayıcı bir Premium özelliğidir",
+        "cta": "Premium al"
       }
     }
   }

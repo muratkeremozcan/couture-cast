@@ -83,6 +83,12 @@ export type ContractApiClient = Pick<
   | 'apiV1CommercePremiumPaletteConsentPost'
   | 'apiV1CommercePremiumPaletteAnalyzePost'
   | 'apiV1CommercePremiumPaletteRecommendationsPut'
+  // Story 5.5 premium 7-day outfit planner. The 403/503 error interactions
+  // hit the mock server through raw fetch rather than these methods, exactly
+  // like the palette advisor error rows above: the generated SDK throws on
+  // non-2xx responses.
+  | 'apiV1CommercePremiumPlannerGet'
+  | 'apiV1CommercePremiumPlannerPlanDateReshufflePost'
 >
 
 export type CreateClient = (mockServer: V3MockServer) => ContractApiClient

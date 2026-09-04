@@ -91,6 +91,7 @@ describe('FeatureFlagsService', () => {
       ['weather_alerts_enabled', true],
       ['commerce_affiliate_enabled', true],
       ['commerce_subscription_enabled', true],
+      ['premium_planner_enabled', true],
     ])
 
     const cachedValues = new Map<string, boolean | null>([
@@ -100,6 +101,7 @@ describe('FeatureFlagsService', () => {
       ['weather_alerts_enabled', null],
       ['commerce_affiliate_enabled', null],
       ['commerce_subscription_enabled', null],
+      ['premium_planner_enabled', null],
     ])
 
     const findValue = vi
@@ -121,7 +123,7 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 6, fallbackCount: 0 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 7, fallbackCount: 0 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: true },
       { key: 'community_feed_enabled', value: false },
@@ -129,6 +131,7 @@ describe('FeatureFlagsService', () => {
       { key: 'weather_alerts_enabled', value: true },
       { key: 'commerce_affiliate_enabled', value: true },
       { key: 'commerce_subscription_enabled', value: true },
+      { key: 'premium_planner_enabled', value: true },
     ])
   })
 
@@ -154,7 +157,7 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 6, fallbackCount: 6 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 7, fallbackCount: 7 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: false },
       { key: 'community_feed_enabled', value: false },
@@ -168,6 +171,8 @@ describe('FeatureFlagsService', () => {
       { key: 'commerce_affiliate_enabled', value: false },
       // Story 5.2: identical reasoning for the premium purchasing switch.
       { key: 'commerce_subscription_enabled', value: false },
+      // Story 5.5: identical fail-closed reasoning for the premium planner.
+      { key: 'premium_planner_enabled', value: false },
     ])
   })
 })
