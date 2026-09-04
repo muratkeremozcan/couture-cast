@@ -455,12 +455,12 @@ Hardcoded planner colors stay confined to legacy code removed during this story.
   - [x] Add both analytics events to all seven registration points.
   - [x] Add strict negative fixtures and registry set-equality tests.
 
-- [ ] **Task 6: Planner API** (AC 1 through 6, AC 8, AC 9)
-  - [ ] Add `PlannerService` with owned-location resolution, window calculation, fingerprinting, partial-day generation, pruning, and batched garment enrichment.
-  - [ ] Add atomic, versioned reshuffle with preference exclusions and `unchanged` calculation.
-  - [ ] Register controller, service, engine, direct flag module, and direct telemetry module imports.
-  - [ ] Parse success payloads through contracts and preserve private no-store headers.
-  - [ ] Test gate order, flag off, partial success, stable reread, invalidation, cold-read races, transactional rollback, version conflicts, location switching, and cross-user input.
+- [x] **Task 6: Planner API** (AC 1 through 6, AC 8, AC 9)
+  - [x] Add `PlannerService` with owned-location resolution, window calculation, fingerprinting, partial-day generation, pruning, and batched garment enrichment.
+  - [x] Add atomic, versioned reshuffle with preference exclusions and `unchanged` calculation.
+  - [x] Register controller, service, engine, direct flag module, and direct telemetry module imports.
+  - [x] Parse success payloads through contracts and preserve private no-store headers.
+  - [x] Test gate order, flag off, partial success, stable reread, invalidation, cold-read races, transactional rollback, version conflicts, location switching, and cross-user input.
 
 - [ ] **Task 7: Web planner** (AC 3, 5, 7)
   - [ ] Add generated-client wrapper and failure classification.
@@ -587,10 +587,123 @@ Record the deployed value and manual native accessibility evidence in the Dev Ag
 
 ### Agent Model Used
 
+claude-sonnet-5 (Tasks 1 through 6)
+
 ### Debug Log References
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed. Comprehensive developer guide created.
+- Tasks 1 through 6 complete: daily weather ingestion, the shared `ritual-generation.engine.ts`
+  extraction (zero assertion changes to the existing 50-test `ritual.service.spec.ts`), the
+  `PlannerDayPlan` schema with owner-only RLS verified against an isolated Postgres instance, the
+  `planner.ts` HTTP contract and generated client at OpenAPI `1.5.0`, the `premium_planner_enabled`
+  flag and both planner analytics events across every registration touchpoint, and the
+  `PlannerController` / `PlannerService` API surface itself.
+- `GET /api/v1/commerce/premium/planner` and `POST /api/v1/commerce/premium/planner/:planDate/reshuffle`
+  both live in `PersonalizationModule` behind `RequestAuthGuard` then `PremiumEntitlementGuard` (401,
+  then 403, then per-day `generation_failed`/503 handling), require `x-couture-platform: web|mobile`,
+  and parse every response through the published `plannerResponseSchema` /
+  `plannerReshuffleResponseSchema` before it leaves the controller.
+- Per-day generation failures degrade to that date's own `error` result (`generation_failed`,
+  retryable) instead of failing the whole seven-day window; a stale or invalid stored row regenerates
+  in place (update-by-id, not delete-then-create) so a mid-request failure cannot leave a date with no
+  row at all.
+- Reshuffle excludes the caller's disliked garment as a soft preference, not a hard filter: the engine
+  falls back to an excluded garment only when it is the sole eligible option for a category, rather
+  than forcing a starter-wardrobe placeholder over real wardrobe coverage.
+- `npm run verify:changed`, root `npm run typecheck`, and root `npm run lint` are all green as of this
+  record. `apps/api`'s own suite is 164 files / 2040 tests passing (3 skipped, unrelated to this
+  story). Full command output is not reproduced here; rerun the three commands above to reverify.
+- One pre-existing test outside this story's stated scope needed a fix as a direct consequence of Task
+  5's new flag: `feature-flags.service.spec.ts` hardcoded the registry's key count (6) and the exact
+  `upsertMany` payload; adding `premium_planner_enabled` made the registry's true size 7. Updated both
+  assertions in that spec rather than leaving the suite red.
+- Local Postgres migration authoring used `prisma migrate diff --from-schema-datamodel ... --to-schema-datamodel ... --script`
+  against the schema files directly (no live database needed) to avoid pulling in unrelated drift from
+  the shared local dev database, then hand-wrote each migration file from that clean diff.
+- RLS policies for `PlannerDayPlan` were verified against an isolated `postgres:16-alpine` Docker
+  container bootstrapped to match `.github/workflows/pr-checks.yml` exactly (roles, `auth.jwt()`,
+  full migration history applied via `scripts/prisma-migrate-deploy.mjs`), not against the shared local
+  dev database, and not merely asserted from schema text.
+- Out of scope for this session by the requesting session's explicit instruction: Task 7 (web planner),
+  Task 8 (mobile planner), Task 9 (localization/accessibility evidence), and Task 10 (cross-boundary
+  Pact/integration/Playwright/Maestro verification and `deferred-work.md`). Those tasks consume the API
+  surface documented above.
 
 ### File List
+
+**Task 1 — Daily weather ingestion and persistence**
+
+- `apps/api/src/modules/weather/providers/weather.types.ts` (M)
+- `apps/api/src/modules/weather/providers/weather.schemas.ts` (M)
+- `apps/api/src/modules/weather/providers/weather.config.ts` (M)
+- `apps/api/src/modules/weather/providers/weather.config.spec.ts` (M)
+- `apps/api/src/modules/weather/providers/weather-date.util.ts` (A)
+- `apps/api/src/modules/weather/providers/openweather.provider.ts` (M)
+- `apps/api/src/modules/weather/providers/openweather.provider.spec.ts` (M)
+- `apps/api/src/modules/weather/providers/weatherapi.provider.ts` (M)
+- `apps/api/src/modules/weather/providers/weatherapi.provider.spec.ts` (M)
+- `apps/api/src/modules/weather/providers/fixtures/openweather.fixtures.ts` (M)
+- `apps/api/src/modules/weather/weather.repository.ts` (M)
+- `apps/api/src/modules/weather/weather.repository.spec.ts` (M)
+- `apps/api/src/modules/weather/weather.controller.spec.ts` (M)
+- `packages/db/prisma/schema.prisma` (M, shared with Task 3)
+- `packages/db/prisma/migrations/20260904090000_add_weather_daily_summaries/migration.sql` (A)
+
+**Task 2 — Shared generation engine**
+
+- `apps/api/src/modules/personalization/ritual-generation.engine.ts` (A)
+- `apps/api/src/modules/personalization/ritual-generation.engine.spec.ts` (A)
+- `apps/api/src/modules/personalization/ritual.service.ts` (M)
+
+**Task 3 — Planner schema, RLS, factories, and cleanup**
+
+- `packages/db/prisma/schema.prisma` (M, shared with Task 1)
+- `packages/db/prisma/migrations/20260904091500_add_planner_day_plan/migration.sql` (A)
+- `packages/db/test/rls/harness.ts` (M)
+- `packages/db/test/rls/planner.spec.ts` (A)
+- `packages/db/test/planner-schema.spec.ts` (A)
+- `packages/testing/src/cleanup.ts` (M)
+- `packages/testing/src/factories/registry.ts` (M)
+- `packages/testing/src/factories/planner.factory.ts` (A)
+- `packages/testing/src/factories/index.ts` (M)
+- `packages/testing/test/planner.factory.spec.ts` (A)
+- `packages/testing/templates/test-template.spec.ts` (M)
+- `packages/testing/test/cleanup.spec.ts` (M)
+
+**Task 4 — Contracts and generated client**
+
+- `packages/api-client/src/contracts/http/planner.ts` (A)
+- `packages/api-client/src/contracts/http/index.ts` (M)
+- `packages/api-client/src/contracts/http/openapi.ts` (M)
+- `packages/api-client/docs/http.openapi.json` (M, generated)
+- `packages/api-client/src/generated/apis/PlannerApi.ts` (A, generated)
+- `packages/api-client/src/generated/**` (M, generated — version-string ripple only; see the
+  `f3e89717` commit diff for full file list)
+- `apps/api/src/contracts/http.ts` (M)
+- `packages/api-client/testing/planner-contract.spec.ts` (A)
+
+**Task 5 — Flag and analytics registries**
+
+- `packages/config/src/flags.ts` (M)
+- `packages/config/src/flags.spec.ts` (M)
+- `packages/db/prisma/seeds/feature-flags.ts` (M)
+- `packages/api-client/src/types/analytics-events.ts` (M)
+- `packages/api-client/src/testing/analytics-event-assertions.ts` (M)
+- `apps/api/src/modules/telemetry/telemetry.service.ts` (M)
+- `apps/api/src/modules/telemetry/telemetry.service.spec.ts` (M)
+
+**Task 6 — Planner API**
+
+- `apps/api/src/modules/personalization/planner-payload.schema.ts` (A)
+- `apps/api/src/modules/personalization/planner.service.ts` (A)
+- `apps/api/src/modules/personalization/planner.service.spec.ts` (A)
+- `apps/api/src/modules/personalization/planner.controller.ts` (A)
+- `apps/api/src/modules/personalization/planner.controller.spec.ts` (A)
+- `apps/api/src/modules/personalization/personalization.module.ts` (M)
+- `apps/api/src/modules/commerce/premium-entitlement.guard.ts` (M, stale comment only)
+- `apps/api/src/contracts/http.ts` (M, shared with Task 4 — added the previously-missing
+  `weatherConditionSchema` value export)
+- `apps/api/src/modules/feature-flags/feature-flags.service.spec.ts` (M, unrelated pre-existing test
+  fixed as a direct consequence of Task 5's new registry key; see Completion Notes)
