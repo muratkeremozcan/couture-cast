@@ -424,12 +424,12 @@ Hardcoded planner colors stay confined to legacy code removed during this story.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Daily weather ingestion and persistence** (AC 2, 9)
-  - [ ] Add normalized and provider daily schemas with strict range and date validation.
-  - [ ] Map OpenWeather daily data and remove it from `exclude`.
-  - [ ] Add safe, configurable WeatherAPI forecast depth and map returned daily summaries.
-  - [ ] Add `WeatherSnapshot.daily_summaries`, migration, repository serialization, and guarded read parsing.
-  - [ ] Preserve all hourly, failover, freshness, alert, and refresh behavior in existing tests.
+- [x] **Task 1: Daily weather ingestion and persistence** (AC 2, 9)
+  - [x] Add normalized and provider daily schemas with strict range and date validation.
+  - [x] Map OpenWeather daily data and remove it from `exclude`.
+  - [x] Add safe, configurable WeatherAPI forecast depth and map returned daily summaries.
+  - [x] Add `WeatherSnapshot.daily_summaries`, migration, repository serialization, and guarded read parsing.
+  - [x] Preserve all hourly, failover, freshness, alert, and refresh behavior in existing tests.
 
 - [ ] **Task 2: Shared generation engine** (AC 1, 2, 4, 9)
   - [ ] Extract the locale-aware generation core and date helpers from `RitualService`.
