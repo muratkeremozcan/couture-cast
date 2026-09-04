@@ -439,6 +439,8 @@ export default function SettingsScreen() {
 
           <PaletteAdvisorLinkRow />
 
+          <PlannerLinkRow />
+
           <Text style={styles.infoText}>{apiHealthMessage}</Text>
           <Text style={styles.infoText}>
             {t('settings.diagnostic_info', {
@@ -1287,6 +1289,30 @@ function PaletteAdvisorLinkRow() {
       onPress={() => router.push('/palette-advisor')}
     >
       <Text style={styles.actionText}>{t('commerce.premium.palette.sectionTitle')}</Text>
+    </Pressable>
+  )
+}
+
+/**
+ * Story 5.5 Task 8: the entry point to the 7-day outfit planner.
+ *
+ * Follows `PaletteAdvisorLinkRow` exactly, for the same reason: a link row rather than a
+ * fourth/fifth inline section, not entitlement-gated at the entry point because the
+ * destination renders its own locked panel for a non-entitled or signed-out reader
+ * (Decision 7).
+ */
+function PlannerLinkRow() {
+  const { t } = useTranslation()
+
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={t('commerce.premium.planner.sectionTitle')}
+      style={styles.actionButton}
+      testID="planner-link"
+      onPress={() => router.push('/planner')}
+    >
+      <Text style={styles.actionText}>{t('commerce.premium.planner.sectionTitle')}</Text>
     </Pressable>
   )
 }
