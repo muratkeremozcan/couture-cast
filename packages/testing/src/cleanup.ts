@@ -49,6 +49,7 @@ export interface CleanupPrismaClient {
   premiumThemePreference: CleanupDelegate
   paletteProfile: CleanupDelegate
   advisorRecommendationState: CleanupDelegate
+  plannerDayPlan: CleanupDelegate
 }
 
 export interface CleanupConfiguration {
@@ -258,6 +259,7 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const premiumThemePreferenceIds = uniqueValues(tracked.premiumThemePreferences)
   const paletteProfileIds = uniqueValues(tracked.paletteProfiles)
   const advisorRecommendationStateIds = uniqueValues(tracked.advisorRecommendationStates)
+  const plannerDayPlanIds = uniqueValues(tracked.plannerDayPlans)
 
   const commercePreferenceWhere = buildDeleteWhere(commercePreferenceIds, userIds)
   const affiliateClickWhere = buildDeleteWhere(affiliateClickIds, userIds)
@@ -269,6 +271,7 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
     advisorRecommendationStateIds,
     userIds
   )
+  const plannerDayPlanWhere = buildDeleteWhere(plannerDayPlanIds, userIds)
 
   const outfitRecommendationWhere = buildDeleteWhere(ritualIds, userIds)
   const outfitCapsuleGarmentWhere = buildDeleteWhere(outfitCapsuleGarmentIds, userIds)
@@ -340,6 +343,15 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
     if (paletteProfileWhere) {
       await prisma.paletteProfile.deleteMany({
         where: paletteProfileWhere,
+      })
+    }
+
+    // Story 5.5. PlannerDayPlan references both User and SavedLocation (the
+    // composite (location_id, user_id) FK), so it must precede the
+    // savedLocation delete below even though both FKs cascade.
+    if (plannerDayPlanWhere) {
+      await prisma.plannerDayPlan.deleteMany({
+        where: plannerDayPlanWhere,
       })
     }
 

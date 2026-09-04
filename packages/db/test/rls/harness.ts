@@ -55,6 +55,10 @@ export const selfOnlyTables = [
   // adjacent guardian-shared PaletteInsights (garment colour, not skin).
   'PaletteProfile',
   'AdvisorRecommendationState',
+  // Story 5.5: a planner day is a personal, derived recommendation cache row
+  // (same reasoning as PaletteProfile above), not something a guardian has a
+  // mandate to read or write.
+  'PlannerDayPlan',
 ] as const
 
 export const ownerOrGlobalReadTables = ['EventEnvelope'] as const
@@ -118,6 +122,8 @@ export type SeededScenario = {
   otherPaletteProfileId: string
   advisorRecommendationStateId: string
   otherAdvisorRecommendationStateId: string
+  plannerDayPlanId: string
+  otherPlannerDayPlanId: string
 }
 
 export const buildClaims = (email: string, role: string) => ({
@@ -223,6 +229,8 @@ export const seedScenario = async (): Promise<SeededScenario> => {
     otherPaletteProfileId: `other-palette-profile-${suffix}`,
     advisorRecommendationStateId: `advisor-recommendation-${suffix}`,
     otherAdvisorRecommendationStateId: `other-advisor-recommendation-${suffix}`,
+    plannerDayPlanId: `planner-day-plan-${suffix}`,
+    otherPlannerDayPlanId: `other-planner-day-plan-${suffix}`,
   }
 
   const client = await adminPool.connect()
@@ -390,6 +398,25 @@ export const seedScenario = async (): Promise<SeededScenario> => {
         'New York',
         'NY',
         'US',
+      ]
+    )
+
+    // Story 5.5. The owner's row and the unrelated user's row each reference
+    // their own SavedLocation, proving the composite FK (location_id, user_id)
+    // as well as ordinary owner isolation.
+    await client.query(
+      `INSERT INTO public."PlannerDayPlan"
+        ("id", "user_id", "location_id", "plan_date", "locale",
+         "dependency_fingerprint", "plan_payload", "updated_at")
+       VALUES ($1, $2, $3, CURRENT_DATE, 'en-US', 'fingerprint-owner', '{}'::jsonb, NOW()),
+              ($4, $5, $6, CURRENT_DATE, 'en-US', 'fingerprint-other', '{}'::jsonb, NOW())`,
+      [
+        seeded.plannerDayPlanId,
+        seeded.teenId,
+        seeded.savedLocationId,
+        seeded.otherPlannerDayPlanId,
+        seeded.otherTeenId,
+        seeded.otherSavedLocationId,
       ]
     )
 
@@ -703,6 +730,12 @@ export const cleanupScenario = async (seeded: SeededScenario | undefined) => {
     ])
     await client.query('DELETE FROM public."EngagementEvent" WHERE "id" = $1', [
       seeded.eventId,
+    ])
+    // Story 5.5. Deleted before SavedLocation, which its composite FK
+    // references.
+    await client.query('DELETE FROM public."PlannerDayPlan" WHERE "id" IN ($1, $2)', [
+      seeded.plannerDayPlanId,
+      seeded.otherPlannerDayPlanId,
     ])
     await client.query('DELETE FROM public."SavedLocation" WHERE "id" IN ($1, $2)', [
       seeded.savedLocationId,

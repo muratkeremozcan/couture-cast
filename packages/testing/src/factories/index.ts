@@ -70,19 +70,30 @@ export {
   persistCommercePreference,
 } from './commerce.factory.js'
 export {
+  buildAdvisorRecommendationStateCreateInput,
   buildBillingCustomerCreateInput,
   buildBillingEventCreateInput,
+  buildPaletteProfileCreateInput,
   buildPremiumEntitlementCreateInput,
   buildPremiumThemePreferenceCreateInput,
+  createAdvisorRecommendationState,
   createBillingCustomer,
   createBillingEvent,
+  createPaletteProfile,
   createPremiumEntitlement,
   createPremiumThemePreference,
+  persistAdvisorRecommendationState,
   persistBillingCustomer,
   persistBillingEvent,
+  persistPaletteProfile,
   persistPremiumEntitlement,
   persistPremiumThemePreference,
 } from './premium.factory.js'
+export {
+  buildPlannerDayPlanCreateInput,
+  createPlannerDayPlan,
+  persistPlannerDayPlan,
+} from './planner.factory.js'
 export {
   DEFAULT_FACTORY_REGISTRY_KEYS,
   createFactoryRegistry,
@@ -179,12 +190,20 @@ export type {
   PersistedCommerceCatalog,
 } from './commerce.factory.js'
 export type {
+  AdvisorRecommendationStateFactoryOverrides,
+  AdvisorRecommendationStateFixture,
   BillingCustomerFactoryOverrides,
   BillingCustomerFixture,
   BillingEventFactoryOverrides,
   BillingEventFixture,
+  PaletteProfileFactoryOverrides,
+  PaletteProfileFixture,
   PremiumEntitlementFactoryOverrides,
   PremiumEntitlementFixture,
   PremiumThemePreferenceFactoryOverrides,
   PremiumThemePreferenceFixture,
 } from './premium.factory.js'
+export type {
+  PlannerDayPlanFactoryOverrides,
+  PlannerDayPlanFixture,
+} from './planner.factory.js'

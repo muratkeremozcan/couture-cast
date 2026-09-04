@@ -50,6 +50,8 @@ const prisma = {
   // Story 5.4 palette advisor.
   paletteProfile: { deleteMany: () => Promise.resolve({ count: 0 }) },
   advisorRecommendationState: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  // Story 5.5 planner.
+  plannerDayPlan: { deleteMany: () => Promise.resolve({ count: 0 }) },
 } satisfies Record<string, DeleteManyRecorder>
 
 describe('example factory suite', () => {
