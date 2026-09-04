@@ -431,12 +431,12 @@ Hardcoded planner colors stay confined to legacy code removed during this story.
   - [x] Add `WeatherSnapshot.daily_summaries`, migration, repository serialization, and guarded read parsing.
   - [x] Preserve all hourly, failover, freshness, alert, and refresh behavior in existing tests.
 
-- [ ] **Task 2: Shared generation engine** (AC 1, 2, 4, 9)
-  - [ ] Extract the locale-aware generation core and date helpers from `RitualService`.
-  - [ ] Add hourly, daily-projection, and unavailable-weather adapters.
-  - [ ] Add exclusion and deterministic fallback behavior.
-  - [ ] Keep `ritual.service.spec.ts` assertions unchanged and green.
-  - [ ] Test DST boundaries, leap day, month and year end, daily projection fields, unavailable weather, and exclusions.
+- [x] **Task 2: Shared generation engine** (AC 1, 2, 4, 9)
+  - [x] Extract the locale-aware generation core and date helpers from `RitualService`.
+  - [x] Add hourly, daily-projection, and unavailable-weather adapters.
+  - [x] Add exclusion and deterministic fallback behavior.
+  - [x] Keep `ritual.service.spec.ts` assertions unchanged and green.
+  - [x] Test DST boundaries, leap day, month and year end, daily projection fields, unavailable weather, and exclusions.
 
 - [ ] **Task 3: Planner schema, RLS, factories, and cleanup** (AC 8, 9)
   - [ ] Add `PlannerOutfitSource`, `PlannerDayPlan`, relations, indexes, and migration.
