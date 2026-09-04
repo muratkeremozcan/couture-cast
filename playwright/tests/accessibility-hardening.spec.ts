@@ -368,6 +368,17 @@ test.describe('Story 3.8 interaction states', () => {
     expect(Number.parseFloat(transitionDuration)).toBeLessThanOrEqual(0.00001)
 
     await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
+    // Story 5.5 Task 10 finding: the `planner-open-control` mouse click above
+    // (added for Decision 7) leaves Chromium's `:focus-visible` heuristic in
+    // its pointer-interaction state, so the plain `chip.focus()` call below
+    // no longer matched `:focus-visible` on its own -- `outlineStyle` came
+    // back `'none'` instead of `'solid'`, a real regression this test caught
+    // the first time it actually ran (5.4's session pinned the edit but
+    // never executed it). One real keyboard event resets that heuristic
+    // before the script-triggered focus, matching how a keyboard user would
+    // actually reach this element; confirmed by removing it and reproducing
+    // the failure.
+    await page.keyboard.press('Tab')
     await chip.focus()
     const forcedStyles = await chip.evaluate((node) => {
       const styles = getComputedStyle(node)

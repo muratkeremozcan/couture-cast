@@ -120,7 +120,16 @@ function OutfitCard({
       className="space-y-2 rounded-lg border border-[color:var(--theme-card-border)] bg-white p-3"
       data-testid={`planner-outfit-${outfit.scenario}`}
     >
-      <p className="lookbook-metrics text-[11px] uppercase tracking-wide text-[color:var(--theme-secondary)]">
+      {/*
+       * `--theme-secondary` is a decorative accent (a button background at
+       * line ~363, a focus-outline color at ~656), not a text color: in every
+       * one of the four premium themes it is too light against this card's
+       * white background to clear WCAG's 4.5:1 small-text minimum (the
+       * default theme's `#c9a14a` measures 2.41:1). `--theme-card-text` is
+       * the token this codebase already defines for legible text on a card
+       * (Decision 8), and the capsule name directly below already uses it.
+       */}
+      <p className="lookbook-metrics text-[11px] uppercase tracking-wide text-[color:var(--theme-card-text)]">
         {t(`commerce.premium.planner.scenario.${outfit.scenario}`)}
       </p>
       {outfit.capsuleName && (

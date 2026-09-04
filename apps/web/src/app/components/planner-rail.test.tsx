@@ -463,7 +463,7 @@ describe('PlannerRail', () => {
   describe.each([
     ['rail' as const, 'desktop'],
     ['overlay' as const, 'phone'],
-  ])('automated accessibility, %s variant (%s width)', (variant) => {
+  ])('automated accessibility, %s variant (%s width)', (variant, _widthLabel) => {
     it('passes signed out with the locked upsell', async () => {
       const { container } = renderRail({ variant })
       await waitFor(() =>
