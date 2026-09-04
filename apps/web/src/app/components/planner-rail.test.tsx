@@ -269,6 +269,26 @@ describe('PlannerRail', () => {
     await waitFor(() => expect(screen.getByTestId('planner-days')).toBeInTheDocument())
   })
 
+  it('shows a per-day reshuffle error on an unclassified reshuffle failure', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    const target = SEVEN_DATES[0]!
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      ),
+      http.post(RESHUFFLE_PATH, () =>
+        HttpResponse.json(errorBody(500, 'boom'), { status: 500 })
+      )
+    )
+    renderRail()
+    await waitFor(() => expect(screen.getByTestId('planner-days')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByTestId(`planner-reshuffle-${target}`))
+    expect(await screen.findByTestId(`planner-day-alert-${target}`)).toHaveTextContent(
+      'Unable to reshuffle this day. Try again.'
+    )
+  })
+
   it('reshuffles a day and announces the update', async () => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
     const target = SEVEN_DATES[0]!
@@ -450,6 +470,156 @@ describe('PlannerRail', () => {
     )
     expect(document.activeElement).toBe(opener)
     document.body.removeChild(opener)
+  })
+
+  it('aborts an in-flight reshuffle, not just the week fetch, when the rail closes', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    const target = SEVEN_DATES[0]!
+    let reshuffleSignal: AbortSignal | undefined
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      ),
+      http.post(RESHUFFLE_PATH, ({ request }) => {
+        reshuffleSignal = request.signal
+        return new Promise(() => {
+          // Never resolves; the assertion is on the abort signal alone.
+        })
+      })
+    )
+    const { rerender } = renderRail()
+    await waitFor(() => expect(screen.getByTestId('planner-days')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByTestId(`planner-reshuffle-${target}`))
+    await waitFor(() => expect(reshuffleSignal).toBeDefined())
+    expect(reshuffleSignal?.aborted).toBe(false)
+
+    rerender(
+      <I18nextProvider i18n={getI18n()}>
+        <PlannerRail isOpen={false} onClose={vi.fn()} variant="rail" />
+      </I18nextProvider>
+    )
+    expect(reshuffleSignal?.aborted).toBe(true)
+  })
+
+  it('refreshes silently on window focus while open and entitled', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    let requestCount = 0
+    useMswHandlers(
+      http.get(PLANNER_PATH, () => {
+        requestCount += 1
+        return HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      })
+    )
+    renderRail()
+    await waitFor(() => expect(screen.getByTestId('planner-days')).toBeInTheDocument())
+    expect(requestCount).toBe(1)
+
+    // A silent refresh does not reset to the checking skeleton.
+    window.dispatchEvent(new Event('focus'))
+    await waitFor(() => expect(requestCount).toBe(2))
+    expect(screen.queryByTestId('planner-skeleton')).not.toBeInTheDocument()
+    expect(screen.getByTestId('planner-days')).toBeInTheDocument()
+  })
+
+  it('does not refresh on window focus once closed', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    let requestCount = 0
+    useMswHandlers(
+      http.get(PLANNER_PATH, () => {
+        requestCount += 1
+        return HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      })
+    )
+    const { rerender } = renderRail()
+    await waitFor(() => expect(screen.getByTestId('planner-days')).toBeInTheDocument())
+
+    rerender(
+      <I18nextProvider i18n={getI18n()}>
+        <PlannerRail isOpen={false} onClose={vi.fn()} variant="rail" />
+      </I18nextProvider>
+    )
+    window.dispatchEvent(new Event('focus'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(requestCount).toBe(1)
+  })
+
+  it('locks with the not-entitled upsell when a reshuffle discovers entitlement lapsed', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    const target = SEVEN_DATES[0]!
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      ),
+      http.post(RESHUFFLE_PATH, () =>
+        HttpResponse.json(
+          { statusCode: 403, message: PREMIUM_REQUIRED_MESSAGE, error: 'Forbidden' },
+          { status: 403 }
+        )
+      )
+    )
+    renderRail()
+    await waitFor(() => expect(screen.getByTestId('planner-days')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByTestId(`planner-reshuffle-${target}`))
+    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
+  })
+
+  it('shows the disabled note when a reshuffle discovers the flag went off', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    const target = SEVEN_DATES[0]!
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      ),
+      http.post(RESHUFFLE_PATH, () =>
+        HttpResponse.json(
+          {
+            statusCode: 503,
+            message: PREMIUM_PLANNER_DISABLED_MESSAGE,
+            error: 'Service Unavailable',
+          },
+          { status: 503 }
+        )
+      )
+    )
+    renderRail()
+    await waitFor(() => expect(screen.getByTestId('planner-days')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByTestId(`planner-reshuffle-${target}`))
+    expect(await screen.findByTestId('planner-rail-disabled')).toBeInTheDocument()
+  })
+
+  it('ignores an overlay keypress that is neither Escape nor Tab', async () => {
+    const onClose = vi.fn()
+    renderRail({ variant: 'overlay', onClose })
+    await waitFor(() =>
+      expect(screen.getByTestId('planner-rail-locked')).toBeInTheDocument()
+    )
+
+    fireEvent.keyDown(screen.getByRole('complementary'), { key: 'a' })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(document.activeElement).toHaveAccessibleName('Close planner')
+  })
+
+  it('wraps Tab forward and Shift+Tab backward between the overlay endpoints', async () => {
+    renderRail({ variant: 'overlay' })
+    await waitFor(() =>
+      expect(screen.getByTestId('planner-rail-locked')).toBeInTheDocument()
+    )
+
+    const overlay = screen.getByRole('complementary')
+    const closeButton = screen.getByRole('button', { name: 'Close planner' })
+    const getPremiumLink = screen.getByTestId('planner-rail-get-premium')
+    expect(document.activeElement).toBe(closeButton)
+
+    // Shift+Tab from the first focusable element wraps to the last.
+    fireEvent.keyDown(overlay, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(getPremiumLink)
+
+    // Tab from the last focusable element wraps to the first.
+    fireEvent.keyDown(overlay, { key: 'Tab' })
+    expect(document.activeElement).toBe(closeButton)
   })
 
   // Story 5.5 Task 9 (AC 7): the axe matrix. `variant` stands in for the two

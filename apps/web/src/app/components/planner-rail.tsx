@@ -169,8 +169,17 @@ function WeatherSummary({
   t: (key: string) => string
 }) {
   if (weather.confidence === 'unavailable') {
+    // `text-neutral-500` measured 4.35:1 against this card's
+    // `--theme-card-bg` (a `ReadyDayCard` root, not the white `OutfitCard`
+    // background `--theme-card-text`'s sibling fix at `OutfitCard` above
+    // addresses), just under WCAG's 4.5:1 small-text minimum.
+    // `--theme-card-text` is the token this codebase pairs with
+    // `--theme-card-bg` by design (Decision 8) for exactly this reason.
     return (
-      <p className="text-xs text-neutral-500" data-testid="planner-weather-unavailable">
+      <p
+        className="text-xs text-[color:var(--theme-card-text)]"
+        data-testid="planner-weather-unavailable"
+      >
         {t('commerce.premium.planner.weatherUnavailable')}
       </p>
     )
