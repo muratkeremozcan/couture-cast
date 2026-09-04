@@ -3,8 +3,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Prisma } from '@prisma/client'
 
-import { WeatherRepository } from './weather.repository.js'
-import type { NormalizedWeatherForecast } from './providers/weather.types.js'
+import { parseDailySummaries, WeatherRepository } from './weather.repository.js'
+import type {
+  NormalizedDailyWeatherEntry,
+  NormalizedWeatherForecast,
+} from './providers/weather.types.js'
 
 type CreateForecastSegmentInput = {
   forecast_at: Date
@@ -282,6 +285,91 @@ describe('WeatherRepository', () => {
         last_provider_failure_at: true,
         last_provider_success_at: true,
       },
+    })
+  })
+
+  // Story 5.5 Decision 3.
+  describe('daily_summaries persistence', () => {
+    it('persists the daily projection as JSON when present', async () => {
+      const forecast: NormalizedWeatherForecast = {
+        ...buildForecast(),
+        daily: [
+          {
+            localDate: '2026-07-06',
+            condition: 'rain',
+            temperatureMin: 14,
+            temperatureMax: 22,
+            precipitationProbability: 0.3,
+            precipitationAmount: 1.2,
+            windSpeed: 4,
+          },
+        ],
+      }
+      const { prisma, tx } = createPrismaStub()
+      const repository = new WeatherRepository(prisma as never)
+
+      await repository.persistForecast(forecast)
+
+      const createArgs = tx.weatherSnapshot.create.mock.calls[0]?.[0] as {
+        data: { daily_summaries: unknown }
+      }
+      expect(createArgs.data.daily_summaries).toEqual(forecast.daily)
+    })
+
+    it('stores an explicit JSON null when the daily projection is absent', async () => {
+      const forecast = buildForecast()
+      const { prisma, tx } = createPrismaStub()
+      const repository = new WeatherRepository(prisma as never)
+
+      await repository.persistForecast(forecast)
+
+      const createArgs = tx.weatherSnapshot.create.mock.calls[0]?.[0] as {
+        data: { daily_summaries: unknown }
+      }
+      expect(createArgs.data.daily_summaries).toBe(Prisma.JsonNull)
+    })
+  })
+
+  // Story 5.5 Decision 3: guarded read parsing.
+  describe('parseDailySummaries', () => {
+    const validEntry: NormalizedDailyWeatherEntry = {
+      localDate: '2026-07-06',
+      condition: 'rain',
+      temperatureMin: 14,
+      temperatureMax: 22,
+      precipitationProbability: 0.3,
+      precipitationAmount: 1.2,
+      windSpeed: 4,
+    }
+
+    it('returns an empty array for null, undefined, or non-array JSON', () => {
+      expect(parseDailySummaries(null)).toEqual([])
+      expect(parseDailySummaries(undefined)).toEqual([])
+      expect(
+        parseDailySummaries({ not: 'an array' } as unknown as Prisma.JsonValue)
+      ).toEqual([])
+    })
+
+    it('parses every valid entry', () => {
+      expect(parseDailySummaries([validEntry] as unknown as Prisma.JsonValue)).toEqual([
+        validEntry,
+      ])
+    })
+
+    it('discards a malformed entry and logs it, keeping the valid ones', () => {
+      const warn = vi.fn<(message: string, meta?: unknown) => void>()
+      const malformed = { ...validEntry, localDate: 'not-a-date' }
+
+      const result = parseDailySummaries(
+        [validEntry, malformed] as unknown as Prisma.JsonValue,
+        { warn }
+      )
+
+      expect(result).toEqual([validEntry])
+      expect(warn).toHaveBeenCalledTimes(1)
+      const [message, meta] = warn.mock.calls[0]!
+      expect(message).toBe('Discarding malformed WeatherSnapshot.daily_summaries entry')
+      expect(Array.isArray((meta as { issues: unknown }).issues)).toBe(true)
     })
   })
 })

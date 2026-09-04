@@ -97,6 +97,44 @@ describe('WeatherApiProvider', () => {
         severity: 'medium',
       }),
     ])
+    // Story 5.5 Decision 3: the fixture models the default `days=3` depth,
+    // so exactly three daily entries come back -- a shorter response stays
+    // valid and simply leaves the remaining planner dates unavailable.
+    expect(result.daily).toHaveLength(3)
+    expect(result.daily![0]).toMatchObject({
+      condition: 'clear',
+      temperatureMin: 15,
+      temperatureMax: 25,
+      precipitationProbability: 0.1,
+      precipitationAmount: 0,
+      windSpeed: 15 / 3.6,
+    })
+    expect(result.daily![0]!.localDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(result.daily![0]!.feelsLikeMin).toBeUndefined()
+  })
+
+  it('requests a configured forecast depth', async () => {
+    const deepProvider = new WeatherApiProvider({ apiKey, env: {}, forecastDays: 8 })
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(
+      responseWith(getWeatherApiSuccessFixture(target.latitude, target.longitude))
+    )
+
+    await deepProvider.fetchForecast(target, signal)
+
+    expect(calledUrl().searchParams.get('days')).toBe('8')
+  })
+
+  it('drops a malformed daily aggregate without failing the whole forecast', async () => {
+    const fixture = getWeatherApiSuccessFixture(target.latitude, target.longitude)
+    // A day summary missing `condition` is unparseable; the rest of the
+    // (still valid) daily entries and the hourly forecast must survive.
+    delete (fixture.forecast.forecastday[0]!.day as { condition?: unknown }).condition
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(responseWith(fixture))
+
+    const result = await provider.fetchForecast(target, signal)
+
+    expect(result.daily).toHaveLength(2)
+    expect(result.hourly).toHaveLength(48)
   })
 
   it('requires a configured API key', async () => {

@@ -27,6 +27,7 @@ const createSnapshot = () => ({
   fetched_at: new Date('2026-07-07T13:30:00.000Z'),
   temperature: 21,
   condition: 'rain',
+  daily_summaries: null,
   alerts: [
     {
       event: 'Flood Watch',

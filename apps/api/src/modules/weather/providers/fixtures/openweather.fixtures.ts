@@ -55,6 +55,27 @@ export function getOpenWeatherSuccessFixture(lat = 40.7128, lon = -74.006) {
       ],
     },
     hourly,
+    // Story 5.5 Decision 3: eight daily entries, matching One Call 3.0's
+    // real depth once `daily` is removed from the `exclude` param.
+    daily: Array.from({ length: 8 }, (_, i) => {
+      const dayEpoch = Math.floor(Date.now() / 1000) + i * 86400
+      return {
+        dt: dayEpoch,
+        temp: { min: 14 + i, max: 24 + i },
+        feels_like: { day: 20 + i, night: 13 + i, eve: 19 + i, morn: 14 + i },
+        pop: 0.2,
+        rain: 0.5,
+        wind_speed: 5.5,
+        weather: [
+          {
+            id: 500,
+            main: 'Rain',
+            description: 'light rain',
+            icon: '10d',
+          },
+        ],
+      }
+    }),
     alerts: [
       {
         sender_name: 'National Weather Service',

@@ -10,13 +10,21 @@ import {
   WeatherProviderError,
 } from './weather-provider.error.js'
 import type { IWeatherProvider } from './weather-provider.interface.js'
-import type { WeatherApiHourSchema } from './weather.schemas.js'
+import { WeatherApiForecastDaysSchema } from './weather.config.js'
+import type {
+  WeatherApiForecastDaySchema,
+  WeatherApiHourSchema,
+} from './weather.schemas.js'
 import {
+  LocalDateSchema,
+  NormalizedDailyWeatherEntrySchema,
   NormalizedWeatherForecastSchema,
+  WeatherApiDaySummarySchema,
   WeatherApiResponseSchema,
   WeatherIngestionTargetSchema,
 } from './weather.schemas.js'
 import type {
+  NormalizedDailyWeatherEntry,
   NormalizedWeatherAlert,
   NormalizedWeatherForecast,
   WeatherIngestionTarget,
@@ -34,17 +42,24 @@ export interface WeatherApiProviderOptions {
   apiKey?: string
   baseUrl?: string
   env?: NodeJS.ProcessEnv
+  // Story 5.5 Decision 3: overridable for tests; otherwise read from
+  // `WEATHERAPI_FORECAST_DAYS` (default 3, capped at 8).
+  forecastDays?: number
 }
 
 @Injectable()
 export class WeatherApiProvider implements IWeatherProvider {
   private readonly apiKey: string
   private readonly baseUrl: string
+  private readonly forecastDays: number
 
   constructor(options: WeatherApiProviderOptions = {}) {
     const env = options.env ?? process.env
     this.apiKey = options.apiKey ?? env.WEATHERAPI_API_KEY ?? ''
     this.baseUrl = options.baseUrl ?? DEFAULT_BASE_URL
+    this.forecastDays =
+      options.forecastDays ??
+      WeatherApiForecastDaysSchema.parse(env.WEATHERAPI_FORECAST_DAYS)
   }
 
   async fetchForecast(
@@ -160,6 +175,7 @@ export class WeatherApiProvider implements IWeatherProvider {
             severity: mapWeatherApiAlertSeverity(alert.severity),
           })
         ),
+      daily: this.extractDaily(data.forecast.forecastday),
     }
 
     const finalValidation = NormalizedWeatherForecastSchema.safeParse(normalizedForecast)
@@ -191,6 +207,47 @@ export class WeatherApiProvider implements IWeatherProvider {
         }
       )
     }
+  }
+
+  // Story 5.5 Decision 3: maps each `forecastday.day` aggregate into the
+  // normalized shape, at most eight entries. `date` and `day` are validated
+  // independently here (never as part of the container schema), so one
+  // malformed daily aggregate is dropped -- logged, never thrown -- rather
+  // than failing the whole forecast.
+  private extractDaily(
+    forecastDays: z.infer<typeof WeatherApiForecastDaySchema>[]
+  ): NormalizedDailyWeatherEntry[] | undefined {
+    const entries: NormalizedDailyWeatherEntry[] = []
+    for (const forecastDay of forecastDays.slice(0, 8)) {
+      const dateResult = LocalDateSchema.safeParse(forecastDay.date)
+      const dayResult = WeatherApiDaySummarySchema.safeParse(forecastDay.day)
+      if (!dateResult.success || !dayResult.success) {
+        console.warn('Discarding malformed WeatherAPI daily entry', {
+          dateIssues: dateResult.success ? [] : dateResult.error.issues,
+          dayIssues: dayResult.success ? [] : dayResult.error.issues,
+        })
+        continue
+      }
+      const day = dayResult.data
+      const precipitationProbability = Math.max(
+        day.daily_chance_of_rain ?? 0,
+        day.daily_chance_of_snow ?? 0
+      )
+      const candidate = {
+        localDate: dateResult.data,
+        condition: mapWeatherApiCondition(day.condition.code),
+        temperatureMin: day.mintemp_c,
+        temperatureMax: day.maxtemp_c,
+        precipitationProbability: precipitationProbability / 100,
+        precipitationAmount: day.totalprecip_mm,
+        windSpeed: day.maxwind_kph / 3.6,
+      }
+      const validated = NormalizedDailyWeatherEntrySchema.safeParse(candidate)
+      if (validated.success) {
+        entries.push(validated.data)
+      }
+    }
+    return entries.length > 0 ? entries : undefined
   }
 
   private extractUniqueHourly(
@@ -234,7 +291,7 @@ export class WeatherApiProvider implements IWeatherProvider {
 
     url.searchParams.set('key', this.apiKey)
     url.searchParams.set('q', `${latitude},${longitude}`)
-    url.searchParams.set('days', '3')
+    url.searchParams.set('days', String(this.forecastDays))
     url.searchParams.set('aqi', 'no')
     url.searchParams.set('alerts', 'yes')
     return url

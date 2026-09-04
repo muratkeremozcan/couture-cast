@@ -60,7 +60,8 @@ describe('OpenWeatherProvider', () => {
     expect(url.searchParams.get('lat')).toBe('40.7128')
     expect(url.searchParams.get('lon')).toBe('-74.006')
     expect(url.searchParams.get('units')).toBe('metric')
-    expect(url.searchParams.get('exclude')).toBe('minutely,daily')
+    // Story 5.5 Decision 3: `daily` stays out of `exclude`.
+    expect(url.searchParams.get('exclude')).toBe('minutely')
     expect(url.searchParams.get('appid')).toBe(apiKey)
     expect(result).toMatchObject({
       provider: 'openweather',
@@ -95,6 +96,44 @@ describe('OpenWeatherProvider', () => {
       result.hourly[1]!.forecastAt.getTime() - result.hourly[0]!.forecastAt.getTime()
     ).toBe(3600000)
     expect(result.alerts).toHaveLength(1)
+    // Story 5.5 Decision 3: eight daily entries, feels-like min/max derived
+    // from the four provider feels_like values (day/night/eve/morn).
+    expect(result.daily).toHaveLength(8)
+    expect(result.daily![0]).toMatchObject({
+      condition: 'rain',
+      temperatureMin: 14,
+      temperatureMax: 24,
+      feelsLikeMin: 13,
+      feelsLikeMax: 20,
+      precipitationProbability: 0.2,
+      precipitationAmount: 0.5,
+      windSpeed: 5.5,
+    })
+    expect(result.daily![0]!.localDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('leaves the daily projection unavailable when the response omits it', async () => {
+    const fixture = getOpenWeatherSuccessFixture(target.latitude, target.longitude)
+    delete (fixture as { daily?: unknown }).daily
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(responseWith(fixture))
+
+    const result = await provider.fetchForecast(target, signal)
+
+    expect(result.daily).toBeUndefined()
+    expect(result.hourly).toHaveLength(48)
+  })
+
+  it('drops a malformed daily entry without failing the whole forecast', async () => {
+    const fixture = getOpenWeatherSuccessFixture(target.latitude, target.longitude)
+    // A daily entry with an empty condition list is unparseable; the rest of
+    // the (still valid) daily entries and the hourly forecast must survive.
+    ;(fixture.daily as unknown[])[0] = { ...fixture.daily[0], weather: [] }
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(responseWith(fixture))
+
+    const result = await provider.fetchForecast(target, signal)
+
+    expect(result.daily).toHaveLength(7)
+    expect(result.hourly).toHaveLength(48)
   })
 
   it('keeps the response-arrival hour when JSON parsing crosses an hour boundary', async () => {

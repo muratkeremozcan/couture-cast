@@ -73,6 +73,33 @@ export const OpenWeatherAlertSchema = z.object({
   end: EpochSecondsSchema,
 })
 
+// Story 5.5 Decision 3: One Call 3.0's `daily` block, requested by removing
+// `daily` from the `exclude` param. `temp` carries min/max; `feels_like` only
+// carries day/night/eve/morn (OpenWeather never ships a feels-like min/max),
+// so the provider derives min/max from those four values.
+export const OpenWeatherDailyTemperatureSchema = z.object({
+  min: TemperatureSchema,
+  max: TemperatureSchema,
+})
+
+export const OpenWeatherDailyFeelsLikeSchema = z.object({
+  day: TemperatureSchema,
+  night: TemperatureSchema,
+  eve: TemperatureSchema,
+  morn: TemperatureSchema,
+})
+
+export const OpenWeatherDailySchema = z.object({
+  dt: EpochSecondsSchema,
+  temp: OpenWeatherDailyTemperatureSchema,
+  feels_like: OpenWeatherDailyFeelsLikeSchema,
+  pop: z.number().finite().min(0).max(1),
+  rain: z.number().finite().nonnegative().optional(),
+  snow: z.number().finite().nonnegative().optional(),
+  wind_speed: WindSpeedSchema,
+  weather: z.array(OpenWeatherConditionSchema).min(1),
+})
+
 export const OpenWeatherResponseSchema = z.object({
   lat: LatitudeSchema,
   lon: LongitudeSchema,
@@ -80,6 +107,12 @@ export const OpenWeatherResponseSchema = z.object({
   current: OpenWeatherCurrentSchema,
   hourly: z.array(OpenWeatherHourlySchema),
   alerts: z.array(OpenWeatherAlertSchema).optional().nullable(),
+  // Story 5.5 Decision 3: loosely typed (`unknown`) at this container level
+  // on purpose. Each entry is independently validated against
+  // `OpenWeatherDailySchema` in the provider, so one malformed day is
+  // dropped rather than rejecting the whole response -- hourly weather must
+  // never go down because of a bad daily entry.
+  daily: z.array(z.unknown()).max(8).optional().nullable(),
 })
 
 export const WeatherApiConditionSchema = z.object({
@@ -108,7 +141,24 @@ export const WeatherApiHourSchema = z.object({
   condition: WeatherApiConditionSchema,
 })
 
+// Story 5.5 Decision 3: `date` and `day` are validated independently by the
+// provider (via `WeatherApiDaySummarySchema.safeParse`), never as part of
+// this container schema, so a malformed daily aggregate is dropped rather
+// than rejecting the whole forecast (the hourly array, extracted from
+// `hour` alone, is unaffected either way).
+export const WeatherApiDaySummarySchema = z.object({
+  maxtemp_c: TemperatureSchema,
+  mintemp_c: TemperatureSchema,
+  maxwind_kph: WindSpeedSchema,
+  totalprecip_mm: z.number().finite().nonnegative(),
+  daily_chance_of_rain: z.number().finite().min(0).max(100).optional(),
+  daily_chance_of_snow: z.number().finite().min(0).max(100).optional(),
+  condition: WeatherApiConditionSchema,
+})
+
 export const WeatherApiForecastDaySchema = z.object({
+  date: z.unknown().optional(),
+  day: z.unknown().optional(),
   hour: z.array(WeatherApiHourSchema),
 })
 
@@ -165,6 +215,34 @@ export const NormalizedHourlyWeatherEntrySchema = NormalizedConditionSchema.exte
   windGust: WindSpeedSchema,
 })
 
+// Story 5.5 Decision 3: validated `YYYY-MM-DD`, checked for real calendar
+// validity (not just the digit shape) so a malformed provider date can never
+// silently become the wrong planner day.
+export const LocalDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid local date')
+  .refine((value) => {
+    const [year, month, day] = value.split('-').map(Number)
+    const parsed = new Date(Date.UTC(year!, month! - 1, day))
+    return (
+      parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() === month! - 1 &&
+      parsed.getUTCDate() === day
+    )
+  }, 'Invalid calendar date')
+
+export const NormalizedDailyWeatherEntrySchema = z.object({
+  localDate: LocalDateSchema,
+  condition: WeatherConditionSchema,
+  temperatureMin: TemperatureSchema,
+  temperatureMax: TemperatureSchema,
+  feelsLikeMin: TemperatureSchema.optional(),
+  feelsLikeMax: TemperatureSchema.optional(),
+  precipitationProbability: z.number().finite().min(0).max(1),
+  precipitationAmount: z.number().finite().nonnegative(),
+  windSpeed: WindSpeedSchema,
+})
+
 export const NormalizedWeatherAlertSchema = z
   .object({
     event: NonEmptyStringSchema,
@@ -191,6 +269,9 @@ export const NormalizedWeatherForecastSchema = z
     current: NormalizedCurrentWeatherSchema,
     hourly: z.array(NormalizedHourlyWeatherEntrySchema).length(48),
     alerts: z.array(NormalizedWeatherAlertSchema),
+    // Story 5.5 Decision 3: additive and optional. Existing hourly-only
+    // callers never see this field and keep working unchanged.
+    daily: z.array(NormalizedDailyWeatherEntrySchema).max(8).optional(),
   })
   .superRefine((forecast, context) => {
     const providerUpdateAge =

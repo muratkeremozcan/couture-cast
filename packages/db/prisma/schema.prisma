@@ -299,6 +299,9 @@ model WeatherSnapshot {
   temperature         Float
   condition           String
   alerts              Json?
+  // Story 5.5 Decision 3: at most eight NormalizedDailyWeatherEntry rows,
+  // parsed with the canonical Zod schema on every read.
+  daily_summaries     Json?
   fetched_at          DateTime          @default(now())
   created_at          DateTime          @default(now())
   segments            ForecastSegment[]
