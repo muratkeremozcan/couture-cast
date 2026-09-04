@@ -450,10 +450,10 @@ Hardcoded planner colors stay confined to legacy code removed during this story.
   - [x] Register the contract, bump OpenAPI to `1.5.0`, regenerate the client, and run Optic.
   - [x] Add contract tests for duplicate dates, duplicate scenarios, invalid dates, missing platform, and non-null planner affiliate data.
 
-- [ ] **Task 5: Flag and analytics registries** (AC 5, 6)
-  - [ ] Add `premium_planner_enabled` to all four flag touchpoints.
-  - [ ] Add both analytics events to all seven registration points.
-  - [ ] Add strict negative fixtures and registry set-equality tests.
+- [x] **Task 5: Flag and analytics registries** (AC 5, 6)
+  - [x] Add `premium_planner_enabled` to all four flag touchpoints.
+  - [x] Add both analytics events to all seven registration points.
+  - [x] Add strict negative fixtures and registry set-equality tests.
 
 - [ ] **Task 6: Planner API** (AC 1 through 6, AC 8, AC 9)
   - [ ] Add `PlannerService` with owned-location resolution, window calculation, fingerprinting, partial-day generation, pruning, and batched garment enrichment.
