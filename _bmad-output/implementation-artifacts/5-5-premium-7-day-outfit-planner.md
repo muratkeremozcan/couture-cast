@@ -469,11 +469,11 @@ Hardcoded planner colors stay confined to legacy code removed during this story.
   - [x] Update the existing layout and accessibility tests pinned to the static rail.
   - [x] Add component tests with MSW for all access, partial-week, retry, close, focus, and concurrency states.
 
-- [ ] **Task 8: Mobile planner** (AC 3, 5, 7)
-  - [ ] Add client wrapper, thin route, screen, and Premium settings link.
-  - [ ] Render the same contract states with `ScrollView`, themed tokens, 44-pixel controls, and live announcements.
-  - [ ] Add screen tests with MSW for locked, checking, entitlement error, ready week, partial week, retry, reshuffle, unchanged, conflict, and double-tap protection.
-  - [ ] Update existing settings rendering suites for the new router dependency and row.
+- [x] **Task 8: Mobile planner** (AC 3, 5, 7)
+  - [x] Add client wrapper, thin route, screen, and Premium settings link.
+  - [x] Render the same contract states with `ScrollView`, themed tokens, 44-pixel controls, and live announcements.
+  - [x] Add screen tests with MSW for locked, checking, entitlement error, ready week, partial week, retry, reshuffle, unchanged, conflict, and double-tap protection.
+  - [x] Update existing settings rendering suites for the new router dependency and row.
 
 - [ ] **Task 9: Localization and accessibility evidence** (AC 7)
   - [ ] Add the planner and mobile locked keys to all ten catalogs.
@@ -587,7 +587,7 @@ Record the deployed value and manual native accessibility evidence in the Dev Ag
 
 ### Agent Model Used
 
-claude-sonnet-5 (Tasks 1 through 7)
+claude-sonnet-5 (Tasks 1 through 8)
 
 ### Debug Log References
 
@@ -710,12 +710,54 @@ claude-sonnet-5 (Tasks 1 through 7)
   non-workspace files under `playwright/`. Task 10 owns running the full Playwright suite;
   this session verified the edits by reading them against the component's actual runtime
   behavior and by running every equivalent assertion at the component-test layer instead.
-- Out of scope for this session by the requesting session's explicit instruction: Task 8
-  (mobile planner), Task 9 (localization/accessibility evidence beyond web's own AC 7
-  scope, which Task 7 above already closes -- Task 9's remaining scope is the mobile locked
-  keys, the web axe matrix at desktop/phone widths signed-out and entitled, and manual
-  keyboard/VoiceOver/TalkBack evidence), and Task 10 (cross-boundary
-  Pact/integration/Playwright/Maestro verification and `deferred-work.md`).
+- Out of scope for the web and mobile sessions by the requesting session's explicit instruction: Task 9
+  (localization/accessibility evidence beyond what Tasks 7/8 already closed for their own AC 7 scope --
+  the remaining scope is the web axe matrix at desktop/phone widths signed-out and entitled, plus manual
+  keyboard/VoiceOver/TalkBack evidence) and Task 10 (cross-boundary Pact/integration/Playwright/Maestro
+  verification and `deferred-work.md`).
+- Task 8 (mobile planner) complete: `apps/mobile/src/lib/planner.ts` (client wrapper, following
+  `premium-theme.ts`/`palette-advisor.ts`'s `readAccessToken` pre-check and status-to-reason mapping
+  exactly), `apps/mobile/src/features/premium/planner-screen.tsx` (the screen itself), the thin
+  `apps/mobile/app/planner.tsx` route, and a `PlannerLinkRow` settings entry following
+  `PaletteAdvisorLinkRow`'s established pattern (link role, accessible label, stable `testID`, not
+  entitlement-gated at the entry point).
+- The screen consumes `useAppTheme()`'s premium palette on each day card (`cardBg`/`cardBorder`/
+  `cardText`), the one existing consumer of that hook before this story was `PremiumThemeSection` in
+  settings; a degraded weather confidence (`unavailable`) renders only its own label, with no
+  temperature range, condition, or freshness badge, so a starter-wardrobe baseline day never implies a
+  precision it does not have.
+- Reshuffle is per-day: a busy card disables its own button and ignores a second press
+  (`busyDate` gates `handleReshuffle`), a `409` conflict re-fetches the whole week (there is no
+  single-day GET) and shows the conflict notice on that date, and `unchanged: true` renders its own
+  "no different outfits" notice rather than being conflated with a real reshuffle.
+- Added `commerce.premium.planner.*` (35 keys) and `commerce.premium.plannerLocked.*` (2 keys, mirroring
+  the web catalogs' existing `plannerLocked.title`/`.cta`) to all ten mobile locale catalogs, and a new
+  `apps/mobile/src/i18n/planner-locales.spec.ts` parity spec; `premium-locales.spec.ts` now excludes both
+  subtrees the same way it already excludes `theme`/`palette`, and its stale "web-only, deliberately
+  absent" comment about `plannerLocked.*` is corrected since mobile ships it now.
+- Garment category captions on planner cards reuse the existing `wardrobe.tagging.options.category.*`
+  keys for the accessibility label only (screen-reader text on each garment thumbnail), rather than
+  adding a duplicate translated key set inside the planner subtree, since Decision 8's enumerated
+  planner copy list does not include garment category names.
+- `apps/mobile/src/screens/planner-screen.test.tsx` covers loading, signed-out locked, not-entitled
+  locked (403), disabled (503), unclassified load failure with retry, a full seven-date ready week,
+  degraded (`unavailable`) weather, an isolated per-date error card beside six ready dates, whole-week
+  retry from a failed date, reshuffle success, reshuffle `unchanged`, a `409` version conflict, and
+  double-tap protection during an in-flight reshuffle -- 13 tests, all real network round trips through
+  MSW rather than a stubbed `src/lib/planner`.
+- `apps/mobile/src/screens/settings-premium-section.test.tsx`, `settings-premium-theme-section.test.tsx`,
+  and `tab-two-screen.test.tsx` needed no new assertions: they already mock `expo-router` for
+  `PaletteAdvisorLinkRow`'s pre-existing `router.push` dependency, and the new `PlannerLinkRow` uses the
+  same mocked singleton.
+- Building `packages/api-client` (`npm run build --workspace @couture/api-client`) was required before
+  `apps/mobile`'s lint passed clean: its `./testing/*` subpath export resolves through `dist/`, and two
+  pre-existing test files (`wardrobe-hub-screen.test.tsx`, `deep-link-handling.test.tsx`, and others)
+  import from it. This worktree's lint script has no `pretypecheck`-style hook to build shared packages
+  first the way `typecheck`/`test` do, so a bare `npm run lint` here failed on `import/no-unresolved`
+  until the package was built once; `npm run verify:changed` builds it itself and was fully green with
+  no code changes needed.
+- `npm run verify:changed` (root) is green: mobile's own 69 files / 699 tests, mobile lint, mobile
+  typecheck, and the widget/watchOS prebuild suites all pass.
 
 ### File List
 
@@ -815,3 +857,16 @@ claude-sonnet-5 (Tasks 1 through 7)
 - `apps/web/src/i18n/premium-locales.spec.ts` (M, planner subtree exclusion per Decision 15)
 - `playwright/tests/lookbook-prism.spec.ts` (M)
 - `playwright/tests/accessibility-hardening.spec.ts` (M)
+
+**Task 8 — Mobile planner**
+
+- `apps/mobile/src/lib/planner.ts` (A)
+- `apps/mobile/src/features/premium/planner-screen.tsx` (A)
+- `apps/mobile/app/planner.tsx` (A)
+- `apps/mobile/app/(tabs)/settings.tsx` (M — `PlannerLinkRow`)
+- `apps/mobile/src/screens/planner-screen.test.tsx` (A)
+- `apps/mobile/src/i18n/planner-locales.spec.ts` (A)
+- `apps/mobile/src/i18n/premium-locales.spec.ts` (M — excludes `planner`/`plannerLocked`, corrects the
+  stale "web-only" comment)
+- `apps/mobile/assets/locales/{en-US,en-CA,de-DE,es-419,fr-CA,fr-FR,it-IT,pt-BR,pt-PT,tr-TR}.json` (M —
+  `commerce.premium.planner.*` and `commerce.premium.plannerLocked.*`)

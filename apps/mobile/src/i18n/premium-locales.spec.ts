@@ -62,10 +62,18 @@ function premiumTree(catalog: Catalog): Record<string, unknown> {
   const commerce = (catalog.commerce ?? {}) as Record<string, unknown>
   const premium = (commerce.premium ?? {}) as Record<string, unknown>
   // Story 5.4 adds `palette` the same way and audits it in
-  // `palette-advisor-locales.spec.ts`. The rule Decision 15 states: a new feature
-  // area gets its own spec AND the parent gets an exclusion.
+  // `palette-advisor-locales.spec.ts`. Story 5.5 adds `planner` and
+  // `plannerLocked` the same way again and audits them in
+  // `planner-locales.spec.ts`. The rule Decision 15 states: a new feature area
+  // gets its own spec AND the parent gets an exclusion.
   return Object.fromEntries(
-    Object.entries(premium).filter(([key]) => key !== 'theme' && key !== 'palette')
+    Object.entries(premium).filter(
+      ([key]) =>
+        key !== 'theme' &&
+        key !== 'palette' &&
+        key !== 'planner' &&
+        key !== 'plannerLocked'
+    )
   )
 }
 
@@ -95,8 +103,10 @@ const reference = flatten(premiumTree(enUS as Catalog))
 
 describe('5.2 mobile premium locale parity', () => {
   it('5.2-I18N-MOB-01 ships the 22 Decision 12a mobile keys in the reference catalog', () => {
-    // 21 shared keys plus the mobile-only `unavailableInBuild`. The web-only
-    // keys (signedOutHint, plannerLocked.*) are deliberately absent here.
+    // 21 shared keys plus the mobile-only `unavailableInBuild`. `signedOutHint`
+    // stays web-only. `plannerLocked.*` now ships on mobile too (Story 5.5),
+    // but it is excluded here the same way `theme`/`palette`/`planner` are,
+    // and audited in its own `planner-locales.spec.ts`.
     expect(reference.size).toBe(22)
     expect(reference.has('unavailableInBuild')).toBe(true)
     expect(reference.has('signedOutHint')).toBe(false)
