@@ -403,6 +403,25 @@ describe('generateRitualScenarios: exclusions', () => {
     expect(withExclusion.scenarios[0].garmentIds).toContain('top-2')
   })
 
+  // Story 5.5 AC 4: exclusion is a soft preference. A category with only one
+  // real eligible garment must keep using it rather than degrade to a
+  // starter-wardrobe placeholder just because reshuffle excluded it.
+  it('falls back to an excluded garment rather than a placeholder when it is the only option', () => {
+    const garments = [
+      buildGarment({ id: 'top-only', category: 'top', comfort_range: 'mild' }),
+      buildGarment({ id: 'bottom-1', category: 'bottom', comfort_range: 'mild' }),
+      buildGarment({ id: 'shoes-1', category: 'shoes', comfort_range: 'mild' }),
+    ]
+    const result = generateRitualScenarios({
+      ...baseInput,
+      eligibleGarments: garments,
+      weather: availableWeather(),
+      exclusions: { garmentIds: ['top-only'] },
+    })
+    expect(result.scenarios[0].garmentIds).toContain('top-only')
+    expect(result.scenarios[0].isStarterWardrobe).toBe(false)
+  })
+
   it('excludes capsule ids from capsule evaluation', () => {
     const garment = buildGarment({ id: 'g1', category: 'top', comfort_range: 'mild' })
     const garment2 = buildGarment({ id: 'g2', category: 'bottom', comfort_range: 'mild' })

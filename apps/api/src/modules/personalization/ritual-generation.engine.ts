@@ -942,37 +942,59 @@ export interface RitualGenerationResult {
   ]
 }
 
+const CLOSE_COMFORT_MATCHES: Record<string, string[]> = {
+  cold: ['cool'],
+  cool: ['mild', 'cold'],
+  mild: ['cool', 'warm'],
+  warm: ['mild', 'hot'],
+  hot: ['warm'],
+}
+
+function pickBestGarment(
+  candidates: readonly GarmentItem[],
+  targetComfortRange: string
+): GarmentItem | undefined {
+  const exact = candidates.find((g) => g.comfort_range === targetComfortRange)
+  if (exact) return exact
+
+  const preferences = CLOSE_COMFORT_MATCHES[targetComfortRange] || []
+  for (const pref of preferences) {
+    const match = candidates.find((g) => g.comfort_range === pref)
+    if (match) return match
+  }
+
+  return candidates[0]
+}
+
+/**
+ * Story 5.5 Decision 1/AC 4: `excludedGarmentIds` is a soft preference, not a
+ * hard filter. A category with real eligible garments never degrades to a
+ * `default-${category}` placeholder just because reshuffle's exclusion list
+ * happened to exclude the only item that category has -- the exclusion is
+ * dropped for that one slot and the best excluded candidate is reused
+ * instead. A placeholder is reserved for a category with zero eligible
+ * garments at all, exclusions aside.
+ */
 function selectGenericGarments(
   requiredCategories: readonly string[],
   eligibleGarments: readonly GarmentItem[],
-  targetComfortRange: string
+  targetComfortRange: string,
+  excludedGarmentIds: ReadonlySet<string> = new Set()
 ): { garmentIds: string[]; usedPlaceholder: boolean } {
   let usedPlaceholder = false
-  const closeMatches: Record<string, string[]> = {
-    cold: ['cool'],
-    cool: ['mild', 'cold'],
-    mild: ['cool', 'warm'],
-    warm: ['mild', 'hot'],
-    hot: ['warm'],
-  }
 
   const garmentIds = requiredCategories.map((category) => {
-    const candidates = eligibleGarments.filter((g) => g.category === category)
-    if (candidates.length === 0) {
+    const allCandidates = eligibleGarments.filter((g) => g.category === category)
+    if (allCandidates.length === 0) {
       usedPlaceholder = true
       return `default-${category}`
     }
 
-    const exact = candidates.find((g) => g.comfort_range === targetComfortRange)
-    if (exact) return exact.id
-
-    const preferences = closeMatches[targetComfortRange] || []
-    for (const pref of preferences) {
-      const match = candidates.find((g) => g.comfort_range === pref)
-      if (match) return match.id
-    }
-
-    return candidates[0]!.id
+    const preferredCandidates = allCandidates.filter((g) => !excludedGarmentIds.has(g.id))
+    const chosen =
+      pickBestGarment(preferredCandidates, targetComfortRange) ??
+      pickBestGarment(allCandidates, targetComfortRange)
+    return chosen!.id
   })
 
   return { garmentIds, usedPlaceholder }
@@ -1071,10 +1093,14 @@ function generateAvailableScenario(
   }
 
   const targetComfortRange = resolveComfortRangeFromTemperature(adjustedFeelsLike)
+  // Soft exclusion for the generic path: `input.eligibleGarments` (not the
+  // hard-filtered `eligibleGarments` above) so a category with real garments
+  // never degrades to a placeholder just because its only item was excluded.
   const { garmentIds: genericGarmentIds, usedPlaceholder } = selectGenericGarments(
     requiredCategories,
-    eligibleGarments,
-    targetComfortRange
+    input.eligibleGarments,
+    targetComfortRange,
+    excludedGarmentIds
   )
 
   const garmentIds = capsuleEval ? capsuleEval.garmentIds : genericGarmentIds
