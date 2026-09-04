@@ -50,6 +50,69 @@
         "title": "Il planner di 7 giorni è una funzione Premium",
         "cta": "Ottieni Premium"
       },
+      "planner": {
+        "sectionTitle": "Pianificatore outfit di 7 giorni",
+        "openControl": "Pianifica la settimana",
+        "close": "Chiudi pianificatore",
+        "checking": "Verifica del tuo accesso Premium…",
+        "loading": "Caricamento della tua settimana…",
+        "today": "Oggi",
+        "tomorrow": "Domani",
+        "scenario": {
+          "morning": "Mattina",
+          "midday": "Mezzogiorno",
+          "evening": "Sera"
+        },
+        "condition": {
+          "clear": "Sereno",
+          "partly_cloudy": "Parzialmente nuvoloso",
+          "cloudy": "Nuvoloso",
+          "fog": "Nebbia",
+          "drizzle": "Pioggerella",
+          "rain": "Pioggia",
+          "sleet": "Nevischio",
+          "snow": "Neve",
+          "thunderstorm": "Temporale",
+          "wind": "Ventoso",
+          "unknown": "Condizioni sconosciute"
+        },
+        "confidence": {
+          "hourly": "Previsioni orarie",
+          "daily": "Riepilogo giornaliero"
+        },
+        "weatherUnavailable": "Meteo non disponibile per questo giorno",
+        "freshness": {
+          "fresh": "Appena aggiornato",
+          "cached": "Aggiornato di recente",
+          "stale": "Potrebbe non essere aggiornato"
+        },
+        "garmentCategory": {
+          "top": "Parte superiore",
+          "bottom": "Parte inferiore",
+          "outerwear": "Capospalla",
+          "dress": "Vestito",
+          "shoes": "Scarpe",
+          "accessory": "Accessorio"
+        },
+        "starterWardrobe": "Selezione guardaroba iniziale",
+        "reshuffle": {
+          "action": "Rimescola",
+          "loading": "Rimescolamento in corso…",
+          "unchanged": "Nessuna nuova combinazione disponibile per questo giorno.",
+          "updated": "{{day}}: outfit aggiornato.",
+          "conflict": "Questo giorno è cambiato dall'ultima visualizzazione. Aggiornamento…",
+          "error": "Impossibile rimescolare questo giorno. Riprova."
+        },
+        "dayError": "Non è stato possibile generare l'outfit per questo giorno.",
+        "retry": "Riprova",
+        "disabled": "Il pianificatore è temporaneamente non disponibile. Riprova più tardi.",
+        "errorTitle": "Impossibile caricare il pianificatore outfit",
+        "announce": {
+          "opened": "Pianificatore outfit aperto.",
+          "ready": "Il tuo piano di 7 giorni è pronto.",
+          "dayFailed": "Non è stato possibile generare l'outfit per {{day}}."
+        }
+      },
       "theme": {
         "sectionTitle": "Palette dell'interfaccia",
         "disclosure": "Le palette dell'interfaccia sono una funzione Premium. La tua scelta viene salvata nel tuo account CoutureCast e si applica su ogni dispositivo da cui accedi. Una palette cambia solo i colori: non cambia mai quali outfit vengono consigliati. CoutureCast invia la palette scelta al suo fornitore di analisi con un identificativo pseudonimo; non vengono condivise foto di capi né dati personali.",

@@ -50,6 +50,69 @@
         "title": "7 Günlük Planlayıcı bir Premium özelliğidir",
         "cta": "Premium'a geç"
       },
+      "planner": {
+        "sectionTitle": "7 Günlük Kombin Planlayıcı",
+        "openControl": "Haftayı planla",
+        "close": "Planlayıcıyı kapat",
+        "checking": "Premium erişiminiz kontrol ediliyor…",
+        "loading": "Haftanız yükleniyor…",
+        "today": "Bugün",
+        "tomorrow": "Yarın",
+        "scenario": {
+          "morning": "Sabah",
+          "midday": "Öğle",
+          "evening": "Akşam"
+        },
+        "condition": {
+          "clear": "Açık",
+          "partly_cloudy": "Parçalı bulutlu",
+          "cloudy": "Bulutlu",
+          "fog": "Sisli",
+          "drizzle": "Çisenti",
+          "rain": "Yağmurlu",
+          "sleet": "Sulu kar",
+          "snow": "Kar",
+          "thunderstorm": "Gök gürültülü sağanak",
+          "wind": "Rüzgarlı",
+          "unknown": "Koşullar bilinmiyor"
+        },
+        "confidence": {
+          "hourly": "Saatlik tahmin",
+          "daily": "Günlük özet"
+        },
+        "weatherUnavailable": "Bu gün için hava durumu bilgisi yok",
+        "freshness": {
+          "fresh": "Az önce güncellendi",
+          "cached": "Yakın zamanda güncellendi",
+          "stale": "Güncel olmayabilir"
+        },
+        "garmentCategory": {
+          "top": "Üst",
+          "bottom": "Alt",
+          "outerwear": "Dış giyim",
+          "dress": "Elbise",
+          "shoes": "Ayakkabı",
+          "accessory": "Aksesuar"
+        },
+        "starterWardrobe": "Başlangıç gardırobu seçimi",
+        "reshuffle": {
+          "action": "Yeniden karıştır",
+          "loading": "Yeniden karıştırılıyor…",
+          "unchanged": "Bu gün için yeni bir kombinasyon bulunamadı.",
+          "updated": "{{day}}: kombin güncellendi.",
+          "conflict": "Bu gün son görüntülemenizden bu yana değişti. Yenileniyor…",
+          "error": "Bu gün yeniden karıştırılamadı. Lütfen tekrar deneyin."
+        },
+        "dayError": "Bu gün için kombin oluşturulamadı.",
+        "retry": "Tekrar dene",
+        "disabled": "Planlayıcı geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
+        "errorTitle": "Kombin planlayıcı yüklenemedi",
+        "announce": {
+          "opened": "Kombin planlayıcı açıldı.",
+          "ready": "7 günlük planınız hazır.",
+          "dayFailed": "{{day}} için kombin oluşturulamadı."
+        }
+      },
       "theme": {
         "sectionTitle": "Arayüz paletleri",
         "disclosure": "Arayüz paletleri bir Premium özelliğidir. Seçimin CoutureCast hesabına kaydedilir ve giriş yaptığın her cihazda geçerli olur. Palet yalnızca renkleri değiştirir: hangi kombinlerin önerileceğini asla değiştirmez. CoutureCast, seçtiğin paleti takma bir kimlikle analiz sağlayıcısına gönderir; kıyafet fotoğrafları veya kişisel bilgiler paylaşılmaz.",

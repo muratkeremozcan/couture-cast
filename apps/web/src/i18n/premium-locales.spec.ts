@@ -66,10 +66,13 @@ function premiumTree(catalog: Catalog): Record<string, unknown> {
   const commerce = (catalog.commerce ?? {}) as Record<string, unknown>
   const premium = (commerce.premium ?? {}) as Record<string, unknown>
   // Story 5.4 adds `palette` the same way and audits it in
-  // `palette-advisor-locales.spec.ts`. The rule Decision 15 states: a new feature
-  // area gets its own spec AND the parent gets an exclusion.
+  // `palette-advisor-locales.spec.ts`. Story 5.5 adds `planner` the same way and
+  // audits it in `planner-locales.spec.ts`. The rule Decision 15 states: a new
+  // feature area gets its own spec AND the parent gets an exclusion.
   return Object.fromEntries(
-    Object.entries(premium).filter(([key]) => key !== 'theme' && key !== 'palette')
+    Object.entries(premium).filter(
+      ([key]) => key !== 'theme' && key !== 'palette' && key !== 'planner'
+    )
   )
 }
 

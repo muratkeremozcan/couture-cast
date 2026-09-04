@@ -50,6 +50,69 @@
         "title": "The 7-Day Planner is a Premium feature",
         "cta": "Get Premium"
       },
+      "planner": {
+        "sectionTitle": "7-Day Outfit Planner",
+        "openControl": "Plan week",
+        "close": "Close planner",
+        "checking": "Checking your Premium access…",
+        "loading": "Loading your week…",
+        "today": "Today",
+        "tomorrow": "Tomorrow",
+        "scenario": {
+          "morning": "Morning",
+          "midday": "Midday",
+          "evening": "Evening"
+        },
+        "condition": {
+          "clear": "Clear",
+          "partly_cloudy": "Partly cloudy",
+          "cloudy": "Cloudy",
+          "fog": "Fog",
+          "drizzle": "Drizzle",
+          "rain": "Rain",
+          "sleet": "Sleet",
+          "snow": "Snow",
+          "thunderstorm": "Thunderstorm",
+          "wind": "Windy",
+          "unknown": "Conditions unknown"
+        },
+        "confidence": {
+          "hourly": "Hourly forecast",
+          "daily": "Daily outlook"
+        },
+        "weatherUnavailable": "Weather unavailable for this day",
+        "freshness": {
+          "fresh": "Just updated",
+          "cached": "Recently updated",
+          "stale": "May be out of date"
+        },
+        "garmentCategory": {
+          "top": "Top",
+          "bottom": "Bottom",
+          "outerwear": "Outerwear",
+          "dress": "Dress",
+          "shoes": "Shoes",
+          "accessory": "Accessory"
+        },
+        "starterWardrobe": "Starter wardrobe pick",
+        "reshuffle": {
+          "action": "Reshuffle",
+          "loading": "Reshuffling…",
+          "unchanged": "No new combination available for this day.",
+          "updated": "{{day}}: outfit updated.",
+          "conflict": "This day changed since you last viewed it. Refreshing…",
+          "error": "Unable to reshuffle this day. Try again."
+        },
+        "dayError": "This day couldn't be generated.",
+        "retry": "Retry",
+        "disabled": "The planner is temporarily unavailable. Please check back soon.",
+        "errorTitle": "Unable to load the outfit planner",
+        "announce": {
+          "opened": "Outfit planner opened.",
+          "ready": "Your 7-day plan is ready.",
+          "dayFailed": "{{day}} could not be generated."
+        }
+      },
       "theme": {
         "sectionTitle": "Interface palettes",
         "disclosure": "Interface palettes are a Premium feature. Your choice is saved to your CoutureCast account and applies on every device you sign in on. A palette changes colours only: it never changes which outfits are recommended. CoutureCast sends the palette you picked to its analytics provider under a pseudonymous id; no wardrobe photos or personal details are shared.",

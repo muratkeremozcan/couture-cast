@@ -50,6 +50,69 @@
         "title": "El planificador de 7 días es una función Premium",
         "cta": "Obtener Premium"
       },
+      "planner": {
+        "sectionTitle": "Planificador de looks de 7 días",
+        "openControl": "Planificar la semana",
+        "close": "Cerrar planificador",
+        "checking": "Verificando tu acceso Premium…",
+        "loading": "Cargando tu semana…",
+        "today": "Hoy",
+        "tomorrow": "Mañana",
+        "scenario": {
+          "morning": "Mañana",
+          "midday": "Mediodía",
+          "evening": "Noche"
+        },
+        "condition": {
+          "clear": "Despejado",
+          "partly_cloudy": "Parcialmente nublado",
+          "cloudy": "Nublado",
+          "fog": "Niebla",
+          "drizzle": "Llovizna",
+          "rain": "Lluvia",
+          "sleet": "Aguanieve",
+          "snow": "Nieve",
+          "thunderstorm": "Tormenta eléctrica",
+          "wind": "Ventoso",
+          "unknown": "Condiciones desconocidas"
+        },
+        "confidence": {
+          "hourly": "Pronóstico por hora",
+          "daily": "Resumen diario"
+        },
+        "weatherUnavailable": "Clima no disponible para este día",
+        "freshness": {
+          "fresh": "Recién actualizado",
+          "cached": "Actualizado recientemente",
+          "stale": "Puede estar desactualizado"
+        },
+        "garmentCategory": {
+          "top": "Parte superior",
+          "bottom": "Parte inferior",
+          "outerwear": "Abrigo",
+          "dress": "Vestido",
+          "shoes": "Calzado",
+          "accessory": "Accesorio"
+        },
+        "starterWardrobe": "Selección de guardarropa inicial",
+        "reshuffle": {
+          "action": "Repetir combinación",
+          "loading": "Generando nueva combinación…",
+          "unchanged": "No hay una nueva combinación disponible para este día.",
+          "updated": "{{day}}: look actualizado.",
+          "conflict": "Este día cambió desde la última vez que lo viste. Actualizando…",
+          "error": "No se pudo generar una nueva combinación para este día. Inténtalo de nuevo."
+        },
+        "dayError": "No se pudo generar el look de este día.",
+        "retry": "Reintentar",
+        "disabled": "El planificador no está disponible temporalmente. Vuelve a intentarlo más tarde.",
+        "errorTitle": "No se pudo cargar el planificador de looks",
+        "announce": {
+          "opened": "Planificador de looks abierto.",
+          "ready": "Tu plan de 7 días está listo.",
+          "dayFailed": "No se pudo generar el look de {{day}}."
+        }
+      },
       "theme": {
         "sectionTitle": "Paletas de la interfaz",
         "disclosure": "Las paletas de la interfaz son una función Premium. Tu elección se guarda en tu cuenta de CoutureCast y se aplica en todos los dispositivos donde inicies sesión. Una paleta solo cambia los colores: nunca cambia qué atuendos se recomiendan. CoutureCast envía la paleta que elegiste a su proveedor de análisis con un identificador seudónimo; no se comparten fotos de prendas ni datos personales.",

@@ -50,6 +50,69 @@
         "title": "Le planificateur 7 jours est une fonctionnalité Premium",
         "cta": "Obtenir Premium"
       },
+      "planner": {
+        "sectionTitle": "Planificateur de tenues sur 7 jours",
+        "openControl": "Planifier la semaine",
+        "close": "Fermer le planificateur",
+        "checking": "Vérification de votre accès Premium…",
+        "loading": "Chargement de votre semaine…",
+        "today": "Aujourd'hui",
+        "tomorrow": "Demain",
+        "scenario": {
+          "morning": "Matin",
+          "midday": "Midi",
+          "evening": "Soir"
+        },
+        "condition": {
+          "clear": "Dégagé",
+          "partly_cloudy": "Partiellement nuageux",
+          "cloudy": "Nuageux",
+          "fog": "Brouillard",
+          "drizzle": "Bruine",
+          "rain": "Pluie",
+          "sleet": "Neige fondue",
+          "snow": "Neige",
+          "thunderstorm": "Orage",
+          "wind": "Venteux",
+          "unknown": "Conditions inconnues"
+        },
+        "confidence": {
+          "hourly": "Prévisions horaires",
+          "daily": "Aperçu quotidien"
+        },
+        "weatherUnavailable": "Météo indisponible pour ce jour",
+        "freshness": {
+          "fresh": "Mis à jour à l'instant",
+          "cached": "Mis à jour récemment",
+          "stale": "Peut être obsolète"
+        },
+        "garmentCategory": {
+          "top": "Haut",
+          "bottom": "Bas",
+          "outerwear": "Manteau",
+          "dress": "Robe",
+          "shoes": "Chaussures",
+          "accessory": "Accessoire"
+        },
+        "starterWardrobe": "Sélection de garde-robe de départ",
+        "reshuffle": {
+          "action": "Remélanger",
+          "loading": "Remélange en cours…",
+          "unchanged": "Aucune nouvelle combinaison disponible pour ce jour.",
+          "updated": "{{day}} : tenue mise à jour.",
+          "conflict": "Ce jour a changé depuis votre dernière visite. Actualisation…",
+          "error": "Impossible de remélanger ce jour. Veuillez réessayer."
+        },
+        "dayError": "La tenue de ce jour n'a pas pu être générée.",
+        "retry": "Réessayer",
+        "disabled": "Le planificateur est temporairement indisponible. Veuillez réessayer plus tard.",
+        "errorTitle": "Impossible de charger le planificateur de tenues",
+        "announce": {
+          "opened": "Planificateur de tenues ouvert.",
+          "ready": "Votre plan de 7 jours est prêt.",
+          "dayFailed": "La tenue du {{day}} n'a pas pu être générée."
+        }
+      },
       "theme": {
         "sectionTitle": "Palettes d'interface",
         "disclosure": "Les palettes d'interface sont une fonctionnalité Premium. Votre choix est enregistré dans votre compte CoutureCast et s'applique sur tous les appareils où vous vous connectez. Une palette ne change que les couleurs : elle ne modifie jamais les tenues recommandées. CoutureCast transmet la palette choisie à son fournisseur d'analyse sous un identifiant pseudonyme ; aucune photo de vêtement ni donnée personnelle n'est partagée.",

@@ -50,6 +50,69 @@
         "title": "Der 7-Tage-Planer ist eine Premium-Funktion",
         "cta": "Premium holen"
       },
+      "planner": {
+        "sectionTitle": "7-Tage-Outfit-Planer",
+        "openControl": "Woche planen",
+        "close": "Planer schließen",
+        "checking": "Premium-Zugang wird geprüft…",
+        "loading": "Deine Woche wird geladen…",
+        "today": "Heute",
+        "tomorrow": "Morgen",
+        "scenario": {
+          "morning": "Morgens",
+          "midday": "Mittags",
+          "evening": "Abends"
+        },
+        "condition": {
+          "clear": "Klar",
+          "partly_cloudy": "Teilweise bewölkt",
+          "cloudy": "Bewölkt",
+          "fog": "Nebel",
+          "drizzle": "Nieselregen",
+          "rain": "Regen",
+          "sleet": "Schneeregen",
+          "snow": "Schnee",
+          "thunderstorm": "Gewitter",
+          "wind": "Windig",
+          "unknown": "Bedingungen unbekannt"
+        },
+        "confidence": {
+          "hourly": "Stündliche Vorhersage",
+          "daily": "Tagesübersicht"
+        },
+        "weatherUnavailable": "Wetter für diesen Tag nicht verfügbar",
+        "freshness": {
+          "fresh": "Gerade aktualisiert",
+          "cached": "Kürzlich aktualisiert",
+          "stale": "Möglicherweise veraltet"
+        },
+        "garmentCategory": {
+          "top": "Oberteil",
+          "bottom": "Unterteil",
+          "outerwear": "Oberbekleidung",
+          "dress": "Kleid",
+          "shoes": "Schuhe",
+          "accessory": "Accessoire"
+        },
+        "starterWardrobe": "Starter-Garderobe-Auswahl",
+        "reshuffle": {
+          "action": "Neu mischen",
+          "loading": "Wird neu gemischt…",
+          "unchanged": "Keine neue Kombination für diesen Tag verfügbar.",
+          "updated": "{{day}}: Outfit aktualisiert.",
+          "conflict": "Dieser Tag hat sich seit deinem letzten Besuch geändert. Wird aktualisiert…",
+          "error": "Dieser Tag konnte nicht neu gemischt werden. Bitte erneut versuchen."
+        },
+        "dayError": "Für diesen Tag konnte kein Outfit erstellt werden.",
+        "retry": "Erneut versuchen",
+        "disabled": "Der Planer ist vorübergehend nicht verfügbar. Bitte später wieder vorbeischauen.",
+        "errorTitle": "Der Outfit-Planer konnte nicht geladen werden",
+        "announce": {
+          "opened": "Outfit-Planer geöffnet.",
+          "ready": "Dein 7-Tage-Plan ist bereit.",
+          "dayFailed": "{{day}} konnte nicht erstellt werden."
+        }
+      },
       "theme": {
         "sectionTitle": "Oberflächenpaletten",
         "disclosure": "Oberflächenpaletten sind eine Premium-Funktion. Deine Auswahl wird in deinem CoutureCast-Konto gespeichert und gilt auf jedem Gerät, auf dem du dich anmeldest. Eine Palette ändert nur Farben: Sie ändert nie, welche Outfits empfohlen werden. CoutureCast übermittelt die gewählte Palette unter einer pseudonymen Kennung an seinen Analyseanbieter; Kleidungsfotos oder persönliche Daten werden nicht geteilt.",
