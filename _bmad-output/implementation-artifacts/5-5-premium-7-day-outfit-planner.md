@@ -438,11 +438,11 @@ Hardcoded planner colors stay confined to legacy code removed during this story.
   - [x] Keep `ritual.service.spec.ts` assertions unchanged and green.
   - [x] Test DST boundaries, leap day, month and year end, daily projection fields, unavailable weather, and exclusions.
 
-- [ ] **Task 3: Planner schema, RLS, factories, and cleanup** (AC 8, 9)
-  - [ ] Add `PlannerOutfitSource`, `PlannerDayPlan`, relations, indexes, and migration.
-  - [ ] Mirror owner-only grants and policies; add schema and actor-matrix tests.
-  - [ ] Extend `selfOnlyTables`, `SeededScenario`, seed cleanup, testing factories, public exports, registry, and global cleanup.
-  - [ ] Test cascades, cross-user denial, authenticated owner insert, and malformed payload cleanup.
+- [x] **Task 3: Planner schema, RLS, factories, and cleanup** (AC 8, 9)
+  - [x] Add `PlannerOutfitSource`, `PlannerDayPlan`, relations, indexes, and migration.
+  - [x] Mirror owner-only grants and policies; add schema and actor-matrix tests.
+  - [x] Extend `selfOnlyTables`, `SeededScenario`, seed cleanup, testing factories, public exports, registry, and global cleanup.
+  - [x] Test cascades, cross-user denial, authenticated owner insert, and malformed payload cleanup.
 
 - [ ] **Task 4: Contracts and generated client** (AC 1, 3, 4, 5)
   - [ ] Create the strict GET and reshuffle contracts from Decision 5.
