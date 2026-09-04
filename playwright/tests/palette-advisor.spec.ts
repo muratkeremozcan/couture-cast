@@ -253,7 +253,12 @@ premiumSeededTest.describe(
 
     premiumSeededTest(
       '[P0] 5.4-E2E-010 grants consent, derives a wardrobe palette, dismisses a card, and survives reload',
-      async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
+      async ({
+        premiumSession: _premiumSession,
+        page,
+        interceptNetworkCall,
+        recurse,
+      }) => {
         await log.step('Load /palette and capture the initial (no consent) read')
         const loaded = await openPalette(page, interceptNetworkCall)
 
@@ -302,16 +307,15 @@ premiumSeededTest.describe(
         // The worker is a real process here. Reloading rather than waiting for a
         // push: no socket carries analysis completion (stated deferral), so the
         // client's own answer to "is it done" is another read.
-        await expect
-          .poll(
-            async () => {
-              await page.reload()
-              await waitForAccessibilityReady(page)
-              return page.getByTestId('palette-advisor-undertone').textContent()
-            },
-            { timeout: 30_000, intervals: [500, 1_000, 2_000] }
-          )
-          .toBeTruthy()
+        await recurse(
+          async () => {
+            await page.reload()
+            await waitForAccessibilityReady(page)
+            return page.getByTestId('palette-advisor-undertone').textContent()
+          },
+          (undertone) => Boolean(undertone),
+          { timeout: 30_000, interval: 1_000 }
+        )
 
         await log.step('Assert the derived palette is the pinned wardrobe classification')
         await expect(page.getByTestId('palette-advisor-undertone')).toHaveText('Olive')

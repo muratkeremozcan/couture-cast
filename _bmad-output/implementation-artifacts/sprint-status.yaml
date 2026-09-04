@@ -87,12 +87,12 @@ development_status:
   4-4-wardrobe-onboarding-silhouette-setup: done
 
   # Epic 5: Commerce & Premium Enhancements (Phase 2)
-  epic-5: in-progress
+  epic-5: done
   5-1-affiliate-shop-this-look-cta: done
   5-2-premium-subscription-lifecycle: done
   5-3-premium-theme-switcher: done
   5-4-color-palette-beauty-accessory-advisor: done
-  5-5-premium-7-day-outfit-planner: review
+  5-5-premium-7-day-outfit-planner: done
 
   # Epic 6: Community & Moderation Loop (Phase 3)
   epic-6: backlog
