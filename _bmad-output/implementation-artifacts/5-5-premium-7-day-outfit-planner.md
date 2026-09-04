@@ -444,11 +444,11 @@ Hardcoded planner colors stay confined to legacy code removed during this story.
   - [x] Extend `selfOnlyTables`, `SeededScenario`, seed cleanup, testing factories, public exports, registry, and global cleanup.
   - [x] Test cascades, cross-user denial, authenticated owner insert, and malformed payload cleanup.
 
-- [ ] **Task 4: Contracts and generated client** (AC 1, 3, 4, 5)
-  - [ ] Create the strict GET and reshuffle contracts from Decision 5.
-  - [ ] Add exact collection invariants, message constants, the API contract bridge export, and all error responses.
-  - [ ] Register the contract, bump OpenAPI to `1.5.0`, regenerate the client, and run Optic.
-  - [ ] Add contract tests for duplicate dates, duplicate scenarios, invalid dates, missing platform, and non-null planner affiliate data.
+- [x] **Task 4: Contracts and generated client** (AC 1, 3, 4, 5)
+  - [x] Create the strict GET and reshuffle contracts from Decision 5.
+  - [x] Add exact collection invariants, message constants, the API contract bridge export, and all error responses.
+  - [x] Register the contract, bump OpenAPI to `1.5.0`, regenerate the client, and run Optic.
+  - [x] Add contract tests for duplicate dates, duplicate scenarios, invalid dates, missing platform, and non-null planner affiliate data.
 
 - [ ] **Task 5: Flag and analytics registries** (AC 5, 6)
   - [ ] Add `premium_planner_enabled` to all four flag touchpoints.
