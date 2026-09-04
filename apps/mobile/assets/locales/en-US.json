@@ -524,6 +524,63 @@
         "loadError": "We could not load your palette. Try again.",
         "saveError": "We could not save that change. Try again.",
         "deleteConfirm": "This erases your undertone, your depth, every saved and dismissed suggestion, and any photo still held. It cannot be undone."
+      },
+      "planner": {
+        "sectionTitle": "7-Day Planner",
+        "intro": "See a starter outfit for each of the next seven days, built from your saved location's weather and wardrobe.",
+        "loading": "Loading your weekly planner…",
+        "errorLoad": "Unable to load your weekly planner.",
+        "retry": "Retry",
+        "disabled": "The 7-day planner is temporarily unavailable. Your account keeps working normally.",
+        "starterWardrobe": "Built from a starter wardrobe.",
+        "day": {
+          "error": {
+            "title": "This day could not be generated.",
+            "retry": "Retry this day"
+          }
+        },
+        "scenario": {
+          "morning": "Morning",
+          "midday": "Midday",
+          "evening": "Evening"
+        },
+        "conditions": {
+          "clear": "Clear sky",
+          "partly_cloudy": "Partly cloudy",
+          "cloudy": "Cloudy",
+          "fog": "Foggy",
+          "drizzle": "Drizzle",
+          "rain": "Rainy",
+          "sleet": "Sleet",
+          "snow": "Snowy",
+          "thunderstorm": "Thunderstorm",
+          "wind": "Windy",
+          "unknown": "Unknown"
+        },
+        "weather": {
+          "confidence": {
+            "hourly": "Hourly forecast",
+            "daily": "Daily forecast",
+            "unavailable": "Weather unavailable for this day"
+          },
+          "freshness": {
+            "fresh": "Current",
+            "cached": "Recently updated",
+            "stale": "May be out of date"
+          }
+        },
+        "reshuffle": {
+          "cta": "Reshuffle",
+          "loading": "Reshuffling…",
+          "success": "This day was reshuffled.",
+          "unchanged": "No different outfits were available for this day.",
+          "conflict": "This day changed since you last viewed it. Refreshing…",
+          "error": "Unable to reshuffle this day. Try again."
+        }
+      },
+      "plannerLocked": {
+        "title": "The 7-Day Planner is a Premium feature",
+        "cta": "Get Premium"
       }
     }
   }

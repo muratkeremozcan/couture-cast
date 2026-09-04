@@ -524,6 +524,63 @@
         "loadError": "Non siamo riusciti a caricare la tua palette. Riprova.",
         "saveError": "Non siamo riusciti a salvare la modifica. Riprova.",
         "deleteConfirm": "Questo cancella il tuo sottotono, la profondità, ogni suggerimento salvato e ignorato e qualsiasi foto ancora conservata. Non è reversibile."
+      },
+      "planner": {
+        "sectionTitle": "Pianificatore di 7 giorni",
+        "intro": "Scopri un outfit di partenza per ciascuno dei prossimi sette giorni, creato in base al meteo e al guardaroba della tua posizione salvata.",
+        "loading": "Caricamento del tuo pianificatore settimanale…",
+        "errorLoad": "Impossibile caricare il tuo pianificatore settimanale.",
+        "retry": "Riprova",
+        "disabled": "Il pianificatore di 7 giorni non è temporaneamente disponibile. Il tuo account continua a funzionare normalmente.",
+        "starterWardrobe": "Creato a partire da un guardaroba di partenza.",
+        "day": {
+          "error": {
+            "title": "Impossibile generare questo giorno.",
+            "retry": "Riprova per questo giorno"
+          }
+        },
+        "scenario": {
+          "morning": "Mattina",
+          "midday": "Mezzogiorno",
+          "evening": "Sera"
+        },
+        "conditions": {
+          "clear": "Cielo sereno",
+          "partly_cloudy": "Parzialmente nuvoloso",
+          "cloudy": "Nuvoloso",
+          "fog": "Nebbia",
+          "drizzle": "Pioggerella",
+          "rain": "Pioggia",
+          "sleet": "Nevischio",
+          "snow": "Neve",
+          "thunderstorm": "Temporale",
+          "wind": "Ventoso",
+          "unknown": "Sconosciuto"
+        },
+        "weather": {
+          "confidence": {
+            "hourly": "Previsioni orarie",
+            "daily": "Previsioni giornaliere",
+            "unavailable": "Meteo non disponibile per questo giorno"
+          },
+          "freshness": {
+            "fresh": "Aggiornato",
+            "cached": "Aggiornato di recente",
+            "stale": "Potrebbe non essere aggiornato"
+          }
+        },
+        "reshuffle": {
+          "cta": "Rimescola",
+          "loading": "Rimescolamento in corso…",
+          "success": "Questo giorno è stato rimescolato.",
+          "unchanged": "Non erano disponibili altri outfit per questo giorno.",
+          "conflict": "Questo giorno è cambiato dall'ultima volta che lo hai visto. Aggiornamento…",
+          "error": "Impossibile rimescolare questo giorno. Riprova."
+        }
+      },
+      "plannerLocked": {
+        "title": "Il pianificatore di 7 giorni è una funzione Premium",
+        "cta": "Ottieni Premium"
       }
     }
   }

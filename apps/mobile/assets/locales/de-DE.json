@@ -524,6 +524,63 @@
         "loadError": "Wir konnten deine Palette nicht laden. Versuche es erneut.",
         "saveError": "Wir konnten die Änderung nicht speichern. Versuche es erneut.",
         "deleteConfirm": "Damit werden dein Unterton, deine Tiefe, alle gespeicherten und ausgeblendeten Vorschläge sowie ein noch vorhandenes Foto gelöscht. Das lässt sich nicht rückgängig machen."
+      },
+      "planner": {
+        "sectionTitle": "7-Tage-Planer",
+        "intro": "Sieh dir für jeden der nächsten sieben Tage ein Startoutfit an, erstellt aus dem Wetter und der Garderobe deines gespeicherten Standorts.",
+        "loading": "Dein Wochenplaner wird geladen …",
+        "errorLoad": "Dein Wochenplaner konnte nicht geladen werden.",
+        "retry": "Erneut versuchen",
+        "disabled": "Der 7-Tage-Planer ist vorübergehend nicht verfügbar. Dein Konto funktioniert weiterhin normal.",
+        "starterWardrobe": "Aus einer Start-Garderobe erstellt.",
+        "day": {
+          "error": {
+            "title": "Dieser Tag konnte nicht erstellt werden.",
+            "retry": "Diesen Tag erneut versuchen"
+          }
+        },
+        "scenario": {
+          "morning": "Morgen",
+          "midday": "Mittag",
+          "evening": "Abend"
+        },
+        "conditions": {
+          "clear": "Klarer Himmel",
+          "partly_cloudy": "Teilweise bewölkt",
+          "cloudy": "Bewölkt",
+          "fog": "Neblig",
+          "drizzle": "Nieselregen",
+          "rain": "Regnerisch",
+          "sleet": "Schneeregen",
+          "snow": "Schnee",
+          "thunderstorm": "Gewitter",
+          "wind": "Windig",
+          "unknown": "Unbekannt"
+        },
+        "weather": {
+          "confidence": {
+            "hourly": "Stündliche Vorhersage",
+            "daily": "Tagesvorhersage",
+            "unavailable": "Wetter für diesen Tag nicht verfügbar"
+          },
+          "freshness": {
+            "fresh": "Aktuell",
+            "cached": "Kürzlich aktualisiert",
+            "stale": "Möglicherweise veraltet"
+          }
+        },
+        "reshuffle": {
+          "cta": "Neu mischen",
+          "loading": "Wird neu gemischt …",
+          "success": "Dieser Tag wurde neu gemischt.",
+          "unchanged": "Für diesen Tag waren keine anderen Outfits verfügbar.",
+          "conflict": "Dieser Tag hat sich geändert, seit du ihn zuletzt gesehen hast. Wird aktualisiert …",
+          "error": "Dieser Tag konnte nicht neu gemischt werden. Versuche es erneut."
+        }
+      },
+      "plannerLocked": {
+        "title": "Der 7-Tage-Planer ist eine Premium-Funktion",
+        "cta": "Premium holen"
       }
     }
   }
