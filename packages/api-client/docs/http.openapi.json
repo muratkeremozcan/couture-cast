@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -2175,7 +2175,8 @@
           "snow",
           "thunderstorm",
           "wind",
-          "unknown"
+          "unknown",
+          null
         ]
       },
       "WeatherProvider": {
@@ -2204,7 +2205,8 @@
               "snow",
               "thunderstorm",
               "wind",
-              "unknown"
+              "unknown",
+              null
             ]
           }
         },
@@ -2259,7 +2261,8 @@
               "snow",
               "thunderstorm",
               "wind",
-              "unknown"
+              "unknown",
+              null
             ]
           },
           "providerWeatherCode": {
@@ -2369,7 +2372,8 @@
                   "snow",
                   "thunderstorm",
                   "wind",
-                  "unknown"
+                  "unknown",
+                  null
                 ]
               }
             },
@@ -2426,7 +2430,8 @@
                     "snow",
                     "thunderstorm",
                     "wind",
-                    "unknown"
+                    "unknown",
+                    null
                   ]
                 },
                 "providerWeatherCode": {
@@ -2570,7 +2575,8 @@
                               "snow",
                               "thunderstorm",
                               "wind",
-                              "unknown"
+                              "unknown",
+                              null
                             ]
                           }
                         },
@@ -2627,7 +2633,8 @@
                                 "snow",
                                 "thunderstorm",
                                 "wind",
-                                "unknown"
+                                "unknown",
+                                null
                               ]
                             },
                             "providerWeatherCode": {
@@ -2772,7 +2779,8 @@
                               "snow",
                               "thunderstorm",
                               "wind",
-                              "unknown"
+                              "unknown",
+                              null
                             ]
                           }
                         },
@@ -2829,7 +2837,8 @@
                                 "snow",
                                 "thunderstorm",
                                 "wind",
-                                "unknown"
+                                "unknown",
+                                null
                               ]
                             },
                             "providerWeatherCode": {
@@ -2981,7 +2990,8 @@
                               "snow",
                               "thunderstorm",
                               "wind",
-                              "unknown"
+                              "unknown",
+                              null
                             ]
                           }
                         },
@@ -3038,7 +3048,8 @@
                                 "snow",
                                 "thunderstorm",
                                 "wind",
-                                "unknown"
+                                "unknown",
+                                null
                               ]
                             },
                             "providerWeatherCode": {
@@ -3368,7 +3379,8 @@
                           "snow",
                           "thunderstorm",
                           "wind",
-                          "unknown"
+                          "unknown",
+                          null
                         ]
                       }
                     },
@@ -3425,7 +3437,8 @@
                             "snow",
                             "thunderstorm",
                             "wind",
-                            "unknown"
+                            "unknown",
+                            null
                           ]
                         },
                         "providerWeatherCode": {
@@ -10411,6 +10424,991 @@
         "required": [
           "data"
         ]
+      },
+      "PlannerDayResult": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ready"
+                ]
+              },
+              "planDate": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape."
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "weather": {
+                "type": "object",
+                "properties": {
+                  "confidence": {
+                    "type": "string",
+                    "enum": [
+                      "hourly",
+                      "daily",
+                      "unavailable"
+                    ],
+                    "description": "hourly: exact 08:00/13:00/19:00 segments. daily: projected from the provider daily summary. unavailable: no usable weather for this date at all."
+                  },
+                  "freshness": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "fresh",
+                      "cached",
+                      "stale",
+                      null
+                    ],
+                    "description": "Null exactly when confidence is unavailable; there is no snapshot to date."
+                  },
+                  "condition": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "clear",
+                      "partly_cloudy",
+                      "cloudy",
+                      "fog",
+                      "drizzle",
+                      "rain",
+                      "sleet",
+                      "snow",
+                      "thunderstorm",
+                      "wind",
+                      "unknown",
+                      null
+                    ]
+                  },
+                  "temperatureLow": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "temperatureHigh": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "confidence",
+                  "freshness",
+                  "condition",
+                  "temperatureLow",
+                  "temperatureHigh"
+                ],
+                "additionalProperties": false
+              },
+              "isStarterWardrobe": {
+                "type": "boolean",
+                "description": "True when any scenario fell back to a placeholder garment because the eligible wardrobe had nothing for a required category."
+              },
+              "outfits": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Unique identifier for the recommendation card."
+                    },
+                    "scenario": {
+                      "type": "string",
+                      "enum": [
+                        "morning",
+                        "midday",
+                        "evening"
+                      ],
+                      "description": "The daily scenario: morning, midday, or evening."
+                    },
+                    "garmentIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The custom or fallback garment identifiers suggested."
+                    },
+                    "reasoningBadges": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Unique key for the badge."
+                          },
+                          "label": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Localized default label for the badge."
+                          },
+                          "bullets": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "minItems": 1,
+                            "description": "Explanatory bullet points explaining why the badge triggered."
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "label",
+                          "bullets"
+                        ]
+                      },
+                      "description": "Reasoning badges justifying the garments chosen."
+                    },
+                    "comfortNotes": {
+                      "type": "string",
+                      "description": "Explanation string based on weather and comfort thresholds."
+                    },
+                    "capsuleId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Optional capsule ID if recommendation came from an outfit capsule."
+                    },
+                    "capsuleName": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Optional capsule name if recommendation came from an outfit capsule."
+                    },
+                    "autoFilledGarmentIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Optional list of garment IDs auto-filled into a partial capsule."
+                    },
+                    "shopThisLook": {
+                      "type": "null",
+                      "description": "Always null. Planner cards never carry an affiliate CTA; this preserves the shared scenario contract while keeping planner affiliate behavior out of scope for this story."
+                    },
+                    "displayGarments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "category": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "top",
+                              "bottom",
+                              "outerwear",
+                              "dress",
+                              "shoes",
+                              "accessory",
+                              null
+                            ]
+                          },
+                          "imageAccess": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "url": {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "expiresAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "expiresAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "category",
+                          "imageAccess"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Category and fresh signed image access for every real garment id in garmentIds, batched in one lookup per Decision 4 rather than resolved per garment. A starter-wardrobe placeholder id has no entry here."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "scenario",
+                    "garmentIds",
+                    "reasoningBadges",
+                    "comfortNotes",
+                    "shopThisLook",
+                    "displayGarments"
+                  ]
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Collection invariant enforced at runtime and NOT expressible in this schema: the three outfits always cover three distinct scenarios (morning, midday, evening), one each."
+              }
+            },
+            "required": [
+              "status",
+              "planDate",
+              "version",
+              "weather",
+              "isStarterWardrobe",
+              "outfits"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "error"
+                ]
+              },
+              "planDate": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape."
+              },
+              "errorCode": {
+                "type": "string",
+                "enum": [
+                  "generation_failed"
+                ]
+              },
+              "retryable": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "planDate",
+              "errorCode",
+              "retryable"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PlannerResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "locationId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "timezone": {
+                "type": "string",
+                "minLength": 1
+              },
+              "anchorDate": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape."
+              },
+              "daysReady": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 7
+              },
+              "days": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "ready"
+                          ]
+                        },
+                        "planDate": {
+                          "type": "string",
+                          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                          "description": "Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape."
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "weather": {
+                          "type": "object",
+                          "properties": {
+                            "confidence": {
+                              "type": "string",
+                              "enum": [
+                                "hourly",
+                                "daily",
+                                "unavailable"
+                              ],
+                              "description": "hourly: exact 08:00/13:00/19:00 segments. daily: projected from the provider daily summary. unavailable: no usable weather for this date at all."
+                            },
+                            "freshness": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "fresh",
+                                "cached",
+                                "stale",
+                                null
+                              ],
+                              "description": "Null exactly when confidence is unavailable; there is no snapshot to date."
+                            },
+                            "condition": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "clear",
+                                "partly_cloudy",
+                                "cloudy",
+                                "fog",
+                                "drizzle",
+                                "rain",
+                                "sleet",
+                                "snow",
+                                "thunderstorm",
+                                "wind",
+                                "unknown",
+                                null
+                              ]
+                            },
+                            "temperatureLow": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            },
+                            "temperatureHigh": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "confidence",
+                            "freshness",
+                            "condition",
+                            "temperatureLow",
+                            "temperatureHigh"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "isStarterWardrobe": {
+                          "type": "boolean",
+                          "description": "True when any scenario fell back to a placeholder garment because the eligible wardrobe had nothing for a required category."
+                        },
+                        "outfits": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "Unique identifier for the recommendation card."
+                              },
+                              "scenario": {
+                                "type": "string",
+                                "enum": [
+                                  "morning",
+                                  "midday",
+                                  "evening"
+                                ],
+                                "description": "The daily scenario: morning, midday, or evening."
+                              },
+                              "garmentIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "The custom or fallback garment identifiers suggested."
+                              },
+                              "reasoningBadges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "key": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "description": "Unique key for the badge."
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "description": "Localized default label for the badge."
+                                    },
+                                    "bullets": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "minItems": 1,
+                                      "description": "Explanatory bullet points explaining why the badge triggered."
+                                    }
+                                  },
+                                  "required": [
+                                    "key",
+                                    "label",
+                                    "bullets"
+                                  ]
+                                },
+                                "description": "Reasoning badges justifying the garments chosen."
+                              },
+                              "comfortNotes": {
+                                "type": "string",
+                                "description": "Explanation string based on weather and comfort thresholds."
+                              },
+                              "capsuleId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "Optional capsule ID if recommendation came from an outfit capsule."
+                              },
+                              "capsuleName": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "Optional capsule name if recommendation came from an outfit capsule."
+                              },
+                              "autoFilledGarmentIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "Optional list of garment IDs auto-filled into a partial capsule."
+                              },
+                              "shopThisLook": {
+                                "type": "null",
+                                "description": "Always null. Planner cards never carry an affiliate CTA; this preserves the shared scenario contract while keeping planner affiliate behavior out of scope for this story."
+                              },
+                              "displayGarments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "category": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ],
+                                      "enum": [
+                                        "top",
+                                        "bottom",
+                                        "outerwear",
+                                        "dress",
+                                        "shoes",
+                                        "accessory",
+                                        null
+                                      ]
+                                    },
+                                    "imageAccess": {
+                                      "type": [
+                                        "object",
+                                        "null"
+                                      ],
+                                      "properties": {
+                                        "url": {
+                                          "type": "string",
+                                          "format": "uri"
+                                        },
+                                        "expiresAt": {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        }
+                                      },
+                                      "required": [
+                                        "url",
+                                        "expiresAt"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "category",
+                                    "imageAccess"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "description": "Category and fresh signed image access for every real garment id in garmentIds, batched in one lookup per Decision 4 rather than resolved per garment. A starter-wardrobe placeholder id has no entry here."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "scenario",
+                              "garmentIds",
+                              "reasoningBadges",
+                              "comfortNotes",
+                              "shopThisLook",
+                              "displayGarments"
+                            ]
+                          },
+                          "minItems": 3,
+                          "maxItems": 3,
+                          "description": "Collection invariant enforced at runtime and NOT expressible in this schema: the three outfits always cover three distinct scenarios (morning, midday, evening), one each."
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "planDate",
+                        "version",
+                        "weather",
+                        "isStarterWardrobe",
+                        "outfits"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "error"
+                          ]
+                        },
+                        "planDate": {
+                          "type": "string",
+                          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                          "description": "Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape."
+                        },
+                        "errorCode": {
+                          "type": "string",
+                          "enum": [
+                            "generation_failed"
+                          ]
+                        },
+                        "retryable": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "planDate",
+                        "errorCode",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "minItems": 7,
+                "maxItems": 7,
+                "description": "Collection invariant enforced at runtime and NOT expressible in this schema: exactly seven unique, consecutive local dates in chronological order, one entry per date. A failed date is represented as status \"error\" rather than omitted, so the array is always exactly seven long."
+              }
+            },
+            "required": [
+              "locationId",
+              "timezone",
+              "anchorDate",
+              "daysReady",
+              "days"
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PlannerQueryParams": {
+        "type": "object",
+        "properties": {
+          "locationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional ID of a saved user location. Defaults to the primary or first location."
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en-US",
+              "en-CA",
+              "es-419",
+              "fr-CA",
+              "fr-FR",
+              "tr-TR",
+              "de-DE",
+              "it-IT",
+              "pt-BR",
+              "pt-PT"
+            ],
+            "description": "Optional locale override for this localized planner response."
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerHeaders": {
+        "type": "object",
+        "properties": {
+          "x-couture-platform": {
+            "type": "string",
+            "enum": [
+              "web",
+              "mobile"
+            ],
+            "description": "Which client is calling. Required on every planner operation; drives the platform property on both planner analytics events."
+          }
+        },
+        "required": [
+          "x-couture-platform"
+        ]
+      },
+      "PlannerReshufflePathParams": {
+        "type": "object",
+        "properties": {
+          "planDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape."
+          }
+        },
+        "required": [
+          "planDate"
+        ],
+        "additionalProperties": false
+      },
+      "PlannerReshuffleInput": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The version currently displayed by the client. Guards against a stale reshuffle."
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "PlannerReshuffleResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "day": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ready"
+                    ]
+                  },
+                  "planDate": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "description": "Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape."
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "weather": {
+                    "type": "object",
+                    "properties": {
+                      "confidence": {
+                        "type": "string",
+                        "enum": [
+                          "hourly",
+                          "daily",
+                          "unavailable"
+                        ],
+                        "description": "hourly: exact 08:00/13:00/19:00 segments. daily: projected from the provider daily summary. unavailable: no usable weather for this date at all."
+                      },
+                      "freshness": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "fresh",
+                          "cached",
+                          "stale",
+                          null
+                        ],
+                        "description": "Null exactly when confidence is unavailable; there is no snapshot to date."
+                      },
+                      "condition": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "clear",
+                          "partly_cloudy",
+                          "cloudy",
+                          "fog",
+                          "drizzle",
+                          "rain",
+                          "sleet",
+                          "snow",
+                          "thunderstorm",
+                          "wind",
+                          "unknown",
+                          null
+                        ]
+                      },
+                      "temperatureLow": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "temperatureHigh": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "confidence",
+                      "freshness",
+                      "condition",
+                      "temperatureLow",
+                      "temperatureHigh"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "isStarterWardrobe": {
+                    "type": "boolean",
+                    "description": "True when any scenario fell back to a placeholder garment because the eligible wardrobe had nothing for a required category."
+                  },
+                  "outfits": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Unique identifier for the recommendation card."
+                        },
+                        "scenario": {
+                          "type": "string",
+                          "enum": [
+                            "morning",
+                            "midday",
+                            "evening"
+                          ],
+                          "description": "The daily scenario: morning, midday, or evening."
+                        },
+                        "garmentIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "The custom or fallback garment identifiers suggested."
+                        },
+                        "reasoningBadges": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "Unique key for the badge."
+                              },
+                              "label": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "Localized default label for the badge."
+                              },
+                              "bullets": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "minItems": 1,
+                                "description": "Explanatory bullet points explaining why the badge triggered."
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "bullets"
+                            ]
+                          },
+                          "description": "Reasoning badges justifying the garments chosen."
+                        },
+                        "comfortNotes": {
+                          "type": "string",
+                          "description": "Explanation string based on weather and comfort thresholds."
+                        },
+                        "capsuleId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Optional capsule ID if recommendation came from an outfit capsule."
+                        },
+                        "capsuleName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Optional capsule name if recommendation came from an outfit capsule."
+                        },
+                        "autoFilledGarmentIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Optional list of garment IDs auto-filled into a partial capsule."
+                        },
+                        "shopThisLook": {
+                          "type": "null",
+                          "description": "Always null. Planner cards never carry an affiliate CTA; this preserves the shared scenario contract while keeping planner affiliate behavior out of scope for this story."
+                        },
+                        "displayGarments": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "category": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "enum": [
+                                  "top",
+                                  "bottom",
+                                  "outerwear",
+                                  "dress",
+                                  "shoes",
+                                  "accessory",
+                                  null
+                                ]
+                              },
+                              "imageAccess": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "url": {
+                                    "type": "string",
+                                    "format": "uri"
+                                  },
+                                  "expiresAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "expiresAt"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "category",
+                              "imageAccess"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "Category and fresh signed image access for every real garment id in garmentIds, batched in one lookup per Decision 4 rather than resolved per garment. A starter-wardrobe placeholder id has no entry here."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "scenario",
+                        "garmentIds",
+                        "reasoningBadges",
+                        "comfortNotes",
+                        "shopThisLook",
+                        "displayGarments"
+                      ]
+                    },
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "description": "Collection invariant enforced at runtime and NOT expressible in this schema: the three outfits always cover three distinct scenarios (morning, midday, evening), one each."
+                  }
+                },
+                "required": [
+                  "status",
+                  "planDate",
+                  "version",
+                  "weather",
+                  "isStarterWardrobe",
+                  "outfits"
+                ],
+                "additionalProperties": false
+              },
+              "unchanged": {
+                "type": "boolean",
+                "description": "True only when all three scenario garment sets and capsule choices are identical to the displayed result."
+              }
+            },
+            "required": [
+              "day",
+              "unchanged"
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
       }
     },
     "parameters": {}
@@ -15268,6 +16266,286 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/premium/planner": {
+      "get": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Get or generate the seven-day outfit planner for a saved location",
+        "description": "Returns exactly seven consecutive local dates, each ready with three scenario outfits or reporting an isolated generation failure. Weather-aware: uses exact hourly segments when available, a daily-summary projection when not, and an honest wardrobe baseline when no usable weather exists for a date.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Optional ID of a saved user location. Defaults to the primary or first location."
+            },
+            "required": false,
+            "description": "Optional ID of a saved user location. Defaults to the primary or first location.",
+            "name": "locationId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en-US",
+                "en-CA",
+                "es-419",
+                "fr-CA",
+                "fr-FR",
+                "tr-TR",
+                "de-DE",
+                "it-IT",
+                "pt-BR",
+                "pt-PT"
+              ],
+              "description": "Optional locale override for this localized planner response."
+            },
+            "required": false,
+            "description": "Optional locale override for this localized planner response.",
+            "name": "locale",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ],
+              "description": "Which client is calling. Required on every planner operation; drives the platform property on both planner analytics events."
+            },
+            "required": true,
+            "description": "Which client is calling. Required on every planner operation; drives the platform property on both planner analytics events.",
+            "name": "x-couture-platform",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Planner window resolved (fully or partially ready)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not entitled (\"A Premium subscription is required for this feature.\") or location not owned by user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "premium_planner_enabled resolved false (\"The premium planner is temporarily unavailable.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/premium/planner/{planDate}/reshuffle": {
+      "post": {
+        "tags": [
+          "planner"
+        ],
+        "summary": "Reshuffle one day of the planner",
+        "description": "Regenerates a single date, preferring capsules and garments absent from the currently displayed result. Atomic: the three scenarios, version, source, and reshuffle count change together or not at all.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape."
+            },
+            "required": true,
+            "name": "planDate",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Optional ID of a saved user location. Defaults to the primary or first location."
+            },
+            "required": false,
+            "description": "Optional ID of a saved user location. Defaults to the primary or first location.",
+            "name": "locationId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en-US",
+                "en-CA",
+                "es-419",
+                "fr-CA",
+                "fr-FR",
+                "tr-TR",
+                "de-DE",
+                "it-IT",
+                "pt-BR",
+                "pt-PT"
+              ],
+              "description": "Optional locale override for this localized planner response."
+            },
+            "required": false,
+            "description": "Optional locale override for this localized planner response.",
+            "name": "locale",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ],
+              "description": "Which client is calling. Required on every planner operation; drives the platform property on both planner analytics events."
+            },
+            "required": true,
+            "description": "Which client is calling. Required on every planner operation; drives the platform property on both planner analytics events.",
+            "name": "x-couture-platform",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlannerReshuffleInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Day reshuffled (or left unchanged, when no disjoint result exists)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerReshuffleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid planDate or request body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not entitled (\"A Premium subscription is required for this feature.\"), or location/date not owned by or in scope for user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The displayed version is stale (\"This day changed since you last viewed it.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "premium_planner_enabled resolved false (\"The premium planner is temporarily unavailable.\")",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
                 }
               }
             }
