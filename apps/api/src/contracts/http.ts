@@ -60,6 +60,7 @@ export {
   type UserPreferencesInput,
   type UserPreferencesResponse,
   latestWeatherResponseSchema,
+  weatherConditionSchema,
   type LatestWeatherResponse,
   type WeatherAlert,
   type WeatherCondition,

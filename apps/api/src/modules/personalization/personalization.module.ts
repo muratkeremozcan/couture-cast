@@ -6,11 +6,16 @@ import { RequestAuthGuard } from '../auth/security.guards.js'
 import { WeatherModule } from '../weather/weather.module.js'
 import { LocationPreferencesModule } from '../location-preferences/location-preferences.module.js'
 import { CommerceModule } from '../commerce/commerce.module.js'
+import { FeatureFlagsModule } from '../feature-flags/feature-flags.module.js'
+import { TelemetryModule } from '../telemetry/telemetry.module.js'
+import { SupabaseWardrobeStorageAdapter } from '../wardrobe/wardrobe-storage.adapter.js'
 import { RitualController } from './ritual.controller.js'
 import { RitualService, RITUAL_REDIS_CLIENT } from './ritual.service.js'
 import { RITUAL_CACHE_INVALIDATOR } from './ritual-cache.js'
 import { ComfortController } from './comfort.controller.js'
 import { ComfortService } from './comfort.service.js'
+import { PlannerController } from './planner.controller.js'
+import { PlannerService } from './planner.service.js'
 import Redis from 'ioredis'
 import { getRedisConfig, redisOptionsFromConfig } from '../../config/redis.js'
 
@@ -23,11 +28,22 @@ import { getRedisConfig, redisOptionsFromConfig } from '../../config/redis.js'
     LocationPreferencesModule,
     // Story 5.1: one-way. CommerceModule must never import this module back.
     CommerceModule,
+    // Story 5.5 Decision 6: CommerceModule exports PremiumEntitlementService/
+    // Guard but not FeatureFlagsService/TelemetryService, so the planner
+    // imports both directly rather than reaching through CommerceModule.
+    FeatureFlagsModule,
+    TelemetryModule,
   ],
-  controllers: [RitualController, ComfortController],
+  controllers: [RitualController, ComfortController, PlannerController],
   providers: [
     RitualService,
     ComfortService,
+    PlannerService,
+    // Story 5.5: also provided directly by CommerceModule and WardrobeModule,
+    // which each register their own instance of this stateless, self-
+    // configuring (env-var-only constructor) adapter rather than exporting
+    // one across modules.
+    SupabaseWardrobeStorageAdapter,
     RequestAuthGuard,
     // The wardrobe retention purge only ever clears a user's ritual cache, so
     // it depends on this narrow token instead of the whole `RitualService`.
