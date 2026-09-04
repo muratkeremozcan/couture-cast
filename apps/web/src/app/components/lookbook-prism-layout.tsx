@@ -164,9 +164,18 @@ export function LookbookPrismLayout() {
   // drawer. `window.innerWidth` matches this file's own existing posthog
   // layout-mode check below rather than introducing `matchMedia`, which has
   // no other user in this codebase.
-  const [isNarrowViewport, setIsNarrowViewport] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth < 1440
-  )
+  //
+  // The initial value must be a literal, not a `window`-dependent lazy
+  // initializer: SSR has no `window` (`isNarrowViewport` would resolve to
+  // `false`), but React reuses that SAME initializer for the client's first
+  // hydration render too, where `window` DOES exist -- so a real narrow
+  // viewport made the client's first render disagree with the server's,
+  // which is exactly React error #418 ("Minified React error #418",
+  // hydration mismatch). `false` matches the server unconditionally; the
+  // effect below corrects it immediately on mount, one render after
+  // hydration completes, which is the standard fix for viewport-dependent
+  // state in an SSR'd component.
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false)
   const plannerOpenerRef = useRef<HTMLElement | null>(null)
   const [activeTab, setActiveTab] = useState<FilterCategory>('New')
   const [chipCategory, setChipCategory] = useState<ChipCategory>('Personal')
@@ -234,6 +243,10 @@ export function LookbookPrismLayout() {
     function handleResize() {
       setIsNarrowViewport(window.innerWidth < 1440)
     }
+    // Correct the SSR-safe `false` default to the real viewport immediately
+    // on mount -- this runs after hydration has already committed with the
+    // matching `false`, so it costs one extra render rather than a mismatch.
+    handleResize()
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])

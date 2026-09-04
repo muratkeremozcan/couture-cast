@@ -181,6 +181,43 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   })
 
   /**
+   * At >=1440px the rail renders through `DesktopPlannerRailSlot` (the
+   * inline third-column form), not `PlannerOverlaySlot` -- a distinct code
+   * path (and a distinct `onClose` closure) from every other test in this
+   * file, which run at jsdom's default 1024px width and so always exercise
+   * the overlay.
+   */
+  it('opens and closes through the desktop rail slot at 1440px and wider', () => {
+    const originalInnerWidth = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1440,
+    })
+
+    try {
+      render(<LookbookPrismLayout />)
+      fireEvent(window, new Event('resize'))
+
+      fireEvent.click(screen.getByTestId('planner-open-control'))
+      expect(
+        screen.getByRole('complementary', { name: /planner rail/i })
+      ).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: /close planner/i }))
+      expect(
+        screen.queryByRole('complementary', { name: /planner rail/i })
+      ).not.toBeInTheDocument()
+    } finally {
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: originalInnerWidth,
+      })
+    }
+  })
+
+  /**
    * Story 5.2 Decision 2, extended by 5.5 Decision 7: the rail is the
    * story's one real premium gate. With no session there is no entitlement
    * request at all — the locked upsell is the default, which is also what
