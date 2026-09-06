@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "db:migrate": "prisma migrate dev",
-    "prepare:shared-deps": "npm run build --workspace @couture/utils && npm run build --workspace @couture/testing",
+    "prepare:shared-deps": "npm run db:generate && npm run build --workspace @couture/utils && npm run build --workspace @couture/testing",
     "predb:seed": "npm run prepare:shared-deps",
     "db:seed": "prisma db seed",
     "predb:reset": "npm run prepare:shared-deps",
