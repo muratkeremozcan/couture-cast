@@ -1038,18 +1038,6 @@ export function registerCommunityContracts(
           'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
         },
       },
-      429: {
-        description: 'Daily posting rate limit reached. Carries a Retry-After header.',
-        headers: {
-          'Retry-After': {
-            description: 'Seconds until the rolling 24-hour window admits another post.',
-            schema: { type: 'integer', minimum: 1 },
-          },
-        },
-        content: {
-          'application/json': { schema: commonSchemas.tooManyRequestsHttpErrorSchema },
-        },
-      },
       500: {
         description: 'Internal server error occurred.',
         content: {

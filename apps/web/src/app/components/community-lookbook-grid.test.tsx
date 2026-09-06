@@ -748,6 +748,19 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         'aria-pressed',
         'false'
       )
+      // The unpressed auto chip's own label, not just its pressed state. It used
+      // to read the resolved band unconditionally, so an `all`-arm viewer with a
+      // resolved band saw the auto chip promise "Your climate: Temperate and dry"
+      // beside the unfiltered feed the `all` chip was actually, correctly, showing.
+      // `toHaveTextContent` has no `exact` option in this version -- a plain
+      // string argument is always a substring check (`textContent.includes(...)`),
+      // which would pass on that exact regression, since "Your climate:
+      // Temperate and dry" contains "Your climate". `.textContent` compared with
+      // `.toBe` is what actually pins the unqualified label rather than a
+      // superstring of it; mutation-tested against the un-gated `modeLabel` call
+      // to confirm the substring form does not catch this before landing on this
+      // shape.
+      expect(screen.getByTestId('community-filter-auto').textContent).toBe('Your climate')
       // The announcement names the feed that arrived. It used to name the request
       // instead, so this reader was told "Showing Your climate: Temperate and dry
       // looks" over a feed carrying every region.

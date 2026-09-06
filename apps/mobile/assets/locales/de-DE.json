@@ -592,7 +592,6 @@
     "share": "Teile deinen Look",
     "newPost": "Neuer Beitrag",
     "deepLink": {
-      "highlight": "Aus deiner Benachrichtigung geöffnet",
       "invalid": "Dieser Link ist ungültig, abgelaufen oder nicht mehr verfügbar."
     },
     "filters": {
@@ -748,7 +747,7 @@
       "selfReport": "Du kannst deinen eigenen Look nicht melden.",
       "notFound": "Dieser Look ist nicht mehr verfügbar.",
       "disabled": "Der Community-Feed ist vorübergehend nicht verfügbar.",
-      "mediaUnavailable": "Dieser Look ist vorübergehend nicht verfügbar. Versuche es gleich noch einmal.",
+      "mediaUnavailable": "Dieser Look ist vorübergehend nicht verfügbar. Versuche es in Kürze erneut.",
       "generic": "Etwas ist schiefgelaufen. Versuche es erneut."
     }
   }

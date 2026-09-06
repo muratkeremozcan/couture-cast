@@ -592,7 +592,6 @@
     "share": "Partilhe o seu visual",
     "newPost": "Nova publicação",
     "deepLink": {
-      "highlight": "Aberto a partir da sua notificação",
       "invalid": "Esta ligação é inválida, expirou ou já não está disponível."
     },
     "filters": {

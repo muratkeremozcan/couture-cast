@@ -2149,6 +2149,87 @@ The corollary that made this cheap to check: run the candidate rule over the
 existing fixtures and read the verdicts, rather than predicting them. That took
 one script and replaced an argument about nine files with a list of one.
 
+## `toHaveTextContent` with a string is a substring check, and looks like equality (2026-09-06)
+
+The thirteenth instance of the vacuous-pass class on this branch, and the first
+where the weakness came from a matcher's own semantics rather than from how a
+test was written.
+
+Fixing the web copy of the served-mode chip defect needed an assertion that the
+unselected `auto` chip reads `Your climate` and not `Your climate: Temperate and
+dry`. The first attempt was
+`expect(chip).toHaveTextContent('Your climate', { exact: true })`. It passed
+against the fix AND against the mutation that removed the fix, which is the only
+reason anyone looked closer.
+
+Two things were wrong and both are worth knowing.
+
+`{ exact: true }` is not an option this matcher has. Read from the shipped
+artifact rather than the docs: `toHaveTextContent(node, checkWith, options =
+{normalizeWhitespace: true})` in
+`node_modules/@testing-library/jest-dom/dist/matchers-98b869c1.js:433` destructures
+only `normalizeWhitespace`. An unknown key is silently ignored, so the option
+that made the assertion look strict did nothing at all.
+
+And the matcher is a substring check by design. `matches()` at :156 is
+`matcher instanceof RegExp ? matcher.test(text) : text.includes(String(matcher))`.
+So every `toHaveTextContent('some label')` in this repository passes on any
+element whose text merely CONTAINS that label. That is correct and useful for
+"this banner mentions this message", and it is silently wrong wherever the point
+is that the text is exactly the label — precisely the shape here, where the
+expected value is a strict prefix of the buggy value.
+
+The replacement is `expect(chip.textContent).toBe('Your climate')`, which is
+already the convention on the mobile side (`6.1-MOB-090` asserts
+`.textContent).toBe(enUS.community.filters.mode.auto)`). Re-running the mutation
+against it goes correctly red with
+`expected 'Your climate: Temperate and dry' to be 'Your climate'`.
+
+Scope, measured rather than estimated: 296 uses of `toHaveTextContent` across
+`apps/` and `packages/`, of which 120 pass a string literal and therefore carry
+substring semantics. No remaining call site passes a bogus options object — that
+one was the only instance and it is gone. The 120 are not defects; most are
+genuine containment assertions. What is unaudited is which of them intend
+equality, and the honest answer is that nobody has looked.
+
+What a fix needs. The rule is cheap to state and hard to enforce by review: use
+`toHaveTextContent` when the claim is that text is PRESENT, and
+`expect(el.textContent).toBe(...)` when the claim is that text is EXACTLY this,
+because only the second can fail when a qualifier is appended.
+
+THE PREFIX HEURISTIC WAS RUN, so this is a measured recommendation rather than a
+suggested one. Flagging every positive `toHaveTextContent('X')` whose `X` is a
+strict prefix of another string literal in the same file takes a few seconds over
+29 files and returns six pairs. Triaged, none is a defect:
+
+- Three are `not.toHaveTextContent(...)`, where substring semantics is not merely
+  acceptable but STRONGER than equality: "this banner must not contain the raw
+  `ECONNRESET` anywhere" is exactly a containment claim. A lint rule has to
+  exclude the negated form or it will be noise.
+- `6.1-WEB-011` is the shape done right, and by accident of construction it is
+  the answer to the whole entry: it pairs `toHaveTextContent('Your climate')`
+  with `not.toHaveTextContent('Your climate:')`, so the second assertion carries
+  the exactness the first cannot. A rule should treat a positive and a negative
+  on the same element with a longer prefix as satisfied.
+- `toHaveTextContent('Loading')` on a disabled load-more button is a genuine
+  presence claim about a loading state.
+- `toHaveTextContent('You')` on `author-name-self-post` is the one worth
+  strengthening. Three characters is a weak claim about a display name, and the
+  surrounding test is about which moderation affordances render rather than about
+  pseudonymity, so nothing else in it would fail if the self label regressed to
+  something merely containing "You". Not urgent, because the pseudonymity
+  guarantee has real coverage elsewhere at the contract tier
+  (`6.1-CON-013`) and end to end (`6.1-E2E-06`, which pins the alias format).
+
+So the durable fix is a lint rule with two exclusions — negated assertions, and
+positives paired with a longer-prefix negation on the same element — and the
+backlog it produces today is one assertion, not 120.
+
+The general lesson, which is the branch's recurring one in a new costume: an
+options object with a plausible key that the callee never reads is a test that
+looks stronger than it is, and the only thing that distinguishes the two is
+mutating the code and watching the assertion fail.
+
 ## An advisory CI job cannot be the last line of defence (2026-09-06)
 
 A mutation-testing leftover reached `main`'s pull request as committed code.

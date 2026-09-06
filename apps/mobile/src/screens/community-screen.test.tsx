@@ -217,11 +217,44 @@ function feed(overrides: Partial<CommunityFeed> = {}): CommunityFeed {
  * encoder parses before it encodes, so it is also what makes a future required
  * field a compile error rather than a silently passing test.
  *
- * `apps/mobile/vitest.config.ts` should carry `'buffer'` in `optimizeDeps.include`
- * for the reason its own comment gives; that file belongs to another owner.
+ * The one `buffer` package this monorepo resolves to anywhere is 5.7.1, and its
+ * `toString` switch has no `'base64url'` case at all -- so this is not a bundling
+ * or pre-optimization timing gap that `optimizeDeps.include` would fix, it is a
+ * missing feature in the only version available. Patched narrowly, here, rather
+ * than in `vitest.config.ts`: nothing else in this browser-mode suite mints a
+ * cursor, so nothing else needs it, and reaching for a newer `buffer` dependency
+ * for one test file's sake would be a wider change than the gap it closes.
  */
 const browserGlobal = globalThis as typeof globalThis & { Buffer?: typeof Buffer }
 browserGlobal.Buffer ??= Buffer
+const supportsBase64Url = (() => {
+  try {
+    return Buffer.from('a').toString('base64url' as BufferEncoding) === 'YQ'
+  } catch {
+    // buffer@5.7.1 throws on an encoding it does not recognise rather than
+    // returning something wrong, which is exactly the case this check exists
+    // to detect.
+    return false
+  }
+})()
+if (!supportsBase64Url) {
+  const encodeBase64: (encoding: BufferEncoding, ...rest: never[]) => string =
+    Buffer.prototype.toString
+  Buffer.prototype.toString = function toStringWithBase64Url(
+    this: Buffer,
+    encoding?: BufferEncoding,
+    ...rest: never[]
+  ) {
+    if (encoding !== 'base64url') {
+      return encodeBase64.call(this, encoding as BufferEncoding, ...rest)
+    }
+    return encodeBase64
+      .call(this, 'base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+  } as typeof Buffer.prototype.toString
+}
 
 function cursor(band: ClimateBand | null, mode: CommunityFeedMode = 'auto') {
   return encodeCommunityFeedCursor({
@@ -423,9 +456,6 @@ describe('Mobile community screen (Story 6.1)', () => {
 
     const highlight = await screen.findByTestId('highlighted-community-card-post-a')
     expect(postReads).toBe(1)
-    // The badge was a hardcoded "Community post #<id>", and the body under it was
-    // three more English literals assembled from the notification's payload.
-    expect(highlight.textContent).toContain(enUS.community.deepLink.highlight)
 
     // A real card rather than a synthetic one: the alt text the author had to
     // confirm and the moderation control are both present, and neither could be on
@@ -439,6 +469,20 @@ describe('Mobile community screen (Story 6.1)', () => {
     expect(screen.getAllByTestId('community-post-card-post-a')).toHaveLength(1)
     expect(highlight.contains(screen.getByTestId('community-post-card-post-a'))).toBe(
       true
+    )
+
+    // No separate visible badge: web's own highlighted card carries none, only a
+    // border treatment, so this reuses web's existing announcement key instead of
+    // inventing a new one that would have needed translating on a surface this
+    // session may not touch.
+    //
+    // `waitFor`, not a synchronous assertion: `findByTestId` above resolves the
+    // moment the highlighted card lands in the DOM, which a real browser can do
+    // before the effect that announces it has actually run.
+    await waitFor(() =>
+      expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(
+        enUS.community.feed.announceFocused
+      )
     )
   })
 

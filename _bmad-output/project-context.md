@@ -99,6 +99,13 @@ _This file contains critical rules and patterns that AI agents must follow when 
   use the relevant integration, Playwright, Maestro, Pact, or k6 command when
   the changed boundary requires it.
 - Never commit focused tests (`.only`); ESLint rejects them.
+- `toHaveTextContent(string)` is a SUBSTRING check, so it passes on any element
+  whose text merely contains the argument, and it silently ignores unknown
+  options such as `{ exact: true }`. Use it when the claim is that text is
+  present; use `expect(el.textContent).toBe(...)` when the claim is that text is
+  exactly this, or pair the positive with a `not.toHaveTextContent(...)` on the
+  longer string the way `6.1-WEB-011` does. Only those two forms can fail when a
+  qualifier is appended to a label.
 
 ### Code Quality & Style Rules
 
@@ -181,4 +188,4 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Update it when the stack or project conventions change.
 - Review periodically and remove stale or redundant rules.
 
-Last Updated: 2026-07-17
+Last Updated: 2026-09-06

@@ -592,7 +592,6 @@
     "share": "Comparte tu look",
     "newPost": "Nueva publicación",
     "deepLink": {
-      "highlight": "Abierto desde tu notificación",
       "invalid": "Este enlace no es válido, venció o ya no está disponible."
     },
     "filters": {

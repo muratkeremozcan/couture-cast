@@ -931,14 +931,14 @@ describe('community HTTP contracts', () => {
       {
         method: 'post',
         path: '/api/v1/community/posts/allocate',
-        // The 429 here is documented and, as of 2026-09-06, not reachable:
-        // `CommunityService.allocatePost` enforces no rolling cap, and the only
-        // two throws of `CommunityRateLimitException` are in `publishPost` and
-        // `reportPost`. Recorded rather than quietly dropped, because deciding
-        // between rate-limiting allocation and removing the documented response
-        // is a product call, not a fixture edit. This row asserts what the
-        // document says today; when that decision lands, this row moves with it.
-        statuses: ['200', '400', '401', '403', '409', '429', '500', '503'],
+        // No 429 here, on purpose. `CommunityService.allocatePost` enforces no
+        // rolling cap; the only two throws of `CommunityRateLimitException` are
+        // in `publishPost` and `reportPost`. The document carried a 429 for this
+        // operation until 2026-09-06, when this table caught the mismatch and it
+        // was removed as the wrong side: the daily cap counts PUBLISHED posts, a
+        // draft allocated here may never be published, and gating allocation
+        // would refuse upload sessions for drafts the cap was never meant to see.
+        statuses: ['200', '400', '401', '403', '409', '500', '503'],
       },
       {
         method: 'post',

@@ -229,6 +229,19 @@ describe('6.1 community locale parity', () => {
   })
 
   /**
+   * Web-only card-detail copy. The web grid clamps a card to a 256px thumbnail
+   * and a 3-line caption, so opening a look there expands it into a modal with
+   * its own open/close affordance. Mobile's card already renders a larger image
+   * and exposes the full alt text to VoiceOver via `accessibilityLabel`, so the
+   * open interaction there is a silent tap that only records the analytics
+   * event -- there is no second surface to label. This is a deliberate,
+   * documented exception rather than a gap: an unexplained absence would look
+   * like a missed translation, and adding unused strings to mobile's catalogs to
+   * satisfy the comparison would be worse than the asymmetry it papers over.
+   */
+  const WEB_ONLY_KEYS = ['card.detailClose', 'card.open', 'card.openLabel']
+
+  /**
    * The spec requires identical localized states on both surfaces. Comparing
    * values rather than keys is what makes that a real check: two catalogs can
    * share a key tree and still tell a Turkish reader two different things about
@@ -237,10 +250,31 @@ describe('6.1 community locale parity', () => {
   it('6.1-I18N-MOB-09 ships the same community tree on web and mobile in every locale', async () => {
     for (const locale of SUPPORTED_LOCALES) {
       const web = await WEB_CATALOG_PATHS[locale]()
-      expect(
-        Object.fromEntries(flatten(communityTree(web.default))),
-        `${locale} web/mobile community tree`
-      ).toEqual(Object.fromEntries(flatten(communityTree(CATALOGS[locale]))))
+      const webTree = Object.fromEntries(flatten(communityTree(web.default)))
+      for (const key of WEB_ONLY_KEYS) {
+        delete webTree[key]
+      }
+      expect(webTree, `${locale} web/mobile community tree`).toEqual(
+        Object.fromEntries(flatten(communityTree(CATALOGS[locale])))
+      )
+    }
+  })
+
+  /**
+   * `WEB_ONLY_KEYS` above is a documented exception, not a blind spot: this
+   * pins that the web catalog actually carries every one of them, with a real
+   * translation, in every locale. Without it a typo in the exception list
+   * (or a key silently dropped from web) would pass MOB-09 by excluding
+   * something that was never there to begin with.
+   */
+  it('6.1-I18N-MOB-10 still requires the documented web-only keys to exist and be translated', async () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      const web = await WEB_CATALOG_PATHS[locale]()
+      const webTree = Object.fromEntries(flatten(communityTree(web.default)))
+      for (const key of WEB_ONLY_KEYS) {
+        expect(webTree[key], `${locale} ${key}`).toBeTruthy()
+        expect(webTree[key]?.trim().length, `${locale} ${key}`).toBeGreaterThan(0)
+      }
     }
   })
 })

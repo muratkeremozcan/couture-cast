@@ -163,11 +163,16 @@ describe('CommunityCard (Story 6.1)', () => {
   })
 
   it('6.1-MOB-085 records an open from the photo without regrouping the card', () => {
-    const { onOpen, onReport } = renderCard()
+    // Rendered with one fixed object, compared against that same object below.
+    // `item()` stamps `imageAccess.expiresAt` off live `Date.now()`, so calling
+    // it a second time for the comparison raced the clock and could compare two
+    // objects a few milliseconds apart.
+    const fixedItem = item()
+    const { onOpen, onReport } = renderCard({ item: fixedItem })
 
     press(screen.getByTestId('community-card-open-post-a'))
     expect(onOpen).toHaveBeenCalledTimes(1)
-    expect(onOpen).toHaveBeenCalledWith(item())
+    expect(onOpen).toHaveBeenCalledWith(fixedItem)
 
     // The two native contracts a pressable card is most likely to break. The
     // container must still not group (iOS would announce one element and hide the
@@ -275,7 +280,12 @@ describe('CommunityCard (Story 6.1)', () => {
 
   it('6.1-MOB-088 emphasises the look a deep link landed on', () => {
     const { rerender } = renderCard()
-    expect(screen.getByTestId('community-post-card-post-a').style.borderWidth).toBe('1px')
+    const card = screen.getByTestId('community-post-card-post-a')
+    // `styles.card` comes from `StyleSheet.create`, which react-native-web
+    // compiles to a CSS class rather than an inline style; `.style` only
+    // reflects the inline override, so it reads empty here even though the
+    // element genuinely renders a 1px border.
+    expect(getComputedStyle(card).borderWidth).toBe('1px')
 
     rerender(
       <CommunityCard
@@ -287,7 +297,7 @@ describe('CommunityCard (Story 6.1)', () => {
     )
     // Border weight, not the gold alone: the emphasis has to survive a reader who
     // cannot separate the accent from the divider.
-    expect(screen.getByTestId('community-post-card-post-a').style.borderWidth).toBe('2px')
+    expect(getComputedStyle(card).borderWidth).toBe('2px')
   })
 
   it('6.1-MOB-035 offers Withdraw on an own look and Report on everyone else’s', () => {

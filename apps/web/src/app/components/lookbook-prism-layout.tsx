@@ -199,6 +199,11 @@ export function LookbookPrismLayout() {
   // Without lifting the resolved band, the two navs answer "which climate am I
   // seeing" differently: the grid's names the band, this one says "Your climate".
   const [viewerBand, setViewerBand] = useState<ClimateBand | null>(null)
+  // Same reason as `viewerBand`, for `mode`: the experiment can serve `all` to a
+  // viewer who requested `auto`, and without this the two navs would disagree
+  // about which chip is pressed. `null` until the grid's first response lands,
+  // so this nav starts by mirroring the click like the grid itself does.
+  const [servedMode, setServedMode] = useState<FilterCategory | null>(null)
 
   // Deep Link & Notification States
   const [isInvalidDeepLink, setIsInvalidDeepLink] = useState(false)
@@ -463,7 +468,7 @@ export function LookbookPrismLayout() {
           </div>
 
           <LookbookFilterNav
-            activeTab={activeTab}
+            activeTab={servedMode ?? activeTab}
             isMobilePreview={isMobilePreview}
             onTabChange={setActiveTab}
             viewerBand={viewerBand}
@@ -566,6 +571,7 @@ export function LookbookPrismLayout() {
             chipCategory={chipCategory}
             highlightedCardId={highlightedCardId}
             onViewerBandChange={setViewerBand}
+            onServedModeChange={setServedMode}
           />
         </section>
 

@@ -191,9 +191,15 @@ function altTextOf(item: CommunityFeedItem, authorName: string, t: Translate): s
 function modeLabel(
   mode: CommunityFeedMode,
   viewerBand: ClimateBand | null,
-  t: Translate
+  t: Translate,
+  // Defaults to the pre-existing behaviour for the two callers describing a
+  // served or just-requested mode directly, where `mode` already IS the thing
+  // being labelled. The chip strip is different: it renders one button per
+  // possible mode and must not let an unselected `auto` button promise a
+  // resolved climate the currently served feed is not filtered to.
+  isActive = true
 ): string {
-  if (mode === 'auto' && viewerBand) {
+  if (isActive && mode === 'auto' && viewerBand) {
     return t('community.filters.mode.autoWithBand', {
       band: t(`community.band.${viewerBand}`),
     })
@@ -384,7 +390,7 @@ export function LookbookFilterNav({
               aria-pressed={isActive}
               className={`min-h-[44px] whitespace-nowrap border-b-2 px-3 py-2 text-xs uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${tabletStyles} ${activeStyles}`}
             >
-              {modeLabel(mode, viewerBand, t)}
+              {modeLabel(mode, viewerBand, t, isActive)}
             </button>
           )
         })}
@@ -1835,21 +1841,33 @@ export function CommunityLookbookGrid({
    */
   useEffect(() => {
     const controller = new AbortController()
+    // A boolean the closure owns, not the signal. Every fresh page pulls this
+    // effect down and back up, and relying on the abort to race the settlement
+    // of the SAME call it cancels would leave the superseded promise able to
+    // clear a value the newer one had already set, depending on which happened
+    // to settle last. The flag makes a torn-down run's callbacks inert
+    // regardless of that ordering.
+    let cancelled = false
     if (highlightedCardId && !items.some((item) => item.id === highlightedCardId)) {
       void getCommunityPostFromWeb(highlightedCardId, controller.signal)
         .then((post) => {
-          setDeepLinkedItem(post)
+          if (!cancelled) {
+            setDeepLinkedItem(post)
+          }
         })
         .catch(() => {
           // A target withdrawn between the link being followed and this read is
           // an expected outcome, and `processWebDeepLink` owns the invalid-link
           // copy, so nothing is reported from here.
-          setDeepLinkedItem(null)
+          if (!cancelled) {
+            setDeepLinkedItem(null)
+          }
         })
     } else {
       setDeepLinkedItem(null)
     }
     return () => {
+      cancelled = true
       controller.abort()
     }
   }, [highlightedCardId, items])

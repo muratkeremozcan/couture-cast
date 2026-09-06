@@ -192,11 +192,14 @@ describe('Mobile Deep Link Handling (Story 3.7)', () => {
 
     const highlight = await screen.findByTestId('highlighted-community-card-look-42')
 
-    // The badge is a catalogue key. It used to read "Community post #look-42",
-    // pinned verbatim by this file, which is both untranslated and an id nobody
-    // outside the codebase has any use for.
-    expect(highlight.textContent).toContain(enUS.community.deepLink.highlight)
-    expect(highlight.textContent).not.toContain('look-42')
+    // The card used to be synthesised from the notification payload, badged with
+    // the hardcoded, untranslated "Community post #look-42". It is the real post
+    // now, with no separate badge, so the raw id must not leak into the render.
+    expect(highlight.textContent).not.toContain('Community post #')
+    expect(highlight.textContent).not.toContain('#look-42')
+    expect(
+      screen.getByTestId('community-card-image-look-42').getAttribute('aria-label')
+    ).toBe(communityPost().altText)
 
     expect(mockCapture).toHaveBeenCalledWith('deep_link_handled', {
       source: 'notification',

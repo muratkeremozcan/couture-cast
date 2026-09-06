@@ -592,7 +592,6 @@
     "share": "Share your look",
     "newPost": "New post",
     "deepLink": {
-      "highlight": "Opened from your notification",
       "invalid": "This link is invalid, expired, or no longer available."
     },
     "filters": {

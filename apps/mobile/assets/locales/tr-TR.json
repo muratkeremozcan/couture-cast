@@ -592,7 +592,6 @@
     "share": "Kombinini paylaş",
     "newPost": "Yeni gönderi",
     "deepLink": {
-      "highlight": "Bildiriminden açıldı",
       "invalid": "Bu bağlantı geçersiz, süresi dolmuş veya artık kullanılamıyor."
     },
     "filters": {
@@ -748,7 +747,7 @@
       "selfReport": "Kendi kombinini şikayet edemezsin.",
       "notFound": "Bu kombin artık kullanılamıyor.",
       "disabled": "Topluluk akışı geçici olarak kullanılamıyor.",
-      "mediaUnavailable": "Bu kombin geçici olarak kullanılamıyor. Birazdan tekrar dene.",
+      "mediaUnavailable": "Bu kombin geçici olarak kullanılamıyor. Kısa süre sonra tekrar dene.",
       "generic": "Bir şeyler ters gitti. Tekrar dene."
     }
   }

@@ -58,8 +58,14 @@ export function CommunityFilterChips({
       >
         {COMMUNITY_FILTER_MODES.map((mode) => {
           const isActive = selectedMode === mode
+          // The band qualifier is tied to `isActive`, not just to `mode === 'auto'`.
+          // The experiment can serve `all` to a viewer who requested `auto`, and
+          // `viewerBand` is resolved independently of what was served, so without
+          // this the auto chip would promise "Your climate: X" while a completely
+          // different, unfiltered feed sits on screen and the `all` chip is the
+          // one actually pressed.
           const label =
-            mode === 'auto' && viewerBand
+            isActive && mode === 'auto' && viewerBand
               ? t('community.filters.mode.autoWithBand', {
                   band: t(`community.band.${viewerBand}`),
                 })

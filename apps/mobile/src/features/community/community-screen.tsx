@@ -207,12 +207,22 @@ export function CommunityScreen() {
     })
   }, [])
 
+  /**
+   * Mirrors web's own deep-link focus effect: focus lands on the card itself
+   * (web calls `cardElement.focus()`), and `community.feed.announceFocused` is
+   * the same key web already announces through its own live region. Reusing it
+   * means the two surfaces need no new locale key for this, and no separate
+   * visible badge either -- web's highlighted card carries no such badge, only a
+   * border treatment, which is what `CommunityCard`'s `isHighlighted` prop gives
+   * mobile already.
+   */
   useEffect(() => {
     if (!deepLinkPost) {
       return
     }
+    AccessibilityInfo.announceForAccessibility(t('community.feed.announceFocused'))
     focusNode(targetRef.current)
-  }, [focusNode, deepLinkPost])
+  }, [focusNode, deepLinkPost, t])
 
   /**
    * One in-flight feed request at a time, guarded twice: the `AbortController`
@@ -712,26 +722,10 @@ export function CommunityScreen() {
           testID={`highlighted-community-card-${deepLinkPost.id}`}
           style={styles.highlightSection}
         >
-          {/*
-            Grouping is deliberate here and only here: the badge is one line of
-            text, so collapsing it costs nothing, and it gives accessibility focus
-            somewhere to land that announces why this look is at the top. The card
-            below it stays ungrouped, so the reader walks into its alt text and
-            controls exactly as they would in the feed.
-          */}
-          <View
-            ref={targetRef}
-            accessible
-            accessibilityRole="header"
-            style={styles.highlightBadgeRow}
-          >
-            <Text style={[styles.highlightBadge, { color: palette.text }]}>
-              {t('community.deepLink.highlight')}
-            </Text>
-          </View>
           <CommunityCard
             item={deepLinkPost}
             isHighlighted
+            containerRef={targetRef}
             isReported={reportedPostIds.has(deepLinkPost.id)}
             onReport={handleReportPost}
             onWithdraw={handleWithdrawPost}
@@ -909,15 +903,6 @@ const styles = StyleSheet.create({
   },
   highlightSection: {
     marginTop: 12,
-  },
-  highlightBadgeRow: {
-    paddingHorizontal: 16,
-  },
-  highlightBadge: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    marginBottom: 6,
   },
   infoPanel: {
     marginHorizontal: 16,
