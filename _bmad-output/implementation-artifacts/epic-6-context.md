@@ -2,6 +2,8 @@
 
 <!-- Compiled from planning artifacts. Edit freely. Regenerate with compile-epic-context if planning docs change. -->
 
+_Updated: 2026-09-06: re-sliced remaining work from the shipped Story 6.1 baseline._
+
 ## Goal
 
 Turn CoutureCast from a private daily ritual into a social one. This epic delivers the community
@@ -19,10 +21,18 @@ signed.
 ## Stories
 
 - Story 6.1: Community feed by climate band
-- Story 6.2: Reactions and comments
-- Story 6.3: Locale highlight modules
-- Story 6.4: Social export workflows
-- Story 6.5: Moderation queue and SLA tracking
+- Story 6.2: Production content-screening readiness
+- Story 6.3: Curated reactions
+- Story 6.4: Threaded comments
+- Story 6.5: Realtime engagement and notifications
+- Story 6.6: Community City Spotlight
+- Story 6.7: Home spotlight teaser
+- Story 6.8: Safe branded share-card export
+- Story 6.9: Native platform sharing
+- Story 6.10: Moderator queue and case detail
+- Story 6.11: Moderation decisions and account sanctions
+- Story 6.12: SLA monitoring and escalation
+- Story 6.13: Immutable moderation history
 
 ## Requirements & Constraints
 
@@ -108,14 +118,29 @@ signed.
 
 ## Cross-Story Dependencies
 
-- Story 6.1 is the foundation. Stories 6.2, 6.4, and 6.5 all build on the post model and feed it
-  establishes; run 6.1 through 6.3 in order before enabling export and moderation.
-- Story 6.3 consumes the reaction aggregates from 6.2 and the localization framework from Epic 3.
-- Story 6.4 depends on the shareable outfit card from Epic 2 alongside the feed from 6.1.
-- Story 6.5 depends on the flag capture in 6.1 and the telemetry and audit baseline from Epic 1.
+- Story 6.1 is the foundation for every remaining lane. Production read and write controls stay
+  disabled while those lanes are built and verified.
+- Story 6.2 replaces the unavailable image-screener adapter and closes the model-readiness gate. It
+  also supplies the text-screening boundary consumed by comments in Story 6.4.
+- Story 6.3 creates reaction aggregates. Story 6.6 consumes them for deterministic spotlight
+  ranking, and Story 6.7 projects that result onto Home.
+- Story 6.5 consumes the durable reaction and comment writes from Stories 6.3 and 6.4. It owns
+  Socket.io publication, reconnect behavior, engagement pushes, and focused deep links.
+- Story 6.8 creates and saves the privacy-safe export asset. Story 6.9 owns native platform handoff
+  and recovery while preserving that prepared asset.
+- Story 6.10 exposes existing report snapshots through the moderator queue. Story 6.11 routes
+  decisions and sanctions through the operator boundary, Story 6.12 monitors the SLA, and Story
+  6.13 enforces immutable retention and evidence export.
 - Epic 3 supplies the responsive split layout, chip and bottom navigation, localization, deep-link
   handling, and accessibility hardening. Epic 4 supplies the garment and image capture pipeline that
   community posts reuse, including its consent, retention, and NSFW screening path.
 - Delivery note (2026-09-05): Epics 4 and 5 were built ahead of their Phase 3 label; CC-4.1 through
   CC-5.5 are already `done`. Cross-phase prerequisites recorded on CC-3.7 and CC-6.1 are satisfied
   by that early delivery and do not gate the Phase 2 Community Beta.
+
+## Open refinement decision
+
+- The product brief requires follow and unfollow from feed and profile views. FR4 and the former
+  Story 6.2 omit a follow graph and public community profile. Keep the Following filter disabled
+  until product adds separately sized stories or amends the brief and UX promise. Close this
+  decision before Community Beta sign-off.

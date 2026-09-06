@@ -7,6 +7,8 @@
 **Project Level:** Level 3  
 **Target Scale:** 2–3 cross-functional squads with shared moderation support
 
+_Updated: 2026-09-06: re-sliced the remaining Epic 6 work from the shipped Story 6.1 baseline._
+
 ---
 
 ## Overview
@@ -479,41 +481,172 @@ As a style explorer, I want a feed of looks from similar weather regions so that
 3. Surface weekly challenge banner curated by editorial team.  
    **Prerequisites:** CC-3.1, CC-4.1.
 
-**Story CC-6.2: Reactions and comments**  
-As a community member, I want to react and comment on posts so that I can engage with peers.  
+**Story CC-6.2: Production content-screening readiness**
+As a trust and safety operator, I want production-grade image and text screening so that Community
+Beta can publish safe content without routing every submission to manual review.
 **Acceptance Criteria**
 
-1. Provide curated emoji palette and threaded comments with report option.
-2. Aggregate reactions to drive highlight ranking.
-3. Enforce age gate (13+) and log interactions for analytics.  
+1. Integrate the ADR-013 image screener into the standalone moderation worker with a pinned model
+   identity, bounded execution time, and fail-closed unavailable behavior.
+2. Screen caption and alt text for every enabled Community Beta locale, including documented
+   obfuscation cases and escalation for languages or confidence levels requiring human review.
+3. Prove model startup, retry, latency, false-positive, false-negative, and degraded-mode behavior
+   with versioned fixtures and produce the signed model-readiness evidence for the beta gate.
+   **Prerequisites:** CC-6.1, CC-0.4, CC-1.4.
+
+**Story CC-6.3: Curated reactions**
+As a community member, I want to applaud a look with a curated reaction so that I can engage quickly
+and contribute a trustworthy ranking signal.
+**Acceptance Criteria**
+
+1. Provide a closed emoji palette with one current reaction per member and post; replacement,
+   removal, and retried requests are idempotent.
+2. Return exact per-emoji and total aggregates on feed items, and invalidate affected feed and
+   highlight caches when a post leaves public visibility.
+3. Enforce the 13+ participation gate, emit privacy-safe deduplicated analytics, and deliver
+   accessible reaction controls on web and mobile.
    **Prerequisites:** CC-6.1.
 
-**Story CC-6.3: Locale highlight modules**  
-As a user, I want curated highlight sections so that standout looks surface quickly.  
+**Story CC-6.4: Threaded comments**
+As a community member, I want to discuss a look in a readable thread so that I can exchange useful
+style feedback safely.
 **Acceptance Criteria**
 
-1. Rank posts using reactions + recency to populate “City Spotlight” modules.
-2. Display modules on home screen and community tab with CTA to view more.
-3. Respect locale copy via localization framework.  
-   **Prerequisites:** CC-6.2, CC-3.2.
+1. Create and keyset-page top-level comments with one reply level; stable ordering prevents gaps or
+   duplicates during concurrent writes.
+2. Screen text before publication, preserve thread shape with author-deletion tombstones, and expose
+   a report action on every visible comment.
+3. Route accepted reports to moderation within five minutes, enforce age and consent rules, emit
+   privacy-safe analytics, and deliver accessible web and mobile states.
+   **Prerequisites:** CC-6.1, CC-6.2.
 
-**Story CC-6.4: Social export workflows**  
-As a trendsetter, I want to share CoutureCast outfit cards to social platforms so that my friends see them.  
+**Story CC-6.5: Realtime engagement and notifications**
+As a community member, I want new posts and engagement updates to arrive promptly so that the feed
+feels current and relevant.
 **Acceptance Criteria**
 
-1. Provide native share sheet integration for Pinterest, Instagram, Facebook, TikTok.
-2. Generate branded asset with optional watermark and stripped personal data.
-3. Offer “Save to camera roll” fallback if platform share fails.  
-   **Prerequisites:** CC-6.1, CC-2.1.
+1. Publish versioned new-post, reaction, and comment events after durable commits; reconnect and
+   polling fallback preserve order and suppress duplicates.
+2. Send opt-in engagement notifications within 60 seconds while honoring quiet hours and invalid
+   token cleanup.
+3. Deep-link to the visible target with keyboard and screen-reader focus, and record delivery,
+   fallback, and failure telemetry without sensitive content.
+   **Prerequisites:** CC-6.3, CC-6.4, CC-3.7.
 
-**Story CC-6.5: Moderation queue & SLA tracking**  
-As a community manager, I need queueing and audit controls so that flagged content is reviewed within 24 hours.  
+**Story CC-6.6: Community City Spotlight**
+As a community member, I want a ranked City Spotlight in the Community tab so that standout local
+looks surface quickly.
 **Acceptance Criteria**
 
-1. Capture flags with content snapshot and submit to moderation dashboard.
-2. Track review timestamps, actions (resolve, escalate, ban) and enforce 24-hour SLA alerts.
-3. Maintain immutable audit log for 12 months.  
-   **Prerequisites:** CC-6.1, CC-1.4.
+1. Rank eligible published posts through deterministic reaction and recency scoring with a pinned
+   time window, tie breaker, coarse location source, and documented minimum privacy cohort.
+2. Cache the ranked read model in Redis and invalidate it when engagement changes or moderation
+   removes a post.
+3. Deliver a localized, paginated Community tab module with an accessible View more path and
+   privacy-safe impression and open analytics.
+   **Prerequisites:** CC-6.3, CC-3.2.
+
+**Story CC-6.7: Home spotlight teaser**
+As a user, I want a compact spotlight on Home so that I can discover community inspiration without
+interrupting my daily ritual.
+**Acceptance Criteria**
+
+1. Render the spotlight independently of hero loading and preserve the existing Home experience
+   when highlight data is empty, stale, disabled, or unavailable.
+2. Link the teaser to the corresponding Community result and maintain focus and screen-reader
+   context across navigation.
+3. Localize every state and show a disclosed affiliate CTA with click analytics only when the
+   selected highlight has an eligible sponsorship.
+   **Prerequisites:** CC-6.6, CC-5.1, CC-3.2.
+
+**Story CC-6.8: Safe branded share-card export**
+As a trendsetter, I want to create and save a privacy-safe CoutureCast card so that I control the
+asset before sharing it.
+**Acceptance Criteria**
+
+1. Render a deterministic branded card from an eligible outfit or community post with an optional
+   watermark and a localized preview.
+2. Strip source metadata, exact location, user identifiers, signed media URLs, and other personal
+   fields from both pixels and exported metadata.
+3. Save to the camera roll on iOS and Android or download on web with explicit permission,
+   cancellation, storage-failure, and accessibility states.
+   **Prerequisites:** CC-6.1, CC-2.1, CC-3.2.
+
+**Story CC-6.9: Native platform sharing**
+As a trendsetter, I want to send my prepared card through an available social app so that friends
+can see the look.
+**Acceptance Criteria**
+
+1. Invoke the native share sheet for Pinterest, Instagram, Facebook, and TikTok targets when the
+   operating system exposes them, with a generic system-share path for other compatible apps.
+2. Preserve the prepared card and composition state when a member cancels, the target is absent, or
+   the handoff fails.
+3. Offer the Story 6.8 save path after failure and record platform, outcome, and duration analytics
+   without exported content or personal data.
+   **Prerequisites:** CC-6.8.
+
+**Story CC-6.10: Moderator queue and case detail**
+As a community moderator, I want an ordered queue with complete case context so that I can review
+the highest-risk and oldest content first.
+**Acceptance Criteria**
+
+1. Expose moderator-only, keyset-paginated queue and case-detail contracts over the existing post
+   and comment report snapshots, with filters for source, locale, risk, status, and SLA state.
+2. Render an accessible Next.js admin queue and case view with safe media access, machine findings,
+   reporter context, prior actions, and time remaining.
+3. Keep unauthorized roles and direct database clients outside every moderation read path, and
+   prove queue intake remains visible within five minutes of an accepted report.
+   **Prerequisites:** CC-6.1, CC-6.4, CC-1.4.
+
+**Story CC-6.11: Moderation decisions and account sanctions**
+As a community moderator, I want controlled decision actions so that harmful content and repeat
+abuse receive consistent treatment.
+**Acceptance Criteria**
+
+1. Route resolve, release, takedown, escalate, and ban actions through canonical contracts and the
+   existing operator service, with a required reason and authenticated moderator identity.
+2. Serialize conflicting reviews, make retries idempotent, invalidate public caches immediately,
+   and preserve the first effective decision timestamp.
+3. Define temporary and permanent ban effects on sessions, new engagement, existing content, and
+   appeal status; show localized operator outcomes and append attributed audit events.
+   **Prerequisites:** CC-6.10, CC-0.11.
+
+**Story CC-6.12: SLA monitoring and escalation**
+As a community manager, I want at-risk and breached cases escalated automatically so that every
+report receives review within 24 hours.
+**Acceptance Criteria**
+
+1. Calculate at-risk and breached states from persisted intake and resolution timestamps using a
+   scheduled, retry-safe worker.
+2. Alert the configured operations channel before breach and at breach, deduplicate retries, and
+   escalate delivery failures through the established observability path.
+3. Provide queue and SLA dashboards, alert tests, and an operating runbook that proves ownership,
+   staffing coverage, and response steps for the beta gate.
+   **Prerequisites:** CC-6.10, CC-1.4, CC-0.7.
+
+**Story CC-6.13: Immutable moderation history**
+As a compliance reviewer, I want moderation history protected and retained so that CoutureCast can
+demonstrate trustworthy safety operations.
+**Acceptance Criteria**
+
+1. Enforce append-only moderation decision records at the database boundary and reject updates or
+   deletions from application and authenticated database roles.
+2. Retain audit metadata for at least 12 months while account erasure removes personal content and
+   anonymizes subject and reporter identity within the established 72-hour deadline.
+3. Provide a moderator-authorized evidence export plus database, API, and end-to-end proof for the
+   audit, privacy, and deletion signatures on the Community Beta gate.
+   **Prerequisites:** CC-6.11, CC-1.4.
+
+### Epic 6 refinement decision
+
+The product brief requires follow and unfollow behavior from feed and profile views. FR4 and the
+original Epic 6 story set require reactions and comments without defining a follow graph or public
+community profile. Keep the Following filter disabled until product chooses one of these changes:
+
+1. Add separately sized follow-graph, community-profile, privacy, and feed stories.
+2. Amend the brief and UX specification to remove Following from the Community Beta promise.
+
+This decision does not block drafting Story 6.2. It must close before Community Beta sign-off.
 
 ---
 
@@ -548,9 +681,14 @@ As a community manager, I need queueing and audit controls so that flagged conte
 
 ### Phase roadmap
 
-- **Sprint 0 (Epic 0)**: Provision infrastructure, test environments, and development tooling. Complete all 12 foundation stories (CC-0.1 through CC-0.12) before Epic 1 begins. Critical path: CC-0.1 → CC-0.2 → CC-0.3 → CC-0.11 (guardian consent) establishes baseline; CC-0.4 through CC-0.12 can partially overlap.
+- **Sprint 0 (Epic 0)**: Provision infrastructure, test environments, and development tooling.
+  Complete all 14 foundation stories (CC-0.1 through CC-0.14) before Epic 1 begins. Critical path:
+  CC-0.1 → CC-0.2 → CC-0.3 → CC-0.11 establishes the guardian-consent baseline; CC-0.4
+  through CC-0.14 can partially overlap where their recorded prerequisites allow it.
 - **Phase 1 (Epics 1–3)**: Build the weather backbone, personalization engine, and cross-surface experiences with localization. Stories CC-1.1, CC-2.1, CC-3.1 can kick off in parallel once Epic 0 is complete.
-- **Phase 2 (Epic 6)**: Launch community loop; run CC-6.1–CC-6.3 sequentially before enabling social export and moderation.
+- **Phase 2 (Epic 6)**: Build the remaining safety, engagement, highlight, export, and moderation
+  lanes behind disabled production controls. Open Community Beta only after CC-6.2 through CC-6.13
+  and every signed release-gate item are complete.
 - **Phase 3 (Epics 4–5)**: Layer wardrobe capture and monetization. Ensure CC-4.1 (garment capture) lands before CC-5.4 (palette advisor) so the advisor has wardrobe context.
 - **Delivery note (2026-09-05):** Epics 4 and 5 were built ahead of their Phase 3 label; CC-4.1 through CC-5.5 are already `done`. Cross-phase prerequisites recorded on CC-3.7 and CC-6.1 are satisfied by that early delivery and do not gate the Phase 2 Community Beta.
 
@@ -563,8 +701,8 @@ As a community manager, I need queueing and audit controls so that flagged conte
 
 **Feature Epics (Phase 1-3) Parallel Opportunities:**
 
-- Parallel-ready stories: CC-1.1 & CC-1.4 (telemetry) can run concurrently once API schema agreed. CC-3.2 (localization) and CC-3.3 (widgets) can overlap after CC-3.1 design tokens settle.
-- Sequential chains: CC-2.1 → CC-2.2 → CC-2.3; CC-6.1 → CC-6.2 → CC-6.3 → CC-6.5; CC-4.1 → CC-4.2 → CC-4.3; CC-5.2 gates CC-5.3, CC-5.4 & CC-5.5.
+- Parallel-ready stories: CC-1.1 & CC-1.4 (telemetry) can run concurrently once API schema agreed. CC-3.2 (localization) and CC-3.3 (widgets) can overlap after CC-3.1 design tokens settle. In Epic 6, the content-screening, reactions, export, and moderator-queue lanes can begin after CC-6.1 while production controls remain disabled.
+- Sequential chains: CC-2.1 → CC-2.2 → CC-2.3; CC-6.3 → CC-6.6 → CC-6.7; CC-6.2 + CC-6.4 → CC-6.5; CC-6.8 → CC-6.9; CC-6.10 → CC-6.11 → CC-6.13; CC-6.10 → CC-6.12; CC-4.1 → CC-4.2 → CC-4.3; CC-5.2 gates CC-5.3, CC-5.4 & CC-5.5.
 
 ### Key files / components
 
@@ -590,13 +728,13 @@ As a community manager, I need queueing and audit controls so that flagged conte
 ## Summary
 
 - **Epics:** 7 (including Epic 0: Platform Foundation)
-- **Stories:** 41 (12 Epic 0 infrastructure + 29 feature stories)
-- **Parallel-ready stories:** 9 (post-Epic 0 completion)
-- **Sequential dependency chains:** Epic 0 → all other epics (critical path); 6 primary chains within feature epics
-- **Estimated cadence:** Sprint 0 (Epic 0 foundation), Phase 1 (~2 sprints for Epics 1-3), Phase 2 (~2 sprints for Epic 6), Phase 3 (~2 sprints for Epics 4-5)
-- **Total Duration:** ~7-8 sprints (Sprint 0 + 6-7 feature sprints = 14-16 weeks / 3.5-4 months)
+- **Stories:** 51 (14 Epic 0 infrastructure + 37 feature stories)
+- **Epic 6 remaining stories:** 12 across four delivery lanes
+- **Sequential dependency chains:** Epic 0 → all other epics (critical path); Epic 6 chains are listed under Parallelization hints
+- **Estimated cadence:** Sprint 0 and Phases 1 and 3 are complete. Re-estimate Phase 2 after the twelve remaining Epic 6 stories are drafted and sized.
+- **Total duration:** The original 7-8 sprint estimate is retired because it treated the four former Epic 6 feature packages as single-session stories.
 
 **Epic 0 (Sprint 0) Completion Criteria:**
-All 12 infrastructure stories (CC-0.1 through CC-0.12) must complete before Epic 1 feature work begins. This includes: monorepo initialization, Prisma schema, Supabase setup, Redis/BullMQ config, Socket.io gateway, CI/CD pipelines, observability stack, secret management, OpenAPI tooling, test fixtures, guardian consent implementation, and test environment provisioning.
+All 14 infrastructure stories (CC-0.1 through CC-0.14) must complete before Epic 1 feature work begins. This includes: monorepo initialization, Prisma schema, Supabase setup, Redis/BullMQ config, Socket.io gateway, CI/CD pipelines, observability stack, secret management, OpenAPI tooling, test fixtures, guardian consent implementation, test environment provisioning, cross-surface E2E scaffolding, and expanded test infrastructure.
 
-Every story is scoped for a single-agent session and tagged with prerequisites to keep dependency management explicit. Use the `create-story` workflow for detailed implementation plans as you pull stories into sprint planning. Vision requirement FR8 (CoutureCast Jr.) remains intentionally unassigned pending dedicated discovery.
+Every remaining story is planned for one focused delivery context and tagged with prerequisites. Validate that review envelope while drafting each implementation story. Vision requirement FR8 (CoutureCast Jr.) remains intentionally unassigned pending dedicated discovery.

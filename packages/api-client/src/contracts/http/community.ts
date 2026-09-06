@@ -263,7 +263,7 @@ export const communityPostCaptionSchema = z
   })
   .openapi({
     description:
-      'Caption of at most 280 characters. Applies a best-effort denylist for a fixed set of TLDs (com, org, net, io, co, app, dev, ai, me, tv, info, biz, uk, ca, de, fr, tr) to catch URLs and web links, plus a generic pattern to catch email addresses. Domains outside this TLD list pass unblocked. Ordinary prose that merely contains a listed TLD as a substring is refused even when it is not actually a URL or email. Nothing downstream re-checks this field, so it should not be treated as a complete boundary control.',
+      'Caption of at most 280 characters. Applies a best-effort denylist. Anything carrying an http://, https:// or www. prefix is refused whatever its TLD, and so is anything matching a generic email pattern, again whatever its TLD. The fixed TLD list (com, org, net, io, co, app, dev, ai, me, tv, info, biz, uk, ca, de, fr, tr) governs only bare domain-like values carrying no such prefix, so a bare domain outside that list (example.xyz) passes unblocked. Ordinary prose that merely contains a listed TLD as a substring is refused even when it is not actually a URL or email. Nothing downstream re-checks this field, so it should not be treated as a complete boundary control.',
   })
 
 export const communityPostAltTextSchema = z

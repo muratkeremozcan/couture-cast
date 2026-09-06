@@ -436,6 +436,57 @@ describe('climate-band classifier', () => {
       // it averages 30/30/30 = 30 (warm) with 3/3 wet -> 'warm_wet'.
       expect(classifyClimateBand(days)).toBe('warm_wet')
     })
+
+    it('drops a date whose refreshed row is unusable rather than falling back to the stale row', () => {
+      // The last-wins rule has to survive the refreshed row being UNUSABLE, not
+      // just disagreeing. Deduplicating over already-filtered usable rows would
+      // never see this row, so the stale row it replaced would win and the date
+      // would keep contributing — a stale value outliving its own replacement.
+      const staleButUsable: ClimateBandDay = {
+        localDate: '2026-09-05',
+        temperatureMin: 8,
+        temperatureMax: 12,
+        precipitationAmount: 0,
+      }
+      // 1.5 is out of the canonical 0..1 range, so it is treated as an absent
+      // signal and this row carries no usable precipitation at all.
+      const refreshedButUnusable: ClimateBandDay = {
+        localDate: '2026-09-05',
+        temperatureMin: 8,
+        temperatureMax: 12,
+        precipitationProbability: 1.5,
+      }
+      const otherDates: ClimateBandDay[] = [
+        {
+          localDate: '2026-09-06',
+          temperatureMin: 8,
+          temperatureMax: 12,
+          precipitationAmount: 0,
+        },
+        {
+          localDate: '2026-09-07',
+          temperatureMin: 8,
+          temperatureMax: 12,
+          precipitationAmount: 0,
+        },
+      ]
+
+      // Only 2026-09-06 and 2026-09-07 survive: 2 usable unique dates, below
+      // MINIMUM_USABLE_DAYS.
+      expect(
+        classifyClimateBand([staleButUsable, refreshedButUnusable, ...otherDates])
+      ).toBeNull()
+
+      // Control: the identical shape with a usable refreshed row does classify,
+      // so the null above is the dropped date and not some unrelated rejection.
+      expect(
+        classifyClimateBand([
+          staleButUsable,
+          { ...refreshedButUnusable, precipitationProbability: 0.1 },
+          ...otherDates,
+        ])
+      ).toBe('temperate_dry')
+    })
   })
 
   describe('MAXIMUM_USABLE_DAYS ceiling', () => {

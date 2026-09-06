@@ -1,7 +1,28 @@
 import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
 // Story 6.1 Task 4: ADR-013 automated content screening engine.
-// Multilingual text safety filtering and server-side NSFW image screening,
+// Dictionary-based text safety filtering and server-side NSFW image screening,
 // both with a deterministic, fail-closed verdict.
+//
+// READ THE WORD "FILTERING" NARROWLY, because this used to say "multilingual
+// text safety filtering" and that oversold it in two directions at once.
+//
+// It screens three languages, not ten. `SCREENABLE_LANGUAGES` is `en`/`es`/`fr`;
+// `tr`, `de`, `it` and `pt` ship as supported locales with no dictionary here, and
+// `resolveScreeningLanguage` returns null for them so the post is held rather
+// than cleared. That is a deliberate fail-closed gap, not a silent pass.
+//
+// And within those three it matches whole tokens against a fixed word list.
+// `normalizeTextForModeration` folds diacritics and case and nothing else, and
+// `scanTermList` compares single-word terms by exact token equality against a
+// split on non-alphanumerics. So a repeated character, internal punctuation, or a
+// spaced-out variant all pass: `fuuuck`, `f.u.c.k` and `f u c k` are each invisible
+// to a dictionary holding the unobfuscated word. Only multi-word terms, which use
+// substring matching, tolerate punctuation in the middle.
+//
+// Obfuscation handling was never specified for this story, so widening it is a
+// product decision rather than a defect fix, and the honest thing in the meantime
+// is for this comment not to imply a boundary the code does not enforce. Anything
+// downstream that needs to assume real adversarial coverage does not have it yet.
 
 export const ADR013_TEXT_ENGINE_VERSION = 'adr013-text-v2.0'
 export const ADR013_IMAGE_ENGINE_VERSION = 'adr013-nsfw-v1.0'

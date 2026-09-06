@@ -23,9 +23,11 @@
  *   inclusive range 0..1, or a finite precipitationAmount >= 0. Out-of-range or
  *   non-finite precipitation is treated as absent, so legacy rows carrying no usable
  *   precipitation are excluded rather than inferred dry (they must not inflate the
- *   wet-ratio denominator). Classification requires at least 3 usable unique days
- *   after localDate deduplication; fewer than 3 returns null. Null is a first-class
- *   state everywhere and is never a silent fallback to temperate_dry.
+ *   wet-ratio denominator). Usability is judged AFTER localDate deduplication, not
+ *   before, so a date whose latest row is unusable drops out rather than falling
+ *   back to the stale row that row replaced. Classification requires at least 3
+ *   usable unique days; fewer than 3 returns null. Null is a first-class state
+ *   everywhere and is never a silent fallback to temperate_dry.
  * - Window: at most 8 usable days are ever averaged (Story 5.5 Decision 3's daily
  *   forecast cap: "today" plus a 7-day window; both providers' `extractDaily`
  *   already truncate their raw daily array to 8 entries before it reaches this
@@ -150,26 +152,34 @@ export function classifyClimateBand(days: readonly ClimateBandDay[]): ClimateBan
     return null
   }
 
-  const rawUsableDays = days.filter(isUsableDay)
-
   // Deduplicate by localDate when present, keeping the LAST occurrence of a
   // given date rather than the first. There is no row-write timestamp on
   // ClimateBandDay to reason about staleness with, and array order is the
   // only recency signal any caller documents: a refreshed forecast for a
   // date is appended after the stale one it replaces. A first-occurrence
   // dedupe would let that stale row win.
+  //
+  // Dedupe runs over ALL days and usability is judged afterwards, in that
+  // order deliberately. Filtering first would build the index out of usable
+  // rows only, so a date whose refreshed row is unusable would fall back to
+  // the stale row it replaced instead of dropping out — the stale value
+  // surviving its own replacement, which is the failure the last-wins rule
+  // exists to prevent. The last row for a date is that date's truth; if that
+  // truth is unusable, the date contributes nothing.
   const lastIndexForDate = new Map<string, number>()
-  rawUsableDays.forEach((day, index) => {
-    if (day.localDate) {
+  days.forEach((day, index) => {
+    if (day?.localDate) {
       lastIndexForDate.set(day.localDate, index)
     }
   })
-  let usableDays: ClimateBandDay[] = rawUsableDays.filter((day, index) => {
-    if (!day.localDate) {
-      return true
-    }
-    return lastIndexForDate.get(day.localDate) === index
-  })
+  let usableDays: ClimateBandDay[] = days
+    .filter((day, index) => {
+      if (!day?.localDate) {
+        return true
+      }
+      return lastIndexForDate.get(day.localDate) === index
+    })
+    .filter(isUsableDay)
 
   // Ceiling: never average over more than MAXIMUM_USABLE_DAYS. Array order
   // is the recency order established by the dedupe above, so the most
