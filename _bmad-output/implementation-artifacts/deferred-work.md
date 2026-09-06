@@ -2414,3 +2414,34 @@ file's own Code Review Findings section.
   the newer `prelint`, while `test` and `test:coverage` have no prebuild at all.
   A clean checkout can lint and typecheck but cannot reliably test. One shared
   prebuild script referenced by all of them removes the asymmetry.
+
+## `npm run validate` cannot fail on a coverage regression, by construction (2026-09-06)
+
+Found while sealing story 6.1. `validate` is `npm-run-all typecheck lint test
+build`, and `test` is a plain `npm run --workspaces test`: no coverage, no
+ratchet. What actually gates a PR is `test:coverage`
+(`scripts/run-workspace-test-coverage.mjs`), run by `pr-checks.yml:181`. So a
+green local `validate` proves the suites ran and says nothing about whether
+the coverage ratchet still holds, and a developer who trusts "validate is
+green" is trusting a narrower claim than the sentence implies.
+
+This is not hypothetical. `apps/api/vitest.config.ts` records 2026-08-18, when
+`packages/db/.env` silently repointed `DATABASE_URL` inside a worker process,
+roughly sixty integration tests announced themselves skipped in a log nobody
+read, and the only surviving signal was the coverage ratchet failing for a
+reason that named coverage rather than the database. `validate` was green
+throughout that incident, and would be green again under the same fault today.
+
+Two ways to close it, deliberately left as a decision rather than a fix here,
+because it is a workflow change rather than a story-scoped one:
+
+1. Point `validate` at `test:coverage` instead of `test`, so the local gate
+   and the CI gate are the same gate. Slower local runs for everyone, in
+   exchange for "validate is green" meaning what people already assume it
+   means.
+2. Document the distinction in `project-context.md`'s Development Workflow
+   Rules, whose current line -- "use `npm run validate` for the full
+   typecheck, lint, test, and build gate" -- is precisely what invites the
+   reading that costs the incident above. The weaker option: it relies on
+   everyone remembering a caveat about the command that exists to let them
+   stop remembering caveats.
