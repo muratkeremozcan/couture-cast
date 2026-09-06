@@ -41,4 +41,11 @@ regexes = [
   # Fixed UUID used only as a stored My Form upload idempotency key in a
   # wardrobe-silhouette.service.spec.ts replay fixture
   '''^a3f7c2d1-5b9e-4a86-9c31-2e7d4b8f6a05$''',
+  # Fixed UUIDs used only as the Story 6.1 community allocate and publish
+  # idempotency-key fixtures in Pact contracts. They have to be literals rather
+  # than generated: `scripts/check-pact-determinism.sh` runs the consumer suite
+  # three times and compares pact hashes, so a computed value changes the pact
+  # between runs and reports as UNSTABLE.
+  '''^8c1f2a6d-3b45-4e7a-9c02-1d5e6f708a91$''',
+  '''^b47ac10b-58cc-4372-a567-0e02b2c3d479$''',
 ]

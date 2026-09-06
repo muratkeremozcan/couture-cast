@@ -235,12 +235,44 @@ describe('community schema', () => {
       })
     })
 
-    it('6.1-DB-015 leaves the community-images bucket private with no client storage policy', async () => {
+    it('6.1-DB-015 leaves the community-images bucket private with no client storage policy', async (context) => {
       // The dropped policy read the owner out of the second path segment, which
       // only worked because the path embedded a user id — and a signed URL
       // carries its path, so every share leaked the author. Signed URLs are
-      // minted by the API on service_role instead.
-      await inRolledBackTransaction(async (client) => {
+      // minted by the API with the service key instead.
+      //
+      // GUARDED THE SAME WAY THE MIGRATION GUARDS ITSELF. The Story 6.1
+      // migration wraps its storage block in
+      // `IF to_regclass('storage.buckets') IS NOT NULL`, because `storage` is a
+      // Supabase schema and a stock PostgreSQL image has none. CI's quality gate
+      // runs `postgres:16-alpine` with the migrations applied and provisions the
+      // roles and the `auth` schema by hand, but not `storage`, so the bucket
+      // this asserts on cannot exist there. It passed locally against real
+      // Supabase and failed in CI, which is the honest shape of the difference:
+      // environment, not command.
+      //
+      // The skip is LOUD on purpose. A silent one would let a green CI run read
+      // as evidence the bucket was checked, which is the same trap the
+      // integration tier's schema probe exists to avoid.
+      const client = await adminPool.connect()
+
+      try {
+        const storagePresent = await client.query<{ present: boolean }>(
+          "SELECT to_regclass('storage.buckets') IS NOT NULL AS present"
+        )
+
+        if (!storagePresent.rows[0]?.present) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            '[6.1-DB-015] SKIPPED: this database has no Supabase `storage` schema, so ' +
+              'the community-images bucket cannot exist and its privacy could NOT be ' +
+              'verified here. This assertion only runs against a database with Supabase ' +
+              'storage; a green run without it is not evidence the bucket is private.'
+          )
+          context.skip()
+          return
+        }
+
         const bucket = await client.query<{ public: boolean }>(
           'SELECT "public" FROM storage.buckets WHERE "id" = \'community-images\''
         )
@@ -253,7 +285,9 @@ describe('community schema', () => {
              AND "policyname" = 'community_read_authorized'`
         )
         expect(policies.rows).toEqual([])
-      })
+      } finally {
+        client.release()
+      }
     })
   })
 
@@ -525,9 +559,17 @@ describe('community schema', () => {
       // written by the seed, by the factories and by the API alike. A signed URL
       // carries its path, so an owner id in one deanonymizes the author to
       // whoever the URL reaches.
-      const client = await adminPool.connect()
+      //
+      // A ROW IS SEEDED FIRST, AND THE COUNT IS ASSERTED, because otherwise this
+      // passes vacuously wherever the table is empty. CI's quality gate applies
+      // the migrations and never runs the seed, so on that database this
+      // assertion had nothing to look at and reported success over zero rows --
+      // the quieter half of the same defect that made 6.1-DB-015 fail there
+      // loudly. Seeding one row makes the assertion falsifiable in every
+      // environment while still sweeping whatever else the database holds.
+      await inRolledBackTransaction(async (client) => {
+        const fixture = await seedCommunityGraph(client)
 
-      try {
         const rows = await client.query<{
           id: string
           user_id: string
@@ -536,6 +578,9 @@ describe('community schema', () => {
           `SELECT "id", "user_id", "image_object_path" FROM public."LookbookPost"
            WHERE "image_object_path" IS NOT NULL`
         )
+
+        expect(rows.rows.length).toBeGreaterThan(0)
+        expect(rows.rows.map((row) => row.id)).toContain(fixture.postId)
 
         const leaking = rows.rows.filter((row) =>
           communityObjectPathContainsIdentifier(row.image_object_path ?? '', row.user_id)
@@ -546,9 +591,7 @@ describe('community schema', () => {
           (row) => !COMMUNITY_OBJECT_PATH_PATTERN.test(row.image_object_path ?? '')
         )
         expect(malformed).toEqual([])
-      } finally {
-        client.release()
-      }
+      })
     })
   })
 
