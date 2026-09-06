@@ -98,6 +98,11 @@ describe('CommunityChallengeBanner (Story 6.1)', () => {
     const results = await runAxe(container, {
       runOnly: { type: 'tag', values: AXE_TAGS },
     })
+
+    // Anchors the scan the same way 6.1-MOB-041 does: `violations` is empty for a
+    // clean tree and for no tree at all, and `passes` is what separates them.
+    expect(results.passes.length, 'axe scanned an empty tree').toBeGreaterThan(0)
+
     expect(
       results.violations.map((violation) => violation.id),
       JSON.stringify(results.violations, null, 2)

@@ -51,7 +51,6 @@ afterEach(() => {
  * component-level `uploadMyFormPhotoFromWeb` stub.
  */
 interface ImagePrepOverrides {
-  /** Intrinsic size of the decoded source image. */
   naturalWidth?: number
   naturalHeight?: number
   /** Fail decoding, the way a corrupt or cross-origin file would. */
@@ -384,7 +383,7 @@ describe('uploadMyFormPhotoFromWeb transport sequence', () => {
     })
   }
 
-  /** Routes each of the three legs (source-blob fetch, allocate, upload PUT, commit) to its own canned response. */
+  /** Routes each leg (source-blob fetch, allocate, upload PUT, commit) to its own canned response. */
   function installTransportFetchMock(
     overrides: {
       allocation?: unknown

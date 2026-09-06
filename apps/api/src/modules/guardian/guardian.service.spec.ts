@@ -488,6 +488,21 @@ class InMemoryGuardianPrisma {
       .mockResolvedValue({ count: 0 }),
   }
 
+  /**
+   * Story 6.1 HIGH-1: revocation now hides the member's community content in the
+   * same transaction, so the in-memory client has to answer for this table too.
+   */
+  lookbookPost = {
+    updateMany: vi
+      .fn<
+        (args: {
+          where: { user_id: string; status: { in: string[] } }
+          data: { status: 'consent_suspended' }
+        }) => Promise<{ count: number }>
+      >()
+      .mockResolvedValue({ count: 0 }),
+  }
+
   $transaction = vi.fn(
     async <T>(
       callback: (tx: InMemoryGuardianPrisma) => Promise<T>,
@@ -972,6 +987,33 @@ describe('GuardianService', () => {
       },
     })
     expect(retentionUpdate?.data.deletion_requested_at).toBeInstanceOf(Date)
+
+    // Story 6.1 HIGH-1: `consent_suspended` had NO PRODUCER. The enum member
+    // existed, both feed status filters honoured it, nine locales shipped copy
+    // and Pact asserted it, and nothing ever wrote it, so a 13-to-15-year-old's
+    // published post stayed live after their guardian's consent lapsed. The
+    // integration test that covered it inserted a row ALREADY at
+    // `consent_suspended` and asserted the read filters, so no test drove the
+    // transition. This one drives it.
+    expect(prisma.lookbookPost.updateMany).toHaveBeenCalledOnce()
+    const suspension = prisma.lookbookPost.updateMany.mock.calls[0]?.[0]
+    expect(suspension).toMatchObject({
+      where: { user_id: teen.id },
+      data: { status: 'consent_suspended' },
+    })
+    // `pending_review` as well as `published`: the moderation processor
+    // publishes with `where: { id, status: 'pending_review' }`, so moving the row
+    // out of that status is what stops a post already in the screening queue
+    // from going live seconds after consent lapsed.
+    expect(suspension?.where.status.in).toEqual(
+      expect.arrayContaining(['published', 'pending_review'])
+    )
+    // `flagged` and `review_failed` are deliberately left alone: both are
+    // already invisible and both carry a moderation verdict that folding them
+    // into `consent_suspended` would erase.
+    expect(suspension?.where.status.in).not.toContain('flagged')
+    expect(suspension?.where.status.in).not.toContain('review_failed')
+
     expect(capture).toHaveBeenCalledOnce()
     const analyticsEvent = capture.mock.calls[0]?.[0]
     expect(analyticsEvent).toMatchObject({
@@ -1069,6 +1111,10 @@ describe('GuardianService', () => {
     expect(compliance?.guardianConsentRevokedAt).toBeUndefined()
     expect(invalidateUserSessions).not.toHaveBeenCalled()
     expect(markTeenAccessGranted).toHaveBeenCalledWith(teen.id)
+    // Consent has not lapsed while another guardian still holds it, so the
+    // member's community posts stay published. The suspension is keyed on the
+    // last active consent going, not on any one guardian withdrawing.
+    expect(prisma.lookbookPost.updateMany).not.toHaveBeenCalled()
   })
 
   it('retries revokeConsent when the serializable transaction hits a write conflict', async () => {
@@ -2236,18 +2282,87 @@ describe('GuardianService', () => {
       vi.setSystemTime(AGE_REFERENCE_DATE)
     })
 
+    // THESE THREE CASES USED TO ASSERT THE HOLE. The guard began with
+    // `if (role !== 'teen') return`, and the tests asserted that a non-teen
+    // claim skipped the consent tables entirely — which is exactly how an
+    // under-13 account whose token carried any other role published to a public
+    // feed unchecked. The role claim is read verbatim from Supabase
+    // `app_metadata.app_role` and is never derived from a birthdate, so it is
+    // not evidence of age in either direction. What the guard must do for these
+    // roles is resolve the stored age and then allow the upload, which is a
+    // different assertion from not looking at all.
     it.each([undefined, 'adult', 'guardian'])(
-      'does not gate uploads for the %s role',
+      'resolves age from the stored profile rather than trusting the %s role claim, and allows an adult',
       async (role) => {
         const { prisma, service } = createService()
+        seedUser(prisma, {
+          id: 'user-1',
+          email: 'adult.user@example.com',
+          preferences: activeCompliancePreferences(),
+          birthdate: birthdateForAge(30),
+        })
 
         await expect(
           service.assertWardrobeUploadAllowed('user-1', role)
         ).resolves.toBeUndefined()
-        // Non-teen roles must not even touch the consent tables.
-        expect(prisma.user.findUnique).not.toHaveBeenCalled()
+        expect(prisma.user.findUnique).toHaveBeenCalled()
       }
     )
+
+    it.each([undefined, 'adult'])(
+      'refuses an under-13 account carrying the %s role claim',
+      async (role) => {
+        // The whole point of the finding: the claim said "not a teen" and the
+        // stored birthdate says otherwise, and the birthdate wins.
+        const { service, prisma } = createService()
+        seedUser(prisma, {
+          id: 'user-under-13',
+          email: 'child.user@example.com',
+          preferences: activeCompliancePreferences(),
+          birthdate: birthdateForAge(11),
+        })
+
+        await expect(
+          service.assertWardrobeUploadAllowed('user-under-13', role)
+        ).rejects.toThrow(ForbiddenException)
+      }
+    )
+
+    it('refuses an account with no birthdate on file, whatever the claim says', async () => {
+      // Fails closed. Signup has always written a birthdate, so this is an
+      // account that predates it or was created outside it, and an unknown age
+      // on a public surface cannot be treated as an adult without reopening the
+      // hole one layer down.
+      const { service, prisma } = createService()
+      seedUser(prisma, {
+        id: 'user-no-birthdate',
+        email: 'legacy.nobirthdate@example.com',
+        preferences: activeCompliancePreferences(),
+        birthdate: null,
+      })
+
+      await expect(
+        service.assertWardrobeUploadAllowed('user-no-birthdate', 'adult')
+      ).rejects.toThrow(ForbiddenException)
+    })
+
+    it('allows an adult whose preferences carry no compliance block at all', async () => {
+      // The age check runs BEFORE the compliance check. `accountStatus` is a
+      // guardian-consent state and is meaningless for an adult; reading it first
+      // would refuse every legacy account whose preferences predate the
+      // compliance block, which is a lockout unrelated to age.
+      const { service, prisma } = createService()
+      seedUser(prisma, {
+        id: 'user-legacy-adult',
+        email: 'legacy.adult@example.com',
+        preferences: null,
+        birthdate: birthdateForAge(41),
+      })
+
+      await expect(
+        service.assertWardrobeUploadAllowed('user-legacy-adult', undefined)
+      ).resolves.toBeUndefined()
+    })
 
     it('denies uploads when the teen account does not exist', async () => {
       const { service } = createService()

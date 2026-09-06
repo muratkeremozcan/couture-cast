@@ -142,9 +142,8 @@ function createMobileTeenClientForMockServer(mockServer: V3MockServer) {
 
 /**
  * Story 6.1: the community challenge routes mount `RolesGuard` with
- * `@Roles('admin')`, which neither the guardian nor the teen identity can pass.
- * The guard runs for real in the provider fixture, so recording that surface
- * honestly needs an actual admin actor.
+ * `@Roles('admin')`, and the guard runs for real in the provider fixture, so
+ * recording that surface honestly needs an actual admin actor.
  */
 function createMobileAdminClientForMockServer(mockServer: V3MockServer) {
   return createMobileApiClient({
@@ -467,8 +466,7 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
     await verifyPlannerReshuffleConflictInteraction(pact)
   })
   // Story 6.1: the community feed by climate band. `x-couture-platform` is
-  // passed as a literal per consumer, so this pact records what mobile
-  // actually sends rather than mirroring the other client's header.
+  // passed as a literal per consumer, so this pact records what mobile sends.
   it('reads the auto-mode community feed', async () => {
     await verifyCommunityFeedInteraction(pact, createMobileClientForMockServer, 'mobile')
   })

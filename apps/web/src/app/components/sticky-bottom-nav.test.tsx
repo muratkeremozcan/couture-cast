@@ -2,7 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 // Learning path Step 26: Chip navigation and sticky bottom nav.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
-// Story 3.6 Task 5 step 2 owner: unit-test web sticky bottom navigation mobile visibility and telemetry in apps/web/src/app/components/sticky-bottom-nav.test.tsx
+// Story 3.6 Task 5 step 2 owner: sticky bottom navigation mobile visibility and telemetry.
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { resolveActiveNavTab, StickyBottomNav } from './sticky-bottom-nav'
@@ -90,7 +90,7 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
   /**
    * Story 5.4 Decision 14. The exact-equality match this replaced highlighted Home on
    * every nested route, so `/wardrobe/capsules` told the reader they were on the home
-   * tab. Adding `/palette` -- a destination route under no tab at all -- is what made
+   * tab. Adding `/palette`, a destination route under no tab at all, is what made
    * the second half of the rule necessary: no tab is a real answer, and defaulting to
    * Home is the same lie in a different place.
    */

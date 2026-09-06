@@ -227,6 +227,8 @@ describe('CommunityService', () => {
       )
     const findPostById = vi.fn().mockResolvedValue(null)
     const updatePost = vi.fn().mockResolvedValue(ownPendingPost)
+    const withdrawPostAndRequestErasure = vi.fn().mockResolvedValue(undefined)
+    const requestErasureForUser = vi.fn().mockResolvedValue(2)
     const publishWithinQuota = vi.fn().mockImplementation(
       ({
         postId,
@@ -304,6 +306,8 @@ describe('CommunityService', () => {
       createPostDraft,
       findPostById,
       updatePost,
+      withdrawPostAndRequestErasure,
+      requestErasureForUser,
       publishWithinQuota,
       recordReport,
       findChallengeById,
@@ -375,6 +379,8 @@ describe('CommunityService', () => {
       createPostDraft,
       findPostById,
       updatePost,
+      withdrawPostAndRequestErasure,
+      requestErasureForUser,
       publishWithinQuota,
       recordReport,
       findChallengeById,
@@ -410,10 +416,92 @@ describe('CommunityService', () => {
       const { service, getFeatureFlag } = createService({ flagEnabled: false })
 
       await expect(
-        service.withdrawPost({ userId: viewerUserId, postId: 'p', platform: 'web' })
+        service.publishPost({
+          userId: viewerUserId,
+          role: 'adult',
+          platform: 'web',
+          input: {
+            postId: 'post-mine',
+            uploadSessionId: 'session-1',
+            altText: 'A denim jacket over a striped shirt',
+            altTextConfirmed: true as const,
+            caption: 'Autumn commute look',
+            locale: 'en-US' as const,
+          },
+        })
       ).rejects.toThrow(ServiceUnavailableException)
 
       expect(getFeatureFlag).toHaveBeenCalledWith('community_write_enabled', viewerUserId)
+    })
+
+    // Closing posting must not take away the two things a reader needs while the
+    // feed is still being served: the ability to report what they are seeing,
+    // and the ability of an author to pull their own post. Both used to sit
+    // behind the write flag, so an operator closing posting during an incident
+    // silenced abuse reports at the moment they mattered most.
+    it('keeps reporting available when posting is closed but the feed is still served', async () => {
+      const { service, getFeatureFlag, recordReport } = createService()
+      getFeatureFlag.mockImplementation((key: string) =>
+        Promise.resolve(key === 'community_read_enabled')
+      )
+
+      await expect(
+        service.reportPost({
+          userId: viewerUserId,
+          postId: 'other-post',
+          platform: 'web',
+          input: { reason: 'spam' },
+        })
+      ).resolves.toEqual({ tracked: true })
+
+      expect(getFeatureFlag).toHaveBeenCalledWith('community_read_enabled', viewerUserId)
+      expect(getFeatureFlag).not.toHaveBeenCalledWith(
+        'community_write_enabled',
+        viewerUserId
+      )
+      expect(recordReport).toHaveBeenCalled()
+    })
+
+    it('keeps an author able to withdraw their own post when posting is closed', async () => {
+      const { service, getFeatureFlag, findPostById, withdrawPostAndRequestErasure } =
+        createService()
+      getFeatureFlag.mockImplementation((key: string) =>
+        Promise.resolve(key === 'community_read_enabled')
+      )
+      findPostById.mockResolvedValueOnce({ ...publishedPost, user_id: viewerUserId })
+
+      await expect(
+        service.withdrawPost({
+          userId: viewerUserId,
+          postId: 'post-mine',
+          platform: 'web',
+        })
+      ).resolves.toEqual({ tracked: true })
+
+      expect(withdrawPostAndRequestErasure).toHaveBeenCalled()
+    })
+
+    it('closes reporting and withdrawal when the feed itself is dark', async () => {
+      // The flag that silences reports has to be the one that also stops
+      // serving the content, so a fully dark feed still closes both.
+      const { service } = createService({ flagEnabled: false })
+
+      await expect(
+        service.reportPost({
+          userId: viewerUserId,
+          postId: 'other-post',
+          platform: 'web',
+          input: { reason: 'spam' },
+        })
+      ).rejects.toThrow(ServiceUnavailableException)
+
+      await expect(
+        service.withdrawPost({
+          userId: viewerUserId,
+          postId: 'post-mine',
+          platform: 'web',
+        })
+      ).rejects.toThrow(ServiceUnavailableException)
     })
   })
 
@@ -436,6 +524,9 @@ describe('CommunityService', () => {
         publishedAt: '2026-09-05T12:00:00.000Z',
         id: 'post-sample-1',
         mode: 'auto' as const,
+        // The band the page was actually filtered on. The default viewer
+        // resolves to `temperate_dry`, and `auto` filters on the viewer's band.
+        band: 'temperate_dry' as const,
       }
 
       await service.getFeed({
@@ -458,6 +549,7 @@ describe('CommunityService', () => {
         publishedAt: '2026-09-05T12:00:00.000Z',
         id: 'post-sample-1',
         mode: 'cold_wet',
+        band: 'cold_wet',
       })
 
       await expect(
@@ -480,6 +572,7 @@ describe('CommunityService', () => {
         publishedAt: '2020-01-01T00:00:00.000Z',
         id: 'post-long-gone',
         mode: 'auto',
+        band: 'temperate_dry',
       })
 
       const result = await service.getFeed({
@@ -877,6 +970,7 @@ describe('CommunityService', () => {
         userId: viewerUserId,
         postId: 'post-other-user',
         platform: 'web',
+        input: { experimentVariant: 'auto' },
       })
 
       expect(telemetryFailures).toEqual([])
@@ -895,6 +989,7 @@ describe('CommunityService', () => {
         userId: viewerUserId,
         postId: 'post-other-user',
         platform: 'web',
+        input: { experimentVariant: 'auto' },
       })
 
       expect(captureEvent).toHaveBeenCalledWith(
@@ -913,8 +1008,72 @@ describe('CommunityService', () => {
           userId: viewerUserId,
           postId: 'post-self-user',
           platform: 'web',
+          input: { experimentVariant: 'auto' },
         })
       ).rejects.toThrow(NotFoundException)
+    })
+
+    // The sink upserts on the dedupe key, so a post-only key collapsed every
+    // viewer's open of one post into ONE event. The non-self lift AC7 advances
+    // on could therefore never exceed one per post no matter the traffic, which
+    // made the beta gate unmeasurable in a second, quieter way than the missing
+    // route did.
+    it('scopes the dedupe key to the viewer, so two people opening one post stay two events', async () => {
+      const { service, findPostById, captureEvent } = createService()
+      findPostById.mockResolvedValue(publishedPost)
+
+      await service.recordCardOpened({
+        userId: 'viewer-one',
+        postId: 'post-other-user',
+        platform: 'web',
+        input: { experimentVariant: 'auto' },
+      })
+      await service.recordCardOpened({
+        userId: 'viewer-two',
+        postId: 'post-other-user',
+        platform: 'web',
+        input: { experimentVariant: 'auto' },
+      })
+
+      const keys = captureEvent.mock.calls
+        .filter((call) => call[1] === 'community_card_opened')
+        .map((call) => (call[2] as { dedupeKey: string }).dedupeKey)
+      expect(keys).toHaveLength(2)
+      expect(keys[0]).not.toBe(keys[1])
+      expect(keys[0]).toContain('viewer-one')
+    })
+
+    it('attributes the open to the arm the client was serving, not to a fresh derivation', async () => {
+      // An assignment can change between a feed read and a tap. Re-deriving here
+      // would attribute the open to an arm the viewer never saw.
+      const { service, findPostById, captureEvent } = createService()
+      findPostById.mockResolvedValueOnce(publishedPost)
+
+      await service.recordCardOpened({
+        userId: viewerUserId,
+        postId: 'post-other-user',
+        platform: 'web',
+        input: { experimentVariant: 'all' },
+      })
+
+      expect(captureEvent).toHaveBeenCalledWith(
+        viewerUserId,
+        'community_card_opened',
+        expect.objectContaining({ experimentVariant: 'all' })
+      )
+    })
+
+    it('is gated on the read flag, so a dark feed records no opens', async () => {
+      const { service } = createService({ flagEnabled: false })
+
+      await expect(
+        service.recordCardOpened({
+          userId: viewerUserId,
+          postId: 'post-other-user',
+          platform: 'web',
+          input: { experimentVariant: 'auto' },
+        })
+      ).rejects.toThrow(ServiceUnavailableException)
     })
   })
 
@@ -1357,19 +1516,56 @@ describe('CommunityService', () => {
     )
 
     it('withdraws a published post and emits the event', async () => {
-      const { service, findPostById, updatePost, captureEvent, telemetryFailures } =
-        createService()
+      const {
+        service,
+        findPostById,
+        withdrawPostAndRequestErasure,
+        captureEvent,
+        telemetryFailures,
+      } = createService()
       findPostById.mockResolvedValueOnce({ ...publishedPost, user_id: viewerUserId })
 
       await expect(withdraw(service)).resolves.toEqual({ tracked: true })
 
-      expect(updatePost).toHaveBeenCalledWith('post-mine', { status: 'withdrawn' })
+      expect(withdrawPostAndRequestErasure).toHaveBeenCalledWith(
+        'post-mine',
+        expect.any(Date)
+      )
       expect(telemetryFailures).toEqual([])
       expect(captureEvent).toHaveBeenCalledWith(
         viewerUserId,
         'community_post_withdrawn',
         expect.objectContaining({ climateBand: 'temperate_dry' })
       )
+    })
+  })
+
+  describe('requestAccountContentErasure', () => {
+    // The erasure sweep had no producer at all: `erasure_requested_at` was
+    // written only by the test factory, so a withdrawn post's image stayed in
+    // the bucket forever and the 72-hour deadline never started, which meant
+    // `community_erasure_overdue` could not fire even in principle. Withdrawal
+    // is one producer; account deletion is the other.
+    it('marks every unclaimed post of the member and reports the count', async () => {
+      const { service, requestErasureForUser } = createService()
+
+      await expect(service.requestAccountContentErasure(viewerUserId)).resolves.toEqual({
+        postsMarked: 2,
+      })
+
+      expect(requestErasureForUser).toHaveBeenCalledWith(viewerUserId, expect.any(Date))
+    })
+
+    it('is not gated on either rollout flag, because erasure is not a feature', async () => {
+      // A member asking for their content to be deleted must not be refused
+      // because the beta happens to be closed.
+      const { service, getFeatureFlag } = createService({ flagEnabled: false })
+
+      await expect(service.requestAccountContentErasure(viewerUserId)).resolves.toEqual({
+        postsMarked: 2,
+      })
+
+      expect(getFeatureFlag).not.toHaveBeenCalled()
     })
   })
 
@@ -1842,6 +2038,9 @@ describe('CommunityService', () => {
         publishedAt: '2026-09-05T12:00:00.000Z',
         id: 'post-other-user',
         mode: 'all',
+        // `all` filters on nothing, so the page was served unfiltered and the
+        // cursor records that as `null` rather than omitting the field.
+        band: null,
       })
 
       await service.getFeed({
@@ -1864,6 +2063,7 @@ describe('CommunityService', () => {
         publishedAt: '2026-09-05T12:00:00.000Z',
         id: 'post-other-user',
         mode: 'cold_wet',
+        band: 'cold_wet',
       })
 
       await expect(
@@ -1874,6 +2074,81 @@ describe('CommunityService', () => {
           cursor: foreignCursor,
         })
       ).rejects.toThrow(COMMUNITY_CURSOR_INVALID_MESSAGE)
+    })
+
+    // HIGH-9: binding the mode alone left a real hole open. Under `auto` the
+    // band is recomputed per request from weather guaranteed fresh only within
+    // 60 minutes, so it can move mid-scroll while `mode` stays `auto` the whole
+    // time and nothing notices.
+    it('rejects a cursor whose band no longer matches the one being filtered on', async () => {
+      // Page one was served on `cold_dry`; this viewer now resolves to
+      // `temperate_dry`. Applying page one's keyset to the new filtered set
+      // would skip everything newer in the new band for the rest of the scroll.
+      const { service } = createService()
+      const staleBandCursor = encodeCommunityFeedCursor({
+        publishedAt: '2026-09-05T12:00:00.000Z',
+        id: 'post-sample-1',
+        mode: 'auto',
+        band: 'cold_dry',
+      })
+
+      await expect(
+        service.getFeed({
+          userId: viewerUserId,
+          platform: 'web',
+          mode: 'auto',
+          cursor: staleBandCursor,
+        })
+      ).rejects.toThrow(COMMUNITY_CURSOR_INVALID_MESSAGE)
+    })
+
+    it('rejects an unfiltered cursor once the band has resolved', async () => {
+      // The other half of the same failure: page one was served with no band at
+      // all because resolution failed, and page two would silently become the
+      // filtered feed under the same cursor. `null` is a real assertion about
+      // page one, not an absence.
+      const { service } = createService()
+      const unfilteredCursor = encodeCommunityFeedCursor({
+        publishedAt: '2026-09-05T12:00:00.000Z',
+        id: 'post-sample-1',
+        mode: 'auto',
+        band: null,
+      })
+
+      await expect(
+        service.getFeed({
+          userId: viewerUserId,
+          platform: 'web',
+          mode: 'auto',
+          cursor: unfilteredCursor,
+        })
+      ).rejects.toThrow(COMMUNITY_CURSOR_INVALID_MESSAGE)
+    })
+
+    it('accepts an unfiltered cursor while the band is still unresolved', async () => {
+      // The legitimate case the `null` has to stay distinguishable for: a viewer
+      // whose band never resolves pages the all-regions feed, and every page is
+      // minted and validated as unfiltered.
+      const { service, findPublishedFeedPosts } = createService({
+        weatherStatus: 'unavailable',
+      })
+      const unfilteredCursor = encodeCommunityFeedCursor({
+        publishedAt: '2026-09-05T12:00:00.000Z',
+        id: 'post-sample-1',
+        mode: 'auto',
+        band: null,
+      })
+
+      await service.getFeed({
+        userId: viewerUserId,
+        platform: 'web',
+        mode: 'auto',
+        cursor: unfilteredCursor,
+      })
+
+      expect(findPublishedFeedPosts).toHaveBeenCalledWith(
+        expect.objectContaining({ filterBand: undefined })
+      )
     })
   })
 })

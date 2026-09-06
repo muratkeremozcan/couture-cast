@@ -42,6 +42,8 @@ import {
   type CommunityPlatform,
   type CreateCommunityChallengeInput,
   type EmbeddedCommunityChallenge,
+  type OpenCommunityPostInput,
+  type OpenCommunityPostResponse,
   type PublishCommunityPostInput,
   type ReportCommunityPostInput,
   type ReportCommunityPostResponse,
@@ -153,16 +155,34 @@ export class CommunityService {
     const experimentVariant = resolveCommunityExperimentVariant(userId)
     const effectiveMode = this.resolveEffectiveMode(mode, experimentVariant)
 
-    // The cursor is bound to the mode it was minted under, so a client that
-    // changed filters gets the same stable 400 a malformed cursor produces and
-    // simply restarts paging rather than paging one feed with another's keyset.
+    // The band is resolved BEFORE the cursor is decoded, because the cursor is
+    // validated against it.
+    const band = await this.resolveViewerBand(userId)
+    const filterBand = this.resolveFilterBand(effectiveMode, band.viewerBand)
+
+    // The cursor is bound to BOTH the mode and the band it was minted under, so
+    // a client that changed filters, or a viewer whose band moved mid-scroll,
+    // gets the same stable 400 a malformed cursor produces and simply restarts
+    // paging rather than paging one feed with another's keyset.
+    //
     // It binds to the EFFECTIVE mode: the assignment is stable per viewer, so
     // page two resolves to the same effective mode as page one whether the
     // client re-sends `auto` or echoes back the mode it was served.
-    const decodedCursor = this.parseCursor(cursor, effectiveMode)
-    const band = await this.resolveViewerBand(userId)
-
-    const filterBand = this.resolveFilterBand(effectiveMode, band.viewerBand)
+    //
+    // BINDING THE MODE ALONE WAS NOT ENOUGH, and this is the failure the band
+    // closes. Under `auto`, the default and the arm the beta is measuring, the
+    // band is recomputed on every request from weather guaranteed fresh only
+    // within 60 minutes. If it flips between pages, page two applies page one's
+    // keyset to a differently filtered set and everything newer in the new band
+    // is skipped for that scroll. If resolution fails outright,
+    // `resolveFilterBand` returns undefined and page two silently becomes the
+    // unfiltered all-regions feed under the same cursor, with no 400 anywhere
+    // because `mode` is still `auto` in both cases.
+    //
+    // `filterBand ?? null` rather than leaving it undefined: undefined would
+    // skip the check, and asserting `null` is a real assertion, that this page
+    // was served unfiltered exactly as the cursor's page was.
+    const decodedCursor = this.parseCursor(cursor, effectiveMode, filterBand ?? null)
 
     const { posts, nextCursor } = await this.repository.findPublishedFeedPosts({
       filterBand,
@@ -266,13 +286,14 @@ export class CommunityService {
 
   private parseCursor(
     cursor: string | undefined,
-    mode: CommunityFeedMode
+    mode: CommunityFeedMode,
+    band: ClimateBand | null
   ): CommunityFeedCursorPayload | undefined {
     if (!cursor) {
       return undefined
     }
 
-    const decodedResult = safeDecodeCommunityFeedCursor(cursor, mode)
+    const decodedResult = safeDecodeCommunityFeedCursor(cursor, mode, band)
     if (!decodedResult.success) {
       throw new BadRequestException(COMMUNITY_CURSOR_INVALID_MESSAGE)
     }
@@ -625,11 +646,35 @@ export class CommunityService {
     })
   }
 
+  /**
+   * Records that a viewer opened a card.
+   *
+   * IT HAD NO ROUTE. Eight endpoints were registered and none of them was
+   * card-open: no contract path, no SDK operation, no client caller, and the
+   * only caller anywhere in the repository was this method's own unit spec. It
+   * is the sole input to AC7's advance condition — climate matching advances
+   * only on at least a 10% relative non-self card-open lift — so the beta gate
+   * was unmeasurable at any traffic volume.
+   *
+   * `isSelf` is decided HERE, from the stored `user_id`, and never accepted from
+   * the client. The advance condition counts NON-SELF opens, so a client-asserted
+   * flag would let the population being measured move the number that decides
+   * whether the feature ships.
+   *
+   * `experimentVariant` is the opposite case and comes FROM the client. It is the
+   * arm the client was serving when the card was drawn, so the event is
+   * attributed to the feed the viewer actually saw; re-deriving it here would
+   * mis-attribute an open whose assignment changed between the feed read and the
+   * tap.
+   */
   async recordCardOpened(params: {
     userId: string
     postId: string
     platform: CommunityPlatform
-  }): Promise<void> {
+    input: OpenCommunityPostInput
+  }): Promise<OpenCommunityPostResponse> {
+    await this.assertReadEnabled(params.userId)
+
     const post = await this.repository.findPostById(params.postId)
     if (!post || post.status !== 'published') {
       throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
@@ -637,11 +682,22 @@ export class CommunityService {
 
     await this.capture(params.userId, 'community_card_opened', {
       platform: params.platform,
-      dedupeKey: postDedupeKey(params.postId, 'community_card_opened'),
+      // Scoped to the VIEWER as well as the post. The sink upserts on this key,
+      // so a post-only key collapsed every viewer's open of one post into a
+      // single event and the lift the beta gate measures could never rise above
+      // one per post. The report event next door already keys on
+      // `${postId}:${userId}` and says why; this was a local inconsistency
+      // rather than a considered choice.
+      dedupeKey: postDedupeKey(
+        `${params.postId}:${params.userId}`,
+        'community_card_opened'
+      ),
       climateBand: post.climate_band ?? null,
       isSelf: post.user_id === params.userId,
-      experimentVariant: resolveCommunityExperimentVariant(params.userId),
+      experimentVariant: params.input.experimentVariant,
     })
+
+    return { tracked: true }
   }
 
   async allocatePost(params: {
@@ -968,7 +1024,14 @@ export class CommunityService {
   }): Promise<ReportCommunityPostResponse> {
     const { userId, postId, platform, input } = params
 
-    await this.assertWriteEnabled(userId)
+    // Reporting is gated on READ, never on write. The Spec Change Log's stated
+    // reason for splitting the two flags is that closing posting must not dark
+    // the feed for people already reading it. Reporting is how a reader acts on
+    // what is still being served to them, so gating it on the write flag would
+    // mean that the moment an operator closes posting during an incident, the
+    // abuse reports that incident depends on stop arriving. The flag that
+    // silences reports has to be the one that also stops serving the content.
+    await this.assertReadEnabled(userId)
 
     // The subject alias is denormalized onto the report so the row stays
     // actionable after erasure nulls its `post_id`, and it is the pseudonym
@@ -1027,7 +1090,13 @@ export class CommunityService {
   }): Promise<WithdrawCommunityPostResponse> {
     const { userId, postId, platform } = params
 
-    await this.assertWriteEnabled(userId)
+    // Withdrawal is gated on READ for the same reason reporting is, and one
+    // more: this is the author removing their OWN post. Closing posting is a
+    // statement about new content arriving, and turning it into a statement
+    // that authors may no longer retract what is still publicly served inverts
+    // the flag's purpose. An author who wants their post down during an
+    // incident is the person with the strongest claim to be heard.
+    await this.assertReadEnabled(userId)
 
     const post = await this.repository.findPostById(postId)
     if (!post) {
@@ -1044,9 +1113,11 @@ export class CommunityService {
       throw new ConflictException('POST_NOT_WITHDRAWABLE')
     }
 
-    await this.repository.updatePost(postId, {
-      status: 'withdrawn',
-    })
+    // Withdrawal schedules deletion. It used to write `status` alone, which is
+    // why the erasure sweep had no producer and never ran: the author saw the
+    // post disappear from the feed while the image stayed in the bucket
+    // indefinitely. The clock starts here, and the sweep does the rest.
+    await this.repository.withdrawPostAndRequestErasure(postId, new Date())
 
     await this.capture(userId, 'community_post_withdrawn', {
       platform,
@@ -1057,6 +1128,48 @@ export class CommunityService {
     return {
       tracked: true,
     }
+  }
+
+  /**
+   * Marks every piece of a member's community content for erasure.
+   *
+   * THIS METHOD HAS NO CALLER TODAY, AND THAT IS THE POINT. There is no
+   * account-deletion flow anywhere in `apps/api`
+   * (`premium-entitlement.service.ts:145` says the same thing about its own
+   * hook point), so account erasure has nowhere to attach. Writing the community
+   * half now means that when a deletion flow is built it calls one method rather
+   * than rediscovering which columns start the clock; leaving it out would mean
+   * account deletion silently skipping community content the first time someone
+   * wires it up.
+   *
+   * TWO ORDERING CONSTRAINTS FOR THAT FUTURE CALLER, both load-bearing:
+   *
+   *   1. Call this BEFORE deleting the `User` row. `LookbookPost.user_id` is
+   *      `onDelete: Cascade`, so deleting the user first drops the very rows
+   *      that name the storage objects, and those objects then leak with nothing
+   *      left in the database pointing at them.
+   *   2. Do not delete the `User` row until the sweep has stamped
+   *      `objects_purged_at` on the marked rows. This method starts a deletion;
+   *      `CommunityMaintenanceService.sweepErasureRequests` completes it, and it
+   *      needs the rows to still exist to do so.
+   *
+   * It deliberately does not touch `CommunityAlias`. The alias is the pseudonym
+   * an orphaned report is still attributed to after erasure nulls `post_id`, so
+   * dropping it would destroy the moderation trail the erasure design keeps on
+   * purpose.
+   */
+  async requestAccountContentErasure(userId: string): Promise<{ postsMarked: number }> {
+    const postsMarked = await this.repository.requestErasureForUser(userId, new Date())
+
+    this.logger.log(
+      {
+        event: 'community_account_erasure_requested',
+        postsMarked,
+      },
+      'Marked community content for erasure following an account erasure request'
+    )
+
+    return { postsMarked }
   }
 
   async createChallenge(

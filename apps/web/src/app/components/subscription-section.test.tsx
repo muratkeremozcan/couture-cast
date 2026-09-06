@@ -336,8 +336,8 @@ describe('SubscriptionSection', () => {
   /**
    * The portal's half of the same 409. `manageInStore` was already translated in all
    * ten catalogs and rendered nowhere on this path, so the store-managed reader used
-   * to get "Unable to start checkout. Please try again." — wrong instruction and no
-   * next step, for the one failure with a completely clear answer.
+   * to get "Unable to start checkout. Please try again.": the wrong instruction and
+   * no next step, for the one failure with a completely clear answer.
    */
   it('5.2-WEB-SEC-24 points a store-managed reader at the store, not at checkout', async () => {
     signIn()

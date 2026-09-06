@@ -6,23 +6,23 @@
 // all ten catalogs without a single test going red. This file is the community
 // namespace's copy of that harness, following `commerce-locales.spec.ts`.
 //
-// Three of the checks below derive their expected key set from the contract
-// instead of a hand-written list. `community.status.*`, `community.report.reason.*`
-// and `community.band.unresolved.*` each render one member of a zod enum, and
+// Three of the checks below derive their expected key set from the contract.
+// `community.status.*`, `community.report.reason.*` and
+// `community.band.unresolved.*` each render one member of a zod enum, and
 // `community.band.*` renders one member of the `CLIMATE_BANDS` tuple. A hand-pinned
 // list would have to be edited in lockstep with the enum by the same person who
-// forgot to edit the catalogs, which is not a check at all. Deriving it means a
-// seventh climate band, or a new report reason, fails here rather than rendering a
-// raw `temperate_wet` on a pill in front of a member.
+// forgot to edit the catalogs. Deriving it means a seventh climate band, or a new
+// report reason, turns this spec red before a raw `temperate_wet` reaches a pill in
+// front of a member.
 //
 // The cross-surface check (mobile and web ship the same `community` subtree) lives
-// in `apps/mobile/src/i18n/community-locales.spec.ts`, not here: the mobile vitest
-// project can reach the web catalogs by relative path, and already does so in
-// `wardrobe-capsules-locales.spec.ts`, while the web project cannot see
+// in `apps/mobile/src/i18n/community-locales.spec.ts`. The mobile vitest project can
+// reach the web catalogs by relative path and already does so in
+// `wardrobe-capsules-locales.spec.ts`; the web project cannot see
 // `apps/mobile/assets`.
 //
 // All non-English values are machine-translation drafts pending human review before
-// release (PRD NFR Localization 1) — the parity checks hold the tree together until
+// release (PRD NFR Localization 1). The parity checks hold the tree together until
 // that review lands.
 import { CLIMATE_BANDS } from '@couture/utils'
 import {
@@ -61,13 +61,12 @@ const CATALOGS: Record<SupportedLocale, Catalog> = {
 }
 
 /**
- * Values that are legitimately spelled the same as the English source in a target
- * language, reviewed rather than left as an English fallback. Every entry is an
- * admission, so the list stays short and each one is argued:
+ * Reviewed values that a target language legitimately spells the same as the English
+ * source. Every entry is an admission, so the list stays short and each one is argued:
  *
  * - `title` in `de-DE` and `it-IT`: both catalogs already ship the English loanword
- *   for this exact word — the mobile `tabs.community` label reads "Community" in
- *   German and in Italian. "Gemeinschaft" and "Comunità" would name the page
+ *   for this exact word. The mobile `tabs.community` label reads "Community" in
+ *   German and in Italian, so "Gemeinschaft" and "Comunità" would name the page
  *   something the tab bar underneath it does not call it.
  * - `compose.photoLabel` in `fr-CA` and `fr-FR`: "photo" is the French word.
  */
@@ -162,12 +161,6 @@ describe('6.1 community locale parity', () => {
     }
   })
 
-  /**
-   * The band pills and the band filter row both render a `CLIMATE_BANDS` member.
-   * Deriving the expected keys from the tuple means adding a seventh band fails
-   * here, in every locale at once, rather than painting a raw `temperate_wet` onto
-   * a pill.
-   */
   it('6.1-I18N-WEB-05 labels every climate band in every locale', () => {
     const expectedBandKeys = [...CLIMATE_BANDS, 'unclassified', 'unresolved'].sort()
     const expectedModeKeys = [...CLIMATE_BANDS, 'auto', 'autoWithBand', 'all'].sort()

@@ -1,18 +1,17 @@
 // Story 5.2 Task 9: the web Premium settings section and the planner-rail gate
 // against a real API (5.2-E2E-010, 5.2-E2E-011).
 //
-// ARRANGEMENT RULE (Decision 9): entitlement state cannot be arranged through
-// the public API — `PremiumEntitlement` is worker-only by design — so the
-// entitled, expired, and grace branches run as the seeded premium users and are
-// strictly READ-ONLY on them (they are shared across parallel workers). The
-// never-subscribed branch is a fresh public-API signup, which is also the only
-// account allowed to drive a real checkout-session creation.
+// ARRANGEMENT RULE (Decision 9): `PremiumEntitlement` is worker-only by design, so
+// entitlement state cannot be arranged through the public API. The entitled,
+// expired and grace branches run as the seeded premium users and are strictly
+// READ-ONLY on them, since those accounts are shared across parallel workers. The
+// never-subscribed branch is a fresh public-API signup, and it is the only account
+// allowed to drive a real checkout-session creation.
 //
-// CHECKOUT HAND-OFF WITHOUT LEAVING THE APP: the fake Stripe client's session
-// URLs live on `checkout.stripe.test`, an RFC-2606 host that never resolves in
-// DNS. The spec stubs that host with `page.route` BEFORE clicking subscribe, so
-// the browser proves the app initiated the navigation without ever touching an
-// unresolvable origin.
+// CHECKOUT HAND-OFF WITHOUT LEAVING THE APP: the fake Stripe client's session URLs
+// live on `checkout.stripe.test`, an RFC-2606 host that never resolves in DNS. The
+// spec stubs that host with `page.route` BEFORE clicking subscribe, so the browser
+// proves the app initiated the navigation without touching an unresolvable origin.
 import type { Locator, Page } from '@playwright/test'
 import { log } from '@seontechnologies/playwright-utils/log'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
@@ -31,10 +30,9 @@ import {
 import { test as anonymousTest } from '../support/fixtures/merged-fixtures'
 
 const SUBSCRIPTION_URL = `**${SUBSCRIPTION_PATH}`
-// Story 5.5 Decision 7: the planner rail's entitlement gate is the planner
-// GET itself (401/403/503), not a separate subscription read -- see
-// `apps/web/src/lib/planner.ts`. The four `5.2-E2E-011` tests below watch
-// this instead of `SUBSCRIPTION_URL`, matching `planner.spec.ts`'s constant.
+// Story 5.5 Decision 7: the planner rail's entitlement gate is the planner GET
+// itself (401/403/503); see `apps/web/src/lib/planner.ts`. The four `5.2-E2E-011`
+// tests below watch this, matching `planner.spec.ts`'s constant.
 const PLANNER_PATH = '/api/v1/commerce/premium/planner'
 const PLANNER_URL = `**${PLANNER_PATH}`
 
@@ -65,10 +63,9 @@ function watchSubscriptionRead(
 }
 
 /**
- * Network-first, like the commerce suite's `openSettings`: the status read is
- * registered before the navigation that triggers it, so the spec never races
- * the page. Returns the exchange rather than asserting so a failure names the
- * claim that broke instead of "openSettings failed".
+ * Network-first: the status read is registered before the navigation that triggers
+ * it, so the spec never races the page. It returns the exchange and asserts
+ * nothing, so a failure names the claim that broke.
  */
 async function openSettings(
   page: Page,
@@ -85,13 +82,12 @@ async function openSettings(
 }
 
 /**
- * The lookbook home at the one viewport where the planner rail renders
- * inline (>=1440px, Decision 7's third-column form), with the "Plan week"
- * control already clicked open -- the rail defaults closed, so a caller that
- * only navigated here would see nothing. The realtime poll is stubbed
- * exactly as `lookbook-prism.spec.ts` does, so the page settles without a
- * live events dependency. Register any network watch (e.g. on `PLANNER_URL`)
- * before calling this, network-first, since the open click happens inside it.
+ * The lookbook home at the one viewport where the planner rail renders inline
+ * (>=1440px, Decision 7's third-column form), with the "Plan week" control already
+ * clicked open: the rail defaults closed, so a caller that only navigated here
+ * would see nothing. The realtime poll is stubbed so the page settles without a
+ * live events dependency. Register any network watch (e.g. on `PLANNER_URL`) before
+ * calling this, since the open click happens inside it.
  */
 async function openLookbookUltrawide(
   page: Page,
@@ -119,10 +115,9 @@ function plannerRail(page: Page): Locator {
 premiumSeededTest.describe('Story 5.2 web settings, seeded active subscriber', () => {
   premiumSeededTest.use({ premiumSeedUser: 'active' })
 
-  // Story 5.5: AC 1 needs an owned saved location to resolve a planner
-  // window against, and nothing in the seed graph gives this account one --
-  // see `ensurePremiumSeedLocation`'s own docblock. Mirrors `planner.spec.ts`'s
-  // identical guard for the same shared seeded account.
+  // Story 5.5: AC 1 needs an owned saved location to resolve a planner window
+  // against, and nothing in the seed graph gives this account one. See
+  // `ensurePremiumSeedLocation`'s own docblock.
   premiumSeededTest.beforeAll(async ({ request }, testInfo) => {
     if (isNonLocalEnvironment(testInfo)) return
     const apiBaseUrl = resolveApiBaseUrl(testInfo, { fallback: 'http://localhost:4000' })
@@ -154,7 +149,6 @@ premiumSeededTest.describe('Story 5.2 web settings, seeded active subscriber', (
       await expect(page.getByTestId('premium-status-line')).toContainText(
         'Premium is active: Premium Monthly'
       )
-      // Web-managed subscription: the Customer Portal button, not a store hint.
       await expect(page.getByTestId('premium-manage-button')).toBeVisible()
       await expect(page.getByTestId('premium-manage-in-store')).toHaveCount(0)
       // Already entitled: rendering a subscribe control would sell a second
@@ -180,9 +174,9 @@ premiumSeededTest.describe('Story 5.2 web settings, seeded active subscriber', (
       await expect(plannerRail(page)).toBeVisible()
       await expect(page.getByTestId('planner-rail-locked')).toHaveCount(0)
       await expect(page.getByTestId('planner-rail-get-premium')).toHaveCount(0)
-      // Story 5.5: the live seven-day week is the "unlocked" proof now, not
-      // the old Story 3.5 static shell text. `planner.spec.ts` owns the deep
-      // per-day content assertions this file does not need to duplicate.
+      // Story 5.5: the live seven-day week is the "unlocked" proof, replacing the
+      // Story 3.5 static shell text. `planner.spec.ts` owns the deep per-day
+      // content assertions.
       await expect(page.getByTestId('planner-days')).toBeVisible()
     }
   )
@@ -208,7 +202,6 @@ premiumSeededTest.describe('Story 5.2 web settings, seeded expired subscriber', 
       )
       await expect(subscribeButton(page, 'monthly')).toBeEnabled()
       await expect(subscribeButton(page, 'annual')).toBeEnabled()
-      // Nothing to manage: no live subscription, no portal entry, no store hint.
       await expect(page.getByTestId('premium-manage-button')).toHaveCount(0)
       await expect(page.getByTestId('premium-manage-in-store')).toHaveCount(0)
     }
@@ -216,14 +209,12 @@ premiumSeededTest.describe('Story 5.2 web settings, seeded expired subscriber', 
 
   premiumSeededTest(
     '[P1] 5.2-E2E-011 keeps the planner rail locked for the expired user',
-    // The 403 below is the subject of the test, not an accident -- same
-    // reason and same annotation as `commerce-affiliate-preferences.spec.ts`'s
-    // `5.1-E2E-WEB-05`.
+    // The 403 below is the subject of the test, so the network monitor is off.
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
-      // Expired means `PremiumEntitlementGuard` rejects the planner GET
-      // itself with 403 (PREMIUM_REQUIRED_MESSAGE) -- there is no separate
-      // subscription-status payload to read `status: 'expired'` off any more.
+      // Expired means `PremiumEntitlementGuard` rejects the planner GET itself with
+      // 403 (PREMIUM_REQUIRED_MESSAGE). No separate subscription-status payload
+      // carries `status: 'expired'` any more.
       const load = interceptNetworkCall({ method: 'GET', url: PLANNER_URL })
       await openLookbookUltrawide(page, interceptNetworkCall)
 
@@ -263,8 +254,8 @@ premiumSeededTest.describe(
         )
 
         await log.step('Assert the manage entry is the store hint, not the portal')
-        // An `app_store` subscription answered with a portal button would send
-        // the user to a 409; the client renders the store hint instead.
+        // An `app_store` subscription answered with a portal button would send the
+        // user to a 409, so the client renders the store hint.
         await expect(page.getByTestId('premium-manage-in-store')).toContainText(
           'App Store or Play Store'
         )
@@ -283,8 +274,8 @@ premiumFreshTest.describe('Story 5.2 web settings, never-subscribed user', () =>
       const loaded = await openSettings(page, interceptNetworkCall)
 
       expect(loaded.status).toBe(200)
-      // The wire contract for "never subscribed": status none with the
-      // entitlement keys serialized as nulls, never omitted.
+      // The wire contract for "never subscribed": status none with the entitlement
+      // keys serialized as nulls, never omitted.
       expect(loaded.responseJson).toEqual({
         data: {
           status: 'none',
@@ -297,10 +288,9 @@ premiumFreshTest.describe('Story 5.2 web settings, never-subscribed user', () =>
         },
       })
 
-      // Asserted as a substring that omits the apostrophe: the `quotes` rule
-      // wants single quotes and prettier wants double for an escaped one, and
-      // the two cannot both be satisfied on this literal. The distinguishing
-      // half of the copy is what matters here anyway.
+      // A substring that omits the apostrophe: the `quotes` rule wants single
+      // quotes and prettier wants double for an escaped one, and the two cannot
+      // both be satisfied on this literal.
       await expect(page.getByTestId('premium-status-line')).toContainText(
         'have a Premium subscription yet'
       )
@@ -337,14 +327,13 @@ premiumFreshTest.describe('Story 5.2 web settings, never-subscribed user', () =>
       expect(exchange.requestJson).toEqual({ plan: 'premium_monthly' })
 
       await log.step('Assert the app initiated navigation to the session URL')
-      // The landed URL is the assertion subject rather than the response body.
-      // `redirectToExternalUrl` calls `window.location.assign` the moment the
-      // response resolves, so reading `exchange.responseJson` races that
-      // navigation and returns null whenever the browser wins — which is a
-      // flake, not a finding. The app can only navigate to the URL this
-      // exchange returned, so asserting where it landed proves the same
-      // hand-off deterministically, and the stub answering at all proves the
-      // browser never touched an unresolvable `.test` host.
+      // The landed URL is the assertion subject. `redirectToExternalUrl` calls
+      // `window.location.assign` the moment the response resolves, so reading
+      // `exchange.responseJson` races that navigation and returns null whenever the
+      // browser wins, which flakes. The app can only navigate to the URL this
+      // exchange returned, so asserting where it landed proves the same hand-off
+      // deterministically, and the stub answering at all proves the browser never
+      // touched an unresolvable `.test` host.
       await page.waitForURL(`${FAKE_CHECKOUT_ORIGIN}/**`)
       // The fake Stripe client's URL shape (Decision 9): https, RFC-2606 host.
       expect(page.url()).toMatch(/^https:\/\/checkout\.stripe\.test\//)
@@ -357,8 +346,8 @@ premiumFreshTest.describe('Story 5.2 web settings, never-subscribed user', () =>
     // Same 403-is-the-subject reason as the expired test above.
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ premiumFreshSession: _premiumFreshSession, page, interceptNetworkCall }) => {
-      // Never-subscribed means the same 403 from `PremiumEntitlementGuard`
-      // as the expired case above -- see that test's comment.
+      // Never-subscribed draws the same 403 from `PremiumEntitlementGuard` as the
+      // expired case above.
       const load = interceptNetworkCall({ method: 'GET', url: PLANNER_URL })
       await openLookbookUltrawide(page, interceptNetworkCall)
 
@@ -397,9 +386,8 @@ anonymousTest.describe('Story 5.2 web settings and planner rail signed out', () 
       await expect(page.getByTestId('premium-signed-out-hint')).toHaveText(
         'Sign in to subscribe or manage Premium'
       )
-      // The controls render disabled with the hint, mirroring the commerce
-      // section's signed-out shape, so the page communicates what exists
-      // without offering an action that cannot succeed.
+      // The controls render disabled with the hint, so the page communicates what
+      // exists without offering an action that cannot succeed.
       await expect(subscribeButton(page, 'monthly')).toBeDisabled()
       await expect(subscribeButton(page, 'annual')).toBeDisabled()
       await expect(page.getByTestId('premium-manage-button')).toHaveCount(0)
@@ -427,12 +415,11 @@ anonymousTest.describe('Story 5.2 web settings and planner rail signed out', () 
         'href',
         '/settings'
       )
-      // Signed out means no session to spend on a read the gate cannot use:
-      // an entitlement the client cannot verify is an entitlement it does not
-      // have (locked by construction, not by response). `PlannerRail` checks
-      // `hasWebSession()` before calling `getPlannerFromWeb` (Decision 7), so
-      // this asserts zero requests to the planner endpoint specifically, not
-      // the now-unrelated subscription endpoint.
+      // Signed out means no session to spend on a read the gate cannot use: an
+      // entitlement the client cannot verify is one it does not have, so the rail is
+      // locked by construction. `PlannerRail` checks `hasWebSession()` before
+      // calling `getPlannerFromWeb` (Decision 7), so this counts requests to the
+      // planner endpoint specifically.
       expect(plannerRequests).toBe(0)
     }
   )

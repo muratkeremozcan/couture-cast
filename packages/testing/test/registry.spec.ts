@@ -12,7 +12,7 @@ import {
 describe('createFactoryRegistry', () => {
   it('returns the tracked id so factories can inline the call', () => {
     // Factories do `id: registry.track('users', user.id)`, so the return value
-    // is part of the contract, not a convenience.
+    // is part of the contract.
     const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
 
     expect(registry.track('users', 'user-1')).toBe('user-1')

@@ -2,7 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
 // Learning path Step 28: Accessibility hardening.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
-// Story 3.6 Task 5 step 1 owner: unit-test web chip navigation keyboard traversal, ARIA live updates, and telemetry error isolation in apps/web/src/app/components/chip-navigation.test.tsx
+// Story 3.6 Task 5 step 1 owner: chip navigation keyboard traversal, ARIA live updates, and telemetry error isolation.
 import { useState } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -83,21 +83,17 @@ describe('ChipNavigation Component (Story 3.6)', () => {
     personalChip.focus()
     expect(document.activeElement).toBe(personalChip)
 
-    // ArrowRight -> Community
     fireEvent.keyDown(personalChip, { key: 'ArrowRight' })
     expect(document.activeElement).toBe(communityChip)
     expect(communityChip).toHaveAttribute('aria-pressed', 'true')
 
-    // ArrowRight -> Sponsored
     fireEvent.keyDown(communityChip, { key: 'ArrowRight' })
     expect(document.activeElement).toBe(sponsoredChip)
     expect(sponsoredChip).toHaveAttribute('aria-pressed', 'true')
 
-    // Home -> Personal
     fireEvent.keyDown(sponsoredChip, { key: 'Home' })
     expect(document.activeElement).toBe(personalChip)
 
-    // End -> Sponsored
     fireEvent.keyDown(personalChip, { key: 'End' })
     expect(document.activeElement).toBe(sponsoredChip)
 

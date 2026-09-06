@@ -1,7 +1,7 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Story 4.4 Task 7 step 1 owner: prove the onboarding-state Zod schemas parse
-// and reject correctly, mirroring wardrobe-contract.spec.ts's structure.
+// and reject correctly.
 import { describe, expect, it } from 'vitest'
 import type { z } from 'zod'
 import {
@@ -67,11 +67,10 @@ describe('Wardrobe Onboarding HTTP Contracts', () => {
       // createFirstState/advanceExistingState: not_started only ever pairs
       // with currentStep 'permission' and null timestamps at revision 0;
       // completed only ever pairs with currentStep 'complete' and a set
-      // completedAt (the cross-field invariants below, not independent
-      // per-field overrides -- overriding only `status` on an otherwise
-      // unrelated fixture is exactly what let an invalid combination like
-      // {status: 'not_started', currentStep: 'silhouette'} slip through
-      // before the schema enforced this).
+      // completedAt. These are cross-field invariants: overriding only `status`
+      // on an otherwise unrelated fixture is what let an invalid combination
+      // like {status: 'not_started', currentStep: 'silhouette'} slip through
+      // before the schema enforced this.
       const validStateForStatus: Record<
         z.infer<typeof wardrobeOnboardingStatusEnum>,
         Record<string, unknown>
@@ -321,8 +320,8 @@ describe('Wardrobe Onboarding HTTP Contracts', () => {
 
     it('does not require `error` on the 428 precondition-required envelope', () => {
       // `parseOnboardingIfMatchHeader` raises a bare `HttpException`, which
-      // Nest serializes with no `error` reason phrase -- unlike the 409/412
-      // envelopes below, whose Nest exception classes always add one.
+      // Nest serializes with no `error` reason phrase. The 409/412 envelopes
+      // below come from Nest exception classes, which always add one.
       const spec = generateHttpOpenApiDocument()
       const schema = spec.components?.schemas?.['OnboardingPreconditionRequiredError'] as
         | { required?: string[] }

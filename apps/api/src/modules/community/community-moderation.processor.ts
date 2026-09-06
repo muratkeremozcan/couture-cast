@@ -2,7 +2,7 @@
 // Implements ADR-013 transactional content screening, publishing, flagging,
 // SLA alert recording, and retry exhaustion handling.
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
-import { PrismaClient, type ClimateBand } from '@prisma/client'
+import { PrismaClient, type ClimateBand, type LookbookPost } from '@prisma/client'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
 import {
   SupabaseCommunityStorageAdapter,
@@ -15,6 +15,7 @@ import {
 } from './community-moderation.engine.js'
 import { type CommunityModerationJob } from './community-moderation.queue.js'
 import { postDedupeKey } from './community-analytics.js'
+import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
 import {
   CommunityImageValidationError,
   verifyAndNormalizeCommunityImage,
@@ -151,11 +152,12 @@ export class CommunityModerationProcessor {
         challengeId: post.challenge_id,
         engineVersion,
         platform,
+        post,
       })
       return
     }
 
-    await this.flagPost(post.id, post.user_id, screeningResult, engineVersion)
+    await this.flagPost(post.id, post.user_id, screeningResult, engineVersion, post)
   }
 
   private async emit<
@@ -224,8 +226,10 @@ export class CommunityModerationProcessor {
     challengeId: string | null
     engineVersion: string
     platform: 'web' | 'mobile' | undefined
+    post: LookbookPost
   }): Promise<void> {
-    const { postId, userId, climateBand, challengeId, engineVersion, platform } = params
+    const { postId, userId, climateBand, challengeId, engineVersion, platform, post } =
+      params
     const publishedAt = new Date()
     const updated = await this.prisma.$transaction(async (tx) => {
       const updateResult = await tx.lookbookPost.updateMany({
@@ -239,6 +243,30 @@ export class CommunityModerationProcessor {
       })
 
       if (updateResult.count === 1) {
+        // A PASSING VERDICT USED TO WRITE NO AUDIT ROW AT ALL. Only `flagPost`
+        // and `recordReport` created `ModerationEvent`s, so the moderation trail
+        // recorded refusals and nothing else: there was no way to answer "was
+        // this post ever screened, by what, and when" for anything that
+        // published, which is every post a reader can actually see. The row
+        // carries the engine version so a later model regression can be scoped
+        // to exactly the posts the bad version cleared.
+        // NO `subject_alias` HERE, DELIBERATELY. The report path denormalizes the
+        // author's pseudonym because a report is about someone's conduct and has
+        // to stay attributable once erasure nulls `post_id`. A machine verdict is
+        // about the CONTENT, and nothing queries these rows by author, so
+        // resolving an alias would mean injecting the repository into the worker
+        // composition to mint a pseudonym no reader ever asks for.
+        await tx.moderationEvent.create({
+          data: {
+            post_id: postId,
+            action: 'screening_passed',
+            reason: engineVersion,
+            image_object_path: post.image_object_path,
+            content_snapshot: buildCommunityContentSnapshot(post, publishedAt),
+            created_at: publishedAt,
+          },
+        })
+
         await tx.communityModerationOutbox.updateMany({
           where: { post_id: postId },
           data: { dispatched_at: publishedAt },
@@ -283,7 +311,8 @@ export class CommunityModerationProcessor {
     postId: string,
     userId: string,
     screeningResult: CommunityModerationResult,
-    engineVersion: string
+    engineVersion: string,
+    post: LookbookPost
   ): Promise<void> {
     const reason = screeningResult.reasons.join(', ') || 'flagged_by_screening'
     const flaggedAt = new Date()
@@ -307,6 +336,8 @@ export class CommunityModerationProcessor {
           post_id: postId,
           action: 'flagged',
           reason,
+          image_object_path: post.image_object_path,
+          content_snapshot: buildCommunityContentSnapshot(post, flaggedAt),
           created_at: flaggedAt,
         },
       })

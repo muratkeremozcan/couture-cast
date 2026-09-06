@@ -121,8 +121,7 @@ describe('cleanup', () => {
   it('bounds unowned billing events to the current cleanup scope', async () => {
     // Story 5.2: unknown-subject webhook tests write BillingEvent rows with
     // user_id NULL, which neither tracked ids nor the user filter can reach.
-    // Those are swept by the same scope anchor as the cooldown table — never
-    // an unscoped delete of every unowned billing event.
+    // The same scope anchor that bounds the cooldown sweep bounds these.
     const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
     const calls: CleanupCall[] = []
     const prisma = createCleanupPrismaStub(calls)
@@ -167,7 +166,7 @@ describe('cleanup', () => {
     await cleanup({ prisma, registry })
 
     expect(calls.map((call) => call.delegate)).toEqual([
-      // Story 5.2: billing first — events, then the entitlement and customer
+      // Story 5.2: billing first. Events, then the entitlement and customer
       // rows that hang off the tracked user. All three are reachable through
       // the user filter even with no billing ids registered.
       'billingEvent',
@@ -179,9 +178,8 @@ describe('cleanup', () => {
       'premiumThemePreference',
       // Story 5.4: both palette tables reference only the tracked user with
       // ON DELETE CASCADE and nothing references them, so like the theme
-      // preference they only have to precede the user delete. The per-item
-      // state goes before the profile purely for readability -- neither
-      // references the other.
+      // preference they only have to precede the user delete. Neither
+      // references the other; the per-item state goes first for readability.
       'advisorRecommendationState',
       'paletteProfile',
       // Story 5.5: PlannerDayPlan references both the tracked user and
@@ -191,8 +189,8 @@ describe('cleanup', () => {
       // Story 6.1: the community tables go as one ordered group. Only the
       // outbox still cascades from the post; ModerationEvent.post_id and
       // CommunityPostReport.post_id are ON DELETE SET NULL, so deleting the
-      // post first would orphan them rather than remove them, and an orphaned
-      // row is reachable by nothing this function knows about.
+      // post first orphans them, and an orphaned row is reachable by nothing
+      // this function knows about.
       'communityModerationOutbox',
       'communityPostReport',
       'moderationEvent',
@@ -257,6 +255,7 @@ describe('cleanup', () => {
         { id: { in: ['moderation-1'] } },
         { silhouette_profile_id: { in: ['silhouette-1'] } },
         { flagged_by_id: { in: ['user-1'] } },
+        { reviewed_by_id: { in: ['user-1'] } },
       ],
     })
     expect(
@@ -297,12 +296,9 @@ describe('cleanup', () => {
       billingEvents: [],
       billingCustomers: [],
       premiumThemePreferences: [],
-      // Story 5.4.
       paletteProfiles: [],
       advisorRecommendationStates: [],
-      // Story 5.5.
       plannerDayPlans: [],
-      // Story 6.1.
       lookbookPosts: [],
       communityChallenges: [],
       communityModerationOutboxEntries: [],
@@ -353,8 +349,9 @@ describe('cleanup', () => {
   })
 
   it('issues no deletes at all when nothing was registered', async () => {
-    // The registry is the only thing scoping these statements. An empty
-    // registry must produce zero deletes, never an unscoped deleteMany.
+    // The registry is the only thing scoping these statements, so an empty
+    // registry has to produce zero deletes. An unscoped deleteMany here would
+    // empty tables the run never wrote to.
     const calls: CleanupCall[] = []
     const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
 
@@ -393,7 +390,7 @@ describe('cleanup', () => {
 
   it('scopes owner-wide deletes by user when no child ids were registered', async () => {
     // A persisted user drags rows the test never registered (push tokens, audit
-    // entries, preferences). Those are removed by owner rather than by id.
+    // entries, preferences), and the owner id is the only handle on them.
     const calls: CleanupCall[] = []
     const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
 
@@ -408,13 +405,15 @@ describe('cleanup', () => {
     expect(whereFor('notificationPreference')).toEqual({ user_id: { in: ['user-1'] } })
     expect(whereFor('savedLocation')).toEqual({ user_id: { in: ['user-1'] } })
     expect(whereFor('paletteInsights')).toEqual({ OR: [{ user_id: { in: ['user-1'] } }] })
-    // ModerationEvent has no user_id column, but it does have flagged_by_id,
-    // and Story 6.1 made that reachable: a tracked user who filed a community
-    // report leaves a moderation row behind that no other filter here matches,
-    // and ModerationEvent.post_id no longer cascades from the post to sweep it
-    // away. The delete is by reporter, never unscoped.
+    // ModerationEvent has no user_id column. A tracked user who filed a
+    // community report leaves a moderation row that only flagged_by_id reaches.
     expect(whereFor('moderationEvent')).toEqual({
-      OR: [{ flagged_by_id: { in: ['user-1'] } }],
+      OR: [
+        { flagged_by_id: { in: ['user-1'] } },
+        // A `report_resolved` row for an already-erased subject carries no
+        // post_id and no flagged_by_id; the operator is all that names it.
+        { reviewed_by_id: { in: ['user-1'] } },
+      ],
     })
     expect(whereFor('communityPostReport')).toEqual({
       OR: [{ reporter_id: { in: ['user-1'] } }],
@@ -440,7 +439,7 @@ describe('cleanup', () => {
     // Story 6.1 (M6). The lookbook delete used to sit inside deleteByUserIds,
     // which returns immediately when no user ids are tracked. A test that
     // persisted a post without also tracking its author therefore left the row
-    // behind while cleanup reported success -- the worst shape of leak, because
+    // behind while cleanup reported success. That is the worst shape of leak:
     // nothing fails until an unrelated suite trips over the stale row.
     const calls: CleanupCall[] = []
     const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
@@ -456,10 +455,10 @@ describe('cleanup', () => {
 
   it('reaches community report and moderation rows through the post and the reporter', async () => {
     // Story 6.1 (M7). ModerationEvent.post_id and CommunityPostReport.post_id
-    // are ON DELETE SET NULL, so neither row is swept away by deleting the
-    // post. Both builders therefore have to match on post_id in their own
-    // right, and on the reporting user, or a report filed during a test is
-    // unreachable by cleanup entirely.
+    // are ON DELETE SET NULL, so deleting the post sweeps neither row. Both
+    // builders have to match on post_id in their own right, and on the
+    // reporting user, or a report filed during a test is unreachable by
+    // cleanup entirely.
     const calls: CleanupCall[] = []
     const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
 
@@ -472,7 +471,11 @@ describe('cleanup', () => {
       calls.find((call) => call.delegate === delegate)?.where
 
     expect(whereFor('moderationEvent')).toEqual({
-      OR: [{ post_id: { in: ['post-1'] } }, { flagged_by_id: { in: ['user-1'] } }],
+      OR: [
+        { post_id: { in: ['post-1'] } },
+        { flagged_by_id: { in: ['user-1'] } },
+        { reviewed_by_id: { in: ['user-1'] } },
+      ],
     })
     expect(whereFor('communityPostReport')).toEqual({
       OR: [{ post_id: { in: ['post-1'] } }, { reporter_id: { in: ['user-1'] } }],
@@ -482,7 +485,7 @@ describe('cleanup', () => {
     })
 
     // The report and the moderation row must both be gone before the post they
-    // point at, or SET NULL turns them into orphans instead of deleting them.
+    // point at; SET NULL orphans whatever is still standing.
     const order = calls.map((call) => call.delegate)
     expect(order.indexOf('communityPostReport')).toBeLessThan(
       order.indexOf('lookbookPost')
@@ -506,8 +509,6 @@ describe('cleanup', () => {
   })
 
   it('drains the shared factory registry when the caller passes none', async () => {
-    // Factories register into the module-level registry, so `cleanup({ prisma })`
-    // with no explicit registry has to pick that one up.
     const calls: CleanupCall[] = []
 
     expect(registerForCleanup('users', 'user-shared')).toBe('user-shared')

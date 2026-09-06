@@ -10,6 +10,7 @@ import {
   type SavedLocation,
 } from '@prisma/client'
 import type { ClimateBand } from '@couture/utils'
+import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
 import {
   encodeCommunityFeedCursor,
   type CommunityFeedCursorPayload,
@@ -159,6 +160,14 @@ export class CommunityRepository {
         publishedAt: lastPost.published_at.toISOString(),
         id: lastPost.id,
         mode,
+        // The band actually filtered on, which is a different value from `mode`
+        // and has to travel separately. Under `auto` the band is derived per
+        // request from weather guaranteed fresh only within 60 minutes, so it
+        // can move between two pages of one scroll while `mode` stays `auto`
+        // throughout. `null` records that this page was served unfiltered, a
+        // state the reader can legitimately page through and one that must stay
+        // distinguishable from a band that has since resolved.
+        band: filterBand ?? null,
       })
     }
 
@@ -238,6 +247,59 @@ export class CommunityRepository {
     return this.prisma.lookbookPost.findUnique({
       where: { id: postId },
     })
+  }
+
+  /**
+   * Withdraws a post and starts its erasure clock in one statement.
+   *
+   * Withdrawal used to write `status` alone, which left the whole erasure sweep
+   * unreachable: `erasure_requested_at` had no producer anywhere in production
+   * code, so a withdrawn post's image stayed in the bucket forever and the
+   * 72-hour deadline never started, meaning `community_erasure_overdue` could
+   * not fire even in principle.
+   *
+   * `COALESCE` rather than a plain assignment because the clock must never be
+   * pushed back. Account erasure can already have stamped this row while it was
+   * still `published`, in the window before the sweep picks it up; if the author
+   * then withdraws it, a plain assignment would restart the 72 hours and turn a
+   * deletion that was already running late into one that looks on time. Raw SQL
+   * because Prisma cannot express "set this column only if it is null" in a
+   * single `update`, and a read-then-write would race the sweep.
+   *
+   * `updated_at` is set by hand for the same reason: `@updatedAt` is applied by
+   * the Prisma client, and this statement does not go through it.
+   */
+  async withdrawPostAndRequestErasure(postId: string, requestedAt: Date): Promise<void> {
+    await this.prisma.$executeRaw`
+      UPDATE "LookbookPost"
+      SET status = 'withdrawn'::"CommunityPostStatus",
+          erasure_requested_at = COALESCE(erasure_requested_at, ${requestedAt}),
+          updated_at = ${requestedAt}
+      WHERE id = ${postId}
+    `
+  }
+
+  /**
+   * Starts the erasure clock on every one of a member's posts that is not
+   * already counting down, and reports how many rows that moved.
+   *
+   * Every status is in scope, including `withdrawn` and `draft`. A post
+   * withdrawn before this code existed has an object in the bucket and no clock
+   * at all, and a `draft` or `uploading` row can hold an uploaded object that
+   * was never published. Erasure that skipped either would leave exactly the
+   * bytes the request was about.
+   */
+  async requestErasureForUser(userId: string, requestedAt: Date): Promise<number> {
+    const { count } = await this.prisma.lookbookPost.updateMany({
+      where: {
+        user_id: userId,
+        erasure_requested_at: null,
+      },
+      data: {
+        erasure_requested_at: requestedAt,
+      },
+    })
+    return count
   }
 
   async updatePost(
@@ -390,9 +452,23 @@ export class CommunityRepository {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_report:' || ${reporterId}))`
 
         const locked = await tx.$queryRaw<
-          { user_id: string; status: string; image_object_path: string | null }[]
+          {
+            user_id: string
+            status: string
+            image_object_path: string | null
+            caption: string | null
+            alt_text: string | null
+            locale: string | null
+            climate_band: string | null
+          }[]
         >`
-          SELECT user_id, status::text AS status, image_object_path
+          SELECT user_id,
+                 status::text AS status,
+                 image_object_path,
+                 caption,
+                 alt_text,
+                 locale,
+                 climate_band::text AS climate_band
           FROM "LookbookPost"
           WHERE id = ${postId}
           FOR UPDATE
@@ -435,6 +511,13 @@ export class CommunityRepository {
           }
         }
 
+        // Captured under the same `FOR UPDATE` lock that decided the post was
+        // visible, so the snapshot is the content the reporter actually saw
+        // rather than whatever the row holds by the time anyone reads the
+        // report. Erasure nulls `post_id` and anonymization nulls the text, and
+        // without this the surviving row said nothing about what was reported.
+        const contentSnapshot = buildCommunityContentSnapshot(post, new Date())
+
         await tx.communityPostReport.create({
           data: {
             post_id: postId,
@@ -443,6 +526,7 @@ export class CommunityRepository {
             details: details ?? null,
             subject_alias: subjectAlias,
             image_object_path: post.image_object_path,
+            content_snapshot: contentSnapshot,
             sla_due_at: new Date(Date.now() + slaHours * 60 * 60 * 1000),
           },
         })
@@ -458,6 +542,7 @@ export class CommunityRepository {
             reason,
             subject_alias: subjectAlias,
             image_object_path: post.image_object_path,
+            content_snapshot: contentSnapshot,
           },
         })
 

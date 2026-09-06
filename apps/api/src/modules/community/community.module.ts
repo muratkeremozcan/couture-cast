@@ -14,6 +14,7 @@ import { SupabaseCommunityStorageAdapter } from './community-storage.adapter.js'
 import { CommunityModerationQueue } from './community-moderation.queue.js'
 import { CommunityModerationOutboxDispatcher } from './community-moderation.outbox.js'
 import { CommunityModerationProcessor } from './community-moderation.processor.js'
+import { CommunityModerationActionsService } from './community-moderation.actions.js'
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { CommunityModerationProcessor } from './community-moderation.processor.j
     CommunityModerationQueue,
     CommunityModerationOutboxDispatcher,
     CommunityModerationProcessor,
+    CommunityModerationActionsService,
     RequestAuthGuard,
     RolesGuard,
   ],
@@ -44,6 +46,7 @@ import { CommunityModerationProcessor } from './community-moderation.processor.j
     CommunityModerationQueue,
     CommunityModerationOutboxDispatcher,
     CommunityModerationProcessor,
+    CommunityModerationActionsService,
   ],
 })
 export class CommunityModule {}

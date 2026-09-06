@@ -777,6 +777,50 @@ export class GuardianService {
             })
 
             const sessionInvalidated = remainingActiveGuardians === 0
+
+            // Story 6.1 HIGH-1: when the last active guardian consent goes, the
+            // member's community content stops being publicly visible in the
+            // same transaction that revokes the consent.
+            //
+            // `consent_suspended` had NO PRODUCER before this. The enum member
+            // existed, both feed status filters honoured it, nine locales
+            // shipped copy for it and Pact asserted it, and nothing anywhere
+            // ever wrote it, so a 13-to-15-year-old's published post stayed live
+            // after consent lapsed. That contradicts the frozen matrix row "Hide
+            // immediately" and the project rule that under-16 community
+            // functionality stays consent-gated.
+            //
+            // TWO STATUSES, AND ONLY TWO. `published` is the visible content the
+            // matrix is about. `pending_review` is content that is about to
+            // become visible: the moderation processor publishes with
+            // `where: { id, status: 'pending_review' }`, so moving the row out of
+            // that status here makes the processor's update match zero rows and
+            // return without publishing. Without it, a post already in the queue
+            // when consent lapsed would go live seconds later.
+            //
+            // `flagged` and `review_failed` are deliberately untouched. Both are
+            // already invisible, and both carry a moderation verdict; folding
+            // them into `consent_suspended` would erase that verdict, so a future
+            // restore-on-consent path would release content a moderator had
+            // flagged.
+            //
+            // Keyed on `sessionInvalidated` rather than on this one revocation,
+            // because consent has only lapsed once NO active guardian remains.
+            // This sits outside the `consent.teen.profile` check below: hiding a
+            // minor's public content must not depend on whether a profile row
+            // happens to exist.
+            if (sessionInvalidated) {
+              await tx.lookbookPost.updateMany({
+                where: {
+                  user_id: teenId,
+                  status: { in: ['published', 'pending_review'] },
+                },
+                data: {
+                  status: 'consent_suspended',
+                },
+              })
+            }
+
             if (sessionInvalidated && consent.teen.profile) {
               await tx.userProfile.update({
                 where: { user_id: teenId },
@@ -1137,11 +1181,53 @@ export class GuardianService {
   }
 
   // Story 4.1 Task 3 step 1 owner: assertWardrobeUploadAllowed for teen guardian consent verification
-  async assertWardrobeUploadAllowed(userId: string, role?: string): Promise<void> {
-    if (role !== 'teen') {
-      return
-    }
-
+  /**
+   * The age gate for every surface that accepts user-supplied media.
+   *
+   * IT USED TO BE A NO-OP UNLESS THE ROLE CLAIM WAS EXACTLY `'teen'`. The first
+   * statement was `if (role !== 'teen') return`, so the entire birthdate and
+   * consent check below was skipped for any other value, and an under-13 account
+   * whose token carried anything else published unchecked. Story 6.1 pointed
+   * this guard at a PUBLIC surface for the first time; wardrobe is private, so
+   * the same hole there leaked a minor's uploads to nobody but themselves.
+   *
+   * THE CLAIM IS NOT EVIDENCE OF AGE, IN EITHER DIRECTION. `role` is read
+   * verbatim from Supabase `app_metadata.app_role` and is never derived from a
+   * birthdate (`affiliate-offer.service.ts` documents the same trap from the
+   * other side: someone who signed up at 15 still carries `'teen'` at 25,
+   * because the emancipation sweep revokes consent rows without touching the
+   * Supabase role). A claim that is wrong for grown adults in one direction is
+   * not a claim to skip a safety check on in the other. Age is resolved from the
+   * stored profile for every caller.
+   *
+   * WHAT THIS COSTS. Callers that previously returned with no query now issue
+   * one, and an account with no `birthdate` on file is now refused instead of
+   * waved through. Signup has always written `birthdate` (`auth.service.ts`
+   * parses it, age-gates on it, and stores it in the same create), so this
+   * refuses accounts that predate that or were made outside it. On a public
+   * surface refusing is the only correct answer; the alternative, treating an
+   * unknown age as an adult, is the hole this whole guard exists to close.
+   *
+   * IF YOU ARE WRITING A FIXTURE, A SEED, AN IMPORT OR A DEBUG SCRIPT THAT
+   * CREATES A USER, GIVE IT A BIRTHDATE. A row inserted straight into
+   * `UserProfile` without one cannot upload or post, and the failure surfaces
+   * here as `GUARDIAN_CONSENT_REQUIRED`, which reads like a consent problem
+   * rather than a missing column. When this change was made, exactly one row on
+   * the development database had no birthdate and it was a debug script's, which
+   * is the shape of every account this will refuse: signup cannot produce one.
+   * Failing that way round is the point. A script that forgets an age is
+   * refused at a public posting surface instead of silently passing.
+   *
+   * `role` is kept in the signature and deliberately unused. Every caller
+   * already passes it, and removing the parameter would turn any future
+   * reinstatement of claim-based routing into a change at nine call sites
+   * instead of one function body.
+   */
+  async assertWardrobeUploadAllowed(
+    userId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    role?: string
+  ): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -1160,14 +1246,30 @@ export class GuardianService {
       throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
     }
 
+    const age = calculateAge(user.profile.birthdate)
+
+    // The age check moved AHEAD of the compliance check when the claim-based
+    // early return was removed, and the order is load-bearing.
+    //
+    // `compliance.accountStatus` is a GUARDIAN-CONSENT state: signup writes
+    // `pending_guardian_consent` or `active`, and revocation rewrites it. It is
+    // the right question to ask about a 13-to-15-year-old and a meaningless one
+    // to ask about an adult. Reading it before the age check would fail closed
+    // for every adult whose `preferences` carries no compliance block at all,
+    // because `extractComplianceState` returns `{}` for a legacy or absent
+    // value and `{}.accountStatus` is not `'active'`. That would lock adults out
+    // of their own wardrobe for a reason that has nothing to do with age, which
+    // is a different change from the one this guard needed.
+    //
+    // Teen behaviour is unchanged by the reorder: anyone under 16 still reaches
+    // every check below in the same sequence as before.
+    if (age >= 16) {
+      return
+    }
+
     const compliance = extractComplianceState(user.profile.preferences)
     if (compliance.accountStatus !== 'active') {
       throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
-    }
-
-    const age = calculateAge(user.profile.birthdate)
-    if (age >= 16) {
-      return
     }
 
     if (age < 13) {

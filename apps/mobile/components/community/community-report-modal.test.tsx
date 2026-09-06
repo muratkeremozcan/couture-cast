@@ -318,8 +318,8 @@ describe('CommunityReportModal (Story 6.1)', () => {
 
     /*
      * The regression this guards. React Native's `accessibilityState` object is
-     * native-only -- react-native-web's `forwardedProps` table carries
-     * `aria-checked` and `accessibilityChecked` and nothing for the object form --
+     * native-only; react-native-web's `forwardedProps` table carries
+     * `aria-checked` and `accessibilityChecked` and nothing for the object form,
      * so every `role="radio"` here rendered with NO `aria-checked` and axe failed
      * `aria-required-attr` under WCAG 4.1.2. `app.json` ships a web target
      * (`web.bundler: metro`), so that was a real failure on that surface rather

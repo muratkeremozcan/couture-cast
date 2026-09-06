@@ -19,7 +19,8 @@
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { GuardianService } from '../src/modules/guardian/guardian.service.js'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
 import { CommunityRepository } from '../src/modules/community/community.repository.js'
 import {
@@ -144,6 +145,14 @@ afterAll(async () => {
   if (schemaReady) {
     const owned = { user: { email: { startsWith: namespace } } }
     await prisma.jobFailure.deleteMany({ where: { job_id: { contains: namespace } } })
+    // Consent rows hold a foreign key onto `User`, so they go before the users
+    // do or the delete below fails on the constraint. `AuditLog` deliberately
+    // has no cleanup: a trigger refuses DELETE on it because those rows are the
+    // immutable consent and moderation record. Nothing in this suite commits an
+    // audit row -- 6.1-INT-090 rolls its transaction back -- so none accumulate.
+    await prisma.guardianConsent.deleteMany({
+      where: { teen: { email: { startsWith: namespace } } },
+    })
     await prisma.moderationEvent.deleteMany({
       where: { post: { user: { email: { startsWith: namespace } } } },
     })
@@ -422,6 +431,145 @@ describe('6.1 community lifecycle sweeps', () => {
 
       const row = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: post.id } })
       expect(row.status).toBe('pending_review')
+    })
+  })
+
+  describe('consent revocation and post hiding commit together', () => {
+    /*
+     * `guardian.service.ts` moves a teen's published posts to
+     * `consent_suspended` INSIDE the transaction that revokes the consent, and
+     * its comment says so: "hidden in the same transaction that revokes the
+     * consent." That co-transaction is the entire claim. Either both land or
+     * neither does, because the two halves failing apart are both wrong in a way
+     * a user notices -- consent revoked with the post still public, or a post
+     * hidden on a revocation that never committed and which the guardian would
+     * therefore have to perform again.
+     *
+     * `guardian.service.spec.ts` cannot see this. Its `$transaction` is a mock
+     * that invokes the callback, so it proves the call was made inside something
+     * called a transaction, not that the two writes share a fate. Only a real
+     * PostgreSQL transaction that actually rolls back can show that, which is
+     * what this does: the work runs on a real `tx`, then the transaction throws
+     * before commit.
+     *
+     * The mutation this is built to catch: change that `tx.lookbookPost` to
+     * `this.prisma.lookbookPost`. It is a one-word diff, it reads as harmless,
+     * every unit test stays green, and the hide then commits on its own
+     * connection and survives the rollback.
+     */
+    async function seedConsentedTeenWithPublishedPost(
+      storage: InMemoryCommunityStorage
+    ): Promise<{ guardianId: string; teenId: string; postIdValue: string }> {
+      const guardianId = await createUser('guardian')
+      const teenId = await createUser('teen')
+
+      await prisma.guardianConsent.create({
+        data: {
+          guardian_id: guardianId,
+          teen_id: teenId,
+          status: 'granted',
+          consent_level: 'full_access',
+          revoked_at: null,
+        },
+      })
+
+      const post = await createPost(storage, {
+        id: postId('consent-tx'),
+        userId: teenId,
+        status: 'published',
+        publishedAt: new Date(),
+      })
+
+      return { guardianId, teenId, postIdValue: post.id }
+    }
+
+    /**
+     * A `GuardianService` whose `$transaction` runs the real thing, reads the
+     * two rows back THROUGH THE SAME `tx` while it is still open, and then
+     * throws so PostgreSQL genuinely rolls the whole thing back.
+     *
+     * Observing from inside is what makes one test do the work of two. A
+     * rollback assertion on its own is satisfied perfectly by a service that
+     * never wrote the hide at all, so the in-transaction reading is the half
+     * that says the write HAPPENS, and the post-rollback reading is the half
+     * that says it is BOUND to the transaction. Splitting them into two tests
+     * would need the second one to commit, and a committed revocation writes an
+     * immutable `AuditLog` row that teardown is forbidden to delete and that
+     * pins its user row forever.
+     *
+     * The throw is deliberately not a serialization failure: `revokeConsent`
+     * retries those three times, and a retryable error would run the body
+     * repeatedly and muddy what the assertions read.
+     */
+    function serviceThatRollsBack(observed: {
+      postStatus?: string
+      consentStatus?: string
+    }): GuardianService {
+      const rollingBack = new Proxy(prisma, {
+        get(target, property, receiver) {
+          if (property === '$transaction') {
+            return (callback: (tx: PrismaClient) => Promise<unknown>) =>
+              target.$transaction(async (tx) => {
+                await callback(tx as unknown as PrismaClient)
+
+                const post = await (tx as unknown as PrismaClient).lookbookPost.findFirst(
+                  { where: { id: { startsWith: `${namespace}-consent-tx` } } }
+                )
+                const consent = await (
+                  tx as unknown as PrismaClient
+                ).guardianConsent.findFirst({
+                  where: { teen: { email: { startsWith: namespace } } },
+                })
+                observed.postStatus = post?.status
+                observed.consentStatus = consent?.status
+
+                throw new Error('forced rollback after the transaction body ran')
+              })
+          }
+          return Reflect.get(target, property, receiver) as unknown
+        },
+      })
+
+      return new GuardianService(
+        { capture: vi.fn() } as never,
+        rollingBack,
+        { invalidateConsentState: vi.fn().mockResolvedValue(undefined) } as never,
+        { invalidateUserSessions: vi.fn().mockResolvedValue(undefined) } as never
+      )
+    }
+
+    it('6.1-INT-090 hides a teen post inside the revoking transaction, and not outside it', async (context) => {
+      if (!requireSchema(context)) return
+
+      const storage = new InMemoryCommunityStorage()
+      const { guardianId, teenId, postIdValue } =
+        await seedConsentedTeenWithPublishedPost(storage)
+      const observed: { postStatus?: string; consentStatus?: string } = {}
+
+      await expect(
+        serviceThatRollsBack(observed).revokeConsent(guardianId, teenId)
+      ).rejects.toThrow('forced rollback')
+
+      // INSIDE: both writes happened, on the same transaction, before the throw.
+      // If this is still `published` the service never wrote the hide and the
+      // rollback assertion below would pass for the wrong reason.
+      expect(observed.postStatus).toBe('consent_suspended')
+      expect(observed.consentStatus).toBe('revoked')
+
+      // OUTSIDE: neither survived. A `consent_suspended` here means the hide
+      // committed on its own connection, so a teen's content is hidden on the
+      // strength of a revocation the database never accepted, and the guardian
+      // would have to perform the revocation again to make the record agree.
+      const post = await prisma.lookbookPost.findUniqueOrThrow({
+        where: { id: postIdValue },
+      })
+      expect(post.status).toBe('published')
+
+      const consent = await prisma.guardianConsent.findFirstOrThrow({
+        where: { guardian_id: guardianId, teen_id: teenId },
+      })
+      expect(consent.status).toBe('granted')
+      expect(consent.revoked_at).toBeNull()
     })
   })
 })

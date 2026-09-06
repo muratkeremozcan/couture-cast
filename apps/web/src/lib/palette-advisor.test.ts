@@ -29,8 +29,8 @@ import {
 const PALETTE_PATH = '/api/v1/commerce/premium/palette'
 
 // Canvas is not implemented in jsdom, so the one genuinely browser-only step of the
-// upload is replaced. Everything downstream of it -- the allocate call, the header the
-// bytes go up with, the commit body and the idempotency key shared by both requests --
+// upload is replaced. Everything downstream of it (the allocate call, the header the
+// bytes go up with, the commit body and the idempotency key shared by both requests)
 // is the real code path.
 vi.mock('./wardrobe', async (importOriginal) => {
   const actual = await importOriginal<typeof WardrobeModule>()
@@ -90,8 +90,8 @@ describe('web palette advisor client (Story 5.4)', () => {
   /**
    * The two 403s are the whole reason this module classifies on the message rather
    * than the status alone. `PremiumEntitlementGuard` runs pre-handler and the consent
-   * check runs in the service body, so the pair is deterministic (Decision 10) — but
-   * only the message distinguishes them on the wire.
+   * check runs in the service body, so the pair is deterministic (Decision 10). Only
+   * the message distinguishes them on the wire.
    */
   it('5.4-WEB-003 separates the consent 403 from the entitlement 403', async () => {
     signIn()

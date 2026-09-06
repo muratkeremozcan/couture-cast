@@ -6,9 +6,8 @@ import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
 
-// Story 5.4: `/palette` joins the list explicitly. This scan does not discover
-// routes -- it iterates this literal array -- so a destination route that is
-// not listed here is never scanned at either viewport and AC 8's axe evidence
+// This scan discovers nothing: it iterates this literal array, so a destination
+// route missing from it is never scanned at either viewport and AC 8's axe evidence
 // for it does not exist.
 const primaryRoutes = ['/', '/community', '/wardrobe', '/settings', '/palette'] as const
 const secondaryRoutes = [
@@ -252,19 +251,11 @@ test.describe('Story 3.8 interaction states', () => {
     await expect(page.locator(':focus')).not.toHaveAttribute('data-testid', /chip-/)
 
     /*
-     * The `article[id^="lookbook-card-"]` half of this assertion is gone rather
-     * than adapted, and the reason is a product blocker rather than a DOM rename.
-     * No community card can be rendered on this page today: the seeded posts are
-     * dropped from the feed because their storage objects were never uploaded,
-     * and a post created through the API never leaves `pending_review` because
-     * the local E2E stack does not run the community moderation worker. Both are
-     * written up in the file header of `community-feed.spec.ts`, and the focus
-     * contract they carried is asserted there — behind a `fixme` naming those
-     * blockers — rather than silently dropped here.
-     *
-     * What survives is the half that never needed a card: a non-card child of a
-     * scrolling region must NOT be focusable, which is the property that keeps
-     * the tab order short.
+     * The `article[id^="lookbook-card-"]` half of this assertion moved to
+     * `community-feed.spec.ts`, which owns the community focus contract. What
+     * survives is the half that never needed a card: a non-card child of a
+     * scrolling region must NOT be focusable, which is the property that keeps the
+     * tab order short.
      */
     await expect(
       page.locator('[data-testid="outfit-scroll"] > div').first()
@@ -306,16 +297,11 @@ test.describe('Story 3.8 interaction states', () => {
 
     /*
      * The community deep-link half of this test is asserted in
-     * `community-feed.spec.ts` instead, for two reasons that arrived together.
-     * `look-3` was an id from `MOCK_LOOKBOOK_ITEMS`, which Story 6.1 deleted, so
-     * the locator names a card that can never exist; and the real seeded id that
-     * replaces it (`lookbook-3`) still does not render, for the two blockers that
-     * spec's header records. Rewriting the id here would have produced a test
-     * that fails for a reason unrelated to accessibility, in a file about
-     * accessibility.
-     *
-     * The severe-alert half above is untouched and still proves the programmatic
-     * focus contract this test exists for.
+     * `community-feed.spec.ts`. `look-3` was an id from `MOCK_LOOKBOOK_ITEMS`, which
+     * Story 6.1 deleted, so the locator named a card that can never exist, and
+     * rewriting the id here would produce a test failing for a reason unrelated to
+     * accessibility, in a file about accessibility. The severe-alert half above
+     * still proves the programmatic focus contract this test exists for.
      */
   })
 
@@ -373,9 +359,8 @@ test.describe('Story 3.8 interaction states', () => {
     await page.setViewportSize(viewports[0])
     await openStablePage(page, '/', interceptNetworkCall)
 
-    // Story 5.5 Decision 7: the planner defaults closed and opens from the
-    // "Plan week" control; `viewports[0]` is desktop width, so this opens the
-    // inline rail variant.
+    // Story 5.5 Decision 7: the planner defaults closed and opens from the "Plan
+    // week" control. `viewports[0]` is desktop width, so this opens the inline rail.
     await page.getByTestId('planner-open-control').click()
     const planner = page.getByRole('complementary', { name: 'Planner Rail' })
     await expect(planner).toBeVisible()
@@ -387,15 +372,12 @@ test.describe('Story 3.8 interaction states', () => {
     expect(Number.parseFloat(transitionDuration)).toBeLessThanOrEqual(0.00001)
 
     await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
-    // Story 5.5 Task 10 finding: the `planner-open-control` mouse click above
-    // (added for Decision 7) leaves Chromium's `:focus-visible` heuristic in
-    // its pointer-interaction state, so the plain `chip.focus()` call below
-    // no longer matched `:focus-visible` on its own -- `outlineStyle` came
-    // back `'none'` instead of `'solid'`, a real regression this test caught
-    // the first time it actually ran (5.4's session pinned the edit but
-    // never executed it). One real keyboard event resets that heuristic
-    // before the script-triggered focus, matching how a keyboard user would
-    // actually reach this element; confirmed by removing it and reproducing
+    // The `planner-open-control` mouse click above leaves Chromium's
+    // `:focus-visible` heuristic in its pointer-interaction state, so a plain
+    // `chip.focus()` stopped matching `:focus-visible` and `outlineStyle` came back
+    // `'none'` where the assertion below wants `'solid'`. One real keyboard event
+    // resets that heuristic before the script-triggered focus, matching how a
+    // keyboard user reaches this element; confirmed by removing it and reproducing
     // the failure.
     await page.keyboard.press('Tab')
     await chip.focus()
@@ -432,10 +414,9 @@ test.describe('Story 3.8 interaction states', () => {
       '/?source=notification&type=severe_weather&alertId=alert-999',
       interceptNetworkCall
     )
-    // Scoped to the alert panel itself: the page also carries a persistent
-    // "Plan week" control near the hero actions (Story 5.5 Decision 7) with
-    // the same accessible name, and this assertion is specifically about the
-    // alert's own dark surface.
+    // Scoped to the alert panel: the page also carries a persistent "Plan week"
+    // control near the hero actions (Story 5.5 Decision 7) with the same accessible
+    // name, and this assertion is about the alert's own dark surface.
     const severeAlert = page.getByTestId('severe-weather-alert-focused')
     const alert = await focusColors(
       severeAlert.getByRole('button', { name: 'Plan week' })

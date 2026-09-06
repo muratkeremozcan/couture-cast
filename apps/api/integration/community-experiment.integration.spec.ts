@@ -31,9 +31,10 @@
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
 import { classifyClimateBand, type ClimateBand } from '@couture/utils'
+import { COMMUNITY_CURSOR_INVALID_MESSAGE } from '@couture/api-client/contracts/http'
 import type { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
 import type { GuardianService } from '../src/modules/guardian/guardian.service.js'
 import type { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
@@ -120,6 +121,7 @@ let allArmUserId = ''
 let authorUserId = ''
 let resolvedBand: ClimateBand
 let offBand: ClimateBand
+let alternateBand: ClimateBand
 const inBandPostIds: string[] = []
 const offBandPostIds: string[] = []
 
@@ -134,11 +136,38 @@ const telemetryService = {
   captureEvent: vi.fn().mockResolvedValue(undefined),
 } as unknown as TelemetryService
 
-const weatherQueryService = {
-  getLatestWeather: vi.fn().mockResolvedValue({
+/**
+ * Cold, dry days. Used to move the viewer's resolved band BETWEEN two page
+ * fetches, which is the only way to reach the cursor's band check: the band is
+ * derived per request from weather that is only guaranteed fresh for 60 minutes,
+ * so it can legitimately change mid-scroll while the requested mode stays
+ * `auto` throughout.
+ */
+const COLD_DAILY_SUMMARIES = DAILY_SUMMARIES.map((day) => ({
+  ...day,
+  temperatureMin: -6,
+  temperatureMax: 2,
+}))
+
+/** Held separately so a test can re-point it and restore it. */
+const getLatestWeather = vi.fn().mockResolvedValue({
+  status: 'fresh',
+  data: { daily_summaries: DAILY_SUMMARIES },
+})
+
+const serveWeather = (summaries: typeof DAILY_SUMMARIES) => {
+  getLatestWeather.mockResolvedValue({
     status: 'fresh',
-    data: { daily_summaries: DAILY_SUMMARIES },
-  }),
+    data: { daily_summaries: summaries },
+  })
+}
+
+const serveNoWeather = () => {
+  getLatestWeather.mockResolvedValue({ status: 'unavailable', data: null })
+}
+
+const weatherQueryService = {
+  getLatestWeather,
 } as unknown as WeatherQueryService
 
 const guardianService = {} as unknown as GuardianService
@@ -176,6 +205,15 @@ beforeAll(async () => {
   }
   resolvedBand = classified
   offBand = resolvedBand === 'cold_wet' ? 'warm_dry' : 'cold_wet'
+
+  const coldClassified = classifyClimateBand(COLD_DAILY_SUMMARIES)
+  if (!coldClassified || coldClassified === resolvedBand) {
+    throw new Error(
+      'The cold fixture must classify to a DIFFERENT band than the temperate one, ' +
+        'or the band-change tests cannot change anything.'
+    )
+  }
+  alternateBand = coldClassified
 
   autoArmUserId = findUserIdInArm('auto')
   allArmUserId = findUserIdInArm('all')
@@ -287,6 +325,149 @@ describe('6.1 community feed experiment arms', () => {
     // every assertion above about `mode` would still pass.
     expect(allIds).not.toEqual(autoIds)
     expect(allIds.filter((id) => !autoIds.includes(id)).length).toBeGreaterThan(0)
+  })
+
+  describe('cursor band binding across a mid-scroll band change', () => {
+    /*
+     * The band is derived per request from weather guaranteed fresh only within
+     * 60 minutes, so under `mode: 'auto'` it can change between page one and
+     * page two while the REQUESTED MODE STAYS `auto` THROUGHOUT. That is what
+     * makes the mode check insufficient on its own and why the cursor carries
+     * the resolved band as well.
+     *
+     * Two failures it prevents. If the band moves and page two applies page
+     * one's keyset to a differently filtered set, everything newer in the new
+     * band is skipped for that scroll. And if resolution FAILS, the filter drops
+     * entirely and page two silently becomes the unfiltered all-regions feed
+     * under the same cursor, with no 400 because the mode still matches.
+     *
+     * The second is the more dangerous, and it turns on an argument distinction
+     * that is easy to lose: `safeDecodeCommunityFeedCursor` treats `undefined`
+     * as "skip the band check" and `null` as "assert this page was unfiltered".
+     * `community.service.ts` passes `filterBand ?? null`, so a failed resolution
+     * asserts null rather than skipping. A service that let `undefined` through
+     * would serve page two unfiltered and silently, and would pass a test that
+     * only checked the band-changed case.
+     *
+     * Every test here keeps the viewer in the AUTO arm and requests `auto` for
+     * both pages, so the mode check can never be what fires.
+     */
+    afterEach(() => {
+      serveWeather(DAILY_SUMMARIES)
+    })
+
+    async function firstPageCursor(): Promise<string> {
+      const page = await service.getFeed({
+        userId: autoArmUserId,
+        platform: 'web',
+        mode: 'auto',
+        limit: 2,
+      })
+      expect(page.mode).toBe('auto')
+      expect(page.viewerBand).toBe(resolvedBand)
+      if (!page.nextCursor) {
+        throw new Error('Fixture is too small to produce a cursor for page two.')
+      }
+      return page.nextCursor
+    }
+
+    it('6.1-INT-073 refuses page two when the resolved band changed mid-scroll', async (context) => {
+      if (!requireSchema(context)) return
+
+      const cursor = await firstPageCursor()
+
+      // The weather moves, so the same `auto` request now resolves elsewhere.
+      serveWeather(COLD_DAILY_SUMMARIES)
+
+      await expect(
+        service.getFeed({
+          userId: autoArmUserId,
+          platform: 'web',
+          mode: 'auto',
+          cursor,
+          limit: 2,
+        })
+      ).rejects.toThrow(COMMUNITY_CURSOR_INVALID_MESSAGE)
+
+      // And the band really did move, so the refusal above is the band check
+      // firing rather than something incidental.
+      const fresh = await service.getFeed({
+        userId: autoArmUserId,
+        platform: 'web',
+        mode: 'auto',
+        limit: 2,
+      })
+      expect(fresh.viewerBand).toBe(alternateBand)
+      expect(fresh.mode).toBe('auto')
+    })
+
+    it('6.1-INT-074 refuses page two when band resolution fails rather than serving it unfiltered', async (context) => {
+      if (!requireSchema(context)) return
+
+      // THE null-VERSUS-undefined CASE. Resolution failing drops the filter, so
+      // a service that passed `undefined` here would skip the check and hand the
+      // reader the all-regions feed under a cursor minted for one band, with no
+      // error anywhere. The refusal is the only thing that distinguishes the two
+      // implementations, because the mode is `auto` in both.
+      const cursor = await firstPageCursor()
+
+      serveNoWeather()
+
+      await expect(
+        service.getFeed({
+          userId: autoArmUserId,
+          platform: 'web',
+          mode: 'auto',
+          cursor,
+          limit: 2,
+        })
+      ).rejects.toThrow(COMMUNITY_CURSOR_INVALID_MESSAGE)
+
+      // Resolution genuinely failed and the filter genuinely dropped: a fresh
+      // first page is unfiltered and says why the band is unresolved. Without
+      // this, the assertion above could pass while the band still resolved.
+      const fresh = await service.getFeed({
+        userId: autoArmUserId,
+        platform: 'web',
+        mode: 'auto',
+        limit: 50,
+      })
+      expect(fresh.viewerBand).toBeNull()
+      expect(fresh.bandResolved).toBe(false)
+      expect(fresh.bandUnresolvedReason).toBe('weather_unavailable')
+      expect(fresh.items.map((item) => item.id)).toEqual(
+        expect.arrayContaining(offBandPostIds)
+      )
+    })
+
+    it('6.1-INT-075 continues paging when the band did not change', async (context) => {
+      if (!requireSchema(context)) return
+
+      // The control. Two refusals with nothing that succeeds would prove only
+      // that something rejects cursors, not that the band is what decides.
+      const first = await service.getFeed({
+        userId: autoArmUserId,
+        platform: 'web',
+        mode: 'auto',
+        limit: 2,
+      })
+      expect(first.nextCursor).not.toBeNull()
+
+      const second = await service.getFeed({
+        userId: autoArmUserId,
+        platform: 'web',
+        mode: 'auto',
+        cursor: first.nextCursor ?? undefined,
+        limit: 2,
+      })
+
+      expect(second.mode).toBe('auto')
+      const firstIds = first.items.map((item) => item.id)
+      const secondIds = second.items.map((item) => item.id)
+      // A real continuation: disjoint from page one, and still band-filtered.
+      expect(firstIds.filter((id) => secondIds.includes(id))).toEqual([])
+      expect(second.items.every((item) => item.climateBand === resolvedBand)).toBe(true)
+    })
   })
 
   it('6.1-INT-071 keeps a viewer in the same arm across repeated requests', async (context) => {

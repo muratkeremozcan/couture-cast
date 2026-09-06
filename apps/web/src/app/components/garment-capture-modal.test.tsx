@@ -135,7 +135,6 @@ describe('GarmentCaptureModal Component', () => {
   })
 })
 
-/** Uploads a valid image through the file picker and lands on the crop step. */
 async function chooseValidImage(user: ReturnType<typeof userEvent.setup>) {
   await user.upload(
     screen.getByLabelText('Garment image file'),

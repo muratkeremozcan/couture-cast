@@ -165,7 +165,22 @@ ALTER TABLE public."ModerationEvent" ADD CONSTRAINT "ModerationEvent_post_id_fke
 ALTER TABLE public."ModerationEvent"
   ADD COLUMN "subject_alias" TEXT,
   ADD COLUMN "content_snapshot" JSONB,
-  ADD COLUMN "image_object_path" TEXT;
+  ADD COLUMN "image_object_path" TEXT,
+  -- The engine version an operator's release overrode.
+  --
+  -- Releasing a flagged post is a human overruling a machine verdict, so the
+  -- audit row has to say WHICH version was overruled. Without this the value
+  -- has nowhere structured to go and ends up formatted into the free-text
+  -- `reason`, which is the pattern this branch already removed once: reporter
+  -- free text was being concatenated there, which destroyed the closed enum and
+  -- made a changed reason undetectable, and is why CommunityPostReport exists as
+  -- its own table. A well-behaved format string is still that pattern.
+  --
+  -- Holds the overridden engine version and nothing else. The operator is
+  -- already named by `reviewed_by_id` on the same row, so this must not
+  -- duplicate identity, and NULL is the ordinary case: only a release written
+  -- over a machine verdict fills it.
+  ADD COLUMN "overridden_engine_version" TEXT;
 
 -- CreateTable CommunityChallenge
 CREATE TABLE public."CommunityChallenge" (
@@ -344,6 +359,30 @@ DROP POLICY IF EXISTS authenticated_insert_own_user_data ON public."LookbookPost
 DROP POLICY IF EXISTS authenticated_update_own_user_data ON public."LookbookPost";
 DROP POLICY IF EXISTS authenticated_delete_own_user_data ON public."LookbookPost";
 DROP POLICY IF EXISTS authenticated_read_published_community_posts ON public."LookbookPost";
+
+-- EngagementEvent. Locked down with LookbookPost, and for the same reason.
+--
+-- 20260420113000_add_guardian_shared_rls_policies put both tables in its
+-- self-only list, granting the four DML verbs to `authenticated` with policies
+-- checking only `user_id`. Its own comment said they stayed self-scoped "until
+-- Story 6 formalizes"; formalizing LookbookPost and leaving this behind was the
+-- other half of the same job.
+--
+-- `EngagementEvent.post_id` is a REQUIRED foreign key to LookbookPost, so an
+-- authenticated client with any `post_id` guess gets a post-existence oracle:
+-- the insert succeeds for a real post and fails with 23503 for a fabricated
+-- one, which distinguishes rows the API deliberately answers 404 for. Proven
+-- live before this REVOKE was written, and it was worse than an oracle -- the
+-- insert against another user's DRAFT post SUCCEEDED, so a client could attach
+-- engagement to content it cannot read. The same grants let a client forge and
+-- delete its own engagement rows, which is the aggregate a later story ranks on.
+REVOKE ALL ON TABLE public."EngagementEvent" FROM anon, authenticated;
+ALTER TABLE public."EngagementEvent" ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS authenticated_read_own_user_data ON public."EngagementEvent";
+DROP POLICY IF EXISTS authenticated_insert_own_user_data ON public."EngagementEvent";
+DROP POLICY IF EXISTS authenticated_update_own_user_data ON public."EngagementEvent";
+DROP POLICY IF EXISTS authenticated_delete_own_user_data ON public."EngagementEvent";
 
 -- CommunityChallenge. Editorial rows include unstarted and deactivated
 -- challenges, so a `USING (true)` read policy let any authenticated client

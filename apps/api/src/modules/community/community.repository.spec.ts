@@ -210,7 +210,7 @@ describe('CommunityRepository', () => {
       const publishedAt = '2026-09-05T10:00:00.000Z'
 
       await repo.findPublishedFeedPosts({
-        cursor: { publishedAt, id: 'post-cursor-id', mode: 'auto' },
+        cursor: { publishedAt, id: 'post-cursor-id', mode: 'auto', band: null },
         limit: 12,
         mode: 'auto',
       })
@@ -233,10 +233,11 @@ describe('CommunityRepository', () => {
       )
     })
 
-    it('mints the next cursor through the contract encoder, stamped with the mode', async () => {
+    it('mints the next cursor through the contract encoder, stamped with the mode and the band', async () => {
       // Hand-rolling the base64 here is how the encoder and the decoder drift
       // apart; the cursor also has to carry its mode so it cannot page a
-      // different feed.
+      // different feed, and the BAND it was actually filtered on, which is a
+      // different value that can move between two pages of one scroll.
       const { repo, lookbookPostFindMany } = createRepo()
       lookbookPostFindMany.mockResolvedValue([
         publishedRow('post-1', '2026-09-05T12:00:00.000Z'),
@@ -244,7 +245,11 @@ describe('CommunityRepository', () => {
         publishedRow('post-3', '2026-09-05T10:00:00.000Z'),
       ])
 
-      const result = await repo.findPublishedFeedPosts({ limit: 2, mode: 'cold_wet' })
+      const result = await repo.findPublishedFeedPosts({
+        limit: 2,
+        mode: 'cold_wet',
+        filterBand: 'cold_wet',
+      })
 
       expect(result.posts.length).toBe(2)
       expect(result.nextCursor).not.toBeNull()
@@ -256,7 +261,28 @@ describe('CommunityRepository', () => {
         publishedAt: '2026-09-05T11:00:00.000Z',
         id: 'post-2',
         mode: 'cold_wet',
+        band: 'cold_wet',
       })
+    })
+
+    it('records an unfiltered page as band null rather than omitting the field', async () => {
+      // `all`, and `auto` with an unresolved viewer, both filter on nothing. The
+      // cursor has to say so explicitly: an absent band would be indistinguishable
+      // from a band that has since resolved, which is the whole failure the field
+      // exists to catch.
+      const { repo, lookbookPostFindMany } = createRepo()
+      lookbookPostFindMany.mockResolvedValue([
+        publishedRow('post-1', '2026-09-05T12:00:00.000Z'),
+        publishedRow('post-2', '2026-09-05T11:00:00.000Z'),
+        publishedRow('post-3', '2026-09-05T10:00:00.000Z'),
+      ])
+
+      const result = await repo.findPublishedFeedPosts({ limit: 2, mode: 'all' })
+
+      const decoded = JSON.parse(
+        Buffer.from(result.nextCursor!, 'base64url').toString('utf8')
+      ) as { band: unknown }
+      expect(decoded.band).toBeNull()
     })
 
     it('returns nextCursor: null on the last page', async () => {
@@ -539,12 +565,77 @@ describe('CommunityRepository', () => {
     })
   })
 
+  describe('erasure producers', () => {
+    // `erasure_requested_at` had no production writer at all: only the test
+    // factory and specs ever set it, so the entire erasure sweep was
+    // unreachable, a withdrawn post's image stayed in the bucket forever, and
+    // the 72-hour deadline never started, which meant `community_erasure_overdue`
+    // could not fire even in principle.
+    it('withdraws and starts the clock in one statement', async () => {
+      const { repo, executeRaw } = createRepo()
+      const requestedAt = new Date('2026-09-06T10:00:00.000Z')
+
+      await repo.withdrawPostAndRequestErasure('post-1', requestedAt)
+
+      const statement = JSON.stringify(executeRaw.mock.calls[0])
+      expect(statement).toContain('UPDATE')
+      expect(statement).toContain('withdrawn')
+      expect(statement).toContain('erasure_requested_at')
+    })
+
+    it('coalesces the clock rather than assigning it, so a later withdrawal cannot push a deadline back', async () => {
+      // Account erasure can already have stamped a row while it was still
+      // published. A plain assignment on withdrawal would restart the 72 hours
+      // and make a deletion that was already late look on time.
+      const { repo, executeRaw } = createRepo()
+
+      await repo.withdrawPostAndRequestErasure('post-1', new Date())
+
+      expect(JSON.stringify(executeRaw.mock.calls[0])).toContain('COALESCE')
+    })
+
+    it('marks every post of a member that is not already counting down, and reports the count', async () => {
+      const { repo, lookbookPostUpdateMany } = createRepo()
+      lookbookPostUpdateMany.mockResolvedValueOnce({ count: 4 })
+      const requestedAt = new Date('2026-09-06T10:00:00.000Z')
+
+      await expect(repo.requestErasureForUser('user-1', requestedAt)).resolves.toBe(4)
+
+      expect(lookbookPostUpdateMany).toHaveBeenCalledWith({
+        where: { user_id: 'user-1', erasure_requested_at: null },
+        data: { erasure_requested_at: requestedAt },
+      })
+    })
+
+    it('filters on no status, because a draft and an already-withdrawn post both hold objects', async () => {
+      // A post withdrawn before the clock existed has bytes in the bucket and no
+      // deadline at all, and a `draft` or `uploading` row can hold an object that
+      // was never published. Erasure that skipped either would leave exactly the
+      // bytes the request was about.
+      const { repo, lookbookPostUpdateMany } = createRepo()
+      lookbookPostUpdateMany.mockResolvedValueOnce({ count: 0 })
+
+      await repo.requestErasureForUser('user-1', new Date())
+
+      const where = (
+        lookbookPostUpdateMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }
+      ).where
+      expect(where).not.toHaveProperty('status')
+    })
+  })
+
   describe('recordReport', () => {
     const lockedPublishedPost = [
       {
         user_id: 'author-other',
         status: 'published',
         image_object_path: 'community/post-1/session.jpg',
+        // Read under the same FOR UPDATE lock that decides visibility, so the
+        // audit snapshot is the content the reporter actually saw.
+        caption: 'Autumn commute look',
+        alt_text: 'A denim jacket over a striped shirt',
+        locale: 'en-US',
+        climate_band: 'temperate_dry',
       },
     ]
 
@@ -660,6 +751,13 @@ describe('CommunityRepository', () => {
           details: 'Repetitive marketing links',
           subject_alias: 'Style Explorer AABBCCDD',
           image_object_path: 'community/post-1/session.jpg',
+          content_snapshot: {
+            caption: 'Autumn commute look',
+            altText: 'A denim jacket over a striped shirt',
+            locale: 'en-US',
+            climateBand: 'temperate_dry',
+            capturedAt: expect.any(String) as string,
+          },
           sla_due_at: expect.any(Date) as Date,
         },
       })
@@ -673,6 +771,45 @@ describe('CommunityRepository', () => {
           reason: 'spam',
         }) as unknown,
       })
+    })
+
+    // `content_snapshot` is declared on both audit tables and, before this, was
+    // written by nobody, while the erasure sweep asserted in a comment that both
+    // retain it. Erasure nulls `post_id` and anonymization nulls the caption,
+    // alt text and locale on the post itself, so without the snapshot a report
+    // that outlived its subject pointed at nothing and described nothing.
+    it('carries the same content snapshot onto the ModerationEvent, so an orphaned audit row still says what was reported', async () => {
+      const {
+        repo,
+        queryRaw,
+        reportFindUnique,
+        reportFindMany,
+        reportCreate,
+        moderationEventCreate,
+      } = createRepo()
+      queryRaw.mockResolvedValueOnce(lockedPublishedPost)
+      reportFindUnique.mockResolvedValueOnce(null)
+      reportFindMany.mockResolvedValueOnce([])
+
+      await repo.recordReport(reportParams())
+
+      const reportSnapshot = (
+        reportCreate.mock.calls[0]?.[0] as { data: { content_snapshot?: unknown } }
+      ).data.content_snapshot
+      const eventSnapshot = (
+        moderationEventCreate.mock.calls[0]?.[0] as {
+          data: { content_snapshot?: unknown }
+        }
+      ).data.content_snapshot
+
+      expect(eventSnapshot).toEqual(reportSnapshot)
+      expect(eventSnapshot).toMatchObject({
+        caption: 'Autumn commute look',
+        altText: 'A denim jacket over a striped shirt',
+      })
+      // No user id anywhere in the snapshot: `subject_alias` is how the row
+      // says whose content it was, and it is a pseudonym.
+      expect(JSON.stringify(eventSnapshot)).not.toContain('author-other')
     })
 
     it('maps a lost P2002 race to the outcome of whichever report won', async () => {

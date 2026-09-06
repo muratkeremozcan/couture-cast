@@ -4,7 +4,7 @@
 // `palette-advisor-screen.test.tsx` exercises this module through a whole screen
 // render, the right place for the STATE MACHINE (locked/consent/sources/result) but a
 // poor place to reach every status-code and malformed-response branch this module
-// classifies -- a screen test needs an extra render per edge case for branches that have
+// classifies; a screen test needs an extra render per edge case for branches that have
 // nothing to do with rendering. Everything here is asserted through MSW against the real
 // generated client, the way `planner.test.ts` and `premium-theme.test.ts` cover their
 // own boundaries: the failure taxonomy is only worth anything if the status codes really

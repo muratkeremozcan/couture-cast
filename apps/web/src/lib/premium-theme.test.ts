@@ -91,7 +91,7 @@ describe('applyWebThemeAttribute', () => {
   it('5.3-WEB-004 never writes the card-only Default selector onto <html>', () => {
     applyWebThemeAttribute(null)
     // Both halves, because `not.toBe('default')` alone stayed green for a removed
-    // attribute, for `'DEFAULT'`, and for any other value — none of which fall through
+    // attribute, for `'DEFAULT'`, and for any other value, none of which fall through
     // to `:root` the way this test's docblock claims.
     expect(document.documentElement.getAttribute('data-theme')).toBe('')
     expect(document.documentElement.getAttribute('data-theme')).not.toBe(
@@ -123,7 +123,7 @@ describe('hasWebSession', () => {
  * this module can produce is untranslated English (the server's own `PREMIUM_*` text,
  * a transport error, the signed-out guard string), and none of it may reach a reader in
  * one of the other nine locales. Anything unclassifiable reads as `unknown`, which is
- * the conservative answer — the section shows its own translated copy rather than
+ * the conservative answer: the section shows its own translated copy rather than
  * inferring entitlement or flag state from a failure it could not classify.
  */
 describe('premiumThemeFailureReason', () => {

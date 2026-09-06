@@ -192,7 +192,7 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
 
     /**
      * AC 1: withdrawal is an erase, so it is confirmed before it fires, and it runs
-     * `DELETE` -- the one route that is neither entitlement- nor flag-gated.
+     * `DELETE`, the one route that is neither entitlement- nor flag-gated.
      */
     it('5.4-WEB-016 confirms before withdrawing consent, then erases', async () => {
       signIn()
@@ -415,7 +415,7 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
 
     /**
      * AC 6: the disclosure is a sibling text node BEFORE the control it describes.
-     * `compareDocumentPosition` is the assertion that survives a restyle -- a CSS
+     * `compareDocumentPosition` is the assertion that survives a restyle: a CSS
      * `order` or a flex-reverse would move the control visually without moving it in
      * the accessibility tree, and a "both are present" check would still pass.
      */
@@ -876,8 +876,8 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
           new File(['selfie-bytes'], 'selfie.png', { type: 'image/png' })
         )
 
-        // Whatever the upload's outcome -- and it is refused here -- the local
-        // handle on the image is released. That is the `finally` this asserts.
+        // Whatever the upload's outcome (it is refused here), the local handle on the
+        // image is released. That is the `finally` this asserts.
         await waitFor(() => expect(revoked).toEqual(created))
         expect(created).toHaveLength(1)
         // Reset immediately, so choosing the same file twice still fires `change`.
@@ -910,9 +910,9 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
 
   /**
    * The sponsored handoff's failure doors. `handleSponsoredActivate` refuses to
-   * navigate unless the click was attributed first -- "traffic the partner
-   * cannot attribute is worth nothing to them and cannot be audited by us" --
-   * and both ways that can fail were untested.
+   * navigate unless the click was attributed first: "traffic the partner cannot
+   * attribute is worth nothing to them and cannot be audited by us". Both ways that
+   * can fail were untested.
    */
   describe('sponsored handoff failures', () => {
     const sponsoredProfile: ProfileOverrides = {

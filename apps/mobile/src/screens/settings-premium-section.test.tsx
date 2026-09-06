@@ -3,7 +3,7 @@
 // The premium network/SDK boundary is owned here the way the commerce
 // preference boundary is owned in `tab-two-screen.test.tsx`; the render-state
 // resolver and entitlement predicate stay real. Purchase outcome mapping from
-// the raw SDK is covered in `src/lib/premium.test.ts` — this suite drives the
+// the raw SDK is covered in `src/lib/premium.test.ts`; this suite drives the
 // section through all five purchase outcomes and the per-status renders. The
 // bounded poll is mocked at the boundary (its timing contract is fake-timer
 // tested in the lib suite), so nothing here sleeps.
@@ -176,8 +176,8 @@ describe('SettingsScreen premium section', () => {
       // AC 5: purchasesEnabled on the status response is the ONLY kill-switch
       // exposure, read before rendering any subscribe control.
       //
-      // Restore is deliberately NOT gated. It mints no purchase — it re-reads
-      // what the store already sold this user — so gating it would strand a
+      // Restore is deliberately NOT gated. It mints no purchase; it re-reads
+      // what the store already sold this user, so gating it would strand a
       // subscriber whose entitlement is missing from our mirror with no way to
       // recover access while the switch is off, which is precisely the
       // lock-out AC 5 forbids. AC 1 lists restore as its own entry point, and

@@ -1,6 +1,6 @@
 // Learning path Step 25: Lookbook Prism responsive layout and community grid.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-25-lookbook-prism-responsive-layout-and-community-grid
-// Story 3.5 Task 6 step 1 owner: unit-test layout controls and PostHog event triggers in apps/web/src/app/components/layout-controls.test.tsx
+// Story 3.5 Task 6 step 1 owner: layout controls and PostHog event triggers.
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { LayoutControls } from './layout-controls'

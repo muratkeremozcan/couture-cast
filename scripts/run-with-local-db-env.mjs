@@ -43,10 +43,16 @@ if (args.length === 0) {
 
 const env = { ...process.env }
 
-// Scan the repo root so a real `.env` file wins over the built-in default, exactly as
-// `start-api-e2e-with-workers.mjs` does. Prisma loads those files itself and dotenv
-// leaves an already-set variable alone, so injecting here would shadow the file.
-if (applyLocalE2eDatabaseUrl(env, { repoRootToScan: repoRoot })) {
+// Deliberately NOT scanning the repo root, unlike `start-api-e2e-with-workers.mjs`.
+// That script hands its env to processes which then load the ROOT env files, so
+// injecting there would shadow a real value. The Prisma CLI does not: it resolves
+// dotenv relative to the schema, so it picks up `packages/db/.env`, which points at
+// `localhost:5432/couture_cast` rather than the local Supabase container. Declining
+// to inject because a root `.env.local` exists therefore hands the run to the wrong
+// database, silently, which is the exact defect this wrapper was written to prevent.
+// Measured on 2026-09-06: two `db:reset` runs went to the fossil database before this
+// was corrected, and the only symptom was a migration checksum that failed to change.
+if (applyLocalE2eDatabaseUrl(env)) {
   console.log(
     `[run-with-local-db-env] No DATABASE_URL set; using the local default ${env.DATABASE_URL}`
   )

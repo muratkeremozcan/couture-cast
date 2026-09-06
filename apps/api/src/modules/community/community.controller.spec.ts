@@ -84,6 +84,7 @@ describe('CommunityController', () => {
     })
     const publishPost = vi.fn().mockResolvedValue(mockFeedData.items[0])
     const reportPost = vi.fn().mockResolvedValue({ tracked: true })
+    const recordCardOpened = vi.fn().mockResolvedValue({ tracked: true })
     const withdrawPost = vi.fn().mockResolvedValue({ tracked: true })
     // The service now returns the public projection; the controller only wraps
     // and validates it, so the double returns projection shape, not table rows.
@@ -107,6 +108,7 @@ describe('CommunityController', () => {
       allocatePost,
       publishPost,
       reportPost,
+      recordCardOpened,
       withdrawPost,
       createChallenge,
       updateChallenge,
@@ -119,6 +121,7 @@ describe('CommunityController', () => {
       allocatePost,
       publishPost,
       reportPost,
+      recordCardOpened,
       withdrawPost,
       createChallenge,
       updateChallenge,
@@ -485,6 +488,57 @@ describe('CommunityController', () => {
         controller.reportPost(authContext, 'post-1', 'web', { reason: 'spam' }, response)
       ).rejects.toThrow(CommunityRateLimitException)
       expect(setHeader).toHaveBeenCalledWith('Retry-After', '900')
+    })
+  })
+
+  describe('openPost', () => {
+    // This route did not exist. Eight endpoints were registered and none was
+    // card-open, so the only event AC7's advance condition reads had no way to
+    // be emitted and the beta gate was unmeasurable at any traffic volume.
+    it('throws BadRequestException when platform header is missing', async () => {
+      const { controller } = createController()
+      await expect(
+        controller.openPost(authContext, 'post-1', undefined, {
+          experimentVariant: 'auto',
+        })
+      ).rejects.toThrow(BadRequestException)
+    })
+
+    it('rejects a body that asserts isSelf, because the server owns that judgement', async () => {
+      // The advance condition counts NON-SELF opens. A client-supplied flag would
+      // let the population being measured move the number that decides whether
+      // the feature ships, so the schema is strict and the extra key is a 400.
+      const { controller, recordCardOpened } = createController()
+      await expect(
+        controller.openPost(authContext, 'post-1', 'web', {
+          experimentVariant: 'auto',
+          isSelf: false,
+        })
+      ).rejects.toThrow(BadRequestException)
+      expect(recordCardOpened).not.toHaveBeenCalled()
+    })
+
+    it('rejects a body with no experiment variant', async () => {
+      const { controller } = createController()
+      await expect(controller.openPost(authContext, 'post-1', 'web', {})).rejects.toThrow(
+        BadRequestException
+      )
+    })
+
+    it('passes the served arm through and returns the tracked envelope', async () => {
+      const { controller, recordCardOpened } = createController()
+
+      const response = await controller.openPost(authContext, 'post-1', 'web', {
+        experimentVariant: 'all',
+      })
+
+      expect(recordCardOpened).toHaveBeenCalledWith({
+        userId: 'user-test-123',
+        postId: 'post-1',
+        platform: 'web',
+        input: { experimentVariant: 'all' },
+      })
+      expect(response.tracked).toBe(true)
     })
   })
 

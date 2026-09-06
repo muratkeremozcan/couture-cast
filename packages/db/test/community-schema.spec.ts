@@ -61,6 +61,10 @@ const enumMembers = async (client: PoolClient, typeName: string) => {
 /** Every table this story serves through the API and through nothing else. */
 const COMMUNITY_TABLES = [
   'LookbookPost',
+  // Locked down by this story alongside LookbookPost. Owner-scoped rights here
+  // were a post-existence oracle through the required `post_id` foreign key, so
+  // it belongs in the same posture and the same assertion.
+  'EngagementEvent',
   'CommunityChallenge',
   'CommunityModerationOutbox',
   'CommunityAlias',
@@ -203,6 +207,23 @@ describe('community schema', () => {
   describe('grants and policies', () => {
     it('6.1-DB-013 grants anon and authenticated nothing on any community table', async () => {
       await inRolledBackTransaction(async (client) => {
+        // THE TABLE NAMES ARE RESOLVED BEFORE THE GRANTS ARE COUNTED.
+        //
+        // `role_table_grants` returns nothing for a table that does not exist,
+        // so a typo or a rename in `COMMUNITY_TABLES` empties the result set and
+        // this assertion passes while proving nothing about the table it meant
+        // to name. That is the same silent shape 6.1-DB-034 was found in, and
+        // the list is hand-maintained, which is exactly where it happens.
+        // 6.1-DB-014 does assert the tables resolve, but a guard that depends on
+        // a different test still running is not a guard.
+        const resolved = await client.query<{ present: string | null }>(
+          `SELECT to_regclass('public.' || quote_ident(t)) IS NOT NULL AS present
+           FROM unnest($1::text[]) AS t`,
+          [COMMUNITY_TABLES]
+        )
+        expect(resolved.rows).toHaveLength(COMMUNITY_TABLES.length)
+        expect(resolved.rows.filter((row) => !row.present)).toEqual([])
+
         const grants = await client.query(
           `SELECT "grantee", "table_name", "privilege_type"
            FROM information_schema.role_table_grants
@@ -426,6 +447,69 @@ describe('community schema', () => {
             [`community-report-dup-${randomUUID()}`, fixture.postId, fixture.reporterId]
           )
         ).rejects.toMatchObject({ code: '23505' })
+      })
+    })
+
+    it('6.1-DB-037 records the engine version an operator release overrode', async () => {
+      // Releasing a flagged post is a human overruling a machine verdict, so the
+      // audit row must say WHICH version was overruled or the trail implies the
+      // model passed something it did not.
+      //
+      // Structured, not formatted into `reason`. Concatenating a value into that
+      // free-text column is the pattern this story removed when reporter text was
+      // going there: it destroyed the closed enum and made a changed reason
+      // undetectable, which is why CommunityPostReport is its own table. A
+      // well-behaved format string would be the same mistake in better clothes.
+      await inRolledBackTransaction(async (client) => {
+        const fixture = await seedCommunityGraph(client)
+        const releaseId = `community-release-${randomUUID()}`
+
+        await client.query(
+          `INSERT INTO public."ModerationEvent"
+            ("id", "post_id", "reviewed_by_id", "action", "overridden_engine_version")
+           VALUES ($1, $2, $3, 'released_by_operator', $4)`,
+          [
+            releaseId,
+            fixture.postId,
+            fixture.reporterId,
+            'adr013-text-v2.0;adr013-nsfw-v1.0',
+          ]
+        )
+
+        const release = await client.query<{
+          action: string | null
+          reason: string | null
+          reviewed_by_id: string | null
+          overridden_engine_version: string | null
+        }>(
+          `SELECT "action", "reason", "reviewed_by_id", "overridden_engine_version"
+           FROM public."ModerationEvent" WHERE "id" = $1`,
+          [releaseId]
+        )
+
+        expect(release.rows[0]?.overridden_engine_version).toBe(
+          'adr013-text-v2.0;adr013-nsfw-v1.0'
+        )
+        // The operator is named by `reviewed_by_id`; the new column must not
+        // duplicate identity.
+        expect(release.rows[0]?.reviewed_by_id).toBe(fixture.reporterId)
+        // And `reason` stays empty rather than carrying a formatted string,
+        // which is the whole point of the column existing.
+        expect(release.rows[0]?.reason).toBeNull()
+      })
+    })
+
+    it('6.1-DB-038 leaves the override column null on an ordinary moderation row', async () => {
+      // NULL is the common case: only a release written over a machine verdict
+      // fills it, so a non-null value is meaningful on its own.
+      await inRolledBackTransaction(async (client) => {
+        const fixture = await seedCommunityGraph(client)
+
+        const seeded = await client.query<{ overridden_engine_version: string | null }>(
+          'SELECT "overridden_engine_version" FROM public."ModerationEvent" WHERE "id" = $1',
+          [fixture.moderationEventId]
+        )
+        expect(seeded.rows[0]?.overridden_engine_version).toBeNull()
       })
     })
 

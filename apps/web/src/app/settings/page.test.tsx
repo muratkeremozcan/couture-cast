@@ -445,7 +445,7 @@ describe('Web settings page', () => {
    * Story 5.3 Decision 11: the theme gallery is the third child section, after the
    * subscription one, because its locked state points at the subscribe controls that
    * have to already be above it. All three sections must render signed out, each with
-   * its own disclosure — the unauthenticated axe run loads this page.
+   * its own disclosure; the unauthenticated axe run loads this page.
    */
   it('5.3-WEB-SETTINGS-01 renders the theme section after the Premium section', async () => {
     render(<SettingsPage />)

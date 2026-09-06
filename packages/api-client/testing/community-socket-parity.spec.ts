@@ -20,13 +20,11 @@ import {
 } from '../src/types/socket-events'
 import { climateBandSchema, communityPostStatusSchema } from '../src/contracts/http'
 
-/** Peels optional/nullable wrappers so a field's own type can be inspected. */
 const unwrapSchema = (schema: z.ZodTypeAny): z.ZodTypeAny =>
   schema instanceof z.ZodOptional || schema instanceof z.ZodNullable
     ? unwrapSchema(schema.unwrap() as z.ZodTypeAny)
     : schema
 
-/** Copies a fixture without one key, to exercise a required field's absence. */
 const withoutKey = (
   source: Readonly<Record<string, unknown>>,
   key: string

@@ -3,7 +3,7 @@
 // The settings section's suite covers the states a reader can see. This one covers the
 // two things that live only here: the classification of every failure reason into a
 // render state, and the no-provider fallback that keeps a stray consumer on Default
-// instead of throwing. Both are AC 6 surface area — the section renders them, but this
+// instead of throwing. Both are AC 6 surface area: the section renders them, but this
 // is where the decision is made.
 // `render` from vitest-browser-react is typed as non-thenable but must be awaited for
 // the effects it triggers to flush, exactly as the screen suites do.
@@ -134,7 +134,7 @@ describe('AppThemeProvider', () => {
 
   /**
    * A read that failed tells us nothing about entitlement, so the honest state is Default
-   * plus an error — never an upsell a paying subscriber would find insulting.
+   * plus an error. An upsell there would insult a paying subscriber.
    */
   it('falls back to Default and reports failure for an unclassifiable error', async () => {
     server.use(http.get(THEME_ROUTE, () => errorEnvelope(500, 'Boom.')))

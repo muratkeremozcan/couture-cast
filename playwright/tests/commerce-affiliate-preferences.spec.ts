@@ -1,12 +1,10 @@
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
-// Story 5.1 Task 9: the Web settings opt-out journey against a real API.
 //
-// Round one built this page against MSW because the commerce endpoints did not
-// exist yet. This is the first time the round trip is exercised end to end, so
-// the assertions below deliberately cover the wire shape as well as the UI: a
-// page that renders the right thing off the wrong request would have passed
-// every unit test in `apps/web/src/app/settings/page.test.tsx`.
+// Round one built this page against MSW because the commerce endpoints did not exist
+// yet, so the assertions below cover the wire shape as well as the UI: a page that
+// renders the right thing off the wrong request passes every unit test in
+// `apps/web/src/app/settings/page.test.tsx`.
 import type { Locator, Page } from '@playwright/test'
 import { log } from '@seontechnologies/playwright-utils/log'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
@@ -33,10 +31,7 @@ const MIN_FOCUS_CONTRAST = 3
 type PreferenceBody = { data: { affiliateCtasEnabled: boolean } }
 type PreferenceRequest = { affiliateCtasEnabled: boolean }
 
-/**
- * The fixture is handed to a test already bound to `unknown` payloads, so its
- * results are narrowed at the call site rather than parameterized at it.
- */
+/** The fixture is bound to `unknown` payloads, so results are narrowed here. */
 type PreferenceExchange = {
   status: number
   requestJson: PreferenceRequest | null
@@ -48,13 +43,12 @@ function optOutToggle(page: Page): Locator {
 }
 
 /**
- * The section's own error, addressed by test id rather than by `role="alert"`.
- *
- * Next renders `<div role="alert" aria-live="assertive"
- * id="__next-route-announcer__">` into every page, so `getByRole('alert')`
- * always resolves to at least one element: asserting a count of zero can never
- * pass, and asserting text is a strict-mode violation the moment the section's
- * own alert appears. Both were real failures on the first CI run.
+ * The section's own error, addressed by test id. Next renders
+ * `<div role="alert" aria-live="assertive" id="__next-route-announcer__">` into every
+ * page, so `getByRole('alert')` always resolves to at least one element: asserting a
+ * count of zero can never pass, and asserting text is a strict-mode violation the
+ * moment the section's own alert appears. Both were real failures on the first CI
+ * run.
  */
 function errorMessage(page: Page): Locator {
   return page.getByTestId('commerce-error-message')
@@ -72,12 +66,10 @@ function watchPreferenceCall(
 }
 
 /**
- * Network-first: the read is registered before the navigation that triggers it,
- * so the spec never races the page and never needs a wait.
- *
- * Returns the exchange rather than asserting on it. An `expect` in here would
- * report a failure as "openSettings failed" instead of naming the claim that
- * broke, which is the whole reason assertions belong in test bodies.
+ * Network-first: the read is registered before the navigation that triggers it, so
+ * the spec never races the page and never needs a wait. It returns the exchange and
+ * asserts nothing, because an `expect` in here would report every failure as
+ * "openSettings failed" and hide the claim that actually broke.
  */
 async function openSettings(
   page: Page,
@@ -103,8 +95,8 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     const loaded = await openSettings(page, interceptNetworkCall)
 
     expect(loaded.status).toBe(200)
-    // A user with no stored row reads as enabled; the server is the authority
-    // on that default, not the client.
+    // A user with no stored row reads as enabled, and the server is the authority on
+    // that default.
     expect(loaded.responseJson).toEqual({ data: { affiliateCtasEnabled: true } })
 
     await log.step('Assert the section, its disclosure, and the control')
@@ -121,8 +113,8 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     await expect(optOutToggle(page)).toBeEnabled()
 
     await log.step('Assert the disclosure precedes the control in reading order')
-    // PRD FR5.1's acceptance is "disclosures visible before click", which is a
-    // statement about document order, not about both being on screen.
+    // PRD FR5.1's acceptance is "disclosures visible before click", a statement
+    // about document order.
     const disclosurePrecedesControl = await page.evaluate(() => {
       const text = document.querySelector('[data-testid="commerce-disclosure"]')
       const control = document.querySelector('[data-testid="commerce-opt-out-toggle"]')
@@ -209,16 +201,15 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     interceptNetworkCall,
   }) => {
     expect((await openSettings(page, interceptNetworkCall)).status).toBe(200)
-    // The intercept resolves when the response arrives, which is a render
-    // earlier than the control becoming interactive. A disabled checkbox is not
-    // in the tab order, so tabbing before this lands on the nav instead.
+    // The intercept resolves when the response arrives, one render before the
+    // control becomes interactive. A disabled checkbox is out of the tab order, so
+    // tabbing before this lands on the nav.
     await expect(optOutToggle(page)).toBeEnabled()
 
     await log.step('Tab from the top of the document to the control')
-    // The skip link is the first focusable element in the layout and the
-    // checkbox is the first one inside `main`, so two presses is the whole
-    // path. Asserting the exact count is the point: a control that is only
-    // reachable after ten tabs is reachable but not usable.
+    // The skip link is the first focusable element in the layout and the checkbox is
+    // the first one inside `main`, so two presses is the whole path. The exact count
+    // is the point: a control reachable only after ten tabs is unusable.
     await page.keyboard.press('Tab')
     await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused()
     await page.keyboard.press('Tab')
@@ -239,8 +230,8 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     expect(contrastRatio(ring.outlineColor, DARK_SURFACE_RGB)).toBeGreaterThanOrEqual(
       MIN_FOCUS_CONTRAST
     )
-    // The gold halo is the second half of the indicator; without it the ring is
-    // a plain outline and the design token is dead code.
+    // The gold halo is the second half of the indicator; without it the ring is a
+    // plain outline and the design token is dead code.
     expect(ring.boxShadow).toContain('201, 161, 74')
 
     await log.step('Toggle with Space and assert the request went out')
@@ -261,11 +252,10 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
 
   test(
     '[P1] 5.1-E2E-WEB-05 keeps the control enabled after a failed save and reverts it',
-    // The 503 below is the subject of the test, not an accident. The
-    // `networkErrorMonitor` fixture in `merged-fixtures.ts` is `auto: true` and
-    // fails any test that sees a response of 400 or worse, so without this
-    // annotation the test fails on the monitor before reaching its assertions.
-    // Same annotation, same reason, as `home-analytics-resilience.spec.ts`.
+    // The 503 below is the subject of the test. The `networkErrorMonitor` fixture in
+    // `merged-fixtures.ts` is `auto: true` and fails any test that sees a response
+    // of 400 or worse, so without this annotation the test fails on the monitor
+    // before reaching its assertions.
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ commerceSession: _commerceSession, page, interceptNetworkCall }) => {
       expect((await openSettings(page, interceptNetworkCall)).status).toBe(200)
@@ -288,15 +278,14 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
       expect((await failedSave).status).toBe(503)
 
       // commerce-preferences-section.tsx shows catalog copy unconditionally on a
-      // failed save, never the server's (English-only) error body -- the same fix
-      // premium.ts got on 2026-08-19, for the same reason: a save and a read have
-      // no actionable failure to distinguish, so there is nothing an untranslated
-      // server string would tell a reader that the catalog string does not.
+      // failed save, never the server's English-only error body. A save and a read
+      // have no actionable failure to distinguish, so an untranslated server string
+      // would tell a reader nothing the catalog string does not.
       await expect(errorMessage(page)).toHaveText(
         'Unable to update shopping preferences.'
       )
-      // Reverted. A consent control that keeps showing a state the server
-      // rejected is a broken opt-out, not a cosmetic bug.
+      // Reverted. A consent control that keeps showing a state the server rejected
+      // is a broken opt-out.
       await expect(optOutToggle(page)).toBeChecked()
       await expect(optOutToggle(page)).toBeEnabled()
       await expect(page.getByTestId('commerce-status-region')).toBeEmpty()
@@ -326,8 +315,8 @@ anonymousTest.describe('Story 5.1 web settings signed out', () => {
       )
       await expect(optOutToggle(page)).toBeDisabled()
 
-      // The page must not ask for a preference it has no credential to read;
-      // the unauthenticated accessibility gate loads this same route.
+      // The page must not ask for a preference it has no credential to read, and the
+      // unauthenticated accessibility gate loads this same route.
       expect(preferenceRequests).toBe(0)
     }
   )

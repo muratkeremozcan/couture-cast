@@ -11,7 +11,7 @@
 // Only the native modules are mocked, and only the ones the screen genuinely touches:
 // `expo-image-picker`, `expo-image-manipulator`, `expo-file-system` and `expo-crypto`
 // cannot be evaluated in a browser bundle at all. `@/src/lib/commerce` is deliberately
-// NOT mocked -- `palette-advisor.ts` imports `withRequestTimeout` from it, and replacing
+// NOT mocked; `palette-advisor.ts` imports `withRequestTimeout` from it, and replacing
 // that with a `vi.fn()` would silently stop every request this suite is meant to make.
 /*
  * `vitest-browser-react`'s `render` and this repo's `press` helper both return
@@ -86,7 +86,7 @@ vi.mock('expo-crypto', () => ({
  * Declaring a `vi.mock` for it makes Vite resolve the specifier anyway, which
  * wedges the optimizer and took three unrelated suites down with
  * "Cannot read properties of undefined (reading 'EventEmitter')" from
- * `expo-asset` -- exactly the hazard `vitest.config.ts` documents at length.
+ * `expo-asset`, exactly the hazard `vitest.config.ts` documents at length.
  *
  * What matters at this tier is the load-bearing half: the click is minted with
  * the right body BEFORE any navigation, so traffic the partner cannot attribute
@@ -533,19 +533,16 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
   /**
    * A `ready` analysis stamped with a version this build has replaced.
    *
-   * THE ORIGINAL FRAMING OF THIS TEST WAS HALF WRONG and the correction is
-   * worth keeping. It read the empty card list as the consequence of the
-   * retired version -- "every stored `item_key` resolves to nothing" -- but
-   * `PaletteAdvisorService.resolveRecommendations` builds its cards from the
-   * CURRENT `ADVISOR_RULES` keyed on the stored undertone and depth, and never
-   * consults `analysis_version` at all. A version bump therefore yields cards,
-   * not an empty list; the empty list here is simply what the fixture serves,
-   * and it stays because rendering nothing must not crash the surface either.
+   * The empty card list proves nothing about the retired version:
+   * `PaletteAdvisorService.resolveRecommendations` builds its cards from the CURRENT
+   * `ADVISOR_RULES` keyed on the stored undertone and depth and never consults
+   * `analysis_version` at all, so a version bump still yields cards. The empty list is
+   * what the fixture serves, and it stays because rendering nothing must not crash the
+   * surface either.
    *
-   * What the retired version genuinely costs the reader is the palette above
-   * the cards: an undertone, a depth and a confidence derived under rules this
-   * build has retired, presented as though they were current. That is what the
-   * note asserted below exists to say.
+   * What the retired version genuinely costs the reader is the palette above the cards:
+   * an undertone, a depth and a confidence derived under rules this build has retired,
+   * presented as though they were current. That is what the note asserted below says.
    */
   it('5.4-MOB-023 explains a ready palette from a retired analysis version', async () => {
     servePalette({
@@ -630,7 +627,7 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
      * `applyWriteFailure` argues in its own docblock that a rejected write must
      * re-resolve the screen rather than print a line, and coverage put the
      * `signed_out` case, the `in_progress` case and the generic fallback all at
-     * zero -- the same gap the web panel had, on the surface where a session can
+     * zero; the same gap the web panel had, on the surface where a session can
      * also expire while the app sits in the background.
      */
     it('5.4-MOB-027 drops to the signed-out state when a write is refused as signed out', async () => {

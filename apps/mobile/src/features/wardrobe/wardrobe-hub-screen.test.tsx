@@ -68,7 +68,7 @@ import { WardrobeHubScreen } from './wardrobe-hub-screen'
 
 /**
  * Base64url-shaped JWT payload, built at runtime (not a literal) so it
- * doesn't look like a credential to secret scanners -- a hardcoded
+ * doesn't look like a credential to secret scanners; a hardcoded
  * JWT-shaped string here previously tripped gitleaks' generic-api-key rule
  * in CI.
  */
@@ -218,7 +218,7 @@ describe('WardrobeHubScreen', () => {
   it('4.4-MOB-HUB-03B polls a still-processing commit until it needs tags, then opens tagging (regression, 4.4-R05)', async () => {
     // The extraction split "who owns polling a still-processing garment"
     // across the capture modal (reports the commit result) and this screen
-    // (owns pollCommittedGarment) -- exactly the seam a regression could
+    // (owns pollCommittedGarment): exactly the seam a regression could
     // silently break with no test noticing, since every other capture test
     // here only exercises the immediate 'awaiting_tags' commit result.
     server.use(...captureUploadHandlers('garment-2', 'processing'))

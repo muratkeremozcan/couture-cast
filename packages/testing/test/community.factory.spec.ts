@@ -52,7 +52,7 @@ function stubPrisma() {
   }
 }
 
-/** A fixed clock, so every timestamp assertion below is exact rather than approximate. */
+/** A fixed clock, so every timestamp assertion below is exact. */
 const NOW = new Date('2026-09-05T12:00:00.000Z')
 
 describe('community factories', () => {
@@ -140,11 +140,11 @@ describe('community factories', () => {
       // embedded in every signed URL the API mints, so a user id here would
       // deanonymize the author to anyone the URL reaches.
       //
-      // Asserted through the SHARED pattern, which the database seed is held to
-      // by the same rule in `packages/db/test/community-schema.spec.ts`. The
-      // factory was fixed for this and the seed was not, so for a while the
-      // repository both obeyed and broke the boundary depending on which file
-      // you read; one exported pattern is what stops that recurring.
+      // Asserted through the SHARED pattern, which also holds the database seed
+      // in `packages/db/test/community-schema.spec.ts`. The factory was fixed
+      // for this and the seed was not, so for a while the repository both
+      // obeyed and broke the boundary depending on which file you read. One
+      // exported pattern is what stops that recurring.
       expect(post.imageObjectPath).toMatch(COMMUNITY_OBJECT_PATH_PATTERN)
       expect(post.imageObjectPath).toMatch(/^community\/post-123\/[a-zA-Z0-9]{32}\.jpg$/)
       expect(

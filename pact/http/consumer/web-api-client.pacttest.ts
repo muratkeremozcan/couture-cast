@@ -140,9 +140,8 @@ const createWebTeenClientForMockServer = (mockServer: { url: string }) =>
 
 /**
  * Story 6.1: the community challenge routes mount `RolesGuard` with
- * `@Roles('admin')`, which neither the guardian nor the teen identity can pass.
- * The guard runs for real in the provider fixture, so recording that surface
- * honestly needs an actual admin actor.
+ * `@Roles('admin')`, and the guard runs for real in the provider fixture, so
+ * recording that surface honestly needs an actual admin actor.
  */
 const createWebAdminClientForMockServer = (mockServer: { url: string }) =>
   createApiClient(mockServer.url, {
@@ -476,8 +475,7 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
     await verifyPlannerReshuffleConflictInteraction(pact)
   })
   // Story 6.1: the community feed by climate band. `x-couture-platform` is
-  // passed as a literal per consumer, so this pact records what web
-  // actually sends rather than mirroring the other client's header.
+  // passed as a literal per consumer, so this pact records what web sends.
   it('reads the auto-mode community feed', async () => {
     await verifyCommunityFeedInteraction(pact, createWebClientForMockServer, 'web')
   })

@@ -112,13 +112,11 @@ function renderModal(
   return { onClose, onGarmentCommitted }
 }
 
-/** Picks a library photo and waits for the crop step to render. */
 async function pickLibraryPhoto() {
   fireEvent.click(screen.getByTestId('garment-source-library'))
   await waitFor(() => screen.getByTestId('garment-crop-preview'))
 }
 
-/** Picks a library photo, then confirms the crop to start the upload. */
 async function pickLibraryPhotoAndConfirm() {
   await pickLibraryPhoto()
   fireEvent.click(screen.getByTestId('garment-confirm-image'))

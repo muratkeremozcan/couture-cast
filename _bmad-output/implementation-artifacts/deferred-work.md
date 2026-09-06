@@ -1937,3 +1937,90 @@ them lost runs to it in one day.
   individually correct, and dropping them puts every workspace back to compiling
   against whatever `dist` happens to be on disk, which is the same defect the
   `pretest:cov` entry above describes.
+
+## Tests that construct their own subject, found across story 6.1 (2026-09-06)
+
+Four defects on this branch had the same shape, and naming the shape is worth
+more than the four fixes, because it is cheap to spot once stated.
+
+In each case a schema element landed, a test asserted the behaviour that element
+was supposed to drive, and no production code ever produced it. The test built
+the row, the status, the timestamp or the payload in its own arrange block and
+then asserted that the reader handled it correctly. That is a true statement
+about the reader. It says nothing about whether anything in the system ever
+creates that input.
+
+The four:
+
+- `consent_suspended` was a valid post status with no producer.
+- `erasure_requested_at` was a column with no producer.
+- The card-open event had a payload and no route to emit it.
+- `overridden_engine_version` landed on `ModerationEvent`, `6.1-DB-037` pinned
+  its shape, and `community-moderation.actions.ts` kept concatenating the engine
+  version into the free-text `reason` and left the new column NULL on every real
+  operator release.
+
+The tell: **if the arrange block writes the thing under test, the test cannot
+tell you the feature exists.** A green suite over all four looked identical to a
+green suite over a working feature. Every layer reported success while the
+behaviour being tested was absent from production code.
+
+The check that catches it is to ask, for any test whose fixture writes a row or
+a payload directly, which production code path writes that same shape, and to
+be able to name the file. Where no such path exists, the test is pinning a
+contract that nothing honours.
+
+## Construct contract payloads through the contract's own encoder (2026-09-06)
+
+`6.1-API-04` hand-built its probe cursor as
+`JSON.stringify({ publishedAt, id, mode })`. When the cursor payload gained a
+required `band`, the `.strict()` schema began rejecting that probe at the parse
+step, which returns `COMMUNITY_CURSOR_INVALID_MESSAGE` and a 400. The test
+asserts precisely that message and that status, so it stayed green while it had
+stopped exercising mode binding entirely.
+
+Three things had to line up for this to hide, and each one is defensible on its
+own:
+
+1. **A per-workspace green does not cover cross-workspace consumers of a
+   contract.** `verify:api` was exit 0 and honest, because `pact/` sits outside
+   `apps/api`. The same field omission in the Pact fixtures was caught by the
+   repository-wide `npm run typecheck` as three `TS2345`s.
+2. **Even the repository-wide typecheck only covers consumers that go through a
+   typed constructor.** The Pact fixtures were catchable because they call
+   `encodeCommunityFeedCursor`. Hand-rolled JSON has no type to violate.
+3. **The cursor's three rejection paths deliberately return an identical
+   message.** Schema parse failure, mode mismatch and band mismatch are
+   indistinguishable to a client, which is correct: a viewer who changed filters
+   must not be able to tell which one fired. The same indistinguishability that
+   protects the client means no assertion on the response can reveal which path a
+   test is actually exercising.
+
+The rule that falls out is narrow and costs nothing: construct contract payloads
+through the contract's own encoder. `encodeCommunityFeedCursor` parses before it
+encodes, so the next required field becomes a compile error rather than a silent
+vacuous pass.
+
+A sweep of `apps`, `packages`, `pact` and `playwright` for hand-built cursor
+payloads returned zero further hits.
+
+## A correctness property that only exists under real concurrency (2026-09-06)
+
+Third appearance on this branch of a property that cannot exist without two
+transactions racing, guarded by a test that cannot produce two transactions.
+The rolling-window rate limit was caught by a racing test, the challenge overlap
+by the exclusion constraint underneath it, and the operator moderation lock had
+neither until this branch closed it.
+
+Both closures are mutation-proved. Deleting `FOR UPDATE` from
+`community-moderation.actions.ts` leaves all fourteen unit tests green and turns
+two integration tests red. Moving the consent hide from `tx` to `this.prisma`
+leaves eighty-nine guardian unit tests green and turns one red. Both mutations
+were run, then reverted, and the production files verified byte-exact against
+backups.
+
+One case was deliberately not sold as a third proof. The release-racing-takedown
+test does not go red under the mutation, because under READ COMMITTED the loser
+sees either the committed new status or the old one and both readings are
+self-consistent. It is an invariant test, its docblock says so, and it is
+recorded here as an invariant test so nobody later reads it as race coverage.

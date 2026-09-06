@@ -1,14 +1,12 @@
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
-// Story 5.1 Task 9: the affiliate commerce API against the seeded catalog.
 //
-// SETUP SHAPE. Decision 14: "seeded catalog plus public-API user setup", never
-// public-API catalog setup. There is no public catalog API and there is not
-// supposed to be one, so the partner and its four wildcard offers come from
-// `packages/db/prisma/seeds/commerce.ts` and only the acting user is created
-// here. The seed constants are imported rather than retyped so a change to the
-// partner slug or its allowed host breaks this suite instead of silently
-// making it assert against a partner that no longer exists.
+// SETUP SHAPE. Decision 14: seeded catalog plus public-API user setup. There is no
+// public catalog API and there is not supposed to be one, so the partner and its
+// four wildcard offers come from `packages/db/prisma/seeds/commerce.ts` and only the
+// acting user is created here. The seed constants are imported so a change to the
+// partner slug or its allowed host breaks this suite instead of silently making it
+// assert against a partner that no longer exists.
 import { log } from '@seontechnologies/playwright-utils/log'
 import {
   affiliateClickResponseSchema,
@@ -47,10 +45,10 @@ import { buildUniqueId } from '../../support/helpers/api-test'
 const RITUAL_PATH = '/api/v1/ritual'
 
 /**
- * Both processes must derive the same signing secret. The API resolves it
- * through `resolvePartnerWebhookSecret`, which falls back to this exact
- * function when the environment names no secret; calling the same export here
- * is what stops the two from drifting into a permanently-401 suite.
+ * Both processes must derive the same signing secret. The API resolves it through
+ * `resolvePartnerWebhookSecret`, which falls back to this exact function when the
+ * environment names no secret; calling the same export here stops the two from
+ * drifting into a permanently-401 suite.
  */
 const PARTNER_SECRET = buildTestOnlyPartnerWebhookSecret(
   SAMPLE_PARTNER_WEBHOOK_SECRET_REF
@@ -82,11 +80,8 @@ type ScenarioOutfit = {
 type RitualBody = { data?: { outfits: ScenarioOutfit[] } }
 
 /**
- * Extracts the outfits from a ritual read, throwing rather than asserting.
- *
- * Setup that cannot proceed is an error, not a failed expectation; keeping
- * `expect` out of the helpers is what makes a failure name the claim that broke
- * instead of reporting "readRitual failed".
+ * Extracts the outfits from a ritual read. Setup that cannot proceed throws: keeping
+ * `expect` out of the helpers makes a failure name the claim that broke.
  */
 async function readRitual(
   apiRequest: ApiRequestFn,
@@ -165,12 +160,10 @@ async function recordClick(
 type SignedWebhook = { headers: Record<string, string>; body: string }
 
 /**
- * Signs the exact bytes that will be sent.
- *
- * The body is passed through as a string rather than an object because the
- * signature covers the raw request bytes. Re-serializing between signing and
- * sending would change key order or whitespace and invalidate a signature that
- * is, semantically, correct.
+ * Signs the exact bytes that will be sent. The body is passed through as a string
+ * because the signature covers the raw request bytes: re-serializing between signing
+ * and sending would change key order or whitespace and invalidate a signature that
+ * is semantically correct.
  */
 function signWebhook(
   payload: unknown,
@@ -257,13 +250,11 @@ test.describe('Story 5.1 affiliate commerce API', () => {
     const { outfit, offer } = firstEligible(outfits)
 
     await log.step('Assert the block names one partner and carries no URL')
-    // `.strict()`, so this also proves no `url`, `deepLink`, or product field
-    // leaked into the payload. The deep link is built server-side at click time
-    // precisely so a client never holds one.
+    // The schema is `.strict()`, so parsing rejects any extra field. Pinning the key
+    // set states the intent that strictness enforces: no url, no deep link, no
+    // product identifier ever reaches a client. The deep link is built server-side
+    // at click time so a client never holds one.
     expect(shopThisLookSchema.parse(offer)).toEqual(offer)
-    // The schema is `.strict()`, so parsing already rejects an extra field.
-    // Pinning the key set states the intent the strictness enforces: no url,
-    // no deep link, no product identifier ever reaches a client.
     expect(Object.keys(offer).sort()).toEqual([
       'garmentCategory',
       'offerId',
@@ -377,9 +368,9 @@ test.describe('Story 5.1 affiliate commerce API', () => {
       `${host} is neither ${SAMPLE_PARTNER_ALLOWED_HOST} nor a dot-suffix of it`
     ).toBe(true)
 
-    // The placeholder must be substituted, and with the HMAC token rather than
-    // the internal row id: a raw row id in a third-party URL would let anyone
-    // holding a partner secret attribute revenue to guessed identifiers.
+    // The placeholder must be substituted, and with the HMAC token: a raw row id in
+    // a third-party URL would let anyone holding a partner secret attribute revenue
+    // to guessed identifiers.
     expect(redirectUrl).not.toContain('{clickToken}')
     const clickToken = parsed.searchParams.get('cc')
     expect(clickToken).toBeTruthy()
@@ -598,15 +589,12 @@ test.describe('Story 5.1 affiliate commerce API', () => {
 })
 
 /*
- * NOT COVERED HERE, AND WHY.
- *
- * "shopThisLook is null while commerce_affiliate_enabled is off" and the click
- * endpoint's 503 are the one part of AC 6 this layer cannot reach. The flag
- * resolves remote-first through PostHog, then through the shared `FeatureFlag`
- * row, and there is no public endpoint that sets either. Flipping the row from
- * a spec would make the flag global mutable state shared by every other test in
- * a `fullyParallel` run, which is exactly the shared-state flakiness this suite
- * is supposed to avoid.
+ * NOT COVERED HERE, AND WHY. "shopThisLook is null while
+ * commerce_affiliate_enabled is off" and the click endpoint's 503 are the part of
+ * AC 6 this layer cannot reach. The flag resolves remote-first through PostHog, then
+ * through the shared `FeatureFlag` row, and no public endpoint sets either. Flipping
+ * the row from a spec would make the flag global mutable state shared by every other
+ * test in a `fullyParallel` run.
  *
  * Both are covered where the flag is injectable:
  *   - `apps/api/src/modules/commerce/affiliate-offer.service.spec.ts` (null block)

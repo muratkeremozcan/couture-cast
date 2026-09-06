@@ -5233,6 +5233,30 @@ export type OnboardingPreconditionRequiredErrorErrorEnum =
 /**
  *
  * @export
+ * @interface OpenCommunityPostInput
+ */
+export interface OpenCommunityPostInput {
+  /**
+   *
+   * @type {OpenCommunityPostInputExperimentVariantEnum}
+   * @memberof OpenCommunityPostInput
+   */
+  experimentVariant: OpenCommunityPostInputExperimentVariantEnum
+}
+
+/**
+ * @export
+ */
+export const OpenCommunityPostInputExperimentVariantEnum = {
+  auto: 'auto',
+  all: 'all',
+} as const
+export type OpenCommunityPostInputExperimentVariantEnum =
+  (typeof OpenCommunityPostInputExperimentVariantEnum)[keyof typeof OpenCommunityPostInputExperimentVariantEnum]
+
+/**
+ *
+ * @export
  * @interface OutfitCapsuleListResponse
  */
 export interface OutfitCapsuleListResponse {

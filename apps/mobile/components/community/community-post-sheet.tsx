@@ -555,7 +555,13 @@ export function CommunityPostSheet({
                 multiline
                 maxLength={200}
                 value={altText}
-                onChangeText={setAltText}
+                onChangeText={(next) => {
+                  setAltText(next)
+                  // Editing the description withdraws the confirmation. Without this the
+                  // wire carries altTextConfirmed: true for text nobody confirmed, and
+                  // z.literal(true) still passes because the shape is intact.
+                  setAltTextConfirmed(false)
+                }}
               />
 
               <ComposeCheckboxRow

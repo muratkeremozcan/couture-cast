@@ -1,25 +1,24 @@
 // Learning path Step 38: Community feed by climate band.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-38-community-feed-by-climate-band
-// Story 6.1 Task 6: the community HTTP surface against the real running API.
 //
-// WHY THE DELIBERATE ERROR ROWS LIVE HERE RATHER THAN IN THE BROWSER SPEC.
+// WHY THE DELIBERATE ERROR ROWS LIVE HERE AND NOT IN THE BROWSER SPEC.
 // `merged-fixtures.ts` composes `networkErrorMonitor`, which fails a test when the
 // page issues a request that comes back failing. Every row below drives a 400, a
-// 404, a 409 or a 429 on purpose, so running them through the browser would either
-// trip that monitor or force it to be disabled — and a disabled monitor is worse
-// than the coverage it was protecting, because it stops catching the unexpected
-// failures it exists for. `merged-fixtures.ts:47-53` records the Story 4.4 round of
-// exactly this argument.
+// 404, a 409 or a 429 on purpose, so running them through the browser would trip
+// that monitor or force it to be disabled, and a disabled monitor stops catching
+// the unexpected failures it exists for. `merged-fixtures.ts:47-53` records the
+// Story 4.4 round of this argument.
 //
-// WHAT THIS FILE CAN AND CANNOT REACH. Everything asserted below was verified
-// against a real local API before it was written. Two journeys are deliberately
-// absent because they are BLOCKED rather than skipped, and both are written up in
-// `playwright/tests/community-feed.spec.ts`:
-//   - anything requiring a post to appear in the public feed;
-//   - the self-report 403, which needs the caller's own post to be visible, and
-//     therefore published, which is what the blockers prevent.
-// A self-report against an author's own `pending_review` post returns 404, not
-// 403, because the report path resolves visibility before ownership.
+// Two journeys are deliberately absent because both need a post visible in the
+// public feed, and both are written up in `playwright/tests/community-feed.spec.ts`:
+// anything reading the public feed, and the self-report 403. A self-report against
+// an author's own `pending_review` post returns 404, not 403, because the report
+// path resolves visibility before ownership.
+import {
+  encodeCommunityFeedCursor,
+  type ClimateBand,
+  type CommunityFeedMode,
+} from '@couture/api-client/contracts/http'
 import {
   communityApiTest as test,
   expect,
@@ -28,7 +27,7 @@ import {
 
 const FEED_PATH = '/api/v1/community/feed'
 
-/** A published seeded post: reportable, which is all these rows need it to be. */
+/** A published seeded post, so it is reportable. */
 const SEEDED_POST_ID = SEEDED_COMMUNITY_POSTS[0].id
 
 /** Not a real id in any shape the API mints, so it can only ever be a 404. */
@@ -69,14 +68,13 @@ test.describe('6.1 community feed HTTP contract', () => {
     expect(response.status()).toBe(200)
 
     /*
-     * THE RAW BODY, not an SDK-decoded object, and that distinction is the whole
-     * point of this assertion. The generated client's `FromJSON` copies only the
-     * fields its model declares, so a field the API actually served would be
-     * discarded before any assertion could see it; and Pact's response matching
-     * treats the expected body as a subset, so an extra key verifies clean there
-     * too. `pact/http/consumer/interactions/community.ts` says so in place. This
-     * is the tier where "the server sends exactly the allowlisted projection"
-     * can actually be proven, so it is proven here.
+     * THE RAW BODY, and that is the point of this assertion. The generated client's
+     * `FromJSON` copies only the fields its model declares, so an extra field the
+     * API served would be discarded before any assertion could see it; Pact's
+     * response matching treats the expected body as a subset, so an extra key
+     * verifies clean there too (`pact/http/consumer/interactions/community.ts` says
+     * so in place). This is the tier where "the server sends exactly the
+     * allowlisted projection" can be proven.
      */
     const body = (await response.json()) as { data: Record<string, unknown> }
     expect(Object.keys(body)).toEqual(['data'])
@@ -118,54 +116,70 @@ test.describe('6.1 community feed HTTP contract', () => {
     communityApi,
   }) => {
     /*
-     * THE SERVED MODE IS ASKED FOR, NOT ASSUMED, and that is the whole point of
-     * this arrangement.
-     *
-     * The beta experiment assignment is stable per viewer and now SELECTS the
-     * effective mode: `resolveEffectiveMode` is
-     * `requestedMode === 'auto' ? variant : requestedMode`, so a request for
+     * THIS TEST ASKS THE API WHICH MODE IT SERVED. The beta experiment assignment
+     * is stable per viewer and SELECTS the effective mode: `resolveEffectiveMode`
+     * is `requestedMode === 'auto' ? variant : requestedMode`, so a request for
      * `auto` is served whichever arm that user id hashes into, and the cursor is
-     * bound to what was SERVED rather than what was asked for. An earlier
-     * version of this test hardcoded a cursor stamped `all` and expected a
-     * mismatch against `auto`. For a caller in the `all` arm that cursor now
-     * MATCHES and the request succeeds, and since `communityApiTest` signs up a
-     * fresh account per test the arm is redrawn every run — a coin flip, not a
-     * stable failure.
+     * bound to what was SERVED. An earlier version of this test hardcoded a cursor
+     * stamped `all` and expected a mismatch against `auto`. For a caller in the
+     * `all` arm that cursor now MATCHES and the request succeeds, and
+     * `communityApiTest` signs up a fresh account per test, so the arm is redrawn
+     * every run: a coin flip.
      *
      * WHAT A GREEN RUN HERE DOES AND DOES NOT PROVE. A single pass would look
-     * identical under the old hardcoded cursor if the account happened to draw
-     * the `auto` arm, so the run is evidence only in combination with the
-     * structure below: the probe cursor is stamped with whichever arm was NOT
-     * served, so the mismatch cannot depend on the draw. If someone later
-     * simplifies this back to a fixed `mode` literal, it will pass roughly half
-     * the time and that half will look like a green suite.
+     * identical under the old hardcoded cursor if the account happened to draw the
+     * `auto` arm, so the run is evidence only in combination with the structure
+     * below: the probe cursor is stamped with whichever arm was NOT served, so the
+     * mismatch cannot depend on the draw. If someone later simplifies this back to
+     * a fixed `mode` literal, it will pass roughly half the time and that half will
+     * look like a green suite.
      *
-     * So page one is fetched first purely to learn the effective mode, and the
-     * cursor is then stamped with the OTHER value. The mismatch is guaranteed
-     * for either arm, and the test never depends on which one it drew. Pinning a
-     * fixture that hashes into a convenient arm would pass today and silently
-     * stop testing anything the moment the assignment secret rotates.
+     * So page one is fetched purely to learn the effective mode, and the cursor is
+     * then stamped with the OTHER value. Pinning a fixture that hashes into a
+     * convenient arm would pass today and silently stop testing anything the moment
+     * the assignment secret rotates.
      */
     const servedPage = await request.get(
       `${communityApi.apiBaseUrl}${FEED_PATH}?mode=auto&limit=1`,
       { headers: communityApi.headers }
     )
     expect(servedPage.status()).toBe(200)
-    const servedMode = ((await servedPage.json()) as { data: { mode: string } }).data.mode
+    const servedBody = (await servedPage.json()) as {
+      data: { mode: string; viewerBand: ClimateBand | null }
+    }
+    const servedMode = servedBody.data.mode
+    const servedBand = servedBody.data.viewerBand
     // `auto` is never the EFFECTIVE mode: it always resolves to one arm or the
-    // other. If that stops being true this assertion says so rather than the
-    // mismatch below quietly becoming a match.
+    // other. If that stops being true this assertion says so before the mismatch
+    // below quietly becomes a match.
     expect(['auto', 'all']).toContain(servedMode)
-    const foreignMode = servedMode === 'all' ? 'auto' : 'all'
+    const foreignMode: CommunityFeedMode = servedMode === 'all' ? 'auto' : 'all'
 
-    const cursor = Buffer.from(
-      JSON.stringify({
-        publishedAt: '2026-01-01T00:04:00.000Z',
-        id: SEEDED_POST_ID,
-        mode: foreignMode,
-      }),
-      'utf8'
-    ).toString('base64url')
+    /*
+     * MINTED THROUGH THE CONTRACT'S OWN ENCODER, not hand-rolled JSON, and that
+     * is load-bearing rather than tidy. `communityFeedCursorPayloadSchema` is
+     * `.strict()`, and the cursor now has THREE rejection paths that all return
+     * the identical message: a schema parse failure, a mode mismatch, and a band
+     * mismatch. A hand-built payload that omits a newly required field therefore
+     * still produces the 400 this test expects — via the schema path — and the
+     * test goes on passing while no longer exercising mode binding at all.
+     * That is not hypothetical: `band` was added to the payload and this test
+     * kept passing for the wrong reason until it was caught by reading the
+     * schema. `encodeCommunityFeedCursor` parses before it encodes, so a future
+     * required field breaks the typecheck instead.
+     *
+     * `band` is set to what the SERVER will compare against, so the mode is the
+     * only thing that mismatches. The comparison is
+     * `parseCursor(cursor, effectiveMode, filterBand ?? null)`, and `filterBand`
+     * is null when the effective mode is `all` and the viewer band otherwise.
+     */
+    const expectedBand = servedMode === 'all' ? null : servedBand
+    const cursor = encodeCommunityFeedCursor({
+      publishedAt: '2026-01-01T00:04:00.000Z',
+      id: SEEDED_POST_ID,
+      mode: foreignMode,
+      band: expectedBand,
+    })
 
     const response = await request.get(
       `${communityApi.apiBaseUrl}${FEED_PATH}?mode=auto&cursor=${cursor}`,
@@ -201,13 +215,9 @@ test.describe('6.1 community feed HTTP contract', () => {
     playwright,
   }) => {
     /*
-     * The cross-user boundary, driven with two real accounts rather than asserted
-     * from the schema. The second account allocates — which creates a `draft` row
-     * it owns — and the first account asks for it by id.
-     *
-     * 404 rather than 403 is the contract, and it is the stronger answer:
-     * distinguishing "exists but is not yours" from "does not exist" would let
-     * any caller probe for the existence of another member's unpublished posts.
+     * 404 is the contract here, and it is the stronger answer: distinguishing
+     * "exists but is not yours" from "does not exist" would let any caller probe
+     * for the existence of another member's unpublished posts.
      */
     const other = await playwright.request.newContext()
     try {
@@ -219,8 +229,8 @@ test.describe('6.1 community feed HTTP contract', () => {
       })
       expect(signup.status()).toBe(201)
       const otherUserId = ((await signup.json()) as { userId: string }).userId
-      // The draft allocated below belongs to THIS account, not to the fixture's,
-      // so the teardown has to be told about it or the row outlives the run.
+      // The draft allocated below belongs to THIS account, so the teardown has to
+      // be told about it or the row outlives the run.
       communityApi.trackUser(otherUserId)
 
       const allocate = await other.post(
@@ -266,9 +276,9 @@ test.describe('6.1 community feed HTTP contract', () => {
     expect(await first.json()).toEqual({ tracked: true })
 
     /*
-     * A REPLAY OF THE SAME REASON IS 200, not a conflict. Someone who taps report
-     * twice has not done anything wrong, and the earlier draft of this contract
-     * contradicted itself on exactly this point.
+     * A REPLAY OF THE SAME REASON IS 200. Someone who taps report twice has done
+     * nothing wrong, and an earlier draft of this contract contradicted itself on
+     * this point.
      */
     const replay = await request.post(reportUrl, {
       headers: communityApi.headers,
@@ -335,9 +345,9 @@ test.describe('6.1 community feed HTTP contract', () => {
     ).data
 
     /*
-     * The ORIGINAL session, not a second one. A new row here would strand the
-     * first upload, which is the whole failure the idempotency key exists to
-     * prevent for a client that lost the response to a dropped connection.
+     * The ORIGINAL session comes back. A new row here would strand the first
+     * upload, the failure the idempotency key exists to prevent for a client that
+     * lost the response to a dropped connection.
      */
     expect(replaySession.postId).toBe(firstSession.postId)
     expect(replaySession.uploadSessionId).toBe(firstSession.uploadSessionId)

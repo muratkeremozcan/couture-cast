@@ -1,30 +1,24 @@
 // Learning path Step 38: Community feed by climate band.
 // Story 6.1 Task 8 owner: the mobile community feed screen and its HTTP client.
 //
-// The network boundary stays REAL and is driven through MSW. `@/src/lib/community`
-// is deliberately NOT mocked: the whole point of this surface is that a request
-// shape, a classified failure reason and a rendered state have to agree, and three
-// of the states here are reachable only through a *rejected* request (401, 409
-// already-reported, 429 with Retry-After). Stubbing the client would leave exactly
-// the interesting half unproven -- the first draft of this screen rendered
-// `error.message` straight from the SDK, so a 429, a 409 and a 500 all read as
-// "Response returned an error code", and no mocked-lib test could have caught it.
+// The network boundary stays REAL and is driven through MSW; `@/src/lib/community` is
+// deliberately not mocked. Three of the states here are reachable only through a
+// rejected request (401, 409 already-reported, 429 with Retry-After), and the first
+// draft of this screen rendered `error.message` straight from the SDK, so a 429, a 409
+// and a 500 all read as "Response returned an error code". A mocked client proves none
+// of that.
 //
 // Only native modules are mocked. `src/lib/community.ts` imports `expo-image-picker`,
-// `expo-image-manipulator`, `expo-file-system` and `expo-crypto` LAZILY (they pull in
-// `expo-modules-core`, which cannot be evaluated in a browser bundle), so the mocks
-// below stand in for all four exactly as `palette-advisor-screen.test.tsx` does.
+// `expo-image-manipulator`, `expo-file-system` and `expo-crypto` LAZILY because they
+// pull in `expo-modules-core`, which cannot be evaluated in a browser bundle.
 //
-// Image URLs in the fixtures are `data:` URIs rather than `https://storage.local/...`.
-// react-native-web's `Image` really loads the URI through `ImageLoader` and renders a
-// second `<img src>` for the context menu, so an unreachable host fires the card's
-// `onError`, which asks the screen to refetch the feed. That would put phantom feed
-// requests into every request-count assertion in this file.
+// Fixture image URLs are `data:` URIs. react-native-web's `Image` really loads the URI
+// through `ImageLoader` and renders a second `<img src>` for the context menu, so an
+// unreachable host fires the card's `onError`, which asks the screen to refetch the
+// feed and puts phantom requests into every request-count assertion in this file.
 /*
- * `vitest-browser-react`'s `render` and this repo's `press` helper both return plain
- * values rather than promises, but every sibling screen suite awaits them so the call
- * sites read the same whichever helper is in use. Same disable, same reason, as
- * `palette-advisor-screen.test.tsx`.
+ * `vitest-browser-react`'s `render` and this repo's `press` helper return plain values;
+ * every sibling screen suite awaits them so the call sites read the same way.
  */
 /* eslint-disable @typescript-eslint/await-thenable */
 import React from 'react'
@@ -655,11 +649,11 @@ describe('Mobile community screen (Story 6.1)', () => {
   })
 
   /**
-   * A duplicate report of the SAME reason answers 200, not a conflict:
-   * `community.repository.ts` replays the stored row and its P2002 race resolves
-   * the same way. What makes the second tap impossible is the settled control,
-   * not an error state -- the client carried an `already_reported` reason until
-   * the constant behind it turned out to be thrown by nothing.
+   * A duplicate report of the SAME reason answers 200: `community.repository.ts`
+   * replays the stored row and its P2002 race resolves the same way. The settled
+   * control is what makes the second tap impossible; the client carried an
+   * `already_reported` reason until the constant behind it turned out to be thrown by
+   * nothing.
    */
   it('6.1-MOB-013 settles the control on a replayed report so a second tap is impossible', async () => {
     let reportCalls = 0
@@ -880,7 +874,6 @@ describe('Mobile community screen (Story 6.1)', () => {
       expect(screen.queryByTestId('community-caption-error')).toBeNull()
     )
 
-    // The confirmation gate: still blocked until the author confirms.
     expect(publishButton.getAttribute('aria-disabled')).toBe('true')
     press(screen.getByTestId('community-confirm-alt-text'))
     await waitFor(() =>
@@ -1018,8 +1011,7 @@ describe('Mobile community screen (Story 6.1)', () => {
     const altInput = screen.getByTestId<HTMLTextAreaElement>('community-alt-text-input')
     await waitFor(() => expect(altInput.value.length).toBeGreaterThan(0))
 
-    // Opening from the banner CTA opts in by default; the check mark and the
-    // challenge title are the visible proof of it.
+    // Opening from the banner CTA opts the look in by default.
     const toggle = screen.getByTestId('community-post-challenge-toggle')
     expect(toggle.textContent).toContain('✓')
     expect(toggle.textContent).toContain(CHALLENGE.title)
@@ -1070,8 +1062,8 @@ describe('Mobile community screen (Story 6.1)', () => {
 })
 
 /**
- * The client wrapper's own contract. Every one of these reasons reaches the screen
- * as a different translated string, and the mapping from an HTTP outcome onto a
+ * The client wrapper's own contract. Every one of these reasons reaches the screen as a
+ * different translated string, and the mapping from an HTTP outcome onto a
  * `CommunityFailureReason` is where the SDK's untranslated wording used to leak.
  */
 describe('mobile community client (Story 6.1)', () => {

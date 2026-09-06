@@ -280,6 +280,7 @@ describe('6.1 community feed query plans', () => {
         publishedAt: cursorSeedDate.toISOString(),
         id: cursorSeedId,
         mode: 'temperate_dry',
+        band: 'temperate_dry',
       },
       limit: 20,
       mode: 'temperate_dry',

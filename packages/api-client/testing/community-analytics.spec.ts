@@ -1,11 +1,5 @@
-// Story 6.1 community analytics wrappers and strict negative fixture tests.
-//
-// Matrix row "Analytics": closed-enum, exactly-once events that record no
-// sensitive payload. Two properties carry the beta gate and are asserted
-// individually: `is_self` on community_card_opened, because the gate advances on
-// non-self card-open lift, and the `climate_band`/`filter_mode` split on
-// community_feed_viewed, because the unresolved-band guardrail counts viewers
-// whose own band did not resolve and a filter override would corrupt the count.
+// Story 6.1 matrix row "Analytics": closed-enum, exactly-once events that record
+// no sensitive payload.
 import { describe, expect, it } from 'vitest'
 import {
   analyticsEventNameSchema,
@@ -214,7 +208,6 @@ const SENSITIVE_FIELDS: Record<string, Record<string, unknown>> = {
   moderation_reason: { moderation_reason: 'failed_image_screen' },
 }
 
-/** Copies a fixture without one key, to exercise a required field's absence. */
 const withoutKey = (
   source: Readonly<Record<string, unknown>>,
   key: string

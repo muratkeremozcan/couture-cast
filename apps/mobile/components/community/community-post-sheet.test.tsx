@@ -377,7 +377,6 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     expect(
       screen.getByTestId('community-publish-button').getAttribute('aria-disabled')
     ).toBe('true')
-    // Photo chosen and a suggestion in the field, so the blocker has moved on.
     expect(touchableSpy.props.get('community-publish-button')?.accessibilityHint).toBe(
       enUS.community.validation.altConfirmRequired
     )
@@ -667,16 +666,6 @@ describe('CommunityPostSheet (Story 6.1)', () => {
       runOnly: { type: 'tag', values: AXE_TAGS },
     })
 
-    /*
-     * DEFECT, reported rather than hidden: react-native-web does not forward React
-     * Native's `accessibilityState` object, so both `role="checkbox"` rows render
-     * with no `aria-checked` and axe fails WCAG 4.1.2. `app.json` ships a web
-     * target (`web.bundler: metro`), so this is a real failure on that surface. The
-     * fix is one prop in `community-post-sheet.tsx` -- `aria-checked={checked}` on
-     * `ComposeCheckboxRow` beside the existing `accessibilityState` -- and this task
-     * may not edit that file. Pinned tightly: a NEW rule, or a node outside the two
-     * checkboxes, fails this test.
-     */
     expect(
       results.violations.map((violation) => violation.id),
       JSON.stringify(results.violations, null, 2)
@@ -686,8 +675,8 @@ describe('CommunityPostSheet (Story 6.1)', () => {
      * The regression this guards, same shape as the report modal's radios: React
      * Native's `accessibilityState` object never reaches the web DOM, so both
      * `role="checkbox"` rows rendered with no `aria-checked` and axe failed
-     * `aria-required-attr` under WCAG 4.1.2. Asserting the attribute directly
-     * means dropping the `aria-checked` prop fails here by name.
+     * `aria-required-attr` under WCAG 4.1.2. Asserting the attribute directly means
+     * dropping the `aria-checked` prop fails here by name.
      */
     expect(
       Array.from(document.querySelectorAll('[role="checkbox"]'), (node) =>

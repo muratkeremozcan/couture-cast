@@ -206,7 +206,58 @@ describe('CommunityModerationProcessor & Worker', () => {
           climateBand: 'temperate_dry',
         }
       )
+      // A PASSING VERDICT NOW WRITES AN AUDIT ROW. This assertion used to read
+      // `not.toHaveBeenCalled()`, which pinned the defect in place: only
+      // `flagPost` and `recordReport` ever created a `ModerationEvent`, so the
+      // moderation trail recorded refusals and nothing else and there was no way
+      // to answer "was this post screened, by what, and when" for any post a
+      // reader can actually see. The engine version is on the row so a later
+      // model regression can be scoped to exactly the posts that version
+      // cleared.
+      expect(mockModerationEventCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          post_id: 'post-100',
+          action: 'screening_passed',
+          reason: expect.stringContaining('adr013') as string,
+          image_object_path: 'community/post-100/session-1.jpg',
+          content_snapshot: expect.objectContaining({
+            caption: expect.any(String) as string,
+            altText: expect.any(String) as string,
+          }) as unknown,
+        }) as unknown,
+      })
+    })
+
+    it('writes no audit row when the publish update loses its race', async () => {
+      // The audit row lives inside the same transaction as the status update and
+      // behind the same `count === 1` guard, so a second worker that arrives
+      // after the post already published records nothing. Without the guard a
+      // redelivered job would add a second "screened and passed" row for one
+      // screening.
+      mockFindUnique.mockResolvedValueOnce(
+        pendingPost({
+          id: 'post-raced',
+          user_id: 'user-1',
+          image_object_path: 'community/post-raced/session-1.jpg',
+        })
+      )
+      mockPostUpdateMany.mockResolvedValueOnce({ count: 0 })
+
+      const processor = createProcessor(
+        new FixtureCommunityModerationEngine({
+          textOutcome: { passed: true, reasons: [] },
+          imageOutcome: { passed: true, reasons: [] },
+        })
+      )
+
+      await processor.process({
+        postId: 'post-raced',
+        uploadSessionId: 'session-1',
+        platform: 'web',
+      })
+
       expect(mockModerationEventCreate).not.toHaveBeenCalled()
+      expect(mockOutboxUpdateMany).not.toHaveBeenCalled()
     })
 
     it('counts one challenge participation, keyed so retries and extra posts collapse', async () => {

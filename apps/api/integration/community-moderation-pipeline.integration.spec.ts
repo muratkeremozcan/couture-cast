@@ -33,6 +33,7 @@ import {
   SCREENING_UNAVAILABLE_REASON,
 } from '../src/modules/community/community-moderation.engine.js'
 import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
+import { CommunityModerationActionsService } from '../src/modules/community/community-moderation.actions.js'
 import {
   buildCommunityModerationJobId,
   type CommunityModerationPublisher,
@@ -544,6 +545,7 @@ describe('6.1 community moderation pipeline', () => {
           publishedAt: (firstPage.posts.at(-1)?.published_at ?? new Date()).toISOString(),
           id: firstPage.posts.at(-1)?.id ?? '',
           mode: band,
+          band,
         },
         limit: 3,
         mode: band,
@@ -620,6 +622,195 @@ describe('6.1 community moderation pipeline', () => {
 
       await dispatcher.dispatchPending()
       expect(queue.jobs.some((job) => job.postId === postId)).toBe(true)
+    })
+  })
+
+  describe('operator actions under concurrency', () => {
+    /*
+     * WHY THESE ARE HERE AND NOT IN `community-moderation.actions.spec.ts`.
+     *
+     * That spec covers the service well at fourteen tests, and it cannot cover
+     * the one property the service is built around. `lockPost` issues
+     * `SELECT id FROM "LookbookPost" WHERE id = $1 FOR UPDATE` and the method's
+     * own comment names the race it closes: "without the lock two operators
+     * acting at once could each read `flagged` and both write an audit row for a
+     * release that only happened once." The unit spec's `$queryRaw` is a bare
+     * `vi.fn()` whose resolved value is set in `beforeEach` and whose SQL text is
+     * never asserted, so DELETING `FOR UPDATE` LEAVES ALL FOURTEEN GREEN.
+     *
+     * That matters more here than it would elsewhere because there is nothing
+     * underneath the lock. `releaseFlaggedPost` writes with a bare
+     * `tx.lookbookPost.update({ where: { id } })` carrying no status predicate,
+     * so the in-memory `post.status !== 'flagged'` check plus the row lock are
+     * the entire mechanism -- no unique index, no CHECK, no conditional UPDATE
+     * that would return zero rows for the loser. This is the same shape as
+     * `publishWithinQuota`, whose rolling cap is likewise unexpressible as a
+     * constraint, and 6.1-INT-011 exists for exactly that reason.
+     *
+     * So these are written the way 6.1-INT-011 was: real parallel transactions
+     * against real PostgreSQL, built to go red when the lock is removed. A
+     * failure here is an API defect and must not be retried, serialised, or
+     * given a longer timeout.
+     */
+    const actions = () => new CommunityModerationActionsService(prisma)
+
+    async function createPostInStatus(
+      status: 'flagged' | 'published',
+      label: string
+    ): Promise<{ postId: string; userId: string }> {
+      const userId = await createUser(label)
+      const postId = `${status}-${randomUUID()}`
+      const fixture = createLookbookPost({
+        id: postId,
+        userId,
+        status,
+        caption: 'A classic autumn trench',
+        altText: 'Full length photo of a trench coat outfit',
+        // A flagged post carries the screener's verdict, which is what an
+        // operator release overrides and what the audit row has to name.
+        moderationReason: status === 'flagged' ? SCREENING_UNAVAILABLE_REASON : null,
+        moderationEngineVersion:
+          status === 'flagged' ? 'adr013-text-v2.0;adr013-nsfw-v1.0' : null,
+        publishedAt: status === 'published' ? new Date() : null,
+        submittedAt: new Date(),
+      })
+      await prisma.lookbookPost.create({ data: buildLookbookPostCreateInput(fixture) })
+      return { postId, userId }
+    }
+
+    const eventsFor = (postId: string, action: string) =>
+      prisma.moderationEvent.count({ where: { post_id: postId, action } })
+
+    it('6.1-INT-080 releases a flagged post exactly once when two operators act at once', async (context) => {
+      if (!requireSchema(context)) return
+
+      const { postId } = await createPostInStatus('flagged', 'race-release')
+      const [operatorA, operatorB] = await Promise.all([
+        createUser('operator-a'),
+        createUser('operator-b'),
+      ])
+      const service = actions()
+
+      const results = await Promise.all([
+        service.releaseFlaggedPost({
+          postId,
+          operatorId: operatorA,
+          reason: 'Reviewed: the screener was unavailable, not offended',
+        }),
+        service.releaseFlaggedPost({
+          postId,
+          operatorId: operatorB,
+          reason: 'Reviewed: the screener was unavailable, not offended',
+        }),
+      ])
+
+      // Exactly one operator performed the release. Without the lock both read
+      // `flagged`, both return true, and the post is released twice.
+      expect(results.filter((result) => result.released)).toHaveLength(1)
+      expect(results.filter((result) => !result.released)).toHaveLength(1)
+
+      // And the database agrees with the return values, which is the half the
+      // unit spec cannot check: one audit row, not two. A duplicated row here
+      // would tell a compliance reader two humans independently overruled the
+      // screener when only one did.
+      expect(await eventsFor(postId, 'released_by_operator')).toBe(1)
+
+      const post = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
+      expect(post.status).toBe('published')
+      expect(post.published_at).not.toBeNull()
+    })
+
+    it('6.1-INT-081 takes a published post down exactly once when two operators act at once', async (context) => {
+      if (!requireSchema(context)) return
+
+      // The mirror of 6.1-INT-080 on the other write path. Both go through the
+      // same `lockPost`, and a takedown duplicated in the audit trail is worse
+      // than a duplicated release: the row is the evidence a takedown happened,
+      // and two of them for one action makes the trail unusable as a count.
+      const { postId } = await createPostInStatus('published', 'race-takedown')
+      const [operatorA, operatorB] = await Promise.all([
+        createUser('takedown-a'),
+        createUser('takedown-b'),
+      ])
+      const service = actions()
+
+      const results = await Promise.all([
+        service.takeDownPublishedPost({
+          postId,
+          operatorId: operatorA,
+          reason: 'Reported and confirmed',
+        }),
+        service.takeDownPublishedPost({
+          postId,
+          operatorId: operatorB,
+          reason: 'Reported and confirmed',
+        }),
+      ])
+
+      expect(results.filter((result) => result.takenDown)).toHaveLength(1)
+      expect(await eventsFor(postId, 'taken_down_by_operator')).toBe(1)
+
+      const post = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
+      expect(post.status).toBe('flagged')
+    })
+
+    it('6.1-INT-082 leaves the post agreeing with its own audit trail when a release races a takedown', async (context) => {
+      if (!requireSchema(context)) return
+
+      /*
+       * The two actions are inverses on the same row, and either order is legal:
+       * a takedown then a release ends published with two rows, a release
+       * refused then a takedown ends flagged with one. What is NOT legal is the
+       * post disagreeing with the last thing the audit trail says happened to
+       * it, because the trail is what an operator and a regulator both read.
+       *
+       * Honest about its strength: unlike the two above, this one is not proven
+       * red by deleting `FOR UPDATE`. Under READ COMMITTED the loser either sees
+       * the committed new status or the old one, and both readings produce a
+       * self-consistent pair, so removing the lock does not reliably break it.
+       * It is an invariant test rather than a race test, kept because the
+       * invariant is the thing anyone actually reasons about and nothing else
+       * asserts it.
+       */
+      const { postId } = await createPostInStatus('published', 'race-mixed')
+      const [releaser, taker] = await Promise.all([
+        createUser('mixed-release'),
+        createUser('mixed-takedown'),
+      ])
+      const service = actions()
+
+      await Promise.all([
+        service.takeDownPublishedPost({
+          postId,
+          operatorId: taker,
+          reason: 'Reported and confirmed',
+        }),
+        service.releaseFlaggedPost({
+          postId,
+          operatorId: releaser,
+          reason: 'Reviewed and cleared',
+        }),
+      ])
+
+      const post = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
+      const latest = await prisma.moderationEvent.findFirstOrThrow({
+        where: {
+          post_id: postId,
+          action: { in: ['released_by_operator', 'taken_down_by_operator'] },
+        },
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+      })
+
+      const expectedStatus =
+        latest.action === 'released_by_operator' ? 'published' : 'flagged'
+      expect(
+        post.status,
+        `the post is ${post.status} but the newest operator event is ${latest.action}`
+      ).toBe(expectedStatus)
+
+      // Neither action may fire twice, whichever order they landed in.
+      expect(await eventsFor(postId, 'released_by_operator')).toBeLessThanOrEqual(1)
+      expect(await eventsFor(postId, 'taken_down_by_operator')).toBeLessThanOrEqual(1)
     })
   })
 })

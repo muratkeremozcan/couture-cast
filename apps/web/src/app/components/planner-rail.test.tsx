@@ -623,8 +623,8 @@ describe('PlannerRail', () => {
   })
 
   // Story 5.5 Task 9 (AC 7): the axe matrix. `variant` stands in for the two
-  // supported widths -- `rail` is the >=1440px desktop layout, `overlay` is
-  // the narrower phone/tablet layout (Decision 7) -- and each is checked both
+  // supported widths (`rail` is the >=1440px desktop layout, `overlay` the
+  // narrower phone/tablet layout, Decision 7), and each is checked both
   // signed out (the locked upsell, no request) and entitled (the full ready
   // week). The two states render structurally different DOM (a locked panel
   // vs. seven day cards), so a pass on one variant/state combination says

@@ -70,7 +70,6 @@ function affiliateImpressions() {
 
 type SaveRitualCacheCall = Parameters<typeof RitualCacheModule.saveRitualCache>
 
-/** Asserts that nothing the screen handed to the device cache carries an offer. */
 function expectNoPersistedOffers() {
   const calls = saveRitualCacheMock.mock.calls as SaveRitualCacheCall[]
   expect(calls.length).toBeGreaterThan(0)

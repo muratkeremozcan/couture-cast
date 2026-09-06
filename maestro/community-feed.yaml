@@ -113,11 +113,37 @@ tags:
     id: 'community-filter-chip-all'
     label: 'The every-climate filter is offered'
 
+# THE TAP IS BRACKETED BY TWO ASSERTIONS, AND THAT IS THE POINT.
+#
+# `tapOn` reports COMPLETED whether or not anything handled the touch, so a tap
+# with no assertion after it proves nothing. This one used to sit alone: if it
+# no-opped the feed stayed on `auto`, and because `auto` falls back to every
+# region when the device user has no saved location, every card assertion below
+# would still have passed. The flow would have been green while testing a filter
+# it never applied.
+#
+# Asserting the transition rather than the end state is what closes it. The
+# screen opens on `auto` (`useState<CommunityFeedMode>('auto')` in
+# community-screen.tsx), so the `before` assertion is not already true of the
+# state the tap produces, and the `after` assertion cannot hold unless the tap
+# was handled. `selected` reads `accessibilityState.selected` off the chip
+# (community-filter-chips.tsx), the same form `accessibility-hardening.yaml` and
+# `chip-navigation-bottom-nav.yaml` already use.
+- assertVisible:
+    id: 'community-filter-chip-auto'
+    selected: true
+    label: 'Precondition: the screen opens on the viewer-climate filter'
+
 - tapOn:
     id: 'community-filter-chip-all'
     retryTapIfNoChange: true
     label: 'Pin the feed to every climate so the result does not depend on this
       device user having a saved location'
+
+- assertVisible:
+    id: 'community-filter-chip-all'
+    selected: true
+    label: 'The tap was handled: selection MOVED to the every-climate filter'
 
 # --- The feed renders real seeded rows, in publication order -----------------
 

@@ -25,6 +25,8 @@ import {
   createCommunityChallengeInputSchema,
   publishCommunityPostInputSchema,
   publishCommunityPostResponseSchema,
+  openCommunityPostInputSchema,
+  openCommunityPostResponseSchema,
   reportCommunityPostInputSchema,
   reportCommunityPostResponseSchema,
   updateCommunityChallengeInputSchema,
@@ -33,6 +35,7 @@ import {
   type CommunityChallengeResponse,
   type CommunityFeedResponse,
   type CommunityPostResponse,
+  type OpenCommunityPostResponse,
   type PublishCommunityPostResponse,
   type ReportCommunityPostResponse,
   type WithdrawCommunityPostResponse,
@@ -220,6 +223,56 @@ export class CommunityController {
     )
 
     return publishCommunityPostResponseSchema.parse({ data })
+  }
+
+  /**
+   * Records a card open.
+   *
+   * The event this writes is the ONLY input to AC7's advance condition, a 10%
+   * relative non-self card-open lift, and until this route existed nothing could
+   * emit it: eight endpoints were registered and none was card-open, so the beta
+   * gate was unmeasurable at any traffic volume.
+   *
+   * Read-gated rather than write-gated. Opening a card is reading the feed, and
+   * a viewer browsing during a posting freeze still generates the measurement
+   * the freeze is being evaluated against.
+   *
+   * There is no 403 on this path by design. Any viewer may open any post they
+   * can see, and a post they cannot see answers 404, so a 403 would confirm that
+   * a hidden post exists.
+   */
+  @Post('posts/:postId/opened')
+  @HttpCode(200)
+  async openPost(
+    @AuthContext() auth: RequestAuthContext,
+    @Param('postId') postId: string,
+    @Headers('x-couture-platform') platformHeader: string | undefined,
+    @Body() rawBody: unknown
+  ): Promise<OpenCommunityPostResponse> {
+    const headersResult = communityHeadersSchema.safeParse({
+      'x-couture-platform': platformHeader,
+    })
+    if (!headersResult.success) {
+      throw new BadRequestException(
+        headersResult.error.issues.map((i) => i.message).join('; ')
+      )
+    }
+
+    const bodyResult = openCommunityPostInputSchema.safeParse(rawBody)
+    if (!bodyResult.success) {
+      throw new BadRequestException(
+        bodyResult.error.issues.map((i) => i.message).join('; ')
+      )
+    }
+
+    const result = await this.communityService.recordCardOpened({
+      userId: auth.userId,
+      postId,
+      platform: headersResult.data['x-couture-platform'],
+      input: bodyResult.data,
+    })
+
+    return openCommunityPostResponseSchema.parse(result)
   }
 
   @Post('posts/:postId/report')

@@ -86,6 +86,13 @@ export const workerOnlyTables = [
   'AlertDeliveryOutbox',
   'AlertCooldownReservation',
   'LookbookPost',
+  // Moved out of `selfOnlyTables` by Story 6.1, and it belongs here for the same
+  // reason LookbookPost does. `EngagementEvent.post_id` is a REQUIRED foreign key
+  // to LookbookPost, so owner-scoped INSERT rights are a post-existence oracle:
+  // proven live, an insert naming another user's DRAFT post SUCCEEDED, while a
+  // fabricated id failed with 23503. Two different answers about a row the API
+  // deliberately 404s. Both now return the same 42501.
+  'EngagementEvent',
   'CommunityChallenge',
   'CommunityModerationOutbox',
   'CommunityAlias',
@@ -94,7 +101,6 @@ export const workerOnlyTables = [
 ] as const
 
 export const selfOnlyTables = [
-  'EngagementEvent',
   'SavedLocation',
   'AlertRule',
   'NotificationPreference',

@@ -1,6 +1,6 @@
-// Two guards over the hand-authored migration SQL, both added after the same
-// bug class was found twice in one afternoon and neither instance was caught by
-// any existing gate.
+// Three guards over the hand-authored migration SQL. All three exist because the
+// same bug class keeps appearing here — a divergence between what a migration
+// says and what a database actually holds, which no existing gate could see.
 //
 // Class 1 — identifier truncation. PostgreSQL silently shortens any identifier
 // past 63 bytes. It does not warn, and the shortened name is what ends up in
@@ -21,9 +21,15 @@
 // next `prisma migrate dev` either fail with 42P07 or quietly recreate the index
 // without its `WHERE advisor_slot IS NOT NULL`.
 //
-// Both guards are data-driven from the migrations folder, so a new partial index
-// or a new over-long name is covered the day it lands rather than the day
-// someone notices the drift.
+// Class 3 — a migration amended after a database already applied it. Prisma 6.19
+// reports such a database as up to date, measured with a control, so the drift is
+// invisible to `migrate status` and `migrate deploy` alike. DB-HYGIENE-03 carries
+// the argument and the evidence.
+//
+// All three guards are data-driven from the migrations folder, so a new partial
+// index, a new over-long name or a newly amended migration is covered the day it
+// lands rather than the day someone notices the drift.
+import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -140,6 +146,7 @@ describe('migration hygiene', () => {
       /\b(?:CREATE\s+(?:UNIQUE\s+)?INDEX(?:\s+CONCURRENTLY)?(?:\s+IF\s+NOT\s+EXISTS)?|CREATE\s+POLICY|ADD\s+CONSTRAINT|CONSTRAINT|CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?|CREATE\s+TYPE|ALTER\s+INDEX)\s+([A-Za-z_][A-Za-z0-9_$]*)/gi
 
     const violations: string[] = []
+    let scanned = 0
 
     for (const migration of migrations) {
       for (const pattern of [quoted, unquoted]) {
@@ -147,6 +154,7 @@ describe('migration hygiene', () => {
         let match: RegExpExecArray | null
         while ((match = pattern.exec(migration.sql)) !== null) {
           const identifier = match[1] ?? ''
+          scanned += 1
           const bytes = Buffer.byteLength(identifier, 'utf8')
           if (bytes > MAX_IDENTIFIER_BYTES) {
             violations.push(
@@ -157,6 +165,23 @@ describe('migration hygiene', () => {
         }
       }
     }
+
+    // GUARDS THIS TEST'S OWN PREMISE, the way DB-HYGIENE-02 guards its `live.size`.
+    //
+    // Everything above is `violations.push` inside two regex loops, so the
+    // assertion at the end is `[] === []` whenever the loops find nothing to
+    // look at — an empty migrations directory, a `readMigrations` pointed at the
+    // wrong path, or either pattern rewritten until it stops matching. None of
+    // those is hypothetical: the whole file is regex over hand-authored SQL, and
+    // the identifier that motivated it is one character over the limit. A guard
+    // that silently stops guarding is the failure this file exists to prevent,
+    // and the same shape was found live in 6.1-DB-034, which was green in CI
+    // since it landed while sweeping zero rows.
+    //
+    // Both floors sit well under the measured values — 38 migrations and 2,187
+    // identifiers on 2026-09-06 — so ordinary churn does not trip them.
+    expect(migrations.length, 'no migrations were read to scan').toBeGreaterThan(20)
+    expect(scanned, 'the identifier patterns matched nothing').toBeGreaterThan(500)
 
     // A failure here is not cosmetic. PostgreSQL will accept the migration and
     // store a shortened name, after which the catalog and the migration text
@@ -214,6 +239,90 @@ describe('migration hygiene', () => {
 
       expect(lostPredicate).toEqual([])
       expect(missing).toEqual([])
+    } finally {
+      client.release()
+    }
+  })
+
+  it('DB-HYGIENE-03 keeps applied migration history matching the migration files', async () => {
+    // Class 3 — a migration amended after it was already applied.
+    //
+    // PRISMA DOES NOT DETECT THIS, which is the whole reason the check exists.
+    // Measured on 6.19.0 against a database whose recorded checksum for
+    // `20260905120000` demonstrably differed from the file: `migrate deploy`
+    // reported "No pending migrations to apply" and `migrate status` reported
+    // "Database schema is up to date!", both exit 0. That result was taken with a
+    // control — deleting one applied row made `migrate status` exit 1 and name the
+    // migration — so the clean answer is Prisma reading the history and declining
+    // to care, not an inert command. The documentation implies otherwise; the
+    // measurement is what this comment rests on.
+    //
+    // WHY IT MATTERS depends on what the amendment did, and the two live examples
+    // on this branch are one of each. `20260713170000` renamed a 64-byte index to
+    // the 63-byte text PostgreSQL had already truncated it to, so a database that
+    // applied either version is in the identical state: harmless. The Story 6.1
+    // migration's `EngagementEvent` REVOKE is new DDL, so a database holding that
+    // migration as applied has never executed it and simply does not have the
+    // lockdown, while `migrate status` calls it up to date.
+    //
+    // THIS IS PERMANENTLY GREEN IN CI, and that is not evidence it does nothing.
+    // CI creates the database and applies every migration from scratch on each
+    // run, so its history can never diverge. The population this protects is
+    // developer machines, which is exactly where a `db:reset` from before an
+    // amendment leaves a schema that looks current and is not.
+    const client = await adminPool.connect()
+
+    try {
+      const history = await client.query<{ migration_name: string; checksum: string }>(
+        'SELECT "migration_name", "checksum" FROM public."_prisma_migrations"'
+      )
+      const recorded = new Map(
+        history.rows.map((row) => [row.migration_name, row.checksum])
+      )
+
+      // Prisma stores the SHA-256 of the migration file's raw bytes. Verified
+      // rather than assumed: 36 of the 38 migrations on this branch hash to their
+      // recorded value exactly, which is only possible if the algorithm is this
+      // one, and the two that do not are the two known amendments.
+      const drifted: string[] = []
+      let compared = 0
+
+      for (const migration of migrations) {
+        const checksum = recorded.get(migration.name)
+        // A migration that is present on disk and absent from history is simply
+        // pending. `migrate status` already reports that, and a developer who has
+        // pulled a branch and not yet reset is in a normal state, so it is not
+        // this check's business.
+        if (checksum === undefined) continue
+
+        compared += 1
+        const actual = createHash('sha256')
+          .update(
+            readFileSync(join(migrationsDirectory, migration.name, 'migration.sql'))
+          )
+          .digest('hex')
+
+        if (actual !== checksum) {
+          drifted.push(migration.name)
+        }
+      }
+
+      // ANCHORED, because a detector for a silent divergence must not diverge
+      // silently itself. `drifted` is empty when every file matches AND when
+      // nothing was compared at all: an empty `_prisma_migrations`, a connection
+      // pointed at the wrong database, or a repointed migrations directory would
+      // each produce a confident green over zero comparisons. The floor sits well
+      // under the 38 rows measured on 2026-09-06.
+      expect(compared, 'no applied migrations were compared').toBeGreaterThan(20)
+
+      expect(
+        drifted,
+        'These migration files changed after this database applied them, so its ' +
+          'schema is NOT what the files say even though `prisma migrate status` ' +
+          'reports it up to date. Run `npm run db:reset` to rebuild from the ' +
+          'current files. If you are seeing this in CI, something is reusing a ' +
+          'database across runs and that is the real defect.'
+      ).toEqual([])
     } finally {
       client.release()
     }

@@ -18,14 +18,13 @@ import {
 } from '../src/factories/premium.factory.js'
 
 /**
- * Story 5.2 premium billing factories.
+ * The defaults encode migration constraints and Decision 6's allowlist rule. A
+ * drifted fixture fails at the database with an opaque error; these cases catch
+ * it in an assertion first.
  *
- * The defaults encode migration constraints and Decision 6's allowlist rule, so
- * a fixture that drifts fails in an assertion here rather than at the database
- * with an opaque error. Persistence is asserted against a stubbed Prisma
- * client: these are unit tests of the camelCase-to-snake_case mapping and the
- * cleanup registration; whether the columns actually exist is the schema
- * suite's job in `packages/db/test`.
+ * Persistence runs against a stubbed Prisma client, so a green run proves the
+ * camelCase to snake_case mapping and the cleanup registration. Whether the
+ * columns exist is the schema suite's job in `packages/db/test`.
  */
 
 type CreateStub = { create: ReturnType<typeof vi.fn> }
@@ -69,7 +68,7 @@ describe('premium factories', () => {
       const entitlement = createPremiumEntitlement()
 
       // Most consumers exercise the entitled branch; the deny branch is one
-      // explicit override away.
+      // override away.
       expect(entitlement.status).toBe('active')
       expect(entitlement.store).toBe('stripe')
       expect(entitlement.productId).toBe('premium_monthly')
@@ -132,9 +131,9 @@ describe('premium factories', () => {
     it('5.2-FACTORY-05 defaults the payload to allowlisted projection keys only', () => {
       const event = createBillingEvent()
 
-      // Decision 6: the payload is a projection, never a raw provider body. A
-      // fixture default carrying a receipt id, email, or URL would let an
-      // allowlist regression pass silently.
+      // Decision 6: the payload carries an allowlisted projection of the
+      // provider body. A fixture default holding a receipt id, email, or URL
+      // would let an allowlist regression pass silently.
       expect(Object.keys(event.payload).sort()).toEqual(
         [
           'cancelReason',
@@ -197,7 +196,7 @@ describe('premium factories', () => {
     it('5.2-FACTORY-08 uses a synthetic stripe customer id', () => {
       const customer = createBillingCustomer()
 
-      // Stripe-shaped so lookups behave, but unmistakably a test value.
+      // Stripe-shaped so lookups behave, and unmistakably a test value.
       expect(customer.stripeCustomerId).toMatch(/^cus_test_/)
     })
 
@@ -228,19 +227,20 @@ describe('premium factories', () => {
     it('5.3-FACTORY-01 defaults to a chosen palette, not to Default', () => {
       const preference = createPremiumThemePreference()
 
-      // The interesting fixture is a user who has actually picked a palette;
-      // Default is one explicit `theme: null` away. Jewel Radiance is the only
-      // primary accent that clears 4.5:1 against white text, so a fixture that
-      // renders untouched renders an accessible pairing.
+      // The interesting fixture is a user who has picked a palette; Default is
+      // one explicit `theme: null` away. Jewel Radiance is the only primary
+      // accent that clears 4.5:1 against white text, so a fixture that renders
+      // untouched renders an accessible pairing.
       expect(preference.theme).toBe('jewel_radiance')
     })
 
     it('5.3-FACTORY-02 keeps null as a real selection rather than an omitted field', async () => {
       const { prisma, premiumThemePreference } = stubPrisma()
 
-      // Reset is an upsert to null, never a delete. If the factory dropped the
-      // key when it is null, the column default would fill it in and a "reset"
-      // fixture would be indistinguishable from a never-touched one.
+      // Reset is an upsert that writes null, so the row survives. If the
+      // factory dropped the key when it is null, the column default would fill
+      // it in and a "reset" fixture would be indistinguishable from a
+      // never-touched one.
       await persistPremiumThemePreference(
         prisma,
         createPremiumThemePreference({

@@ -1,49 +1,12 @@
 // Learning path Step 38: Community feed by climate band.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-38-community-feed-by-climate-band
-// Story 6.1 Task 6: the web community feed against the real running stack.
 //
-// TWO BLOCKERS STOP A POST FROM REACHING THIS PAGE TODAY, and every `fixme` below
-// names them rather than asserting around them. Both were established against a
-// live local API, not inferred:
-//
-//  1. THE SEED WRITES `image_object_path` BUT NEVER UPLOADS THE OBJECT.
-//     `packages/db/prisma/seeds/rituals.ts` publishes five `LookbookPost` rows
-//     with paths like `community/lookbook-1/<hash>.jpg`, but nothing ever puts
-//     bytes at those paths. `CommunityService.buildFeedItems` drops any post whose
-//     image cannot be signed — it logs "Community post omitted from feed because
-//     its image could not be signed" and `continue`s — so all five are silently
-//     omitted and `GET /feed?mode=all` answers 200 with `items: []`. Measured with
-//     `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` correctly set, so this is not
-//     a missing-credentials artefact: five omission warnings per request, five
-//     matching rows returned by the identical Prisma query run directly.
-//     This defeats the story's own acceptance criterion that seeded data makes
-//     both positive paths reachable.
-//
-//  2. THE LOCAL E2E STACK NEVER SCREENS A POST.
-//     `scripts/start-api-e2e-with-workers.mjs` spawns only
-//     `apps/api/dist/src/workers/wardrobe.bootstrap.js`. The community moderation
-//     worker, its outbox dispatcher and its maintenance schedulers are wired into
-//     `apps/api/src/workers/bootstrap.ts`, which that script never starts. A post
-//     published through the API therefore sits at `pending_review` indefinitely —
-//     confirmed by polling one for forty seconds — and never enters the public
-//     feed. This is the same stack `playwright/config/local.config.ts` boots for
-//     its `webServer`, so it applies to every spec in this directory.
-//
-// A third, smaller finding sits behind the same wall: `GET /posts/{postId}` for a
-// PUBLISHED seeded post answers 404, while reporting that same post answers 200.
-// The single-post read resolves through the same signing step the feed does, so a
-// storage gap presents to a client as "not found" rather than as an outage.
-//
-// WHAT THIS FILE DOES ASSERT is everything the page genuinely does today: the
-// signed-in shell, the eight filter chips and their cursor-resetting behaviour, the
-// single live region, the empty state, and axe over the feed page and the
-// create-post modal. That is real coverage, and it is written so that the moment
-// either blocker is fixed the `fixme`s become the interesting half of the file.
-//
-// THE SESSION IS NOT OPTIONAL. `apps/web/src/lib/community.ts` reads
-// `sessionStorage[couturecast.access-token]` as its sole credential, so a spec on
-// the default fixture renders the signed-out panel and finds nothing. See
-// `support/helpers/community-session.ts`.
+// WHAT THE FIXTURE SCREENER DOES AND DOES NOT BUY. It clears every image without
+// looking at the bytes, and it is the only reason a published post is reachable
+// here at all: the real ADR-013 model is not a dependency of this repository, so
+// the default screener fails closed and every post terminates at `flagged`. A
+// green run of this file is evidence about the publication pipeline, the feed,
+// the cursor and the page. It is not evidence about image safety.
 import { log } from '@seontechnologies/playwright-utils/log'
 import { checkA11y } from '../support/helpers/accessibility'
 import {
@@ -55,24 +18,19 @@ import {
 } from '../support/helpers/community-session'
 
 /*
- * The community grid lives on the Lookbook Prism home page, inside its
- * "Community Section" region. `/community` is the mobile-destination stub
+ * The community grid lives on the Lookbook Prism home page, inside its "Community
+ * Section" region. `/community` is the mobile-destination stub
  * (`apps/web/src/app/components/mobile-destination-page.tsx`) and renders only an
- * `h1` — a spec pointed there finds nothing and looks broken.
+ * `h1`, so a spec pointed there finds nothing and looks broken.
  */
 const COMMUNITY_ROUTE = '/'
 
 test.describe('6.1 community feed by climate band', () => {
   /*
-   * Every test below destructures `communitySession`, including the ones that
-   * never reference it. Playwright fixtures are LAZY: a test that omits it does
-   * not get the session, renders the signed-out panel, and fails on a missing
-   * grid for a reason that has nothing to do with what it was asserting.
-   *
-   * The events poll is stubbed for the same reason `lookbook-prism.spec.ts` and
-   * `chip-navigation-bottom-nav.spec.ts` stub it: it answers 401 through the web
-   * origin, and `networkErrorMonitor` — correctly — fails a test on an unexpected
-   * failing request. Stubbing it keeps the monitor armed for everything else.
+   * The events poll answers 401 through the web origin and `networkErrorMonitor`
+   * correctly fails a test on an unexpected failing request, so stubbing it keeps
+   * the monitor armed for everything else. Same reason `lookbook-prism.spec.ts`
+   * and `chip-navigation-bottom-nav.spec.ts` stub it.
    */
   test.beforeEach(({ interceptNetworkCall }) => {
     void interceptNetworkCall({
@@ -92,35 +50,25 @@ test.describe('6.1 community feed by climate band', () => {
     await page.goto(COMMUNITY_ROUTE)
 
     /*
-     * `toBeAttached`, not `toBeVisible`. The grid container is rendered
-     * unconditionally for a signed-in reader, but with zero items it has no
-     * layout box, and `toBeVisible` fails on a zero-height element. Asserting
-     * attachment is the claim that actually holds today and keeps holding once
-     * the feed has content.
+     * The grid container renders unconditionally for a signed-in reader, but with
+     * zero items it has no layout box and `toBeVisible` fails on a zero-height
+     * element. Attachment is the claim that holds today and keeps holding once the
+     * feed has content.
      */
     await expect(page.getByTestId('community-card-grid')).toBeAttached()
 
     /*
-     * EXACTLY ONE `role="status"` on the page. Before Story 6.1 there were four —
-     * the loading skeleton carried one, the filter nav carried its own sr-only
-     * region, and `getByRole('status')` threw on the ambiguity. More than that,
-     * several regions announcing at once is a real screen-reader defect rather
-     * than a test inconvenience: the announcements race and the reader hears
-     * whichever won.
+     * Exactly one `role="status"`: several live regions announcing at once is a
+     * real screen-reader defect, because the announcements race and the reader
+     * hears whichever won. Scoped to the community surface, since the Story 3.6
+     * chip-navigation bar has its own legitimate one and a page-wide count would
+     * assert something this story never claimed.
      */
     const communitySection = page.getByRole('complementary', {
       name: /community lookbook/i,
     })
     await expect(communitySection.getByRole('status')).toHaveCount(1)
     await expect(page.getByTestId('community-live-region')).toBeAttached()
-
-    /*
-     * Scoped to the community surface on purpose. The Story 3.6 chip-navigation
-     * bar has its own `role="status"` ("Showing Personal recommendations") and
-     * that one is legitimate, so a page-wide count would be asserting something
-     * this story never claimed. What Story 6.1 fixed is the community component
-     * announcing from four places at once.
-     */
   })
 
   test('6.1-E2E-02 offers every defined filter and no undefined one', async ({
@@ -131,10 +79,10 @@ test.describe('6.1 community feed by climate band', () => {
     await page.goto(COMMUNITY_ROUTE)
 
     /*
-     * KEYED ON THE TEST ID, never on the accessible name. The `auto` chip names
-     * the resolved band when there is one ("Your climate: Temperate and wet"), so
-     * its name is data-dependent and a name selector would be flaky in exactly
-     * the situation the chip matters.
+     * KEYED ON THE TEST ID. The `auto` chip names the resolved band when there is
+     * one ("Your climate: Temperate and wet"), so its accessible name is
+     * data-dependent and a name selector would be flaky in exactly the situation
+     * the chip matters.
      */
     const modes = [
       'auto',
@@ -151,8 +99,8 @@ test.describe('6.1 community feed by climate band', () => {
     }
 
     // Eight, and only eight. Story 6.1 deleted `New`, `Following`, `Near me` and
-    // `Brands` because they had no server behavior, and the spec forbids an
-    // active chip without one; a ninth chip reappearing is that regression.
+    // `Brands` because they had no server behavior, and the spec forbids an active
+    // chip without one. A ninth chip reappearing is that regression.
     await expect(page.locator('[data-testid^="community-filter-"]')).toHaveCount(
       modes.length
     )
@@ -177,10 +125,9 @@ test.describe('6.1 community feed by climate band', () => {
 
     /*
      * The cursor is bound to the mode it was minted under, so a filter change has
-     * to restart paging rather than carry the previous filter's cursor across.
-     * Asserting on the REQUEST the click produced is what proves the client
-     * dropped the cursor: a client that kept it would send one here, and the
-     * server would answer 400.
+     * to restart paging. Asserting on the REQUEST the click produced is what proves
+     * the client dropped the cursor: a client that kept it would send one here and
+     * the server would answer 400.
      */
     expect(banded.request, 'the filter click issued a feed request').not.toBeNull()
     const requestedUrl = new URL(banded.request!.url())
@@ -206,12 +153,6 @@ test.describe('6.1 community feed by climate band', () => {
     expect(communitySession.userId).toBeTruthy()
     await page.goto(COMMUNITY_ROUTE)
 
-    /*
-     * `create-post-button` renders ONLY when there is a web session. A signed-out
-     * run finds nothing here, and that absence looks identical to a broken render,
-     * so this says so rather than letting a future reader guess: if this locator
-     * is empty, check the session before you check the component.
-     */
     const openControl = page.getByTestId('create-post-button')
     await expect(
       openControl,
@@ -228,23 +169,15 @@ test.describe('6.1 community feed by climate band', () => {
     await expect(confirmAltText).toBeVisible()
 
     /*
-     * Alt text must be CONFIRMED before publishing: the contract types
-     * `altTextConfirmed` as the literal `true`, so an unconfirmed publish cannot
-     * even be expressed. The control starts unchecked, which is the accessible
-     * default — a pre-checked confirmation is not a confirmation.
+     * The contract types `altTextConfirmed` as the literal `true`, so an
+     * unconfirmed publish cannot be expressed. The control starts unchecked: a
+     * pre-checked confirmation confirms nothing.
      */
     await expect(confirmAltText).not.toBeChecked()
 
     await checkA11y(page)
   })
 
-  /*
-   * These three were `fixme` while the seed wrote `image_object_path` without
-   * uploading an object and the local stack ran no community moderation worker.
-   * Both are fixed — the seed uploads before it writes rows, and
-   * `scripts/start-api-e2e-with-workers.mjs` starts the worker with
-   * `COMMUNITY_NSFW_SCREENER=fixture` — so they assert for real now.
-   */
   test('6.1-E2E-06 renders the seeded feed and keeps the author pseudonymous', async ({
     page,
     communitySession,
@@ -260,12 +193,18 @@ test.describe('6.1 community feed by climate band', () => {
     )
     await expect(page.getByTestId(`climate-badge-${firstSeeded.id}`)).toBeVisible()
 
-    // Pseudonymous: an author name renders, and it is not a user id.
+    // PSEUDONYMITY IS ASSERTED POSITIVELY, AS THE ALIAS FORMAT. This was
+    // `not.toHaveText(/[0-9a-f]{8}-[0-9a-f]{4}/)`, which only excludes a lowercase
+    // UUID prefix. A real profile name, an email local part and a seeded id like
+    // `lookbook-1` all pass that, so the assertion could not fail for the
+    // regression the test is named after: the projection handing back an author's
+    // actual identity. `generateCommunityAuthorAlias` mints
+    // `Style Explorer <8 uppercase hex>` and `CommunityAlias` stores it, so the
+    // rendered name has exactly one legal shape and anything else is a leak.
     const authorName = page.getByTestId(`author-name-${firstSeeded.id}`)
     await expect(authorName).toBeVisible()
-    await expect(authorName).not.toHaveText(/[0-9a-f]{8}-[0-9a-f]{4}/)
+    await expect(authorName).toHaveText(/^Style Explorer [0-9A-F]{8}$/)
 
-    // Reporting is offered on another member's post; withdrawing is not.
     await expect(page.getByTestId(`report-button-${firstSeeded.id}`)).toBeVisible()
     await expect(page.getByTestId(`withdraw-button-${firstSeeded.id}`)).toHaveCount(0)
   })
@@ -297,9 +236,9 @@ test.describe('6.1 community feed by climate band', () => {
     const target = SEEDED_COMMUNITY_POSTS[2]
     await page.goto(`/?source=notification&type=community&cardId=${target.id}`)
 
-    // The contract this inherits from `accessibility-hardening.spec.ts`, which
-    // could no longer state it: a deep-link target receives programmatic focus
-    // and is focusable only programmatically.
+    // The contract inherited from `accessibility-hardening.spec.ts`, which could no
+    // longer state it: a deep-link target receives programmatic focus and is
+    // focusable only programmatically.
     const card = page.locator(`#lookbook-card-${target.id}`)
     await expect(card).toBeFocused()
     await expect(card).toHaveAttribute('tabindex', '-1')

@@ -264,7 +264,7 @@ describe('mobile premium theme boundary', () => {
   /**
    * TEA coverage-gate follow-up: `readServerMessage`'s own two branches and the
    * transport-failure catch-all, none of which the status-code table above
-   * reaches -- every case there replies with a well-formed JSON error body.
+   * reaches: every case there replies with a well-formed JSON error body.
    */
   describe('malformed and transport failures', () => {
     it('falls back to a generic message when the error body is not JSON', async () => {

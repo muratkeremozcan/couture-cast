@@ -106,7 +106,6 @@ import { getSavedSettings } from '../lib/settings-storage'
 import { setMobileAnalyticsDiagnosticsEnabled } from '../analytics/mobile-analytics-diagnostics'
 import SettingsScreen, { API_HEALTH_TIMEOUT_MS } from '../../app/(tabs)/settings'
 
-/** jsdom reports integer scroll/client widths; see the overflow assertion. */
 const SUBPIXEL_ROUNDING_SLACK_PX = 2
 
 const SETTINGS_STORAGE_KEY = 'couture-cast-settings.json'
@@ -483,7 +482,7 @@ describe('SettingsScreen', () => {
       ).toBeGreaterThan(0)
 
       // Story 5.2: the premium section carries the other multi-sentence
-      // disclosure plus the subscribe controls; named for the same reason —
+      // disclosure plus the subscribe controls; named for the same reason:
       // the loop must not pass because the section vanished from a locale.
       const premiumDisclosure = await screen.findByTestId('premium-settings-disclosure')
       expect(

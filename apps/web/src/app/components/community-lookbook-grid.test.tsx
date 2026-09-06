@@ -1,21 +1,12 @@
 // Learning path Step 38: Community feed by climate band.
 // Story 6.1 Task 7 owner: the web community surface.
 //
-// These drive the real `lib/community` through MSW rather than a mocked module,
-// the way `palette-advisor-panel.test.tsx` does. That is not a style preference
-// here: every user-visible state on this surface is chosen by
-// `communityFailureReason(error)`, and that reason is decided by reading the
-// server's own message constants out of a `.strict()` error envelope. A mocked
-// lib would let the grid render `community.error.rateLimited` for a 409 and
-// still pass. So each state below is one MSW response away from the real one.
-//
-// Three habits of the file it replaces are asserted against on purpose:
-//   - `getByRole('status')` used to be ambiguous across four live regions, so
-//     the count is asserted, not just the content.
-//   - the old grid rendered `New`, `Following`, `Near me` and `Brands`, chips
-//     with no server behind them; their absence is asserted.
-//   - an image failure used to hide the `<img>` and never recover, so both the
-//     unmount and the recovery are asserted.
+// These drive the real `lib/community` through MSW, the way
+// `palette-advisor-panel.test.tsx` does. Every user-visible state on this surface
+// is chosen by `communityFailureReason(error)`, and that reason is decided by
+// reading the server's own message constants out of a `.strict()` error envelope.
+// A mocked lib would let the grid render `community.error.rateLimited` for a 409
+// and still pass. So each state below is one MSW response away from the real one.
 import axe from 'axe-core'
 import { Blob as NodeBlob } from 'node:buffer'
 import { delay, http, HttpResponse } from 'msw'
@@ -225,7 +216,7 @@ function renderGrid(props: Partial<ComponentProps<typeof CommunityLookbookGrid>>
  * `prepareGarmentImage` decodes the chosen photo and re-encodes it through a
  * real `<canvas>`, neither of which jsdom implements. Stubbed the same way
  * `lib/wardrobe.test.ts` stubs them, so the transport sequence the compose flow
- * actually performs -- prepare, allocate, PUT bytes, publish -- still runs.
+ * performs (prepare, allocate, PUT bytes, publish) still runs.
  */
 function installImagePrepMocks(source = { widthPx: 900, heightPx: 1200 }) {
   class FakeImage {
@@ -523,8 +514,8 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         expect(chip).toHaveAttribute('aria-pressed', mode === 'auto' ? 'true' : 'false')
       }
 
-      // The `auto` chip names the band the server resolved rather than saying
-      // "your climate" and leaving the reader to guess which one that is.
+      // The `auto` chip names the band the server resolved, so the reader never has
+      // to guess which climate is theirs.
       expect(screen.getByTestId('community-filter-auto')).toHaveTextContent(
         'Your climate: Warm and wet'
       )
@@ -987,7 +978,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
      * A duplicate report of the SAME reason is a 200, not a conflict:
      * `community.repository.ts` replays the stored row, and its P2002 race
      * resolves the same way. So the second submission settles exactly like the
-     * first, and there is no `already_reported` state to render -- the client
+     * first, and there is no `already_reported` state to render: the client
      * carried one until the constant behind it turned out to be thrown by
      * nothing. A CHANGED reason is the only 409 a reporter can provoke, and
      * `6.1-WEB-026` covers it.
@@ -1448,7 +1439,6 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       const form = container.querySelector('form')
       expect(form).not.toBeNull()
 
-      // No photo yet.
       fireEvent.submit(form as HTMLFormElement)
       expect(await screen.findByTestId('create-post-error')).toHaveTextContent(
         'Choose a photo to share.'

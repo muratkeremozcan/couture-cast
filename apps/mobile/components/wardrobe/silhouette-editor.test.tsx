@@ -105,7 +105,6 @@ const processingMyForm = {
   imageAccess: null,
 }
 
-/** The full allocate/put/commit chain a My Form upload walks through. */
 function uploadHandlers() {
   return [
     http.post('*/api/v1/wardrobe/silhouette/my-form/upload-url', () =>
@@ -129,7 +128,6 @@ function uploadHandlers() {
   ]
 }
 
-/** Opens the My Form tab and confirms the basewear guidance switch. */
 async function openConfirmedMyFormTab() {
   await waitFor(() => screen.getByTestId('silhouette-height-value'))
   fireEvent.click(screen.getByTestId('silhouette-tab-my-form'))
@@ -305,7 +303,7 @@ describe('SilhouetteEditor', () => {
         '*/api/v1/wardrobe/silhouette/my-form/upload-url',
         async ({ request }) => {
           // The picked asset (1000x1600, set in beforeEach) is already under the
-          // 4096px cap, so no resize is needed -- but the photo must still be
+          // 4096px cap, so no resize is needed, but the photo must still be
           // re-encoded through manipulateAsync so the declared mimeType below
           // is actually true. A prior version skipped re-encoding whenever no
           // resize was needed, silently uploading the original (possibly JPEG)
@@ -457,7 +455,6 @@ describe('SilhouetteEditor', () => {
       )
     })
 
-    // First attempt fails at allocation.
     fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
     await waitFor(() => screen.getByTestId('silhouette-my-form-failed'))
     expect(seenIdempotencyKeys).toHaveLength(1)

@@ -304,6 +304,84 @@ describe.concurrent('community table RLS policies', () => {
   )
 
   scenarioTest(
+    '6.1-DB-009 refuses every client role the engagement table, closing the post-existence oracle',
+    async ({ scenario: seeded }) => {
+      // EngagementEvent was left in the guardian migration's self-only list when
+      // LookbookPost was locked down, and owner-scoped rights on it are not a
+      // small leak. `post_id` is a REQUIRED foreign key to LookbookPost, so the
+      // outcome of an INSERT answers a question the API refuses to: a real post
+      // succeeded, a fabricated one failed with 23503, and the difference
+      // identifies rows the caller is deliberately shown a 404 for.
+      //
+      // Proven live before the fix, and the insert against another user's DRAFT
+      // post did not merely leak its existence -- it SUCCEEDED, attaching
+      // engagement to content the client cannot read.
+      const adminClient = await adminPool.connect()
+      const realPostId = randomUUID()
+      const absentPostId = `absent-${randomUUID()}`
+
+      try {
+        await insertLookbookPost(adminClient, {
+          id: realPostId,
+          userId: seeded.teenId,
+          status: 'draft',
+          caption: 'hidden draft',
+          publishedAt: null,
+        })
+
+        const claims = buildClaims(seeded.otherTeenEmail, 'teen')
+
+        // Every verb is refused, not just reads.
+        for (const statement of [
+          'SELECT "id" FROM public."EngagementEvent" LIMIT 1',
+          'UPDATE public."EngagementEvent" SET "event_type" = \'forged\' WHERE "id" = $1',
+          'DELETE FROM public."EngagementEvent" WHERE "id" = $1',
+        ]) {
+          await withRole('authenticated', claims, async (client) =>
+            expect(
+              client.query(statement, statement.includes('$1') ? [seeded.eventId] : [])
+            ).rejects.toMatchObject({ code: PERMISSION_DENIED })
+          )
+        }
+
+        // THE ORACLE ITSELF. Both inserts must fail the SAME way; a 42501 for one
+        // and a 23503 for the other would still distinguish them.
+        const outcomes: string[] = []
+        for (const postId of [realPostId, absentPostId]) {
+          await withRole('authenticated', claims, async (client) => {
+            try {
+              await client.query(
+                `INSERT INTO public."EngagementEvent" ("id", "user_id", "post_id", "event_type")
+                 VALUES ($1, $2, $3, 'applaud')`,
+                [randomUUID(), seeded.otherTeenId, postId]
+              )
+              outcomes.push('inserted')
+            } catch (error) {
+              outcomes.push((error as { code?: string }).code ?? 'unknown')
+            }
+          })
+        }
+
+        expect(outcomes).toEqual([PERMISSION_DENIED, PERMISSION_DENIED])
+        // Stated separately because indistinguishability is the property, not
+        // merely that both were refused.
+        expect(new Set(outcomes).size).toBe(1)
+
+        await withRole('anon', null, async (client) =>
+          expect(
+            client.query('SELECT "id" FROM public."EngagementEvent" LIMIT 1')
+          ).rejects.toMatchObject({ code: PERMISSION_DENIED })
+        )
+      } finally {
+        await adminClient.query('DELETE FROM public."LookbookPost" WHERE "id" = $1', [
+          realPostId,
+        ])
+        adminClient.release()
+      }
+    }
+  )
+
+  scenarioTest(
     '6.1-DB-008 refuses the anonymous role the whole community surface',
     async ({ scenario: seeded }) => {
       await withRole('anon', null, async (client) =>

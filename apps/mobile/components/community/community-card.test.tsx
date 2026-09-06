@@ -17,8 +17,8 @@ vi.mock('expo-localization', () => ({
 
 /**
  * `accessible` is a NATIVE-only prop. react-native-web's `forwardedProps` table has
- * no entry for it, so it never reaches the DOM and no DOM assertion can observe it --
- * yet without it iOS VoiceOver skips the image entirely and the alt text the author
+ * no entry for it, so it never reaches the DOM and no DOM assertion can observe it.
+ * Without it iOS VoiceOver skips the image entirely and the alt text the author
  * was made to confirm is never announced. The prop is therefore asserted where it is
  * actually handed over. The recorder renders the REAL `Image`, so the expiry effect,
  * the `onError` path and the axe scan below all still run against the real component.
@@ -340,6 +340,19 @@ describe('CommunityCard (Story 6.1)', () => {
     const results = await runAxe(container, {
       runOnly: { type: 'tag', values: AXE_TAGS },
     })
+
+    // THE SCAN IS PROVED TO HAVE TAKEN A READING BEFORE ITS VERDICT IS BELIEVED.
+    //
+    // `violations` is empty both when the markup is clean and when there was no
+    // markup to check, and the two are indistinguishable from the assertion
+    // below. A changed testID, a prop guard returning null, or a render helper
+    // that quietly stops mounting would all turn this into a green tick over an
+    // empty container. `passes` counts rule/node pairs axe actually evaluated,
+    // so a non-zero count is the instrument reporting that it read something.
+    // Same anchor on 6.1-MOB-046 and 6.1-MOB-050; the two modal scans in this
+    // directory already have one, because they wait on `role="dialog"` first.
+    expect(results.passes.length, 'axe scanned an empty tree').toBeGreaterThan(0)
+
     expect(
       results.violations.map((violation) => violation.id),
       JSON.stringify(results.violations, null, 2)

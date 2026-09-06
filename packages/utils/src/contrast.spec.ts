@@ -1,7 +1,7 @@
 // Learning path Step 35: Premium theme switcher.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
 /**
- * Story 5.3 AC 2: the premium palettes' contrast is proven, not eyeballed.
+ * Story 5.3 AC 2: the premium palettes' contrast is measured here.
  *
  * The six fixtures below are the Decision 2 table, pinned as regression fixtures so a
  * designer nudging a hex value fails here rather than shipping an illegible pairing.

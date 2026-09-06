@@ -19,6 +19,7 @@ import type {
   CommunityFeedResponse,
   CommunityPostResponse,
   CreateCommunityChallengeInput,
+  OpenCommunityPostInput,
   PublishCommunityPostInput,
   PublishCommunityPostResponse,
   ReportCommunityPostInput,
@@ -51,6 +52,12 @@ export interface ApiV1CommunityPostsAllocatePostRequest {
 export interface ApiV1CommunityPostsPostIdGetRequest {
   postId: string
   xCouturePlatform: ApiV1CommunityPostsPostIdGetXCouturePlatformEnum
+}
+
+export interface ApiV1CommunityPostsPostIdOpenedPostRequest {
+  postId: string
+  xCouturePlatform: ApiV1CommunityPostsPostIdOpenedPostXCouturePlatformEnum
+  openCommunityPostInput: OpenCommunityPostInput
 }
 
 export interface ApiV1CommunityPostsPostIdReportPostRequest {
@@ -480,6 +487,99 @@ export class CommunityApi extends runtime.BaseAPI {
   }
 
   /**
+   * Creates request options for apiV1CommunityPostsPostIdOpenedPost without sending the request
+   */
+  async apiV1CommunityPostsPostIdOpenedPostRequestOpts(
+    requestParameters: ApiV1CommunityPostsPostIdOpenedPostRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['postId'] == null) {
+      throw new runtime.RequiredError(
+        'postId',
+        'Required parameter "postId" was null or undefined when calling apiV1CommunityPostsPostIdOpenedPost().'
+      )
+    }
+
+    if (requestParameters['xCouturePlatform'] == null) {
+      throw new runtime.RequiredError(
+        'xCouturePlatform',
+        'Required parameter "xCouturePlatform" was null or undefined when calling apiV1CommunityPostsPostIdOpenedPost().'
+      )
+    }
+
+    if (requestParameters['openCommunityPostInput'] == null) {
+      throw new runtime.RequiredError(
+        'openCommunityPostInput',
+        'Required parameter "openCommunityPostInput" was null or undefined when calling apiV1CommunityPostsPostIdOpenedPost().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['xCouturePlatform'] != null) {
+      headerParameters['x-couture-platform'] = String(
+        requestParameters['xCouturePlatform']
+      )
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/community/posts/{postId}/opened`
+    urlPath = urlPath.replace(
+      `{${'postId'}}`,
+      encodeURIComponent(String(requestParameters['postId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['openCommunityPostInput'],
+    }
+  }
+
+  /**
+   * Records one card-open. The server decides whether the opener is the author, because a client-asserted is-self flag would let the beta gate be moved by the population it measures. Repeats within the deduplication window collapse to one event.
+   * Record that a viewer opened a community post
+   */
+  async apiV1CommunityPostsPostIdOpenedPostRaw(
+    requestParameters: ApiV1CommunityPostsPostIdOpenedPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<TrackedResponse>> {
+    const requestOptions =
+      await this.apiV1CommunityPostsPostIdOpenedPostRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Records one card-open. The server decides whether the opener is the author, because a client-asserted is-self flag would let the beta gate be moved by the population it measures. Repeats within the deduplication window collapse to one event.
+   * Record that a viewer opened a community post
+   */
+  async apiV1CommunityPostsPostIdOpenedPost(
+    requestParameters: ApiV1CommunityPostsPostIdOpenedPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<TrackedResponse> {
+    const response = await this.apiV1CommunityPostsPostIdOpenedPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
    * Creates request options for apiV1CommunityPostsPostIdReportPost without sending the request
    */
   async apiV1CommunityPostsPostIdReportPostRequestOpts(
@@ -791,6 +891,15 @@ export const ApiV1CommunityPostsPostIdGetXCouturePlatformEnum = {
 } as const
 export type ApiV1CommunityPostsPostIdGetXCouturePlatformEnum =
   (typeof ApiV1CommunityPostsPostIdGetXCouturePlatformEnum)[keyof typeof ApiV1CommunityPostsPostIdGetXCouturePlatformEnum]
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdOpenedPostXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type ApiV1CommunityPostsPostIdOpenedPostXCouturePlatformEnum =
+  (typeof ApiV1CommunityPostsPostIdOpenedPostXCouturePlatformEnum)[keyof typeof ApiV1CommunityPostsPostIdOpenedPostXCouturePlatformEnum]
 /**
  * @export
  */

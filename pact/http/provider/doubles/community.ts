@@ -13,6 +13,9 @@ import {
   COMMUNITY_SELF_REPORT_MESSAGE,
   COMMUNITY_UPLOAD_SESSION_MISMATCH_MESSAGE,
   encodeCommunityFeedCursor,
+  safeDecodeCommunityFeedCursor,
+  type ClimateBand,
+  type CommunityFeedMode,
   type AllocateCommunityPostInput,
   type AllocateCommunityPostSession,
   type CommunityFeed,
@@ -29,13 +32,12 @@ import { getProviderCommunityState } from '../state'
 /**
  * Provider double for the community surface (Story 6.1).
  *
- * Shape follows `doubles/planner.ts`: one scenario-driven double for the whole
- * service rather than for the weather, storage, moderation-queue and guardian
- * collaborators it composes, with the real guards left un-mocked so their
+ * Shape follows `doubles/planner.ts`. The double sits at the whole service, so
+ * the weather, storage, moderation-queue and guardian collaborators it composes
+ * are covered by one seam, and the real guards stay un-mocked so their
  * rejections are the real ones. `RolesGuard` on the two challenge routes is the
- * case that matters here -- it is why `doubles/identity.ts` resolves a third,
- * admin token, instead of this double hand-writing a 403 that would prove
- * nothing about the guard.
+ * case that matters here. It is why `doubles/identity.ts` resolves a third,
+ * admin token; a hand-written 403 would prove nothing about the guard.
  *
  * TWO OUTCOMES ARE NOT MODELLED HERE ON PURPOSE. An unknown feed `mode` and an
  * invalid challenge window are both rejected by Zod inside
@@ -43,11 +45,11 @@ import { getProviderCommunityState } from '../state'
  * would imply a service code path that does not exist.
  *
  * THE ALLOCATE REPLAY AND THE ALLOCATE MISMATCH SHARE ONE SCENARIO. They share
- * one world state -- a session already recorded against the key -- and differ
- * only in the payload presented against it, so the double compares the incoming
- * `sha256` with the recorded one rather than being told the answer by two
- * different provider states. Deciding it from the payload is what makes this a
- * test of idempotency rather than a test of the state handler.
+ * one world state, a session already recorded against the key, and differ only
+ * in the payload presented against it. The double therefore compares the
+ * incoming `sha256` with the recorded one. Deciding it from the payload is what
+ * makes this a test of idempotency; two provider states would only test the
+ * state handler.
  *
  * Every identifier, date and message below is mirrored in
  * `pact/http/consumer/interactions/community.ts`. Both sides must agree or the
@@ -70,7 +72,7 @@ const IMAGE_URL =
   'https://storage.couturecast.test/community/posts/6100/published-0001.jpg'
 const UPLOAD_URL = 'https://storage.couturecast.test/community/uploads/6100/session-0001'
 
-const VIEWER_BAND = 'temperate_dry'
+const VIEWER_BAND = 'temperate_dry' as const
 const LOCALE = 'en-US'
 
 /**
@@ -102,6 +104,7 @@ const AUTO_MODE_CURSOR = encodeCommunityFeedCursor({
   publishedAt: PUBLISHED_AT,
   id: PUBLISHED_POST_ID,
   mode: 'auto',
+  band: VIEWER_BAND,
 })
 
 function buildPublishedItem(): CommunityFeedItem {
@@ -156,9 +159,9 @@ function buildResolvedFeed(): CommunityFeed {
 }
 
 /**
- * Too few usable weather days to classify a band. The feed still carries
- * content -- an unresolved band degrades the filter, it does not empty the
- * page -- and states its reason so the client can explain itself.
+ * Too few usable weather days to classify a band. An unresolved band degrades
+ * the filter and the page still carries content, with the reason stated so the
+ * client can explain itself.
  */
 function buildBandUnresolvedFeed(): CommunityFeed {
   return {
@@ -232,9 +235,9 @@ function buildUploadSession(): AllocateCommunityPostSession {
 }
 
 /**
- * The post as it comes back from `publishPost`: handed to moderation, not made
- * live. `status` is `pending_review` and `publishedAt` is still null, because
- * nothing has screened it yet.
+ * The post as it comes back from `publishPost`, handed to moderation. `status`
+ * is `pending_review` and `publishedAt` is still null, because nothing has
+ * screened it yet.
  */
 function buildPendingReviewItem(): CommunityFeedItem {
   return {
@@ -252,13 +255,13 @@ function buildPendingReviewItem(): CommunityFeedItem {
 }
 
 /**
- * `CommunityService.createChallenge` returns a `CommunityChallengeProjection`
- * -- already mapped out of the Prisma row by `mapChallenge` -- and the
- * controller hands it straight to `communityChallengeResponseSchema.parse`.
- * So this answers in the CONTRACT shape: camelCase keys and ISO strings, not
- * `climate_band` and `Date`. A snake_case row here fails that strict parse with
- * seven "Required" issues plus an "Unrecognized key(s)" issue and surfaces as a
- * 500, which is exactly what it did before this was corrected.
+ * `CommunityService.createChallenge` returns a `CommunityChallengeProjection`,
+ * already mapped out of the Prisma row by `mapChallenge`, and the controller
+ * hands it straight to `communityChallengeResponseSchema.parse`. So this answers
+ * in the CONTRACT shape: camelCase keys and ISO strings. A snake_case row here
+ * fails that strict parse with seven "Required" issues plus an "Unrecognized
+ * key(s)" issue and surfaces as a 500, which is what it did before this was
+ * corrected.
  */
 function buildChallengeProjection() {
   return {
@@ -275,21 +278,62 @@ function buildChallengeProjection() {
   }
 }
 
+/**
+ * The band `parseCursor` compares a cursor against, mirroring
+ * `resolveFilterBand`: `all` filters on no band, `auto` resolves to the viewer's,
+ * and a band literal is its own filter. The double's viewer band is
+ * `VIEWER_BAND`, matching `buildResolvedFeed`.
+ */
+function expectedBandFor(mode: CommunityFeedMode): ClimateBand | null {
+  if (mode === 'all') return null
+  if (mode === 'auto') return VIEWER_BAND
+  return mode
+}
+
 export function createCommunityDoubles() {
   const scenarioOf = () => getProviderCommunityState()?.scenario ?? 'feed-resolved'
 
   const mockCommunityService = {
-    getFeed: (): Promise<CommunityFeed> => {
+    /*
+     * THE CURSOR DECISION IS MADE BY THE REAL CODEC, not by the scenario.
+     *
+     * This used to be a zero-argument function that rejected unconditionally
+     * whenever the state said `feed-cursor-invalid`, and that one state backs all
+     * three rows of `communityFeedRejections`. The consequence was that deleting
+     * the mode and band comparisons out of `safeDecodeCommunityFeedCursor` left
+     * both cursor interactions green: the double was rejecting because it had
+     * been told to, so the provider tier was two fixtures agreeing with each
+     * other about a property the consumer docblock nominates as observable only
+     * on the wire.
+     *
+     * Now the cursor is decoded with the contract's own function, using the mode
+     * the request actually carried, exactly as `parseCursor` does in the real
+     * service. A well-formed cursor for this mode is accepted and the feed comes
+     * back; a malformed one and one minted under another mode are rejected by the
+     * codec rather than by the fixture. `allocatePost` below already decided from
+     * its payload for the same reason.
+     */
+    getFeed: (params: {
+      mode?: CommunityFeedMode
+      cursor?: string
+    }): Promise<CommunityFeed> => {
+      const mode = params.mode ?? 'auto'
+      if (params.cursor) {
+        const decoded = safeDecodeCommunityFeedCursor(
+          params.cursor,
+          mode,
+          expectedBandFor(mode)
+        )
+        if (!decoded.success) {
+          return Promise.reject(new BadRequestException(decoded.error))
+        }
+      }
+
       switch (scenarioOf()) {
         case 'feed-band-unresolved':
           return Promise.resolve(buildBandUnresolvedFeed())
         case 'feed-removed-content':
           return Promise.resolve(buildRemovedContentFeed())
-        case 'feed-cursor-invalid':
-          // Both cursor rejections land here and both carry the same message:
-          // a client that changed filters must not be able to tell a corrupt
-          // cursor from one minted under another mode.
-          return Promise.reject(new BadRequestException(COMMUNITY_CURSOR_INVALID_MESSAGE))
         default:
           return Promise.resolve(buildResolvedFeed())
       }
@@ -305,7 +349,7 @@ export function createCommunityDoubles() {
     /*
      * No rate-limit branch, matching the real service: the daily cap lives in
      * `publishPost` because allocation produces drafts and a draft is free. A
-     * 429 modelled here would have been a fiction the contract then pinned.
+     * 429 modelled here would be a fiction the contract then pinned.
      */
     allocatePost: (params: {
       input: AllocateCommunityPostInput
@@ -364,8 +408,8 @@ export function createCommunityDoubles() {
 
     createChallenge: () => {
       if (scenarioOf() === 'challenge-overlap') {
-        // The overlap check has to consider global (null-band) rows too, which
-        // is a service property; what this records is the envelope it produces.
+        // The overlap check has to consider global (null-band) rows too. That
+        // is a service property; this records the envelope it produces.
         return Promise.reject(new ConflictException(COMMUNITY_CHALLENGE_OVERLAP_MESSAGE))
       }
       return Promise.resolve(buildChallengeProjection())

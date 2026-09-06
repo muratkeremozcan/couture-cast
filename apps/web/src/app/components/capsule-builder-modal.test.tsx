@@ -71,7 +71,6 @@ describe('CapsuleBuilderModal', () => {
     expect(screen.getByTestId('capsule-name-input')).toBeInTheDocument()
   })
 
-  /** Nothing is pre-selected; the user chooses their own garments. */
   it('4.3-WEB-MODAL-02 starts with no garments selected', () => {
     renderModal()
     expect(screen.getByTestId('capsule-selection-count')).toHaveTextContent(

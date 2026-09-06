@@ -4,7 +4,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
 // Learning path Step 28: Accessibility hardening.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
-// Story 3.5 Task 6 step 3 owner: integration-test Lookbook Prism responsive layout, comparison mode, and focus rings in apps/web/src/app/components/lookbook-prism-layout.test.tsx
+// Story 3.5 Task 6 step 3 owner: Lookbook Prism responsive layout, comparison mode, and focus rings.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
@@ -13,7 +13,6 @@ import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 
-// Mock posthog-js
 vi.mock('posthog-js', () => ({
   default: {
     capture: vi.fn(),
@@ -175,11 +174,9 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   })
 
   /**
-   * Story 6.1: the community column is API-backed now, so this needs a session
-   * and a feed fixture to have a card to place in the reading order at all. It
-   * used to read `New` off the chip strip and "Milan Autumn Wool Trench" off
-   * `MOCK_LOOKBOOK_ITEMS`; both are gone, because a chip with no server behind
-   * it is what the spec's Boundaries forbid.
+   * The old form read `New` off the chip strip and "Milan Autumn Wool Trench" off
+   * `MOCK_LOOKBOOK_ITEMS`; both are gone, because the spec's Boundaries forbid a
+   * chip with no server behind it.
    */
   it('3.5-INT-005: Keeps semantic reading order and excludes static cards from Tab', async () => {
     signIn()
@@ -211,9 +208,8 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   /**
    * Story 5.5 Decision 7: the rail defaults closed and opens only from the
    * "Plan week" control, so every planner test opens it first. Signed out,
-   * `PlannerRail` renders `locked` with no network request at all
-   * (`hasWebSession()` short-circuits before `getPlannerFromWeb`), so this
-   * needs no MSW handler.
+   * `PlannerRail` renders `locked` with no network request (`hasWebSession()`
+   * short-circuits before `getPlannerFromWeb`), so this needs no MSW handler.
    */
   it('restores the planner after it is closed', () => {
     render(<LookbookPrismLayout />)
@@ -235,11 +231,10 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   })
 
   /**
-   * At >=1440px the rail renders through `DesktopPlannerRailSlot` (the
-   * inline third-column form), not `PlannerOverlaySlot` -- a distinct code
-   * path (and a distinct `onClose` closure) from every other test in this
-   * file, which run at jsdom's default 1024px width and so always exercise
-   * the overlay.
+   * At >=1440px the rail renders through `DesktopPlannerRailSlot`, the inline
+   * third-column form. That is a distinct code path, with its own `onClose`
+   * closure, from every other test in this file: they run at jsdom's default
+   * 1024px width and so always exercise `PlannerOverlaySlot`.
    */
   it('opens and closes through the desktop rail slot at 1440px and wider', () => {
     const originalInnerWidth = window.innerWidth
@@ -272,10 +267,10 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   })
 
   /**
-   * Story 5.2 Decision 2, extended by 5.5 Decision 7: the rail is the
-   * story's one real premium gate. With no session there is no entitlement
-   * request at all — the locked upsell is the default, which is also what
-   * the signed-out accessibility run sees.
+   * Story 5.2 Decision 2, extended by 5.5 Decision 7: the rail is the story's one
+   * real premium gate. With no session there is no entitlement request, so the
+   * locked upsell is the default, which is also what the signed-out accessibility
+   * run sees.
    */
   it('5.2-WEB-RAIL-01 renders the locked upsell signed out, with no request', () => {
     render(<LookbookPrismLayout />)
@@ -304,7 +299,6 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
     expect(screen.queryByTestId('planner-rail-locked')).not.toBeInTheDocument()
   })
 
-  /** A non-entitled caller must not unlock the rail. */
   it('5.2-WEB-RAIL-03 keeps the locked upsell for a non-entitled caller', async () => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
     const requested = vi.fn()
@@ -326,11 +320,11 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   })
 
   /**
-   * Story 6.1: the chip category no longer selects a feed filter -- all three
-   * land on `auto` -- so what it still synchronizes is the hero copy and the
-   * grid's `data-chip-category`. The old assertion that "Parisian Silk &
-   * Cashmere Blend" appeared TWICE was reading the hero title and a
-   * `MOCK_LOOKBOOK_ITEMS` card that no longer exists.
+   * Story 6.1: the chip category no longer selects a feed filter; all three land
+   * on `auto`. What it still synchronizes is the hero copy and the grid's
+   * `data-chip-category`. The old assertion that "Parisian Silk & Cashmere Blend"
+   * appeared TWICE was reading the hero title and a `MOCK_LOOKBOOK_ITEMS` card
+   * that no longer exists.
    */
   it('synchronizes chip selection across hero and community content', () => {
     render(<LookbookPrismLayout />)
@@ -358,10 +352,9 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   /**
    * The hero card is hardcoded story 3.5 design copy, and the `Sponsored` chip's
    * entry used to read "Sponsored Selection" over "A clearly labeled brand
-   * selection" — a paid-placement disclosure over content with no partner
-   * behind it. Story 5.1 owns the real vocabulary for that ("Paid partnership",
-   * "Presented by {{partner}}"), and it renders only beside an offer that
-   * exists.
+   * selection": a paid-placement disclosure over content with no partner behind
+   * it. Story 5.1 owns the real vocabulary for that ("Paid partnership",
+   * "Presented by {{partner}}"), and it renders only beside an offer that exists.
    *
    * This asserts the negative because that is the failure mode: nothing about
    * the page looks wrong when placeholder copy claims a sponsorship, so only a

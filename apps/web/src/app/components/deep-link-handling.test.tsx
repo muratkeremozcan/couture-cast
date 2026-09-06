@@ -18,7 +18,7 @@ function signIn() {
 
 /**
  * Story 6.1: a community deep link now resolves against the server. Its target
- * has to exist on both sides -- `GET /api/v1/community/posts/{postId}`, which
+ * has to exist on both sides: `GET /api/v1/community/posts/{postId}`, which
  * the default handler answers for `mockCommunityFeedItem.id` and 404s for every
  * other id, and the feed the grid renders the highlighted card from. The
  * default feed is empty, so a test that wants a card serves one.

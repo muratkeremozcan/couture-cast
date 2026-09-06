@@ -13273,6 +13273,22 @@
         ],
         "additionalProperties": false
       },
+      "OpenCommunityPostInput": {
+        "type": "object",
+        "properties": {
+          "experimentVariant": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "all"
+            ]
+          }
+        },
+        "required": [
+          "experimentVariant"
+        ],
+        "additionalProperties": false
+      },
       "UpdateCommunityChallengeInput": {
         "type": "object",
         "properties": {
@@ -19121,6 +19137,106 @@
           },
           "503": {
             "description": "Community write rollout is disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/posts/{postId}/opened": {
+      "post": {
+        "tags": [
+          "community"
+        ],
+        "summary": "Record that a viewer opened a community post",
+        "description": "Records one card-open. The server decides whether the opener is the author, because a client-asserted is-self flag would let the beta gate be moved by the population it measures. Repeats within the deduplication window collapse to one event.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID of the post that was opened."
+          },
+          {
+            "name": "x-couture-platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ]
+            },
+            "description": "Platform making the request."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenCommunityPostInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Card open recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Post not found or not visible to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Community read rollout is disabled.",
             "content": {
               "application/json": {
                 "schema": {

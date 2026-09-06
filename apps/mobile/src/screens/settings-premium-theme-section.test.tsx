@@ -4,7 +4,7 @@
 // and the mobile half of AC 4, 6 and 7. The network boundary stays REAL here and is
 // driven through MSW: the section's whole job is turning HTTP outcomes into rendered
 // states, so stubbing the lib would leave the interesting half unproven. Only the
-// unrelated parts of the settings screen are mocked — analytics, the health probe, and
+// unrelated parts of the settings screen are mocked: analytics, the health probe, and
 // the 5.2 premium/RevenueCat section, whose own suite owns it.
 //
 // `AppThemeProvider` wraps the screen deliberately rather than being mocked. It holds the
@@ -75,7 +75,7 @@ vi.mock('@/src/lib/api-health', () => ({
   loadMobileApiHealth: loadMobileApiHealthMock,
 }))
 
-// The 5.2 section is mocked at its own boundary — `settings-premium-section.test.tsx`
+// The 5.2 section is mocked at its own boundary; `settings-premium-section.test.tsx`
 // owns it. A static factory, because browser-mode module mocking cannot resolve
 // importOriginal factories; the two pure exports get their real implementations wired in
 // `beforeAll` so the neighbouring section still renders from the actual logic.
@@ -209,8 +209,8 @@ describe('SettingsScreen interface palettes section', () => {
 
     /**
      * AC 4. The preview is the one element that pins no palette of its own, so its
-     * background is the applied palette and nothing else. Asserting on it — rather than
-     * on the "Selected" label alone — is what proves the choice reached `useAppTheme()`
+     * background is the applied palette and nothing else. Asserting on it, rather than
+     * on the "Selected" label alone, is what proves the choice reached `useAppTheme()`
      * and would re-color the rest of the app, not just this card.
      */
     it('5.3-MOB-010 re-colors the live preview from the context the moment a save lands', async () => {
@@ -281,8 +281,8 @@ describe('SettingsScreen interface palettes section', () => {
     })
 
     /**
-     * A signed-out reader has no subscribe controls above them — the 5.2 section renders
-     * its own signed-out state — so pointing at "the controls above" would name a control
+     * A signed-out reader has no subscribe controls above them; the 5.2 section renders
+     * its own signed-out state, so pointing at "the controls above" would name a control
      * that is not on the screen. The signed-out copy names the sign-in step first.
      */
     it('names the sign-in step first when there is no session', async () => {
@@ -300,13 +300,11 @@ describe('SettingsScreen interface palettes section', () => {
    * `Intl.ListFormat` is optional under ECMA-402 and Hermes ships without it, so a raw
    * `new Intl.ListFormat(...)` in this section threw on device, took `SettingsScreen`
    * and the whole tab layout down with it, and reached CI only as a Maestro failure
-   * reading "Element not found: Id matching regex: tab-settings" — a message naming
-   * nothing about the actual cause.
-   *
-   * This suite runs in Chromium, which does ship `Intl.ListFormat`, which is exactly
-   * why the crash passed component tests and had to be found on an emulator. The
-   * device runtime therefore has to be simulated for the regression to be reachable
-   * at this level at all.
+   * reading "Element not found: Id matching regex: tab-settings", a message naming
+   * nothing about the actual cause. This suite runs in Chromium, which does ship
+   * `Intl.ListFormat`, which is why the crash passed component tests and had to be
+   * found on an emulator. The device runtime therefore has to be simulated for the
+   * regression to be reachable at this level at all.
    */
   describe('runtimes that ship no Intl.ListFormat', () => {
     const withoutListFormat = async (assertions: () => Promise<void>) => {
@@ -351,7 +349,7 @@ describe('SettingsScreen interface palettes section', () => {
      * The kill switch is reachable by an entitled subscriber, and it disables every card.
      * Every other disabled control in this app carries a reason next to it, so the note
      * is that reason and the cards point at it through `aria-describedby` and
-     * `accessibilityHint` — a card is never disabled without a stated cause.
+     * `accessibilityHint`. A card is never disabled without a stated cause.
      */
     it('disables the cards and states the reason when the kill switch is off', async () => {
       serveTheme(themeResponse({ themesEnabled: false }))
@@ -402,7 +400,7 @@ describe('SettingsScreen interface palettes section', () => {
 
     it('5.3-MOB-011 renders Default for a stored palette this build cannot render', async () => {
       // A real Postgres enum makes this unreachable from the database today, so the
-      // stubbed response is what actually exercises the client-side fallback — the same
+      // stubbed response is what actually exercises the client-side fallback; the same
       // reasoning the web Playwright spec records for its own stale-key test.
       serveTheme(themeResponse({ theme: 'spring_bloom' }))
       await renderSettings()
@@ -417,7 +415,7 @@ describe('SettingsScreen interface palettes section', () => {
   })
 
   /**
-   * AC 7: what a palette is, where the choice is stored, and what it does not change —
+   * AC 7: what a palette is, where the choice is stored, and what it does not change,
    * in reading order before the gallery, never a tooltip and never only an accessible
    * name.
    */

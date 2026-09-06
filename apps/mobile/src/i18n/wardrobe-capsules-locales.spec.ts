@@ -94,7 +94,7 @@ describe('4.3 mobile wardrobe capsule locale parity', () => {
   //
   // `garmentsRange` is rendered by web and not by mobile. The mobile modal
   // already surfaces the same sentence through `errors.garmentCount`, so
-  // rendering both put the identical string on screen twice -- caught by
+  // rendering both put the identical string on screen twice, caught by
   // 4.3-MOB-MODAL-04 and -15, which then matched two elements. The key stays in
   // the mobile catalogs because 4.3-I18N-MOB-06 requires one key tree across
   // both surfaces.

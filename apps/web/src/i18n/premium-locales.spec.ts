@@ -5,14 +5,14 @@
 // Story 5.2 Task 7 owner: ten-locale parity for the `commerce.premium.*` tree.
 //
 // The premium namespace lives under `commerce.premium` (Decision 12a), but its
-// parity harness is this file, not `commerce-locales.spec.ts` — that spec pins
-// the 5.1 key set exactly and excludes this subtree. The key list below is the
+// parity harness is this file: `commerce-locales.spec.ts` pins the 5.1 key set
+// exactly and excludes this subtree. The key list below is the
 // Decision 12a enumeration: the shared surface keys plus the three web-only
 // keys (`signedOutHint`, `plannerLocked.title`, `plannerLocked.cta`). The
 // mobile-only `unavailableInBuild` key deliberately has no web entry.
 //
 // All non-English values are machine-translation drafts pending human review
-// before release (AC 7 / PRD NFR Localization 1) — the parity checks hold the
+// before release (AC 7 / PRD NFR Localization 1). The parity checks hold the
 // tree together until that review lands.
 import { describe, expect, it } from 'vitest'
 import { SUPPORTED_LOCALES, type SupportedLocale } from './index'

@@ -91,8 +91,8 @@ describe('capsule name normalization', () => {
 
 // `Intl.Segmenter` is optional under ECMA-402 and Hermes ships without it. This
 // module used to construct one at module scope, so merely *importing* it threw
-// under React Native and took the mobile app down at launch — every Maestro
-// flow failed on `launchApp` from 2026-08-08 until the segmenter was made lazy.
+// under React Native and took the mobile app down at launch: every Maestro flow
+// failed on `launchApp` from 2026-08-08 until the segmenter was made lazy.
 // The API is the only caller of these validators and runs on Node, so exact
 // grapheme semantics are unaffected there; these tests pin the degraded path.
 describe('runtimes that ship no Intl.Segmenter', () => {

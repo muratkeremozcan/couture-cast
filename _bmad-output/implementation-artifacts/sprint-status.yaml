@@ -96,7 +96,7 @@ development_status:
 
   # Epic 6: Community & Moderation Loop (Phase 2)
   epic-6: in-progress
-  6-1-community-feed-by-climate-band: review
+  6-1-community-feed-by-climate-band: done
   6-2-reactions-and-comments: backlog
   6-3-locale-highlight-modules: backlog
   6-4-social-export-workflows: backlog

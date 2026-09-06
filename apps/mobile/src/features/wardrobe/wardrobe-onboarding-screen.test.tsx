@@ -67,7 +67,7 @@ vi.mock('@/src/lib/native-utils', async (importOriginal) => {
     // Unlike WardrobeHubScreen (which takes an injectable `pollOffsetsMs`
     // prop), WardrobeOnboardingScreen's garment poll has no override, so
     // 4.4-MOB-ONB-14 would otherwise pay the real production 1s/2s/4s/8s
-    // schedule -- the same class of real-wall-clock wait already fixed once
+    // schedule, the same class of real-wall-clock wait already fixed once
     // for silhouette-editor.test.tsx's 4.4-MOB-SIL-07 via an injectable prop.
     // Delegating to the real implementation with a near-zero delay keeps the
     // abort-signal contract faithful while making the test fast.
@@ -86,7 +86,7 @@ import { WardrobeOnboardingScreen } from './wardrobe-onboarding-screen'
 /**
  * Base64url-shaped JWT payload so `resolveOwnerUserId` can decode a userId.
  * Built at runtime (not a literal) so it doesn't look like a credential to
- * secret scanners -- a hardcoded JWT-shaped string here previously tripped
+ * secret scanners; a hardcoded JWT-shaped string here previously tripped
  * gitleaks' generic-api-key rule in CI.
  */
 function fakeAccessToken(userId: string): string {
@@ -377,7 +377,7 @@ describe('WardrobeOnboardingScreen', () => {
       expect(liveRegion?.textContent).toBe('Picking up where you left off')
     })
     // AC1 requires resuming "at the same step with the same checklist
-    // state" -- the announcement alone doesn't prove the checklist itself
+    // state"; the announcement alone doesn't prove the checklist itself
     // came back; a regression that dropped listGarmentsFromMobile on resume
     // would still pass on the announcement check alone.
     await waitFor(() => {
@@ -412,7 +412,7 @@ describe('WardrobeOnboardingScreen', () => {
       'aria-disabled',
       'true'
     )
-    // 'processing' is also not tappable -- there's no suggestion data to
+    // 'processing' is also not tappable: there's no suggestion data to
     // tag yet, unlike 'awaiting_tags'.
     expect(
       screen.queryByTestId(`onboarding-tag-${readyGarment.id}`)
@@ -422,7 +422,7 @@ describe('WardrobeOnboardingScreen', () => {
   it('4.4-MOB-ONB-09 surfaces a guardian-consent block for a teen actor', async () => {
     // Simulates the *outcome* a real guardian-consent-revoked teen actor
     // triggers (the API's 403 GUARDIAN_CONSENT_REQUIRED response) rather than
-    // constructing a teen/guardian persona -- that decision lives server-side
+    // constructing a teen/guardian persona; that decision lives server-side
     // (Task 3/4), out of this component test's scope.
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
@@ -524,8 +524,8 @@ describe('WardrobeOnboardingScreen', () => {
     })
 
     // Retry must first pick up the revision the other device already
-    // advanced to (a GET refresh), then resubmit with a live If-Match --
-    // not blindly repeat the same stale header.
+    // advanced to (a GET refresh), then resubmit with a live If-Match. Repeating
+    // the same stale header fails again.
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({ data: { ...inProgressState, revision: 5 } })
@@ -548,8 +548,8 @@ describe('WardrobeOnboardingScreen', () => {
 
   it('4.4-MOB-ONB-13 tags a garment from the checklist and unblocks Continue', async () => {
     // The checklist is the only place in onboarding where tagging can be
-    // started, and Continue stays blocked until every garment is ready --
-    // so the tagging round trip has to update the checklist in place.
+    // started, and Continue stays blocked until every garment is ready, so the
+    // tagging round trip has to update the checklist in place.
     let garmentListReads = 0
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>

@@ -1,13 +1,10 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Story 4.4 Task 5 owner: unit-test the web wardrobe onboarding guided flow.
-// Split from a single 1086-line file (Claude's TEA test review on PR #120,
-// story 4.4 tasks 8/9) along its 3 pre-existing describe blocks -- this file
-// keeps the primary happy-path describe block; the bootstrap/step-advance
-// failure paths and the remaining guided-flow paths moved to
-// `page.bootstrap-failures.test.tsx` and `page.remaining-paths.test.tsx`.
-// Verbatim test bodies, no behavior change -- only the file boundary moved,
-// and each file's preamble is trimmed to what that file's tests actually use.
+// This file keeps the primary happy-path describe block. The bootstrap and
+// step-advance failure paths live in `page.bootstrap-failures.test.tsx`, the
+// remaining guided-flow paths in `page.remaining-paths.test.tsx`; the three were
+// one file until it passed this repo's 1000-line test-file ceiling.
 // @vitest-environment jsdom
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -226,11 +223,6 @@ const committedGarment2: GarmentItemContract = {
 // at once, so this label is a regex literal instead of a string literal.
 const CONFIRM_CHECKBOX_LABEL = /I'm wearing plain white or black clothing/
 
-/**
- * Opens the capture modal, uploads a file, and confirms the crop. Shared by
- * every test that needs a committed garment (3+ uses), per the project's
- * fixture-extraction convention.
- */
 async function captureAndCommitGarment(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: 'Add another garment' }))
   await user.upload(
@@ -615,7 +607,7 @@ describe('WardrobeOnboardingPage', () => {
 
     // `fireEvent.change`, not `userEvent`, is deliberate here: jsdom does not
     // implement a real browser's native arrow-key stepping behavior for
-    // `<input type="range">` (confirmed directly -- `user.click` +
+    // `<input type="range">` (confirmed directly: `user.click` +
     // `user.keyboard('{ArrowRight}')` never changes the value in this
     // environment), and `userEvent` has no supported drag-to-value gesture
     // for range inputs either. `fireEvent.change` is this testing stack's

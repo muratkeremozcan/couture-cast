@@ -20,11 +20,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
  * "the app did not start", which reads like a harness problem rather than an
  * import-time throw in a shared package.
  *
- * So the runtime difference is simulated here instead: delete the optional APIs
- * a Hermes-class runtime lacks, reset the module registry so module-scope code
+ * So the runtime difference is simulated here: delete the optional APIs a
+ * Hermes-class runtime lacks, reset the module registry so module-scope code
  * genuinely re-runs, and import every module in the package fresh. A lazy,
- * feature-detected use behind a function boundary still passes -- which is the
- * shape the wardrobe fix adopted, and the shape this guard is asking for.
+ * feature-detected use behind a function boundary still passes. That is the
+ * shape the wardrobe fix adopted and the shape this guard asks for.
  */
 
 /**

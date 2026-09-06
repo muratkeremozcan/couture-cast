@@ -15,10 +15,8 @@ import {
 
 // Story 0.9 Task 2 step 6 owner:
 // prove here that the generated document is valid OpenAPI and contains the initial migrated slice.
-//
-// Why this step matters:
-// SDK generation should depend on a validated contract, not on hope. This test is the quality gate
-// that catches broken registration or invalid schema output before the spec is reused elsewhere.
+// SDK generation reads this document, so broken registration or invalid schema
+// output has to fail here, before the spec is reused elsewhere.
 test('writes a valid HTTP OpenAPI document for the initial contract slice', async () => {
   const outputDir = mkdtempSync(join(tmpdir(), 'couture-http-openapi-'))
 

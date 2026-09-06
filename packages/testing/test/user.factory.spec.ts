@@ -16,10 +16,8 @@ type UserCreateArgs = {
   include: Record<string, unknown>
 }
 
-/**
- * Only `user.create` is exercised by the persistence path, so the stub models
- * that one delegate and is cast to the client type the factory expects.
- */
+// The persistence path only reaches `user.create`, so the stub models that one
+// delegate.
 function createPrismaStub(row: { id: string }) {
   const create = vi.fn<(args: UserCreateArgs) => Promise<{ id: string }>>()
   create.mockResolvedValue(row)

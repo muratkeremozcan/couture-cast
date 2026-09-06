@@ -268,20 +268,21 @@ describe.concurrent('guardian-aware RLS policies', () => {
         )
       }
 
-      // EngagementEvent is the social table that IS still owner-scoped, and the
-      // guardian is still denied it, so the original intent of this test is not
-      // lost with the LookbookPost half.
+      // EngagementEvent went the same way in the same story, and for a sharper
+      // reason: its required `post_id` foreign key made owner-scoped INSERT
+      // rights a post-existence oracle against posts the client cannot read.
+      // The guardian is still denied it, so this test's original intent holds;
+      // what changed is the mechanism, from an empty result to a refusal.
       await withRole(
         'authenticated',
         buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
-        async (client) => {
-          const teenEngagement = await client.query(
-            'SELECT "id" FROM public."EngagementEvent" WHERE "user_id" = $1',
-            [seeded.teenId]
-          )
-
-          expect(teenEngagement.rows).toHaveLength(0)
-        }
+        async (client) =>
+          expect(
+            client.query(
+              'SELECT "id" FROM public."EngagementEvent" WHERE "user_id" = $1',
+              [seeded.teenId]
+            )
+          ).rejects.toMatchObject({ code: '42501' })
       )
     }
   )

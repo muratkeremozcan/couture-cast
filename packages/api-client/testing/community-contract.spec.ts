@@ -1,10 +1,3 @@
-// Story 6.1: Community HTTP contracts specification and tests.
-//
-// These suites exist to prove the Boundaries the story states at the tier where
-// they are cheapest to prove: the public projection carries no private field,
-// the cursor is bound to the filter mode it was minted under, alt text cannot be
-// published unconfirmed, and a challenge window is Monday-anchored in its own
-// zone rather than in UTC.
 import { describe, expect, it } from 'vitest'
 import { CLIMATE_BANDS } from '@couture/utils'
 import {
@@ -24,6 +17,7 @@ import {
   encodeCommunityFeedCursor,
   generateHttpOpenApiDocument,
   ianaTimeZoneSchema,
+  openCommunityPostInputSchema,
   publishCommunityPostInputSchema,
   safeDecodeCommunityFeedCursor,
   updateCommunityChallengeInputSchema,
@@ -31,11 +25,9 @@ import {
 
 type CursorResult = ReturnType<typeof safeDecodeCommunityFeedCursor>
 
-/** Narrows the safe-decode result so two failures can be compared by message. */
 const failureMessageOf = (result: CursorResult): string | undefined =>
   result.success ? undefined : result.error
 
-/** Copies a fixture without one key, to exercise a required field's absence. */
 const withoutKey = (
   source: Readonly<Record<string, unknown>>,
   key: string
@@ -47,13 +39,13 @@ const withoutKey = (
 
 describe('community HTTP contracts', () => {
   describe('cursor serialization and decoding', () => {
-    it('6.1-CON-001 round-trips a publishedAt, id, mode cursor payload', () => {
-      // Matrix row "Feed page": public rows page on `published_at,id`, and the
-      // cursor embeds the filter mode it was minted under.
+    it('6.1-CON-001 round-trips a publishedAt, id, mode, band cursor payload', () => {
+      // Matrix row "Feed page": public rows page on `published_at,id`.
       const payload = {
         publishedAt: '2026-09-05T12:00:00.000Z',
         id: 'post-12345',
         mode: 'temperate_dry',
+        band: 'temperate_dry',
       } as const
 
       const encoded = encodeCommunityFeedCursor(payload)
@@ -83,13 +75,15 @@ describe('community HTTP contracts', () => {
     })
 
     it('6.1-CON-003 rejects a cursor minted under a different mode with that same message', () => {
-      // Matrix row "Feed page": a changed filter discards the cursor. The
-      // message must be indistinguishable from the malformed-cursor message so
-      // the failure mode a client handles is "restart paging", singular.
+      // Matrix row "Feed page": the message must be indistinguishable from the
+      // malformed-cursor message, so the failure a client handles is "restart
+      // paging", singular. No expected band is passed anywhere below, so a
+      // failure here can only have come from the mode.
       const autoCursor = encodeCommunityFeedCursor({
         publishedAt: '2026-09-05T12:00:00.000Z',
         id: 'post-1',
         mode: 'auto',
+        band: 'temperate_dry',
       })
 
       expect(safeDecodeCommunityFeedCursor(autoCursor, 'auto').success).toBe(true)
@@ -101,11 +95,11 @@ describe('community HTTP contracts', () => {
         failureMessageOf(safeDecodeCommunityFeedCursor('!!!garbage!!!'))
       )
 
-      // A band-pinned cursor is equally bound: `cold_dry` is not `warm_dry`.
       const bandCursor = encodeCommunityFeedCursor({
         publishedAt: '2026-09-05T12:00:00.000Z',
         id: 'post-2',
         mode: 'cold_dry',
+        band: 'cold_dry',
       })
       expect(safeDecodeCommunityFeedCursor(bandCursor, 'warm_dry').success).toBe(false)
       expect(safeDecodeCommunityFeedCursor(bandCursor, 'cold_dry').success).toBe(true)
@@ -117,6 +111,7 @@ describe('community HTTP contracts', () => {
           publishedAt: '2026-09-05T12:00:00.000Z',
           id: 'post-123',
           mode: 'auto',
+          band: null,
           extraProp: 'forbidden',
         }),
         'utf8'
@@ -131,6 +126,7 @@ describe('community HTTP contracts', () => {
           publishedAt: '2026-09-05T12:00:00.000Z',
           id: 'post-123',
           mode: 'auto',
+          band: null,
           extraProp: 'forbidden',
         }).success
       ).toBe(false)
@@ -149,6 +145,102 @@ describe('community HTTP contracts', () => {
         COMMUNITY_CURSOR_INVALID_MESSAGE
       )
       expect(safeDecodeCommunityFeedCursor(legacy).success).toBe(false)
+    })
+
+    it('6.1-CON-005a rejects a cursor minted under a different band with that same message', () => {
+      // The resolved band is not recoverable from the mode. Under `auto`, the
+      // arm the beta experiment measures, it is derived per request from
+      // weather only guaranteed fresh for 60 minutes, so it can move between
+      // page one and page two while the mode reads `auto` throughout.
+      const cursor = encodeCommunityFeedCursor({
+        publishedAt: '2026-09-05T12:00:00.000Z',
+        id: 'post-3',
+        mode: 'auto',
+        band: 'cold_dry',
+      })
+
+      expect(safeDecodeCommunityFeedCursor(cursor, 'auto', 'cold_dry').success).toBe(true)
+
+      const mismatch = safeDecodeCommunityFeedCursor(cursor, 'auto', 'warm_wet')
+      expect(mismatch.success).toBe(false)
+      expect(failureMessageOf(mismatch)).toBe(COMMUNITY_CURSOR_INVALID_MESSAGE)
+      expect(failureMessageOf(mismatch)).toBe(
+        failureMessageOf(safeDecodeCommunityFeedCursor('!!!garbage!!!'))
+      )
+    })
+
+    it('6.1-CON-005b keeps an unfiltered page distinguishable from a resolved band', () => {
+      // `null` means the page was served with no band filter, which a reader
+      // can legitimately page through. Conflating it with a resolved band goes
+      // wrong both ways: a band that resolves on page two applies page one's
+      // keyset to a narrower set and skips everything newer in it, and a band
+      // that stops resolving turns page two into the unfiltered all-regions
+      // feed under the same cursor, with no 400 because the mode still matches.
+      const shared = { publishedAt: '2026-09-05T12:00:00.000Z', mode: 'auto' } as const
+      const unfiltered = encodeCommunityFeedCursor({
+        ...shared,
+        id: 'post-4',
+        band: null,
+      })
+      const filtered = encodeCommunityFeedCursor({
+        ...shared,
+        id: 'post-5',
+        band: 'cold_dry',
+      })
+
+      expect(safeDecodeCommunityFeedCursor(unfiltered, 'auto', null).success).toBe(true)
+      expect(safeDecodeCommunityFeedCursor(unfiltered, 'auto', 'cold_dry').success).toBe(
+        false
+      )
+      expect(safeDecodeCommunityFeedCursor(filtered, 'auto', 'cold_dry').success).toBe(
+        true
+      )
+      expect(safeDecodeCommunityFeedCursor(filtered, 'auto', null).success).toBe(false)
+    })
+
+    it('6.1-CON-005c skips the band check when no expected band is passed', () => {
+      // `undefined` and `null` are different arguments: omitting the band opts
+      // out of the check entirely, so a caller written before the band existed
+      // still decodes its own cursors, while `null` is a real expectation that
+      // the page was unfiltered.
+      const cursor = encodeCommunityFeedCursor({
+        publishedAt: '2026-09-05T12:00:00.000Z',
+        id: 'post-6',
+        mode: 'auto',
+        band: 'cold_dry',
+      })
+
+      expect(safeDecodeCommunityFeedCursor(cursor).success).toBe(true)
+      expect(safeDecodeCommunityFeedCursor(cursor, 'auto').success).toBe(true)
+      expect(safeDecodeCommunityFeedCursor(cursor, 'auto', undefined).success).toBe(true)
+    })
+
+    it('6.1-CON-005d requires band and still refuses an unknown field beside it', () => {
+      // Required and nullable, never optional: a cursor minted before the band
+      // was carried would otherwise decode into a page whose filter is unknown,
+      // which is the case the band exists to catch.
+      const payload = {
+        publishedAt: '2026-09-05T12:00:00.000Z',
+        id: 'post-7',
+        mode: 'auto',
+        band: null,
+      }
+
+      expect(communityFeedCursorPayloadSchema.safeParse(payload).success).toBe(true)
+      expect(
+        communityFeedCursorPayloadSchema.safeParse(withoutKey(payload, 'band')).success
+      ).toBe(false)
+      expect(
+        communityFeedCursorPayloadSchema.safeParse({ ...payload, region: 'emea' }).success
+      ).toBe(false)
+
+      const withoutBand = Buffer.from(
+        JSON.stringify(withoutKey(payload, 'band')),
+        'utf8'
+      ).toString('base64url')
+      expect(() => decodeCommunityFeedCursor(withoutBand)).toThrow(
+        COMMUNITY_CURSOR_INVALID_MESSAGE
+      )
     })
   })
 
@@ -208,9 +300,9 @@ describe('community HTTP contracts', () => {
 
     it('6.1-CON-011 exposes exactly the allowlisted public keys and nothing else', () => {
       // Boundaries/Never: no cross-user table row, no user id in an object path
-      // or signed URL, no moderation internals. Asserted as an exact key set so
-      // adding a field to the public projection has to be a deliberate edit
-      // here, not an accident that ships to every viewer.
+      // or signed URL, no moderation internals. The exact key set is a
+      // deliberate gate: adding a field to the public projection has to be an
+      // edit here, in front of a reviewer, before it reaches every viewer.
       expect(Object.keys(communityFeedItemSchema.shape).sort()).toEqual([
         'altText',
         'author',
@@ -251,8 +343,8 @@ describe('community HTTP contracts', () => {
     })
 
     it('6.1-CON-013 keeps the author pseudonymous with a display name and a self flag', () => {
-      // Boundaries/Always: keep authors pseudonymous. Ask First covers
-      // publishing real profile names, so the projection cannot carry one.
+      // Boundaries/Always: authors stay pseudonymous. Publishing a real profile
+      // name is Ask First, so the projection cannot carry one.
       expect(Object.keys(communityFeedAuthorSchema.shape).sort()).toEqual([
         'displayName',
         'isSelf',
@@ -343,12 +435,41 @@ describe('community HTTP contracts', () => {
     })
 
     it('6.1-CON-017 rejects a publish that omits altTextConfirmed entirely', () => {
-      // The omission case is the one a direct API caller reaches for, so it has
-      // to fail at the contract rather than only in the service.
+      // The omission case is what a direct API caller sends, so the contract has
+      // to fail it before the service ever runs.
       expect(
         publishCommunityPostInputSchema.safeParse(
           withoutKey(publishInput, 'altTextConfirmed')
         ).success
+      ).toBe(false)
+    })
+  })
+
+  describe('card-open input', () => {
+    it('6.1-CON-017a requires the served experiment variant and refuses anything else', () => {
+      // The beta gate advances on a non-self card-open lift, so the arm the
+      // viewer was actually served travels with the event; re-deriving it would
+      // attribute the open to an assignment that changed after the feed read.
+      // Whether the opener is the author stays server-decided, so a client
+      // cannot send that judgement in beside it.
+      expect(
+        openCommunityPostInputSchema.parse({ experimentVariant: 'auto' })
+          .experimentVariant
+      ).toBe('auto')
+      expect(
+        openCommunityPostInputSchema.parse({ experimentVariant: 'all' }).experimentVariant
+      ).toBe('all')
+
+      expect(openCommunityPostInputSchema.safeParse({}).success).toBe(false)
+      expect(
+        openCommunityPostInputSchema.safeParse({ experimentVariant: 'temperate_dry' })
+          .success
+      ).toBe(false)
+      expect(
+        openCommunityPostInputSchema.safeParse({
+          experimentVariant: 'auto',
+          isSelf: false,
+        }).success
       ).toBe(false)
     })
   })
@@ -459,7 +580,7 @@ describe('community HTTP contracts', () => {
     it('6.1-CON-023b rejects a non-IANA zone through the create and update schemas', () => {
       // Matrix row "Challenge": an invalid window is a 400. A validation pipe
       // reaches this through safeParse, so the composed schema has to return a
-      // failed result rather than raise, or the caller gets a 500 instead.
+      // failed result. If it throws, the caller gets a 500.
       for (const zone of INVALID_TIME_ZONES) {
         expect(
           createCommunityChallengeInputSchema.safeParse(createInput({ timeZone: zone }))
@@ -573,7 +694,6 @@ describe('community HTTP contracts', () => {
 
   describe('climate band enum vocabulary', () => {
     it('6.1-CON-033 accepts exactly the six canonical climate bands, in tuple order', () => {
-      // Boundaries/Always: one six-value CLIMATE_BANDS tuple with parity tests.
       expect(climateBandSchema.options).toEqual([...CLIMATE_BANDS])
       expect(climateBandSchema.options).toHaveLength(6)
 
@@ -668,7 +788,6 @@ describe('community HTTP contracts', () => {
     it('6.1-CON-040 preserves nullable enum values without mutating the ClimateBand component', () => {
       expect(document.info.version).toBe('1.6.0')
 
-      // Standalone ClimateBand component must NOT contain null.
       const standaloneBand = document.components?.schemas?.ClimateBand as {
         type?: string
         enum?: (string | null)[]
@@ -677,7 +796,6 @@ describe('community HTTP contracts', () => {
       expect(standaloneBand.enum).not.toContain(null)
       expect(standaloneBand.enum).toEqual([...CLIMATE_BANDS])
 
-      // Nullable publication in CommunityFeed.viewerBand must contain null.
       const communityFeed = document.components?.schemas?.CommunityFeed as {
         properties?: {
           viewerBand?: { type?: string[]; enum?: (string | null)[] }
@@ -687,6 +805,30 @@ describe('community HTTP contracts', () => {
       expect(communityFeed).toBeDefined()
       expect(communityFeed.properties?.viewerBand?.enum).toContain(null)
       expect(communityFeed.properties?.bandUnresolvedReason?.enum).toContain(null)
+    })
+
+    it('6.1-CON-041 registers the card-open path with its parameters and failures', () => {
+      const openedPath = document.paths?.['/api/v1/community/posts/{postId}/opened']
+
+      expect(openedPath?.post).toBeDefined()
+      expect(openedPath?.post?.security).toEqual([{ bearerAuth: [] }])
+      expect(openedPath?.post?.requestBody).toBeDefined()
+      expect(
+        (openedPath?.post?.parameters ?? []).map(
+          (parameter) => (parameter as { name?: string }).name
+        )
+      ).toEqual(['postId', 'x-couture-platform'])
+
+      // The exact set, because the absent codes carry meaning: any viewer may
+      // open any post they can see, so there is no 403 to document, and a post
+      // they cannot see is a 404 rather than an authorization failure.
+      expect(Object.keys(openedPath?.post?.responses ?? {}).sort()).toEqual([
+        '200',
+        '401',
+        '404',
+        '500',
+        '503',
+      ])
     })
   })
 })

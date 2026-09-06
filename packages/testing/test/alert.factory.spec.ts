@@ -15,10 +15,8 @@ import { getTrackedEntityIds, resetTrackedEntities } from '../src/factories/regi
 
 type PrismaCreateArgs = { data: Record<string, unknown> }
 
-/**
- * Each factory persists through exactly one delegate, so the stub models that
- * delegate and is cast to the client type the factory expects.
- */
+// Each factory persists through exactly one delegate, so the stub models that
+// delegate alone.
 function createPrismaStub(delegate: 'alertRule' | 'notificationPreference', id: string) {
   const create = vi.fn<(args: PrismaCreateArgs) => Promise<{ id: string }>>()
   create.mockResolvedValue({ id })

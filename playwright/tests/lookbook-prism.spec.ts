@@ -1,18 +1,13 @@
 // Learning path Step 25: Lookbook Prism responsive layout and community grid.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-25-lookbook-prism-responsive-layout-and-community-grid
-// Story 3.5 Task 6 step 4 owner: E2E smoke test responsive layout boundaries across viewports in playwright/tests/lookbook-prism.spec.ts
 import { log } from '@seontechnologies/playwright-utils/log'
 import { communityTest, expect } from '../support/helpers/community-session'
 
 /**
- * Story 6.1 note on the session. This spec used the bare fixture and therefore
- * rendered the SIGNED-OUT community panel ("Sign in to take part in the
- * community."), because `apps/web/src/lib/community.ts` reads
- * `sessionStorage[couturecast.access-token]` as its sole credential and
- * `merged-fixtures.ts`'s auth-session fixture does not write that key. Every
- * community assertion below was therefore looking at a panel with no grid in it,
- * which is indistinguishable from a broken render. `communityTest` writes the key
- * the app actually reads.
+ * `communityTest`, because the community grid renders only for a signed-in reader.
+ * On the bare fixture this spec rendered the SIGNED-OUT panel and every community
+ * assertion below was looking at a panel with no grid in it. See
+ * `support/helpers/community-session.ts`.
  */
 communityTest.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
   communityTest(
@@ -28,17 +23,16 @@ communityTest.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
       })
 
       /*
-       * The planner read is stubbed to restore this spec's original scope rather
-       * than to hide a failure. Signing the spec in (which the community grid
-       * assertion below requires) also made the planner rail's own fetch real,
-       * and a fresh account has no Premium entitlement, so opening the drawer
-       * issues a genuine 403 that `networkErrorMonitor` — correctly — fails on.
-       * That 403 is proven where it belongs, in `planner.spec.ts` and in the
-       * Pact planner interactions; here the rail is scenery for a LAYOUT
-       * assertion, and it renders its drawer either way.
+       * The planner read is stubbed to keep this spec's scope. Signing in, which the
+       * community grid assertion below requires, also makes the planner rail's fetch
+       * real, and a fresh account has no Premium entitlement, so opening the drawer
+       * issues a genuine 403 that `networkErrorMonitor` correctly fails on. That 403
+       * is proven in `planner.spec.ts` and in the Pact planner interactions; here
+       * the rail is scenery for a LAYOUT assertion and renders its drawer either
+       * way.
        *
-       * Seven `error` days rather than seven ready ones: it is the smallest body
-       * the contract accepts, and this spec asserts nothing about day content.
+       * Seven `error` days: the smallest body the contract accepts, and this spec
+       * asserts nothing about day content.
        */
       const plannerWindow = [
         '2026-07-16',
@@ -103,7 +97,7 @@ communityTest.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
         })
         .toBe(true)
       // Story 5.5 Decision 7: closed by default. Below 1440px the planner is
-      // reachable as a focus-trapped overlay drawer, not simply hidden.
+      // reachable as a focus-trapped overlay drawer.
       const plannerRail = page.getByRole('complementary', { name: /planner rail/i })
       const openControl = page.getByTestId('planner-open-control')
       await expect(plannerRail).toBeHidden()

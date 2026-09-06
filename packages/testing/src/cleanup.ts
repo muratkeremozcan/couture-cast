@@ -195,6 +195,7 @@ type ModerationEventWhereClause =
   | { silhouette_profile_id: { in: string[] } }
   | { post_id: { in: string[] } }
   | { flagged_by_id: { in: string[] } }
+  | { reviewed_by_id: { in: string[] } }
 
 /**
  * ModerationEvent has no user_id column (it references garment_item_id,
@@ -208,6 +209,16 @@ type ModerationEventWhereClause =
  * only while ModerationEvent.post_id cascaded from the post; it no longer does
  * (the cascade destroyed third-party reports on account erasure), so an
  * unreachable row is now a row left behind.
+ *
+ * `reviewed_by_id` is the branch that catches everything the others miss, and it
+ * is not redundant with `post_id`. A `report_resolved` row copies `post_id` off
+ * the CommunityPostReport it resolves, and that column is ON DELETE SET NULL, so
+ * resolving a report whose subject was already erased creates the audit row with
+ * NO post: no `post_id`, no `flagged_by_id` because a resolution is not a flag,
+ * no `silhouette_profile_id`. The operator named in `reviewed_by_id` is the only
+ * thing on it. More generally, a long-lived database accumulates post-less rows
+ * of every operator type as erasure nulls their `post_id` over time, so this is
+ * the branch that reaches them all rather than a special case for one.
  */
 function buildModerationEventWhere(
   moderationEventIds: readonly string[],
@@ -231,6 +242,7 @@ function buildModerationEventWhere(
 
   if (userIds.length > 0) {
     filters.push({ flagged_by_id: { in: uniqueValues(userIds) } })
+    filters.push({ reviewed_by_id: { in: uniqueValues(userIds) } })
   }
 
   if (filters.length === 0) {

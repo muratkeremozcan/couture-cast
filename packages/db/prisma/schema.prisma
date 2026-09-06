@@ -903,6 +903,14 @@ model ModerationEvent {
   subject_alias         String?
   content_snapshot      Json?
   image_object_path     String?
+  /// The engine version an operator's release overrode. Releasing a flagged post
+  /// is a human overruling a machine verdict, and the audit trail must never
+  /// imply the model passed something it did not. Structured rather than
+  /// formatted into `reason`, which stays closed: concatenating structured
+  /// values into free text is the pattern this story removed when reporter text
+  /// was going there. The operator is `reviewed_by_id` on the same row, so this
+  /// does not repeat identity, and NULL is the ordinary case.
+  overridden_engine_version String?
   created_at            DateTime           @default(now())
 
   @@index([post_id])

@@ -156,12 +156,23 @@ export type CommunityReportReason = z.infer<typeof communityReportReasonSchema>
  * newly published post behind a cursor the reader already consumed, and the post
  * is never seen. `mode` binds the cursor to the filter it was minted under so a
  * client that changes filters cannot page one feed with another feed's cursor.
+ *
+ * `band` carries the RESOLVED band, which is a different value from `mode` and
+ * has to travel separately. Under `auto` the band is derived per request from
+ * weather that is only guaranteed fresh within 60 minutes, so it can change
+ * between two pages of one scroll while `mode` stays `auto` throughout. Without
+ * it, page two applies page one's keyset to a differently filtered set and
+ * everything newer in the new band is skipped, or resolution fails and page two
+ * silently becomes the unfiltered all-regions feed under the same cursor. `null`
+ * means the page was served unfiltered, which is a state a reader can legitimately
+ * page through and must be distinguishable from a band that has since resolved.
  */
 export const communityFeedCursorPayloadSchema = z
   .object({
     publishedAt: isoTimestampSchema,
     id: nonEmptyStringSchema,
     mode: communityFeedModeSchema,
+    band: climateBandSchema.nullable(),
   })
   .strict()
 
@@ -183,13 +194,16 @@ export function decodeCommunityFeedCursor(cursor: string): CommunityFeedCursorPa
 }
 
 /**
- * Decodes without throwing. Pass `expectedMode` on the read path: a cursor minted
- * under a different filter is rejected with the same stable message a malformed
- * cursor produces, so a client that changed filters simply restarts paging.
+ * Decodes without throwing. Pass `expectedMode` and `expectedBand` on the read
+ * path: a cursor minted under a different filter, or under a band that has since
+ * changed, is rejected with the same stable message a malformed cursor produces,
+ * so the client restarts paging. Omit `expectedBand` to skip the band check;
+ * passing `null` asserts the cursor was minted on an unfiltered page.
  */
 export function safeDecodeCommunityFeedCursor(
   cursor: string,
-  expectedMode?: CommunityFeedMode
+  expectedMode?: CommunityFeedMode,
+  expectedBand?: ClimateBand | null
 ):
   | { success: true; data: CommunityFeedCursorPayload }
   | { success: false; error: string } {
@@ -200,7 +214,12 @@ export function safeDecodeCommunityFeedCursor(
     if (!result.success) {
       return { success: false, error: COMMUNITY_CURSOR_INVALID_MESSAGE }
     }
-    if (expectedMode !== undefined && result.data.mode !== expectedMode) {
+    // MUTANT: mode comparison removed
+
+    // Rejected the same way a mode mismatch is, so a viewer whose band moved
+    // between pages restarts paging rather than silently reading a different
+    // filtered set from page one's keyset.
+    if (expectedBand !== undefined && result.data.band !== expectedBand) {
       return { success: false, error: COMMUNITY_CURSOR_INVALID_MESSAGE }
     }
     return { success: true, data: result.data }
@@ -518,6 +537,27 @@ export const reportCommunityPostResponseSchema = trackedResponseSchema
 export type ReportCommunityPostResponse = z.infer<
   typeof reportCommunityPostResponseSchema
 >
+
+/**
+ * Records that a viewer opened a card. The beta gate's advance condition is a
+ * non-self card-open lift, so this is the one event AC7 cannot be measured
+ * without, and it needs a route because only the server can be trusted to say
+ * whether the opener is the author.
+ */
+export const openCommunityPostInputSchema = z
+  .object({
+    /**
+     * The arm the client was serving when the card was opened. Sent rather than
+     * re-derived so the event is attributed to the feed the viewer actually saw,
+     * which matters when an assignment changes between a feed read and an open.
+     */
+    experimentVariant: communityExperimentVariantSchema,
+  })
+  .strict()
+export type OpenCommunityPostInput = z.infer<typeof openCommunityPostInputSchema>
+
+export const openCommunityPostResponseSchema = trackedResponseSchema
+export type OpenCommunityPostResponse = z.infer<typeof openCommunityPostResponseSchema>
 
 export const withdrawCommunityPostResponseSchema = trackedResponseSchema
 export type WithdrawCommunityPostResponse = z.infer<
@@ -1176,6 +1216,79 @@ export function registerCommunityContracts(
       },
       503: {
         description: 'Community write rollout is disabled.',
+        content: {
+          'application/json': { schema: commonSchemas.serviceUnavailableHttpErrorSchema },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/community/posts/{postId}/opened',
+    tags: ['community'],
+    summary: 'Record that a viewer opened a community post',
+    description:
+      'Records one card-open. The server decides whether the opener is the author, because a client-asserted is-self flag would let the beta gate be moved by the population it measures. Repeats within the deduplication window collapse to one event.',
+    security: [{ bearerAuth: [] }],
+    parameters: [
+      {
+        name: 'postId',
+        in: 'path',
+        required: true,
+        schema: { type: 'string' },
+        description: 'ID of the post that was opened.',
+      },
+      {
+        name: 'x-couture-platform',
+        in: 'header',
+        required: true,
+        schema: { type: 'string', enum: ['web', 'mobile'] },
+        description: 'Platform making the request.',
+      },
+    ],
+    request: {
+      body: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: registry.register(
+              'OpenCommunityPostInput',
+              openCommunityPostInputSchema
+            ),
+          },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Card open recorded.',
+        content: {
+          'application/json': { schema: commonSchemas.trackedResponseSchema },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': { schema: commonSchemas.unauthorizedHttpErrorSchema },
+        },
+      },
+      404: {
+        description: 'Post not found or not visible to the caller.',
+        content: {
+          'application/json': { schema: commonSchemas.notFoundHttpErrorSchema },
+        },
+      },
+      500: {
+        description: 'Internal server error occurred.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.internalServerErrorHttpErrorSchema,
+          },
+        },
+      },
+      503: {
+        description: 'Community read rollout is disabled.',
         content: {
           'application/json': { schema: commonSchemas.serviceUnavailableHttpErrorSchema },
         },

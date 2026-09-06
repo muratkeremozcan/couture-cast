@@ -223,7 +223,6 @@ function buildGarment(id: string, category: string) {
 
 const BUILDER_GARMENTS = [buildGarment('g-1', 'top'), buildGarment('g-2', 'bottom')]
 
-/** Fills the builder's required fields so a submit is actually attempted. */
 function fillBuilderForm(name: string) {
   fireEvent.change(screen.getByTestId('capsule-name-input'), { target: { value: name } })
   fireEvent.click(screen.getByTestId('garment-select-checkbox-g-1'))

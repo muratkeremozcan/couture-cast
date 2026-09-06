@@ -15,12 +15,10 @@ import { getSavedSettings } from '../lib/settings-storage'
 
 describe('Localization Client System tests', () => {
   beforeAll(async () => {
-    // Make sure i18n is initialized with the catalogs
     await initI18n()
   })
 
   beforeEach(async () => {
-    // Reset to default locale before each test
     await i18n.changeLanguage('en-US')
   })
 

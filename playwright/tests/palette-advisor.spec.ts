@@ -1,34 +1,23 @@
 // Learning path Step 36: Colour palette, beauty and accessory advisor.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
-// Story 5.4 Task 9 owner: the Playwright half of the colour palette &
-// beauty/accessory advisor (`/palette`, `palette-advisor-panel.tsx`,
-// `apps/web/src/lib/palette-advisor.ts`).
+// Covers `/palette`, `palette-advisor-panel.tsx` and
+// `apps/web/src/lib/palette-advisor.ts`.
 //
-// STRUCTURE MIRRORS `premium-theme-switcher.spec.ts` (same domain, same
-// fixtures): the same network-first `open*` helper built on
-// `interceptNetworkCall`, the same `log.step` narration, and the same
-// `page.route` + `route.fallback()` pattern for the signed-out zero-call
-// assertion (an `interceptNetworkCall` promise only resolves once a matching
-// call happens, so it cannot prove the ABSENCE of one).
+// WRITE SAFETY. This suite writes for real against a seeded user shared across
+// parallel workers: `PaletteProfile` (consent, the derived palette, the analysis
+// lifecycle) and `AdvisorRecommendationState` rows. Both are erased by a single
+// `DELETE /api/v1/commerce/premium/palette`, the same path the UI's own withdraw
+// control runs, so cleanup needs no private access. The writing block runs under
+// `test.describe.configure({ mode: 'serial' })` and resets in BOTH `beforeEach` and
+// `afterEach`, so a run that crashes mid-test still leaves the fixture clean.
 //
-// WRITE SAFETY. This suite writes for real, against a seeded user shared across
-// parallel workers, and it writes MORE than 5.3 did: `PaletteProfile` (consent,
-// the derived palette, the analysis lifecycle) and `AdvisorRecommendationState`
-// rows. Both are erased by a single `DELETE /api/v1/commerce/premium/palette`,
-// which is the same path the UI's own withdraw control runs, so cleanup needs no
-// private access. The writing block runs under
-// `test.describe.configure({ mode: 'serial' })` and resets in BOTH `beforeEach`
-// and `afterEach`, so a run that crashes mid-test still leaves the fixture clean
-// for the next one and a fresh checkout starts from a known state.
-//
-// THE WARDROBE JOURNEY IS REAL, NOT STUBBED. `POST /analyze` enqueues a BullMQ
-// job that the E2E stack's own wardrobe worker consumes
-// (`scripts/start-api-e2e-with-workers.mjs`), reading the `PaletteInsights` rows
-// `seedPaletteAdvisorWardrobe` writes for this account -- ten garments, every
-// one carrying `#C9A14A`, whose CIELAB hue of 84.1 degrees puts it in the olive
-// wedge. The derived undertone is therefore a fixed value to assert, not a
-// range, and `depth` is null because garment colour is not evidence of skin
-// depth (AC 2/AC 4).
+// THE WARDROBE JOURNEY IS REAL. `POST /analyze` enqueues a BullMQ job that the E2E
+// stack's own wardrobe worker consumes (`scripts/start-api-e2e-with-workers.mjs`),
+// reading the `PaletteInsights` rows `seedPaletteAdvisorWardrobe` writes for this
+// account: ten garments, every one carrying `#C9A14A`, whose CIELAB hue of 84.1
+// degrees puts it in the olive wedge. The derived undertone is therefore a fixed
+// value to assert, and `depth` is null because garment colour is no evidence of
+// skin depth (AC 2/AC 4).
 import type { Locator, Page } from '@playwright/test'
 import type { ApiRequestFixtureParams } from '@seontechnologies/playwright-utils/api-request'
 import { log } from '@seontechnologies/playwright-utils/log'
@@ -69,9 +58,8 @@ function watchPaletteCall(
 }
 
 /**
- * Network-first, like the theme and subscription suites' own `open*` helpers:
- * the profile read is registered before the navigation that triggers it, so the
- * spec never races the page.
+ * Network-first: the profile read is registered before the navigation that
+ * triggers it, so the spec never races the page.
  */
 async function openPalette(
   page: Page,
@@ -93,11 +81,9 @@ type ApiRequestFn = <T = unknown>(
 
 /**
  * Erases everything this suite can write, through the same public `DELETE` the
- * withdraw control uses.
- *
- * Asserted rather than fire-and-forget: this row is shared across parallel
- * workers, so a silently failed reset would leave the next run's first assertion
- * pointing at the wrong symptom instead of at the cleanup failure.
+ * withdraw control uses. The response is asserted because the row is shared across
+ * parallel workers: a silently failed reset would point the next run's first
+ * assertion at the wrong symptom.
  */
 async function resetSeededPalette(
   apiRequest: ApiRequestFn,
@@ -139,9 +125,9 @@ anonymousTest.describe('Story 5.4 palette advisor, signed out', () => {
         await page.setViewportSize({ width: viewport.width, height: viewport.height })
 
         let paletteRequests = 0
-        // playwright-utils deviation: interceptNetworkCall's promise only
-        // resolves on a matching call, so it cannot structurally prove an
-        // absence of one; see the file header.
+        // playwright-utils deviation: `interceptNetworkCall`'s promise resolves
+        // only on a matching call, so it cannot prove the ABSENCE of one. Counting
+        // through `page.route` + `route.fallback()` can.
         await page.route(PALETTE_URL, async (route) => {
           paletteRequests += 1
           await route.fallback()
@@ -173,17 +159,16 @@ anonymousTest.describe('Story 5.4 palette advisor, signed out', () => {
 
   /**
    * Decision 14. `/palette` is a destination route that belongs to no bottom-nav
-   * tab, and the exact-equality active-tab match this story replaced would have
-   * highlighted Home here -- telling the reader they were somewhere they are not.
+   * tab, and the exact-equality active-tab match this story replaced highlighted
+   * Home here, telling the reader they were somewhere they are not.
    */
   anonymousTest(
     '[P1] 5.4-E2E-014 highlights no bottom-nav tab on /palette',
     async ({ page }) => {
-      // The bottom nav is `min-[768px]:hidden`, so it exists in the DOM at
-      // every width and is only VISIBLE on a phone viewport. Asserting it at
-      // the default 1280-wide viewport resolved the element fourteen times and
-      // read "hidden" every time. 375x812 is the width story 3.6's own
-      // bottom-nav spec uses for exactly this reason.
+      // The bottom nav is `min-[768px]:hidden`, so it exists in the DOM at every
+      // width and is only VISIBLE on a phone viewport. Asserting it at the default
+      // 1280-wide viewport resolved the element fourteen times and read "hidden"
+      // every time. 375x812 is the width story 3.6's own bottom-nav spec uses.
       await page.setViewportSize({ width: 375, height: 812 })
       await page.goto('/palette')
       await waitForAccessibilityReady(page)
@@ -239,8 +224,8 @@ premiumSeededTest.describe(
   'Story 5.4 palette advisor, seeded active subscriber (serial write journey)',
   () => {
     premiumSeededTest.use({ premiumSeedUser: 'active' })
-    // See the file header: this account is shared across parallel workers and
-    // this block writes consent, an analysis and recommendation state for real.
+    // This account is shared across parallel workers and this block writes consent,
+    // an analysis and recommendation state for real. See the file header.
     premiumSeededTest.describe.configure({ mode: 'serial' })
 
     premiumSeededTest.beforeEach(async ({ premiumSession, apiRequest }) => {
@@ -298,31 +283,30 @@ premiumSeededTest.describe(
         await page.getByTestId('palette-advisor-source-wardrobe').click()
         const analyzeResult = await analyze
 
-        // 202, not 200: the analysis is enqueued for the worker, not performed
-        // inline, and the body carries `processing` rather than a result.
+        // 202: the analysis is enqueued for the worker and the body carries
+        // `processing`.
         expect(analyzeResult.status).toBe(202)
         expect(analyzeResult.requestJson).toEqual({ source: 'wardrobe' })
 
         await log.step('Poll until the worker publishes a ready palette')
-        // The worker is a real process here. Reloading rather than waiting for a
-        // push: no socket carries analysis completion (stated deferral), so the
-        // client's own answer to "is it done" is another read.
+        // The worker is a real process here. No socket carries analysis completion
+        // (stated deferral), so the client's own answer to "is it done" is another
+        // read.
         await recurse(
           async () => {
             /*
              * A THROW INSIDE A POLL ABORTS THE POLL. `recurse` has no
              * continue-on-error option: if this command raises, the whole wait
-             * fails with `Command failed on iteration 1` rather than trying
-             * again. Under full-suite parallelism a `page.reload()` and the
-             * readiness gate that follows it can transiently exceed their
-             * default timeout, which is precisely the condition a poll exists to
-             * ride out, so a failed attempt returns `null` and the next interval
-             * retries instead of ending the test.
+             * fails with `Command failed on iteration 1`. Under full-suite
+             * parallelism a `page.reload()` and the readiness gate that follows it
+             * can transiently exceed their default timeout, which is the condition
+             * a poll exists to ride out, so a failed attempt returns `null` and the
+             * next interval retries.
              *
-             * This does not soften anything. The predicate below still demands a
-             * real undertone, the 30s budget is unchanged, and the assertions
-             * after the poll still pin the exact classification -- a genuinely
-             * missing palette times out and fails exactly as before.
+             * This softens nothing. The predicate below still demands a real
+             * undertone, the 30s budget is unchanged, and the assertions after the
+             * poll still pin the exact classification, so a genuinely missing
+             * palette times out and fails.
              */
             try {
               await page.reload()
@@ -358,8 +342,8 @@ premiumSeededTest.describe(
         ).toBeVisible()
         await expect(disclosure).toBeVisible()
         await expect(disclosure).toContainText('CoutureCast earns a commission')
-        // Reading order, not merely presence: a CSS reorder would move the
-        // control visually while leaving both elements on the page.
+        // Reading order, since a CSS reorder would move the control visually while
+        // leaving both elements on the page.
         const disclosurePrecedesCta = await page.evaluate(
           ([disclosureId, ctaId]) => {
             const a = document.querySelector(`[data-testid="${disclosureId}"]`)
@@ -421,8 +405,8 @@ premiumSeededTest.describe(
         const afterDismiss = await openPalette(page, interceptNetworkCall)
         expect(afterDismiss.status).toBe(200)
         await expect(recommendations(page)).toBeVisible()
-        // AC 6's whole point: the server omits it, so it is gone after a full
-        // reload rather than only hidden by client state.
+        // AC 6: the server omits it, so it is gone after a full reload and not
+        // merely hidden by client state.
         await expect(
           page.getByTestId(`palette-advisor-card-${jewelryItemKey}`)
         ).toHaveCount(0)
@@ -443,27 +427,24 @@ premiumSeededTest.describe('Story 5.4 palette advisor, stale analysis version', 
     '[P0] 5.4-E2E-012 renders a ready palette whose analysis_version this build does not know',
     async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
       /*
-       * ARRANGEMENT NOTE, and the same wall story 5.3 hit. Every enum on this
-       * row is a real Postgres enum, so the database physically cannot hold an
-       * out-of-enum `undertone` or `status` to seed. `analysis_version` IS a
-       * free-text column, but the only writer is the processor, which always
-       * stamps `ADVISOR_RULES_VERSION`; there is no INSERT path in this
-       * codebase that produces a genuinely retired version, so the GET is
-       * stubbed.
+       * WHY THE GET IS STUBBED. Every enum on this row is a real Postgres enum, so
+       * the database physically cannot hold an out-of-enum `undertone` or `status`
+       * to seed. `analysis_version` IS a free-text column, but its only writer is
+       * the processor, which always stamps `ADVISOR_RULES_VERSION`; no INSERT path
+       * in this codebase produces a genuinely retired version.
        *
-       * WHAT THE STUB IS AND IS NOT SAYING. The empty `recommendations` array
-       * below is a deliberately hostile fixture, not the server's behaviour on
-       * a rules bump: `5.4-INT-032` establishes against real SQL that
-       * `resolveRecommendations` reads the CURRENT `ADVISOR_RULES` off the
-       * stored undertone and depth and never consults `analysis_version`, so a
-       * retired version resolves the full card set. This test keeps the empty
-       * list anyway, because a surface that renders no cards must not crash or
+       * WHAT THE STUB IS AND IS NOT SAYING. The empty `recommendations` array below
+       * is a deliberately hostile fixture. `5.4-INT-032` establishes against real
+       * SQL that `resolveRecommendations` reads the CURRENT `ADVISOR_RULES` off the
+       * stored undertone and depth and never consults `analysis_version`, so on a
+       * rules bump a retired version resolves the full card set. This test keeps the
+       * empty list anyway, because a surface that renders no cards must not crash or
        * error either, and no other tier covers that.
        *
        * The retired version's real cost to the reader is the palette ABOVE the
-       * cards -- an undertone, depth and confidence derived under rules this
-       * build has replaced, shown as though current -- which is what the note
-       * asserted below exists to say.
+       * cards: an undertone, depth and confidence derived under rules this build has
+       * replaced, shown as though current. That is what the note asserted below
+       * exists to say.
        */
       const pageErrors: string[] = []
       page.on('pageerror', (error) => {
@@ -509,12 +490,11 @@ premiumSeededTest.describe('Story 5.4 palette advisor, stale analysis version', 
       await expect(page.getByTestId('palette-advisor-undertone')).toHaveText('Warm')
       await expect(page.getByTestId('palette-advisor-error')).toHaveCount(0)
       await expect(lockedPanel(page)).toHaveCount(0)
-      // `toBeAttached`, not `toBeVisible`. The claim is that the list RENDERS
-      // and is empty, which is the whole point of a retired `analysis_version`:
-      // the result panel stays, no card resolves, and nothing errors. An empty
-      // `<ul>` has no content and therefore no bounding box, so Playwright
-      // reports it `hidden` however correct the DOM is -- asserting visibility
-      // here asserts something the fixture makes impossible by construction.
+      // The claim is that the list RENDERS and is empty: the result panel stays, no
+      // card resolves, and nothing errors. An empty `<ul>` has no content and
+      // therefore no bounding box, so Playwright reports it `hidden` however
+      // correct the DOM is, and `toBeVisible` would assert something the fixture
+      // makes impossible by construction.
       await expect(recommendations(page)).toBeAttached()
       await expect(recommendations(page).getByRole('listitem')).toHaveCount(0)
 

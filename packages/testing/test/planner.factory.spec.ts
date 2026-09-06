@@ -1,4 +1,3 @@
-// Story 5.5: premium 7-day outfit planner.
 import type { PrismaClient } from '@prisma/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -10,10 +9,10 @@ import {
 } from '../src/factories/planner.factory.js'
 
 /**
- * Persistence is asserted against a stubbed Prisma client: these are unit
- * tests of the camelCase-to-snake_case mapping and the cleanup registration;
- * whether the columns and constraints actually exist is the schema suite's
- * job in `packages/db/test/planner-schema.spec.ts`.
+ * Persistence runs against a stubbed Prisma client, so a green run proves the
+ * camelCase to snake_case mapping and the cleanup registration. Whether the
+ * columns and constraints exist is the job of
+ * `packages/db/test/planner-schema.spec.ts`.
  */
 
 type CreateStub = { create: ReturnType<typeof vi.fn> }

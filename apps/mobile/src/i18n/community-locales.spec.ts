@@ -2,12 +2,9 @@
 // Story 6.1 owner: ten-locale parity for the `community.*` tree on Mobile, plus
 // the cross-surface check.
 //
-// This mirrors `apps/web/src/i18n/community-locales.spec.ts` case for case. The
-// one test that only exists here is `6.1-I18N-MOB-09`: the spec requires web and
-// mobile to deliver identical localized states, and the cheapest way to hold that
-// to account is to require the two `community` subtrees to be value-identical in
-// every locale, not merely key-identical. A string that drifts on one surface is
-// then a failure rather than a difference nobody notices until a screenshot.
+// This mirrors `apps/web/src/i18n/community-locales.spec.ts` case for case. The one
+// test that only exists here is `6.1-I18N-MOB-09`, whose reasoning sits on the test
+// itself.
 //
 // It lives on the mobile side because only the mobile vitest project can reach
 // both sets of catalogs by relative path; `wardrobe-capsules-locales.spec.ts:155`
