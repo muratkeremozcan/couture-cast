@@ -29,6 +29,10 @@ import {
   testQueueHealth,
   testRealtimePoll,
 } from '../scenarios/health.scenarios'
+import {
+  testCommunityFeedAll,
+  testCommunityFeedByBand,
+} from '../scenarios/community.scenarios'
 import { testSubscriptionStatus } from '../scenarios/premium.scenarios'
 import {
   testRitualCommerceEligible,
@@ -49,6 +53,8 @@ export {
   testCapsuleColdRitual,
   testRitualCommerceEligible,
   testSubscriptionStatus,
+  testCommunityFeedAll,
+  testCommunityFeedByBand,
 }
 
 const scenarioNames = [
@@ -64,6 +70,8 @@ const scenarioNames = [
   'testCapsuleColdRitual',
   'testRitualCommerceEligible',
   'testSubscriptionStatus',
+  'testCommunityFeedAll',
+  'testCommunityFeedByBand',
 ]
 
 export const options = {
@@ -127,6 +135,17 @@ export const options = {
       `p(95)<${SLO.subscriptionStatus + infraDelay}`,
     ],
     'http_req_failed{name:api/subscription-status}': ['rate<0.01'],
+    // Story 6.1: the two community feed reads, tagged apart because they hit
+    // different composite indexes. Folding them into one key would let a
+    // regression in either hide inside the other's samples.
+    'http_req_duration{name:api/community-feed-all}': [
+      `p(95)<${SLO.communityFeed + infraDelay}`,
+    ],
+    'http_req_failed{name:api/community-feed-all}': ['rate<0.01'],
+    'http_req_duration{name:api/community-feed-band}': [
+      `p(95)<${SLO.communityFeed + infraDelay}`,
+    ],
+    'http_req_failed{name:api/community-feed-band}': ['rate<0.01'],
   },
 }
 

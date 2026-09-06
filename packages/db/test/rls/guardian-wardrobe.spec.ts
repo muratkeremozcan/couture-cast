@@ -247,31 +247,40 @@ describe.concurrent('guardian-aware RLS policies', () => {
   )
 
   scenarioTest(
-    'keeps social tables self-scoped until community sharing semantics exist',
+    'keeps lookbook posts out of reach of the owner and of a full-access guardian alike',
     async ({ scenario: seeded }) => {
-      await withRole(
-        'authenticated',
-        buildClaims(seeded.teenEmail, 'teen'),
-        async (client) => {
-          const ownPosts = await client.query(
-            'SELECT "id" FROM public."LookbookPost" WHERE "user_id" = $1',
-            [seeded.teenId]
-          )
+      // This test used to assert that the owner could read their own posts and
+      // that a guardian could not. Story 6.1 made LookbookPost API-only -- RLS
+      // on, zero policies, zero grants -- so the owner is refused too, and
+      // guardian consent grants nothing here because there is no policy for it
+      // to satisfy. Full reasoning is on `workerOnlyTables` in harness.ts.
+      //
+      // The owner-facing half of this matrix lives in community-posts.spec.ts;
+      // what this file still owns is the guardian actor, which that file has no
+      // fixtures for.
+      for (const email of [seeded.teenEmail, seeded.guardianFullAccessEmail]) {
+        await withRole('authenticated', buildClaims(email, 'guardian'), async (client) =>
+          expect(
+            client.query('SELECT "id" FROM public."LookbookPost" WHERE "user_id" = $1', [
+              seeded.teenId,
+            ])
+          ).rejects.toMatchObject({ code: '42501' })
+        )
+      }
 
-          expect(ownPosts.rows).toHaveLength(1)
-        }
-      )
-
+      // EngagementEvent is the social table that IS still owner-scoped, and the
+      // guardian is still denied it, so the original intent of this test is not
+      // lost with the LookbookPost half.
       await withRole(
         'authenticated',
         buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
         async (client) => {
-          const teenPosts = await client.query(
-            'SELECT "id" FROM public."LookbookPost" WHERE "user_id" = $1',
+          const teenEngagement = await client.query(
+            'SELECT "id" FROM public."EngagementEvent" WHERE "user_id" = $1',
             [seeded.teenId]
           )
 
-          expect(teenPosts.rows).toHaveLength(0)
+          expect(teenEngagement.rows).toHaveLength(0)
         }
       )
     }

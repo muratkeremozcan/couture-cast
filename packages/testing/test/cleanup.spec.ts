@@ -82,6 +82,10 @@ function createCleanupPrismaStub(
     paletteProfile: createDelegate('paletteProfile'),
     advisorRecommendationState: createDelegate('advisorRecommendationState'),
     plannerDayPlan: createDelegate('plannerDayPlan'),
+    communityChallenge: createDelegate('communityChallenge'),
+    communityModerationOutbox: createDelegate('communityModerationOutbox'),
+    communityAlias: createDelegate('communityAlias'),
+    communityPostReport: createDelegate('communityPostReport'),
   }
 }
 
@@ -184,6 +188,16 @@ describe('cleanup', () => {
       // SavedLocation, so it precedes the savedLocation delete below even
       // though both FKs cascade.
       'plannerDayPlan',
+      // Story 6.1: the community tables go as one ordered group. Only the
+      // outbox still cascades from the post; ModerationEvent.post_id and
+      // CommunityPostReport.post_id are ON DELETE SET NULL, so deleting the
+      // post first would orphan them rather than remove them, and an orphaned
+      // row is reachable by nothing this function knows about.
+      'communityModerationOutbox',
+      'communityPostReport',
+      'moderationEvent',
+      'lookbookPost',
+      'communityAlias',
       // Story 5.1: commerce first, and in reverse dependency order.
       // AffiliateClick holds RESTRICT foreign keys onto AffiliateOffer and
       // CommercePartner, so a catalog row cannot go before the clicks that
@@ -194,7 +208,6 @@ describe('cleanup', () => {
       'eventEnvelope',
       'alertCooldownReservation',
       'engagementEvent',
-      'lookbookPost',
       'auditLog',
       'pushToken',
       'alertRule',
@@ -204,7 +217,6 @@ describe('cleanup', () => {
       'outfitCapsuleGarment',
       'outfitCapsule',
       'paletteInsights',
-      'moderationEvent',
       'silhouetteProfile',
       'wardrobeOnboardingState',
       'garmentItem',
@@ -234,13 +246,17 @@ describe('cleanup', () => {
       id: { in: ['user-1'] },
     })
     // Moderation events referencing a silhouette profile must be deleted
-    // before the profile, before the owning user (Story 4.4 Task 2).
+    // before the profile, before the owning user (Story 4.4 Task 2). Story 6.1
+    // added the flagged_by_id branch, because a moderation row written by a
+    // community report carries a post and a reporter and neither of the other
+    // two columns.
     expect(
       calls.find((call) => call.delegate === 'moderationEvent')?.where
     ).toMatchObject({
       OR: [
         { id: { in: ['moderation-1'] } },
         { silhouette_profile_id: { in: ['silhouette-1'] } },
+        { flagged_by_id: { in: ['user-1'] } },
       ],
     })
     expect(
@@ -286,6 +302,12 @@ describe('cleanup', () => {
       advisorRecommendationStates: [],
       // Story 5.5.
       plannerDayPlans: [],
+      // Story 6.1.
+      lookbookPosts: [],
+      communityChallenges: [],
+      communityModerationOutboxEntries: [],
+      communityAliases: [],
+      communityPostReports: [],
     })
   })
 
@@ -386,9 +408,17 @@ describe('cleanup', () => {
     expect(whereFor('notificationPreference')).toEqual({ user_id: { in: ['user-1'] } })
     expect(whereFor('savedLocation')).toEqual({ user_id: { in: ['user-1'] } })
     expect(whereFor('paletteInsights')).toEqual({ OR: [{ user_id: { in: ['user-1'] } }] })
-    // ModerationEvent has no user column, so with neither moderation nor
-    // silhouette ids registered there is nothing it could safely match.
-    expect(calls.map((call) => call.delegate)).not.toContain('moderationEvent')
+    // ModerationEvent has no user_id column, but it does have flagged_by_id,
+    // and Story 6.1 made that reachable: a tracked user who filed a community
+    // report leaves a moderation row behind that no other filter here matches,
+    // and ModerationEvent.post_id no longer cascades from the post to sweep it
+    // away. The delete is by reporter, never unscoped.
+    expect(whereFor('moderationEvent')).toEqual({
+      OR: [{ flagged_by_id: { in: ['user-1'] } }],
+    })
+    expect(whereFor('communityPostReport')).toEqual({
+      OR: [{ reporter_id: { in: ['user-1'] } }],
+    })
   })
 
   it('removes moderation events attached to a silhouette profile under teardown', async () => {
@@ -404,6 +434,60 @@ describe('cleanup', () => {
     expect(calls.find((call) => call.delegate === 'moderationEvent')?.where).toEqual({
       OR: [{ silhouette_profile_id: { in: ['silhouette-1'] } }],
     })
+  })
+
+  it('deletes a tracked lookbook post when no user was tracked', async () => {
+    // Story 6.1 (M6). The lookbook delete used to sit inside deleteByUserIds,
+    // which returns immediately when no user ids are tracked. A test that
+    // persisted a post without also tracking its author therefore left the row
+    // behind while cleanup reported success -- the worst shape of leak, because
+    // nothing fails until an unrelated suite trips over the stale row.
+    const calls: CleanupCall[] = []
+    const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
+
+    registry.track('lookbookPosts', 'post-1')
+
+    await cleanup({ prisma: createCleanupPrismaStub(calls), registry })
+
+    expect(calls.find((call) => call.delegate === 'lookbookPost')?.where).toEqual({
+      OR: [{ id: { in: ['post-1'] } }],
+    })
+  })
+
+  it('reaches community report and moderation rows through the post and the reporter', async () => {
+    // Story 6.1 (M7). ModerationEvent.post_id and CommunityPostReport.post_id
+    // are ON DELETE SET NULL, so neither row is swept away by deleting the
+    // post. Both builders therefore have to match on post_id in their own
+    // right, and on the reporting user, or a report filed during a test is
+    // unreachable by cleanup entirely.
+    const calls: CleanupCall[] = []
+    const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
+
+    registry.track('users', 'user-1')
+    registry.track('lookbookPosts', 'post-1')
+
+    await cleanup({ prisma: createCleanupPrismaStub(calls), registry })
+
+    const whereFor = (delegate: keyof CleanupPrismaClient) =>
+      calls.find((call) => call.delegate === delegate)?.where
+
+    expect(whereFor('moderationEvent')).toEqual({
+      OR: [{ post_id: { in: ['post-1'] } }, { flagged_by_id: { in: ['user-1'] } }],
+    })
+    expect(whereFor('communityPostReport')).toEqual({
+      OR: [{ post_id: { in: ['post-1'] } }, { reporter_id: { in: ['user-1'] } }],
+    })
+    expect(whereFor('communityAlias')).toEqual({
+      OR: [{ user_id: { in: ['user-1'] } }],
+    })
+
+    // The report and the moderation row must both be gone before the post they
+    // point at, or SET NULL turns them into orphans instead of deleting them.
+    const order = calls.map((call) => call.delegate)
+    expect(order.indexOf('communityPostReport')).toBeLessThan(
+      order.indexOf('lookbookPost')
+    )
+    expect(order.indexOf('moderationEvent')).toBeLessThan(order.indexOf('lookbookPost'))
   })
 
   it('clears the registry even when a delete fails', async () => {

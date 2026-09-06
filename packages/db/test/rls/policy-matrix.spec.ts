@@ -8,6 +8,7 @@ import {
   ownerOrGlobalReadTables,
   selfOnlyTables,
   useRlsDatabase,
+  workerOnlyTables,
 } from './harness.js'
 
 describe.concurrent('guardian-aware RLS policies', () => {
@@ -100,8 +101,19 @@ describe.concurrent('guardian-aware RLS policies', () => {
     }
   })
 
-  it('keeps alert delivery coordination tables worker-only', async () => {
-    const privateTables = ['AlertDeliveryOutbox', 'AlertCooldownReservation'] as const
+  it('keeps worker-only tables unreachable from every client role', async () => {
+    // RLS on, zero policies, zero grants to anon and authenticated. All three
+    // are needed: a grant with no policy denies by default only while RLS is
+    // enabled, and hosted Supabase provisioning normally grants ALL on public
+    // tables to both client roles, so an un-enabled table there is wide open
+    // even though the same table looks closed against local Supabase, which
+    // ships no such default ACL.
+    //
+    // Story 6.1 put the entire community surface in this category rather than
+    // giving LookbookPost a published-read policy; see the comment on
+    // `workerOnlyTables` in harness.ts for why no row-level predicate can do
+    // that job.
+    const privateTables = workerOnlyTables
     const client = await adminPool.connect()
 
     try {

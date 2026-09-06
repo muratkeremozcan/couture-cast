@@ -408,5 +408,171 @@
         "unknown": "Algo correu mal com esta fotografia. Tenta novamente."
       }
     }
+  },
+  "community": {
+    "title": "Comunidade",
+    "heading": "Álbum vivo de visuais da comunidade",
+    "sectionLabel": "Álbum de visuais da comunidade",
+    "inspirations": "Inspirações da comunidade",
+    "share": "Partilhe o seu visual",
+    "newPost": "Nova publicação",
+    "deepLink": {
+      "invalid": "Esta ligação é inválida, expirou ou já não está disponível."
+    },
+    "filters": {
+      "label": "Filtros da comunidade",
+      "announce": "A mostrar visuais de {{filter}}.",
+      "mode": {
+        "auto": "O seu clima",
+        "autoWithBand": "O seu clima: {{band}}",
+        "all": "Todos os climas",
+        "cold_dry": "Frio e seco",
+        "cold_wet": "Frio e húmido",
+        "temperate_dry": "Ameno e seco",
+        "temperate_wet": "Ameno e húmido",
+        "warm_dry": "Quente e seco",
+        "warm_wet": "Quente e húmido"
+      }
+    },
+    "band": {
+      "cold_dry": "Frio e seco",
+      "cold_wet": "Frio e húmido",
+      "temperate_dry": "Ameno e seco",
+      "temperate_wet": "Ameno e húmido",
+      "warm_dry": "Quente e seco",
+      "warm_wet": "Quente e húmido",
+      "unclassified": "Qualquer clima",
+      "unresolved": {
+        "no_location": "Adicione uma localização para ver visuais adequados ao seu clima. Até lá, vê todas as faixas climáticas.",
+        "weather_unavailable": "A previsão para a sua zona não está disponível, por isso vê visuais de todas as faixas climáticas.",
+        "weather_stale": "A previsão para a sua zona está desatualizada, por isso vê visuais de todas as faixas climáticas.",
+        "weather_malformed": "Não foi possível ler a previsão para a sua zona, por isso vê visuais de todas as faixas climáticas.",
+        "insufficient_usable_days": "Não há dados de previsão recentes suficientes para determinar o seu clima, por isso vê visuais de todas as faixas climáticas."
+      }
+    },
+    "feed": {
+      "loading": "A carregar os visuais da comunidade",
+      "announceLoaded": "A mostrar visuais de {{filter}}. {{count}} carregados.",
+      "announceLoadedMore": "Mais {{count}} visuais carregados.",
+      "announceFocused": "O visual em destaque está focado.",
+      "emptyTitle": "Ainda não foi partilhado nenhum visual aqui",
+      "emptyBody": "Seja a primeira pessoa a partilhar um visual à prova do tempo.",
+      "errorTitle": "Não foi possível carregar o feed da comunidade.",
+      "retry": "Tentar novamente",
+      "loadMore": "Carregar mais visuais",
+      "loadingMore": "A carregar",
+      "yourPostsTitle": "Os seus visuais em curso",
+      "yourPostsBody": "Mais ninguém vê estes visuais até a verificação terminar."
+    },
+    "card": {
+      "label": "Visual de {{author}}",
+      "authorSelf": "Você",
+      "authorFallback": "Explorador de estilo",
+      "imageUnavailable": "Imagem indisponível",
+      "imageRetry": "Recarregar a imagem",
+      "report": "Denunciar",
+      "reported": "Denunciado",
+      "withdraw": "Retirar",
+      "sponsored": "Patrocinado",
+      "sponsoredAnnounce": "Visual patrocinado"
+    },
+    "status": {
+      "draft": "Rascunho",
+      "uploading": "A carregar",
+      "pending_review": "Em análise",
+      "published": "Publicado",
+      "flagged": "Removido pela moderação",
+      "review_failed": "A verificação não terminou",
+      "withdrawn": "Retirado",
+      "consent_suspended": "Oculto até haver consentimento",
+      "reason": "Motivo: {{reason}}"
+    },
+    "removed": {
+      "flagged": "A moderação removeu este visual. Mais ninguém o consegue ver.",
+      "review_failed": "A verificação não terminou, por isso este visual não foi publicado. Partilhe-o novamente para tentar outra vez.",
+      "withdrawn": "Retirou este visual do feed.",
+      "consent_suspended": "Este visual fica oculto até que um responsável renove o consentimento. Partilhe-o novamente quando o consentimento estiver ativo."
+    },
+    "challenge": {
+      "eyebrow": "Desafio de estilo da semana",
+      "allClimates": "Todos os climas",
+      "participate": "Participar",
+      "participateLabel": "Participar em {{title}}",
+      "activeThisWeek": "Ativo esta semana",
+      "dateRange": "De {{start}} a {{end}}"
+    },
+    "report": {
+      "title": "Denunciar este visual",
+      "description": "Ajude a manter a comunidade segura. Escolha um motivo e a moderação irá analisá-lo.",
+      "reasonLabel": "Motivo da denúncia",
+      "detailsLabel": "Mais detalhes (opcional)",
+      "detailsPlaceholder": "Descreva como este visual infringe as regras da comunidade",
+      "detailsCount": "{{count}} de 500 caracteres",
+      "submit": "Enviar denúncia",
+      "submitting": "A enviar",
+      "cancel": "Cancelar",
+      "close": "Fechar a janela de denúncia",
+      "success": "Obrigado. A moderação vai analisar este visual.",
+      "reason": {
+        "spam": "Spam ou conteúdo enganador",
+        "harassment": "Assédio ou bullying",
+        "inappropriate_content": "Conteúdo inadequado",
+        "hate_speech": "Discurso de ódio",
+        "violence": "Violência ou conteúdo nocivo",
+        "other": "Outro motivo"
+      }
+    },
+    "compose": {
+      "title": "Partilhe o seu visual",
+      "description": "Todos os visuais são verificados automaticamente antes de chegarem ao feed.",
+      "close": "Fechar sem partilhar",
+      "photoLabel": "Fotografia",
+      "photoHint": "JPEG, PNG ou WebP, até 10 MB e pelo menos 256 pixéis de cada lado.",
+      "choosePhoto": "Escolher uma fotografia",
+      "changePhoto": "Mudar a fotografia",
+      "preview": "Pré-visualização do visual que vai partilhar",
+      "altLabel": "Descrição da imagem",
+      "altHint": "Descreva as peças, as camadas e as cores para os membros que usam um leitor de ecrã.",
+      "altPlaceholder": "Descreva as peças, as camadas e as cores",
+      "altSuggested": "Sugerimos uma descrição. Edite-a para corresponder à sua fotografia.",
+      "altConfirm": "Confirmo que esta descrição corresponde à fotografia",
+      "captionLabel": "Legenda (opcional)",
+      "captionPlaceholder": "Notas sobre o tempo, os tecidos ou o estilo",
+      "captionCount": "{{count}} de 280 caracteres",
+      "challengeLabel": "Desafio da semana",
+      "challengeNone": "Sem desafio",
+      "publish": "Publicar",
+      "publishing": "A verificar e a publicar",
+      "uploading": "A carregar a sua fotografia",
+      "cancel": "Cancelar",
+      "success": "O seu visual foi enviado para análise."
+    },
+    "validation": {
+      "photoRequired": "Escolha uma fotografia para partilhar.",
+      "altRequired": "Adicione uma descrição da imagem.",
+      "altConfirmRequired": "Confirme a descrição da imagem antes de publicar.",
+      "captionTooLong": "Mantenha a legenda com 280 caracteres ou menos.",
+      "captionUrl": "A legenda não pode conter ligações.",
+      "captionEmail": "A legenda não pode conter endereços de correio eletrónico.",
+      "imageTooSmall": "Escolha uma imagem com pelo menos 256 pixéis de largura e de altura.",
+      "permissionDenied": "O CoutureCast precisa de aceder às suas fotografias para partilhar um visual.",
+      "pickerFailed": "Não foi possível abrir o seletor de fotografias."
+    },
+    "error": {
+      "load": "Não foi possível carregar o feed da comunidade.",
+      "report": "Não foi possível enviar a sua denúncia.",
+      "withdraw": "Não foi possível retirar este visual. Continua no feed.",
+      "publish": "Não foi possível publicar o seu visual.",
+      "upload": "Não foi possível carregar a sua fotografia, por isso nada foi publicado. Tente novamente.",
+      "signedOut": "Inicie sessão para participar na comunidade.",
+      "ageGate": "Tem de ter pelo menos 13 anos para publicar na comunidade.",
+      "rateLimited": "Atingiu o limite de dez visuais de hoje.",
+      "rateLimitedUntil": "Atingiu o limite de dez visuais de hoje. Tente novamente depois das {{time}}.",
+      "reasonChanged": "Já denunciou este visual por outro motivo.",
+      "selfReport": "Não pode denunciar o seu próprio visual.",
+      "notFound": "Este visual já não está disponível.",
+      "disabled": "O feed da comunidade está temporariamente indisponível.",
+      "generic": "Algo correu mal. Tente novamente."
+    }
   }
 }

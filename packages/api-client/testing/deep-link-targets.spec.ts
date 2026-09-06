@@ -125,7 +125,7 @@ describe('resolveCommunityCardDeepLinkTarget', () => {
         version: '1',
         timestamp: OLDER,
         userId: 'user-1',
-        data: { postId: 'post-1', climateBand: 'Cold-snap' },
+        data: { postId: 'post-1', climateBand: 'cold_dry' },
       },
     }
     const newer: PolledEvent = {
@@ -135,12 +135,12 @@ describe('resolveCommunityCardDeepLinkTarget', () => {
         version: '1',
         timestamp: NEWER,
         userId: 'user-1',
-        data: { postId: 'post-1', climateBand: 'Rain-ready' },
+        data: { postId: 'post-1', climateBand: 'cold_wet' },
       },
     }
 
     expect(
       resolveCommunityCardDeepLinkTarget([older, newer], 'post-1')?.event.data.climateBand
-    ).toBe('Rain-ready')
+    ).toBe('cold_wet')
   })
 })

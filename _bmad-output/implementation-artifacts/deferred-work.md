@@ -927,7 +927,10 @@ shared CI plumbing is proven under `workflow_dispatch` before it gates anything.
 Fixing them from a laptop would mean shipping an unverified guess about
 infrastructure other workstreams depend on. They are the per-attempt Maestro
 artifact fix, the Linux-only Pact consumer flake, and the `open-settings.yaml`
-emulator flake; each entry states what a fix needs and who can do it.
+emulator flake; each entry states what a fix needs and who can do it. Updated
+2026-09-04: story 5.5 closed the `open-settings.yaml` flake and mitigated the
+Pact one, both from real CI failures on PR #141. Two remain, and the Pact
+entry's own port question is one of them.
 
 - **A guardian cannot see a teen's derived palette, and no planning document says
   whether they should.** `PaletteProfile` and `AdvisorRecommendationState` are
@@ -1193,6 +1196,27 @@ realtime fallback events` — a third distinct interaction, in a third file, wit
   rather than treated as a regression, and this entry is why it stays visible
   behind the green tick.
 
+  **Updated 2026-09-04 by story 5.5, commit `f95c09fa`: reproduced, characterised
+  and mitigated. The open question above is untouched.** Saturating 12 to 13 of
+  14 local cores while running the consumer suite repeatedly turned this from
+  unreproducible into a roughly 33% per-run failure (2 of 6 stressed runs, each a
+  single different interaction), which is the reproduction this entry was waiting
+  for. It identified the cause as a PactV4 FFI mock-server timing race:
+  `.addInteraction()...executeTest()` tears down the previous interaction's mock
+  server and stands a fresh one up for every single test, hundreds of times per
+  file, and under contention that teardown and startup pair can overlap, so
+  whichever interaction is mid-registration fails with "The following request was
+  expected but not received" while its own request and response pair is correct.
+  That clears every individual interaction, including the two comfort ones this
+  entry names. `pact/http/vitest.consumer.config.mts` now carries a bounded retry
+  against exactly that signature, with the reasoning in its own comment.
+
+  A retry is a mitigation. What closes this entry is still the fix named above:
+  an explicit distinct `opts.port` per interaction so no two mock servers in one
+  process can share a port number, or an upstream fix in `pact-foundation`. The
+  instrumentation step is now cheaper than it was, because the stressed-run
+  recipe reproduces the failure on demand.
+
 - _Resolved 2026-08-26, with its premise corrected._ **~~A ready palette whose
   `analysis_version` this build has retired renders no advice and no
   explanation.~~** The second half was right and is closed;
@@ -1246,9 +1270,25 @@ realtime fallback events` — a third distinct interaction, in a third file, wit
   and wants its own proving run under `workflow_dispatch` before it gates
   anything.
 
-- **A pre-existing `open-settings.yaml` Maestro flake cost one shard re-run on
-  this PR.** Shard 7 failed two story-3/4 flows,
-  `garment-capsule-localization-flow` and `sanity`, both with
+- _Resolved 2026-09-04 by story 5.5, commit `f95c09fa`._
+  **~~A pre-existing `open-settings.yaml` Maestro flake cost one shard re-run on
+  this PR.~~** The symptom this entry described is the Expo Go developer sheet,
+  and story 5.5 caught it with better evidence than the Android emulator this
+  entry asked for: a real CI failure on `mobile-e2e-android` shard 3, where
+  `tab-wardrobe` reported COMPLETED on all four retry attempts while the
+  hierarchy dump showed `tab-home` still on top and the screenshot showed the
+  sheet covering the tab bar. That sheet is drawn natively by Expo Go and never
+  appears in the hierarchy Maestro queries, which is why a `retry` around
+  `extendedWaitUntil` could never absorb it, and why story 5.5's larger bundle
+  (1903 modules, roughly 22 seconds to build) exposed it by pushing the sheet's
+  rise past `open-app.yaml`'s own absorb window. The fix extracts that file's
+  proven blind backdrop tap into `maestro/subflows/absorb-expo-dev-sheet.yaml`
+  and calls it from both `maestro/subflows/open-settings.yaml` and
+  `maestro/subflows/open-wardrobe-tab.yaml`, so any future caller inherits it.
+
+  The original entry, for the record. **A pre-existing `open-settings.yaml`
+  Maestro flake cost one shard re-run on this PR.** Shard 7 failed two story-3/4
+  flows, `garment-capsule-localization-flow` and `sanity`, both with
   `Assertion is false: id: settings-screen is visible`, then passed both on
   re-run. The subflow already carries the repair history for exactly this
   symptom in its own docblock — the Expo Go developer sheet rising over the tab
@@ -1307,3 +1347,593 @@ not have to rediscover the reasoning.
   advancing real wall-clock time across a retention period; and the story adds
   no k6 scenario because planner reads are Premium-only, user-scoped, and
   outside the existing hot-path performance budget.
+
+- **Manual VoiceOver and TalkBack verification was never performed for this
+  story.** AC 7 asks for native evidence covering semantic component assertions
+  plus manual VoiceOver and TalkBack checks. The semantic half shipped:
+  `apps/mobile/src/screens/planner-screen.test.tsx` and
+  `apps/web/src/app/components/planner-rail.test.tsx` assert roles, accessible
+  names, and live-region politeness versus alert semantics, and
+  `playwright/tests/planner.spec.ts` drives real `Escape` and `Tab` keypresses
+  through Chromium and scans both variants with axe. The manual half did not:
+  the implementing session had no physical iOS or Android device and no real
+  screen reader. Its Dev Agent Record says so plainly, following the disclosure
+  pattern stories 4.4 and 5.1 established for the same limitation.
+  **What a fix needs:** a person with a physical device running VoiceOver on the
+  `/planner` route and TalkBack on the same screen, walking the seven day cards,
+  the reshuffle controls, and the locked and error states, and recording the
+  result in the story's Dev Agent Record. No automated tier in this repository
+  can substitute for it, so it belongs in the operator runbook or a session with
+  real hardware.
+
+- **None of this story's test files carry the searchable `Learning path Step`
+  cross-link comment.** The learning path's own contract
+  (`_bmad-output/project-knowledge/learning-path-step-by-step.md`, instruction 8
+  under "Instructions for LLMs updating this file") requires a Step cross-link
+  comment in every test file a numbered step lists, and Step 37 lists eighteen
+  of them: `apps/api/src/modules/personalization/ritual-generation.engine.spec.ts`,
+  `ritual.service.spec.ts`, `planner.service.spec.ts`,
+  `planner.controller.spec.ts`, `apps/api/integration/planner.integration.spec.ts`,
+  `packages/api-client/testing/planner-contract.spec.ts`,
+  `packages/api-client/testing/planner-analytics.spec.ts`,
+  `packages/db/test/planner-schema.spec.ts`, `packages/db/test/rls/planner.spec.ts`,
+  `packages/testing/test/planner.factory.spec.ts`,
+  `apps/web/src/app/components/planner-rail.test.tsx`,
+  `apps/web/src/app/components/lookbook-prism-layout.test.tsx`,
+  `apps/web/src/lib/planner.test.ts`, `apps/web/src/i18n/planner-locales.spec.ts`,
+  `apps/mobile/src/screens/planner-screen.test.tsx`,
+  `apps/mobile/src/lib/planner.test.ts`,
+  `apps/mobile/src/i18n/planner-locales.spec.ts`, and
+  `playwright/tests/planner.spec.ts`. Story 5.3 added these comments to every
+  file Step 35 lists, so the convention is live and has been honoured once.
+  **What a fix needs:** one comment line per file, in that file's own header
+  comment style, naming Step 37. It is an eighteen-file mechanical edit under
+  `apps/`, `packages/` and `playwright/`, which is why it is recorded here
+  rather than folded into the documentation pass that found it.
+
+## Added during documentation work on story 5.5 (2026-09-05)
+
+Found while writing Step 37 of the learning path. This is process debt: it
+belongs to the story template every future story is drafted from, so recording
+it under a story number would hide it.
+
+- **A story file's `status` is a second copy of a value only
+  `sprint-status.yaml` actually owns, and it drifts.** Three pieces of
+  evidence. The field is already optional: stories 5.1, 4.3 and 4.4 carry no
+  `status:` frontmatter key at all, only a body `Status:` line, so nothing
+  structural depends on it. It drifted in four of the five most recent stories:
+  on 2026-09-05, `5-2` read `in-progress`, `5-3` read `in-progress`, and `5-4`
+  and `5-5` read `review`, while `sprint-status.yaml` recorded all five of
+  5.1 through 5.5 as `done`. And nothing automated reads it: no script under
+  `scripts/` and no workflow under `.github/` references `sprint-status.yaml`
+  or story frontmatter, so the only readers are the BMAD skills, which read
+  both files anyway. A field that is wrong more often than right costs a reader
+  a wrong call. The concrete cost here: the first draft of Step 37 had to carry
+  a caveat sentence explaining which of the two records wins, which is a
+  documentation workaround for a data problem.
+
+  **What a fix needs.** The preferred fix is to delete the field, leave
+  `sprint-status.yaml` as the single live record, and have the story template
+  emit a pointer line naming that file. The fallback, if the BMAD skills need
+  the frontmatter key to write at hand-off, is to keep it and add a consistency
+  check to the quality gate asserting that every story file's status equals its
+  `sprint-status.yaml` entry, so drift fails a build. Either way the
+  repository-side lever is a `_bmad/custom/*.toml` override.
+  `project-context.md:138-139` states that installer-managed BMAD configuration
+  changes through that path because a direct edit to `_bmad/config.toml` is
+  overwritten on installation, so the config file is the wrong one to reach for.
+  The story template itself is not checked into this repository: the `_bmad/`
+  tree here carries `config.toml`, `config.user.toml` and the `custom/`
+  overrides, so whoever picks this up starts from the override and from whatever
+  BMAD skill drafts the story. That is a workflow change with its own blast
+  radius, which is why it is recorded here rather than folded into the story
+  that found it. The four drifted files were corrected in place on 2026-09-05;
+  whatever produces the drift was not touched.
+
+## Deferred from: story 6.1 community feed by climate band (2026-09-05)
+
+Recorded while story 6.1 is still in flight, so a reader of this ledger sees the
+open item without waiting for the story to close.
+
+- **Nine of the ten community locale catalogs are machine-translation drafts
+  that no native speaker has read.** Story 6.1 localized the whole community
+  surface: a `community.*` tree of 135 leaf keys, shipped identically on web
+  (`apps/web/src/i18n/locales/`) and mobile (`apps/mobile/assets/locales/`)
+  across all ten supported locales.
+
+  What is proven, and it is a stronger floor than most localization passes
+  ship with. `apps/web/src/i18n/community-locales.spec.ts` (8 tests,
+  `6.1-I18N-WEB-01` through `-08`) and
+  `apps/mobile/src/i18n/community-locales.spec.ts` (9 tests, `6.1-I18N-MOB-01`
+  through `-09`) both pass, and between them they hold: a non-empty
+  `community` tree in every locale, an identical key tree across all ten,
+  identical `{{token}}` sets, no English text left in a non-English catalog, a
+  label for every `CLIMATE_BANDS` member, every community post status, every
+  report reason and every band-unresolved reason, and, in `6.1-I18N-MOB-09`,
+  the two surfaces value-identical in all ten locales so a string cannot drift
+  on one surface alone. Three of those key sets derive from the contract's own
+  enums rather than a hand-written list, so a seventh climate band or a new
+  report reason fails the spec, which catches it before a raw `temperate_wet`
+  renders on a pill in front of a member.
+
+  What no test can prove is that any of it reads well to a native speaker, or
+  that the tone matches the brand in nine languages. Both spec files carry a
+  header comment saying the non-English values are machine-translation drafts
+  pending human review, so the code does not overstate what it holds either.
+
+  **What a fix needs.** A native speaker per locale reading the rendered
+  surface, not another automated pass: every automated check this repository
+  can run is already green here, and none of them reads for register, idiom or
+  brand voice. This is one of the eight named signatures on the Community Beta
+  release gate. The story's own acceptance criteria keep production `off` until
+  moderation staffing, SLA alerts, privacy, deletion, localization,
+  accessibility, model and rollback evidence are signed, and the same eight are
+  recorded at `_bmad-output/project-knowledge/couturecast_roadmap.md:155` with
+  both production read and write rollout controls held off until every one is
+  signed. So this entry is a named blocker on opening Community Beta.
+
+- **Four local paths that answer confidently about state nobody intended.**
+  The shape is the finding; each instance on its own reads as a one-off.
+  1. `npm run db:seed` from the repository root seeded the WRONG DATABASE. It
+     passed no `DATABASE_URL`, so `prisma db seed` fell through to Prisma's
+     dotenv auto-load, resolved `packages/db/.env`, and connected to
+     `localhost:5432/couture_cast`. The intended target is the local Supabase
+     container.
+     FIXED: root `db:reset` and `db:seed` now route through
+     `scripts/run-with-local-db-env.mjs` (verified in the root `package.json`).
+     The part worth keeping is how it surfaced. It failed loudly only because
+     the two schemas had drifted far enough to produce `P2022`, "the column
+     LookbookPost.status does not exist". Before that divergence it seeded the
+     other database and reported success.
+
+     The same `packages/db/.env` is a live trap for anyone writing a probe, and
+     not only for `db:seed`. `apps/api/vitest.config.ts:10-34` carries a
+     thirty-line warning that importing `@prisma/client` loads that file as a
+     side effect and silently overwrites `process.env.DATABASE_URL` inside the
+     worker. On 2026-09-05 the test architect read that warning, quoted the same
+     config in its own review, then wrote a probe that resolved
+     `process.env.DATABASE_URL` after importing `@prisma/client`, measured
+     `localhost:5432/couture_cast`, and reported the pre-6.1 schema it found
+     there as a finding. Its own diagnosis is the useful part: the probe had no
+     could-not-measure state for "connected to a database I did not name", so it
+     printed a row count and a column set and read agreement with its own
+     expectation of failure as evidence. A probe that logged its resolved
+     connection string would have ended it in one line. (The probe itself is
+     reported; `apps/api/vitest.config.ts`'s warning and the `.env` mechanism
+     are in the repository and were checked.)
+
+  2. `apps/api`'s `pretest:cov` hook never fires for the script that is actually
+     run. `apps/api/package.json` declares `pretest:cov` and `test:cov`, and
+     `test:cov` simply delegates to `test:coverage`, which has no
+     `pretest:coverage` of its own. CI and every documented invocation call
+     `test:coverage`, so a local coverage run reads whatever `dist` happens to
+     be on disk. CI is unaffected: `.github/workflows/pr-checks.yml` runs an
+     explicit "Build packages" step before `npm run test:coverage`. NOT FIXED,
+     because it is build tooling and does not belong in a feature branch.
+  3. `apps/api/dist` lags its source and returns `undefined` for anything added
+     since the last build. On 2026-09-05 the two new
+     `FIXTURE_TEXT_ENGINE_VERSION` and `FIXTURE_IMAGE_ENGINE_VERSION` constants
+     read as `undefined` from built output while the source had them, which is
+     the same shape as the other two: a build artefact silently lagging its
+     source does not fail, it answers, and the caller cannot tell `undefined`
+     from a value. Read the source when a constant is new. (Reported by the
+     session that hit it; the constants are in
+     `apps/api/src/modules/community/community-moderation.engine.ts:14-15` and
+     were checked there.)
+  4. A live verification mutated the one database every other tier reads,
+     leaving eight rows behind including a published post, which made the feed
+     six items where every suite expects five. Nothing on those rows marked
+     which were fixtures and which were somebody's experiment. (Reported by the
+     session that ran the verification; the row count is not re-checkable from
+     the repository.)
+
+  None of the four fails. Each answers confidently about state nobody
+  intended, and two were caught only because a schema had drifted far enough to
+  make them loud. **What a fix needs:** the second is a `package.json` change
+  plus a check that no script declares a pre-hook for a name nothing calls; the
+  third is a habit, which is to read the source when a constant is new; the
+  fourth is the fixture-identification entry below.
+
+- **Test fixture rows are not identifiable, so "whose row is this" is a guess.**
+  Today the only way to separate a seeded row from a leaked one was reading
+  `image_byte_size` off it: `102400` is the factory default
+  (`packages/testing/src/factories/community.factory.ts:123`), and other values
+  trace to a specific spec's own literal or to the byte size of a particular
+  fixture PNG. Even the session that created rows could not reliably identify
+  its own.
+
+  **What a fix needs.** Mark the ACTORS and find rows by join. Rows are created
+  through half a dozen code paths that would each have to remember a marker,
+  while an account is created in exactly one place per suite. So the shape of
+  the fix is a reserved namespace on the account, the existing prefixes kept as
+  the sub-tier label, and one repository-level sweep that deletes every row
+  owned by an account inside it. No schema change and no per-row discipline, and
+  a human doing manual verification opts in for free by signing up inside the
+  namespace, which is what would have prevented the incident above.
+
+  **Amended 2026-09-05 by measurement, and the first draft of this entry had it
+  backwards.** That draft proposed a reserved namespace that separated fixture
+  accounts from real ones, keyed on `@example.com` being the fake domain. On a
+  development machine everything is fake, and the seed itself sits in
+  `@example.com`: `packages/db/prisma/seeds/commerce.ts:396` creates
+  `premium-active@example.com`, and a query for posts owned by any
+  `@example.com` account returns 5, which is every post in the database and
+  exactly the five the seed is there to preserve. A sweep written to that
+  proposal would have deleted the seed. The discriminator has to separate
+  DURABLE fixtures from EPHEMERAL ones, so the seed keeps its own namespace and
+  everything throwaway sits under one suffix that is safe to sweep wholesale.
+
+  The same measurement found that this machine already carries three fixture
+  domains that do not agree with each other, so a cleanup scoped to any one of
+  them misses the other two:
+
+      @example.com            the seed and the older probes
+      @synthetic.test         the API integration specs
+      @k6.couturecast.test    the load tier
+
+  `@k6.couturecast.test` is minted at `k6/helpers/config.ts:173`;
+  `@synthetic.test` is built inline by the integration specs, for example
+  `apps/api/integration/community-challenges.integration.spec.ts:96`; the
+  Playwright helpers mint `@example.com`, for example
+  `playwright/support/helpers/community-session.ts:99`. That changes what the
+  work IS: converge the probes and the ephemeral tiers onto `@synthetic.test`,
+  which already exists and is unambiguous, and leave the seed where it is.
+  Inventing a fourth convention is the thing to avoid.
+
+  One population that fits none of the three, and has to be part of the same
+  convergence: `@couture/testing`'s own user factory mints
+  `faker.internet.email()`
+  (`packages/testing/src/factories/user.factory.ts:101`), which produces
+  ordinary-looking consumer domains. Those accounts are collected today only
+  because `cleanup()` deletes the ids a test registered
+  (`packages/testing/src/cleanup.ts:704`); nothing can find them by domain if a
+  registration is ever missed.
+
+  The population the marker most has to reach is the one easiest to miss:
+  throwaway scripts. The single unattributable report row found on 2026-09-05
+  came from `probe3.sh`, a shell script in a session's scratchpad that was never
+  a committed fixture. It signed accounts up as `p3-$1-$SUF@example.com` with
+  `SUF` set to `$(date +%s)$RANDOM`, which is why a repository-wide search for a
+  generator producing that address shape found nothing: the generator was never
+  in the repository. Provenance came from decomposing the address itself.
+  `178864027315009` splits as the epoch `1788640273`, which is
+  2026-09-05T20:31:13Z, plus a bash `$RANDOM` of `15009`, and the row's
+  `created_at` was 20:31:13.580Z. Sub-second agreement is what turned
+  resemblance into evidence; without it the honest answer would have been to
+  leave a row nobody could account for. (Reported by the session that ran the
+  probe: the script lives in a scratchpad, so nothing here is checkable from the
+  repository except the epoch arithmetic, which is.)
+
+  A committed fixture can be made to follow a convention by review. A script
+  written mid-investigation has no reason to know the convention exists, and it
+  is the population that produces residue nobody can attribute afterwards. It is
+  also the population every session was in on 2026-09-05, which is worth saying
+  plainly. This is where the reserved namespace earns its keep over a per-fixture
+  prefix or a cleanup registry: signing up inside the namespace is ONE STRING in
+  a curl body, a cost a human or an agent writing a five-line probe will actually
+  pay, where "register your account with the cleanup helper" is not.
+
+  The honest limit: this does not cover a row created against a SEEDED account.
+  A namespace would have caught that report row and it would not have caught the
+  published post a probe created against a seed user. There the rule is a
+  convention rather than a mechanism. Verification work should not publish onto
+  seed users, and a session that does it anyway sweeps before handing the
+  database on. The orphaned-storage entry below is the other
+  end of this same problem: an account nobody can identify is also an account
+  nobody can sweep, and its allocated objects outlive it.
+
+  A second property of the same helper decides whether an arm-sensitive
+  assertion fails stably or intermittently, and it differs between two fixtures
+  in one file. `communityTest` hands a test a single account for its whole run,
+  so every request inside that test carries one experiment arm. `communityApiTest`
+  is per test as well, and a test that mints a second actor through `trackUser`
+  gives that actor its own arm; `buildUniqueId` folds a per-run stamp into the
+  address (`playwright/support/helpers/api-test.ts:83-93`), so an account is new
+  on every run and its arm is redrawn at roughly 50/50. One cursor test became a
+  coin flip on exactly that, which would have read as an intermittent cursor
+  defect: close to the worst available disguise for a deliberate behaviour
+  change. The general rule is what to keep: an assertion that depends on a
+  per-viewer assignment must DERIVE the assignment rather than assume it, and
+  "is this fixture stable?" is a question with two different answers inside one
+  helper. (The coin-flip test is reported by the session that hit it; the two
+  fixtures and the per-run stamp are in the repository and were checked.)
+
+  One concrete leak of this shape was found and FIXED today, and it shows the
+  failure mode. The Playwright community fixture's teardown was correctly scoped
+  to the throwaway account it created, and one spec creates a SECOND account and
+  allocates under it, so exactly one orphan draft survived every full-suite run.
+  `playwright/support/helpers/community-session.ts` now exposes `trackUser` and
+  tears down every account a test registers. `POST /posts/allocate` creates a
+  `draft` row and there is no public way to remove one, since `withdrawPost`
+  deliberately rejects anything outside `WITHDRAWABLE_STATUSES`, so a spec that
+  allocates without publishing leaks a row per call forever.
+
+- **The feed's keyset page sorts a materialised set where it could seek.**
+  Prisma expresses the cursor condition as an OR of two predicates, and
+  PostgreSQL plans that differently from the row-comparison form. Measured on
+  2000 seeded rows with identical parameters under `EXPLAIN ANALYZE`, and
+  recorded in `community-feed-query-plan.integration.spec.ts` beside the
+  assertion it explains:
+
+      row-comparison   Limit -> Index Scan using
+                       LookbookPost_climate_band_status_published_at_id_idx,
+                       Index Cond including ROW(published_at, id) < ROW($3, $4),
+                       no Sort node, shared hit=5
+      OR form          Limit -> Sort (published_at DESC, id DESC)
+                         -> Bitmap Heap Scan with Recheck
+                           -> BitmapOr over both feed indexes, shared hit=8
+
+  Both use the band index and neither scans the table, which is what the
+  assertions check and both satisfy. The structural difference is what the
+  numbers do next: the row-comparison seeks once and the index supplies the
+  ordering, while the OR form materialises the matched set across two bitmap
+  scans and then sorts it, so its cost tracks the size of the matched set where
+  the other stays bounded by `LIMIT`.
+
+  **Why this is recorded and not fixed.** It is not a regression this story
+  introduced; Prisma has emitted the keyset this way throughout. Fixing it means
+  hand-written SQL in the feed's hot path, and doing that on the final
+  verification pass of a 204-file branch is a worse risk than a scaling property
+  with a known trigger. And `6.1-PLAN-04` now pins the emitted shape, so a
+  rewrite of the cursor condition is detectable rather than silent.
+
+  **The limit of the measurement, stated so nobody over-reads it.** One band,
+  2000 rows, fresh statistics. The shape difference is structural and will hold.
+  The magnitude at production scale is unmeasured. The k6 result is not evidence
+  about this: p95 91.68ms was measured at seed scale, where the two plans are
+  equivalent at roughly 0.03ms each, and a measurement taken while the matched
+  set is small says nothing about the matched set growing.
+
+  **The trigger.** The matched set here is every published post in one band. It
+  stays small through a 1,000-viewer beta and stops being small when production
+  rollout opens, so re-run this `EXPLAIN` at production-representative row
+  counts before the read rollout advances. The Community Beta gate already
+  carries performance criteria, which is what this attaches to, so it is
+  scheduled work rather than something someone has to remember.
+
+- **Orphaned storage objects have no reconciliation path.** Two of the three
+  community maintenance sweeps purge objects, and each covers one route:
+  `sweepErasureRequests` purges objects for posts carrying
+  `erasure_requested_at`, and `sweepExpiredUploads` purges drafts past
+  `upload_expires_at`, both in
+  `apps/api/src/modules/community/community-maintenance.service.ts` (the third,
+  `sweepStalePendingReview`, raises alerts rather than deleting).
+  Every OTHER route to removing a post takes the row and leaves the bytes: an
+  operator, a test cleanup, a `deleteMany` in a fixture teardown. Today's
+  concrete case was eight rows deleted and eight objects orphaned. Every draft
+  carries an allocated object from its upload session, so an allocate that never
+  publishes already leaves bytes behind before any delete path is involved.
+
+  **What a fix needs.** A reconciliation sweep over the bucket rather than a
+  hope that every delete path remembers. The schema already hints at that
+  answer: `image_object_path` is denormalized onto `ModerationEvent` and onto
+  `CommunityPostReport` (migration lines 306-308) precisely so an orphaned
+  object stays findable after its post row is gone. Explicitly outside story
+  6.1's scope and deliberately not added now.
+
+  **Amended 2026-09-05: the unbounded thing is accounts, and it is arithmetic.**
+  Measured on this machine by the session that ran the gate, and reported here
+  rather than re-run: one full `npm run validate` added 38 accounts and zero
+  durable posts. The user count moved 1296 to 1325 while `@example.com` stayed
+  at exactly 593, because the 38 were 29 `@synthetic.test` and 9
+  `@k6.couturecast.test`. Current scale is 1325 users against the five posts
+  anyone wants.
+
+  Nothing collects those accounts. Both community sweeps key on POSTS, and
+  `@couture/testing`'s `cleanup()` deletes only the ids a test registered
+  (`packages/testing/src/cleanup.ts:704`), which cannot reach an account created
+  outside the registry: the integration specs build users directly through
+  Prisma, and the Playwright and k6 tiers sign up through the API. So at one
+  gate run per pull request the account table grows without bound on any
+  long-lived environment, and the object store grows with it, because every
+  allocate leaves bytes owned by an account nobody will ever collect. That is
+  the same problem the fixture-identification entry above describes, seen from
+  the other end: without a namespace to sweep by, there is nothing to key an
+  account sweep on.
+
+  What bounds the problem, stated because it is the good half of the finding:
+  the integration tier collects its own content correctly. A mid-gate
+  measurement caught twelve posts, including one `consent_suspended` and three
+  `withdrawn`, and the count was back to the seed's five once the gate finished,
+  with `CommunityPostReport` flat at 1. The tier that runs on every pull request
+  creates and collects its own posts and reports. The leak is accounts.
+
+## Open decisions from the Prisma drift cleanup (2026-09-05)
+
+Five pre-existing Prisma drift items were closed in this pass, all on the
+datamodel side with no migration written and no data touched, so
+`prisma migrate diff` on a clean checkout now reports no difference. Four were
+plain cleanups. The fifth left a decision behind that belongs to whoever owns
+the schema's conventions, and it is recorded here because it changes nothing
+today and blocks nothing. This section is a sibling of the story sections above
+because the question is schema-wide.
+
+- **Should `feature_flags.updated_at` be normalised from `timestamptz(6)` to
+  `timestamp(3) without time zone`?** The column was written by hand in
+  `packages/db/prisma/migrations/20260314160000_add_feature_flags/migration.sql`
+  as `TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP`, and the live column is
+  `timestamp with time zone` at precision 6. Every other Prisma-generated
+  timestamp in this schema is `timestamp(3)` without a time zone, which is what
+  a bare `DateTime @updatedAt` means. The drift was two facts at once: a missing
+  default and a genuinely different type.
+
+  What the cleanup did. `packages/db/prisma/schema.prisma` now carries
+  `@default(now()) @updatedAt @db.Timestamptz(6)` on that field, which describes
+  the column that already exists. No value moved and no client behaviour
+  differs, because the query engine reads the column's real type off the wire
+  whatever the annotation says. The field also carries a docblock stating the
+  same reasoning at the point a reader meets it.
+
+  Why nothing forces the question today. The table holds one row per flag key.
+  The column is written only by `packages/db/prisma/seeds/feature-flags.ts`'s
+  upsert and by the API's flag sync through
+  `apps/api/src/modules/feature-flags/feature-flags.repository.ts`, and nothing
+  reads it for logic: the only read is a `findUnique` by key, and no query in
+  the repository filters or orders by it.
+
+  The trade, stated both ways. Normalising costs a data-touching migration and
+  a full table rewrite, which is trivial at this row count, and buys schema
+  consistency plus one fewer annotation. Leaving it costs the annotation and an
+  inconsistency that a future reader trips over once. What makes this a decision
+  and not a cleanup: `timestamptz` is arguably the more correct type for a
+  timestamp, and the rest of the schema is the odd one out, so normalising to
+  match the others could be normalising toward the wrong answer.
+
+  **What a fix needs.** Someone to decide which direction is right for the
+  schema as a whole. The answer is a convention and this column is one instance
+  of it: either every timestamp moves to `timestamptz`, or this one moves to
+  `timestamp(3)` and the convention is written down so the next hand-authored
+  migration follows it. Leaving it
+  exactly as it stands is safe and keeps `prisma migrate diff` quiet either way,
+  so nothing degrades while the decision waits.
+
+## Developer tooling found during the Prisma drift cleanup (2026-09-05)
+
+Unlike most of this ledger, this entry is a recipe. Every step below was run
+end to end. It is recorded here because the fix belongs in its own pull
+request.
+
+- **`prisma migrate dev` has been unusable in this repository since April, and
+  the fix is two lines of setup.** The command dies at `P3006` on
+  `packages/db/prisma/migrations/20260420113000_add_guardian_shared_rls_policies/migration.sql`.
+  No `shadowDatabaseUrl` is configured, so Prisma creates a temporary shadow
+  database with no Supabase `auth` schema, and that migration's
+  `private.current_app_user_id()` and `private.current_app_role()` are
+  `LANGUAGE sql` functions whose bodies call `auth.jwt()`. PostgreSQL validates
+  a sql function body at CREATE FUNCTION time, so it raises
+  `schema "auth" does not exist` and the replay stops.
+
+  **The fix, proven end to end.** First, add
+  `shadowDatabaseUrl = env("SHADOW_DATABASE_URL")` to the datasource block in
+  `packages/db/prisma/schema.prisma`. Second, prepare a shadow database
+  containing the one thing Prisma cannot create for itself:
+
+      CREATE SCHEMA auth;
+      CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$
+        SELECT coalesce(current_setting('request.jwt.claims', true), '{}')::jsonb
+      $$;
+
+  No bootstrap migration is needed.
+
+  **Evidence, which is what makes this actionable.**
+  `prisma migrate diff --from-migrations ... --shadow-database-url <prepared db>`
+  returns "No difference detected": all 38 migrations replay from empty and
+  match the datamodel, which is also the from-migrations drift proof that was
+  previously unobtainable. `prisma migrate dev` against a throwaway main
+  database with that shadow configured returns "Your database is now in sync
+  with your schema." Running the diff a second time against the now-populated
+  shadow still returns no difference and `auth` survives, because Prisma's reset
+  drops only the schemas the migrations own (`public`, `private`). Preparing the
+  database is one-time setup, so it costs nothing per run.
+
+  **Why nothing else is needed. Every claim here was checked.** `auth.` appears
+  in exactly one migration and only inside those two function bodies. `storage.`
+  appears in two migrations, `20260804180000_add_garment_capture_lifecycle` and
+  `20260905120000_add_community_feed_and_challenges`, and both are already
+  guarded by `IF to_regclass('storage.buckets') IS NOT NULL THEN`, so a shadow
+  database without a storage schema skips them correctly. `private` is created
+  by that same April migration, so it is self-supplying. There are zero hits for
+  `supabase_functions`, `extensions.`, `realtime.` and `graphql.`. Roles
+  (`anon`, `authenticated`, `service_role`) are cluster-wide, so a shadow
+  database on the same server inherits them; a shadow on a server WITHOUT those
+  roles needs them created, which is a second setup line worth stating in
+  whatever document ends up carrying the recipe.
+
+  **Blast radius, measured with the variable deliberately unset.**
+  `migrate status`, `migrate diff` and `generate` all exit 0 unchanged, and
+  `migrate dev` produces the same `P3006` it produces today. The config line is
+  inert for anyone who does not set `SHADOW_DATABASE_URL`, so it cannot regress
+  CI or `migrate deploy`, and it is opt-in.
+
+  **Caveat that has to travel with the recipe.** `auth.jwt()` in the shadow
+  database is a STUB returning whatever `request.jwt.claims` holds, and it
+  behaves nothing like Supabase's real function. That is correct for a shadow
+  database, whose only job is replaying migrations to compute a diff, because
+  nothing there evaluates a JWT. The shadow database is neither seeded nor
+  authoritative, and no test may ever be pointed at it.
+
+  **Why this matters more than an annoyance.** It is the likely upstream cause
+  of two defects fixed on 2026-09-05. When `migrate dev` works, Prisma authors
+  the migration and applies its own identifier truncation consistently on both
+  sides, which is the property that keeps
+  `AffiliateClick_user_id_offer_id_recommendation_id_created_a_idx`
+  (`20260811090000_add_commerce_affiliate/migration.sql:124`) honest at 63
+  bytes. When it does not work, migrations get hand-written, and hand-written
+  SQL is where both of those defects lived: a 64-byte index name PostgreSQL
+  silently truncated, and a partial index declared in the datamodel as a plain
+  `@@index` whose derived name would have collided with the real object. The
+  limit of that claim: several hand-written migrations here do things Prisma
+  cannot express at all, including RLS policies, triggers and storage buckets,
+  and would have been hand-written regardless. The claim covers those two defect
+  classes only.
+
+  **Physical evidence that someone already hit this wall.** The local server
+  carries a database called `postgres_shadow_cc` with exactly one non-system
+  schema, `public`, holding 16 tables. It has no `private` schema, no `auth`,
+  and `SELECT to_regclass('public._prisma_migrations')` returns empty, so it
+  carries no migration history at all. That is precisely the state immediately
+  before `20260420113000_add_guardian_shared_rls_policies`, the migration that
+  creates `private` and first calls `auth.jwt()`. Somebody in April pointed
+  `migrate dev` at it, watched it die at exactly the migration that still dies
+  today, and left it.
+
+  To re-check this in one line without a `psql` client on the PATH, which is the
+  route that works on these machines:
+
+      docker exec supabase_db_couture-cast psql -U postgres
+
+  The same listing shows a second stray database, `cc_rls_review_20260420`,
+  whose name carries the same April date as the guardian RLS migration.
+  (Excluding templates, the server holds `_supabase`, `cc_rls_review_20260420`,
+  `postgres` and `postgres_shadow_cc`.) Nobody in the sessions working on this
+  knows what created it and nobody has opened it. Whoever picks up the pull
+  request below has two stray databases to account for.
+
+  **What a fix needs.** Its own pull request. It is dev tooling, nothing in
+  story 6.1 depends on it, and it wants a reviewer whose attention is on
+  developer setup. Scope: the config line; the prepare
+  snippet; a README or CONTRIBUTING note; a decision on whether CI prepares a
+  shadow database too; the cluster-roles caveat; whether an executable
+  `npm run db:shadow:prepare` script belongs in `package.json` so the setup is
+  runnable prose-free; and dropping or repurposing `postgres_shadow_cc`, plus
+  identifying `cc_rls_review_20260420`, so two half-applied fossils are not left
+  sitting on developer machines as their own traps.
+
+## Shared build tooling, found while running story 6.1's suites (2026-09-05)
+
+This is cross-cutting: it costs every session on the repository, and four of
+them lost runs to it in one day.
+
+- **`verify:api` rebuilds the shared packages on every step, and the rebuild is
+  destructive.** `scripts/verify-workspace.mjs` runs lint, typecheck, test and
+  build for the workspace, and `apps/api/package.json` declares `prelint`,
+  `pretypecheck`, `pretest` and `prebuild` as `npm run prepare:shared-deps`.
+  That script builds `@couture/config`, `@couture/utils`, `@couture/api-client`
+  and `@couture/testing` in turn, and each of those four `build` scripts opens
+  with `rm -rf dist tsconfig.build.tsbuildinfo`. So one `verify:api` is at least
+  four full teardown-and-rebuild cycles across four packages, and the session
+  that measured it counted eight `prepare:shared-deps` invocations in a single
+  command's log.
+
+  Any other session compiling or linting during one of those windows fails while
+  the `dist` directories are missing, and the failure does not look like a build
+  race. Four shapes were seen today, and the last two are the ones that mislead,
+  because neither points at a build:
+
+      Cannot find module '.../packages/api-client/dist/contracts/http/index.js'
+      Cannot find module '.prisma/client/default'
+      ENOENT ... packages/testing/dist/index.d.ts
+      Failed to resolve entry for package "@couture/utils"
+
+  the third reported by eslint's `import/no-unresolved` on a file nobody was
+  editing, and the fourth raised by vite's `packageEntryFailure`. The fourth is
+  the least recognisable of the set: it names a PACKAGE rather than a file and
+  comes from the module resolver rather than the test runner, so it reads as a
+  broken dependency declaration.
+
+  **What a fix needs.** Make `prepare:shared-deps` idempotent or cached, so a
+  repeated invocation is cheap and non-destructive when the outputs are already
+  current. Removing the pre-hooks is the wrong direction: each one is
+  individually correct, and dropping them puts every workspace back to compiling
+  against whatever `dist` happens to be on disk, which is the same defect the
+  `pretest:cov` entry above describes.

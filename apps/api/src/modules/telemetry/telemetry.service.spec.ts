@@ -1029,6 +1029,218 @@ describe('TelemetryService', () => {
     })
   })
 
+  describe('Story 6.1 community telemetry', () => {
+    beforeEach(() => {
+      telemetryCreate.mockResolvedValue({ id: 'event-1' })
+    })
+
+    const subjectFor = (userId: string) =>
+      createHmac('sha256', 'telemetry-test-secret-at-least-32-bytes')
+        .update(userId)
+        .digest('base64url')
+
+    it('emits community_feed_viewed with the full closed-enum payload', async () => {
+      await service.captureEvent('raw-user-1', 'community_feed_viewed', {
+        platform: 'web',
+        dedupeKey: 'community_feed_viewed:token:auto:first:1',
+        climateBand: 'temperate_dry',
+        bandResolved: true,
+        filterMode: 'auto',
+        experimentVariant: 'auto',
+        itemCount: 12,
+        isEmpty: false,
+      })
+
+      expect(analyticsCapture).toHaveBeenCalledWith({
+        distinctId: subjectFor('raw-user-1'),
+        event: 'community_feed_viewed',
+        properties: {
+          platform: 'web',
+          dedupe_key: 'community_feed_viewed:token:auto:first:1',
+          climate_band: 'temperate_dry',
+          band_resolved: true,
+          filter_mode: 'auto',
+          experiment_variant: 'auto',
+          item_count: 12,
+          is_empty: false,
+          $ip: null,
+        },
+      })
+      expect(telemetryCreate).toHaveBeenCalledWith({
+        data: {
+          user_id: null,
+          event_type: 'community_feed_viewed',
+          properties: {
+            platform: 'web',
+            dedupe_key: 'community_feed_viewed:token:auto:first:1',
+            climate_band: 'temperate_dry',
+            band_resolved: true,
+            filter_mode: 'auto',
+            experiment_variant: 'auto',
+            item_count: 12,
+            is_empty: false,
+          },
+        },
+      })
+    })
+
+    it('emits community_post_published with a deterministic dedupe key', async () => {
+      await service.captureEvent('raw-user-1', 'community_post_published', {
+        platform: 'mobile',
+        dedupeKey: 'community_post_published:post-1',
+        climateBand: 'cold_wet',
+      })
+
+      expect(analyticsCapture).toHaveBeenCalledWith({
+        distinctId: subjectFor('raw-user-1'),
+        event: 'community_post_published',
+        properties: {
+          platform: 'mobile',
+          dedupe_key: 'community_post_published:post-1',
+          climate_band: 'cold_wet',
+          $ip: null,
+        },
+      })
+      expect(telemetryCreate).toHaveBeenCalledWith({
+        data: {
+          user_id: null,
+          event_type: 'community_post_published',
+          properties: {
+            platform: 'mobile',
+            dedupe_key: 'community_post_published:post-1',
+            climate_band: 'cold_wet',
+          },
+        },
+      })
+    })
+
+    it.each([
+      'community_card_opened',
+      'community_post_allocated',
+      'community_post_submitted',
+      'community_post_withdrawn',
+      'community_challenge_participated',
+    ] as const)(
+      'persists %s with a null user_id, never the raw id',
+      async (eventType) => {
+        // Membership in PSEUDONYMOUS_EVENT_TYPES is the privacy-critical list: an
+        // event missing from it is written to TelemetryEvent carrying the raw user
+        // id and never reaches PostHog at all.
+        const props: Record<string, unknown> = {
+          platform: 'web',
+          dedupeKey: `${eventType}:post-1`,
+        }
+        if (eventType === 'community_card_opened') {
+          props.climateBand = 'cold_wet'
+          props.isSelf = false
+          props.experimentVariant = 'all'
+        } else if (eventType === 'community_post_allocated') {
+          props.replayed = false
+        } else if (eventType === 'community_post_submitted') {
+          props.climateBand = 'cold_wet'
+          props.hasCaption = true
+          props.hasChallenge = false
+        } else {
+          props.climateBand = 'cold_wet'
+        }
+
+        await service.captureEvent('raw-user-1', eventType, props as never)
+
+        expect(telemetryCreate).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            user_id: null,
+            event_type: eventType,
+          }) as unknown,
+        })
+        expect(analyticsCapture).toHaveBeenCalledWith(
+          expect.objectContaining({
+            distinctId: subjectFor('raw-user-1'),
+            event: eventType,
+          })
+        )
+      }
+    )
+
+    it('emits community_post_reported with platform and reason', async () => {
+      await service.captureEvent('raw-user-1', 'community_post_reported', {
+        platform: 'web',
+        dedupeKey: 'community_post_reported:post-1:user-2',
+        reason: 'spam',
+      })
+
+      expect(analyticsCapture).toHaveBeenCalledWith({
+        distinctId: subjectFor('raw-user-1'),
+        event: 'community_post_reported',
+        properties: {
+          platform: 'web',
+          dedupe_key: 'community_post_reported:post-1:user-2',
+          reason: 'spam',
+          $ip: null,
+        },
+      })
+      expect(telemetryCreate).toHaveBeenCalledWith({
+        data: {
+          user_id: null,
+          event_type: 'community_post_reported',
+          properties: {
+            platform: 'web',
+            dedupe_key: 'community_post_reported:post-1:user-2',
+            reason: 'spam',
+          },
+        },
+      })
+    })
+
+    it.each([
+      'community_feed_viewed',
+      'community_post_published',
+      'community_post_reported',
+    ] as const)('refuses to emit %s with no authenticated user', async (eventType) => {
+      const props =
+        eventType === 'community_feed_viewed'
+          ? {
+              platform: 'web',
+              dedupeKey: 'k',
+              climateBand: 'temperate_dry',
+              bandResolved: true,
+              filterMode: 'auto',
+              experimentVariant: 'auto',
+              itemCount: 0,
+              isEmpty: true,
+            }
+          : eventType === 'community_post_published'
+            ? { platform: 'mobile', dedupeKey: 'k', climateBand: 'warm_dry' }
+            : { platform: 'web', dedupeKey: 'k', reason: 'harassment' }
+
+      await expect(service.captureEvent(null, eventType, props as never)).rejects.toThrow(
+        'Community telemetry requires an authenticated user'
+      )
+      expect(telemetryCreate).not.toHaveBeenCalled()
+      expect(analyticsCapture).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      { name: 'caption text', extra: { caption: 'forbidden fit caption' } },
+      { name: 'an image url', extra: { imageUrl: 'https://example.com/forbidden.jpg' } },
+      { name: 'a raw user id', extra: { userId: 'raw-user-1' } },
+      { name: 'coordinates', extra: { latitude: 10, longitude: 20 } },
+    ])(
+      'rejects a community_feed_viewed capture carrying $name before anything is written',
+      async ({ extra }) => {
+        await expect(
+          service.captureEvent('raw-user-1', 'community_feed_viewed', {
+            platform: 'web',
+            climateBand: 'temperate_dry',
+            bandResolved: true,
+            ...extra,
+          } as never)
+        ).rejects.toThrow()
+        expect(telemetryCreate).not.toHaveBeenCalled()
+        expect(analyticsCapture).not.toHaveBeenCalled()
+      }
+    )
+  })
+
   describe('trackOutfitGenerated', () => {
     it('does not re-emit first_outfit_generated when one was already recorded', async () => {
       // Retried ritual generation must not duplicate the funnel event.

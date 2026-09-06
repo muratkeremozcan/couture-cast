@@ -15,6 +15,7 @@ import {
   configureProviderPremiumThemeState,
   configureProviderPaletteAdvisorState,
   configureProviderPlannerState,
+  configureProviderCommunityState,
   parsePactEvent,
   type PactEvent,
 } from './provider-helper'
@@ -66,6 +67,11 @@ type PaletteAdvisorStateParams = {
 type PlannerStateParams = {
   userId?: string
   planDate?: string
+}
+
+type CommunityStateParams = {
+  userId?: string
+  postId?: string
 }
 
 type PremiumThemeStateParams = {
@@ -537,6 +543,185 @@ export const stateHandlers: StateHandlers = {
     configureProviderPremiumThemeState({ userId, scenario: 'owner-erased' })
     return Promise.resolve({
       description: 'Configured an entitled user whose account is erased mid-request',
+    })
+  },
+
+  /**
+   * Story 6.1 community feed by climate band.
+   *
+   * Two of these states do not select a service behaviour at all, and that is
+   * deliberate rather than an omission. 'The community feed is readable' backs
+   * three consumer rows: an unknown `mode` and both cursor rejections. Only the
+   * cursor rows reach `CommunityService`; an unknown `mode` fails
+   * `communityFeedQuerySchema` inside the controller first, so the scenario it
+   * arranges is never consulted. 'An administrator may create a community
+   * challenge' has the same shape: the invalid-window row is rejected by
+   * `createCommunityChallengeInputSchema`'s `superRefine` before the service
+   * runs, while the valid row goes all the way through.
+   *
+   * 'A community upload session already exists for the idempotency key' backs
+   * BOTH the 200 replay and the 409 mismatch, on purpose. They share one world
+   * state and differ only in the payload presented against the key, which is
+   * exactly what idempotency means; the double compares the incoming bytes
+   * rather than being told the answer by two different states.
+   */
+  'A resolved climate band feed page exists for user': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'feed-resolved' })
+    return Promise.resolve({
+      description: 'Configured a feed page with a resolved viewer band',
+    })
+  },
+
+  'The viewer climate band cannot be resolved': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'feed-band-unresolved' })
+    return Promise.resolve({
+      description: 'Configured an all-region feed with an unresolved viewer band',
+    })
+  },
+
+  'The author has withdrawn and consent-suspended posts': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'feed-removed-content' })
+    return Promise.resolve({
+      description: 'Configured removed author content with no readable image',
+    })
+  },
+
+  'The community feed is readable': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'feed-cursor-invalid' })
+    return Promise.resolve({
+      description: 'Configured a readable feed that rejects the presented cursor',
+    })
+  },
+
+  'A published community post is visible to the caller': (parameters?: unknown) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, postId, scenario: 'post-visible' })
+    return Promise.resolve({
+      description: `Configured a visible community post ${postId ?? 'default'}`,
+    })
+  },
+
+  'The requested community post is not visible to the caller': (parameters?: unknown) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, postId, scenario: 'post-not-found' })
+    return Promise.resolve({
+      description: 'Configured a community post the caller cannot see',
+    })
+  },
+
+  'The caller may allocate a community upload session': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'allocate-new' })
+    return Promise.resolve({
+      description: 'Configured a caller who may allocate an upload session',
+    })
+  },
+
+  'A community upload session already exists for the idempotency key': (
+    parameters?: unknown
+  ) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, postId, scenario: 'allocate-replay' })
+    return Promise.resolve({
+      description: 'Configured an allocation already recorded against the key',
+    })
+  },
+
+  'A completed community upload is ready to publish': (parameters?: unknown) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, postId, scenario: 'publish-accepted' })
+    return Promise.resolve({
+      description: 'Configured an uploaded post ready for moderation',
+    })
+  },
+
+  'The publish upload session does not match the post': (parameters?: unknown) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({
+      userId,
+      postId,
+      scenario: 'publish-session-mismatch',
+    })
+    return Promise.resolve({
+      description: 'Configured a publish whose upload session belongs elsewhere',
+    })
+  },
+
+  'The caller has reached the daily community post limit': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'post-rate-limited' })
+    return Promise.resolve({
+      description: 'Configured ten accepted submissions in the rolling 24-hour window',
+    })
+  },
+
+  'A visible community post can be reported by the caller': (parameters?: unknown) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, postId, scenario: 'report-accepted' })
+    return Promise.resolve({
+      description: `Configured a reportable community post ${postId ?? 'default'}`,
+    })
+  },
+
+  'The reported community post is not visible to the caller': (parameters?: unknown) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, postId, scenario: 'report-not-found' })
+    return Promise.resolve({
+      description: 'Configured a report against a post the caller cannot see',
+    })
+  },
+
+  'The caller already reported this community post for another reason': (
+    parameters?: unknown
+  ) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({
+      userId,
+      postId,
+      scenario: 'report-reason-changed',
+    })
+    return Promise.resolve({
+      description: 'Configured an existing report carrying a different reason',
+    })
+  },
+
+  'The reported community post belongs to the caller': (parameters?: unknown) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, postId, scenario: 'report-self' })
+    return Promise.resolve({
+      description: 'Configured a post authored by the reporting caller',
+    })
+  },
+
+  'The caller has reached the community reporting abuse limit': (
+    parameters?: unknown
+  ) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, postId, scenario: 'report-rate-limited' })
+    return Promise.resolve({
+      description: 'Configured a caller past the reporting abuse budget',
+    })
+  },
+
+  'An administrator may create a community challenge': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'challenge-created' })
+    return Promise.resolve({
+      description: 'Configured an administrator with no conflicting challenge',
+    })
+  },
+
+  'An active community challenge already covers this band and window': (
+    parameters?: unknown
+  ) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'challenge-overlap' })
+    return Promise.resolve({
+      description: 'Configured an overlapping active challenge in the same band',
     })
   },
 }

@@ -408,5 +408,171 @@
         "unknown": "Algo salió mal con esta foto. Inténtalo de nuevo."
       }
     }
+  },
+  "community": {
+    "title": "Comunidad",
+    "heading": "Lookbook vivo de la comunidad",
+    "sectionLabel": "Lookbook de la comunidad",
+    "inspirations": "Inspiraciones de la comunidad",
+    "share": "Comparte tu look",
+    "newPost": "Nueva publicación",
+    "deepLink": {
+      "invalid": "Este enlace no es válido, venció o ya no está disponible."
+    },
+    "filters": {
+      "label": "Filtros de la comunidad",
+      "announce": "Se muestran looks de {{filter}}.",
+      "mode": {
+        "auto": "Tu clima",
+        "autoWithBand": "Tu clima: {{band}}",
+        "all": "Todos los climas",
+        "cold_dry": "Frío y seco",
+        "cold_wet": "Frío y húmedo",
+        "temperate_dry": "Templado y seco",
+        "temperate_wet": "Templado y húmedo",
+        "warm_dry": "Cálido y seco",
+        "warm_wet": "Cálido y húmedo"
+      }
+    },
+    "band": {
+      "cold_dry": "Frío y seco",
+      "cold_wet": "Frío y húmedo",
+      "temperate_dry": "Templado y seco",
+      "temperate_wet": "Templado y húmedo",
+      "warm_dry": "Cálido y seco",
+      "warm_wet": "Cálido y húmedo",
+      "unclassified": "Todo clima",
+      "unresolved": {
+        "no_location": "Agrega una ubicación para ver looks que coincidan con tu clima. Mientras tanto, ves todas las franjas climáticas.",
+        "weather_unavailable": "Tu pronóstico local no está disponible, así que ves looks de todas las franjas climáticas.",
+        "weather_stale": "Tu pronóstico local está desactualizado, así que ves looks de todas las franjas climáticas.",
+        "weather_malformed": "No se pudo leer tu pronóstico local, así que ves looks de todas las franjas climáticas.",
+        "insufficient_usable_days": "No hay suficientes datos recientes del pronóstico para identificar tu clima, así que ves looks de todas las franjas climáticas."
+      }
+    },
+    "feed": {
+      "loading": "Cargando looks de la comunidad",
+      "announceLoaded": "Se muestran looks de {{filter}}. {{count}} cargados.",
+      "announceLoadedMore": "Se cargaron {{count}} looks más.",
+      "announceFocused": "El look destacado está enfocado.",
+      "emptyTitle": "Todavía nadie compartió un look aquí",
+      "emptyBody": "Sé la primera persona en compartir un look listo para el clima.",
+      "errorTitle": "No pudimos cargar el feed de la comunidad.",
+      "retry": "Reintentar",
+      "loadMore": "Cargar más looks",
+      "loadingMore": "Cargando",
+      "yourPostsTitle": "Tus looks en proceso",
+      "yourPostsBody": "Solo tú puedes verlos hasta que termine la revisión."
+    },
+    "card": {
+      "label": "Look de {{author}}",
+      "authorSelf": "Tú",
+      "authorFallback": "Explorador de estilo",
+      "imageUnavailable": "Imagen no disponible",
+      "imageRetry": "Volver a cargar la imagen",
+      "report": "Reportar",
+      "reported": "Reportado",
+      "withdraw": "Retirar",
+      "sponsored": "Patrocinado",
+      "sponsoredAnnounce": "Look patrocinado"
+    },
+    "status": {
+      "draft": "Borrador",
+      "uploading": "Subiendo",
+      "pending_review": "En revisión",
+      "published": "Publicado",
+      "flagged": "Eliminado por moderación",
+      "review_failed": "La revisión no se completó",
+      "withdrawn": "Retirado",
+      "consent_suspended": "Oculto a la espera del consentimiento",
+      "reason": "Motivo: {{reason}}"
+    },
+    "removed": {
+      "flagged": "La moderación eliminó este look. Nadie más puede verlo.",
+      "review_failed": "La revisión no se completó, así que este look no se publicó. Compártelo de nuevo para reintentar.",
+      "withdrawn": "Retiraste este look del feed.",
+      "consent_suspended": "Este look queda oculto hasta que una persona tutora renueve el consentimiento. Compártelo de nuevo cuando el consentimiento esté activo."
+    },
+    "challenge": {
+      "eyebrow": "Reto de estilo semanal",
+      "allClimates": "Todos los climas",
+      "participate": "Participar",
+      "participateLabel": "Participar en {{title}}",
+      "activeThisWeek": "Activo esta semana",
+      "dateRange": "Del {{start}} al {{end}}"
+    },
+    "report": {
+      "title": "Reportar este look",
+      "description": "Ayuda a mantener segura a la comunidad. Elige un motivo y una persona moderadora lo revisará.",
+      "reasonLabel": "Motivo del reporte",
+      "detailsLabel": "Más detalles (opcional)",
+      "detailsPlaceholder": "Describe cómo este look incumple las normas de la comunidad",
+      "detailsCount": "{{count}} de 500 caracteres",
+      "submit": "Enviar reporte",
+      "submitting": "Enviando",
+      "cancel": "Cancelar",
+      "close": "Cerrar el cuadro de diálogo del reporte",
+      "success": "Gracias. Una persona moderadora revisará este look.",
+      "reason": {
+        "spam": "Spam o contenido engañoso",
+        "harassment": "Acoso o intimidación",
+        "inappropriate_content": "Contenido inapropiado",
+        "hate_speech": "Discurso de odio",
+        "violence": "Violencia o contenido dañino",
+        "other": "Otra cosa"
+      }
+    },
+    "compose": {
+      "title": "Comparte tu look",
+      "description": "Cada look se revisa automáticamente antes de llegar al feed.",
+      "close": "Cerrar sin compartir",
+      "photoLabel": "Foto",
+      "photoHint": "JPEG, PNG o WebP, hasta 10 MB y al menos 256 píxeles por lado.",
+      "choosePhoto": "Elegir una foto",
+      "changePhoto": "Cambiar la foto",
+      "preview": "Vista previa del look que vas a compartir",
+      "altLabel": "Descripción de la imagen",
+      "altHint": "Describe las prendas, las capas y los colores para quienes usan un lector de pantalla.",
+      "altPlaceholder": "Describe las prendas, las capas y los colores",
+      "altSuggested": "Sugerimos una descripción. Edítala para que coincida con tu foto.",
+      "altConfirm": "Confirmo que esta descripción coincide con la foto",
+      "captionLabel": "Comentario (opcional)",
+      "captionPlaceholder": "Notas sobre el clima, las telas o el estilismo",
+      "captionCount": "{{count}} de 280 caracteres",
+      "challengeLabel": "Reto semanal",
+      "challengeNone": "Sin reto",
+      "publish": "Publicar",
+      "publishing": "Revisando y publicando",
+      "uploading": "Subiendo tu foto",
+      "cancel": "Cancelar",
+      "success": "Tu look se envió a revisión."
+    },
+    "validation": {
+      "photoRequired": "Elige una foto para compartir.",
+      "altRequired": "Agrega una descripción de la imagen.",
+      "altConfirmRequired": "Confirma la descripción de la imagen antes de publicar.",
+      "captionTooLong": "Mantén el comentario en 280 caracteres o menos.",
+      "captionUrl": "El comentario no puede contener enlaces.",
+      "captionEmail": "El comentario no puede contener direcciones de correo electrónico.",
+      "imageTooSmall": "Elige una imagen de al menos 256 píxeles de ancho y de alto.",
+      "permissionDenied": "CoutureCast necesita acceso a tus fotos para compartir un look.",
+      "pickerFailed": "No se pudo abrir el selector de fotos."
+    },
+    "error": {
+      "load": "No pudimos cargar el feed de la comunidad.",
+      "report": "No pudimos enviar tu reporte.",
+      "withdraw": "No pudimos retirar este look. Sigue en el feed.",
+      "publish": "No pudimos publicar tu look.",
+      "upload": "No se pudo subir tu foto, así que no se publicó nada. Inténtalo de nuevo.",
+      "signedOut": "Inicia sesión para participar en la comunidad.",
+      "ageGate": "Necesitas tener al menos 13 años para publicar en la comunidad.",
+      "rateLimited": "Alcanzaste el límite de diez looks de hoy.",
+      "rateLimitedUntil": "Alcanzaste el límite de diez looks de hoy. Inténtalo de nuevo después de las {{time}}.",
+      "reasonChanged": "Ya reportaste este look por otro motivo.",
+      "selfReport": "No puedes reportar tu propio look.",
+      "notFound": "Este look ya no está disponible.",
+      "disabled": "El feed de la comunidad no está disponible por el momento.",
+      "generic": "Algo salió mal. Inténtalo de nuevo."
+    }
   }
 }

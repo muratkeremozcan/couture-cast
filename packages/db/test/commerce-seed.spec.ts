@@ -50,6 +50,31 @@ const removeSeededCatalog = async () => {
     return
   }
 
+  // Reverse dependency order: conversions -> clicks -> offers -> partner.
+  //
+  // AffiliateClick holds ON DELETE RESTRICT foreign keys onto AffiliateOffer and
+  // CommercePartner, so an offer cannot be removed while any click still points
+  // at it. This used to delete the offers directly, which worked only for as
+  // long as nothing had ever clicked a seeded offer. The moment anything did --
+  // a Playwright run, a Maestro flow, an API integration test, or a fixture that
+  // leaked a row -- every test in this file failed on a foreign key violation in
+  // `beforeEach`, before asserting anything, and the failure pointed at the seed
+  // rather than at the click that caused it. Same reverse-order rule
+  // `packages/testing/src/cleanup.ts` follows for every other table.
+  const offers = await prisma.affiliateOffer.findMany({
+    where: { partner_id: partner.id },
+    select: { id: true },
+  })
+  const offerIds = offers.map((offer) => offer.id)
+
+  // AffiliateConversion holds a RESTRICT foreign key onto the partner directly,
+  // as well as a SetNull one onto the click, so it has to go before both.
+  await prisma.affiliateConversion.deleteMany({ where: { partner_id: partner.id } })
+
+  if (offerIds.length > 0) {
+    await prisma.affiliateClick.deleteMany({ where: { offer_id: { in: offerIds } } })
+  }
+
   await prisma.affiliateOffer.deleteMany({ where: { partner_id: partner.id } })
   await prisma.commercePartner.delete({ where: { id: partner.id } })
 }

@@ -1,7 +1,7 @@
 // Learning path Step 27: Widget and notification deep-link handling.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 // Story 3.7 Task 6 step 1 owner: E2E Playwright test widget tap, severe weather alert focus, community lookbook highlight, and invalid deep link fallback
-import { test, expect } from '../support/fixtures/merged-fixtures'
+import { communityTest as test, expect } from '../support/helpers/community-session'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
 import type { Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
@@ -58,17 +58,28 @@ test.describe('Widget / Notification Deep-Link Handling (Story 3.7)', () => {
     await expect(page.getByRole('button', { name: 'Adjust outfit' })).toBeVisible()
   })
 
+  /*
+   * Story 6.1 renamed the target rather than removing the test. `look-3` was an
+   * id from `MOCK_LOOKBOOK_ITEMS`, which the story deleted; `lookbook-3` is a
+   * real seeded post. It needs a session for the same reason every community
+   * assertion does.
+   */
   test('3.7-E2E-003: Community notification deep link highlights target lookbook card', async ({
     page,
     interceptNetworkCall,
+    communitySession,
   }) => {
+    // Required, and required to be DESTRUCTURED: the community grid renders only
+    // for a signed-in reader, and a lazy fixture that never runs leaves a
+    // signed-out panel that looks exactly like a card which failed to render.
+    expect(communitySession.userId).toBeTruthy()
     await openDeepLink(
       page,
       interceptNetworkCall,
-      '/?source=notification&type=community&cardId=look-3'
+      '/?source=notification&type=community&cardId=lookbook-3'
     )
 
-    const highlightedCard = page.locator('#lookbook-card-look-3')
+    const highlightedCard = page.locator('#lookbook-card-lookbook-3')
     await expect(highlightedCard).toBeVisible()
     await expect(highlightedCard).toHaveAttribute('data-highlighted', 'true')
     await expect(highlightedCard).toBeFocused()

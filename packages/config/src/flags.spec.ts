@@ -15,13 +15,24 @@ describe('feature flag registry', () => {
   it('exposes the story 0.7 task 8 flag set', () => {
     expect(FEATURE_FLAG_KEYS).toEqual([
       'premium_themes_enabled',
-      'community_feed_enabled',
+      'community_read_enabled',
+      'community_write_enabled',
       'color_analysis_enabled',
       'weather_alerts_enabled',
       'commerce_affiliate_enabled',
       'commerce_subscription_enabled',
       'premium_planner_enabled',
     ])
+  })
+
+  it('6.1-CFG-001: defaults both community rollout controls to off', () => {
+    // Story 6.1 acceptance: production stays off until moderation staffing, SLA
+    // alerts, privacy, deletion, localization, accessibility, model and rollback
+    // evidence are signed. Read and write are separate controls so the beta can
+    // open reading to a cohort while posting stays shut, and so closing posting
+    // after an incident does not dark the feed for everyone already reading.
+    expect(getDefaultFeatureFlagValue('community_read_enabled')).toBe(false)
+    expect(getDefaultFeatureFlagValue('community_write_enabled')).toBe(false)
   })
 
   it('defaults the premium planner kill switch to off', () => {
@@ -148,7 +159,7 @@ describe('getFeatureFlag', () => {
     // color_analysis_enabled resolves to false here (decision 10): fail-closed
     // is the point, not a ritual-rendering concern like the flags it sits beside.
     await expect(getFeatureFlag('color_analysis_enabled', 'user-5')).resolves.toBe(false)
-    await expect(getFeatureFlag('community_feed_enabled', 'user-5')).resolves.toBe(false)
+    await expect(getFeatureFlag('community_read_enabled', 'user-5')).resolves.toBe(false)
   })
 
   it('prefers the remote answer over a disagreeing cached value', async () => {
@@ -158,7 +169,7 @@ describe('getFeatureFlag', () => {
     const readFallbackFlag = vi.fn().mockResolvedValue(false)
 
     await expect(
-      getFeatureFlag('community_feed_enabled', 'user-6', {
+      getFeatureFlag('community_write_enabled', 'user-6', {
         readRemoteFlag,
         readFallbackFlag,
       })

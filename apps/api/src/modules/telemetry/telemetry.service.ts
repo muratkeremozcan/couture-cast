@@ -23,6 +23,14 @@ import {
   trackAdvisorRecommendationActed,
   trackPremiumPlannerViewed,
   trackPremiumPlannerDayReshuffled,
+  trackCommunityFeedViewed,
+  trackCommunityCardOpened,
+  trackCommunityPostAllocated,
+  trackCommunityPostSubmitted,
+  trackCommunityPostPublished,
+  trackCommunityPostReported,
+  trackCommunityPostWithdrawn,
+  trackCommunityChallengeParticipated,
   garmentTaggingCompletedEventSchema,
   affiliateCtaClickedEventSchema,
   affiliateConversionRecordedEventSchema,
@@ -35,6 +43,14 @@ import {
   advisorRecommendationActedEventSchema,
   premiumPlannerViewedEventSchema,
   premiumPlannerDayReshuffledEventSchema,
+  communityFeedViewedEventSchema,
+  communityCardOpenedEventSchema,
+  communityPostAllocatedEventSchema,
+  communityPostSubmittedEventSchema,
+  communityPostPublishedEventSchema,
+  communityPostReportedEventSchema,
+  communityPostWithdrawnEventSchema,
+  communityChallengeParticipatedEventSchema,
   type AnalyticsEventName,
   type AffiliateCtaClickedEvent,
   type AffiliateConversionRecordedEvent,
@@ -48,6 +64,14 @@ import {
   type AdvisorRecommendationActedEvent,
   type PremiumPlannerViewedEvent,
   type PremiumPlannerDayReshuffledEvent,
+  type CommunityFeedViewedEvent,
+  type CommunityCardOpenedEvent,
+  type CommunityPostAllocatedEvent,
+  type CommunityPostSubmittedEvent,
+  type CommunityPostPublishedEvent,
+  type CommunityPostReportedEvent,
+  type CommunityPostWithdrawnEvent,
+  type CommunityChallengeParticipatedEvent,
 } from '@couture/api-client'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import { createBaseLogger } from '../../logger/pino.config'
@@ -193,6 +217,27 @@ export interface TelemetryPropertiesMap {
     PremiumPlannerDayReshuffledEvent,
     'analyticsSubjectId'
   >
+  /**
+   * Story 6.1. Eight server-side, pseudonymous community events. Callers pass
+   * the raw user id as `captureEvent`'s first argument and the HMAC subject is
+   * derived here. `platform` comes from the required `x-couture-platform` header.
+   *
+   * Every one carries a `dedupeKey`. These fire from request handlers that
+   * clients retry and from a BullMQ job that retries on its own, so the sink has
+   * to be able to collapse a redelivery: a retried publish that double-counts
+   * would corrupt the beta gate's own inputs.
+   */
+  community_feed_viewed: Omit<CommunityFeedViewedEvent, 'analyticsSubjectId'>
+  community_card_opened: Omit<CommunityCardOpenedEvent, 'analyticsSubjectId'>
+  community_post_allocated: Omit<CommunityPostAllocatedEvent, 'analyticsSubjectId'>
+  community_post_submitted: Omit<CommunityPostSubmittedEvent, 'analyticsSubjectId'>
+  community_post_published: Omit<CommunityPostPublishedEvent, 'analyticsSubjectId'>
+  community_post_reported: Omit<CommunityPostReportedEvent, 'analyticsSubjectId'>
+  community_post_withdrawn: Omit<CommunityPostWithdrawnEvent, 'analyticsSubjectId'>
+  community_challenge_participated: Omit<
+    CommunityChallengeParticipatedEvent,
+    'analyticsSubjectId'
+  >
 }
 
 /**
@@ -245,6 +290,37 @@ const premiumPlannerDayReshuffledInputSchema = premiumPlannerDayReshuffledEventS
   .omit({ analyticsSubjectId: true })
   .strict()
 
+const communityFeedViewedInputSchema = communityFeedViewedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const communityCardOpenedInputSchema = communityCardOpenedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const communityPostAllocatedInputSchema = communityPostAllocatedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const communityPostSubmittedInputSchema = communityPostSubmittedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const communityPostWithdrawnInputSchema = communityPostWithdrawnEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const communityChallengeParticipatedInputSchema =
+  communityChallengeParticipatedEventSchema.omit({ analyticsSubjectId: true }).strict()
+
+const communityPostPublishedInputSchema = communityPostPublishedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const communityPostReportedInputSchema = communityPostReportedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
 const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   profile_completed: z.object({
     age: z.number().int().positive(),
@@ -283,6 +359,14 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   advisor_recommendation_acted: advisorRecommendationActedInputSchema,
   premium_planner_viewed: premiumPlannerViewedInputSchema,
   premium_planner_day_reshuffled: premiumPlannerDayReshuffledInputSchema,
+  community_feed_viewed: communityFeedViewedInputSchema,
+  community_card_opened: communityCardOpenedInputSchema,
+  community_post_allocated: communityPostAllocatedInputSchema,
+  community_post_submitted: communityPostSubmittedInputSchema,
+  community_post_published: communityPostPublishedInputSchema,
+  community_post_reported: communityPostReportedInputSchema,
+  community_post_withdrawn: communityPostWithdrawnInputSchema,
+  community_challenge_participated: communityChallengeParticipatedInputSchema,
 }
 
 export function requireAnalyticsIdSecret(): string {
@@ -702,6 +786,149 @@ function buildPremiumPlannerDayReshuffled(
   })
 }
 
+function buildCommunityFeedViewed(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Community telemetry requires an authenticated user')
+  }
+  const parsed = communityFeedViewedInputSchema.parse(props)
+
+  return trackCommunityFeedViewed({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+/**
+ * The five community builders added with the closed-enum expansion. Each one
+ * follows the shape the three originals established: require an authenticated
+ * subject, validate the caller's payload against the published schema minus the
+ * server-derived subject, then hand the mapped payload to the contract's own
+ * tracking function.
+ */
+function buildCommunityCardOpened(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Community telemetry requires an authenticated user')
+  }
+  const parsed = communityCardOpenedInputSchema.parse(props)
+
+  return trackCommunityCardOpened({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildCommunityPostAllocated(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Community telemetry requires an authenticated user')
+  }
+  const parsed = communityPostAllocatedInputSchema.parse(props)
+
+  return trackCommunityPostAllocated({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildCommunityPostSubmitted(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Community telemetry requires an authenticated user')
+  }
+  const parsed = communityPostSubmittedInputSchema.parse(props)
+
+  return trackCommunityPostSubmitted({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildCommunityPostWithdrawn(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Community telemetry requires an authenticated user')
+  }
+  const parsed = communityPostWithdrawnInputSchema.parse(props)
+
+  return trackCommunityPostWithdrawn({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildCommunityChallengeParticipated(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Community telemetry requires an authenticated user')
+  }
+  const parsed = communityChallengeParticipatedInputSchema.parse(props)
+
+  return trackCommunityChallengeParticipated({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildCommunityPostPublished(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Community telemetry requires an authenticated user')
+  }
+  const parsed = communityPostPublishedInputSchema.parse(props)
+
+  return trackCommunityPostPublished({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildCommunityPostReported(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Community telemetry requires an authenticated user')
+  }
+  const parsed = communityPostReportedInputSchema.parse(props)
+
+  return trackCommunityPostReported({
+    ...parsed,
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
 /**
  * Events whose PostHog subject is the HMAC pseudonym rather than a raw user id.
  * Membership here drives three things at once: `TelemetryEvent.user_id` is
@@ -727,6 +954,14 @@ const PSEUDONYMOUS_EVENT_TYPES: ReadonlySet<AnalyticsEventName> = new Set([
   'advisor_recommendation_acted',
   'premium_planner_viewed',
   'premium_planner_day_reshuffled',
+  'community_feed_viewed',
+  'community_card_opened',
+  'community_post_allocated',
+  'community_post_submitted',
+  'community_post_published',
+  'community_post_reported',
+  'community_post_withdrawn',
+  'community_challenge_participated',
 ])
 
 const pseudonymousEventBuilders: Partial<
@@ -752,6 +987,14 @@ const pseudonymousEventBuilders: Partial<
   advisor_recommendation_acted: buildAdvisorRecommendationActed,
   premium_planner_viewed: buildPremiumPlannerViewed,
   premium_planner_day_reshuffled: buildPremiumPlannerDayReshuffled,
+  community_feed_viewed: buildCommunityFeedViewed,
+  community_card_opened: buildCommunityCardOpened,
+  community_post_allocated: buildCommunityPostAllocated,
+  community_post_submitted: buildCommunityPostSubmitted,
+  community_post_published: buildCommunityPostPublished,
+  community_post_reported: buildCommunityPostReported,
+  community_post_withdrawn: buildCommunityPostWithdrawn,
+  community_challenge_participated: buildCommunityChallengeParticipated,
 }
 
 const eventBuilders: Partial<

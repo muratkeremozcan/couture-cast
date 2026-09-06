@@ -52,6 +52,11 @@ const prisma = {
   advisorRecommendationState: { deleteMany: () => Promise.resolve({ count: 0 }) },
   // Story 5.5 planner.
   plannerDayPlan: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  // Story 6.1 community challenge and moderation outbox.
+  communityChallenge: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  communityModerationOutbox: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  communityAlias: { deleteMany: () => Promise.resolve({ count: 0 }) },
+  communityPostReport: { deleteMany: () => Promise.resolve({ count: 0 }) },
 } satisfies Record<string, DeleteManyRecorder>
 
 describe('example factory suite', () => {

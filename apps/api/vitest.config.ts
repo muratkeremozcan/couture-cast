@@ -73,6 +73,7 @@ export default defineConfig({
         'src/main.ts',
         'src/workers/bootstrap.ts',
         'src/workers/wardrobe.bootstrap.ts',
+        'src/workers/community.bootstrap.ts',
         // NestJS DI metadata only — decorator arrays with no branches. Every
         // Test.createTestingModule spec resolves these providers already.
         'src/**/*.module.ts',

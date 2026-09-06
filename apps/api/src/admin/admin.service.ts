@@ -42,6 +42,24 @@ export class AdminService {
     return { deleted: result.count }
   }
 
+  /**
+   * Re-drives a dead-lettered job.
+   *
+   * KNOWN LIMIT for queues that use a DETERMINISTIC job id, which the community
+   * moderation queue does. This adds the job under the name `retry` but BullMQ
+   * still keys on the job id carried in `job_data`, and a completed job retained
+   * under its queue's `removeOnComplete` window makes `queue.add` return the
+   * existing job rather than creating one. For community moderation that window
+   * is seven days, so re-driving a post that has already been screened is a
+   * silent no-op: this method reports `retried: true` and deletes the DLQ row,
+   * and nothing runs.
+   *
+   * An operator hitting that case has to remove the retained job, or issue a new
+   * upload session, which changes the object path and therefore the job id.
+   * Re-arming the outbox row alone looks like it worked and does not. See
+   * `apps/api/src/modules/community/community-moderation.queue.ts` for how that
+   * id is built.
+   */
   async retryFailedJob(id: string) {
     const failure = await prisma.jobFailure.findUnique({ where: { id } })
     if (!failure) {

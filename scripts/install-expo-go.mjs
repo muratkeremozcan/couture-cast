@@ -99,6 +99,27 @@ const run = (cmd, args) =>
     child.on('error', reject)
   })
 
+/**
+ * The device this install targets, as an explicit serial.
+ *
+ * Returning the serial rather than a boolean is the whole point. `adb install`
+ * with no `-s` is only correct when EXACTLY ONE device is attached: with more
+ * than one it refuses outright with `adb: more than one device/emulator` and the
+ * install fails before it starts. That is never hit in CI, where each shard job
+ * owns a single emulator, and is hit immediately on a developer machine that has
+ * just run the sharded suite and still has four emulators booted — which is
+ * exactly how it was found.
+ *
+ * `ANDROID_SERIAL` is adb's own selection variable and is honoured first, so a
+ * caller that already knows which device it wants keeps that choice. Otherwise
+ * the single attached device is used, and when several are attached the first is
+ * taken and named in the log rather than the run dying: installing Expo Go on
+ * any one of a set of interchangeable emulators is a reasonable default, and a
+ * silent choice would be worse than a stated one.
+ *
+ * @param {string} adbPath
+ * @returns {Promise<string>} the serial to pass as `-s`
+ */
 const ensureDevice = async (adbPath) => {
   const devices = await new Promise((resolve, reject) => {
     const child = spawn(adbPath, ['devices'], { stdio: ['ignore', 'pipe', 'inherit'] })
@@ -110,8 +131,34 @@ const ensureDevice = async (adbPath) => {
     })
     child.on('error', reject)
   })
-  const hasDevice = devices.split('\n').some((line) => line.trim().endsWith('\tdevice'))
-  if (!hasDevice) fail('No Android emulator/device detected. Boot an emulator first.')
+
+  const serials = devices
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.endsWith('\tdevice'))
+    .map((line) => line.split('\t')[0])
+
+  if (serials.length === 0) {
+    fail('No Android emulator/device detected. Boot an emulator first.')
+  }
+
+  const requested = process.env.ANDROID_SERIAL?.trim()
+  if (requested) {
+    if (!serials.includes(requested)) {
+      fail(
+        `ANDROID_SERIAL=${requested} is not among the attached devices: ${serials.join(', ')}`
+      )
+    }
+    return requested
+  }
+
+  if (serials.length > 1) {
+    log(
+      `${serials.length} devices attached (${serials.join(', ')}); installing on ${serials[0]}. ` +
+        'Set ANDROID_SERIAL to choose a different one.'
+    )
+  }
+  return serials[0]
 }
 
 /**
@@ -179,10 +226,11 @@ const main = async () => {
 
   const adbPath = getAdb()
   log(`Using adb at: ${adbPath}`)
-  await ensureDevice(adbPath)
+  const serial = await ensureDevice(adbPath)
 
   log('Installing Expo Go on connected device/emulator')
-  await run(adbPath, ['install', '-r', downloadPath])
+  // `-s` is what makes this correct with more than one emulator attached.
+  await run(adbPath, ['-s', serial, 'install', '-r', downloadPath])
   log('Expo Go installed successfully')
 }
 

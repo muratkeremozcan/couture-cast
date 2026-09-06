@@ -21,7 +21,7 @@ import {
   vi,
 } from 'vitest'
 import TabOneScreen from '@/app/(tabs)/index'
-import CommunityScreen from '@/app/(tabs)/community'
+import { CommunityScreen } from '@/src/features/community/community-screen'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { clearRitualMemoryCache } from '@/src/lib/ritual-cache'
 import { initI18n } from '@/src/lib/i18n'

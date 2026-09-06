@@ -1,13 +1,13 @@
 ---
 baseline_commit: c0bc45d8f08d8b82a496029029f76d5cdc8719d4
-status: review
+status: done
 ---
 
 <!-- markdownlint-disable MD013 MD024 MD036 -->
 
 # Story 5.4: Color palette & beauty/accessory advisor
 
-Status: review
+Status: done
 
 **Story key:** `5-4-color-palette-beauty-accessory-advisor` · **Epic:** 5 — Commerce & Premium Enhancements (Phase 2)
 **Baseline commit:** `c0bc45d8` (branch `feat/epic5-story4`, clean, tip of `main` after story 5.3's mobile surface PR #137 and the Maestro sharding PRs #138/#139)

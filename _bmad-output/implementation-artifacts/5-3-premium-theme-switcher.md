@@ -1,13 +1,13 @@
 ---
 baseline_commit: 1d8303b3e1bcff794c8cef0b717a066660ea1bb7
-status: in-progress
+status: done
 ---
 
 <!-- markdownlint-disable MD013 MD024 MD036 -->
 
 # Story 5.3: Premium theme switcher
 
-Status: in-progress
+Status: done
 
 **Story key:** `5-3-premium-theme-switcher` · **Epic:** 5 — Commerce & Premium Enhancements (Phase 2)
 **Baseline commit:** `1d8303b` (branch tip == `main` after story 5.2, PR #129, and the Maestro-gating PR #130)

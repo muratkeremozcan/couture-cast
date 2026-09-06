@@ -10,6 +10,7 @@
       ],
       "@couture/api-client/realtime/*": ["../../packages/api-client/src/realtime/*"],
       "@couture/api-client/types/*": ["../../packages/api-client/src/types/*"],
+      "@couture/api-client/testing/*": ["../../packages/api-client/src/testing/*"],
       "@couture/utils": ["../../packages/utils/src/index.ts"]
     }
   },

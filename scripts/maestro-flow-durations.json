@@ -1,9 +1,11 @@
 {
   "_comment": "Baseline per-flow duration in seconds, feeding the LPT bin-packing in scripts/resolve-maestro-shard.mjs. Recorded from CI run 32373171812 (mobile-e2e-android, 2026-08-20, all four shards, no stall present) via `gh api repos/muratkeremozcan/couture-cast/actions/jobs/<id>/logs | grep -oE \"\\[(Passed|Failed)\\] .+ \\([0-9hms ]+\\)\"`. A flow with no entry here falls back to the mean of the recorded values; refresh this file when a flow's shape changes enough to move its cost meaningfully, not on every run's natural variance.",
+  "_comment_community_feed": "community-feed.yaml's 60 is an ESTIMATE, not a recording: the flow is new in Story 6.1 and has never run in CI, so there is no job log to derive it from. It is entered anyway because the alternative is the mean of the recorded values (~78s), which is further from this flow's real shape -- two network waits and roughly twenty assertions, comparable to palette-advisor.yaml at 55s. Replace it with the figure from the first green mobile-e2e-android run using the grep in the comment above.",
   "accessibility-hardening.yaml": 135,
   "analytics.yaml": 77,
   "chip-navigation-bottom-nav.yaml": 112,
   "commerce-affiliate.yaml": 168,
+  "community-feed.yaml": 60,
   "deep-link-handling.yaml": 36,
   "garment-capsule-create-flow.yaml": 117,
   "garment-capsule-localization-flow.yaml": 97,

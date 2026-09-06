@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -173,6 +173,33 @@
             "type": "string",
             "enum": [
               "Conflict"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "TooManyRequestsHttpError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              429
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Too Many Requests"
             ]
           }
         },
@@ -11396,6 +11423,1920 @@
         "required": [
           "data"
         ]
+      },
+      "ClimateBand": {
+        "type": "string",
+        "enum": [
+          "cold_wet",
+          "cold_dry",
+          "temperate_wet",
+          "temperate_dry",
+          "warm_wet",
+          "warm_dry"
+        ]
+      },
+      "CommunityPostStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "uploading",
+          "pending_review",
+          "published",
+          "flagged",
+          "review_failed",
+          "withdrawn",
+          "consent_suspended"
+        ]
+      },
+      "CommunityFeedMode": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "all",
+          "cold_wet",
+          "cold_dry",
+          "temperate_wet",
+          "temperate_dry",
+          "warm_wet",
+          "warm_dry"
+        ]
+      },
+      "CommunityBandUnresolvedReason": {
+        "type": "string",
+        "enum": [
+          "no_location",
+          "weather_unavailable",
+          "weather_stale",
+          "weather_malformed",
+          "insufficient_usable_days"
+        ]
+      },
+      "CommunityExperimentVariant": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "all"
+        ]
+      },
+      "CommunityReportReason": {
+        "type": "string",
+        "enum": [
+          "spam",
+          "harassment",
+          "inappropriate_content",
+          "hate_speech",
+          "violence",
+          "other"
+        ]
+      },
+      "CommunityFeedAuthor": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "isSelf": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "displayName",
+          "isSelf"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityImageAccess": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityFeedItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "caption": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "altText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "climateBand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The climate band stamped when the post was published, or null if unclassified.",
+            "enum": [
+              "cold_wet",
+              "cold_dry",
+              "temperate_wet",
+              "temperate_dry",
+              "warm_wet",
+              "warm_dry",
+              null
+            ]
+          },
+          "imageAccess": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "url",
+              "expiresAt"
+            ],
+            "additionalProperties": false
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "uploading",
+              "pending_review",
+              "published",
+              "flagged",
+              "review_failed",
+              "withdrawn",
+              "consent_suspended"
+            ]
+          },
+          "challengeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "displayName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "isSelf": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "displayName",
+              "isSelf"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "caption",
+          "altText",
+          "climateBand",
+          "imageAccess",
+          "publishedAt",
+          "createdAt",
+          "status",
+          "challengeId",
+          "author"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityAuthorPostState": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "caption": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "altText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "climateBand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The climate band stamped when the post was classified, or null if unclassified.",
+            "enum": [
+              "cold_wet",
+              "cold_dry",
+              "temperate_wet",
+              "temperate_dry",
+              "warm_wet",
+              "warm_dry",
+              null
+            ]
+          },
+          "imageAccess": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "url",
+              "expiresAt"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "uploading",
+              "pending_review",
+              "published",
+              "flagged",
+              "review_failed",
+              "withdrawn",
+              "consent_suspended"
+            ]
+          },
+          "challengeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "moderationReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "caption",
+          "altText",
+          "climateBand",
+          "imageAccess",
+          "createdAt",
+          "publishedAt",
+          "status",
+          "challengeId",
+          "moderationReason"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityFeed": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "caption": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "altText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "climateBand": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The climate band stamped when the post was published, or null if unclassified.",
+                  "enum": [
+                    "cold_wet",
+                    "cold_dry",
+                    "temperate_wet",
+                    "temperate_dry",
+                    "warm_wet",
+                    "warm_dry",
+                    null
+                  ]
+                },
+                "imageAccess": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "publishedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "uploading",
+                    "pending_review",
+                    "published",
+                    "flagged",
+                    "review_failed",
+                    "withdrawn",
+                    "consent_suspended"
+                  ]
+                },
+                "challengeId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "author": {
+                  "type": "object",
+                  "properties": {
+                    "displayName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "isSelf": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "displayName",
+                    "isSelf"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "id",
+                "caption",
+                "altText",
+                "climateBand",
+                "imageAccess",
+                "publishedAt",
+                "createdAt",
+                "status",
+                "challengeId",
+                "author"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "authorStates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "caption": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "altText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "climateBand": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The climate band stamped when the post was classified, or null if unclassified.",
+                  "enum": [
+                    "cold_wet",
+                    "cold_dry",
+                    "temperate_wet",
+                    "temperate_dry",
+                    "warm_wet",
+                    "warm_dry",
+                    null
+                  ]
+                },
+                "imageAccess": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "publishedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "uploading",
+                    "pending_review",
+                    "published",
+                    "flagged",
+                    "review_failed",
+                    "withdrawn",
+                    "consent_suspended"
+                  ]
+                },
+                "challengeId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "moderationReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "caption",
+                "altText",
+                "climateBand",
+                "imageAccess",
+                "createdAt",
+                "publishedAt",
+                "status",
+                "challengeId",
+                "moderationReason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "all",
+              "cold_wet",
+              "cold_dry",
+              "temperate_wet",
+              "temperate_dry",
+              "warm_wet",
+              "warm_dry"
+            ]
+          },
+          "viewerBand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The climate band resolved for the viewer, or null if unresolvable.",
+            "enum": [
+              "cold_wet",
+              "cold_dry",
+              "temperate_wet",
+              "temperate_dry",
+              "warm_wet",
+              "warm_dry",
+              null
+            ]
+          },
+          "bandResolved": {
+            "type": "boolean"
+          },
+          "bandUnresolvedReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.",
+            "enum": [
+              "no_location",
+              "weather_unavailable",
+              "weather_stale",
+              "weather_malformed",
+              "insufficient_usable_days",
+              null
+            ]
+          },
+          "experimentVariant": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "all"
+            ]
+          },
+          "activeChallenge": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "slug": {
+                "type": "string",
+                "minLength": 1
+              },
+              "climateBand": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The climate band this challenge is restricted to, or null if unrestricted.",
+                "enum": [
+                  "cold_wet",
+                  "cold_dry",
+                  "temperate_wet",
+                  "temperate_dry",
+                  "warm_wet",
+                  "warm_dry",
+                  null
+                ]
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1
+              },
+              "startsAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "endsAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "timeZone": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "climateBand",
+              "title",
+              "body",
+              "startsAt",
+              "endsAt",
+              "timeZone"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "authorStates",
+          "nextCursor",
+          "mode",
+          "viewerBand",
+          "bandResolved",
+          "bandUnresolvedReason",
+          "experimentVariant",
+          "activeChallenge"
+        ],
+        "additionalProperties": false
+      },
+      "EmbeddedCommunityChallenge": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1
+          },
+          "climateBand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The climate band this challenge is restricted to, or null if unrestricted.",
+            "enum": [
+              "cold_wet",
+              "cold_dry",
+              "temperate_wet",
+              "temperate_dry",
+              "warm_wet",
+              "warm_dry",
+              null
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "climateBand",
+          "title",
+          "body",
+          "startsAt",
+          "endsAt",
+          "timeZone"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityChallenge": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "slug": {
+            "type": "string",
+            "minLength": 1
+          },
+          "climateBand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The climate band this challenge is restricted to, or null if unrestricted.",
+            "enum": [
+              "cold_wet",
+              "cold_dry",
+              "temperate_wet",
+              "temperate_dry",
+              "warm_wet",
+              "warm_dry",
+              null
+            ]
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1
+          },
+          "copy": {
+            "type": "object",
+            "description": "Localized challenge copy keyed by supported IETF locale tag, for example \"en-US\". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "body": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "title",
+                "body"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "climateBand",
+          "startsAt",
+          "endsAt",
+          "timeZone",
+          "copy",
+          "isActive",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityFeedResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "caption": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "altText": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "climateBand": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The climate band stamped when the post was published, or null if unclassified.",
+                      "enum": [
+                        "cold_wet",
+                        "cold_dry",
+                        "temperate_wet",
+                        "temperate_dry",
+                        "warm_wet",
+                        "warm_dry",
+                        null
+                      ]
+                    },
+                    "imageAccess": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "publishedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "uploading",
+                        "pending_review",
+                        "published",
+                        "flagged",
+                        "review_failed",
+                        "withdrawn",
+                        "consent_suspended"
+                      ]
+                    },
+                    "challengeId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "author": {
+                      "type": "object",
+                      "properties": {
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "isSelf": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "displayName",
+                        "isSelf"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "caption",
+                    "altText",
+                    "climateBand",
+                    "imageAccess",
+                    "publishedAt",
+                    "createdAt",
+                    "status",
+                    "challengeId",
+                    "author"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "authorStates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "caption": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "altText": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "climateBand": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The climate band stamped when the post was classified, or null if unclassified.",
+                      "enum": [
+                        "cold_wet",
+                        "cold_dry",
+                        "temperate_wet",
+                        "temperate_dry",
+                        "warm_wet",
+                        "warm_dry",
+                        null
+                      ]
+                    },
+                    "imageAccess": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "publishedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "uploading",
+                        "pending_review",
+                        "published",
+                        "flagged",
+                        "review_failed",
+                        "withdrawn",
+                        "consent_suspended"
+                      ]
+                    },
+                    "challengeId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "moderationReason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "caption",
+                    "altText",
+                    "climateBand",
+                    "imageAccess",
+                    "createdAt",
+                    "publishedAt",
+                    "status",
+                    "challengeId",
+                    "moderationReason"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "nextCursor": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "all",
+                  "cold_wet",
+                  "cold_dry",
+                  "temperate_wet",
+                  "temperate_dry",
+                  "warm_wet",
+                  "warm_dry"
+                ]
+              },
+              "viewerBand": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The climate band resolved for the viewer, or null if unresolvable.",
+                "enum": [
+                  "cold_wet",
+                  "cold_dry",
+                  "temperate_wet",
+                  "temperate_dry",
+                  "warm_wet",
+                  "warm_dry",
+                  null
+                ]
+              },
+              "bandResolved": {
+                "type": "boolean"
+              },
+              "bandUnresolvedReason": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.",
+                "enum": [
+                  "no_location",
+                  "weather_unavailable",
+                  "weather_stale",
+                  "weather_malformed",
+                  "insufficient_usable_days",
+                  null
+                ]
+              },
+              "experimentVariant": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "all"
+                ]
+              },
+              "activeChallenge": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "slug": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "climateBand": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The climate band this challenge is restricted to, or null if unrestricted.",
+                    "enum": [
+                      "cold_wet",
+                      "cold_dry",
+                      "temperate_wet",
+                      "temperate_dry",
+                      "warm_wet",
+                      "warm_dry",
+                      null
+                    ]
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "body": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "startsAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endsAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "id",
+                  "slug",
+                  "climateBand",
+                  "title",
+                  "body",
+                  "startsAt",
+                  "endsAt",
+                  "timeZone"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "items",
+              "authorStates",
+              "nextCursor",
+              "mode",
+              "viewerBand",
+              "bandResolved",
+              "bandUnresolvedReason",
+              "experimentVariant",
+              "activeChallenge"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityPostResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "caption": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "altText": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "climateBand": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The climate band stamped when the post was published, or null if unclassified.",
+                "enum": [
+                  "cold_wet",
+                  "cold_dry",
+                  "temperate_wet",
+                  "temperate_dry",
+                  "warm_wet",
+                  "warm_dry",
+                  null
+                ]
+              },
+              "imageAccess": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "url",
+                  "expiresAt"
+                ],
+                "additionalProperties": false
+              },
+              "publishedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "uploading",
+                  "pending_review",
+                  "published",
+                  "flagged",
+                  "review_failed",
+                  "withdrawn",
+                  "consent_suspended"
+                ]
+              },
+              "challengeId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "author": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "isSelf": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "displayName",
+                  "isSelf"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "caption",
+              "altText",
+              "climateBand",
+              "imageAccess",
+              "publishedAt",
+              "createdAt",
+              "status",
+              "challengeId",
+              "author"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "AllocateCommunityPostInput": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en-US",
+              "en-CA",
+              "es-419",
+              "fr-CA",
+              "fr-FR",
+              "tr-TR",
+              "de-DE",
+              "it-IT",
+              "pt-BR",
+              "pt-PT"
+            ]
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          },
+          "byteSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10485760
+          },
+          "sha256": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64,
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "widthPx": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 4096
+          },
+          "heightPx": {
+            "type": "integer",
+            "minimum": 256,
+            "maximum": 4096
+          }
+        },
+        "required": [
+          "locale",
+          "contentType",
+          "byteSize",
+          "sha256",
+          "widthPx",
+          "heightPx"
+        ],
+        "additionalProperties": false
+      },
+      "AllocateCommunityPostResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "postId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uploadSessionId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uploadUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "uploadToken": {
+                "type": "string",
+                "minLength": 1
+              },
+              "requiredHeaders": {
+                "type": "object",
+                "properties": {
+                  "content-type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "content-type"
+                ],
+                "additionalProperties": false
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "altTextSuggestion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "altTextSuggestionLocale": {
+                "type": "string",
+                "enum": [
+                  "en-US",
+                  "en-CA",
+                  "es-419",
+                  "fr-CA",
+                  "fr-FR",
+                  "tr-TR",
+                  "de-DE",
+                  "it-IT",
+                  "pt-BR",
+                  "pt-PT"
+                ]
+              }
+            },
+            "required": [
+              "postId",
+              "uploadSessionId",
+              "uploadUrl",
+              "uploadToken",
+              "requiredHeaders",
+              "expiresAt",
+              "altTextSuggestion",
+              "altTextSuggestionLocale"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "PublishCommunityPostInput": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uploadSessionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "altText": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "altTextConfirmed": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "caption": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 280,
+            "description": "Caption of at most 280 characters. Must not contain URLs, web links, or email addresses."
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en-US",
+              "en-CA",
+              "es-419",
+              "fr-CA",
+              "fr-FR",
+              "tr-TR",
+              "de-DE",
+              "it-IT",
+              "pt-BR",
+              "pt-PT"
+            ]
+          },
+          "challengeId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "postId",
+          "uploadSessionId",
+          "altText",
+          "altTextConfirmed",
+          "locale"
+        ],
+        "additionalProperties": false
+      },
+      "PublishCommunityPostResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "caption": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "altText": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "climateBand": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The climate band stamped when the post was published, or null if unclassified.",
+                "enum": [
+                  "cold_wet",
+                  "cold_dry",
+                  "temperate_wet",
+                  "temperate_dry",
+                  "warm_wet",
+                  "warm_dry",
+                  null
+                ]
+              },
+              "imageAccess": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "url",
+                  "expiresAt"
+                ],
+                "additionalProperties": false
+              },
+              "publishedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "uploading",
+                  "pending_review",
+                  "published",
+                  "flagged",
+                  "review_failed",
+                  "withdrawn",
+                  "consent_suspended"
+                ]
+              },
+              "challengeId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "author": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "isSelf": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "displayName",
+                  "isSelf"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "caption",
+              "altText",
+              "climateBand",
+              "imageAccess",
+              "publishedAt",
+              "createdAt",
+              "status",
+              "challengeId",
+              "author"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ReportCommunityPostInput": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "spam",
+              "harassment",
+              "inappropriate_content",
+              "hate_speech",
+              "violence",
+              "other"
+            ]
+          },
+          "details": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "CreateCommunityChallengeInput": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "minLength": 1
+          },
+          "climateBand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The climate band this challenge is restricted to, or null if unrestricted.",
+            "enum": [
+              "cold_wet",
+              "cold_dry",
+              "temperate_wet",
+              "temperate_dry",
+              "warm_wet",
+              "warm_dry",
+              null
+            ]
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IANA time zone identifier, for example Europe/Istanbul. Validated against the host tz database; an unknown zone is rejected."
+          },
+          "copy": {
+            "type": "object",
+            "description": "Localized challenge copy keyed by supported IETF locale tag, for example \"en-US\". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "body": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "title",
+                "body"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "slug",
+          "startsAt",
+          "endsAt",
+          "timeZone",
+          "copy"
+        ],
+        "additionalProperties": false,
+        "description": "Creates a community challenge. startsAt must fall on a Monday in the given timeZone, and endsAt must be exactly seven days after startsAt. A window that fails either rule is rejected."
+      },
+      "CommunityChallengeResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "slug": {
+                "type": "string",
+                "minLength": 1
+              },
+              "climateBand": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The climate band this challenge is restricted to, or null if unrestricted.",
+                "enum": [
+                  "cold_wet",
+                  "cold_dry",
+                  "temperate_wet",
+                  "temperate_dry",
+                  "warm_wet",
+                  "warm_dry",
+                  null
+                ]
+              },
+              "startsAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "endsAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "timeZone": {
+                "type": "string",
+                "minLength": 1
+              },
+              "copy": {
+                "type": "object",
+                "description": "Localized challenge copy keyed by supported IETF locale tag, for example \"en-US\". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback.",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "body": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "body"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "isActive": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "climateBand",
+              "startsAt",
+              "endsAt",
+              "timeZone",
+              "copy",
+              "isActive",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateCommunityChallengeInput": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "minLength": 1
+          },
+          "climateBand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The climate band this challenge is restricted to, or null if unrestricted.",
+            "enum": [
+              "cold_wet",
+              "cold_dry",
+              "temperate_wet",
+              "temperate_dry",
+              "warm_wet",
+              "warm_dry",
+              null
+            ]
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timeZone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "IANA time zone identifier, for example Europe/Istanbul. Validated against the host tz database; an unknown zone is rejected."
+          },
+          "copy": {
+            "type": "object",
+            "description": "Localized challenge copy keyed by supported IETF locale tag, for example \"en-US\". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "body": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "title",
+                "body"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Updates a community challenge. At least one field must be present. Moving the window requires startsAt, endsAt and timeZone together, and the result must start on a Monday in that zone and span exactly seven days."
       }
     },
     "parameters": {}
@@ -16533,6 +18474,950 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/feed": {
+      "get": {
+        "tags": [
+          "community"
+        ],
+        "summary": "Read community feed by climate band",
+        "description": "Returns a keyset-paginated feed of published community lookbook posts, ordered by published_at desc with id desc tiebreak. The caller’s own posts that are not published are returned separately in authorStates, unpaginated.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-couture-platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ]
+            },
+            "description": "Platform making the request."
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "all",
+                "cold_wet",
+                "cold_dry",
+                "temperate_wet",
+                "temperate_dry",
+                "warm_wet",
+                "warm_dry"
+              ],
+              "default": "auto"
+            },
+            "description": "Feed filter mode. auto resolves the viewer band, all returns every region, a band literal pins the feed to that band."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque base64url keyset pagination cursor. Bound to the mode it was minted under; presenting it under a different mode returns 400."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 12
+            },
+            "description": "Number of posts to return (1-30, default 12)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Community feed retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityFeedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed cursor, cursor minted under a different filter mode, or invalid mode parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Community read rollout is disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/posts/allocate": {
+      "post": {
+        "tags": [
+          "community"
+        ],
+        "summary": "Allocate a community post upload session",
+        "description": "Initiates photo upload for a community lookbook post. Requires Idempotency-Key header.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Client idempotency key for post creation."
+          },
+          {
+            "name": "x-couture-platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ]
+            },
+            "description": "Platform making the request."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AllocateCommunityPostInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload session allocated or replayed successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllocateCommunityPostResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid image upload parameters or dimensions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Age gate requirement not satisfied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency key was reused with a different payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Daily posting rate limit reached. Carries a Retry-After header.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the rolling 24-hour window admits another post.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Community write rollout is disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/posts/{postId}": {
+      "get": {
+        "tags": [
+          "community"
+        ],
+        "summary": "Read a single community post",
+        "description": "Resolves one post directly, for a deep link that lands outside the first feed page and for polling an owned post until it reaches a terminal moderation state. Returns 404 for any post the caller cannot see.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID of the post to read."
+          },
+          {
+            "name": "x-couture-platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ]
+            },
+            "description": "Platform making the request."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Post retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityPostResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Post not found or not visible to the caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Community read rollout is disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/posts/publish": {
+      "post": {
+        "tags": [
+          "community"
+        ],
+        "summary": "Publish a community post to moderation queue",
+        "description": "Finalizes upload and enqueues the post for automated moderation screening. Requires confirmed alt text. Replaying the same Idempotency-Key with the same payload replays the original result; replaying it with a different payload returns 409.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Client idempotency key for the publish transition."
+          },
+          {
+            "name": "x-couture-platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ]
+            },
+            "description": "Platform making the request."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishCommunityPostInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Post queued for moderation with pending_review status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishCommunityPostResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid caption, invalid alt text, or alt text not confirmed by the author.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Age gate requirement not satisfied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Post, upload session, or referenced challenge not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency key reused with a different payload, or the upload session does not match the post.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Daily posting rate limit reached. Carries a Retry-After header giving the seconds until the rolling 24-hour window admits another post.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the rolling 24-hour window admits another post.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Community write rollout is disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/posts/{postId}/report": {
+      "post": {
+        "tags": [
+          "community"
+        ],
+        "summary": "Report a community post for moderation review",
+        "description": "Reports a post with a closed-enum reason. Replaying the same reason is idempotent and returns 200; submitting a different reason for a post this caller already reported returns 409.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID of the post to report."
+          },
+          {
+            "name": "x-couture-platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ]
+            },
+            "description": "Platform making the request."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportCommunityPostInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Report recorded successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid report reason.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A caller cannot report their own post.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Post not found or not visible to reporter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This caller already reported the post for a different reason. A replay of the same reason returns 200.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Reporting abuse limit reached. Carries a Retry-After header giving the seconds until the caller may report again.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the caller may report again.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Community write rollout is disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/posts/{postId}/withdraw": {
+      "post": {
+        "tags": [
+          "community"
+        ],
+        "summary": "Withdraw a community post",
+        "description": "Allows post author to withdraw a published post from the community feed.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID of the post to withdraw."
+          },
+          {
+            "name": "x-couture-platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ]
+            },
+            "description": "Platform making the request."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Post withdrawn successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User is not the author of this post.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Post not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Community write rollout is disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/challenges": {
+      "post": {
+        "tags": [
+          "community"
+        ],
+        "summary": "Create a community challenge (Admin)",
+        "description": "Creates an editorially curated community challenge.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommunityChallengeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Community challenge created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityChallengeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid challenge window or missing en-US fallback.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin role required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Active challenge already exists for this climate band and window.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/challenges/{id}": {
+      "patch": {
+        "tags": [
+          "community"
+        ],
+        "summary": "Update a community challenge (Admin)",
+        "description": "Updates an editorially curated community challenge.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID of the challenge to update."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCommunityChallengeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Community challenge updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityChallengeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid challenge window.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin role required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Challenge not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Active challenge already exists for this climate band and window.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
                 }
               }
             }

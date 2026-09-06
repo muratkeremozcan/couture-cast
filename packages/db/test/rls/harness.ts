@@ -12,6 +12,40 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, it } from 'vitest'
 import { Pool, type PoolClient } from 'pg'
+import {
+  buildLookbookPostCreateInput,
+  createLookbookPost,
+  type LookbookPostFactoryOverrides,
+} from '../../../testing/src/factories/community.factory.ts'
+
+/**
+ * Inserts a LookbookPost built by the shared factory, so this suite's fixtures
+ * and every other suite's agree on defaults and on the snake_case column
+ * mapping. `buildLookbookPostCreateInput` is the single source of that mapping;
+ * hand-written column lists here would drift from it silently the first time a
+ * column is added.
+ *
+ * The factory's clock is pinned per call, because the RLS assertions compare
+ * rows and a wall-clock default makes two fixtures built in the same test
+ * differ by however long the test took.
+ */
+export const insertLookbookPost = async (
+  client: PoolClient,
+  overrides: LookbookPostFactoryOverrides & { id: string; userId: string },
+  now = new Date('2026-09-05T00:00:00.000Z')
+) => {
+  const input = buildLookbookPostCreateInput(createLookbookPost(overrides, { now }))
+  const entries = Object.entries(input).filter(([, value]) => value !== undefined)
+  const columns = entries.map(([column]) => `"${column}"`).join(', ')
+  const placeholders = entries.map((_, index) => `$${index + 1}`).join(', ')
+
+  await client.query(
+    `INSERT INTO public."LookbookPost" (${columns}) VALUES (${placeholders})`,
+    entries.map(([, value]) => value)
+  )
+
+  return input
+}
 
 const databaseUrl =
   process.env.RLS_TEST_DATABASE_URL ??
@@ -30,8 +64,36 @@ export const guardianSharedTables = [
   'SilhouetteProfile',
 ] as const
 
-export const selfOnlyTables = [
+/**
+ * Tables no client role reaches at all: RLS enabled, zero policies, zero grants
+ * to `anon` and `authenticated`. Everything here is read and written by the API
+ * on `service_role`.
+ *
+ * Story 6.1 put the whole community surface in this category. There was briefly
+ * a `publicReadTables` category holding `LookbookPost` behind a
+ * `status = 'published' OR own row` SELECT policy; it is gone, because a
+ * row-level policy cannot express what this story needs. Letting an
+ * authenticated client SELECT a published row hands it `user_id`,
+ * `image_object_path`, `location_key` and `moderation_engine_version` off
+ * someone else's row, which ends the pseudonymity the feed depends on, and the
+ * owner UPDATE policy inherited from the guardian migration let an author move
+ * their own draft to `published` while writing their own
+ * `moderation_engine_version`, which is moderation bypass. Postgres RLS is
+ * row-scoped, not column-scoped, so no predicate closes either hole; the
+ * category has to be "not reachable from a client at all".
+ */
+export const workerOnlyTables = [
+  'AlertDeliveryOutbox',
+  'AlertCooldownReservation',
   'LookbookPost',
+  'CommunityChallenge',
+  'CommunityModerationOutbox',
+  'CommunityAlias',
+  'CommunityPostReport',
+  'ModerationEvent',
+] as const
+
+export const selfOnlyTables = [
   'EngagementEvent',
   'SavedLocation',
   'AlertRule',
@@ -124,6 +186,10 @@ export type SeededScenario = {
   otherAdvisorRecommendationStateId: string
   plannerDayPlanId: string
   otherPlannerDayPlanId: string
+  communityAliasId: string
+  communityAlias: string
+  communityPostReportId: string
+  communityModerationEventId: string
 }
 
 export const buildClaims = (email: string, role: string) => ({
@@ -231,6 +297,10 @@ export const seedScenario = async (): Promise<SeededScenario> => {
     otherAdvisorRecommendationStateId: `other-advisor-recommendation-${suffix}`,
     plannerDayPlanId: `planner-day-plan-${suffix}`,
     otherPlannerDayPlanId: `other-planner-day-plan-${suffix}`,
+    communityAliasId: `community-alias-${suffix}`,
+    communityAlias: `driftwood-${suffix.slice(0, 8)}`,
+    communityPostReportId: `community-report-${suffix}`,
+    communityModerationEventId: `community-moderation-${suffix}`,
   }
 
   const client = await adminPool.connect()
@@ -323,11 +393,42 @@ export const seedScenario = async (): Promise<SeededScenario> => {
       [seeded.silhouetteProfileId, seeded.teenId]
     )
 
+    await insertLookbookPost(client, {
+      id: seeded.postId,
+      userId: seeded.teenId,
+      status: 'draft',
+      caption: 'private lookbook draft',
+      publishedAt: null,
+      submittedAt: null,
+      imageObjectPath: `community/${seeded.postId}/${suffix.replace(/-/g, '')}.jpg`,
+    })
+
+    // Story 6.1. A pseudonym for the author and a report filed against their
+    // post by an unrelated member, so the actor matrix has real rows to prove
+    // the API-only categories against rather than asserting on an empty table.
     await client.query(
-      `INSERT INTO public."LookbookPost"
-        ("id", "user_id", "caption", "updated_at")
-       VALUES ($1, $2, $3, NOW())`,
-      [seeded.postId, seeded.teenId, 'private lookbook draft']
+      `INSERT INTO public."CommunityAlias" ("id", "user_id", "alias")
+       VALUES ($1, $2, $3)`,
+      [seeded.communityAliasId, seeded.teenId, seeded.communityAlias]
+    )
+
+    await client.query(
+      `INSERT INTO public."CommunityPostReport"
+        ("id", "post_id", "reporter_id", "reason", "details", "sla_due_at")
+       VALUES ($1, $2, $3, 'harassment', 'seeded report fixture', NOW() + interval '24 hours')`,
+      [seeded.communityPostReportId, seeded.postId, seeded.otherTeenId]
+    )
+
+    await client.query(
+      `INSERT INTO public."ModerationEvent"
+        ("id", "post_id", "flagged_by_id", "action", "reason", "subject_alias")
+       VALUES ($1, $2, $3, 'report', 'seeded moderation fixture', $4)`,
+      [
+        seeded.communityModerationEventId,
+        seeded.postId,
+        seeded.otherTeenId,
+        seeded.communityAlias,
+      ]
     )
 
     await client.query(
@@ -740,6 +841,18 @@ export const cleanupScenario = async (seeded: SeededScenario | undefined) => {
     await client.query('DELETE FROM public."SavedLocation" WHERE "id" IN ($1, $2)', [
       seeded.savedLocationId,
       seeded.otherSavedLocationId,
+    ])
+    // Story 6.1. The report and the moderation event both reference the post
+    // with ON DELETE SET NULL, so leaving them behind would orphan rows rather
+    // than fail; they are removed explicitly, before the post, for that reason.
+    await client.query('DELETE FROM public."CommunityPostReport" WHERE "id" = $1', [
+      seeded.communityPostReportId,
+    ])
+    await client.query('DELETE FROM public."ModerationEvent" WHERE "id" = $1', [
+      seeded.communityModerationEventId,
+    ])
+    await client.query('DELETE FROM public."CommunityAlias" WHERE "id" = $1', [
+      seeded.communityAliasId,
     ])
     await client.query('DELETE FROM public."LookbookPost" WHERE "id" = $1', [
       seeded.postId,

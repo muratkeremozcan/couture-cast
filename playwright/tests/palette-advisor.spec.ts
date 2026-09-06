@@ -309,9 +309,28 @@ premiumSeededTest.describe(
         // client's own answer to "is it done" is another read.
         await recurse(
           async () => {
-            await page.reload()
-            await waitForAccessibilityReady(page)
-            return page.getByTestId('palette-advisor-undertone').textContent()
+            /*
+             * A THROW INSIDE A POLL ABORTS THE POLL. `recurse` has no
+             * continue-on-error option: if this command raises, the whole wait
+             * fails with `Command failed on iteration 1` rather than trying
+             * again. Under full-suite parallelism a `page.reload()` and the
+             * readiness gate that follows it can transiently exceed their
+             * default timeout, which is precisely the condition a poll exists to
+             * ride out, so a failed attempt returns `null` and the next interval
+             * retries instead of ending the test.
+             *
+             * This does not soften anything. The predicate below still demands a
+             * real undertone, the 30s budget is unchanged, and the assertions
+             * after the poll still pin the exact classification -- a genuinely
+             * missing palette times out and fails exactly as before.
+             */
+            try {
+              await page.reload()
+              await waitForAccessibilityReady(page)
+              return await page.getByTestId('palette-advisor-undertone').textContent()
+            } catch {
+              return null
+            }
           },
           (undertone) => Boolean(undertone),
           { timeout: 30_000, interval: 1_000 }

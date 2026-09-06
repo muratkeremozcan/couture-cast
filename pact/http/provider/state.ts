@@ -446,3 +446,64 @@ export function getProviderPlannerState(): ProviderPlannerState | null {
 export function resetProviderPlannerState() {
   providerPlannerState = null
 }
+
+/**
+ * Story 6.1 community feed by climate band.
+ *
+ * One discriminated scenario per interaction outcome, in the same shape the
+ * planner and capsule states above use. Two of the recorded outcomes are
+ * deliberately absent from this union: an unknown `mode` and an invalid
+ * challenge window are both rejected by Zod inside `CommunityController`
+ * before `CommunityService` is reached, so the double never runs for them and
+ * inventing a scenario would suggest a code path that does not exist. Their
+ * provider states still exist in `state-handlers.ts`, because Pact requires a
+ * handler for every state name a consumer declares; they simply arrange the
+ * ordinary readable/writable world.
+ */
+export type ProviderCommunityScenario =
+  | 'feed-resolved'
+  | 'feed-band-unresolved'
+  | 'feed-removed-content'
+  | 'feed-cursor-invalid'
+  | 'post-visible'
+  | 'post-not-found'
+  | 'allocate-new'
+  | 'allocate-replay'
+  | 'publish-accepted'
+  | 'publish-session-mismatch'
+  | 'post-rate-limited'
+  | 'report-accepted'
+  | 'report-not-found'
+  | 'report-reason-changed'
+  | 'report-self'
+  | 'report-rate-limited'
+  | 'challenge-created'
+  | 'challenge-overlap'
+
+export type ProviderCommunityState = {
+  userId: string | null
+  postId: string | null
+  scenario: ProviderCommunityScenario
+}
+
+let providerCommunityState: ProviderCommunityState | null = null
+
+export function configureProviderCommunityState(state: {
+  userId?: string
+  postId?: string
+  scenario: ProviderCommunityScenario
+}) {
+  providerCommunityState = {
+    userId: state.userId ?? null,
+    postId: state.postId ?? null,
+    scenario: state.scenario,
+  }
+}
+
+export function getProviderCommunityState(): ProviderCommunityState | null {
+  return providerCommunityState
+}
+
+export function resetProviderCommunityState() {
+  providerCommunityState = null
+}

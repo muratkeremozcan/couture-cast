@@ -7,6 +7,13 @@ import {
   skinDepthSchema,
   skinUndertoneSchema,
 } from '../contracts/http/palette-advisor'
+import {
+  climateBandSchema,
+  communityExperimentVariantSchema,
+  communityFeedModeSchema,
+  communityPlatformSchema,
+  communityReportReasonSchema,
+} from '../contracts/http/community'
 
 /** Story 0.7 owner file: analytics contracts + tracking wrappers.
  * Analytics contract here = canonical event name + validated input shape + provider property shape.
@@ -91,6 +98,18 @@ export const analyticsEventNameSchema = z.enum([
   // or capsule content.
   'premium_planner_viewed',
   'premium_planner_day_reshuffled',
+  // Story 6.1. All three server-side only, pseudonymous. Platform comes from the
+  // required `x-couture-platform` header (server-trusted, never client input);
+  // closed-enum properties only: no caption text, no image URL, no raw user id,
+  // no coordinates.
+  'community_feed_viewed',
+  'community_card_opened',
+  'community_post_allocated',
+  'community_post_submitted',
+  'community_post_published',
+  'community_post_reported',
+  'community_post_withdrawn',
+  'community_challenge_participated',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -688,6 +707,113 @@ export type PremiumPlannerDayReshuffledEvent = z.infer<
   typeof premiumPlannerDayReshuffledEventSchema
 >
 
+// Story 6.1 AC 8. Platform comes from the required `x-couture-platform` header.
+//
+// Every community event carries a `dedupeKey`. The moderation pipeline emits from a
+// BullMQ job that retries, so without a stable key a retried job double-counts a
+// publication, and publication count is an input to the beta gate. The key is
+// deterministic per (event, subject occurrence) and the sink upserts on it.
+const communityDedupeKeySchema = nonEmptyString.describe(
+  'Deterministic idempotency key. The analytics sink upserts on it so a retried emit counts once.'
+)
+
+export const communityFeedViewedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  platform: communityPlatformSchema,
+  dedupeKey: communityDedupeKeySchema,
+  /** The viewer's own resolved band. Never the requested filter; see filterMode. */
+  climateBand: climateBandSchema.nullable(),
+  bandResolved: z.boolean(),
+  filterMode: communityFeedModeSchema,
+  experimentVariant: communityExperimentVariantSchema,
+  itemCount: z.number().int().min(0),
+  isEmpty: z.boolean(),
+})
+
+export type CommunityFeedViewedEvent = z.infer<typeof communityFeedViewedEventSchema>
+
+/**
+ * The beta gate advances on non-self card-open lift, so the self flag is required
+ * rather than derived, and the variant has to travel with the event to split arms.
+ */
+export const communityCardOpenedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  platform: communityPlatformSchema,
+  dedupeKey: communityDedupeKeySchema,
+  climateBand: climateBandSchema.nullable(),
+  isSelf: z.boolean(),
+  experimentVariant: communityExperimentVariantSchema,
+})
+
+export type CommunityCardOpenedEvent = z.infer<typeof communityCardOpenedEventSchema>
+
+export const communityPostAllocatedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  platform: communityPlatformSchema,
+  dedupeKey: communityDedupeKeySchema,
+  replayed: z.boolean(),
+})
+
+export type CommunityPostAllocatedEvent = z.infer<
+  typeof communityPostAllocatedEventSchema
+>
+
+export const communityPostSubmittedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  platform: communityPlatformSchema,
+  dedupeKey: communityDedupeKeySchema,
+  climateBand: climateBandSchema.nullable(),
+  hasCaption: z.boolean(),
+  hasChallenge: z.boolean(),
+})
+
+export type CommunityPostSubmittedEvent = z.infer<
+  typeof communityPostSubmittedEventSchema
+>
+
+export const communityPostPublishedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  platform: communityPlatformSchema,
+  dedupeKey: communityDedupeKeySchema,
+  climateBand: climateBandSchema.nullable(),
+})
+
+export type CommunityPostPublishedEvent = z.infer<
+  typeof communityPostPublishedEventSchema
+>
+
+export const communityPostReportedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  platform: communityPlatformSchema,
+  dedupeKey: communityDedupeKeySchema,
+  reason: communityReportReasonSchema,
+})
+
+export type CommunityPostReportedEvent = z.infer<typeof communityPostReportedEventSchema>
+
+export const communityPostWithdrawnEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  platform: communityPlatformSchema,
+  dedupeKey: communityDedupeKeySchema,
+  climateBand: climateBandSchema.nullable(),
+})
+
+export type CommunityPostWithdrawnEvent = z.infer<
+  typeof communityPostWithdrawnEventSchema
+>
+
+/** One per unique published participant, so the challenge count stays honest. */
+export const communityChallengeParticipatedEventSchema = z.object({
+  analyticsSubjectId: nonEmptyString,
+  platform: communityPlatformSchema,
+  dedupeKey: communityDedupeKeySchema,
+  climateBand: climateBandSchema.nullable(),
+})
+
+export type CommunityChallengeParticipatedEvent = z.infer<
+  typeof communityChallengeParticipatedEventSchema
+>
+
 export const analyticsEventSchemas = {
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
@@ -726,6 +852,14 @@ export const analyticsEventSchemas = {
   advisor_recommendation_acted: advisorRecommendationActedEventSchema,
   premium_planner_viewed: premiumPlannerViewedEventSchema,
   premium_planner_day_reshuffled: premiumPlannerDayReshuffledEventSchema,
+  community_feed_viewed: communityFeedViewedEventSchema,
+  community_card_opened: communityCardOpenedEventSchema,
+  community_post_allocated: communityPostAllocatedEventSchema,
+  community_post_submitted: communityPostSubmittedEventSchema,
+  community_post_published: communityPostPublishedEventSchema,
+  community_post_reported: communityPostReportedEventSchema,
+  community_post_withdrawn: communityPostWithdrawnEventSchema,
+  community_challenge_participated: communityChallengeParticipatedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -1726,6 +1860,111 @@ export type PremiumPlannerDayReshuffledProperties = z.infer<
   typeof premiumPlannerDayReshuffledPropertiesSchema
 >
 
+export const communityFeedViewedPropertiesSchema = z
+  .object({
+    platform: communityPlatformSchema,
+    dedupe_key: nonEmptyString,
+    climate_band: climateBandSchema.nullable(),
+    band_resolved: z.boolean(),
+    filter_mode: communityFeedModeSchema,
+    experiment_variant: communityExperimentVariantSchema,
+    item_count: z.number().int().min(0),
+    is_empty: z.boolean(),
+  })
+  .strict()
+
+export type CommunityFeedViewedProperties = z.infer<
+  typeof communityFeedViewedPropertiesSchema
+>
+
+export const communityCardOpenedPropertiesSchema = z
+  .object({
+    platform: communityPlatformSchema,
+    dedupe_key: nonEmptyString,
+    climate_band: climateBandSchema.nullable(),
+    is_self: z.boolean(),
+    experiment_variant: communityExperimentVariantSchema,
+  })
+  .strict()
+
+export type CommunityCardOpenedProperties = z.infer<
+  typeof communityCardOpenedPropertiesSchema
+>
+
+export const communityPostAllocatedPropertiesSchema = z
+  .object({
+    platform: communityPlatformSchema,
+    dedupe_key: nonEmptyString,
+    replayed: z.boolean(),
+  })
+  .strict()
+
+export type CommunityPostAllocatedProperties = z.infer<
+  typeof communityPostAllocatedPropertiesSchema
+>
+
+export const communityPostSubmittedPropertiesSchema = z
+  .object({
+    platform: communityPlatformSchema,
+    dedupe_key: nonEmptyString,
+    climate_band: climateBandSchema.nullable(),
+    has_caption: z.boolean(),
+    has_challenge: z.boolean(),
+  })
+  .strict()
+
+export type CommunityPostSubmittedProperties = z.infer<
+  typeof communityPostSubmittedPropertiesSchema
+>
+
+export const communityPostPublishedPropertiesSchema = z
+  .object({
+    platform: communityPlatformSchema,
+    dedupe_key: nonEmptyString,
+    climate_band: climateBandSchema.nullable(),
+  })
+  .strict()
+
+export type CommunityPostPublishedProperties = z.infer<
+  typeof communityPostPublishedPropertiesSchema
+>
+
+export const communityPostReportedPropertiesSchema = z
+  .object({
+    platform: communityPlatformSchema,
+    dedupe_key: nonEmptyString,
+    reason: communityReportReasonSchema,
+  })
+  .strict()
+
+export type CommunityPostReportedProperties = z.infer<
+  typeof communityPostReportedPropertiesSchema
+>
+
+export const communityPostWithdrawnPropertiesSchema = z
+  .object({
+    platform: communityPlatformSchema,
+    dedupe_key: nonEmptyString,
+    climate_band: climateBandSchema.nullable(),
+  })
+  .strict()
+
+export type CommunityPostWithdrawnProperties = z.infer<
+  typeof communityPostWithdrawnPropertiesSchema
+>
+
+export const communityChallengeParticipatedPropertiesSchema = z
+  .object({
+    platform: communityPlatformSchema,
+    dedupe_key: nonEmptyString,
+    climate_band: climateBandSchema.nullable(),
+  })
+  .strict()
+
+export type CommunityChallengeParticipatedProperties = z.infer<
+  typeof communityChallengeParticipatedPropertiesSchema
+>
+
 export function trackPremiumSubscribeTapped(
   event: PremiumSubscribeTappedEvent,
   distinctId: string
@@ -1894,6 +2133,146 @@ export function trackPremiumPlannerDayReshuffled(
       platform: parsed.platform,
       day_offset: parsed.dayOffset,
       unchanged: parsed.unchanged,
+    }),
+  }
+}
+
+export function trackCommunityFeedViewed(
+  event: CommunityFeedViewedEvent
+): AnalyticsCapturePayload<'community_feed_viewed', CommunityFeedViewedProperties> {
+  const parsed = communityFeedViewedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'community_feed_viewed',
+    properties: communityFeedViewedPropertiesSchema.parse({
+      platform: parsed.platform,
+      dedupe_key: parsed.dedupeKey,
+      climate_band: parsed.climateBand,
+      band_resolved: parsed.bandResolved,
+      filter_mode: parsed.filterMode,
+      experiment_variant: parsed.experimentVariant,
+      item_count: parsed.itemCount,
+      is_empty: parsed.isEmpty,
+    }),
+  }
+}
+
+export function trackCommunityCardOpened(
+  event: CommunityCardOpenedEvent
+): AnalyticsCapturePayload<'community_card_opened', CommunityCardOpenedProperties> {
+  const parsed = communityCardOpenedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'community_card_opened',
+    properties: communityCardOpenedPropertiesSchema.parse({
+      platform: parsed.platform,
+      dedupe_key: parsed.dedupeKey,
+      climate_band: parsed.climateBand,
+      is_self: parsed.isSelf,
+      experiment_variant: parsed.experimentVariant,
+    }),
+  }
+}
+
+export function trackCommunityPostAllocated(
+  event: CommunityPostAllocatedEvent
+): AnalyticsCapturePayload<'community_post_allocated', CommunityPostAllocatedProperties> {
+  const parsed = communityPostAllocatedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'community_post_allocated',
+    properties: communityPostAllocatedPropertiesSchema.parse({
+      platform: parsed.platform,
+      dedupe_key: parsed.dedupeKey,
+      replayed: parsed.replayed,
+    }),
+  }
+}
+
+export function trackCommunityPostSubmitted(
+  event: CommunityPostSubmittedEvent
+): AnalyticsCapturePayload<'community_post_submitted', CommunityPostSubmittedProperties> {
+  const parsed = communityPostSubmittedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'community_post_submitted',
+    properties: communityPostSubmittedPropertiesSchema.parse({
+      platform: parsed.platform,
+      dedupe_key: parsed.dedupeKey,
+      climate_band: parsed.climateBand,
+      has_caption: parsed.hasCaption,
+      has_challenge: parsed.hasChallenge,
+    }),
+  }
+}
+
+export function trackCommunityPostPublished(
+  event: CommunityPostPublishedEvent
+): AnalyticsCapturePayload<'community_post_published', CommunityPostPublishedProperties> {
+  const parsed = communityPostPublishedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'community_post_published',
+    properties: communityPostPublishedPropertiesSchema.parse({
+      platform: parsed.platform,
+      dedupe_key: parsed.dedupeKey,
+      climate_band: parsed.climateBand,
+    }),
+  }
+}
+
+export function trackCommunityPostReported(
+  event: CommunityPostReportedEvent
+): AnalyticsCapturePayload<'community_post_reported', CommunityPostReportedProperties> {
+  const parsed = communityPostReportedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'community_post_reported',
+    properties: communityPostReportedPropertiesSchema.parse({
+      platform: parsed.platform,
+      dedupe_key: parsed.dedupeKey,
+      reason: parsed.reason,
+    }),
+  }
+}
+
+export function trackCommunityPostWithdrawn(
+  event: CommunityPostWithdrawnEvent
+): AnalyticsCapturePayload<'community_post_withdrawn', CommunityPostWithdrawnProperties> {
+  const parsed = communityPostWithdrawnEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'community_post_withdrawn',
+    properties: communityPostWithdrawnPropertiesSchema.parse({
+      platform: parsed.platform,
+      dedupe_key: parsed.dedupeKey,
+      climate_band: parsed.climateBand,
+    }),
+  }
+}
+
+export function trackCommunityChallengeParticipated(
+  event: CommunityChallengeParticipatedEvent
+): AnalyticsCapturePayload<
+  'community_challenge_participated',
+  CommunityChallengeParticipatedProperties
+> {
+  const parsed = communityChallengeParticipatedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'community_challenge_participated',
+    properties: communityChallengeParticipatedPropertiesSchema.parse({
+      platform: parsed.platform,
+      dedupe_key: parsed.dedupeKey,
+      climate_band: parsed.climateBand,
     }),
   }
 }

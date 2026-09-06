@@ -19,7 +19,20 @@ const { FEATURE_FLAG_KEYS, getDefaultFeatureFlagValue } = unwrapCjsNamespace(sha
 
 const canonicalFlagOverrides: Record<FeatureFlagKey, FeatureFlagStoredValue> = {
   premium_themes_enabled: true,
-  community_feed_enabled: false,
+  // Story 6.1: read and write are two independent rollout controls, not one
+  // flag. The beta gate can open browsing to a cohort while submission stays
+  // shut, and a moderation incident has to be able to stop new posts without
+  // blanking the feed for everyone already using it; a single
+  // `community_feed_enabled` could express neither.
+  //
+  // Both registry defaults are false (fail-closed), so these seed overrides are
+  // what turn the feature on in every seeded test and local environment.
+  // Production never runs this seed, so it stays off there until someone flips
+  // it deliberately — and the story holds it off until moderation staffing, SLA
+  // alerts, privacy, deletion, localization, accessibility, model and rollback
+  // evidence are signed.
+  community_read_enabled: true,
+  community_write_enabled: true,
   // Story 5.4: the registry default is `false` (fail-closed, decision 10), so
   // this seed override is what turns the feature on in every seeded test and
   // local environment; production never runs this seed, so it stays off

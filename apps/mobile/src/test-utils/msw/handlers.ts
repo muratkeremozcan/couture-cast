@@ -1,4 +1,43 @@
 import { http, HttpResponse } from 'msw'
+import type { z } from 'zod'
+import {
+  allocateCommunityPostResponseSchema,
+  communityFeedResponseSchema,
+  communityPostResponseSchema,
+  publishCommunityPostResponseSchema,
+  reportCommunityPostResponseSchema,
+  withdrawCommunityPostResponseSchema,
+  type CommunityFeedItem,
+} from '@couture/api-client/contracts/http'
+
+/**
+ * Serves a fixture only after the contract's own response schema accepts it, so a
+ * fixture that drifts from the contract fails the request loudly instead of
+ * teaching a suite a wire shape the server never sends.
+ */
+function communityJson<Schema extends z.ZodTypeAny>(
+  schema: Schema,
+  payload: z.input<Schema>
+) {
+  return HttpResponse.json(schema.parse(payload) as unknown as Record<string, unknown>)
+}
+
+/** One published post, shared by the single-post read and the publish response. */
+const mockCommunityFeedItem: CommunityFeedItem = {
+  id: 'mock-community-post-id',
+  caption: 'Layered wool over a merino base for a damp commute.',
+  altText: 'A charcoal wool coat over a cream knit, with black ankle boots.',
+  climateBand: 'temperate_wet',
+  imageAccess: {
+    url: 'https://storage.local/community/mock-community-post-id.jpg',
+    expiresAt: new Date(Date.now() + 3600000).toISOString(),
+  },
+  publishedAt: new Date().toISOString(),
+  createdAt: new Date().toISOString(),
+  status: 'published',
+  challengeId: null,
+  author: { displayName: 'Style Explorer 4F2A', isSelf: false },
+}
 
 const MOCK_FORECAST_START_MS = Date.parse('2026-07-24T17:00:00.000Z')
 
@@ -389,5 +428,78 @@ export const handlers = [
         rules: [],
       },
     })
+  ),
+  /**
+   * Story 6.1. Every community fixture is parsed by the contract's own response
+   * schema before it is served. The previous handlers answered
+   * `{ data: { success: true } }` for report and withdraw where the contract is
+   * `trackedResponseSchema` (`{ tracked: true }`), so any test built on them
+   * would have passed against a shape the server never sends. `communityJson`
+   * makes that class of drift a loud failure at request time instead.
+   */
+  http.get('*/api/v1/community/feed', () =>
+    communityJson(communityFeedResponseSchema, {
+      data: {
+        items: [],
+        authorStates: [],
+        nextCursor: null,
+        mode: 'auto',
+        viewerBand: 'temperate_dry',
+        bandResolved: true,
+        bandUnresolvedReason: null,
+        experimentVariant: 'auto',
+        activeChallenge: null,
+      },
+    })
+  ),
+  http.get('*/api/v1/community/posts/:postId', ({ params }) =>
+    params.postId === mockCommunityFeedItem.id
+      ? communityJson(communityPostResponseSchema, { data: mockCommunityFeedItem })
+      : HttpResponse.json(
+          { statusCode: 404, message: 'Community post not found.', error: 'Not Found' },
+          { status: 404 }
+        )
+  ),
+  /**
+   * The object store the allocate fixture points at. `vitest.setup.ts` bypasses
+   * unhandled requests, so without this the real PUT leaves the test runner and
+   * fails on DNS, which the client correctly reports as `upload_failed`. The
+   * production code no longer has a test-hostname escape hatch, so the mock has
+   * to answer instead.
+   */
+  http.put(
+    'https://mock-upload.test/upload',
+    () => new HttpResponse(null, { status: 200 })
+  ),
+  http.post('*/api/v1/community/posts/allocate', () =>
+    communityJson(allocateCommunityPostResponseSchema, {
+      data: {
+        postId: 'mock-allocated-post-id',
+        uploadSessionId: 'mock-upload-session-id',
+        uploadUrl: 'https://mock-upload.test/upload',
+        uploadToken: 'mock-token',
+        requiredHeaders: { 'content-type': 'image/jpeg' },
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+        altTextSuggestion: 'A layered outfit photographed against a plain wall.',
+        altTextSuggestionLocale: 'en-US',
+      },
+    })
+  ),
+  http.post('*/api/v1/community/posts/publish', () =>
+    communityJson(publishCommunityPostResponseSchema, {
+      data: {
+        ...mockCommunityFeedItem,
+        id: 'mock-published-post-id',
+        status: 'pending_review',
+        publishedAt: null,
+        author: { displayName: 'You', isSelf: true },
+      },
+    })
+  ),
+  http.post('*/api/v1/community/posts/:postId/report', () =>
+    communityJson(reportCommunityPostResponseSchema, { tracked: true })
+  ),
+  http.post('*/api/v1/community/posts/:postId/withdraw', () =>
+    communityJson(withdrawCommunityPostResponseSchema, { tracked: true })
   ),
 ]

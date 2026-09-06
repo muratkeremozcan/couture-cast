@@ -26,6 +26,15 @@ export function createIdentityDoubles() {
       if (token === 'pact-teen-token') {
         return Promise.resolve({ userId: 'teen-1', role: 'teen' as const })
       }
+      // Story 6.1 community challenges: the create and update routes mount
+      // `RolesGuard` with `@Roles('admin')`, and that guard is left un-mocked
+      // in `provider-helper.ts` so it runs for real. Neither identity above can
+      // pass it, so the admin interactions in
+      // `pact/http/consumer/interactions/community.ts` (`pactAdminAuth`) need a
+      // third one.
+      if (token === 'pact-admin-token') {
+        return Promise.resolve({ userId: 'admin-1', role: 'admin' as const })
+      }
       return Promise.reject(new Error('Unknown Pact access token'))
     },
   } as unknown as AccessTokenIdentityService

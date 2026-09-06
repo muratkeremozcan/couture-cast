@@ -39,19 +39,21 @@
                 "type": "string"
               },
               "climateBand": {
-                "type": "string"
-              },
-              "mediaUrls": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "format": "uri"
-                }
+                "type": "string",
+                "enum": [
+                  "cold_wet",
+                  "cold_dry",
+                  "temperate_wet",
+                  "temperate_dry",
+                  "warm_wet",
+                  "warm_dry"
+                ]
               }
             },
             "required": [
               "postId"
-            ]
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

@@ -24,6 +24,7 @@ export type QueueName =
   | 'billing-reconciliation'
   | 'maintenance'
   | 'palette-analysis'
+  | 'community-moderation'
 
 export type QueueConfig = {
   name: QueueName
@@ -106,6 +107,16 @@ export const queueConfigs: QueueConfig[] = [
   // before reaching any handler.
   {
     name: 'palette-analysis',
+    options: {
+      connection,
+      defaultJobOptions,
+    },
+  },
+  // Story 6.1 Task 4: automated content screening pipeline for community posts
+  // (ADR-013). Jobs run server-side NSFW image screening and multilingual text
+  // profanity filters before publishing or flagging lookbook posts.
+  {
+    name: 'community-moderation',
     options: {
       connection,
       defaultJobOptions,

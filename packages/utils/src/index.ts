@@ -52,9 +52,11 @@ export {
 export type { WcagContrastOptions } from './contrast'
 
 export {
+  buildCommunityObjectPath,
   buildGarmentObjectPath,
   buildPaletteSelfieObjectPath,
   buildSilhouetteObjectPath,
+  parseCommunityObjectPath,
 } from './wardrobe-object-path'
 export type { GarmentObjectExtension } from './wardrobe-object-path'
 
@@ -78,3 +80,6 @@ export {
   WARM_HUE_MAX,
 } from './skin-tone'
 export type { Lab, SkinDepth, SkinUndertone } from './skin-tone'
+
+export { CLIMATE_BANDS, ORDERED_CLIMATE_BANDS, classifyClimateBand } from './climate-band'
+export type { ClimateBand, ClimateBandDay } from './climate-band'

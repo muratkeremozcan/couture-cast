@@ -23,6 +23,7 @@ import { registerSubscriptionContracts } from './subscription'
 import { registerPremiumThemeContracts } from './premium-theme'
 import { registerPaletteAdvisorContracts } from './palette-advisor'
 import { registerPlannerContracts } from './planner'
+import { registerCommunityContracts } from './community'
 
 export const HTTP_OPENAPI_OUTPUT_FILENAME = 'http.openapi.json'
 
@@ -115,6 +116,7 @@ export function createHttpOpenApiRegistry() {
   registerPremiumThemeContracts(registry, commonSchemas)
   registerPaletteAdvisorContracts(registry, commonSchemas)
   registerPlannerContracts(registry, commonSchemas)
+  registerCommunityContracts(registry, commonSchemas)
 
   return registry
 }
@@ -149,7 +151,11 @@ export function generateHttpOpenApiDocument() {
       // Story 5.5 bumps the minor again: two additive planner operations
       // (GET the seven-day window, POST a per-day reshuffle) under a new tag,
       // and no changes to existing operations.
-      version: '1.5.0',
+      // Story 6.1 bumps the minor again: eight additive community operations
+      // (feed read, single-post read, upload allocate, publish, report,
+      // withdraw, challenge create, challenge update) under a new tag, and no
+      // changes to existing operations.
+      version: '1.6.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [

@@ -74,6 +74,51 @@ function buildPlannerResponse() {
   }
 }
 
+/**
+ * Story 6.1: the community column reads `GET /api/v1/community/feed` through
+ * `lib/community.ts`, which throws `signed_out` without a bearer token, so any
+ * test that needs a rendered card signs in and serves one post.
+ */
+const COMMUNITY_POST_ID = 'community-post-1'
+
+function signIn() {
+  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+}
+
+function communityFeedHandler() {
+  return http.get('/api/v1/community/feed', () =>
+    HttpResponse.json({
+      data: {
+        items: [
+          {
+            id: COMMUNITY_POST_ID,
+            caption: 'Wool trench over a silk scarf for a crisp commute.',
+            altText: 'A camel wool trench over a patterned silk scarf.',
+            climateBand: 'temperate_wet',
+            imageAccess: {
+              url: 'https://storage.local/community/community-post-1.jpg',
+              expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+            },
+            publishedAt: '2026-09-05T12:00:00.000Z',
+            createdAt: '2026-09-05T12:00:00.000Z',
+            status: 'published',
+            challengeId: null,
+            author: { displayName: 'Style Explorer 91C4', isSelf: false },
+          },
+        ],
+        authorStates: [],
+        nextCursor: null,
+        mode: 'auto',
+        viewerBand: 'temperate_wet',
+        bandResolved: true,
+        bandUnresolvedReason: null,
+        experimentVariant: 'auto',
+        activeChallenge: null,
+      },
+    })
+  )
+}
+
 describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -129,15 +174,24 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
     )
   })
 
-  it('3.5-INT-005: Keeps semantic reading order and excludes static cards from Tab', () => {
+  /**
+   * Story 6.1: the community column is API-backed now, so this needs a session
+   * and a feed fixture to have a card to place in the reading order at all. It
+   * used to read `New` off the chip strip and "Milan Autumn Wool Trench" off
+   * `MOCK_LOOKBOOK_ITEMS`; both are gone, because a chip with no server behind
+   * it is what the spec's Boundaries forbid.
+   */
+  it('3.5-INT-005: Keeps semantic reading order and excludes static cards from Tab', async () => {
+    signIn()
+    useMswHandlers(communityFeedHandler())
     render(<LookbookPrismLayout />)
 
+    const community = await screen.findByTestId(`lookbook-card-${COMMUNITY_POST_ID}`)
     const hero = screen.getByRole('region', { name: /hero ritual canvas/i })
-    const filter = screen.getByRole('button', { name: /^new$/i })
+    const filter = screen.getByTestId('community-filter-auto')
     const garment = screen.getByText(/double-breasted blazer/i).closest('div.group')
-    const community = screen.getByText(/milan autumn wool trench/i).closest('article')
 
-    if (!garment || !community) {
+    if (!garment) {
       throw new Error('Expected focus targets')
     }
 
@@ -271,20 +325,30 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
     expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
   })
 
+  /**
+   * Story 6.1: the chip category no longer selects a feed filter -- all three
+   * land on `auto` -- so what it still synchronizes is the hero copy and the
+   * grid's `data-chip-category`. The old assertion that "Parisian Silk &
+   * Cashmere Blend" appeared TWICE was reading the hero title and a
+   * `MOCK_LOOKBOOK_ITEMS` card that no longer exists.
+   */
   it('synchronizes chip selection across hero and community content', () => {
     render(<LookbookPrismLayout />)
 
     expect(screen.getByTestId('hero-recommendation-title')).toHaveTextContent(
       'Double-Breasted Blazer & Silk Knit'
     )
-    expect(screen.getByText('Milan Autumn Wool Trench')).toBeInTheDocument()
+    expect(screen.getByTestId('community-card-grid')).toHaveAttribute(
+      'data-chip-category',
+      'Personal'
+    )
 
     fireEvent.click(screen.getByTestId('chip-community'))
 
     expect(screen.getByTestId('hero-recommendation-title')).toHaveTextContent(
       'Parisian Silk & Cashmere Blend'
     )
-    expect(screen.getAllByText('Parisian Silk & Cashmere Blend')).toHaveLength(2)
+    expect(screen.getAllByText('Parisian Silk & Cashmere Blend')).toHaveLength(1)
     expect(screen.getByTestId('community-card-grid')).toHaveAttribute(
       'data-chip-category',
       'Community'

@@ -16,6 +16,12 @@ const env = {
   NODE_ENV: 'test',
   TEST_ENV: 'local',
   GARMENT_TAGGING_ENGINE: 'fixture',
+  // Story 6.1: without this the ADR-013 NSFW model is absent, every post fails
+  // closed to `flagged`, and the published path — the story's central
+  // acceptance criterion — cannot be exercised at any tier. The fixture clears
+  // every image and proves nothing about image safety; it is refused outside a
+  // test environment by both the selector and the fixture's own constructor.
+  COMMUNITY_NSFW_SCREENER: 'fixture',
   PORT: process.env.PORT || '4000',
   API_BASE_URL: apiBaseUrl,
   HTTP_CORS_ORIGIN: process.env.HTTP_CORS_ORIGIN || webBaseUrl,
@@ -266,7 +272,7 @@ async function main() {
   }
 
   console.log(
-    '[start-api-e2e-with-workers] Starting API and Wardrobe Worker in E2E fixture mode...'
+    '[start-api-e2e-with-workers] Starting API, Wardrobe Worker and Community Worker in E2E fixture mode...'
   )
 
   const { child: apiProcess } = startManagedProcess('node', ['apps/api/dist/src/main.js'])
@@ -278,6 +284,28 @@ async function main() {
     repoRoot,
     'Dedicated wardrobe worker started'
   )
+
+  /*
+   * Story 6.1: without this process nothing consumes `community-moderation`, so
+   * a post published through the real API sits at `pending_review` forever and
+   * the community loop cannot be exercised end to end — by a Playwright spec or
+   * by anyone running the app locally.
+   *
+   * `community.bootstrap.js` rather than `bootstrap.js`, which also runs the
+   * community pipeline in production: that process starts weather ingestion and
+   * registers its refresh scheduler, so booting it here would make live calls to
+   * a weather provider on a timer from a test stack. The two share one
+   * composition (`createCommunityWorkerRuntime`) so they cannot drift, and they
+   * subscribe to disjoint queue names so neither steals the other's jobs.
+   */
+  const { child: communityWorkerProcess, ready: communityWorkerReady } =
+    startManagedProcess(
+      'node',
+      ['apps/api/dist/src/workers/community.bootstrap.js'],
+      env,
+      repoRoot,
+      'Dedicated community worker started'
+    )
 
   apiProcess.on('exit', (code) => {
     if (!shuttingDown) {
@@ -295,11 +323,26 @@ async function main() {
     }
   })
 
+  communityWorkerProcess.on('exit', (code) => {
+    if (!shuttingDown) {
+      console.error(
+        `[start-api-e2e-with-workers] Community worker process exited with code ${code}`
+      )
+      void shutdown(code ?? 1)
+    }
+  })
+
+  // Awaited on both paths, not just the web one: an unawaited readiness promise
+  // that rejects on its own timeout is an unhandled rejection, and a stack that
+  // reports itself up before its workers are consuming is how a spec ends up
+  // waiting on a post that nothing is screening.
+  await Promise.all([
+    waitForUrl(new URL('/api/health', apiBaseUrl).toString(), 30_000),
+    workerReady,
+    communityWorkerReady,
+  ])
+
   if (startWeb) {
-    await Promise.all([
-      waitForUrl(new URL('/api/health', apiBaseUrl).toString(), 30_000),
-      workerReady,
-    ])
     if (reuseExistingWeb) {
       console.log(
         `[start-api-e2e-with-workers] Reusing existing Web server at ${webBaseUrl}`

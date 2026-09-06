@@ -1,0 +1,250 @@
+# Learning path Step 38: Community feed by climate band.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-38-community-feed-by-climate-band
+# Story 6.1 Task 6: the community feed tab on mobile.
+#
+# HONEST SCOPE, stated the way premium-planner.yaml and palette-advisor.yaml
+# state theirs. `run-maestro.mjs` signs up a FRESH public-API user and bakes that
+# user's token into the Metro bundle via `EXPO_PUBLIC_E2E_ACCESS_TOKEN` before
+# the Expo server starts; no Maestro flow in this repo signs in through the UI,
+# and the app has no runtime token override. So the harness user owns no posts,
+# holds no guardian consent, and has no moderation history.
+#
+# WHAT THAT DOES *NOT* MEAN IS AN EMPTY FEED, and this is worth stating because
+# it is the opposite of the obvious assumption. The community feed is a PUBLIC
+# read: `packages/db/prisma/seeds/rituals.ts` upserts five already-published
+# `LookbookPost` rows with stable ids `lookbook-1` through `lookbook-5`,
+# captions `Look N — weather-ready layers`, and `climate_band` alternating
+# `temperate_dry` / `cold_dry`. They are published a minute apart in id order, so
+# `lookbook-5` is the NEWEST and leads the `published_at DESC` feed; this flow
+# anchors on it for that reason. CI runs `npm run db:reset` before the shards
+# (.github/workflows/pr-mobile-e2e.yml), so those rows are present and every
+# device sees them. Asserting `community-feed-empty` here would FAIL. This flow
+# therefore proves a populated feed against real seeded data, which is a great
+# deal more than the shell.
+#
+# THIS FLOW IS NOT USER-SCOPED and must stay out of `USER_SCOPED_FLOWS` in
+# scripts/run-maestro.mjs. The ids below are literals in this file, not `-e`
+# parameters, and they name PUBLIC rows every shard's user can read — unlike
+# `${CAPSULE_ID}` or `${GARMENT_A_ID}`, which are seeded for one device's user
+# and are the reason that list exists.
+#
+# WHAT IT CANNOT REACH, and why those journeys live elsewhere:
+#   - Publishing. It would enqueue a real ADR-013 moderation job and consume one
+#     of the ten daily submissions for a user shared across every flow on this
+#     device. The compose sheet is opened and closed here; the publish journey is
+#     `community-screen.test.tsx` through MSW and `playwright/tests/` end to end.
+#   - Withdrawing or the author's own in-progress states. Both need posts the
+#     harness user authored, and it has none. `assertNotVisible` on the withdraw
+#     control below is the honest inverse: the control must NOT be offered on
+#     someone else's post.
+#   - The teen consent gate. It needs an account with a guardian relationship,
+#     which a fresh public signup does not have.
+#
+# A SELECTOR TRAP THIS FLOW ALREADY FELL INTO, worth knowing before editing it.
+# `assertVisible` with BOTH an `id` and a `text` requires ONE node carrying both.
+# The caption's `testID` sits on the `Text` element itself, so the combined form
+# works there. The climate pill's sits on a wrapping `View` with the label on a
+# child `Text` (`apps/mobile/components/community/community-card.tsx`), so the
+# combined form fails against a perfectly correct card. One assertion passing and
+# the next failing on the same card reads as a data problem and is not one; the
+# pill is asserted as two separate steps below for that reason.
+#
+# THIS FLOW PRODUCED NO JUNIT ENTRY AND NO ARTIFACTS in the 4-way sharded run of
+# 2026-09-05 while the other four flows on its device ran and passed, and it
+# passes solo. Ruled out: tag filtering (there is no `maestro/config.yaml`, and
+# these tags match the sibling shape); the duration ESTIMATE affecting shard
+# packing (`resolve-maestro-shard.mjs` is CI-only, and the local sharded path
+# uses Maestro's own `--shard-split`); a harness timeout (the parallel path calls
+# `runMaestroCommand` with no watchdog, unlike the serial path); and flow
+# discovery (the runner handed Maestro 18 paths and reported "ran 18, report
+# described 17"). What remains is Maestro's own `--shard-split`, which this repo
+# already documents as unreliable in `runShardedFlows` — "observed exiting 0
+# while its own summary printed `Passed: 16/17`". The missing-flow guard catches
+# it and turns the suite red, so it is a known open question rather than a hole.
+#
+# The `all` filter is selected before asserting on cards, deliberately. Under
+# `auto` the result depends on whether the shared fixture user happens to have a
+# saved location by the time this flow runs — another flow on the same device may
+# have created one — so `auto` is exactly the kind of order-dependent assertion
+# this suite's shared-user rule warns about. `all` returns every band regardless.
+appId: ${MAESTRO_APP_ID}
+name: 'Community feed by climate band'
+tags:
+  - e2e
+  - community
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+# --- The tab and its shell ---------------------------------------------------
+
+- tapOn:
+    id: 'tab-community'
+    retryTapIfNoChange: true
+    label: 'Open the community tab from the bottom navigation'
+
+- extendedWaitUntil:
+    visible:
+      id: 'community-screen'
+    timeout: 15000
+    label: 'Community screen is the one on top'
+
+- assertVisible:
+    id: 'community-new-post-button'
+    text: 'New post'
+    label: 'Localized compose entry point, not a literal'
+
+# --- AC: the defined filters are present and the future ones are not ---------
+
+- assertVisible:
+    id: 'community-sticky-filter-chips'
+    label: 'Filter chips render with the feed'
+
+- assertVisible:
+    id: 'community-filter-chip-auto'
+    label: 'The viewer-climate filter is offered'
+
+- assertVisible:
+    id: 'community-filter-chip-all'
+    label: 'The every-climate filter is offered'
+
+- tapOn:
+    id: 'community-filter-chip-all'
+    retryTapIfNoChange: true
+    label: 'Pin the feed to every climate so the result does not depend on this
+      device user having a saved location'
+
+# --- The feed renders real seeded rows, in publication order -----------------
+
+# LOOKBOOK-5, NOT LOOKBOOK-1, AND THE CHOICE IS THE ASSERTION.
+#
+# The feed is ordered `published_at DESC, id DESC`, and the seed stamps
+# `lookbook-N` at `SEEDED_PUBLICATION_EPOCH_MS + idx * 60_000`, so `lookbook-5`
+# is the NEWEST post and therefore the first card. `lookbook-1` is the oldest and
+# sits at the bottom, off-screen without scrolling — asserting on it was a bug in
+# this flow that read as a broken feed, and it is exactly the mistake the
+# ordering contract exists to catch.
+#
+# Asserting the newest post is the first visible card is a stronger check than
+# "some card rendered": a feed that lost its ordering, or that fell back to
+# creation time (which moderation stamps long before publication), puts a
+# different post here and fails.
+- extendedWaitUntil:
+    visible:
+      id: 'community-post-card-lookbook-5'
+    timeout: 20000
+    label: 'The newest seeded post is the first card, over the real API'
+
+- assertVisible:
+    id: 'community-card-caption-lookbook-5'
+    text: 'Look 5 — weather-ready layers'
+    label: 'The caption is the seeded row, so this is live data and not a fixture'
+
+# TWO ASSERTIONS, NOT ONE WITH BOTH `id` AND `text`.
+#
+# `assertVisible` with an `id` and a `text` requires ONE node carrying both, and
+# the pill does not have one: `community-card-climate-pill-<id>` is the `testID`
+# on the wrapping `View` (community-card.tsx), while the band label lives on a
+# child `<Text>`. The combined form therefore fails against a perfectly correct
+# card. The caption above is not affected because its `testID` sits on the `Text`
+# element itself.
+- assertVisible:
+    id: 'community-card-climate-pill-lookbook-5'
+    label: 'The climate band pill renders on the card'
+
+- assertVisible:
+    text: 'Temperate and dry'
+    label: 'The seeded band renders through the locale catalog, not as a raw enum'
+
+- assertVisible:
+    id: 'community-card-author-lookbook-5'
+    label: 'The author line renders a pseudonym rather than being absent'
+
+# The signed image URL is minted per request and the card renders it. A post
+# whose object could not be signed is dropped from the feed entirely, so this
+# also proves the seeded object exists in the bucket.
+- assertVisible:
+    id: 'community-card-image-lookbook-5'
+    label: 'The card rendered its signed image rather than the unavailable state'
+
+- assertNotVisible:
+    id: 'community-card-image-unavailable-lookbook-5'
+
+- assertVisible:
+    id: 'community-card-report-lookbook-5'
+    text: 'Report'
+    label: 'Reporting is offered on another member post'
+
+# The withdraw control belongs to the author alone. It must not appear on a post
+# this user did not write, and it is the only ownership control on the card.
+- assertNotVisible:
+    id: 'community-card-withdraw-lookbook-5'
+
+# A populated feed is neither the empty state nor an error state. Asserting the
+# absence of both stops a silently degraded feed from passing the checks above.
+- assertNotVisible:
+    id: 'community-feed-empty'
+- assertNotVisible:
+    id: 'community-feed-error'
+- assertNotVisible:
+    id: 'community-action-error'
+
+- takeScreenshot:
+    path: maestro/artifacts/community-feed-populated
+
+# --- The compose entry point opens and closes -------------------------------
+
+- tapOn:
+    id: 'community-new-post-button'
+    retryTapIfNoChange: true
+    label: 'Open the compose sheet'
+
+- extendedWaitUntil:
+    visible:
+      id: 'community-post-sheet'
+    timeout: 15000
+    label: 'Compose sheet is presented'
+
+- assertVisible:
+    text: 'Share your look'
+    label: 'Localized sheet title'
+
+- assertVisible:
+    id: 'community-pick-image-button'
+    label: 'Photo selection is the first step of the compose flow'
+
+# Alt text is required and must be CONFIRMED before publishing; the contract
+# types `altTextConfirmed` as a literal `true` so an unconfirmed publish is
+# impossible. Both controls therefore have to exist before a photo is chosen.
+- assertVisible:
+    id: 'community-alt-text-input'
+    label: 'Alt text is part of composing, not an afterthought'
+
+- assertVisible:
+    id: 'community-confirm-alt-text'
+    label: 'The author must confirm the alt text they publish'
+
+- takeScreenshot:
+    path: maestro/artifacts/community-compose-sheet
+
+- tapOn:
+    id: 'community-post-sheet-close'
+    retryTapIfNoChange: true
+    label: 'Close the sheet without publishing'
+
+- assertNotVisible:
+    id: 'community-post-sheet'
+
+# Nothing was published, so nothing needs cleaning up: the filter selection is
+# component state that the next flow's `launchApp: clearState: true` discards,
+# and this flow pushed no route. `chip-navigation-bottom-nav.yaml` likewise ends
+# on this tab. The sheet IS closed above, because leaving a modal open would
+# cover the next flow's first assertion on this device.
+- assertVisible:
+    id: 'community-screen'
+    label: 'The flow ends where it started, with no modal covering the screen'

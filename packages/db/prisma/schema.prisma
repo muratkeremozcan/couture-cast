@@ -195,6 +195,41 @@ enum PremiumThemeKey {
   winter_metallic
 }
 
+/// Story 6.1: Canonical climate bands for grouping regional community feed content.
+enum ClimateBand {
+  cold_wet
+  cold_dry
+  temperate_wet
+  temperate_dry
+  warm_wet
+  warm_dry
+}
+
+/// Story 6.1: Lifecycle status for community lookbook posts.
+enum CommunityPostStatus {
+  draft
+  uploading
+  pending_review
+  published
+  flagged
+  review_failed
+  withdrawn
+  consent_suspended
+}
+
+/// Story 6.1: closed reason set for a community post report. Mirrors
+/// `communityReportReasonSchema` in
+/// `packages/api-client/src/contracts/http/community.ts`; the parity test in
+/// `packages/db/test/community-schema.spec.ts` is what keeps the two in step.
+enum CommunityReportReason {
+  spam
+  harassment
+  inappropriate_content
+  hate_speech
+  violence
+  other
+}
+
 model User {
   id                            String                       @id @default(cuid())
   email                         String                       @unique
@@ -234,6 +269,8 @@ model User {
   palette_profile               PaletteProfile?
   advisor_recommendation_states AdvisorRecommendationState[]
   planner_day_plans             PlannerDayPlan[]
+  community_alias               CommunityAlias?
+  community_reports_filed       CommunityPostReport[]        @relation("CommunityReporter")
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -336,7 +373,8 @@ model WeatherIngestionState {
   location_key             String    @id
   last_provider_failure_at DateTime?
   last_provider_success_at DateTime?
-  updated_at               DateTime  @updatedAt
+  /// DEFAULT CURRENT_TIMESTAMP in the database; see AlertCooldownReservation.
+  updated_at               DateTime  @default(now()) @updatedAt
 }
 
 /// RLS: saved weather location preferences are scoped to the owning user_id
@@ -510,31 +548,181 @@ model OutfitRecommendation {
   @@index([capsule_id])
 }
 
-/// RLS: lookbook posts tie to user_id and optional palette insight
+/// RLS: API-only. RLS is enabled with zero policies and zero grants to `anon`
+/// and `authenticated`, so no direct-to-Postgres client reads or writes this
+/// table, not even its owner. The story forbids exposing cross-user rows and
+/// forbids client-controlled lifecycle fields, and RLS is row-scoped rather
+/// than column-scoped, so neither an owner policy nor a published-read policy
+/// can satisfy both. The API serves the allowlisted projection on service_role.
+/// See the header of the Story 6.1 migration for the full reasoning.
 model LookbookPost {
-  id                 String            @id @default(cuid())
-  user               User              @relation(fields: [user_id], references: [id])
-  user_id            String
-  image_urls         Json?
-  caption            String?
-  locale             String?
-  climate_band       String?
-  palette_insight    PaletteInsights?  @relation("LookbookPalette", fields: [palette_insight_id], references: [id])
-  palette_insight_id String?
-  created_at         DateTime          @default(now())
-  updated_at         DateTime          @updatedAt
-  engagement_events  EngagementEvent[]
-  moderation_events  ModerationEvent[]
+  id                        String                     @id @default(cuid())
+  user                      User                       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                   String
+  status                    CommunityPostStatus        @default(draft)
+  caption                   String?
+  alt_text                  String?
+  /// Opaque `community/<postId>/<random>.<ext>`. Never contains a user id: the
+  /// path travels inside every signed URL, so a user id here deanonymizes the
+  /// author to anyone the URL is shared with.
+  image_object_path         String?
+  image_content_type        String?
+  image_checksum            String?
+  image_byte_size           Int?
+  upload_expires_at         DateTime?
+  /// When the author confirmed the alt text stored in `alt_text`. The Zod
+  /// contract refuses an unconfirmed publish at the HTTP boundary, but a
+  /// boundary check leaves no record; without this column nothing downstream
+  /// can tell confirmed text from an accepted machine suggestion, which is the
+  /// question "Never: Publish unconfirmed alt text" actually asks. Nullable
+  /// because `draft` and `uploading` rows have nothing to confirm yet.
+  ///
+  /// The migration adds `LookbookPost_alt_text_confirmed_when_published`, a
+  /// CHECK Prisma cannot express, making the boundary a database invariant
+  /// rather than only a contract one.
+  alt_text_confirmed_at     DateTime?
+  /// When the submission was accepted, which is not `created_at`: the row is
+  /// created at allocate time and a replayed allocate reuses it, so counting
+  /// `created_at` would charge a retry against the rolling 24-hour cap.
+  submitted_at              DateTime?
+  published_at              DateTime?
+  moderation_reason         String?
+  moderation_engine_version String?
+  idempotency_key           String?
+  location_key              String?
+  locale                    String?
+  climate_band              ClimateBand?
+  palette_insight           PaletteInsights?           @relation("LookbookPalette", fields: [palette_insight_id], references: [id])
+  palette_insight_id        String?
+  challenge                 CommunityChallenge?        @relation(fields: [challenge_id], references: [id], onDelete: SetNull)
+  challenge_id              String?
+  moderation_outbox         CommunityModerationOutbox?
+  /// Erasure clock. The story requires deletion to complete within 72 hours,
+  /// and it completes in three observable steps: the request, the row
+  /// anonymization, and the durable removal of the storage object. A sweep
+  /// cannot re-drive what it cannot see, so each step has its own timestamp.
+  erasure_requested_at      DateTime?
+  anonymized_at             DateTime?
+  objects_purged_at         DateTime?
+  created_at                DateTime                   @default(now())
+  updated_at                DateTime                   @updatedAt
+  engagement_events         EngagementEvent[]
+  moderation_events         ModerationEvent[]
+  reports                   CommunityPostReport[]
 
+  @@unique([user_id, idempotency_key])
   @@index([user_id])
+  @@index([challenge_id])
+  /// Feed ordering is `published_at, id` DESC, matching the public cursor. The
+  /// sort direction is declared here as well as in the migration: without it
+  /// Prisma models an ascending index, the SQL creates a descending one, and
+  /// `prisma migrate diff` reports permanent drift on both.
+  @@index([climate_band, status, published_at(sort: Desc), id(sort: Desc)])
+  @@index([status, published_at(sort: Desc), id(sort: Desc)])
+  @@index([upload_expires_at])
+  @@index([user_id, submitted_at(sort: Desc)])
+  @@index([erasure_requested_at, objects_purged_at])
+}
+
+/// Story 6.1: the persisted pseudonym a community post is attributed to.
+/// RLS: API-only, like every other community table.
+///
+/// Deriving it instead, as `sha256(userId).slice(0, 4)`, gives 65,536 unsalted
+/// buckets over a guessable input: it confirms a guessed user id by hashing, it
+/// never rotates, and it collides well below the story's thousand-viewer beta.
+/// A stored row with a server-generated random suffix has neither problem.
+model CommunityAlias {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id    String   @unique
+  alias      String   @unique
+  created_at DateTime @default(now())
+}
+
+/// Story 6.1: one abuse report per (post, reporter).
+/// RLS: API-only, like every other community table.
+///
+/// Report uniqueness lives here rather than on ModerationEvent, whose
+/// UNIQUE (post_id, flagged_by_id) capped that audit log at one row per actor
+/// per post and so made it non-append-only. Both foreign keys are SetNull
+/// because neither the subject's account erasure nor the reporter's may destroy
+/// a moderation record; the denormalized snapshot, alias and object path below
+/// are what keep an orphaned row actionable.
+model CommunityPostReport {
+  id                String                @id @default(cuid())
+  post              LookbookPost?         @relation(fields: [post_id], references: [id], onDelete: SetNull)
+  post_id           String?
+  reporter          User?                 @relation("CommunityReporter", fields: [reporter_id], references: [id], onDelete: SetNull)
+  reporter_id       String?
+  reason            CommunityReportReason
+  details           String?
+  content_snapshot  Json?
+  subject_alias     String?
+  image_object_path String?
+  sla_due_at        DateTime
+  created_at        DateTime              @default(now())
+  resolved_at       DateTime?
+
+  @@unique([post_id, reporter_id])
+  @@index([post_id])
+  @@index([reporter_id])
+  @@index([resolved_at, sla_due_at])
+}
+
+/// Worker-owned transactional handoff from post publish to moderation screening.
+/// RLS: API-only, enabled with zero policies and zero grants.
+model CommunityModerationOutbox {
+  id            String       @id @default(cuid())
+  post          LookbookPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  post_id       String       @unique
+  attempts      Int          @default(0)
+  last_error    String?
+  dispatched_at DateTime?
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+
+  @@index([dispatched_at, created_at])
+}
+
+/// Story 6.1: Editorially curated weekly challenge with optional band
+/// restriction (NULL band = global, applies to every band).
+///
+/// RLS: API-only. A `USING (true)` read policy let any authenticated client
+/// enumerate the entire editorial calendar, unstarted and deactivated rows
+/// included; challenges reach clients as an API projection of the active window.
+///
+/// The migration adds two constraints Prisma cannot express and therefore does
+/// not manage: `CommunityChallenge_window_ordered` (ends_at > starts_at) and
+/// `CommunityChallenge_no_overlap`, a GiST exclusion constraint that rejects two
+/// active challenges competing for the same bands over overlapping windows,
+/// including the band-versus-global case an equality key cannot catch.
+model CommunityChallenge {
+  id           String         @id @default(cuid())
+  slug         String         @unique
+  starts_at    DateTime
+  ends_at      DateTime
+  /// IANA zone the weekly window is anchored in. Required, and with no default:
+  /// a Monday is not a fact until a zone says which instant it begins at, so a
+  /// window stored without its zone silently adopts the server's and opens on
+  /// the wrong day for part of its audience.
+  time_zone    String
+  climate_band ClimateBand?
+  copy         Json
+  is_active    Boolean        @default(true)
+  created_at   DateTime       @default(now())
+  updated_at   DateTime       @updatedAt
+  posts        LookbookPost[]
+
+  @@index([is_active, starts_at, ends_at])
+  @@index([climate_band, is_active])
 }
 
 /// RLS: engagement events filter by user_id for row-level policies
 model EngagementEvent {
   id         String       @id @default(cuid())
-  user       User         @relation(fields: [user_id], references: [id])
+  user       User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
   user_id    String
-  post       LookbookPost @relation(fields: [post_id], references: [id])
+  post       LookbookPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
   post_id    String
   event_type String
   created_at DateTime     @default(now())
@@ -583,7 +771,14 @@ model AlertDeliveryOutbox {
   created_at             DateTime      @default(now())
   updated_at             DateTime      @updatedAt
 
-  @@index([deduplication_key, reservation_started_at])
+  /// 20260713170000_add_rolling_alert_cooldowns asked for
+  /// `AlertDeliveryOutbox_deduplication_key_reservation_started_at_idx`, which
+  /// is 67 characters, so PostgreSQL silently truncated it at its 63-byte
+  /// identifier limit and dropped the `_idx`. Prisma truncates the same name
+  /// differently (it keeps the suffix, giving `..._started_a_idx`), so without
+  /// this map the two disagree forever and `prisma migrate diff` reports a
+  /// rename on every clean checkout. The database's name is the real one.
+  @@index([deduplication_key, reservation_started_at], map: "AlertDeliveryOutbox_deduplication_key_reservation_started_at_id")
   @@index([dispatched_at, created_at])
 }
 
@@ -592,7 +787,12 @@ model AlertCooldownReservation {
   deduplication_key String   @id
   next_eligible_at  DateTime
   created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
+  /// `@default(now())` describes the database rather than changing it: the
+  /// hand-authored migration gave this column DEFAULT CURRENT_TIMESTAMP, and
+  /// `@updatedAt` alone emits no default, so the datamodel disagreed with the
+  /// column on every clean checkout. Prisma always sends a value here, so the
+  /// default only ever serves raw SQL that omits the column.
+  updated_at        DateTime @default(now()) @updatedAt
 }
 
 model JobFailure {
@@ -675,9 +875,17 @@ model SilhouetteProfile {
   @@index([user_id, my_form_status, my_form_upload_expires_at])
 }
 
+/// RLS: API-only worker/audit table (Story 6.1). Enabled with zero policies and
+/// zero grants; the story names ModerationEvent among the tables no
+/// authenticated client may read.
 model ModerationEvent {
   id                    String             @id @default(cuid())
-  post                  LookbookPost?      @relation(fields: [post_id], references: [id])
+  /// SetNull, deliberately not Cascade. LookbookPost.user_id cascades from
+  /// User, so chaining a second cascade here made account erasure destroy other
+  /// people's abuse reports: a third party reports a post, the author deletes
+  /// their account, and the report goes with it. Same reasoning as
+  /// BillingEvent.user_id — the audit fact outlives its subject.
+  post                  LookbookPost?      @relation(fields: [post_id], references: [id], onDelete: SetNull)
   post_id               String?
   garment               GarmentItem?       @relation(fields: [garment_item_id], references: [id])
   garment_item_id       String?
@@ -689,7 +897,16 @@ model ModerationEvent {
   reviewed_by_id        String?
   action                String?
   reason                String?
+  /// Denormalized so the row still says something once post_id is nulled: who
+  /// it was about (pseudonymously), what the content was, and where the image
+  /// object lives so an orphaned object stays findable for purging.
+  subject_alias         String?
+  content_snapshot      Json?
+  image_object_path     String?
   created_at            DateTime           @default(now())
+
+  @@index([post_id])
+  @@index([flagged_by_id])
 }
 
 /// RLS: immutable audit trail entries scoped by user_id
@@ -711,7 +928,17 @@ model AuditLog {
 model FeatureFlag {
   key        String   @id
   value      Json
-  updated_at DateTime @updatedAt
+  /// This column is `TIMESTAMPTZ` with microsecond precision and a
+  /// CURRENT_TIMESTAMP default, because 20260314160000_add_feature_flags wrote
+  /// it by hand that way, while every Prisma-generated timestamp in this schema
+  /// is `timestamp(3)` without a time zone. The annotations below describe the
+  /// column that exists; they change no data and no behaviour, since the query
+  /// engine reads the column's real type off the wire either way.
+  ///
+  /// Normalising the column to `timestamp(3)` to match the rest of the schema
+  /// would be an `ALTER COLUMN TYPE` that rewrites the table and reinterprets
+  /// stored values, which is an owner's decision, not a drift cleanup.
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
   @@map("feature_flags")
 }
@@ -843,6 +1070,26 @@ model CommercePartner {
 /// advisor_slot) = 1`), so every row is unambiguously a garment offer or an
 /// advisor offer. `advisor_undertone` NULL is the wildcard, exactly like
 /// `comfort_range` above, and follows the identical ORDER BY ranking rule.
+/// One index on this table is deliberately NOT declared below:
+///
+///   AffiliateOffer_status_locale_region_advisor_slot_priority_idx
+///     ON ("status", "locale_region", "advisor_slot", "priority" DESC)
+///     WHERE "advisor_slot" IS NOT NULL
+///
+/// created by 20260825090000_add_palette_advisor. It is PARTIAL, and the Prisma
+/// DSL cannot say `WHERE`. The predicate is load-bearing: without it this index
+/// and the garment index below are structurally tied on a garment-only query,
+/// the planner may pick either, and that regressed
+/// commerce-affiliate-offers-query-plan.integration.spec.ts's 5.1-PLAN-03.
+///
+/// It used to be declared here anyway, as a plain `@@index`. That was worse
+/// than not declaring it: Prisma's introspection skips partial indexes, so it
+/// never saw the real object, `prisma migrate diff` reported permanent drift on
+/// a clean checkout, and the next `migrate dev` would have emitted a
+/// `CREATE INDEX` under a name the database already holds. Leaving it
+/// undeclared is the honest description -- Prisma does not manage this index --
+/// and it cannot drop what it cannot see. `packages/db/test/palette-advisor-schema.spec.ts`
+/// (5.4-DB-041) is what guards the object itself.
 model AffiliateOffer {
   id                 String               @id @default(cuid())
   partner            CommercePartner      @relation(fields: [partner_id], references: [id], onDelete: Restrict)
@@ -870,13 +1117,6 @@ model AffiliateOffer {
   clicks             AffiliateClick[]
 
   @@index([status, locale_region, garment_category, priority(sort: Desc)])
-  /// The migration makes this index PARTIAL (WHERE advisor_slot IS NOT NULL),
-  /// which Prisma's schema DSL cannot express -- the hand-authored migration
-  /// SQL is authoritative for the predicate. Without it this index and the
-  /// garment one above are structurally tied on a garment-only query and the
-  /// planner can pick either, which is not a hypothetical: it regressed
-  /// commerce-affiliate-offers-query-plan.integration.spec.ts's 5.1-PLAN-03.
-  @@index([status, locale_region, advisor_slot, priority(sort: Desc)])
   @@index([partner_id])
   @@map("AffiliateOffer")
 }

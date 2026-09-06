@@ -408,5 +408,171 @@
         "unknown": "Un problème est survenu avec cette photo. Réessayez."
       }
     }
+  },
+  "community": {
+    "title": "Communauté",
+    "heading": "Lookbook vivant de la communauté",
+    "sectionLabel": "Lookbook de la communauté",
+    "inspirations": "Inspirations de la communauté",
+    "share": "Partagez votre look",
+    "newPost": "Nouvelle publication",
+    "deepLink": {
+      "invalid": "Ce lien est invalide, expiré ou n’est plus disponible."
+    },
+    "filters": {
+      "label": "Filtres de la communauté",
+      "announce": "Affichage des looks {{filter}}.",
+      "mode": {
+        "auto": "Votre climat",
+        "autoWithBand": "Votre climat : {{band}}",
+        "all": "Tous les climats",
+        "cold_dry": "Froid et sec",
+        "cold_wet": "Froid et humide",
+        "temperate_dry": "Tempéré et sec",
+        "temperate_wet": "Tempéré et humide",
+        "warm_dry": "Chaud et sec",
+        "warm_wet": "Chaud et humide"
+      }
+    },
+    "band": {
+      "cold_dry": "Froid et sec",
+      "cold_wet": "Froid et humide",
+      "temperate_dry": "Tempéré et sec",
+      "temperate_wet": "Tempéré et humide",
+      "warm_dry": "Chaud et sec",
+      "warm_wet": "Chaud et humide",
+      "unclassified": "Par tous les temps",
+      "unresolved": {
+        "no_location": "Ajoutez un lieu pour voir des looks adaptés à votre climat. En attendant, vous voyez toutes les zones climatiques.",
+        "weather_unavailable": "Vos prévisions locales sont indisponibles, vous voyez donc des looks de toutes les zones climatiques.",
+        "weather_stale": "Vos prévisions locales ne sont plus à jour, vous voyez donc des looks de toutes les zones climatiques.",
+        "weather_malformed": "Vos prévisions locales n’ont pas pu être lues, vous voyez donc des looks de toutes les zones climatiques.",
+        "insufficient_usable_days": "Les prévisions récentes ne suffisent pas à déterminer votre climat, vous voyez donc des looks de toutes les zones climatiques."
+      }
+    },
+    "feed": {
+      "loading": "Chargement des looks de la communauté",
+      "announceLoaded": "Affichage des looks {{filter}}. {{count}} chargés.",
+      "announceLoadedMore": "{{count}} looks supplémentaires chargés.",
+      "announceFocused": "Le look mis en avant est sélectionné.",
+      "emptyTitle": "Aucun look partagé ici pour le moment",
+      "emptyBody": "Soyez la première personne à partager un look adapté à la météo.",
+      "errorTitle": "Impossible de charger le fil de la communauté.",
+      "retry": "Réessayer",
+      "loadMore": "Charger plus de looks",
+      "loadingMore": "Chargement",
+      "yourPostsTitle": "Vos looks en cours",
+      "yourPostsBody": "Vous seul les voyez tant que la vérification n’est pas terminée."
+    },
+    "card": {
+      "label": "Look de {{author}}",
+      "authorSelf": "Vous",
+      "authorFallback": "Explorateur de style",
+      "imageUnavailable": "Image indisponible",
+      "imageRetry": "Recharger l’image",
+      "report": "Signaler",
+      "reported": "Signalé",
+      "withdraw": "Retirer",
+      "sponsored": "Sponsorisé",
+      "sponsoredAnnounce": "Look sponsorisé"
+    },
+    "status": {
+      "draft": "Brouillon",
+      "uploading": "Envoi en cours",
+      "pending_review": "En cours d’examen",
+      "published": "Publié",
+      "flagged": "Retiré par la modération",
+      "review_failed": "Vérification non terminée",
+      "withdrawn": "Retiré",
+      "consent_suspended": "Masqué en attente du consentement",
+      "reason": "Motif : {{reason}}"
+    },
+    "removed": {
+      "flagged": "La modération a retiré ce look. Personne d’autre ne peut le voir.",
+      "review_failed": "La vérification n’a pas abouti, ce look n’a donc pas été publié. Partagez-le à nouveau pour réessayer.",
+      "withdrawn": "Vous avez retiré ce look du fil.",
+      "consent_suspended": "Ce look reste masqué jusqu’à ce qu’un parent ou tuteur renouvelle le consentement. Partagez-le à nouveau une fois le consentement actif."
+    },
+    "challenge": {
+      "eyebrow": "Défi style de la semaine",
+      "allClimates": "Tous les climats",
+      "participate": "Participer",
+      "participateLabel": "Participer à {{title}}",
+      "activeThisWeek": "En cours cette semaine",
+      "dateRange": "Du {{start}} au {{end}}"
+    },
+    "report": {
+      "title": "Signaler ce look",
+      "description": "Aidez à préserver la sécurité de la communauté. Choisissez un motif et la modération l’examinera.",
+      "reasonLabel": "Motif du signalement",
+      "detailsLabel": "Plus de détails (facultatif)",
+      "detailsPlaceholder": "Décrivez en quoi ce look enfreint les règles de la communauté",
+      "detailsCount": "{{count}} sur 500 caractères",
+      "submit": "Envoyer le signalement",
+      "submitting": "Envoi en cours",
+      "cancel": "Annuler",
+      "close": "Fermer la fenêtre de signalement",
+      "success": "Merci. La modération va examiner ce look.",
+      "reason": {
+        "spam": "Spam ou contenu trompeur",
+        "harassment": "Harcèlement ou intimidation",
+        "inappropriate_content": "Contenu inapproprié",
+        "hate_speech": "Discours haineux",
+        "violence": "Violence ou contenu dangereux",
+        "other": "Autre chose"
+      }
+    },
+    "compose": {
+      "title": "Partagez votre look",
+      "description": "Chaque look est vérifié automatiquement avant d’apparaître dans le fil.",
+      "close": "Fermer sans partager",
+      "photoLabel": "Photo",
+      "photoHint": "JPEG, PNG ou WebP, jusqu’à 10 Mo et au moins 256 pixels de côté.",
+      "choosePhoto": "Choisir une photo",
+      "changePhoto": "Changer de photo",
+      "preview": "Aperçu du look que vous allez partager",
+      "altLabel": "Description de l’image",
+      "altHint": "Décrivez les vêtements, les couches et les couleurs pour les membres qui utilisent un lecteur d’écran.",
+      "altPlaceholder": "Décrivez les vêtements, les couches et les couleurs",
+      "altSuggested": "Nous avons proposé une description. Modifiez-la pour qu’elle corresponde à votre photo.",
+      "altConfirm": "Je confirme que cette description correspond à la photo",
+      "captionLabel": "Légende (facultatif)",
+      "captionPlaceholder": "Notes sur la météo, les matières ou le style",
+      "captionCount": "{{count}} sur 280 caractères",
+      "challengeLabel": "Défi de la semaine",
+      "challengeNone": "Aucun défi",
+      "publish": "Publier",
+      "publishing": "Vérification et publication",
+      "uploading": "Envoi de votre photo",
+      "cancel": "Annuler",
+      "success": "Votre look a été envoyé pour examen."
+    },
+    "validation": {
+      "photoRequired": "Choisissez une photo à partager.",
+      "altRequired": "Ajoutez une description de l’image.",
+      "altConfirmRequired": "Confirmez la description de l’image avant de publier.",
+      "captionTooLong": "Limitez la légende à 280 caractères.",
+      "captionUrl": "La légende ne peut pas contenir de liens.",
+      "captionEmail": "La légende ne peut pas contenir d’adresses e-mail.",
+      "imageTooSmall": "Choisissez une image d’au moins 256 pixels de large et de haut.",
+      "permissionDenied": "CoutureCast a besoin d’accéder à vos photos pour partager un look.",
+      "pickerFailed": "Le sélecteur de photos n’a pas pu s’ouvrir."
+    },
+    "error": {
+      "load": "Impossible de charger le fil de la communauté.",
+      "report": "Impossible d’envoyer votre signalement.",
+      "withdraw": "Impossible de retirer ce look. Il est toujours dans le fil.",
+      "publish": "Impossible de publier votre look.",
+      "upload": "Votre photo n’a pas pu être envoyée, rien n’a donc été publié. Réessayez.",
+      "signedOut": "Connectez-vous pour participer à la communauté.",
+      "ageGate": "Vous devez avoir au moins 13 ans pour publier dans la communauté.",
+      "rateLimited": "Vous avez atteint la limite de dix looks pour aujourd’hui.",
+      "rateLimitedUntil": "Vous avez atteint la limite de dix looks pour aujourd’hui. Réessayez après {{time}}.",
+      "reasonChanged": "Vous avez déjà signalé ce look pour un autre motif.",
+      "selfReport": "Vous ne pouvez pas signaler votre propre look.",
+      "notFound": "Ce look n’est plus disponible.",
+      "disabled": "Le fil de la communauté est temporairement indisponible.",
+      "generic": "Une erreur s’est produite. Réessayez."
+    }
   }
 }

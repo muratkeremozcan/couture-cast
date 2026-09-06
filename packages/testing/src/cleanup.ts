@@ -50,6 +50,10 @@ export interface CleanupPrismaClient {
   paletteProfile: CleanupDelegate
   advisorRecommendationState: CleanupDelegate
   plannerDayPlan: CleanupDelegate
+  communityChallenge: CleanupDelegate
+  communityModerationOutbox: CleanupDelegate
+  communityAlias: CleanupDelegate
+  communityPostReport: CleanupDelegate
 }
 
 export interface CleanupConfiguration {
@@ -189,15 +193,27 @@ function buildPaletteInsightWhere(
 type ModerationEventWhereClause =
   | { id: { in: string[] } }
   | { silhouette_profile_id: { in: string[] } }
+  | { post_id: { in: string[] } }
+  | { flagged_by_id: { in: string[] } }
 
 /**
  * ModerationEvent has no user_id column (it references garment_item_id,
  * silhouette_profile_id, post_id, flagged_by_id, reviewed_by_id instead), so
  * it needs its own where-builder rather than buildUserFilter.
+ *
+ * Story 6.1 added the post and reporter branches. Before them this builder
+ * filtered on id and silhouette_profile_id only, so a moderation row written by
+ * a community report — which carries a post_id and a flagged_by_id and neither
+ * of the other two — was unreachable by cleanup entirely. That was survivable
+ * only while ModerationEvent.post_id cascaded from the post; it no longer does
+ * (the cascade destroyed third-party reports on account erasure), so an
+ * unreachable row is now a row left behind.
  */
 function buildModerationEventWhere(
   moderationEventIds: readonly string[],
-  silhouetteProfileIds: readonly string[]
+  silhouetteProfileIds: readonly string[],
+  lookbookPostIds: readonly string[],
+  userIds: readonly string[]
 ): { OR: ModerationEventWhereClause[] } | null {
   const filters: ModerationEventWhereClause[] = []
 
@@ -207,6 +223,52 @@ function buildModerationEventWhere(
 
   if (silhouetteProfileIds.length > 0) {
     filters.push({ silhouette_profile_id: { in: uniqueValues(silhouetteProfileIds) } })
+  }
+
+  if (lookbookPostIds.length > 0) {
+    filters.push({ post_id: { in: uniqueValues(lookbookPostIds) } })
+  }
+
+  if (userIds.length > 0) {
+    filters.push({ flagged_by_id: { in: uniqueValues(userIds) } })
+  }
+
+  if (filters.length === 0) {
+    return null
+  }
+
+  return { OR: filters }
+}
+
+type CommunityPostReportWhereClause =
+  | { id: { in: string[] } }
+  | { post_id: { in: string[] } }
+  | { reporter_id: { in: string[] } }
+
+/**
+ * CommunityPostReport carries no user_id either: its owner columns are post_id
+ * and reporter_id, and both are ON DELETE SET NULL so that neither the
+ * subject's erasure nor the reporter's destroys a moderation record. That is
+ * also why the report has to be deleted before the post rather than swept
+ * through it.
+ */
+function buildCommunityPostReportWhere(
+  reportIds: readonly string[],
+  lookbookPostIds: readonly string[],
+  userIds: readonly string[]
+): { OR: CommunityPostReportWhereClause[] } | null {
+  const filters: CommunityPostReportWhereClause[] = []
+
+  if (reportIds.length > 0) {
+    filters.push({ id: { in: uniqueValues(reportIds) } })
+  }
+
+  if (lookbookPostIds.length > 0) {
+    filters.push({ post_id: { in: uniqueValues(lookbookPostIds) } })
+  }
+
+  if (userIds.length > 0) {
+    filters.push({ reporter_id: { in: uniqueValues(userIds) } })
   }
 
   if (filters.length === 0) {
@@ -260,7 +322,15 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const paletteProfileIds = uniqueValues(tracked.paletteProfiles)
   const advisorRecommendationStateIds = uniqueValues(tracked.advisorRecommendationStates)
   const plannerDayPlanIds = uniqueValues(tracked.plannerDayPlans)
+  const lookbookPostIds = uniqueValues(tracked.lookbookPosts)
+  const communityChallengeIds = uniqueValues(tracked.communityChallenges)
+  const communityModerationOutboxIds = uniqueValues(
+    tracked.communityModerationOutboxEntries
+  )
+  const communityAliasIds = uniqueValues(tracked.communityAliases)
+  const communityPostReportIds = uniqueValues(tracked.communityPostReports)
 
+  const lookbookPostWhere = buildDeleteWhere(lookbookPostIds, userIds)
   const commercePreferenceWhere = buildDeleteWhere(commercePreferenceIds, userIds)
   const affiliateClickWhere = buildDeleteWhere(affiliateClickIds, userIds)
   const premiumEntitlementWhere = buildDeleteWhere(premiumEntitlementIds, userIds)
@@ -280,7 +350,15 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const paletteInsightWhere = buildPaletteInsightWhere(wardrobeItemIds, userIds)
   const moderationEventWhere = buildModerationEventWhere(
     moderationEventIds,
-    silhouetteProfileIds
+    silhouetteProfileIds,
+    lookbookPostIds,
+    userIds
+  )
+  const communityAliasWhere = buildDeleteWhere(communityAliasIds, userIds)
+  const communityPostReportWhere = buildCommunityPostReportWhere(
+    communityPostReportIds,
+    lookbookPostIds,
+    userIds
   )
   const silhouetteProfileWhere = buildDeleteWhere(silhouetteProfileIds, userIds)
   const wardrobeOnboardingStateWhere = buildDeleteWhere(
@@ -355,6 +433,59 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
       })
     }
 
+    // Story 6.1 community block, in reverse dependency order and deleted as one
+    // group rather than spread across this function.
+    //
+    // It has to be a group because only one of these five FKs still cascades.
+    // ModerationEvent.post_id and CommunityPostReport.post_id are ON DELETE SET
+    // NULL, so deleting the post no longer removes them; it orphans them, and
+    // an orphaned row is invisible to every filter this function has. So the
+    // rows that reference the post go first, the post goes next, and the
+    // challenge and alias it referenced go after.
+    if (communityModerationOutboxIds.length > 0 || lookbookPostWhere) {
+      await prisma.communityModerationOutbox.deleteMany({
+        where: {
+          OR: [
+            ...(communityModerationOutboxIds.length > 0
+              ? [buildIdFilter(communityModerationOutboxIds)]
+              : []),
+            ...(lookbookPostWhere ? [{ post: lookbookPostWhere }] : []),
+          ],
+        },
+      })
+    }
+
+    if (communityPostReportWhere) {
+      await prisma.communityPostReport.deleteMany({ where: communityPostReportWhere })
+    }
+
+    // Moderation events reference the post, a silhouette profile and the
+    // flagging user, so they precede all three (Story 4.4 Task 2 put this
+    // before the silhouette profile; Story 6.1 moved it ahead of the post too).
+    if (moderationEventWhere) {
+      await prisma.moderationEvent.deleteMany({
+        where: moderationEventWhere,
+      })
+    }
+
+    if (lookbookPostWhere) {
+      await prisma.lookbookPost.deleteMany({
+        where: lookbookPostWhere,
+      })
+    }
+
+    // CommunityChallenge carries no user_id, so tracked ids are the only way to
+    // reach it.
+    if (communityChallengeIds.length > 0) {
+      await prisma.communityChallenge.deleteMany({
+        where: buildIdFilter(communityChallengeIds),
+      })
+    }
+
+    if (communityAliasWhere) {
+      await prisma.communityAlias.deleteMany({ where: communityAliasWhere })
+    }
+
     // Story 5.1 commerce, deleted first and in reverse dependency order:
     // conversions -> clicks -> preferences -> offers -> partners. AffiliateClick
     // holds RESTRICT foreign keys onto AffiliateOffer and CommercePartner, so a
@@ -404,10 +535,6 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
         }),
       () =>
         prisma.engagementEvent.deleteMany({
-          where: buildUserFilter(userIds),
-        }),
-      () =>
-        prisma.lookbookPost.deleteMany({
           where: buildUserFilter(userIds),
         }),
       () =>
@@ -489,14 +616,6 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
     if (paletteInsightWhere) {
       await prisma.paletteInsights.deleteMany({
         where: paletteInsightWhere,
-      })
-    }
-
-    // Moderation events reference a silhouette profile before the profile
-    // itself is removed, before the owning user (Story 4.4 Task 2).
-    if (moderationEventWhere) {
-      await prisma.moderationEvent.deleteMany({
-        where: moderationEventWhere,
       })
     }
 

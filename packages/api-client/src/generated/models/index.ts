@@ -502,6 +502,166 @@ export type AlertRuleType = (typeof AlertRuleType)[keyof typeof AlertRuleType]
 /**
  *
  * @export
+ * @interface AllocateCommunityPostInput
+ */
+export interface AllocateCommunityPostInput {
+  /**
+   *
+   * @type {AllocateCommunityPostInputLocaleEnum}
+   * @memberof AllocateCommunityPostInput
+   */
+  locale: AllocateCommunityPostInputLocaleEnum
+  /**
+   *
+   * @type {AllocateCommunityPostInputContentTypeEnum}
+   * @memberof AllocateCommunityPostInput
+   */
+  contentType: AllocateCommunityPostInputContentTypeEnum
+  /**
+   *
+   * @type {number}
+   * @memberof AllocateCommunityPostInput
+   */
+  byteSize: number
+  /**
+   *
+   * @type {string}
+   * @memberof AllocateCommunityPostInput
+   */
+  sha256: string
+  /**
+   *
+   * @type {number}
+   * @memberof AllocateCommunityPostInput
+   */
+  widthPx: number
+  /**
+   *
+   * @type {number}
+   * @memberof AllocateCommunityPostInput
+   */
+  heightPx: number
+}
+
+/**
+ * @export
+ */
+export const AllocateCommunityPostInputLocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type AllocateCommunityPostInputLocaleEnum =
+  (typeof AllocateCommunityPostInputLocaleEnum)[keyof typeof AllocateCommunityPostInputLocaleEnum]
+
+/**
+ * @export
+ */
+export const AllocateCommunityPostInputContentTypeEnum = {
+  image_jpeg: 'image/jpeg',
+  image_png: 'image/png',
+  image_webp: 'image/webp',
+} as const
+export type AllocateCommunityPostInputContentTypeEnum =
+  (typeof AllocateCommunityPostInputContentTypeEnum)[keyof typeof AllocateCommunityPostInputContentTypeEnum]
+
+/**
+ *
+ * @export
+ * @interface AllocateCommunityPostResponse
+ */
+export interface AllocateCommunityPostResponse {
+  /**
+   *
+   * @type {AllocateCommunityPostResponseData}
+   * @memberof AllocateCommunityPostResponse
+   */
+  data: AllocateCommunityPostResponseData
+}
+/**
+ *
+ * @export
+ * @interface AllocateCommunityPostResponseData
+ */
+export interface AllocateCommunityPostResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof AllocateCommunityPostResponseData
+   */
+  postId: string
+  /**
+   *
+   * @type {string}
+   * @memberof AllocateCommunityPostResponseData
+   */
+  uploadSessionId: string
+  /**
+   *
+   * @type {string}
+   * @memberof AllocateCommunityPostResponseData
+   */
+  uploadUrl: string
+  /**
+   *
+   * @type {string}
+   * @memberof AllocateCommunityPostResponseData
+   */
+  uploadToken: string
+  /**
+   *
+   * @type {CreateGarmentUploadUrlResponseDataRequiredHeaders}
+   * @memberof AllocateCommunityPostResponseData
+   */
+  requiredHeaders: CreateGarmentUploadUrlResponseDataRequiredHeaders
+  /**
+   *
+   * @type {string}
+   * @memberof AllocateCommunityPostResponseData
+   */
+  expiresAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof AllocateCommunityPostResponseData
+   */
+  altTextSuggestion: string
+  /**
+   *
+   * @type {AllocateCommunityPostResponseDataAltTextSuggestionLocaleEnum}
+   * @memberof AllocateCommunityPostResponseData
+   */
+  altTextSuggestionLocale: AllocateCommunityPostResponseDataAltTextSuggestionLocaleEnum
+}
+
+/**
+ * @export
+ */
+export const AllocateCommunityPostResponseDataAltTextSuggestionLocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type AllocateCommunityPostResponseDataAltTextSuggestionLocaleEnum =
+  (typeof AllocateCommunityPostResponseDataAltTextSuggestionLocaleEnum)[keyof typeof AllocateCommunityPostResponseDataAltTextSuggestionLocaleEnum]
+
+/**
+ *
+ * @export
  * @interface AnalyzePaletteInput
  */
 export interface AnalyzePaletteInput {
@@ -1180,6 +1340,21 @@ export interface CheckoutSessionResponseData {
    */
   url: string
 }
+
+/**
+ *
+ * @export
+ */
+export const ClimateBand = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type ClimateBand = (typeof ClimateBand)[keyof typeof ClimateBand]
+
 /**
  *
  * @export
@@ -1419,6 +1594,1051 @@ export type CommitSilhouettePhotoInputConfirmsBasewearGuidanceEnum =
 /**
  *
  * @export
+ * @interface CommunityAuthorPostState
+ */
+export interface CommunityAuthorPostState {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityAuthorPostState
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityAuthorPostState
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityAuthorPostState
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was classified, or null if unclassified.
+   * @type {CommunityAuthorPostStateClimateBandEnum}
+   * @memberof CommunityAuthorPostState
+   */
+  climateBand: CommunityAuthorPostStateClimateBandEnum | null
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @memberof CommunityAuthorPostState
+   */
+  imageAccess: CreateGarmentItemResponseDataImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityAuthorPostState
+   */
+  createdAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityAuthorPostState
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {CommunityAuthorPostStateStatusEnum}
+   * @memberof CommunityAuthorPostState
+   */
+  status: CommunityAuthorPostStateStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityAuthorPostState
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityAuthorPostState
+   */
+  moderationReason: string | null
+}
+
+/**
+ * @export
+ */
+export const CommunityAuthorPostStateClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityAuthorPostStateClimateBandEnum =
+  (typeof CommunityAuthorPostStateClimateBandEnum)[keyof typeof CommunityAuthorPostStateClimateBandEnum]
+
+/**
+ * @export
+ */
+export const CommunityAuthorPostStateStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type CommunityAuthorPostStateStatusEnum =
+  (typeof CommunityAuthorPostStateStatusEnum)[keyof typeof CommunityAuthorPostStateStatusEnum]
+
+/**
+ *
+ * @export
+ */
+export const CommunityBandUnresolvedReason = {
+  no_location: 'no_location',
+  weather_unavailable: 'weather_unavailable',
+  weather_stale: 'weather_stale',
+  weather_malformed: 'weather_malformed',
+  insufficient_usable_days: 'insufficient_usable_days',
+} as const
+export type CommunityBandUnresolvedReason =
+  (typeof CommunityBandUnresolvedReason)[keyof typeof CommunityBandUnresolvedReason]
+
+/**
+ *
+ * @export
+ * @interface CommunityChallenge
+ */
+export interface CommunityChallenge {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallenge
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallenge
+   */
+  slug: string
+  /**
+   * The climate band this challenge is restricted to, or null if unrestricted.
+   * @type {CommunityChallengeClimateBandEnum}
+   * @memberof CommunityChallenge
+   */
+  climateBand: CommunityChallengeClimateBandEnum | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallenge
+   */
+  startsAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallenge
+   */
+  endsAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallenge
+   */
+  timeZone: string
+  /**
+   * Localized challenge copy keyed by supported IETF locale tag, for example "en-US". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback.
+   * @type {{ [key: string]: CommunityChallengeCopyValue; }}
+   * @memberof CommunityChallenge
+   */
+  copy: { [key: string]: CommunityChallengeCopyValue }
+  /**
+   *
+   * @type {boolean}
+   * @memberof CommunityChallenge
+   */
+  isActive: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallenge
+   */
+  createdAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallenge
+   */
+  updatedAt: string
+}
+
+/**
+ * @export
+ */
+export const CommunityChallengeClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityChallengeClimateBandEnum =
+  (typeof CommunityChallengeClimateBandEnum)[keyof typeof CommunityChallengeClimateBandEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityChallengeCopyValue
+ */
+export interface CommunityChallengeCopyValue {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallengeCopyValue
+   */
+  title: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallengeCopyValue
+   */
+  body: string
+}
+/**
+ *
+ * @export
+ * @interface CommunityChallengeResponse
+ */
+export interface CommunityChallengeResponse {
+  /**
+   *
+   * @type {CommunityChallengeResponseData}
+   * @memberof CommunityChallengeResponse
+   */
+  data: CommunityChallengeResponseData
+}
+/**
+ *
+ * @export
+ * @interface CommunityChallengeResponseData
+ */
+export interface CommunityChallengeResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallengeResponseData
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallengeResponseData
+   */
+  slug: string
+  /**
+   * The climate band this challenge is restricted to, or null if unrestricted.
+   * @type {CommunityChallengeResponseDataClimateBandEnum}
+   * @memberof CommunityChallengeResponseData
+   */
+  climateBand: CommunityChallengeResponseDataClimateBandEnum | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallengeResponseData
+   */
+  startsAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallengeResponseData
+   */
+  endsAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallengeResponseData
+   */
+  timeZone: string
+  /**
+   * Localized challenge copy keyed by supported IETF locale tag, for example "en-US". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback.
+   * @type {{ [key: string]: CommunityChallengeCopyValue; }}
+   * @memberof CommunityChallengeResponseData
+   */
+  copy: { [key: string]: CommunityChallengeCopyValue }
+  /**
+   *
+   * @type {boolean}
+   * @memberof CommunityChallengeResponseData
+   */
+  isActive: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallengeResponseData
+   */
+  createdAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityChallengeResponseData
+   */
+  updatedAt: string
+}
+
+/**
+ * @export
+ */
+export const CommunityChallengeResponseDataClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityChallengeResponseDataClimateBandEnum =
+  (typeof CommunityChallengeResponseDataClimateBandEnum)[keyof typeof CommunityChallengeResponseDataClimateBandEnum]
+
+/**
+ *
+ * @export
+ */
+export const CommunityExperimentVariant = {
+  auto: 'auto',
+  all: 'all',
+} as const
+export type CommunityExperimentVariant =
+  (typeof CommunityExperimentVariant)[keyof typeof CommunityExperimentVariant]
+
+/**
+ *
+ * @export
+ * @interface CommunityFeed
+ */
+export interface CommunityFeed {
+  /**
+   *
+   * @type {Array<CommunityFeedItemsInner>}
+   * @memberof CommunityFeed
+   */
+  items: Array<CommunityFeedItemsInner>
+  /**
+   *
+   * @type {Array<CommunityFeedAuthorStatesInner>}
+   * @memberof CommunityFeed
+   */
+  authorStates: Array<CommunityFeedAuthorStatesInner>
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeed
+   */
+  nextCursor: string | null
+  /**
+   *
+   * @type {CommunityFeedModeEnum}
+   * @memberof CommunityFeed
+   */
+  mode: CommunityFeedModeEnum
+  /**
+   * The climate band resolved for the viewer, or null if unresolvable.
+   * @type {CommunityFeedViewerBandEnum}
+   * @memberof CommunityFeed
+   */
+  viewerBand: CommunityFeedViewerBandEnum | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof CommunityFeed
+   */
+  bandResolved: boolean
+  /**
+   * Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.
+   * @type {CommunityFeedBandUnresolvedReasonEnum}
+   * @memberof CommunityFeed
+   */
+  bandUnresolvedReason: CommunityFeedBandUnresolvedReasonEnum | null
+  /**
+   *
+   * @type {CommunityFeedExperimentVariantEnum}
+   * @memberof CommunityFeed
+   */
+  experimentVariant: CommunityFeedExperimentVariantEnum
+  /**
+   *
+   * @type {CommunityFeedActiveChallenge}
+   * @memberof CommunityFeed
+   */
+  activeChallenge: CommunityFeedActiveChallenge
+}
+
+/**
+ * @export
+ */
+export const CommunityFeedModeEnum = {
+  auto: 'auto',
+  all: 'all',
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityFeedModeEnum =
+  (typeof CommunityFeedModeEnum)[keyof typeof CommunityFeedModeEnum]
+
+/**
+ * @export
+ */
+export const CommunityFeedViewerBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityFeedViewerBandEnum =
+  (typeof CommunityFeedViewerBandEnum)[keyof typeof CommunityFeedViewerBandEnum]
+
+/**
+ * @export
+ */
+export const CommunityFeedBandUnresolvedReasonEnum = {
+  no_location: 'no_location',
+  weather_unavailable: 'weather_unavailable',
+  weather_stale: 'weather_stale',
+  weather_malformed: 'weather_malformed',
+  insufficient_usable_days: 'insufficient_usable_days',
+} as const
+export type CommunityFeedBandUnresolvedReasonEnum =
+  (typeof CommunityFeedBandUnresolvedReasonEnum)[keyof typeof CommunityFeedBandUnresolvedReasonEnum]
+
+/**
+ * @export
+ */
+export const CommunityFeedExperimentVariantEnum = {
+  auto: 'auto',
+  all: 'all',
+} as const
+export type CommunityFeedExperimentVariantEnum =
+  (typeof CommunityFeedExperimentVariantEnum)[keyof typeof CommunityFeedExperimentVariantEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityFeedActiveChallenge
+ */
+export interface CommunityFeedActiveChallenge {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedActiveChallenge
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedActiveChallenge
+   */
+  slug: string
+  /**
+   * The climate band this challenge is restricted to, or null if unrestricted.
+   * @type {CommunityFeedActiveChallengeClimateBandEnum}
+   * @memberof CommunityFeedActiveChallenge
+   */
+  climateBand: CommunityFeedActiveChallengeClimateBandEnum | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedActiveChallenge
+   */
+  title: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedActiveChallenge
+   */
+  body: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedActiveChallenge
+   */
+  startsAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedActiveChallenge
+   */
+  endsAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedActiveChallenge
+   */
+  timeZone: string
+}
+
+/**
+ * @export
+ */
+export const CommunityFeedActiveChallengeClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityFeedActiveChallengeClimateBandEnum =
+  (typeof CommunityFeedActiveChallengeClimateBandEnum)[keyof typeof CommunityFeedActiveChallengeClimateBandEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityFeedAuthor
+ */
+export interface CommunityFeedAuthor {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedAuthor
+   */
+  displayName: string
+  /**
+   *
+   * @type {boolean}
+   * @memberof CommunityFeedAuthor
+   */
+  isSelf: boolean
+}
+/**
+ *
+ * @export
+ * @interface CommunityFeedAuthorStatesInner
+ */
+export interface CommunityFeedAuthorStatesInner {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedAuthorStatesInner
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedAuthorStatesInner
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedAuthorStatesInner
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was classified, or null if unclassified.
+   * @type {CommunityFeedAuthorStatesInnerClimateBandEnum}
+   * @memberof CommunityFeedAuthorStatesInner
+   */
+  climateBand: CommunityFeedAuthorStatesInnerClimateBandEnum | null
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @memberof CommunityFeedAuthorStatesInner
+   */
+  imageAccess: CreateGarmentItemResponseDataImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedAuthorStatesInner
+   */
+  createdAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedAuthorStatesInner
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {CommunityFeedAuthorStatesInnerStatusEnum}
+   * @memberof CommunityFeedAuthorStatesInner
+   */
+  status: CommunityFeedAuthorStatesInnerStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedAuthorStatesInner
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedAuthorStatesInner
+   */
+  moderationReason: string | null
+}
+
+/**
+ * @export
+ */
+export const CommunityFeedAuthorStatesInnerClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityFeedAuthorStatesInnerClimateBandEnum =
+  (typeof CommunityFeedAuthorStatesInnerClimateBandEnum)[keyof typeof CommunityFeedAuthorStatesInnerClimateBandEnum]
+
+/**
+ * @export
+ */
+export const CommunityFeedAuthorStatesInnerStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type CommunityFeedAuthorStatesInnerStatusEnum =
+  (typeof CommunityFeedAuthorStatesInnerStatusEnum)[keyof typeof CommunityFeedAuthorStatesInnerStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityFeedItem
+ */
+export interface CommunityFeedItem {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItem
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItem
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItem
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was published, or null if unclassified.
+   * @type {CommunityFeedItemClimateBandEnum}
+   * @memberof CommunityFeedItem
+   */
+  climateBand: CommunityFeedItemClimateBandEnum | null
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @memberof CommunityFeedItem
+   */
+  imageAccess: CreateGarmentItemResponseDataImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItem
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItem
+   */
+  createdAt: string
+  /**
+   *
+   * @type {CommunityFeedItemStatusEnum}
+   * @memberof CommunityFeedItem
+   */
+  status: CommunityFeedItemStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItem
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {CommunityFeedItemAuthor}
+   * @memberof CommunityFeedItem
+   */
+  author: CommunityFeedItemAuthor
+}
+
+/**
+ * @export
+ */
+export const CommunityFeedItemClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityFeedItemClimateBandEnum =
+  (typeof CommunityFeedItemClimateBandEnum)[keyof typeof CommunityFeedItemClimateBandEnum]
+
+/**
+ * @export
+ */
+export const CommunityFeedItemStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type CommunityFeedItemStatusEnum =
+  (typeof CommunityFeedItemStatusEnum)[keyof typeof CommunityFeedItemStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityFeedItemAuthor
+ */
+export interface CommunityFeedItemAuthor {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItemAuthor
+   */
+  displayName: string
+  /**
+   *
+   * @type {boolean}
+   * @memberof CommunityFeedItemAuthor
+   */
+  isSelf: boolean
+}
+/**
+ *
+ * @export
+ * @interface CommunityFeedItemsInner
+ */
+export interface CommunityFeedItemsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItemsInner
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItemsInner
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItemsInner
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was published, or null if unclassified.
+   * @type {CommunityFeedItemsInnerClimateBandEnum}
+   * @memberof CommunityFeedItemsInner
+   */
+  climateBand: CommunityFeedItemsInnerClimateBandEnum | null
+  /**
+   *
+   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @memberof CommunityFeedItemsInner
+   */
+  imageAccess: CreateGarmentItemResponseDataImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItemsInner
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItemsInner
+   */
+  createdAt: string
+  /**
+   *
+   * @type {CommunityFeedItemsInnerStatusEnum}
+   * @memberof CommunityFeedItemsInner
+   */
+  status: CommunityFeedItemsInnerStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItemsInner
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {CommunityFeedItemAuthor}
+   * @memberof CommunityFeedItemsInner
+   */
+  author: CommunityFeedItemAuthor
+}
+
+/**
+ * @export
+ */
+export const CommunityFeedItemsInnerClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityFeedItemsInnerClimateBandEnum =
+  (typeof CommunityFeedItemsInnerClimateBandEnum)[keyof typeof CommunityFeedItemsInnerClimateBandEnum]
+
+/**
+ * @export
+ */
+export const CommunityFeedItemsInnerStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type CommunityFeedItemsInnerStatusEnum =
+  (typeof CommunityFeedItemsInnerStatusEnum)[keyof typeof CommunityFeedItemsInnerStatusEnum]
+
+/**
+ *
+ * @export
+ */
+export const CommunityFeedMode = {
+  auto: 'auto',
+  all: 'all',
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityFeedMode = (typeof CommunityFeedMode)[keyof typeof CommunityFeedMode]
+
+/**
+ *
+ * @export
+ * @interface CommunityFeedResponse
+ */
+export interface CommunityFeedResponse {
+  /**
+   *
+   * @type {CommunityFeedResponseData}
+   * @memberof CommunityFeedResponse
+   */
+  data: CommunityFeedResponseData
+}
+/**
+ *
+ * @export
+ * @interface CommunityFeedResponseData
+ */
+export interface CommunityFeedResponseData {
+  /**
+   *
+   * @type {Array<CommunityFeedItemsInner>}
+   * @memberof CommunityFeedResponseData
+   */
+  items: Array<CommunityFeedItemsInner>
+  /**
+   *
+   * @type {Array<CommunityFeedAuthorStatesInner>}
+   * @memberof CommunityFeedResponseData
+   */
+  authorStates: Array<CommunityFeedAuthorStatesInner>
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedResponseData
+   */
+  nextCursor: string | null
+  /**
+   *
+   * @type {CommunityFeedResponseDataModeEnum}
+   * @memberof CommunityFeedResponseData
+   */
+  mode: CommunityFeedResponseDataModeEnum
+  /**
+   * The climate band resolved for the viewer, or null if unresolvable.
+   * @type {CommunityFeedResponseDataViewerBandEnum}
+   * @memberof CommunityFeedResponseData
+   */
+  viewerBand: CommunityFeedResponseDataViewerBandEnum | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof CommunityFeedResponseData
+   */
+  bandResolved: boolean
+  /**
+   * Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.
+   * @type {CommunityFeedResponseDataBandUnresolvedReasonEnum}
+   * @memberof CommunityFeedResponseData
+   */
+  bandUnresolvedReason: CommunityFeedResponseDataBandUnresolvedReasonEnum | null
+  /**
+   *
+   * @type {CommunityFeedResponseDataExperimentVariantEnum}
+   * @memberof CommunityFeedResponseData
+   */
+  experimentVariant: CommunityFeedResponseDataExperimentVariantEnum
+  /**
+   *
+   * @type {CommunityFeedActiveChallenge}
+   * @memberof CommunityFeedResponseData
+   */
+  activeChallenge: CommunityFeedActiveChallenge
+}
+
+/**
+ * @export
+ */
+export const CommunityFeedResponseDataModeEnum = {
+  auto: 'auto',
+  all: 'all',
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityFeedResponseDataModeEnum =
+  (typeof CommunityFeedResponseDataModeEnum)[keyof typeof CommunityFeedResponseDataModeEnum]
+
+/**
+ * @export
+ */
+export const CommunityFeedResponseDataViewerBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityFeedResponseDataViewerBandEnum =
+  (typeof CommunityFeedResponseDataViewerBandEnum)[keyof typeof CommunityFeedResponseDataViewerBandEnum]
+
+/**
+ * @export
+ */
+export const CommunityFeedResponseDataBandUnresolvedReasonEnum = {
+  no_location: 'no_location',
+  weather_unavailable: 'weather_unavailable',
+  weather_stale: 'weather_stale',
+  weather_malformed: 'weather_malformed',
+  insufficient_usable_days: 'insufficient_usable_days',
+} as const
+export type CommunityFeedResponseDataBandUnresolvedReasonEnum =
+  (typeof CommunityFeedResponseDataBandUnresolvedReasonEnum)[keyof typeof CommunityFeedResponseDataBandUnresolvedReasonEnum]
+
+/**
+ * @export
+ */
+export const CommunityFeedResponseDataExperimentVariantEnum = {
+  auto: 'auto',
+  all: 'all',
+} as const
+export type CommunityFeedResponseDataExperimentVariantEnum =
+  (typeof CommunityFeedResponseDataExperimentVariantEnum)[keyof typeof CommunityFeedResponseDataExperimentVariantEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityImageAccess
+ */
+export interface CommunityImageAccess {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityImageAccess
+   */
+  url: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityImageAccess
+   */
+  expiresAt: string
+}
+/**
+ *
+ * @export
+ * @interface CommunityPostResponse
+ */
+export interface CommunityPostResponse {
+  /**
+   *
+   * @type {CommunityFeedItemsInner}
+   * @memberof CommunityPostResponse
+   */
+  data: CommunityFeedItemsInner
+}
+
+/**
+ *
+ * @export
+ */
+export const CommunityPostStatus = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type CommunityPostStatus =
+  (typeof CommunityPostStatus)[keyof typeof CommunityPostStatus]
+
+/**
+ *
+ * @export
+ */
+export const CommunityReportReason = {
+  spam: 'spam',
+  harassment: 'harassment',
+  inappropriate_content: 'inappropriate_content',
+  hate_speech: 'hate_speech',
+  violence: 'violence',
+  other: 'other',
+} as const
+export type CommunityReportReason =
+  (typeof CommunityReportReason)[keyof typeof CommunityReportReason]
+
+/**
+ *
+ * @export
  * @interface ConflictHttpError
  */
 export interface ConflictHttpError {
@@ -1459,6 +2679,70 @@ export const ConflictHttpErrorErrorEnum = {
 } as const
 export type ConflictHttpErrorErrorEnum =
   (typeof ConflictHttpErrorErrorEnum)[keyof typeof ConflictHttpErrorErrorEnum]
+
+/**
+ * Creates a community challenge. startsAt must fall on a Monday in the given timeZone, and endsAt must be exactly seven days after startsAt. A window that fails either rule is rejected.
+ * @export
+ * @interface CreateCommunityChallengeInput
+ */
+export interface CreateCommunityChallengeInput {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateCommunityChallengeInput
+   */
+  slug: string
+  /**
+   * The climate band this challenge is restricted to, or null if unrestricted.
+   * @type {CreateCommunityChallengeInputClimateBandEnum}
+   * @memberof CreateCommunityChallengeInput
+   */
+  climateBand?: CreateCommunityChallengeInputClimateBandEnum | null
+  /**
+   *
+   * @type {string}
+   * @memberof CreateCommunityChallengeInput
+   */
+  startsAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateCommunityChallengeInput
+   */
+  endsAt: string
+  /**
+   * IANA time zone identifier, for example Europe/Istanbul. Validated against the host tz database; an unknown zone is rejected.
+   * @type {string}
+   * @memberof CreateCommunityChallengeInput
+   */
+  timeZone: string
+  /**
+   * Localized challenge copy keyed by supported IETF locale tag, for example "en-US". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback.
+   * @type {{ [key: string]: CommunityChallengeCopyValue; }}
+   * @memberof CreateCommunityChallengeInput
+   */
+  copy: { [key: string]: CommunityChallengeCopyValue }
+  /**
+   *
+   * @type {boolean}
+   * @memberof CreateCommunityChallengeInput
+   */
+  isActive?: boolean
+}
+
+/**
+ * @export
+ */
+export const CreateCommunityChallengeInputClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CreateCommunityChallengeInputClimateBandEnum =
+  (typeof CreateCommunityChallengeInputClimateBandEnum)[keyof typeof CreateCommunityChallengeInputClimateBandEnum]
 
 /**
  *
@@ -2132,6 +3416,76 @@ export const DeleteSavedLocationResponseDataDeletedEnum = {
 } as const
 export type DeleteSavedLocationResponseDataDeletedEnum =
   (typeof DeleteSavedLocationResponseDataDeletedEnum)[keyof typeof DeleteSavedLocationResponseDataDeletedEnum]
+
+/**
+ *
+ * @export
+ * @interface EmbeddedCommunityChallenge
+ */
+export interface EmbeddedCommunityChallenge {
+  /**
+   *
+   * @type {string}
+   * @memberof EmbeddedCommunityChallenge
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof EmbeddedCommunityChallenge
+   */
+  slug: string
+  /**
+   * The climate band this challenge is restricted to, or null if unrestricted.
+   * @type {EmbeddedCommunityChallengeClimateBandEnum}
+   * @memberof EmbeddedCommunityChallenge
+   */
+  climateBand: EmbeddedCommunityChallengeClimateBandEnum | null
+  /**
+   *
+   * @type {string}
+   * @memberof EmbeddedCommunityChallenge
+   */
+  title: string
+  /**
+   *
+   * @type {string}
+   * @memberof EmbeddedCommunityChallenge
+   */
+  body: string
+  /**
+   *
+   * @type {string}
+   * @memberof EmbeddedCommunityChallenge
+   */
+  startsAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof EmbeddedCommunityChallenge
+   */
+  endsAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof EmbeddedCommunityChallenge
+   */
+  timeZone: string
+}
+
+/**
+ * @export
+ */
+export const EmbeddedCommunityChallengeClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type EmbeddedCommunityChallengeClimateBandEnum =
+  (typeof EmbeddedCommunityChallengeClimateBandEnum)[keyof typeof EmbeddedCommunityChallengeClimateBandEnum]
 
 /**
  *
@@ -5411,6 +6765,96 @@ export type PremiumThemeResponseDataThemeEnum =
 /**
  *
  * @export
+ * @interface PublishCommunityPostInput
+ */
+export interface PublishCommunityPostInput {
+  /**
+   *
+   * @type {string}
+   * @memberof PublishCommunityPostInput
+   */
+  postId: string
+  /**
+   *
+   * @type {string}
+   * @memberof PublishCommunityPostInput
+   */
+  uploadSessionId: string
+  /**
+   *
+   * @type {string}
+   * @memberof PublishCommunityPostInput
+   */
+  altText: string
+  /**
+   *
+   * @type {PublishCommunityPostInputAltTextConfirmedEnum}
+   * @memberof PublishCommunityPostInput
+   */
+  altTextConfirmed: PublishCommunityPostInputAltTextConfirmedEnum
+  /**
+   * Caption of at most 280 characters. Must not contain URLs, web links, or email addresses.
+   * @type {string}
+   * @memberof PublishCommunityPostInput
+   */
+  caption?: string | null
+  /**
+   *
+   * @type {PublishCommunityPostInputLocaleEnum}
+   * @memberof PublishCommunityPostInput
+   */
+  locale: PublishCommunityPostInputLocaleEnum
+  /**
+   *
+   * @type {string}
+   * @memberof PublishCommunityPostInput
+   */
+  challengeId?: string
+}
+
+/**
+ * @export
+ */
+export const PublishCommunityPostInputAltTextConfirmedEnum = {
+  true: true,
+} as const
+export type PublishCommunityPostInputAltTextConfirmedEnum =
+  (typeof PublishCommunityPostInputAltTextConfirmedEnum)[keyof typeof PublishCommunityPostInputAltTextConfirmedEnum]
+
+/**
+ * @export
+ */
+export const PublishCommunityPostInputLocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type PublishCommunityPostInputLocaleEnum =
+  (typeof PublishCommunityPostInputLocaleEnum)[keyof typeof PublishCommunityPostInputLocaleEnum]
+
+/**
+ *
+ * @export
+ * @interface PublishCommunityPostResponse
+ */
+export interface PublishCommunityPostResponse {
+  /**
+   *
+   * @type {CommunityFeedItemsInner}
+   * @memberof PublishCommunityPostResponse
+   */
+  data: CommunityFeedItemsInner
+}
+/**
+ *
+ * @export
  * @interface QueueHealthResponse
  */
 export interface QueueHealthResponse {
@@ -5486,6 +6930,40 @@ export interface QueueMetrics {
    */
   paused?: number
 }
+/**
+ *
+ * @export
+ * @interface ReportCommunityPostInput
+ */
+export interface ReportCommunityPostInput {
+  /**
+   *
+   * @type {ReportCommunityPostInputReasonEnum}
+   * @memberof ReportCommunityPostInput
+   */
+  reason: ReportCommunityPostInputReasonEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ReportCommunityPostInput
+   */
+  details?: string
+}
+
+/**
+ * @export
+ */
+export const ReportCommunityPostInputReasonEnum = {
+  spam: 'spam',
+  harassment: 'harassment',
+  inappropriate_content: 'inappropriate_content',
+  hate_speech: 'hate_speech',
+  violence: 'violence',
+  other: 'other',
+} as const
+export type ReportCommunityPostInputReasonEnum =
+  (typeof ReportCommunityPostInputReasonEnum)[keyof typeof ReportCommunityPostInputReasonEnum]
+
 /**
  *
  * @export
@@ -7190,6 +8668,50 @@ export type SuggestGarmentTagsResponseDataSuggestionsMaterialValueEnum =
 /**
  *
  * @export
+ * @interface TooManyRequestsHttpError
+ */
+export interface TooManyRequestsHttpError {
+  /**
+   *
+   * @type {TooManyRequestsHttpErrorStatusCodeEnum}
+   * @memberof TooManyRequestsHttpError
+   */
+  statusCode: TooManyRequestsHttpErrorStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof TooManyRequestsHttpError
+   */
+  message: string
+  /**
+   *
+   * @type {TooManyRequestsHttpErrorErrorEnum}
+   * @memberof TooManyRequestsHttpError
+   */
+  error: TooManyRequestsHttpErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const TooManyRequestsHttpErrorStatusCodeEnum = {
+  NUMBER_429: 429,
+} as const
+export type TooManyRequestsHttpErrorStatusCodeEnum =
+  (typeof TooManyRequestsHttpErrorStatusCodeEnum)[keyof typeof TooManyRequestsHttpErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const TooManyRequestsHttpErrorErrorEnum = {
+  Too_Many_Requests: 'Too Many Requests',
+} as const
+export type TooManyRequestsHttpErrorErrorEnum =
+  (typeof TooManyRequestsHttpErrorErrorEnum)[keyof typeof TooManyRequestsHttpErrorErrorEnum]
+
+/**
+ *
+ * @export
  * @interface TrackedResponse
  */
 export interface TrackedResponse {
@@ -7462,6 +8984,70 @@ export interface UpdateCommercePreferenceResponse {
    */
   data: CommercePreferenceResponseData
 }
+/**
+ * Updates a community challenge. At least one field must be present. Moving the window requires startsAt, endsAt and timeZone together, and the result must start on a Monday in that zone and span exactly seven days.
+ * @export
+ * @interface UpdateCommunityChallengeInput
+ */
+export interface UpdateCommunityChallengeInput {
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateCommunityChallengeInput
+   */
+  slug?: string
+  /**
+   * The climate band this challenge is restricted to, or null if unrestricted.
+   * @type {UpdateCommunityChallengeInputClimateBandEnum}
+   * @memberof UpdateCommunityChallengeInput
+   */
+  climateBand?: UpdateCommunityChallengeInputClimateBandEnum | null
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateCommunityChallengeInput
+   */
+  startsAt?: string
+  /**
+   *
+   * @type {string}
+   * @memberof UpdateCommunityChallengeInput
+   */
+  endsAt?: string
+  /**
+   * IANA time zone identifier, for example Europe/Istanbul. Validated against the host tz database; an unknown zone is rejected.
+   * @type {string}
+   * @memberof UpdateCommunityChallengeInput
+   */
+  timeZone?: string
+  /**
+   * Localized challenge copy keyed by supported IETF locale tag, for example "en-US". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback.
+   * @type {{ [key: string]: CommunityChallengeCopyValue; }}
+   * @memberof UpdateCommunityChallengeInput
+   */
+  copy?: { [key: string]: CommunityChallengeCopyValue }
+  /**
+   *
+   * @type {boolean}
+   * @memberof UpdateCommunityChallengeInput
+   */
+  isActive?: boolean
+}
+
+/**
+ * @export
+ */
+export const UpdateCommunityChallengeInputClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type UpdateCommunityChallengeInputClimateBandEnum =
+  (typeof UpdateCommunityChallengeInputClimateBandEnum)[keyof typeof UpdateCommunityChallengeInputClimateBandEnum]
+
 /**
  *
  * @export
@@ -8353,7 +9939,7 @@ export interface WeatherCurrent {
    * @type {WeatherCurrentConditionEnum}
    * @memberof WeatherCurrent
    */
-  condition: WeatherCurrentConditionEnum | null
+  condition: WeatherCurrentConditionEnum
 }
 
 /**
@@ -8428,7 +10014,7 @@ export interface WeatherHourlyEntry {
    * @type {WeatherHourlyEntryConditionEnum}
    * @memberof WeatherHourlyEntry
    */
-  condition: WeatherHourlyEntryConditionEnum | null
+  condition: WeatherHourlyEntryConditionEnum
   /**
    *
    * @type {string}
@@ -8610,7 +10196,7 @@ export interface WeatherSnapshotCurrent {
    * @type {WeatherSnapshotCurrentConditionEnum}
    * @memberof WeatherSnapshotCurrent
    */
-  condition: WeatherSnapshotCurrentConditionEnum | null
+  condition: WeatherSnapshotCurrentConditionEnum
 }
 
 /**
@@ -8685,7 +10271,7 @@ export interface WeatherSnapshotHourlyInner {
    * @type {WeatherSnapshotHourlyInnerConditionEnum}
    * @memberof WeatherSnapshotHourlyInner
    */
-  condition: WeatherSnapshotHourlyInnerConditionEnum | null
+  condition: WeatherSnapshotHourlyInnerConditionEnum
   /**
    *
    * @type {string}
