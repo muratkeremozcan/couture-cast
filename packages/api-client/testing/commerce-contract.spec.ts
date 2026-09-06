@@ -45,13 +45,9 @@ import {
  * Story 5.1 Task 8: the consumer-side contract for affiliate commerce.
  *
  * This suite asserts the PUBLISHED SHAPES only. Whether a user is eligible, when
- * a click dedupes, and which offer wins are business rules, and they are proven
- * in the API unit and PostgreSQL integration suites. What is proven here is the
- * thing every surface depends on and no runtime test would catch: that the
- * `shopThisLook` key is always serialized, that a client cannot smuggle a
- * server-derived field into a click request, that the error envelopes have no
- * machine-readable code to branch on, and that the analytics allowlists reject
- * the values the story forbids.
+ * a click dedupes, and which offer wins are business rules, proven in the API
+ * unit and PostgreSQL integration suites. A green run here says nothing about
+ * any of them.
  */
 
 const baseOutfit = {
@@ -155,10 +151,9 @@ describe('commerce preferences', () => {
    * PUT still answers 200 with the current state, so a client has exactly one
    * body to handle whether or not its write moved anything.
    *
-   * Asserted behaviourally rather than by object identity. The two being the
-   * same reference today is an implementation detail; the contract property is
-   * that they accept and reject the same values, and a structurally identical
-   * redefinition should not fail this test while a drifting one must.
+   * Asserted behaviourally, because the contract property is that the two accept
+   * and reject the same values. A structurally identical redefinition passes; a
+   * drifting one fails.
    */
   it.each([
     { name: 'an enabled write', body: { affiliateCtasEnabled: true }, accepted: true },
@@ -220,10 +215,8 @@ describe('attributed click request', () => {
   })
 
   it('closes the surface enum so it cannot become free text', () => {
-    // Story 5.4 adds palette_advisor deliberately (Decision 7). The enum
-    // stays closed either way: a new surface still has to be added here on
-    // purpose, and the assertion below still proves an arbitrary string is
-    // rejected.
+    // Story 5.4 adds palette_advisor deliberately (Decision 7). The enum stays
+    // closed: a new surface has to be added here on purpose.
     expect(affiliateSurfaceSchema.options).toEqual(['mobile_hero', 'palette_advisor'])
     expect(() =>
       affiliateClickRequestSchema.parse(
@@ -442,7 +435,8 @@ describe('commerce error envelopes', () => {
    * Decision 9 exists because of this. Every shared error schema is `.strict()`
    * over exactly `{ statusCode, message, error }`, so there is nowhere to put a
    * `COMMERCE_*` code and a client has to branch on status plus message. The
-   * only error-code concept in this repo feeds telemetry, never a response body.
+   * only error-code concept in this repo feeds telemetry and stays out of
+   * response bodies.
    */
   it.each([
     {
@@ -597,9 +591,8 @@ describe('analytics property allowlists', () => {
   /**
    * The story forbids any URL, product title, garment id, raw user id, or free
    * text from reaching an analytics property. The allowlists are `.strict()`, so
-   * this is real enforcement rather than a convention, and every disallowed
-   * fixture is checked against all three schemas so a future event cannot be
-   * added with a weaker list.
+   * this is enforcement. Every disallowed fixture is checked against all three
+   * schemas so a future event cannot ship with a weaker list.
    */
   for (const { name, schema } of propertySchemas) {
     it.each(DISALLOWED_ANALYTICS_PROPERTY_FIXTURES)(

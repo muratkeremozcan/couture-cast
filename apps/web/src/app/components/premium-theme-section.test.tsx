@@ -6,12 +6,6 @@
 // the bearer header, the PUT body and the contract parsing are exercised by the same
 // tests that cover the UI states. Nothing is mocked: `data-theme` on `<html>` is a real
 // DOM write, which is exactly what AC 4 is about.
-//
-// The last describe block leaves the DOM entirely and reads `globals.css`. That is
-// deliberate: the palette hex values live only there (Decision 11), and AC 2 asks for
-// every pairing the gallery renders to be *proven* against the WCAG maths rather than
-// eyeballed. jsdom paints nothing, so axe cannot judge contrast here; parsing the
-// stylesheet and running it through `@couture/utils` can.
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -104,7 +98,7 @@ const CSS = readFileSync(
  *
  * The leading `:root,` on the Default block is load-bearing: `<html>` carries an empty
  * `data-theme` for Default, so `:root` is the rule that has to supply those values.
- * Comments are stripped first — the block comment above these rules contains no braces,
+ * Comments are stripped first: the block comment above these rules contains no braces,
  * so it would otherwise be swept into the first selector.
  */
 const PALETTE_RULES = [
@@ -142,9 +136,8 @@ const PALETTE_PROPERTIES = [
  * Puts the real palette rules in the test document.
  *
  * The section only ever writes `data-theme`; the stylesheet is what turns that into
- * colors. With the rules installed, a test can assert the palette an element *resolves*
- * rather than the attribute value alone — and an attribute nothing resolves from is
- * precisely the regression this guards.
+ * colors. With the rules installed, a test can assert the palette an element *resolves*.
+ * An attribute nothing resolves from is precisely the regression this guards.
  */
 function installPaletteStyles(): HTMLStyleElement {
   const style = document.createElement('style')
@@ -191,9 +184,10 @@ function previewPalette() {
  * A jsdom axe pass over the rendered tree.
  *
  * This does not replace a browser run: jsdom has no layout, so axe cannot evaluate
- * `color-contrast` or target size here. It does catch what this section is most likely
- * to introduce — an unlabelled control, a broken `aria-describedby`, a list with a
- * non-`li` child — on every unit run. Contrast is judged in the stylesheet block below.
+ * `color-contrast` or target size here. On every unit run it does catch what this
+ * section is most likely to introduce: an unlabelled control, a broken
+ * `aria-describedby`, a list with a non-`li` child. Contrast is judged in the
+ * stylesheet block below.
  */
 async function expectNoAxeViolations(container: HTMLElement) {
   const results = await axe.run(container, {
@@ -253,7 +247,7 @@ describe('PremiumThemeSection', () => {
    * Decision 11's deliberate divergence from `planner-rail.tsx`: this section already
    * sits on `/settings`, so the rail's link back to `/settings` would be a dead
    * control. The copy points at the subscribe controls above instead. No modal, no
-   * countdown, no urgency — the PRD's "no dark patterns" guardrail.
+   * countdown, no urgency: the PRD's "no dark patterns" guardrail.
    *
    * A signed-out reader gets different copy, because Decision 11's reasoning does not
    * reach them: `SubscriptionSection` renders only `commerce.premium.signedOutHint` when
@@ -418,7 +412,6 @@ describe('PremiumThemeSection', () => {
     expect(previewPalette()).toEqual(BLOCKS.get('autumn_umber'))
   })
 
-  /** Reset is visible too: the preview returns to Default with the selection. */
   it('5.3-WEB-113 returns the preview to Default when the palette is reset', async () => {
     signIn()
     useMswHandlers(
@@ -460,7 +453,7 @@ describe('PremiumThemeSection', () => {
 
   /**
    * AC 6: a palette key this build does not know renders Default cleanly. The gallery
-   * still renders in full — a stale value must not cost the reader the whole section.
+   * still renders in full; a stale value must not cost the reader the whole section.
    */
   it('5.3-WEB-011 falls back to Default for an unknown stored palette', async () => {
     signIn()
@@ -476,7 +469,7 @@ describe('PremiumThemeSection', () => {
 
   /**
    * AC 6: a failed read renders Default with a quiet inline error. It must not show the
-   * locked panel either — a read that failed says nothing about entitlement, and
+   * locked panel either: a read that failed says nothing about entitlement, and
    * showing a subscriber an upsell for what they already pay for would be worse.
    *
    * AC 7: the copy is the catalog's, not the server's. The response below carries a
@@ -518,7 +511,7 @@ describe('PremiumThemeSection', () => {
 
   /**
    * A 503 mid-session means the kill switch flipped under the reader, so the section
-   * re-resolves into the state that already explains it rather than printing a line and
+   * re-resolves into the state that already explains it, instead of printing a line and
    * leaving a live gallery behind.
    *
    * The earlier shape of this test asserted the server's own English message in an
@@ -568,8 +561,8 @@ describe('PremiumThemeSection', () => {
   /**
    * The entitlement half of the same rule. A subscription that lapses while `/settings`
    * is open makes the next write a 403, and the section moves to the locked panel the
-   * catalogs already translate — not an English guard message beside a gallery that
-   * still looks usable.
+   * catalogs already translate. The failure mode it replaces is an English guard
+   * message beside a gallery that still looks usable.
    */
   it('5.3-WEB-114 re-resolves to the locked panel when entitlement lapses under the reader', async () => {
     signIn()
@@ -635,7 +628,7 @@ describe('PremiumThemeSection', () => {
   /**
    * Signing out in another tab leaves this section mounted, `ready`, and interactive.
    * Without the re-check the write reaches the lib, which throws
-   * PREMIUM_THEME_SIGNED_OUT_MESSAGE — a developer string with no catalog entry, so
+   * PREMIUM_THEME_SIGNED_OUT_MESSAGE, a developer string with no catalog entry, so
    * English in all ten locales.
    */
   it('5.3-WEB-116 returns to the signed-out panel when the session ends mid-session', async () => {
@@ -686,7 +679,7 @@ describe('PremiumThemeSection', () => {
     expect(
       note.compareDocumentPosition(gallery) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
-    // The stored palette is still applied and still readable — only writing is off.
+    // The stored palette is still applied and still readable; only writing is off.
     expect(activeTheme()).toBe('jewel_radiance')
     // Paired with `5.3-WEB-126`, which proves this exact opacity keeps a dimmed card
     // above the 4.5:1 floor. Changing one without the other breaks that pair.
@@ -759,7 +752,7 @@ describe('PremiumThemeSection', () => {
    * The write counterpart to `5.3-WEB-110`. `setThemeFromWeb` has always accepted a
    * signal and no caller passed one, so navigating away mid-save ran the request to
    * completion and then wrote `data-theme` onto the `<html>` of whatever page the reader
-   * had moved to — from a component that no longer existed. The `<html>` assertion is
+   * had moved to, from a component that no longer existed. The `<html>` assertion is
    * the load-bearing half: an aborted request that still repainted the document would
    * pass a state-only check.
    *
@@ -948,8 +941,8 @@ describe('5.3 premium palette tokens (globals.css)', () => {
   /**
    * Borders are the one carrier that is not a plain hex, so they are excluded from the
    * ratio maths above (the helper rejects `rgba()` rather than guessing a backdrop).
-   * They are decoration here — the selected state is text plus `aria-pressed`, never
-   * a border color — but every palette still has to declare all five properties or a
+   * They are decoration here: the selected state is text plus `aria-pressed`, never
+   * a border color. Every palette still has to declare all five properties, or a
    * card would inherit a stray value from whatever palette is active on `<html>`.
    */
   it('5.3-WEB-125 declares all five carriers as single color values', () => {
@@ -969,7 +962,7 @@ describe('5.3 premium palette tokens (globals.css)', () => {
 
   /**
    * The kill-switch state dims every card with `disabled:opacity-70`, and CSS `opacity`
-   * composites the whole card — text included — against the page behind it, which on
+   * composites the whole card, text included, against the page behind it, which on
    * `/settings` is Tailwind's `bg-neutral-950` (#0a0a0a). That lowers the pairing this
    * block just proved: Jewel Radiance drops from 8.01:1 to 5.40:1.
    *

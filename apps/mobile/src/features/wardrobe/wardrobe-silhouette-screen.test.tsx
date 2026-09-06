@@ -47,7 +47,7 @@ import { WardrobeSilhouetteScreen } from './wardrobe-silhouette-screen'
 
 /**
  * Base64url-shaped JWT payload, built at runtime (not a literal) so it
- * doesn't look like a credential to secret scanners -- a hardcoded
+ * doesn't look like a credential to secret scanners; a hardcoded
  * JWT-shaped string here previously tripped gitleaks' generic-api-key rule
  * in CI for the near-identical literal in sibling test files.
  */
@@ -68,7 +68,7 @@ const defaultProfile = {
 describe('WardrobeSilhouetteScreen', () => {
   // Declared once and restored in `afterEach` (not inline at the end of each
   // test body) so a failing assertion mid-test still releases the resolver
-  // instead of leaking it into whichever test runs next -- the `restore()`
+  // instead of leaking it into whichever test runs next; the `restore()`
   // call this replaces sat after the only `await waitFor`/`expect` in each
   // test, so it would never have run had that assertion thrown.
   let restoreAccessTokenResolver: () => void
@@ -108,7 +108,7 @@ describe('WardrobeSilhouetteScreen', () => {
     // Token resolution is always asynchronous (`resolveMobileAccessToken` is
     // declared `async` even though the resolver here is synchronous), so the
     // very first paint must show an accessible loading state rather than
-    // nothing -- this branch had no coverage at all before this test.
+    // nothing; this branch had no coverage at all before this test.
     expect(screen.getByLabelText('Silhouette')).toBeInTheDocument()
 
     await waitFor(() => {

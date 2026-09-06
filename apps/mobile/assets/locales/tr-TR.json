@@ -583,5 +583,172 @@
         "cta": "Premium al"
       }
     }
+  },
+  "community": {
+    "title": "Topluluk",
+    "heading": "Yaşayan topluluk lookbook’u",
+    "sectionLabel": "Topluluk lookbook’u",
+    "inspirations": "Topluluk ilhamları",
+    "share": "Kombinini paylaş",
+    "newPost": "Yeni gönderi",
+    "deepLink": {
+      "invalid": "Bu bağlantı geçersiz, süresi dolmuş veya artık kullanılamıyor."
+    },
+    "filters": {
+      "label": "Topluluk filtreleri",
+      "announce": "{{filter}} kombinleri gösteriliyor.",
+      "mode": {
+        "auto": "Senin iklimin",
+        "autoWithBand": "Senin iklimin: {{band}}",
+        "all": "Tüm iklimler",
+        "cold_dry": "Soğuk ve kuru",
+        "cold_wet": "Soğuk ve nemli",
+        "temperate_dry": "Ilıman ve kuru",
+        "temperate_wet": "Ilıman ve nemli",
+        "warm_dry": "Sıcak ve kuru",
+        "warm_wet": "Sıcak ve nemli"
+      }
+    },
+    "band": {
+      "cold_dry": "Soğuk ve kuru",
+      "cold_wet": "Soğuk ve nemli",
+      "temperate_dry": "Ilıman ve kuru",
+      "temperate_wet": "Ilıman ve nemli",
+      "warm_dry": "Sıcak ve kuru",
+      "warm_wet": "Sıcak ve nemli",
+      "unclassified": "Her hava",
+      "unresolved": {
+        "no_location": "İklimine uygun kombinleri görmek için bir konum ekle. O zamana kadar tüm iklim kuşaklarını görüyorsun.",
+        "weather_unavailable": "Bulunduğun yerin tahmini kullanılamıyor, bu yüzden tüm iklim kuşaklarındaki kombinleri görüyorsun.",
+        "weather_stale": "Bulunduğun yerin tahmini güncel değil, bu yüzden tüm iklim kuşaklarındaki kombinleri görüyorsun.",
+        "weather_malformed": "Bulunduğun yerin tahmini okunamadı, bu yüzden tüm iklim kuşaklarındaki kombinleri görüyorsun.",
+        "insufficient_usable_days": "İklimini belirlemeye yetecek kadar güncel tahmin verisi yok, bu yüzden tüm iklim kuşaklarındaki kombinleri görüyorsun."
+      }
+    },
+    "feed": {
+      "loading": "Topluluk kombinleri yükleniyor",
+      "announceLoaded": "{{filter}} kombinleri gösteriliyor. {{count}} tanesi yüklendi.",
+      "announceLoadedMore": "{{count}} kombin daha yüklendi.",
+      "announceFocused": "Öne çıkan kombine odaklanıldı.",
+      "emptyTitle": "Burada henüz kombin paylaşılmadı",
+      "emptyBody": "Havaya hazır bir kombin paylaşan ilk kişi sen ol.",
+      "errorTitle": "Topluluk akışı yüklenemedi.",
+      "retry": "Tekrar dene",
+      "loadMore": "Daha fazla kombin yükle",
+      "loadingMore": "Yükleniyor",
+      "yourPostsTitle": "Sürmekte olan kombinlerin",
+      "yourPostsBody": "İnceleme bitene kadar bunları yalnızca sen görürsün."
+    },
+    "card": {
+      "label": "{{author}} tarafından paylaşılan kombin",
+      "authorSelf": "Sen",
+      "authorFallback": "Stil kâşifi",
+      "imageUnavailable": "Görsel kullanılamıyor",
+      "imageRetry": "Görseli yeniden yükle",
+      "report": "Şikayet et",
+      "reported": "Şikayet edildi",
+      "withdraw": "Geri çek",
+      "sponsored": "Sponsorlu",
+      "sponsoredAnnounce": "Sponsorlu kombin"
+    },
+    "status": {
+      "draft": "Taslak",
+      "uploading": "Yükleniyor",
+      "pending_review": "İncelemede",
+      "published": "Yayımlandı",
+      "flagged": "Moderasyon tarafından kaldırıldı",
+      "review_failed": "İnceleme tamamlanmadı",
+      "withdrawn": "Geri çekildi",
+      "consent_suspended": "Onay bekleniyor, gizli",
+      "reason": "Gerekçe: {{reason}}"
+    },
+    "removed": {
+      "flagged": "Moderasyon bu kombini kaldırdı. Başka kimse göremiyor.",
+      "review_failed": "İnceleme tamamlanmadığı için bu kombin yayımlanmadı. Yeniden denemek için tekrar paylaş.",
+      "withdrawn": "Bu kombini akıştan geri çektin.",
+      "consent_suspended": "Bir veli onayı yenileyene kadar bu kombin gizli kalır. Onay etkinleştiğinde tekrar paylaş."
+    },
+    "challenge": {
+      "eyebrow": "Haftalık stil yarışması",
+      "allClimates": "Tüm iklimler",
+      "participate": "Katıl",
+      "participateLabel": "{{title}} yarışmasına katıl",
+      "activeThisWeek": "Bu hafta aktif",
+      "dateRange": "{{start}} ile {{end}} arası"
+    },
+    "report": {
+      "title": "Bu kombini şikayet et",
+      "description": "Topluluğu güvende tutmaya yardım et. Bir gerekçe seç, moderasyon kombini inceleyecek.",
+      "reasonLabel": "Şikayet gerekçesi",
+      "detailsLabel": "Daha fazla ayrıntı (isteğe bağlı)",
+      "detailsPlaceholder": "Bu kombinin topluluk kurallarını nasıl ihlal ettiğini anlat",
+      "detailsCount": "500 karakterin {{count}} tanesi",
+      "submit": "Şikayeti gönder",
+      "submitting": "Gönderiliyor",
+      "cancel": "İptal",
+      "close": "Şikayet penceresini kapat",
+      "success": "Teşekkürler. Moderasyon bu kombini inceleyecek.",
+      "reason": {
+        "spam": "Spam veya yanıltıcı içerik",
+        "harassment": "Taciz veya zorbalık",
+        "inappropriate_content": "Uygunsuz içerik",
+        "hate_speech": "Nefret söylemi",
+        "violence": "Şiddet veya zararlı içerik",
+        "other": "Başka bir şey"
+      }
+    },
+    "compose": {
+      "title": "Kombinini paylaş",
+      "description": "Her kombin akışa düşmeden önce otomatik olarak incelenir.",
+      "close": "Paylaşmadan kapat",
+      "photoLabel": "Fotoğraf",
+      "photoHint": "JPEG, PNG veya WebP; en fazla 10 MB ve her kenarı en az 256 piksel.",
+      "choosePhoto": "Fotoğraf seç",
+      "changePhoto": "Fotoğrafı değiştir",
+      "preview": "Paylaşmak üzere olduğun kombinin önizlemesi",
+      "altLabel": "Görsel açıklaması",
+      "altHint": "Ekran okuyucu kullanan üyeler için giysileri, katmanları ve renkleri anlat.",
+      "altPlaceholder": "Giysileri, katmanları ve renkleri anlat",
+      "altSuggested": "Bir açıklama önerdik. Fotoğrafına uyacak şekilde düzenle.",
+      "altConfirm": "Bu açıklamanın fotoğrafla eşleştiğini onaylıyorum",
+      "captionLabel": "Açıklama yazısı (isteğe bağlı)",
+      "captionPlaceholder": "Hava, kumaşlar veya kombin üzerine notlar",
+      "captionCount": "280 karakterin {{count}} tanesi",
+      "challengeLabel": "Haftalık yarışma",
+      "challengeNone": "Yarışma yok",
+      "publish": "Yayımla",
+      "publishing": "İnceleniyor ve yayımlanıyor",
+      "uploading": "Fotoğrafın yükleniyor",
+      "cancel": "İptal",
+      "success": "Kombinin incelenmek üzere gönderildi."
+    },
+    "validation": {
+      "photoRequired": "Paylaşmak için bir fotoğraf seç.",
+      "altRequired": "Bir görsel açıklaması ekle.",
+      "altConfirmRequired": "Yayımlamadan önce görsel açıklamasını onayla.",
+      "captionTooLong": "Açıklama yazısını en fazla 280 karakterde tut.",
+      "captionUrl": "Açıklama yazısı bağlantı içeremez.",
+      "captionEmail": "Açıklama yazısı e-posta adresi içeremez.",
+      "imageTooSmall": "En az 256 piksel genişliğinde ve yüksekliğinde bir görsel seç.",
+      "permissionDenied": "Bir kombin paylaşmak için CoutureCast’in fotoğraflarına erişmesi gerekiyor.",
+      "pickerFailed": "Fotoğraf seçici açılamadı."
+    },
+    "error": {
+      "load": "Topluluk akışı yüklenemedi.",
+      "report": "Şikayetin gönderilemedi.",
+      "withdraw": "Bu kombin geri çekilemedi. Hâlâ akışta.",
+      "publish": "Kombinin yayımlanamadı.",
+      "upload": "Fotoğrafın yüklenemedi, bu yüzden hiçbir şey yayımlanmadı. Tekrar dene.",
+      "signedOut": "Toplulukta yer almak için oturum aç.",
+      "ageGate": "Toplulukta paylaşım yapmak için en az 13 yaşında olmalısın.",
+      "rateLimited": "Bugünkü on kombin sınırına ulaştın.",
+      "rateLimitedUntil": "Bugünkü on kombin sınırına ulaştın. {{time}} sonrasında tekrar dene.",
+      "reasonChanged": "Bu kombini daha önce başka bir gerekçeyle şikayet ettin.",
+      "selfReport": "Kendi kombinini şikayet edemezsin.",
+      "notFound": "Bu kombin artık kullanılamıyor.",
+      "disabled": "Topluluk akışı geçici olarak kullanılamıyor.",
+      "mediaUnavailable": "Bu kombin geçici olarak kullanılamıyor. Kısa süre sonra tekrar dene.",
+      "generic": "Bir şeyler ters gitti. Tekrar dene."
+    }
   }
 }

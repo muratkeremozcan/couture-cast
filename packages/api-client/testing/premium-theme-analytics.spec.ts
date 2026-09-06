@@ -12,15 +12,7 @@ import {
 } from '../src/types/analytics-events'
 
 /**
- * Story 5.3 premium theme analytics, split from `premium-theme-contract.spec.ts`
- * on the line 5.1 drew and 5.2 kept: `*-contract.spec.ts` asserts published
- * request/response shapes, `*-analytics.spec.ts` asserts the event builders.
- *
- * A new file rather than an addition to `premium-analytics.spec.ts` for the same
- * reason 5.2 gave its locale spec: a feature area owns its own fixtures, and
- * appending here would make a 5.2 file jointly owned for no gain.
- *
- * The negative fixtures are the story's privacy rule made executable. A palette
+ * The negative fixtures are Story 5.3's privacy rule made executable. A palette
  * choice is cosmetic, so the allowlist is one key: no user id, no surface, no
  * hex values, no free text.
  */

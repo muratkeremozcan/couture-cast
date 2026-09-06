@@ -2,20 +2,18 @@
 // tree.
 //
 // The mobile sibling of `apps/web/src/i18n/premium-theme-locales.spec.ts`, and the
-// mobile half of AC 7. A new feature area gets its own dedicated parity spec rather than
-// an extension of `premium-locales.spec.ts` (Decision 13), and that 5.2 spec now filters
-// this `theme` child out so its pinned 22-key list keeps meaning exactly what it meant
-// before.
+// mobile half of AC 7. A new feature area gets its own dedicated parity spec (Decision
+// 13), and the 5.2 spec now filters this `theme` child out so its pinned 22-key list
+// keeps meaning exactly what it meant before.
 //
-// The two surfaces ship the same sixteen keys with the same copy, which is not an
-// accident worth trimming: `locked.body` names the subscribe controls rendered directly
-// above the section on both surfaces, and the disclosure makes the same AC 7 claims about
-// the same server behavior. The assertions below are therefore the same assertions the
-// web spec makes, so copy that drifts on one surface fails on that surface's own spec
-// rather than being caught late by a reader comparing screenshots.
+// The two surfaces ship the same sixteen keys with the same copy: `locked.body` names
+// the subscribe controls rendered directly above the section on both surfaces, and the
+// disclosure makes the same AC 7 claims about the same server behavior. The assertions
+// below are therefore the assertions the web spec makes, so copy that drifts on one
+// surface fails on that surface's own spec.
 //
 // All non-English values are machine-translation drafts pending human review before
-// release (AC 7 / PRD NFR Localization 1) — the parity checks hold the tree together
+// release (AC 7 / PRD NFR Localization 1); the parity checks hold the tree together
 // until that review lands.
 import { describe, expect, it } from 'vitest'
 
@@ -69,17 +67,16 @@ const ENGLISH_LOCALES = SUPPORTED_LOCALES.filter((locale) => locale.startsWith('
 /**
  * The disclosure has to survive translation with its analytics sentence intact, and a
  * substring check is the only thing that can prove that per locale. Each entry is the
- * phrase its catalog uses to name where the palette goes, so reverting a catalog to copy
- * that omits the sentence fails here rather than shipping a privacy claim the code
+ * phrase its catalog uses to name where the palette goes, so a catalog reverted to copy
+ * that omits the sentence fails here, before it can ship a privacy claim the code
  * contradicts. The two French entries reach past the noun phrase because
  * `fournisseur d'analyse` carries an apostrophe, and a literal holding one satisfies
  * neither the `quotes` rule nor Prettier in this config.
  *
- * Why the sentence exists at all: a successful `PUT` fires `premium_theme_selected`
- * server-side (Decision 14), and `TelemetryService` dispatches it to PostHog Cloud. The
- * palette key therefore leaves CoutureCast's own systems on every save, from the mobile
- * surface exactly as from the web one. Pseudonymising the subject id narrows who the row
- * is about; it does not keep the row in-house.
+ * Why the sentence exists: a successful `PUT` fires `premium_theme_selected` server-side
+ * (Decision 14) and `TelemetryService` dispatches it to PostHog Cloud, so the palette key
+ * leaves CoutureCast's own systems on every save. Pseudonymising the subject id narrows
+ * who the row is about; it does not keep the row in-house.
  */
 const DISCLOSURE_ANALYTICS_TOKENS: Record<SupportedLocale, string> = {
   'en-US': 'analytics provider',
@@ -98,8 +95,8 @@ const DISCLOSURE_ANALYTICS_TOKENS: Record<SupportedLocale, string> = {
  * The three palette names are proper nouns from `refs/ux/ux-color-themes.html` and ship
  * untranslated everywhere on purpose: they are what the design system calls these
  * palettes, and a localized "Radiance de bijou" would name nothing a reader could match
- * back to the spec or to the web surface. Nothing else is listed, and nothing else should
- * be — an entry here is an admission, so keep the list this small.
+ * back to the spec or to the web surface. An entry here is an admission, so keep the
+ * list this small.
  */
 const APPROVED_COGNATES: Record<string, readonly SupportedLocale[]> = {
   'names.jewelRadiance': NON_ENGLISH_LOCALES,
@@ -155,14 +152,13 @@ describe('5.3 premium theme locale parity (mobile)', () => {
 
   /**
    * Pinning the exact key set means a later rename, or a quiet drop of the disclosure
-   * copy, fails here rather than in a released build. It is also the assertion that a
-   * fourth palette cannot arrive by locale edit alone: `names.springBloom` would have to
-   * be added here, in the contract enum, and in `src/theme/theme-palettes.ts` to render
-   * at all.
+   * copy, fails here rather than in a released build. It is also what stops a fourth
+   * palette arriving by locale edit alone: `names.springBloom` would have to be added
+   * here, in the contract enum, and in `src/theme/theme-palettes.ts` to render at all.
    *
-   * Unlike 5.2's premium tree, this one has no mobile-only or web-only members: the
-   * mobile surface renders every one of these sixteen keys, including both locked
-   * bodies, because the mobile settings screen is reachable signed out.
+   * This tree has no mobile-only or web-only members: the mobile surface renders every
+   * one of these sixteen keys, including both locked bodies, because the mobile settings
+   * screen is reachable signed out.
    */
   it('5.3-I18N-MOB-THEME-03 carries exactly the keys Decision 13 specifies', () => {
     expect([...reference.keys()].sort()).toEqual([
@@ -289,16 +285,14 @@ describe('5.3 premium theme locale parity (mobile)', () => {
   })
 
   /**
-   * AC 7's disclosure has to match what the server actually does with the selection. A
-   * successful `PUT` emits `premium_theme_selected`, which `TelemetryService` sends to
-   * PostHog Cloud, so the palette key leaves CoutureCast every time someone saves.
+   * AC 7's disclosure has to match what the server does with the selection; the token
+   * map above records why.
    *
    * The positive token check is the guard that holds in all ten languages: reverting any
    * catalog to copy without the analytics sentence drops the token and fails here. The
    * negative below is English-only because it pins the exact false sentence the web
    * catalogs once shipped ("nothing about your choice is shared outside CoutureCast"),
-   * and it is the check that catches a copy pass reaching for the reassuring absolute
-   * again.
+   * and it catches a copy pass reaching for the reassuring absolute again.
    */
   it('5.3-I18N-MOB-THEME-10 discloses the analytics dispatch instead of denying it', () => {
     for (const locale of SUPPORTED_LOCALES) {

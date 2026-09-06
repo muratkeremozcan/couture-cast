@@ -86,7 +86,8 @@ describe('FeatureFlagsService', () => {
   it('syncs all known flags into Postgres fallback storage', async () => {
     const remoteValues = new Map<string, unknown>([
       ['premium_themes_enabled', true],
-      ['community_feed_enabled', false],
+      ['community_read_enabled', false],
+      ['community_write_enabled', false],
       ['color_analysis_enabled', undefined],
       ['weather_alerts_enabled', true],
       ['commerce_affiliate_enabled', true],
@@ -96,7 +97,8 @@ describe('FeatureFlagsService', () => {
 
     const cachedValues = new Map<string, boolean | null>([
       ['premium_themes_enabled', null],
-      ['community_feed_enabled', null],
+      ['community_read_enabled', null],
+      ['community_write_enabled', null],
       ['color_analysis_enabled', false],
       ['weather_alerts_enabled', null],
       ['commerce_affiliate_enabled', null],
@@ -123,10 +125,11 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 7, fallbackCount: 0 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 8, fallbackCount: 0 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: true },
-      { key: 'community_feed_enabled', value: false },
+      { key: 'community_read_enabled', value: false },
+      { key: 'community_write_enabled', value: false },
       { key: 'color_analysis_enabled', value: false },
       { key: 'weather_alerts_enabled', value: true },
       { key: 'commerce_affiliate_enabled', value: true },
@@ -157,10 +160,11 @@ describe('FeatureFlagsService', () => {
 
     const service = new FeatureFlagsService(repository, remoteProvider)
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 7, fallbackCount: 7 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 8, fallbackCount: 8 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: false },
-      { key: 'community_feed_enabled', value: false },
+      { key: 'community_read_enabled', value: false },
+      { key: 'community_write_enabled', value: false },
       // Story 5.4: flipped to fail-closed (decision 10). With no remote answer
       // and no cached row, a consent-gated feature reading photographs of
       // faces must land on false, not on a truthy guess.

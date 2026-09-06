@@ -61,6 +61,14 @@ export const conflictHttpErrorSchema = z
   })
   .strict()
 
+export const tooManyRequestsHttpErrorSchema = z
+  .object({
+    statusCode: z.literal(429),
+    message: nonEmptyStringSchema,
+    error: z.literal('Too Many Requests'),
+  })
+  .strict()
+
 export const internalServerErrorHttpErrorSchema = z
   .object({
     statusCode: z.literal(500),
@@ -85,6 +93,7 @@ export type RegisteredCommonHttpSchemas = {
   forbiddenHttpErrorSchema: typeof forbiddenHttpErrorSchema
   notFoundHttpErrorSchema: typeof notFoundHttpErrorSchema
   conflictHttpErrorSchema: typeof conflictHttpErrorSchema
+  tooManyRequestsHttpErrorSchema: typeof tooManyRequestsHttpErrorSchema
   internalServerErrorHttpErrorSchema: typeof internalServerErrorHttpErrorSchema
   serviceUnavailableHttpErrorSchema: typeof serviceUnavailableHttpErrorSchema
 }
@@ -112,6 +121,10 @@ export function registerCommonHttpSchemas(registry: OpenAPIRegistry) {
     conflictHttpErrorSchema: registry.register(
       'ConflictHttpError',
       conflictHttpErrorSchema
+    ),
+    tooManyRequestsHttpErrorSchema: registry.register(
+      'TooManyRequestsHttpError',
+      tooManyRequestsHttpErrorSchema
     ),
     internalServerErrorHttpErrorSchema: registry.register(
       'InternalServerErrorHttpError',

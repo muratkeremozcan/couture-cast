@@ -19,7 +19,7 @@ import type {
 
 // `router` from 'expo-router' is used for the locked panel's CTA. The real module
 // transitively pulls in `expo-asset` -> `expo-modules-core`, which cannot be evaluated
-// in this browser test bundle -- the same hazard `settings-premium-section.test.tsx`
+// in this browser test bundle; the same hazard `settings-premium-section.test.tsx`
 // and `tab-two-screen.test.tsx` mock around for the same reason.
 vi.mock('expo-router', () => ({ router: { push: vi.fn() } }))
 

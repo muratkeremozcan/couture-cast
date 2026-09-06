@@ -11,6 +11,8 @@ import { GuardianService } from '../modules/guardian/guardian.service'
 import { invalidateRitualCacheForUser } from '../modules/personalization/ritual-cache'
 import { WardrobeRetentionService } from '../modules/wardrobe/wardrobe-retention.service'
 import { SupabaseWardrobeStorageAdapter } from '../modules/wardrobe/wardrobe-storage.adapter'
+import { createCommunityWorkerRuntime } from '../modules/community/community-worker-runtime'
+import { registerCommunityMaintenanceSchedulers } from '../modules/community/community-maintenance.scheduler'
 import { createMaintenanceProcessor } from './maintenance.processor'
 import { registerMaintenanceSchedulers } from './maintenance.scheduler'
 import { createQueues, queueConfigs } from '../config/queues'
@@ -82,16 +84,20 @@ async function startWorkers() {
       (queue) => queue.name === 'billing-reconciliation'
     )
     const maintenanceQueue = startedQueues.find((queue) => queue.name === 'maintenance')
+    const communityModerationQueue = startedQueues.find(
+      (queue) => queue.name === 'community-moderation'
+    )
 
     if (
       !weatherQueue ||
       !alertFanoutQueue ||
       !colorExtractionQueue ||
       !billingReconciliationQueue ||
-      !maintenanceQueue
+      !maintenanceQueue ||
+      !communityModerationQueue
     ) {
       throw new Error(
-        'Required weather-ingestion, alert-fanout, color-extraction, billing-reconciliation, and maintenance queues were not created'
+        'Required weather-ingestion, alert-fanout, color-extraction, billing-reconciliation, maintenance, and community-moderation queues were not created'
       )
     }
 
@@ -235,6 +241,14 @@ async function startWorkers() {
     })
     redisClients.push(maintenanceRedis)
 
+    // Story 6.1: the community moderation pipeline. The publish path writes a
+    // `CommunityModerationOutbox` row inside its transaction; the dispatcher is
+    // what turns those rows into jobs, and the worker is what screens them.
+    // Neither existed before, which is why every community post terminated at
+    // `pending_review`. The composition is shared with `community.bootstrap.ts`
+    // so the two process groups cannot drift.
+    const community = createCommunityWorkerRuntime({ prisma, telemetryService })
+
     const maintenanceProcessor = createMaintenanceProcessor({
       admin: new AdminService(),
       featureFlags: new FeatureFlagsService(
@@ -256,10 +270,12 @@ async function startWorkers() {
             invalidateRitualCacheForUser(maintenanceRedis, userId),
         }
       ),
+      community: community.sweeps,
       logger: logger.child({ feature: 'maintenance' }),
     })
 
     await registerMaintenanceSchedulers(maintenanceQueue)
+    await registerCommunityMaintenanceSchedulers(maintenanceQueue)
 
     workers.push(
       // Serial on purpose. Every sweep is a batched DB scan and two of them
@@ -270,6 +286,11 @@ async function startWorkers() {
         ...defaultWorkerOptions(1),
       })
     )
+
+    // ADR-013 screening is CPU-bound (decode, re-encode, and eventually the
+    // NSFW model), so its concurrency stays low; the runtime caps it at five,
+    // matching the wardrobe silhouette worker for the same reason.
+    workers.push(community.worker)
 
     // Story 4.4: the moderation-review consumer moved to
     // wardrobe.bootstrap.ts, the model-capable process gated by

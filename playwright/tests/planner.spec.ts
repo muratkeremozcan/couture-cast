@@ -1,27 +1,16 @@
-// Story 5.5 Task 10 owner: end-to-end Playwright flow for the web premium
-// 7-day outfit planner (AC 1, 3, 4, 7), against the real running
-// web+API+DB stack -- not MSW. `planner-rail.test.tsx` already proves every
-// state at the component layer with a mocked network; this spec proves the
-// same journeys survive the real `PlannerRail` -> `apps/web/src/lib/planner.ts`
-// -> Next.js rewrite -> `PlannerController`/`PlannerService` -> Postgres round
-// trip, using the seeded `premium-active-user` account
-// (`packages/db/prisma/seeds/commerce.ts`).
+// Story 5.5: the web premium 7-day outfit planner (AC 1, 3, 4, 7) against the real
+// running web+API+DB stack. `planner-rail.test.tsx` proves every state at the
+// component layer with a mocked network; this spec proves the same journeys survive
+// the real `PlannerRail` -> `apps/web/src/lib/planner.ts` -> Next.js rewrite ->
+// `PlannerController`/`PlannerService` -> Postgres round trip, using the seeded
+// `premium-active-user` account (`packages/db/prisma/seeds/commerce.ts`).
 //
-// STRUCTURE MIRRORS `palette-advisor.spec.ts` (same domain, same account, same
-// class of problem): the same `premiumSeededTest.use({ premiumSeedUser: 'active' })`
-// signed-in session, the same `interceptNetworkCall`-based network-first
-// helpers, and -- for the one journey with no real trigger (a per-day
-// generation failure) -- the same "stub the untestable state, keep everything
-// else real" move that spec's stale-`analysis_version` test already uses.
-//
-// WRITE SAFETY. `premium-active-user` is shared across every spec file and
-// worker (see `premium-session.ts`'s file header). The reshuffle/reload test
-// below writes a real `PlannerDayPlan` row for it, so this file's own tests
-// run under `test.describe.configure({ mode: 'serial' })`, matching
-// `palette-advisor.spec.ts`. Unlike that spec, there is no reset step: every
-// assertion here reads its own expectation from the live response it just
-// captured rather than assuming a starting version, so a run left behind by
-// an earlier session is a valid starting point, not stale fixture drift.
+// WRITE SAFETY. `premium-active-user` is shared across every spec file and worker
+// (see `premium-session.ts`'s file header). The reshuffle/reload test below writes a
+// real `PlannerDayPlan` row for it, so this file's tests run under
+// `test.describe.configure({ mode: 'serial' })`. There is no reset step: every
+// assertion reads its expectation from the live response it just captured, so a row
+// left behind by an earlier run is a valid starting point.
 import type { Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { log } from '@seontechnologies/playwright-utils/log'
@@ -48,9 +37,9 @@ function plannerDayLocator(page: Page, planDate: string) {
   return page.getByTestId(`planner-day-${planDate}`)
 }
 
-/** The one real garment id a ready day's cards actually render, if any -- a
- * starter-wardrobe-only day (see the Dev Agent Record: this seeded account
- * owns ten `top` garments and nothing else) may legitimately have none. */
+/** The first garment id a ready day's cards render, if any. A
+ * starter-wardrobe-only day may legitimately have none: this seeded account owns
+ * ten `top` garments and nothing else. */
 function firstDisplayGarmentId(day: PlannerReadyDay): string | null {
   for (const outfit of day.outfits) {
     const garment = outfit.displayGarments[0]
@@ -60,11 +49,9 @@ function firstDisplayGarmentId(day: PlannerReadyDay): string | null {
 }
 
 /**
- * Clicks the hero "Plan week" control and returns the real GET it triggers.
- * Registered right before the click (not network-first like
- * `palette-advisor.spec.ts`'s `openPalette`): Decision 7 fetches nothing
- * until the rail opens, so there is no page-load race to protect against
- * here.
+ * Clicks the hero "Plan week" control and returns the real GET it triggers. The
+ * watch is registered right before the click: Decision 7 fetches nothing until the
+ * rail opens, so there is no page-load race to protect against.
  */
 async function openPlanner(
   page: Page,
@@ -78,11 +65,10 @@ async function openPlanner(
 }
 
 /**
- * Asserts the rendered week is the LIVE response just captured over the
- * network, not the old Story 3.5 static fixture: every assertion below reads
- * its expectation off `data` itself (garment ids included, the strongest
- * possible proof -- a static fixture could never echo back this seeded
- * account's real `GarmentItem` ids) rather than off a hardcoded expectation.
+ * Asserts the rendered week is the LIVE response just captured over the network.
+ * Every assertion below reads its expectation off `data` itself, garment ids
+ * included: a static fixture could never echo back this seeded account's real
+ * `GarmentItem` ids.
  */
 async function assertLiveWeekRendered(page: Page, data: PlannerResponse['data']) {
   await expect(page.getByTestId('planner-days')).toBeVisible()
@@ -121,10 +107,8 @@ async function assertLiveWeekRendered(page: Page, data: PlannerResponse['data'])
       // `.first()`: the seeded account's eligible wardrobe is narrow enough
       // (`packages/db/prisma/seeds/commerce.ts`'s `seedPaletteAdvisorWardrobe`
       // gives it `top` garments only) that the SAME garment id legitimately
-      // renders once per scenario -- up to three times in one day's card, not
-      // a rendering defect. Proving one of them is visible is enough; a
-      // bare `getByTestId` here is a strict-mode violation against real
-      // seeded data, not a false positive to chase further.
+      // renders once per scenario, up to three times in one day's card. A bare
+      // `getByTestId` here is a strict-mode violation against real seeded data.
       await expect(
         dayLocator.getByTestId(`planner-garment-${garmentId}`).first()
       ).toBeVisible()
@@ -139,17 +123,14 @@ premiumSeededTest.describe(
     premiumSeededTest.describe.configure({ mode: 'serial' })
 
     premiumSeededTest.beforeAll(async ({ request }, testInfo) => {
-      // Mirrors `premiumSeededTest`'s own guard: skip entirely off the local
-      // stack rather than trying to reach an API base URL that may not exist
-      // there.
+      // Off the local stack there may be no reachable API base URL, so skip.
       if (isNonLocalEnvironment(testInfo)) return
       const apiBaseUrl = resolveApiBaseUrl(testInfo, {
         fallback: 'http://localhost:4000',
       })
-      // AC 1 needs an owned saved location to resolve a window against, and
-      // nothing in the seed graph gives this account one (see
-      // `ensurePremiumSeedLocation`'s own docblock for why this is
-      // check-then-create rather than a plain create).
+      // AC 1 needs an owned saved location to resolve a window against, and nothing
+      // in the seed graph gives this account one. `ensurePremiumSeedLocation`'s
+      // docblock says why it is check-then-create.
       await ensurePremiumSeedLocation(request, apiBaseUrl, PREMIUM_SEED_USERS.active.id)
     })
 
@@ -214,8 +195,8 @@ premiumSeededTest.describe(
             .getByTestId('lookbook-prism-grid')
             .getByRole('complementary', { name: 'Planner Rail' })
         ).toBeVisible()
-        // Decision 7: the rail variant is ordinary page content -- opening it
-        // must never steal focus onto a close control the way the overlay does.
+        // Decision 7: the rail variant is ordinary page content, so opening it must
+        // never steal focus onto a close control the way the overlay does.
         await expect(page.getByTestId('planner-open-control')).toBeFocused()
 
         await log.step('Assert the live seven-day week rendered, not a static fixture')
@@ -253,8 +234,8 @@ premiumSeededTest.describe(
             data: { day: PlannerReadyDay; unchanged: boolean }
           }
         ).data
-        // Decision 4: version increments on every successful reshuffle
-        // whether or not the outfit content itself changed.
+        // Decision 4: version increments on every successful reshuffle, whether or
+        // not the outfit content changed.
         expect(updated.version).toBe(target.version + 1)
 
         await log.step(
@@ -263,8 +244,7 @@ premiumSeededTest.describe(
         // Scoped to the planner landmark: the page carries other unrelated
         // `role="status"` live regions (the lookbook feed's own "Showing ..."
         // announcements), so an unscoped `page.getByRole('status')` is a
-        // strict-mode violation against the real page, not just the
-        // planner's own announcement.
+        // strict-mode violation against the real page.
         const liveRegion = page
           .getByRole('complementary', { name: 'Planner Rail' })
           .getByRole('status')
@@ -276,9 +256,8 @@ premiumSeededTest.describe(
           await expect(liveRegion).toContainText('outfit updated.')
           const newGarmentId = firstDisplayGarmentId(updated)
           if (newGarmentId) {
-            // `.first()`: see `assertLiveWeekRendered`'s comment -- the
-            // narrow seeded wardrobe can legitimately place the same garment
-            // in more than one scenario.
+            // `.first()`: see `assertLiveWeekRendered`. The narrow seeded wardrobe
+            // can legitimately place the same garment in more than one scenario.
             await expect(
               dayLocator.getByTestId(`planner-garment-${newGarmentId}`).first()
             ).toBeVisible()
@@ -302,10 +281,9 @@ premiumSeededTest.describe(
         )
         expect(persisted?.status).toBe('ready')
         if (persisted?.status === 'ready') {
-          // The persisted `PlannerDayPlan` row, not a fresh regeneration: an
-          // unchanged dependency fingerprint returns the exact same version
-          // (Decision 9/AC 9), so a mismatch here would mean the reshuffle
-          // never reached the database.
+          // An unchanged dependency fingerprint returns the exact same version
+          // (Decision 9/AC 9), so a mismatch here means the reshuffle never
+          // reached the database.
           expect(persisted.version).toBe(updated.version)
         }
         await expect(plannerDayLocator(page, target.planDate)).toBeVisible()
@@ -326,19 +304,15 @@ premiumSeededTest.describe(
       async ({ premiumSession, page, apiRequest, interceptNetworkCall }) => {
         await page.setViewportSize({ width: 1440, height: 900 })
 
-        // AC 3/4's per-day 'error' result only comes from an exception thrown
-        // inside `PlannerService#resolveOneDay` (see `planner.service.ts`'s
-        // `buildErrorDay`); `planner.service.spec.ts`'s own coverage of that
-        // branch pokes a hole in `JSON.stringify` for exactly one call --
-        // there is no request shape, header, or seeded state that reaches it
-        // through the real API, and this story explicitly rules out touching
-        // `packages/db` to fabricate a malformed row directly. So this test
-        // fetches the REAL live week first, then swaps exactly one date to
-        // 'error' before the first render -- the same move
-        // `palette-advisor.spec.ts` makes for its own untestable
-        // `analysis_version` state, and disclosed the same way there. The
-        // stub is one-shot: the retry below is a real request that reaches
-        // the real backend and gets the real, fully-ready week back.
+        // AC 3/4's per-day 'error' result only comes from an exception thrown inside
+        // `PlannerService#resolveOneDay` (see `planner.service.ts`'s
+        // `buildErrorDay`). `planner.service.spec.ts` reaches that branch by poking
+        // a hole in `JSON.stringify` for one call; no request shape, header or
+        // seeded state reaches it through the real API, and this story rules out
+        // touching `packages/db` to fabricate a malformed row. So this test fetches
+        // the REAL live week first, then swaps exactly one date to 'error' before
+        // the first render. The stub is one-shot: the retry below is a real request
+        // that reaches the real backend and gets the real, fully-ready week back.
         const real = (await apiRequest({
           method: 'GET',
           path: PLANNER_PATH,
@@ -363,9 +337,9 @@ premiumSeededTest.describe(
               }
             : day
         )
-        // Validated through the real published schema before it goes on the
-        // wire: this proves the injected fixture is contract-shaped (seven
-        // unique consecutive dates included), not merely plausible-looking.
+        // Validated through the real published schema before it goes on the wire,
+        // which proves the injected fixture is contract-shaped, seven unique
+        // consecutive dates included.
         const injected = plannerResponseSchema.parse({
           data: {
             ...realData,

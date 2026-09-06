@@ -402,15 +402,21 @@ describe('palette advisor schema', () => {
    * Decision 7's advisor index, and specifically the half Prisma cannot
    * express.
    *
-   * `schema.prisma` declares `@@index([status, locale_region, advisor_slot,
-   * priority(sort: Desc)])`, and the hand-authored migration adds
-   * `WHERE "advisor_slot" IS NOT NULL` to it. That predicate is not decoration:
+   * The hand-authored migration creates it with
+   * `WHERE "advisor_slot" IS NOT NULL`. That predicate is not decoration:
    * without it this index and the garment index above are structurally tied on
    * a garment-only query, the planner may pick either, and
    * `commerce-affiliate-offers-query-plan.integration.spec.ts`'s `5.1-PLAN-03`
-   * regressed on exactly that. Since the Prisma DSL cannot say `WHERE`, a
-   * regenerated migration would silently drop it and reintroduce the
-   * regression, so the predicate is asserted here rather than assumed.
+   * regressed on exactly that.
+   *
+   * `schema.prisma` deliberately does NOT declare this index. It used to, as a
+   * plain `@@index` with no way to say `WHERE`, and that was worse than silence:
+   * Prisma's introspection skips partial indexes, so it never saw the real
+   * object, `prisma migrate diff` reported drift on a clean checkout, and the
+   * next generated migration would have emitted a `CREATE INDEX` under a name
+   * the database already holds. Undeclared, Prisma cannot drop what it cannot
+   * see -- which makes this test, not the datamodel, the thing standing between
+   * the predicate and a silent regression.
    */
   describe('AffiliateOffer advisor index', () => {
     it('5.4-DB-041 keeps the advisor index PARTIAL on advisor_slot IS NOT NULL', async () => {

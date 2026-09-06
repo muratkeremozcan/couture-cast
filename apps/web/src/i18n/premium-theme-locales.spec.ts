@@ -11,8 +11,8 @@
 // The key set is Decision 13's twelve plus three. `unavailable` is the first addition:
 // the kill switch (`premium_themes_enabled`) is reachable by an entitled subscriber, and
 // it disables every gallery card. Every other disabled control in this app carries a
-// reason next to it — `commerce.settings.signedOutHint`, `commerce.premium
-// .signedOutHint` — so shipping four silently dead cards would have been the only
+// reason next to it (`commerce.settings.signedOutHint`, `commerce.premium
+// .signedOutHint`), so shipping four silently dead cards would have been the only
 // exception. The note is that reason, and the cards point `aria-describedby` at it.
 //
 // `preview.title` and `preview.body` are the other two. Decision 4 names a preview card
@@ -21,7 +21,7 @@
 // preview is the only thing in the section that re-colors on selection.
 //
 // All non-English values are machine-translation drafts pending human review before
-// release (AC 7 / PRD NFR Localization 1) — the parity checks hold the tree together
+// release (AC 7 / PRD NFR Localization 1). The parity checks hold the tree together
 // until that review lands.
 import { describe, expect, it } from 'vitest'
 import { SUPPORTED_LOCALES, type SupportedLocale } from './index'
@@ -66,12 +66,6 @@ const ENGLISH_LOCALES = SUPPORTED_LOCALES.filter((locale) => locale.startsWith('
  * contradicts. The two French entries reach past the noun phrase because
  * `fournisseur d'analyse` carries an apostrophe, and a literal holding one satisfies
  * neither the `quotes` rule nor Prettier in this config.
- *
- * Why the sentence exists at all: a successful `PUT` fires `premium_theme_selected`
- * server-side (Decision 14), and `TelemetryService` dispatches it to PostHog Cloud. The
- * palette key therefore leaves CoutureCast's own systems on every save. Pseudonymising
- * the subject id narrows who the row is about; it does not keep the row in-house. Copy
- * that says otherwise is false, which is what the first draft of this key said.
  */
 const DISCLOSURE_ANALYTICS_TOKENS: Record<SupportedLocale, string> = {
   'en-US': 'analytics provider',
@@ -90,8 +84,8 @@ const DISCLOSURE_ANALYTICS_TOKENS: Record<SupportedLocale, string> = {
  * The three palette names are proper nouns from `refs/ux/ux-color-themes.html` and ship
  * untranslated everywhere on purpose: they are what the design system calls these
  * palettes, and a localized "Radiance de bijou" would name nothing a reader could match
- * back to the spec or to another surface. Nothing else is listed, and nothing else
- * should be — an entry here is an admission, so keep the list this small.
+ * back to the spec or to another surface. Nothing else is listed: an entry here is an
+ * admission, so keep the list this small.
  */
 const APPROVED_COGNATES: Record<string, readonly SupportedLocale[]> = {
   'names.jewelRadiance': NON_ENGLISH_LOCALES,
@@ -280,9 +274,11 @@ describe('5.3 premium theme locale parity (web)', () => {
   /**
    * AC 7's disclosure has to match what the server actually does with the selection.
    * A successful `PUT` emits `premium_theme_selected`, which `TelemetryService` sends to
-   * PostHog Cloud, so the palette key leaves CoutureCast every time someone saves. The
-   * first draft of this key claimed the opposite ("nothing about your choice is shared
-   * outside CoutureCast"), which was false the moment Decision 14's event landed.
+   * PostHog Cloud, so the palette key leaves CoutureCast every time someone saves.
+   * Pseudonymising the subject id narrows who the row is about; it does not keep the
+   * row in-house. The first draft of this key claimed the opposite ("nothing about your
+   * choice is shared outside CoutureCast"), which was false the moment Decision 14's
+   * event landed.
    *
    * The positive token check is the guard that holds in all ten languages: reverting any
    * catalog to copy without the analytics sentence drops the token and fails here. The

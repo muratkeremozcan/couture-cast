@@ -221,8 +221,8 @@ describe('TabOneScreen degraded and native-only paths', () => {
 
   it('3.3-MOB-HERO-22 ignores a superseded ritual load that fails after a newer one succeeded', async () => {
     // Switching language starts a second load. If the first one then fails,
-    // its error must not replace the recommendations already on screen --
-    // otherwise a slow, dead request retroactively blanks a good render.
+    // its error must not replace the recommendations already on screen; otherwise
+    // a slow, dead request retroactively blanks a good render.
     let releaseSupersededLoad: () => void = () => undefined
     let supersededLoadAnswered = false
     const supersededLoadGate = new Promise<void>((resolve) => {

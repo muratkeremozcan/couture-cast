@@ -2,9 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 // Story 5.4 Task 2/3: every ADVISOR_RULES swatchHex passes meetsWcagAA()
 // against the surface it renders on, exactly as 5.3's Decision 2/3 required
-// for the premium theme accents (which found two of three failing the
-// small-text floor -- a demonstrated hazard on this codebase, not
-// hypothetical caution).
+// for the premium theme accents, where two of three failed the small-text
+// floor.
 import { meetsWcagAA } from '@couture/utils'
 import { describe, expect, it } from 'vitest'
 import {

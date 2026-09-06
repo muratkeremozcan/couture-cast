@@ -1,8 +1,8 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
-// Story 4.4 Task 8 owner: keyboard-only completion, visible focus, slider
-// target geometry, live announcements, and axe for the guided onboarding flow
-// and the standalone silhouette settings surface (AC 5).
+// Story 4.4 AC 5: keyboard-only completion, visible focus, slider target geometry,
+// live announcements and axe, for the guided onboarding flow and the standalone
+// silhouette settings surface.
 import { expect } from '../support/fixtures/merged-fixtures'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
 import { isNonLocalEnvironment } from '../support/helpers/api-test'
@@ -17,12 +17,11 @@ const test = a11yTest
 const MIN_TARGET_PX = 44
 
 // A fake video device makes the permission-granted `getUserMedia` path
-// deterministic in this suite: without it, Chromium has no real camera in a
-// headless/CI environment, so `getUserMedia` rejects even once permission is
-// granted (confirmed directly: `grantPermissions(['camera'])` alone still
-// produced "Camera access unavailable" here). Must be file-level, not inside
-// a `describe` block: Playwright forces a new worker for `launchOptions` and
-// refuses to apply it at describe scope.
+// deterministic: without it Chromium has no real camera in a headless/CI
+// environment, so `getUserMedia` rejects even once permission is granted
+// (`grantPermissions(['camera'])` alone still produced "Camera access unavailable"
+// here). This must be file-level: Playwright forces a new worker for
+// `launchOptions` and refuses to apply it at describe scope.
 a11yTest.use({
   launchOptions: {
     args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
@@ -50,13 +49,10 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
         'onboarding-a11y-axe'
       )
       await page.goto('/wardrobe/onboarding')
-      // Gate the first scan on the permission step's real content, not just
-      // `waitForAccessibilityReady`'s landmark check (which `checkA11y` also
-      // runs internally): the onboarding flow renders a loading state and
-      // then briefly `null` before the permission step itself mounts, and
-      // neither of those intermediate states carries the `main#main-content`
-      // id `waitForAccessibilityReady` waits for -- but asserting the actual
-      // heading here makes that guarantee explicit rather than implicit.
+      // Gate the first scan on the permission step's real content. The onboarding
+      // flow renders a loading state and then briefly `null` before the permission
+      // step mounts, and neither intermediate state carries the `main#main-content`
+      // id `waitForAccessibilityReady` waits for.
       await expect(
         page.getByRole('heading', { level: 2, name: 'Allow camera and photo access' })
       ).toBeVisible()
@@ -161,11 +157,10 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
         testInfo,
         'onboarding-a11y-live'
       )
-      // Grant camera before navigating so the permission outcome is
-      // deterministic: without this, whether the browser context has a real
-      // or fake camera device varies by environment, and the test would
-      // otherwise have to accept either the granted or the denied
-      // announcement to avoid flaking.
+      // Grant camera before navigating so the permission outcome is deterministic.
+      // Whether the browser context has a real or fake camera device varies by
+      // environment, and the test would otherwise have to accept either the granted
+      // or the denied announcement.
       await page.context().grantPermissions(['camera'])
       await page.goto('/wardrobe/onboarding')
       await waitForAccessibilityReady(page)

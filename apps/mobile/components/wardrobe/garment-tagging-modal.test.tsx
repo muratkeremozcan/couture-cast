@@ -149,7 +149,6 @@ describe('MobileGarmentTaggingModal Component', () => {
       )
     })
 
-    // Wait for the modal state to settle with selected category and comfort
     const confirmBtn = await screen.findByRole('button', {
       name: 'wardrobe.tagging.save',
     })

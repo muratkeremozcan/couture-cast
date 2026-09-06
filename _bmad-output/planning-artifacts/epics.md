@@ -367,7 +367,7 @@ As Compliance, I need CoutureCast to meet WCAG 2.1 AA so that launch satisfies l
 
 ---
 
-## Epic 4 — Wardrobe Capture & Closet Tools (Phase 2)
+## Epic 4 — Wardrobe Capture & Closet Tools (Phase 3)
 
 Enable users to build their digital closet, powering richer personalization once the MVP loop is live.
 
@@ -411,7 +411,7 @@ As a new user, I want a guided wardrobe import and silhouette builder so that Co
 
 ---
 
-## Epic 5 — Commerce & Premium Enhancements (Phase 2)
+## Epic 5 — Commerce & Premium Enhancements (Phase 3)
 
 Monetize CoutureCast through premium features, affiliate integrations, and beauty/accessory upsell moments.
 
@@ -464,7 +464,7 @@ As a Premium subscriber, I want to preview outfits for the week so that I can pl
 
 ---
 
-## Epic 6 — Community & Moderation Loop (Phase 3)
+## Epic 6 — Community & Moderation Loop (Phase 2)
 
 Launch the community feed, engagement mechanics, and moderation controls supporting social growth.
 
@@ -550,8 +550,9 @@ As a community manager, I need queueing and audit controls so that flagged conte
 
 - **Sprint 0 (Epic 0)**: Provision infrastructure, test environments, and development tooling. Complete all 12 foundation stories (CC-0.1 through CC-0.12) before Epic 1 begins. Critical path: CC-0.1 → CC-0.2 → CC-0.3 → CC-0.11 (guardian consent) establishes baseline; CC-0.4 through CC-0.12 can partially overlap.
 - **Phase 1 (Epics 1–3)**: Build the weather backbone, personalization engine, and cross-surface experiences with localization. Stories CC-1.1, CC-2.1, CC-3.1 can kick off in parallel once Epic 0 is complete.
-- **Phase 2 (Epics 4–5)**: Layer wardrobe capture and monetization. Ensure CC-4.1 (garment capture) lands before CC-5.4 (palette advisor) so the advisor has wardrobe context.
-- **Phase 3 (Epic 6)**: Launch community loop; run CC-6.1–CC-6.3 sequentially before enabling social export and moderation.
+- **Phase 2 (Epic 6)**: Launch community loop; run CC-6.1–CC-6.3 sequentially before enabling social export and moderation.
+- **Phase 3 (Epics 4–5)**: Layer wardrobe capture and monetization. Ensure CC-4.1 (garment capture) lands before CC-5.4 (palette advisor) so the advisor has wardrobe context.
+- **Delivery note (2026-09-05):** Epics 4 and 5 were built ahead of their Phase 3 label; CC-4.1 through CC-5.5 are already `done`. Cross-phase prerequisites recorded on CC-3.7 and CC-6.1 are satisfied by that early delivery and do not gate the Phase 2 Community Beta.
 
 ### Parallelization hints
 
@@ -563,7 +564,7 @@ As a community manager, I need queueing and audit controls so that flagged conte
 **Feature Epics (Phase 1-3) Parallel Opportunities:**
 
 - Parallel-ready stories: CC-1.1 & CC-1.4 (telemetry) can run concurrently once API schema agreed. CC-3.2 (localization) and CC-3.3 (widgets) can overlap after CC-3.1 design tokens settle.
-- Sequential chains: CC-2.1 → CC-2.2 → CC-2.3; CC-4.1 → CC-4.2 → CC-4.3; CC-5.2 gates CC-5.3, CC-5.4 & CC-5.5; CC-6.1 → CC-6.2 → CC-6.3 → CC-6.5.
+- Sequential chains: CC-2.1 → CC-2.2 → CC-2.3; CC-6.1 → CC-6.2 → CC-6.3 → CC-6.5; CC-4.1 → CC-4.2 → CC-4.3; CC-5.2 gates CC-5.3, CC-5.4 & CC-5.5.
 
 ### Key files / components
 
@@ -580,8 +581,9 @@ As a community manager, I need queueing and audit controls so that flagged conte
 ### Success checkpoints
 
 - **Phase 1 complete:** Users can open the app (any language), see accurate weather + outfit cards, and use widgets/watch; telemetry reports activation and forecast metrics.
-- **Phase 2 complete:** Users can build wardrobes, subscribe, and engage with premium commerce experiences.
-- **Phase 3 complete:** Community feed live with moderated engagement, highlight modules, and social sharing.
+- **Phase 2 complete:** Community feed live with moderated engagement, highlight modules, and social sharing.
+- **Phase 3 complete:** Users can build wardrobes, subscribe, and engage with premium commerce experiences.
+- **Checkpoint status (2026-09-05):** the Phase 3 checkpoint is met while the Phase 2 checkpoint is open, because Epics 4 and 5 shipped ahead of their label (see the delivery note under Phase roadmap). Epic 6 is in progress, and Community Beta opens only on the signed safety gate recorded in `_bmad-output/project-knowledge/couturecast_roadmap.md`.
 
 ---
 
@@ -591,7 +593,7 @@ As a community manager, I need queueing and audit controls so that flagged conte
 - **Stories:** 41 (12 Epic 0 infrastructure + 29 feature stories)
 - **Parallel-ready stories:** 9 (post-Epic 0 completion)
 - **Sequential dependency chains:** Epic 0 → all other epics (critical path); 6 primary chains within feature epics
-- **Estimated cadence:** Sprint 0 (Epic 0 foundation), Phase 1 (~2 sprints for Epics 1-3), Phase 2 (~2 sprints for Epics 4-5), Phase 3 (~2 sprints for Epic 6)
+- **Estimated cadence:** Sprint 0 (Epic 0 foundation), Phase 1 (~2 sprints for Epics 1-3), Phase 2 (~2 sprints for Epic 6), Phase 3 (~2 sprints for Epics 4-5)
 - **Total Duration:** ~7-8 sprints (Sprint 0 + 6-7 feature sprints = 14-16 weeks / 3.5-4 months)
 
 **Epic 0 (Sprint 0) Completion Criteria:**

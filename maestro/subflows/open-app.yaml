@@ -245,6 +245,50 @@ appId: ${MAESTRO_APP_ID}
     point: '50%,10%'
     label: 'Absorb a sheet that rose after the first absorb tap'
 
+# Recover from an absorb tap that took the app off screen.
+#
+# The two taps above are BLIND coordinate taps — they have to be, because the
+# Expo Go developer sheet is drawn outside the app's hierarchy and Maestro cannot
+# see it to guard on. The comment above calls `50%,10%` inert on the screen this
+# subflow lands on, and on a fast device it is. On a contended one it is not:
+# measured on 2026-09-05 across four parallel Android emulators running flows at
+# 4-5x their recorded durations, the per-step hierarchy dumps show the app fully
+# present at the step before these taps (`host.exp.exponent`,
+# `hero-experience-scrollview`, `mobile-chip-navigation`, `tab-home`) and, three
+# minutes later at the assertion below, NOTHING but `com.android.systemui` and
+# its notification entries. Nothing runs between them except the absorb taps.
+# Five flows across three shards and four unrelated stories failed that way in
+# one run, which is what made it a harness problem rather than four flow bugs.
+#
+# Removing the absorb taps is not the fix: they are load-bearing for a sheet that
+# eats the first real gesture of any flow that meets it, and trading a known
+# failure for an unknown one is a bad trade. So the taps stay and their known
+# side effect is recovered from instead — a stray tap now costs one re-entry
+# rather than the whole flow.
+#
+# Guarded on `tab-home`, so this is a no-op on the healthy path and never fires a
+# stray gesture. `back` is Android-only for the reason stated further up: its iOS
+# implementation is an empty method that reports COMPLETED without touching the
+# device. On Android it is the system BACK key, which is also what dismisses a
+# notification shade.
+- runFlow:
+    when:
+      notVisible:
+        id: 'tab-home'
+    commands:
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - back
+      - waitForAnimationToEnd
+      - openLink: ${APP_URL}
+      - extendedWaitUntil:
+          visible:
+            id: 'tab-home'
+          timeout: 30000
+          label: 'Recovered the app after an absorb tap left it'
+
 - assertVisible:
     id: 'tab-home'
     label: 'Still on the app after the absorb taps'

@@ -4,7 +4,6 @@ import { getSavedSettings, saveSettings } from './settings-storage'
 
 const settingsFile = 'couture-cast-settings.json'
 
-/** Swaps `globalThis.localStorage` out and hands back a restore function. */
 function withoutLocalStorage() {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
   Object.defineProperty(globalThis, 'localStorage', {

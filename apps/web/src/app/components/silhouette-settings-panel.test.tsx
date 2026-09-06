@@ -53,11 +53,6 @@ function renderPanel(props: React.ComponentProps<typeof SilhouetteSettingsPanel>
   )
 }
 
-/**
- * Confirms the basewear checkbox, clicks "Upload a full-body photo", then
- * selects a file. Shared by every My Form upload test (3+ uses), per the
- * project's fixture-extraction convention.
- */
 async function confirmAndStartMyFormUpload(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByLabelText(CONFIRM_CHECKBOX_LABEL))
   await user.click(screen.getByRole('button', { name: 'Upload a full-body photo' }))

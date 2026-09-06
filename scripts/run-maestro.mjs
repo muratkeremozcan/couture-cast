@@ -3014,6 +3014,17 @@ const buildMaestroFlowEnvArgs = () => [
  * @param {string[]} flowFailures collected in place
  * @returns {void}
  */
+/**
+ * Flows observed to pass, by name or path, so `finishSuite` can COUNT passes
+ * rather than infer them by subtraction.
+ *
+ * Module scope rather than threaded through four call sites: both the sharded
+ * and the serial recorders below write to it, and `run()` clears it once at the
+ * start. A Set because the two passes can both report a flow and it must not be
+ * counted twice.
+ */
+const flowPasses = new Set()
+
 const recordShardedSuiteOutcome = (
   report,
   reportPath,
@@ -3034,6 +3045,7 @@ const recordShardedSuiteOutcome = (
     log(`FAIL ${name} was skipped and asserted nothing`)
   }
   for (const name of report.passed) {
+    flowPasses.add(name)
     log(`PASS ${name}`)
   }
 
@@ -3305,12 +3317,14 @@ const recordSingleFlowOutcome = (flowPath, maestroExitError, flowFailures) => {
       )
       log(`FAIL ${flowPath} (non-zero exit, clean report)`)
     } else {
+      flowPasses.add(flowPath)
       log(`PASS ${flowPath}`)
     }
   } else if (maestroExitError) {
     flowFailures.push(flowPath)
     log(`FAIL ${flowPath} (${maestroExitError.message})`)
   } else {
+    flowPasses.add(flowPath)
     log(`PASS ${flowPath}`)
   }
 }
@@ -3679,14 +3693,36 @@ const run = async () => {
     // the state of the other seventeen and made a full pass take one boot per
     // flow, so failures are collected and rethrown as one summary at the end.
     const flowFailures = []
+    flowPasses.clear()
 
     /**
      * @param {string[]} failures
      * @returns {void}
      */
     const finishSuite = (failures) => {
-      const passedCount = flowsToRun.length - failures.length
-      log(`Maestro suite: ${passedCount}/${flowsToRun.length} flows passed`)
+      /*
+       * COUNTED, NOT SUBTRACTED. This used to report
+       * `flowsToRun.length - failures.length`, which is a number nobody
+       * measured: a `failures` entry can describe something other than one
+       * flow (the missing-flow guard pushes a single entry covering N flows),
+       * so the subtraction drifts from reality in both directions. One local
+       * run printed "14/21 flows passed" while the JUnit report described 17
+       * cases with 3 failures.
+       *
+       * `flowPasses` is incremented once per flow that actually passed, so the
+       * line now states something that was observed. The two counts are printed
+       * together when they disagree, because a discrepancy is itself a finding:
+       * it means flows neither passed nor produced a recorded failure.
+       */
+      const accounted = flowPasses.size + failures.length
+      log(`Maestro suite: ${flowPasses.size}/${flowsToRun.length} flows passed`)
+      if (accounted !== flowsToRun.length) {
+        log(
+          `Maestro suite: ${flowsToRun.length - accounted} flow(s) neither passed nor ` +
+            `recorded a failure (passed ${flowPasses.size}, failures ${failures.length}, ` +
+            `ran ${flowsToRun.length})`
+        )
+      }
       if (failures.length > 0) {
         throw new Error(
           `${failures.length} Maestro flow(s) failed:\n  ${failures.join('\n  ')}`

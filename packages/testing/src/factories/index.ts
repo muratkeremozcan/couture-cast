@@ -95,6 +95,26 @@ export {
   persistPlannerDayPlan,
 } from './planner.factory.js'
 export {
+  buildCommunityAliasCreateInput,
+  buildCommunityChallengeCreateInput,
+  buildCommunityModerationOutboxCreateInput,
+  buildCommunityObjectPath,
+  COMMUNITY_OBJECT_PATH_PATTERN,
+  communityObjectPathContainsIdentifier,
+  buildCommunityPostReportCreateInput,
+  buildLookbookPostCreateInput,
+  createCommunityAlias,
+  createCommunityChallenge,
+  createCommunityModerationOutbox,
+  createCommunityPostReport,
+  createLookbookPost,
+  persistCommunityAlias,
+  persistCommunityChallenge,
+  persistCommunityModerationOutbox,
+  persistCommunityPostReport,
+  persistLookbookPost,
+} from './community.factory.js'
+export {
   DEFAULT_FACTORY_REGISTRY_KEYS,
   createFactoryRegistry,
   factoryRegistry,
@@ -207,3 +227,16 @@ export type {
   PlannerDayPlanFactoryOverrides,
   PlannerDayPlanFixture,
 } from './planner.factory.js'
+export type {
+  CommunityAliasFactoryOverrides,
+  CommunityAliasFixture,
+  CommunityChallengeFactoryOverrides,
+  CommunityChallengeFixture,
+  CommunityFactoryOptions,
+  CommunityModerationOutboxFactoryOverrides,
+  CommunityModerationOutboxFixture,
+  CommunityPostReportFactoryOverrides,
+  CommunityPostReportFixture,
+  LookbookPostFactoryOverrides,
+  LookbookPostFixture,
+} from './community.factory.js'

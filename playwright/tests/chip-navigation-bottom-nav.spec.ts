@@ -2,9 +2,13 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
 // Learning path Step 28: Accessibility hardening.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
-// Story 3.6 Task 6 step 1 owner: E2E test sticky bottom nav viewport visibility, chip keyboard navigation, and reduced motion in playwright/tests/chip-navigation-bottom-nav.spec.ts
-import { test, expect } from '../support/fixtures/merged-fixtures'
+import { communityTest as test, expect } from '../support/helpers/community-session'
 
+/**
+ * This file asserts the chip's effect on `data-chip-category`, which lives on
+ * `community-card-grid`, and that grid renders only for a signed-in reader. See
+ * `support/helpers/community-session.ts`.
+ */
 test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
   test.beforeEach(({ interceptNetworkCall }) => {
     void interceptNetworkCall({
@@ -71,7 +75,13 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
     await expect(personalChip).toHaveAttribute('aria-pressed', 'true')
     await expect(communityChip).toHaveAttribute('aria-pressed', 'false')
     await expect(heroTitle).toHaveText('Double-Breasted Blazer & Silk Knit')
-    await expect(page.getByText('Milan Autumn Wool Trench')).toBeVisible()
+    // Story 6.1 removed `MOCK_LOOKBOOK_ITEMS`, so no hardcoded look renders for any
+    // chip. `data-chip-category` carries the chip's observable effect on the grid,
+    // which is what this step is about.
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'data-chip-category',
+      'Personal'
+    )
 
     await chipBar.evaluate((element) => {
       const top = element.getBoundingClientRect().top + window.scrollY
@@ -82,8 +92,11 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
       (y) => y !== undefined && y <= 1
     )
 
+    // Story 6.1 renamed this landmark: its `aria-label` is
+    // `t('community.filters.label')`, "Community filters" in en-US, because the nav
+    // it labels is the climate-band filter set.
     const lookbookFilters = page.getByRole('navigation', {
-      name: 'Lookbook Filters',
+      name: 'Community filters',
     })
     await recurse(
       async () => {
@@ -101,7 +114,8 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
     await expect(communityChip).toHaveAttribute('aria-pressed', 'true')
     await expect(personalChip).toHaveAttribute('aria-pressed', 'false')
     await expect(heroTitle).toHaveText('Parisian Silk & Cashmere Blend')
-    await expect(page.getByText('Parisian Silk & Cashmere Blend').last()).toBeVisible()
+    // The `.last()` copy of this string was a mock community card. Only the hero
+    // renders it now, and the line above already asserts that.
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'data-chip-category',
       'Community'
@@ -134,8 +148,12 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
       'rgb(201, 161, 74) 0px 0px 0px 4px'
     )
 
+    // The roving-tabindex contract: one Tab exits the whole chip group. Asserting
+    // it directly, without naming whatever button sits after the group, survives a
+    // rename. `accessibility-hardening.spec.ts` states the same contract the same
+    // way.
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('button', { name: 'New' })).toBeFocused()
+    await expect(page.locator(':focus')).not.toHaveAttribute('data-testid', /chip-/)
   })
 
   test('3.6-E2E-004: respects prefers-reduced-motion media feature', async ({ page }) => {

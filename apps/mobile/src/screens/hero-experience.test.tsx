@@ -26,7 +26,6 @@ vi.mock('expo-router', () => ({
   useRouter: () => mockRouter,
 }))
 
-// Mock analytics hook
 const mockCapture = vi.fn()
 const mockGetDistinctId = vi.fn(() => 'test-user-id')
 vi.mock('@/src/analytics/mobile-analytics', () => ({
@@ -59,12 +58,10 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
   it('displays skeleton state while loading and then loads current weather, 48-hour ribbon, and morning outfit card', async () => {
     await render(<TabOneScreen />)
 
-    // Verify skeleton loaders are visible initially
     expect(screen.getByTestId('weather-header-skeleton')).toBeTruthy()
     expect(screen.getByTestId('hourly-forecast-ribbon-skeleton')).toBeTruthy()
     expect(screen.getByTestId('outfit-recommendation-card-skeleton')).toBeTruthy()
 
-    // Wait for the happy-path rendering to load
     await waitFor(() => {
       expect(screen.getByTestId('weather-header')).toBeTruthy()
     })
@@ -74,21 +71,17 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       'Clear Sky and 70 degrees Fahrenheit'
     )
 
-    // Verify temperature display
     expect(screen.getByTestId('current-temperature').textContent).toBe('70°F')
     expect(screen.getByText('Clear Sky')).toBeTruthy()
 
-    // Verify hourly forecast is present (default shows 8 items)
     expect(screen.getByTestId('hourly-forecast-ribbon')).toBeTruthy()
     const hourlyItems = screen.getAllByTestId('hourly-item')
     expect(hourlyItems.length).toBe(8)
 
-    // Verify default morning outfit card comfort notes
     expect(
       screen.getByText('Mild morning with gentle winds. Trench coat recommended.')
     ).toBeTruthy()
 
-    // Verify garment tiles are rendered
     expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     expect(screen.getByText('Navy Chinos')).toBeTruthy()
     expect(screen.getByTestId('garment-tile-classic-trench-coat')).toHaveAttribute(
@@ -96,10 +89,8 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       'Classic Trench Coat: outerwear'
     )
 
-    // Verify reasoning badges are rendered
     expect(screen.getByText('Breeze Guard')).toBeTruthy()
 
-    // Verify initial telemetry tracked
     expect(mockCapture).toHaveBeenCalledWith('tab_one_viewed')
     expect(mockCapture).toHaveBeenCalledWith('ritual_created', expect.any(Object))
   })
@@ -111,17 +102,15 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       expect(screen.getByTestId('weather-header')).toBeTruthy()
     })
 
-    // Click "Evening plans" toggle
     const eveningToggle = screen.getByTestId('scenario-toggle-evening')
     fireEvent.click(eveningToggle)
 
-    // Verify outfit card changes
     expect(screen.getByText('Cool evening ahead. Sweater recommended.')).toBeTruthy()
     expect(screen.getByText('Crewneck Sweater')).toBeTruthy()
 
-    // Verify telemetry interaction captured. Not "last called": the morning
-    // card's affiliate impression is emitted from a passive effect, which can
-    // flush after this click, and ordering between the two is not a contract.
+    // Asserted with `toHaveBeenCalledWith`: the morning card's affiliate impression
+    // is emitted from a passive effect that can flush after this click, so the order
+    // of the two is not a contract.
     expect(mockCapture).toHaveBeenCalledWith('hero_interaction', {
       interactionType: 'scenario_toggle',
       scenario: 'evening',
@@ -160,20 +149,16 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     const expandButton = screen.getByTestId('ribbon-expand-toggle')
     expect(expandButton.textContent).toBe('Expand (48h)')
 
-    // Click expand
     fireEvent.click(expandButton)
 
-    // Verify items display all 48 entries
     expect(screen.getAllByTestId('hourly-item').length).toBe(48)
     expect(expandButton.textContent).toBe('Collapse')
 
-    // Verify telemetry
     expect(mockCapture).toHaveBeenCalledWith('hero_interaction', {
       interactionType: 'ribbon_toggle',
       isExpanded: true,
     })
 
-    // Click collapse
     fireEvent.click(expandButton)
     expect(screen.getAllByTestId('hourly-item').length).toBe(8)
   })
@@ -185,12 +170,10 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     })
 
-    // Click swap on trench coat
     const swapButton = screen.getByTestId('garment-tile-classic-trench-coat')
     swapButton.focus()
     fireEvent.click(swapButton)
 
-    // Verify modal is visible
     expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
     expect(screen.getByTestId('garment-swap-modal')).toHaveAttribute('role', 'dialog')
     expect(screen.getByTestId('garment-swap-modal')).toHaveAttribute('aria-modal', 'true')
@@ -200,18 +183,15 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       expect(screen.getByTestId('swap-option-classic-trench-coat')).toHaveFocus()
     })
 
-    // Choose 'Leather Jacket'
     const leatherJacketOption = screen.getByTestId('swap-option-leather-jacket')
     fireEvent.click(leatherJacketOption)
 
-    // Verify garment is updated in view
     expect(screen.queryByText('Classic Trench Coat')).toBeNull()
     expect(screen.getByText('Leather Jacket')).toBeTruthy()
     await waitFor(() => {
       expect(screen.getByTestId('garment-tile-leather-jacket')).toHaveFocus()
     })
 
-    // Verify telemetry
     expect(mockCapture).toHaveBeenLastCalledWith('hero_interaction', {
       interactionType: 'garment_swap',
       scenario: 'morning',
@@ -220,13 +200,12 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
   })
 
   it('verifies offline fallback banner and stale state display when API request fails', async () => {
-    // Populate the cache with a stale entry (older than 15 mins)
+    // Older than the 15-minute freshness window.
     await saveRitualCache('test-user-id', 'en-US', {
       data: mockRitualResponse,
       timestamp: Date.now() - 20 * 60 * 1000, // 20 minutes ago (stale!)
     })
 
-    // Now fail the API and render
     server.use(
       http.get('*/api/v1/ritual', () => {
         return new HttpResponse(null, { status: 500 })
@@ -235,7 +214,6 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
     await render(<TabOneScreen />)
 
-    // Verify it loads from cache and displays the stale banner
     await waitFor(() => {
       expect(screen.getByTestId('stale-cache-banner')).toBeTruthy()
     })
@@ -306,7 +284,6 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
   })
 
   it('displays Merlot warning banner when weather alerts are active', async () => {
-    // Use custom MSW mock containing weather alerts
     server.use(
       http.get('*/api/v1/ritual', () => {
         return HttpResponse.json({

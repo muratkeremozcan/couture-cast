@@ -6,7 +6,7 @@
 // this module classifies: a screen test would need an extra render per edge case for
 // branches that have nothing to do with rendering. Everything here is asserted through
 // MSW against the real generated client, the way `premium-theme.test.ts` and
-// `commerce.test.ts` cover their own boundaries -- the failure taxonomy is only worth
+// `commerce.test.ts` cover their own boundaries: the failure taxonomy is only worth
 // anything if the status codes really map onto it.
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -245,7 +245,7 @@ describe('mobile planner boundary', () => {
      * A network-level failure (DNS, offline, a dropped connection) never reaches
      * the generated client's status-code handling at all: `fetch` itself rejects,
      * with whatever `AbortSignal.reason` was in play. This is the module's
-     * catch-all path -- distinct from every case above, which all rejected with a
+     * catch-all path, distinct from every case above, which all rejected with a
      * `ResponseError` wrapping a real HTTP response.
      */
     it('5.5-MOB-LIB-11 classifies a transport failure as unknown and keeps an Error message', async () => {
@@ -261,7 +261,7 @@ describe('mobile planner boundary', () => {
     })
 
     /**
-     * The same catch-all path, but the rejection value itself is not an `Error` --
+     * The same catch-all path, but the rejection value itself is not an `Error`:
      * an aborted request whose caller supplied a plain reason, for instance. The
      * module must not assume `.message` exists on whatever it catches.
      */

@@ -583,5 +583,172 @@
         "cta": "Get Premium"
       }
     }
+  },
+  "community": {
+    "title": "Community",
+    "heading": "Living community lookbook",
+    "sectionLabel": "Community lookbook",
+    "inspirations": "Community inspirations",
+    "share": "Share your look",
+    "newPost": "New post",
+    "deepLink": {
+      "invalid": "This link is invalid, expired, or no longer available."
+    },
+    "filters": {
+      "label": "Community filters",
+      "announce": "Showing {{filter}} looks.",
+      "mode": {
+        "auto": "Your climate",
+        "autoWithBand": "Your climate: {{band}}",
+        "all": "Every climate",
+        "cold_dry": "Cold and dry",
+        "cold_wet": "Cold and wet",
+        "temperate_dry": "Temperate and dry",
+        "temperate_wet": "Temperate and wet",
+        "warm_dry": "Warm and dry",
+        "warm_wet": "Warm and wet"
+      }
+    },
+    "band": {
+      "cold_dry": "Cold and dry",
+      "cold_wet": "Cold and wet",
+      "temperate_dry": "Temperate and dry",
+      "temperate_wet": "Temperate and wet",
+      "warm_dry": "Warm and dry",
+      "warm_wet": "Warm and wet",
+      "unclassified": "All weather",
+      "unresolved": {
+        "no_location": "Add a location to see looks matched to your climate. Until then you are seeing every climate band.",
+        "weather_unavailable": "Your local forecast is unavailable, so you are seeing looks from every climate band.",
+        "weather_stale": "Your local forecast is out of date, so you are seeing looks from every climate band.",
+        "weather_malformed": "Your local forecast could not be read, so you are seeing looks from every climate band.",
+        "insufficient_usable_days": "There is not enough recent forecast data to match your climate, so you are seeing looks from every climate band."
+      }
+    },
+    "feed": {
+      "loading": "Loading community looks",
+      "announceLoaded": "Showing {{filter}} looks. {{count}} loaded.",
+      "announceLoadedMore": "Loaded {{count}} more looks.",
+      "announceFocused": "Focused on the highlighted look.",
+      "emptyTitle": "No looks shared here yet",
+      "emptyBody": "Be the first style explorer to share a weather-ready look.",
+      "errorTitle": "We could not load the community feed.",
+      "retry": "Try again",
+      "loadMore": "Load more looks",
+      "loadingMore": "Loading",
+      "yourPostsTitle": "Your looks in progress",
+      "yourPostsBody": "Only you can see these until screening finishes."
+    },
+    "card": {
+      "label": "Look by {{author}}",
+      "authorSelf": "You",
+      "authorFallback": "Style explorer",
+      "imageUnavailable": "Image unavailable",
+      "imageRetry": "Reload image",
+      "report": "Report",
+      "reported": "Reported",
+      "withdraw": "Withdraw",
+      "sponsored": "Sponsored",
+      "sponsoredAnnounce": "Sponsored look"
+    },
+    "status": {
+      "draft": "Draft",
+      "uploading": "Uploading",
+      "pending_review": "Under review",
+      "published": "Published",
+      "flagged": "Removed by moderation",
+      "review_failed": "Screening did not finish",
+      "withdrawn": "Withdrawn",
+      "consent_suspended": "Hidden pending consent",
+      "reason": "Reason: {{reason}}"
+    },
+    "removed": {
+      "flagged": "Moderation removed this look. Nobody else can see it.",
+      "review_failed": "Screening did not finish, so this look was not published. Share it again to retry.",
+      "withdrawn": "You withdrew this look from the feed.",
+      "consent_suspended": "This look is hidden until a guardian renews consent. Share it again once consent is active."
+    },
+    "challenge": {
+      "eyebrow": "Weekly style challenge",
+      "allClimates": "Every climate",
+      "participate": "Participate",
+      "participateLabel": "Participate in {{title}}",
+      "activeThisWeek": "Active this week",
+      "dateRange": "{{start}} to {{end}}"
+    },
+    "report": {
+      "title": "Report this look",
+      "description": "Help keep the community safe. Choose a reason and a moderator will review it.",
+      "reasonLabel": "Reason for the report",
+      "detailsLabel": "More detail (optional)",
+      "detailsPlaceholder": "Describe how this look breaks the community guidelines",
+      "detailsCount": "{{count}} of 500 characters",
+      "submit": "Submit report",
+      "submitting": "Submitting",
+      "cancel": "Cancel",
+      "close": "Close the report dialog",
+      "success": "Thank you. A moderator will review this look.",
+      "reason": {
+        "spam": "Spam or misleading",
+        "harassment": "Harassment or bullying",
+        "inappropriate_content": "Inappropriate content",
+        "hate_speech": "Hate speech",
+        "violence": "Violence or harmful content",
+        "other": "Something else"
+      }
+    },
+    "compose": {
+      "title": "Share your look",
+      "description": "Every look is screened automatically before it reaches the feed.",
+      "close": "Close without sharing",
+      "photoLabel": "Photo",
+      "photoHint": "JPEG, PNG or WebP, up to 10 MB and at least 256 pixels on each side.",
+      "choosePhoto": "Choose a photo",
+      "changePhoto": "Change photo",
+      "preview": "Preview of the look you are about to share",
+      "altLabel": "Image description",
+      "altHint": "Describe the garments, layers and colours for members using a screen reader.",
+      "altPlaceholder": "Describe the garments, layers and colours",
+      "altSuggested": "We suggested a description. Edit it so it matches your photo.",
+      "altConfirm": "I confirm this description matches the photo",
+      "captionLabel": "Caption (optional)",
+      "captionPlaceholder": "Notes on the weather, the fabrics or the styling",
+      "captionCount": "{{count}} of 280 characters",
+      "challengeLabel": "Weekly challenge",
+      "challengeNone": "No challenge",
+      "publish": "Publish",
+      "publishing": "Screening and publishing",
+      "uploading": "Uploading your photo",
+      "cancel": "Cancel",
+      "success": "Your look was submitted for review."
+    },
+    "validation": {
+      "photoRequired": "Choose a photo to share.",
+      "altRequired": "Add an image description.",
+      "altConfirmRequired": "Confirm the image description before publishing.",
+      "captionTooLong": "Keep the caption to 280 characters or fewer.",
+      "captionUrl": "The caption cannot contain links.",
+      "captionEmail": "The caption cannot contain email addresses.",
+      "imageTooSmall": "Choose an image at least 256 pixels wide and tall.",
+      "permissionDenied": "CoutureCast needs access to your photos to share a look.",
+      "pickerFailed": "The photo picker could not open."
+    },
+    "error": {
+      "load": "We could not load the community feed.",
+      "report": "We could not send your report.",
+      "withdraw": "We could not withdraw this look. It is still in the feed.",
+      "publish": "We could not publish your look.",
+      "upload": "Your photo could not be uploaded, so nothing was published. Try again.",
+      "signedOut": "Sign in to take part in the community.",
+      "ageGate": "You need to be at least 13 to post to the community.",
+      "rateLimited": "You have reached today's limit of ten looks.",
+      "rateLimitedUntil": "You have reached today's limit of ten looks. Try again after {{time}}.",
+      "reasonChanged": "You already reported this look for a different reason.",
+      "selfReport": "You cannot report your own look.",
+      "notFound": "This look is no longer available.",
+      "disabled": "The community feed is temporarily unavailable.",
+      "mediaUnavailable": "This look is temporarily unavailable. Try again shortly.",
+      "generic": "Something went wrong. Try again."
+    }
   }
 }

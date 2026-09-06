@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-09-04
+last_updated: 2026-09-05
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -79,14 +79,14 @@ development_status:
   3-7-widget-notification-deep-link-handling: done
   3-8-accessibility-hardening: done
 
-  # Epic 4: Wardrobe Capture & Closet Tools (Phase 2)
+  # Epic 4: Wardrobe Capture & Closet Tools (Phase 3)
   epic-4: done
   4-1-garment-capture-flow: done
   4-2-smart-tagging-comfort-metadata: done
   4-3-outfit-capsule-builder: done
   4-4-wardrobe-onboarding-silhouette-setup: done
 
-  # Epic 5: Commerce & Premium Enhancements (Phase 2)
+  # Epic 5: Commerce & Premium Enhancements (Phase 3)
   epic-5: done
   5-1-affiliate-shop-this-look-cta: done
   5-2-premium-subscription-lifecycle: done
@@ -94,9 +94,9 @@ development_status:
   5-4-color-palette-beauty-accessory-advisor: done
   5-5-premium-7-day-outfit-planner: done
 
-  # Epic 6: Community & Moderation Loop (Phase 3)
-  epic-6: backlog
-  6-1-community-feed-by-climate-band: backlog
+  # Epic 6: Community & Moderation Loop (Phase 2)
+  epic-6: in-progress
+  6-1-community-feed-by-climate-band: done
   6-2-reactions-and-comments: backlog
   6-3-locale-highlight-modules: backlog
   6-4-social-export-workflows: backlog

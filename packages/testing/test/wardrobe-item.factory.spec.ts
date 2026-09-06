@@ -59,8 +59,6 @@ describe('wardrobe item factory', () => {
   })
 
   it('keeps an explicitly supplied storage path', () => {
-    // Callers pinning a specific path (a legacy or migrated object) must win
-    // over the derived default.
     const item = createWardrobeItem({
       id: 'garment-2',
       userId: 'user-123',

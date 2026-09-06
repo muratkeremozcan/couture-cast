@@ -20,6 +20,7 @@
  * exactly the connection strings they were given.
  */
 
+import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 
@@ -80,4 +81,78 @@ export function applyLocalE2eDatabaseUrl(env = process.env, { repoRootToScan } =
 
 function hasRootEnvFile(repoRoot) {
   return ROOT_ENV_FILES.some((file) => existsSync(path.join(repoRoot, file)))
+}
+
+/**
+ * The local Supabase Storage credentials, resolved the same way CI resolves them.
+ *
+ * WHY THIS EXISTS. The community seed uploads a placeholder object per seeded post,
+ * because a `LookbookPost` row whose object is missing does not render as a broken
+ * image: the feed drops it silently, and `GET /feed` answers `200 items: []` while
+ * the rows sit in the database. So the seed now fails loudly without storage
+ * credentials rather than writing rows it cannot back.
+ *
+ * CI already has them. `.github/actions/start-local-supabase` exports `SUPABASE_URL`
+ * and `SUPABASE_SERVICE_ROLE_KEY` into `$GITHUB_ENV`, and every workflow that runs
+ * `db:reset` uses that action first. A developer running `npm run db:reset` in a
+ * fresh shell had no equivalent, so the loud failure was correct and also new
+ * friction for the one audience that cannot read `$GITHUB_ENV`.
+ *
+ * These come from `supabase status`, which reads them out of the running container.
+ * They are throwaway credentials for a local stack whose keys are fixed defaults,
+ * which is why CI prints them in plain text too.
+ *
+ * SAFETY. Same contract as `applyLocalE2eDatabaseUrl` above: only ever fills in
+ * values that are missing, and only for a run that has already declared itself
+ * local or test. Anything already in the environment always wins, so CI, preview
+ * and production keep exactly the credentials they were given. Note this
+ * deliberately does NOT read the repo-level `.env` files: a stale
+ * `SUPABASE_SERVICE_ROLE_KEY` in one of them is a value that is present and wrong,
+ * which this cannot help with and must not paper over.
+ */
+export const LOCAL_SUPABASE_ENV_KEYS = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']
+
+export function applyLocalSupabaseStorageEnv(env = process.env, { runner } = {}) {
+  const missing = LOCAL_SUPABASE_ENV_KEYS.filter(
+    (key) => !(env[key] && env[key].trim().length > 0)
+  )
+  if (missing.length === 0) {
+    return { applied: false, reason: 'already-set' }
+  }
+  if (!isLocalTestRun(env)) {
+    return { applied: false, reason: 'not-a-local-run' }
+  }
+
+  const status = (runner ?? readSupabaseStatus)()
+  if (status === null) {
+    return { applied: false, reason: 'supabase-status-unavailable', missing }
+  }
+
+  const resolved = {
+    SUPABASE_URL: status.API_URL,
+    SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
+  }
+  const stillMissing = missing.filter((key) => !resolved[key])
+  if (stillMissing.length > 0) {
+    return { applied: false, reason: 'supabase-status-incomplete', missing: stillMissing }
+  }
+
+  for (const key of missing) {
+    env[key] = resolved[key]
+  }
+  return { applied: true, keys: missing }
+}
+
+function readSupabaseStatus() {
+  try {
+    const raw = execFileSync('npx', ['supabase', 'status', '-o', 'json'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    return JSON.parse(raw)
+  } catch {
+    // The stack is not running, or the CLI is absent. Either way the caller's own
+    // loud failure is the right next step; a guess here would be worse.
+    return null
+  }
 }

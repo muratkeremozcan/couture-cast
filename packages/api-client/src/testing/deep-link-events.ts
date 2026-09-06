@@ -23,6 +23,6 @@ export function createCommunityPolledEvent(postId: string, userId: string) {
   return polledEvent(`event-${postId}`, 'lookbook:new', userId, {
     postId,
     locale: 'en-US',
-    climateBand: 'Rain-ready',
+    climateBand: 'cold_wet',
   })
 }

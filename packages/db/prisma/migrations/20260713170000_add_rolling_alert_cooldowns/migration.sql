@@ -38,7 +38,34 @@ SET "reservation_started_at" = envelope."created_at"
 FROM public."EventEnvelope" AS envelope
 WHERE envelope."id" = outbox."event_id";
 
-CREATE INDEX "AlertDeliveryOutbox_deduplication_key_reservation_started_at_idx"
+-- This index name was edited on 2026-09-05, after this migration had already
+-- been applied everywhere. Editing an applied migration is normally forbidden,
+-- so here is why this one is safe, for whoever finds it next.
+--
+-- The name originally written here was
+-- `AlertDeliveryOutbox_deduplication_key_reservation_started_at_idx`, which is
+-- 64 bytes. PostgreSQL truncates identifiers at 63 and does not warn, so what
+-- it actually created -- in every database that ever ran this migration --
+-- was `..._reservation_started_at_id`, one byte shorter, with the `_idx`
+-- suffix cut off. The name below is that truncated name, spelled out.
+--
+-- So the edit is a catalog no-op: applying either text produces the
+-- byte-identical index, and every environment that applied the old text is
+-- already in exactly the state the new text produces. That is a fact about
+-- PostgreSQL rather than about any tool, and it is what makes this safe
+-- independent of how a future Prisma version treats a changed checksum. (For
+-- the record, 6.19.0 tolerates it: `migrate deploy` and `migrate status` both
+-- exit 0 against a database holding the old checksum, verified against an
+-- isolated database seeded with the pre-edit history.)
+--
+-- It was edited rather than left alone because the two truncations disagreed.
+-- Prisma derives its own 63-byte form of the same logical name and keeps the
+-- `_idx` suffix instead of dropping it, so `prisma migrate diff` reported a
+-- phantom rename on every clean checkout. `schema.prisma` now pins the real
+-- name with `map:`, and `packages/db/test/migration-hygiene.spec.ts`
+-- (DB-HYGIENE-01) fails on any future identifier over 63 bytes so this cannot
+-- recur silently.
+CREATE INDEX "AlertDeliveryOutbox_deduplication_key_reservation_started_at_id"
   ON public."AlertDeliveryOutbox"("deduplication_key", "reservation_started_at");
 
 REVOKE ALL ON TABLE public."AlertCooldownReservation" FROM PUBLIC, anon, authenticated;

@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
+import type { ClimateBand } from '@couture/api-client/contracts/http'
 import posthog from 'posthog-js'
 import { I18nextProvider } from 'react-i18next'
 import { getI18n } from '../../i18n'
@@ -16,10 +17,17 @@ import type { ChipCategory } from './chip-navigation'
 import { StickyBottomNav } from './sticky-bottom-nav'
 import { InfoBanner } from './info-banner'
 
+/**
+ * Story 6.1: every chip category lands on the `auto` feed.
+ *
+ * The chip category still drives the hero copy and `data-chip-category`; it no
+ * longer selects a feed filter, because `New`, `Following` and `Brands` were
+ * chips with no server behind them and the spec's Boundaries forbid that.
+ */
 const CHIP_DEFAULT_FILTER: Record<ChipCategory, FilterCategory> = {
-  Personal: 'New',
-  Community: 'Following',
-  Sponsored: 'Brands',
+  Personal: 'auto',
+  Community: 'auto',
+  Sponsored: 'auto',
 }
 
 /**
@@ -31,8 +39,8 @@ const CHIP_DEFAULT_FILTER: Record<ChipCategory, FilterCategory> = {
  * read `'Sponsored Selection'` over `'A clearly labeled brand selection...'`,
  * which is a paid-placement disclosure attached to content with no partner
  * behind it and no `AffiliateOffer` row anywhere near it. It was reachable in
- * ordinary use: `CHIP_DEFAULT_FILTER.Sponsored` is a real chip, and
- * `deep-link-handler.ts` routes the `evening` deep link straight to it.
+ * ordinary use: `Sponsored` is a real chip category, and `deep-link-handler.ts`
+ * routes the `evening` deep link straight to it.
  *
  * The vocabulary for genuine paid placement is owned by story 5.1 and lives in
  * the `commerce.shopThisLook.*` catalog keys — "Paid partnership. CoutureCast
@@ -41,10 +49,17 @@ const CHIP_DEFAULT_FILTER: Record<ChipCategory, FilterCategory> = {
  * Placeholder copy borrowing that language is the inverse failure: a disclosure
  * with nothing to disclose, which is a claim rather than a caveat.
  *
- * So this entry describes the view a reader selected — brand-oriented looks,
- * matching the chip's own `Brands` filter — and says nothing about who paid for
- * it. `lookbook-prism-layout.test.tsx` asserts that, so restoring the old
- * wording turns a test red rather than shipping quietly.
+ * So this entry describes the view a reader selected, brand-oriented looks, and
+ * says nothing about who paid for it. `lookbook-prism-layout.test.tsx` asserts
+ * that, so restoring the old wording turns a test red rather than shipping
+ * quietly.
+ *
+ * Story 6.1 note: the chip category no longer selects a community feed filter.
+ * Every `CHIP_DEFAULT_FILTER` entry now maps to `auto`, because the four legacy
+ * filters (`New`, `Following`, `Near me`, `Brands`) had no server behavior and
+ * the spec forbids an active chip without one. The category still drives this
+ * hero copy and `data-chip-category`, which is why the disclosure rule above
+ * still governs it.
  */
 const HERO_RECOMMENDATIONS: Record<
   ChipCategory,
@@ -177,12 +192,25 @@ export function LookbookPrismLayout() {
   // state in an SSR'd component.
   const [isNarrowViewport, setIsNarrowViewport] = useState(false)
   const plannerOpenerRef = useRef<HTMLElement | null>(null)
-  const [activeTab, setActiveTab] = useState<FilterCategory>('New')
+  const [activeTab, setActiveTab] = useState<FilterCategory>('auto')
   const [chipCategory, setChipCategory] = useState<ChipCategory>('Personal')
+  // The grid is the only thing on this page that sees the feed response, and
+  // this slot renders a second `LookbookFilterNav` from the same filter state.
+  // Without lifting the resolved band, the two navs answer "which climate am I
+  // seeing" differently: the grid's names the band, this one says "Your climate".
+  const [viewerBand, setViewerBand] = useState<ClimateBand | null>(null)
+  // Same reason as `viewerBand`, for `mode`: the experiment can serve `all` to a
+  // viewer who requested `auto`, and without this the two navs would disagree
+  // about which chip is pressed. `null` until the grid's first response lands,
+  // so this nav starts by mirroring the click like the grid itself does.
+  const [servedMode, setServedMode] = useState<FilterCategory | null>(null)
 
   // Deep Link & Notification States
   const [isInvalidDeepLink, setIsInvalidDeepLink] = useState(false)
-  const invalidDeepLinkMessage = 'This link is invalid, expired, or no longer available.'
+  // Mobile routes the same string through `t('common.invalid_link')`; a `tr-TR`
+  // or `de-DE` reader saw English here on exactly the path the catalogs carry
+  // copy for.
+  const invalidDeepLinkMessage = i18n.t('community.deepLink.invalid')
   const [focusedWeatherAlert, setFocusedWeatherAlert] =
     useState<WeatherAlertDeepLinkTarget | null>(null)
   const [highlightedCardId, setHighlightedCardId] = useState<string | undefined>(
@@ -440,9 +468,10 @@ export function LookbookPrismLayout() {
           </div>
 
           <LookbookFilterNav
-            activeTab={activeTab}
+            activeTab={servedMode ?? activeTab}
             isMobilePreview={isMobilePreview}
             onTabChange={setActiveTab}
+            viewerBand={viewerBand}
           />
 
           {/* Outfit Tiles */}
@@ -541,6 +570,8 @@ export function LookbookPrismLayout() {
             isMobilePreview={isMobilePreview}
             chipCategory={chipCategory}
             highlightedCardId={highlightedCardId}
+            onViewerBandChange={setViewerBand}
+            onServedModeChange={setServedMode}
           />
         </section>
 

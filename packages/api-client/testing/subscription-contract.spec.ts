@@ -26,11 +26,8 @@ import * as subscriptionContractExports from '../src/contracts/http/subscription
  *
  * This suite asserts the PUBLISHED SHAPES only. Entitlement transitions,
  * webhook idempotency, and the kill-switch precedence are business rules proven
- * in the API unit and integration suites. What is proven here is what every
- * surface depends on and no runtime test would catch: that a `none` response
- * cannot smuggle entitlement fields, that an entitled response always carries
- * all of them, that the checkout request cannot widen, and that the error
- * envelopes carry messages, never machine-readable codes.
+ * in the API unit and integration suites. A green run here says nothing about
+ * them.
  */
 
 const entitledSubscription = {

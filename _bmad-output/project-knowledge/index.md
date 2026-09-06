@@ -1,5 +1,6 @@
 # CoutureCast project knowledge index
 
+Updated: 2026-09-06: added the verified portfolio and licensing handoff.
 Updated: 2026-07-17 - Removed redundant API and transitional ADR placeholders.
 
 ## Scan record
@@ -95,6 +96,8 @@ These files describe the repository state captured by the completed deep scan.
 
 ### Overview
 
+- [Portfolio and licensing update](./couturecast-portfolio-and-licensing-update.md) - verified scale,
+  public profile positioning, approved copy, and proprietary-source decision
 - [Project overview](./project-overview.md) - system summary, implemented scope, risks, and setup
 - [Source tree analysis](./source-tree-analysis.md) - current ownership, entry points, and boundaries
 - [Integration architecture](./integration-architecture.md) - cross-part and external data flows

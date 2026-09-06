@@ -6,7 +6,6 @@ import * as httpContracts from '../src/contracts/http'
 
 // Story follow-up owner: keep runtime-only contract invariants visible to consumers.
 //
-// Why this test exists:
 // `.refine()` / `.superRefine()` are opaque JavaScript callbacks. `zod-to-openapi`
 // cannot introspect them, so the rules they enforce never reach the published
 // OpenAPI document or the generated TypeScript types. A consumer building a fixture
@@ -94,8 +93,8 @@ const isSchema = (value: unknown): value is z.ZodTypeAny =>
   Boolean(value) && typeof value === 'object' && '_def' in (value as object)
 
 /**
- * Collects the child schemas of any zod node. Unknown node types simply yield
- * nothing, which keeps the walker from throwing as the contract surface grows.
+ * Unknown node types yield nothing, which keeps the walker from throwing as the
+ * contract surface grows.
  */
 function childrenOf(schema: z.ZodTypeAny): [string, z.ZodTypeAny][] {
   const def = defOf(schema)
@@ -206,8 +205,7 @@ test('the walker actually detects an undocumented refinement', () => {
 test('a shared refinement is still reported when only one path documents it', () => {
   // `shared` is undocumented. `documented` wraps it in a described chain, which
   // reaches it with covered=true; `viaProperty` reaches the same node with
-  // covered=false. Keying traversal state on the schema alone would let the
-  // first visit suppress the second and hide a genuinely undocumented rule.
+  // covered=false.
   const shared = z.object({ value: z.string() }).refine(() => true)
   const documented = shared
     .refine(() => true)

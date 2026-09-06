@@ -4,6 +4,7 @@
 
 <!-- markdownlint-configure-file {"MD013": false, "MD060": false} -->
 
+Updated: 2026-09-05 — align Epic 6 Community Beta phase labels and release authority
 Updated: 2026-02-28 — sync with brief governance and clarified activation thresholds
 
 Prepared by: **John – Product Manager (BMAD Method v6)**  
@@ -27,12 +28,12 @@ Version: 1.3 — BMAD Integration + GitHub Preservation
 
 ## 🗓️ 2. Phase Roadmap (PRD Planning Timeline)
 
-| Phase                                         | Duration    | Goals                                                             | Key Deliverables (BMAD Standard)                                                                                              |
-| --------------------------------------------- | ----------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| **Phase 1 — MVP Build**                       | 10–12 weeks | Deliver weather + outfit engine + widgets + EN/ES/FR localization | BMAD Epic Cards (1–2,7,8), PRD artifact in GitHub repo                                                                        |
-| **Phase 2 — Community Beta**                  | +6 weeks    | Social features + moderation + compliance readiness               | BMAD Workflow docs for Epic 4, moderation policy + ops staffing plan, age-gate/privacy readiness sign-off before beta opening |
-| **Phase 3 — Monetization + Wardrobe Uploads** | +4 weeks    | Subscription system + wardrobe uploads                            | BMAD finance/commerce module spec; wardrobe integration plan                                                                  |
-| **Phase 4 — Expansion & Jr. Planning**        | +6 weeks    | Begin COPPA-safe app for U13                                      | BMAD compliance + educational UX deliverables preserved in repo                                                               |
+| Phase                                         | Duration    | Goals                                                             | Key Deliverables (BMAD Standard)                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------- | ----------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Phase 1 — MVP Build**                       | 10–12 weeks | Deliver weather + outfit engine + widgets + EN/ES/FR localization | BMAD Epic Cards (brief Epics 1-2, 7-8; planning Epics 1-3), PRD artifact in GitHub repo                                                                                                                                                                                                                                                                                          |
+| **Phase 2 — Community Beta**                  | +6 weeks    | Social features + moderation + compliance readiness               | BMAD Workflow docs for Epic 6, moderation policy + ops staffing plan, age-gate/privacy readiness sign-off before beta opening. Beta opens only on signed evidence for all eight gate items: moderation staffing, SLA alerts, privacy, deletion, localization, accessibility, model, and rollback. Production read and write rollout controls stay off until every one is signed. |
+| **Phase 3 — Monetization + Wardrobe Uploads** | +4 weeks    | Subscription system + wardrobe uploads                            | BMAD finance/commerce module spec; wardrobe integration plan                                                                                                                                                                                                                                                                                                                     |
+| **Phase 4 — Expansion & Jr. Planning**        | +6 weeks    | Begin COPPA-safe app for U13                                      | BMAD compliance + educational UX deliverables preserved in repo                                                                                                                                                                                                                                                                                                                  |
 
 📌 **Sequencing rule:** This phase order is the roadmap source of truth; prioritization, KPI targets, and launch gates follow this sequence.
 
@@ -52,9 +53,9 @@ Version: 1.3 — BMAD Integration + GitHub Preservation
 
 **MVP Out of Scope:**
 
-- Community sharing (Epic 4)
-- Wardrobe uploads (Epic 3 → moved to Phase 3)
-- Premium subscriptions (Epic 6)
+- Community sharing (planning epics.md Epic 6; brief Epic 4) → Phase 2 Community Beta
+- Wardrobe uploads (planning epics.md Epic 4; brief Epic 3) → Phase 3
+- Premium subscriptions (planning epics.md Epic 5; brief Epic 6) → Phase 3
 
 **Success Gate:**  
 “User can open the app in any launch language, see weather, get an outfit suggestion, and access it from their widget/watch in under 2 minutes.”
@@ -151,4 +152,4 @@ All updates and retros are stored as **BMAD sprint logs** in the GitHub `/_bmad-
 
 **Total Duration:** ~6 months (including QA + Beta feedback)
 
-**Next Step:** Run Phase 1 exit review and open Community Beta only after moderation + age-gate/privacy readiness gates are signed off.
+**Next Step:** Run Phase 1 exit review. Open Community Beta only after moderation staffing, SLA alerts, privacy, deletion, localization, accessibility, model, and rollback evidence are signed. Production read and write rollout controls stay off until every one of those is signed.

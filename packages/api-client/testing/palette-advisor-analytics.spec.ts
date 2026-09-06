@@ -12,10 +12,6 @@ import {
 } from '../src/types/analytics-events'
 
 /**
- * Story 5.4 palette advisor analytics wrappers, split from the contract spec
- * on the same line 5.1 drew: `*-contract.spec.ts` asserts published
- * request/response shapes, `*-analytics.spec.ts` asserts the event builders.
- *
  * The negative fixtures are Decision 13's privacy rule made executable: no
  * raw hex, no confidence score, no image metadata, and no raw user id may
  * reach PostHog through any of these three events.
@@ -183,9 +179,8 @@ describe('5.4 palette advisor analytics wrappers', () => {
    * On the call it was reported as unused: the argument object is contextually
    * typed, so TypeScript attributes the excess-property error to `userId`
    * itself and the directive one line higher matched nothing. That made the
-   * directive a silent no-op AND a typecheck failure, which is the worst of
-   * both -- the runtime `.strict()` assertion below was the only thing left
-   * proving anything.
+   * directive a silent no-op AND a typecheck failure, leaving the runtime
+   * `.strict()` assertion below as the only thing still proving anything.
    */
   it('5.4-CON-022 never accepts a raw user id in place of the pseudonymous subject', () => {
     expect(() =>

@@ -21,6 +21,7 @@ import { TelemetryModule } from './modules/telemetry/telemetry.module'
 import { PersonalizationModule } from './modules/personalization/personalization.module.js'
 import { WardrobeModule } from './modules/wardrobe/wardrobe.module'
 import { CommerceModule } from './modules/commerce/commerce.module.js'
+import { CommunityModule } from './modules/community/community.module'
 
 // `ScheduleModule` is deliberately absent. Every periodic sweep this app used
 // to declare with `@Cron` now runs as a BullMQ Job Scheduler in the worker
@@ -49,6 +50,7 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     PersonalizationModule,
     WardrobeModule,
     CommerceModule,
+    CommunityModule,
   ],
   controllers: [AppController, ApiHealthController, HealthController, AdminController],
   providers: [AppService, AdminService],

@@ -20,11 +20,7 @@ import {
  *
  * This suite asserts the PUBLISHED SHAPES only. Entitlement resolution, the
  * upsert-never-delete reset, and the 403-before-503 precedence are business
- * rules proven in the API suites. What is proven here is what every surface
- * depends on and no runtime test would catch: that the palette enum is closed
- * around exactly the three shipped palettes, that `theme` is nullable and never
- * optional so the key is always on the wire, that neither payload can widen,
- * and that the route carries no id parameter to authorize against.
+ * rules proven in the API suites. A green run here says nothing about them.
  */
 
 const THEME_KEYS = ['jewel_radiance', 'autumn_umber', 'winter_metallic'] as const
@@ -177,11 +173,9 @@ describe('premium theme published operations', () => {
 
   it('5.3-CONTRACT-13 exposes no id parameter to authorize against', () => {
     // The acting user is the only subject; there is no path, query, or body
-    // field naming another user, so cross-user access is unrepresentable rather
-    // than merely rejected.
-    // Scoped to the theme path specifically, not the shared
-    // /api/v1/commerce/premium prefix: Story 5.4 published eight more
-    // operations under that same prefix for the palette advisor.
+    // field naming another user, so cross-user access is unrepresentable.
+    // Scoped to the theme path specifically: Story 5.4 published eight more
+    // operations under the shared /api/v1/commerce/premium prefix.
     const premiumThemePaths = Object.keys(document.paths ?? {}).filter((path) =>
       path.startsWith('/api/v1/commerce/premium/theme')
     )

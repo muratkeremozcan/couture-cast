@@ -6,9 +6,40 @@ import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-
 import { http, HttpResponse } from 'msw'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { mockCommunityFeedItem } from '../../test-utils/msw/handlers'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 
 const captureMock = vi.fn()
+
+function signIn() {
+  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+}
+
+/**
+ * Story 6.1: a community deep link now resolves against the server. Its target
+ * has to exist on both sides: `GET /api/v1/community/posts/{postId}`, which
+ * the default handler answers for `mockCommunityFeedItem.id` and 404s for every
+ * other id, and the feed the grid renders the highlighted card from. The
+ * default feed is empty, so a test that wants a card serves one.
+ */
+function communityFeedHandler() {
+  return http.get('/api/v1/community/feed', () =>
+    HttpResponse.json({
+      data: {
+        items: [mockCommunityFeedItem],
+        authorStates: [],
+        nextCursor: null,
+        mode: 'auto',
+        viewerBand: 'temperate_wet',
+        bandResolved: true,
+        bandUnresolvedReason: null,
+        experimentVariant: 'auto',
+        activeChallenge: null,
+      },
+    })
+  )
+}
 
 vi.mock('posthog-js', () => ({
   default: {
@@ -94,19 +125,27 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
   })
 
   it('3.7-UNIT-003: Selects, scrolls to, and focuses the community card', async () => {
-    setLocationSearch('?source=notification&type=community&cardId=look-4')
+    // Resolution is a server read now, so the card can only be found after the
+    // `GET /community/posts/{postId}` probe answers.
+    signIn()
+    useMswHandlers(communityFeedHandler())
+    setLocationSearch(
+      `?source=notification&type=community&cardId=${mockCommunityFeedItem.id}`
+    )
     render(<LookbookPrismLayout />)
 
-    const highlightedCard = document.getElementById('lookbook-card-look-4')
-    expect(highlightedCard).toBeInTheDocument()
+    const highlightedCard = await screen.findByTestId(
+      `lookbook-card-${mockCommunityFeedItem.id}`
+    )
     expect(highlightedCard).toHaveAttribute('data-highlighted', 'true')
+    expect(screen.queryByTestId('deep-link-info-banner')).not.toBeInTheDocument()
     await waitFor(() => expect(highlightedCard).toHaveFocus())
     expect(captureMock).toHaveBeenCalledWith('deep_link_handled', {
       source: 'notification',
       slot: undefined,
       type: 'community',
       alertId: undefined,
-      cardId: 'look-4',
+      cardId: mockCommunityFeedItem.id,
       surface: 'web',
     })
   })
@@ -189,13 +228,17 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
     })
   })
 
-  it('treats a community card that no longer exists as an invalid link', () => {
+  it('treats a community card that no longer exists as an invalid link', async () => {
+    // Signed in, so the 404 from `GET /community/posts/{postId}` is the reason
+    // the target is unreachable rather than the missing bearer token.
+    signIn()
     setLocationSearch('?source=notification&type=community&cardId=look-does-not-exist')
     render(<LookbookPrismLayout />)
 
     // A card that was removed since the notification was sent must not silently
-    // land the user on an unrelated filter.
-    expect(screen.getByTestId('deep-link-info-banner')).toBeInTheDocument()
+    // land the user on an unrelated filter. The probe is asynchronous, so the
+    // banner arrives with the server's answer.
+    expect(await screen.findByTestId('deep-link-info-banner')).toBeInTheDocument()
     expect(captureMock).toHaveBeenCalledWith(
       'deep_link_invalid',
       expect.objectContaining({ reason: 'Community card target was not found' })

@@ -193,7 +193,6 @@ function collapsePollSchedule() {
   })
 }
 
-/** Drives the capture modal end to end so the page commits `garment`. */
 async function commitGarmentThroughCapture(
   user: ReturnType<typeof userEvent.setup>,
   garment: GarmentItemContract,

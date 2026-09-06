@@ -4,6 +4,7 @@
 
 <!-- markdownlint-configure-file {"MD013": false, "MD060": false} -->
 
+Updated: 2026-09-05 — align Epic 6 Community Beta phase labels and release authority
 Updated: 2026-02-28 — align roadmap authority, age policy, and activation metrics
 
 Version 1.1 — Audience update included
@@ -163,12 +164,16 @@ It has clear **product-market fit**, manageable technical scope, and strong **ph
 
 ### Epic 3 — Wardrobe Management
 
+_Planning numbering: this is Epic 4 in `_bmad-output/planning-artifacts/epics.md`, labelled Phase 3._
+
 - **User Story 3.1**: As a user, I can upload clothing photos and categorize them.
   - ✅ AC: Upload flow auto-tags garment type from supported labels (shirt, pants, jacket, shoes, accessory), and users can edit tags before saving.
 - **User Story 3.2**: As a user, I can build outfits manually for later use.
   - ✅ AC: Saved outfits appear in library within 2 seconds and are retrievable by tag and weather-condition filters.
 
 ### Epic 4 — Community & Social
+
+_Planning numbering: this is Epic 6 in `_bmad-output/planning-artifacts/epics.md`, labelled Phase 2. Community Beta opens only on the signed safety gate: moderation staffing, SLA alerts, privacy, deletion, localization, accessibility, model, and rollback evidence. Production read and write rollout controls stay off until every one of those eight is signed._
 
 - **User Story 4.1**: As a user, I can post my daily outfit and view others’ posts.
   - ✅ AC: Default feed ranks posts from locations within ±5°F and matching precipitation type before recency-based fallback.
@@ -187,6 +192,8 @@ It has clear **product-market fit**, manageable technical scope, and strong **ph
   - ✅ AC: GDPR-compliant deletion within 72 hours.
 
 ### Epic 6 — Monetization
+
+_Planning numbering: this is Epic 5 in `_bmad-output/planning-artifacts/epics.md`, labelled Phase 3._
 
 - **User Story 6.1**: As a user, I can upgrade to Premium via in-app purchase.
   - ✅ AC: Monthly and yearly purchases complete via Stripe or Apple Pay sandbox flows, and Premium entitlement activates in-app within 30 seconds.

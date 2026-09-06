@@ -43,7 +43,6 @@ test.describe('Ritual API – daily scenario outfit recommendations', () => {
       fallback: 'http://localhost:4000',
     })
 
-    // Sign up a user
     const signupPayload = createTeenSignupPayload(testInfo, 'ritual-e2e-user')
     const signupResponse = await apiRequest({
       method: 'POST',
@@ -55,7 +54,6 @@ test.describe('Ritual API – daily scenario outfit recommendations', () => {
     if (signupResponse.status === 201) {
       testUserId = (signupResponse.body as { userId: string }).userId
 
-      // Create a location preference for this user
       const locationResponse = await apiRequest({
         method: 'POST',
         path: '/api/v1/locations',

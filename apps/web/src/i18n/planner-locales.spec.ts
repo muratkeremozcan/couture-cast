@@ -8,7 +8,7 @@
 // file owns the planner keys outright.
 //
 // All non-English values are machine-translation drafts pending human review before
-// release (AC 7 / PRD NFR Localization 1) — the parity checks hold the tree together
+// release (AC 7 / PRD NFR Localization 1). The parity checks hold the tree together
 // until that review lands.
 import { describe, expect, it } from 'vitest'
 import { SUPPORTED_LOCALES, type SupportedLocale } from './index'

@@ -12,11 +12,7 @@ import {
 } from '../src/types/analytics-events'
 
 /**
- * Story 5.2 premium analytics wrappers, split from the contract spec on the
- * same line 5.1 drew: `*-contract.spec.ts` asserts published request/response
- * shapes, `*-analytics.spec.ts` asserts the event builders.
- *
- * The negative fixtures are the story's privacy rule made executable: no
+ * The negative fixtures are Story 5.2's privacy rule made executable: no
  * price, no receipt or transaction id, no URL, no email, and no raw user id
  * may reach PostHog through any premium event.
  */
@@ -36,8 +32,8 @@ describe('5.2 premium analytics wrappers', () => {
   it('5.2-CON-001 builds premium_subscribe_tapped on the client distinct id', () => {
     // The one premium event with no server subject: the client analytics
     // identity is passed in, exactly like affiliate_cta_shown. Directional
-    // volume only — this identifier space has no join to the HMAC subject, so
-    // it is not a funnel leg.
+    // volume only: this identifier space has no join to the HMAC subject, so it
+    // is not a funnel leg.
     const payload = trackPremiumSubscribeTapped(
       { plan: 'premium_monthly', surface: 'mobile_settings' },
       'mobile-distinct-id'

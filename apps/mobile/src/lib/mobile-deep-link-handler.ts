@@ -1,8 +1,6 @@
 // Story 3.7 Task 3 step 1 owner: implement mobile deep-link handler and Expo Router parameter processing
 import {
-  resolveCommunityCardDeepLinkTarget,
   resolveWeatherAlertDeepLinkTarget,
-  type CommunityCardDeepLinkTarget,
   type WeatherAlertDeepLinkTarget,
 } from '@couture/api-client'
 import { eventsPollResultSchema } from '@couture/api-client/contracts/http'
@@ -31,11 +29,10 @@ export async function loadMobileWeatherAlertTarget(
   return resolveWeatherAlertDeepLinkTarget(await pollMobileEvents(), alertId)
 }
 
-export async function loadMobileCommunityCardTarget(
-  cardId: string
-): Promise<CommunityCardDeepLinkTarget | undefined> {
-  return resolveCommunityCardDeepLinkTarget(await pollMobileEvents(), cardId)
-}
+// A community card target used to be resolved from the event poll here. The
+// community screen now reads the post itself through `GET /community/posts/{id}`,
+// which is the only source that knows whether the viewer may see it and is not
+// bounded by the poll window.
 
 export interface ProcessMobileDeepLinkOptions {
   params: Record<string, unknown>

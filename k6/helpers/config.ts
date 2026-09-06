@@ -26,6 +26,8 @@ export const SLO = isSmoke
       ritualEligible: 3000,
       // Story 5.2 subscription status read, relaxed for smoke runs.
       subscriptionStatus: 3000,
+      // Story 6.1 community feed read, relaxed for smoke runs.
+      communityFeed: 3000,
     }
   : {
       aggregate: 1500,
@@ -113,6 +115,63 @@ export const SLO = isSmoke
        * See k6/scenarios/premium.scenarios.ts for the full rationale.
        */
       subscriptionStatus: 300,
+      /**
+       * Story 6.1: one page of `GET /api/v1/community/feed`, in either shape --
+       * `mode=all` and a pinned band share this key because they are the same
+       * work against two composite indexes, and a single number is what the
+       * story's read budget actually is. They stay separately TAGGED in
+       * `k6/tests/couture-api-baseline.k6test.ts` so a breach names which one
+       * moved; sharing the bound is not the same as sharing the measurement.
+       *
+       * ABSOLUTE, NOT RELATIVE, for the reason `ritualEligible` and
+       * `subscriptionStatus` above record at length: `handleSummary` writes one
+       * run's summary and nothing compares two runs, so a budget expressed as a
+       * delta over a baseline would be a threshold nobody could ever evaluate.
+       *
+       * 300 ms, the number this repository already commits to for an indexed
+       * read with no generation work in it. The feed is a keyset page over
+       * `published_at,id` bounded at 30 rows, and
+       * `apps/api/integration/community-feed-query-plan.integration.spec.ts`
+       * asserts both shapes stay index scans against a 2,000-row table with a
+       * negative control proving that assertion can fail. For this bound to
+       * breach, either one of those composite indexes stopped being used, or
+       * per-item signed-URL minting became the dominant cost -- both regressions
+       * this threshold exists to name.
+       *
+       * OBSERVED, in two Story 6.1 verification smoke runs against a real API
+       * and the seeded feed, with the empty-feed guard passing both times so the
+       * numbers describe a populated read rather than the cheaper empty path:
+       *
+       *              run 1        run 2
+       *   all        91.68 ms     86.39 ms
+       *   band      114.83 ms     85.90 ms
+       *
+       * BOTH RUNS ARE KEPT, AND THE PAIR CORRECTS THE FIRST ONE'S STORY. After
+       * run 1 this comment said the band-filtered page costs slightly more and
+       * attributed it to the extra index predicate. Run 2 moved that figure by
+       * 29 ms and put the two paths within 0.5 ms of each other, so the gap was
+       * NOISE on a one-VU sample and the causal explanation was wrong. A wrong
+       * explanation is worse than a wide error bar, because the next person
+       * tunes against it. Independently corroborated: `EXPLAIN` puts both plan
+       * shapes at roughly 0.03 ms at fixture scale, so there was no cost
+       * difference to resolve at this volume in the first place.
+       *
+       * WHAT THE PAIR ESTABLISHES: the endpoint sits comfortably inside its
+       * bound at seed scale. WHAT IT DOES NOT: any cost difference between the
+       * global and band-filtered index paths, which a 29 ms swing on a single
+       * virtual user cannot resolve in either direction.
+       *
+       * Smoke mode enforces the 3000 ms branch above rather than this one, so a
+       * PR run does not exercise this number at all. Treat 300 ms as a committed
+       * bound, not a tuned figure; tighten it once a load-profile run exists at
+       * a volume where the two paths could actually diverge.
+       *
+       * The community WRITE paths deliberately have no SLO key and no scenario:
+       * publishing enqueues a moderation job per call and the rolling 24-hour
+       * cap of ten submissions would put every virtual user past the tenth on
+       * the 429 path. See k6/scenarios/community.scenarios.ts.
+       */
+      communityFeed: 300,
     }
 
 export function apiUrl(path: string) {

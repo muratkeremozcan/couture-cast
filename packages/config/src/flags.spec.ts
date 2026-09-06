@@ -15,7 +15,8 @@ describe('feature flag registry', () => {
   it('exposes the story 0.7 task 8 flag set', () => {
     expect(FEATURE_FLAG_KEYS).toEqual([
       'premium_themes_enabled',
-      'community_feed_enabled',
+      'community_read_enabled',
+      'community_write_enabled',
       'color_analysis_enabled',
       'weather_alerts_enabled',
       'commerce_affiliate_enabled',
@@ -24,9 +25,17 @@ describe('feature flag registry', () => {
     ])
   })
 
+  it('6.1-CFG-001: defaults both community rollout controls to off', () => {
+    // Story 6.1 acceptance: production stays off until moderation staffing, SLA
+    // alerts, privacy, deletion, localization, accessibility, model and rollback
+    // evidence are signed. Read and write are separate controls so the beta can
+    // open reading to a cohort while posting stays shut, and so closing posting
+    // after an incident leaves the feed readable.
+    expect(getDefaultFeatureFlagValue('community_read_enabled')).toBe(false)
+    expect(getDefaultFeatureFlagValue('community_write_enabled')).toBe(false)
+  })
+
   it('defaults the premium planner kill switch to off', () => {
-    // Story 5.5: same fail-closed reasoning as every premium flag above -- a
-    // degraded PostHog can never switch it on by accident.
     expect(getDefaultFeatureFlagValue('premium_planner_enabled')).toBe(false)
   })
 
@@ -38,15 +47,15 @@ describe('feature flag registry', () => {
   })
 
   it('defaults the premium purchasing kill switch to off', () => {
-    // Story 5.2 decision 13: same reasoning as the affiliate switch. Only
-    // purchasing is gated; status, refresh, portal, and webhooks stay on.
+    // Story 5.2 decision 13: only purchasing is gated; status, refresh, portal,
+    // and webhooks stay on.
     expect(getDefaultFeatureFlagValue('commerce_subscription_enabled')).toBe(false)
   })
 
   it('returns registry defaults for known keys', () => {
     expect(getDefaultFeatureFlagValue('premium_themes_enabled')).toBe(false)
     expect(getDefaultFeatureFlagValue('weather_alerts_enabled')).toBe(true)
-    // Story 5.4 decision 10: flipped from `true` to `false` -- a consent-gated
+    // Story 5.4 decision 10: flipped from `true` to `false`. A consent-gated
     // feature that reads photographs of faces is the last flag in this repo
     // that should fail open.
     expect(getDefaultFeatureFlagValue('color_analysis_enabled')).toBe(false)
@@ -129,8 +138,8 @@ describe('getFeatureFlag', () => {
   })
 
   it('rejects an unknown key before it touches any adapter', async () => {
-    // A typo must fail loudly at the call site instead of quietly resolving to
-    // "flag disabled", which would look like an intentional rollout state.
+    // A typo has to fail loudly at the call site. Quietly resolving to "flag
+    // disabled" would look like an intentional rollout state.
     const readRemoteFlag = vi.fn()
     const readFallbackFlag = vi.fn()
 
@@ -143,12 +152,10 @@ describe('getFeatureFlag', () => {
   })
 
   it('resolves to the code default when no adapters are wired at all', async () => {
-    // Local, unit-test and pre-PostHog runtimes call this with no adapters. The
-    // ritual still has to render, so the code default is the only answer.
-    // color_analysis_enabled resolves to false here (decision 10): fail-closed
-    // is the point, not a ritual-rendering concern like the flags it sits beside.
+    // Local, unit-test and pre-PostHog runtimes call this with no adapters, and
+    // the ritual still has to render.
     await expect(getFeatureFlag('color_analysis_enabled', 'user-5')).resolves.toBe(false)
-    await expect(getFeatureFlag('community_feed_enabled', 'user-5')).resolves.toBe(false)
+    await expect(getFeatureFlag('community_read_enabled', 'user-5')).resolves.toBe(false)
   })
 
   it('prefers the remote answer over a disagreeing cached value', async () => {
@@ -158,7 +165,7 @@ describe('getFeatureFlag', () => {
     const readFallbackFlag = vi.fn().mockResolvedValue(false)
 
     await expect(
-      getFeatureFlag('community_feed_enabled', 'user-6', {
+      getFeatureFlag('community_write_enabled', 'user-6', {
         readRemoteFlag,
         readFallbackFlag,
       })
@@ -168,8 +175,8 @@ describe('getFeatureFlag', () => {
   })
 
   it('uses the cached value when only the fallback adapter is wired', async () => {
-    // The API sync path (S0.7/T8/4) keeps this cache warm precisely so a
-    // runtime without a PostHog client still sees the last known rollout.
+    // The API sync path (S0.7/T8/4) keeps this cache warm so a runtime with no
+    // PostHog client still sees the last known rollout.
     const readFallbackFlag = vi.fn().mockResolvedValue(true)
 
     await expect(
@@ -180,8 +187,6 @@ describe('getFeatureFlag', () => {
   })
 
   it('returns the code default when the remote answer is unusable and no cache is wired', async () => {
-    // Partially wired adapters: PostHog answered with a string variant for a
-    // boolean flag and there is no cache to fall through to.
     const readRemoteFlag = vi.fn().mockResolvedValue('variant-a')
 
     await expect(
@@ -204,8 +209,8 @@ describe('getFeatureFlag', () => {
   })
 
   it('degrades to the cache when the remote adapter throws before returning a promise', async () => {
-    // A misconfigured PostHog client throws synchronously rather than
-    // rejecting; the guard has to catch both shapes of failure.
+    // A misconfigured PostHog client throws synchronously; the guard has to
+    // catch that as well as a rejected promise.
     const readRemoteFlag = vi.fn(() => {
       throw new Error('posthog client not initialised')
     })
@@ -220,10 +225,9 @@ describe('getFeatureFlag', () => {
   })
 
   it('degrades to the code default when the cache read fails', async () => {
-    // The cache is the second line of defence, not a hard dependency. This read
-    // used to sit outside the guard, so a database blip rejected out of
-    // getFeatureFlag and took the code default down with it — every caller
-    // would have had to reimplement the fallback the module exists to provide.
+    // This read used to sit outside the guard, so a database blip rejected out
+    // of getFeatureFlag and took the code default down with it. The cache is a
+    // second line of defence, so its failures stay inside the guard.
     const readFallbackFlag = vi.fn().mockRejectedValue(new Error('cache table missing'))
 
     await expect(
@@ -232,8 +236,7 @@ describe('getFeatureFlag', () => {
   })
 
   it('degrades to the code default when both the remote and the cache fail', async () => {
-    // The outage case that matters in production: provider down, cache down,
-    // and the core ritual still has to answer.
+    // Provider down, cache down, and the core ritual still has to answer.
     const readRemoteFlag = vi.fn().mockRejectedValue(new Error('posthog down'))
     const readFallbackFlag = vi.fn().mockRejectedValue(new Error('cache down'))
 

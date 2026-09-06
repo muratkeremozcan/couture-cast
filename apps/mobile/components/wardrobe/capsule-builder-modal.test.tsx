@@ -330,16 +330,13 @@ describe('MobileCapsuleBuilderModal', () => {
   })
 
   /**
-   * Older Android JS engines ship no `crypto.randomUUID`. Without the fallback the
-   * key would be `undefined` and every retry would create a duplicate capsule.
-   */
-  /**
-   * The runtime without `crypto.randomUUID` is Hermes, which is to say every
-   * real device. This case used to assert the key matched `/^\d+-[0-9a-z]+$/`
-   * -- that is, that it was explicitly NOT a UUID -- and so it passed for months
-   * while the API rejected every capsule save from a device with
-   * `400 Idempotency-Key must be a UUID v4`. The contract is a v4 UUID, so that
-   * is what is asserted now, in exactly the runtime that used to get it wrong.
+   * The runtime without `crypto.randomUUID` is Hermes, which is to say every real
+   * device, and without the fallback the key would be `undefined` so every retry would
+   * create a duplicate capsule. This case used to assert the key matched
+   * `/^\d+-[0-9a-z]+$/`, that is, that it was explicitly NOT a UUID, and so it passed
+   * for months while the API rejected every capsule save from a device with
+   * `400 Idempotency-Key must be a UUID v4`. The contract is a v4 UUID, so that is what
+   * is asserted now, in exactly the runtime that used to get it wrong.
    */
   it('4.3-MOB-MODAL-13 mints a v4 idempotency key without crypto.randomUUID', async () => {
     // Restored from the original descriptor: `crypto` is an own accessor on the

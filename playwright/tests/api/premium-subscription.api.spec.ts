@@ -1,18 +1,17 @@
-// Story 5.2 Task 9: the premium subscription API against the seeded fixtures.
+// Story 5.2: the premium subscription API against the seeded fixtures.
 //
-// SETUP SHAPE, and it differs from Story 5.1's on one axis that matters.
-// `PremiumEntitlement` is worker-only by design — a client-writable entitlement
-// row is free Premium — so unlike `CommercePreference`, the entitled, expired,
-// and grace-period states have NO public write path and cannot be arranged
-// here. They come from the deterministic seed users in
-// `packages/db/prisma/seeds/commerce.ts` (Decision 9) and are read strictly
-// read-only. The never-subscribed state is the one branch a fresh public-API
-// signup provides, and it is the only account this file mutates.
+// SETUP SHAPE. `PremiumEntitlement` is worker-only by design, since a
+// client-writable entitlement row is free Premium, so the entitled, expired and
+// grace-period states have NO public write path and cannot be arranged here. They
+// come from the deterministic seed users in `packages/db/prisma/seeds/commerce.ts`
+// (Decision 9) and are read strictly read-only. The never-subscribed state is the
+// one branch a fresh public-API signup provides, and it is the only account this
+// file mutates.
 //
-// The seeded users are shared across parallel Playwright workers, so no test
-// below calls `POST /subscription/refresh` as a seeded user: that endpoint's
-// ledger pull would downgrade a locally-active row the fake ledger knows
-// nothing about, which would break every other worker reading the same fixture.
+// The seeded users are shared across parallel Playwright workers, so no test below
+// calls `POST /subscription/refresh` as a seeded user: that endpoint's ledger pull
+// would downgrade a locally-active row the fake ledger knows nothing about, breaking
+// every other worker reading the same fixture.
 import Stripe from 'stripe'
 import { log } from '@seontechnologies/playwright-utils/log'
 import {
@@ -24,9 +23,8 @@ import {
   BILLING_WEBHOOK_UNAUTHORIZED_MESSAGE,
   SUBSCRIPTION_NOT_FOUND_MESSAGE,
 } from '@couture/api-client/contracts/http'
-// The PURE secrets module, never the Nest service: importing the service would
-// pull its decorators and DI into the Playwright worker, which cannot load
-// them. Same reason 5.1 imports `affiliate-webhook-signature.ts`.
+// The PURE secrets module, never the Nest service: importing the service would pull
+// its decorators and DI into the Playwright worker, which cannot load them.
 import {
   buildTestOnlyRevenueCatWebhookAuth,
   buildTestOnlyStripeWebhookSecret,
@@ -63,16 +61,15 @@ test.describe('premium subscription status over the public API', () => {
     expect(response.status()).toBe(200)
     const body = subscriptionResponseSchema.parse(await response.json())
     expect(body.data.status).toBe('none')
-    // The nulls are serialized rather than omitted, which is what lets both
-    // clients read one shape regardless of subscription state.
+    // The nulls are serialized, never omitted, so both clients read one shape
+    // whatever the subscription state.
     expect(body.data.store).toBeNull()
     expect(body.data.currentPeriodEnd).toBeNull()
     void log.info(`fresh account reads as ${body.data.status}`)
   })
 
-  // `premiumApi` is taken here only for its resolved base URL and its
-  // non-local skip guard; the assertions read the seeded users, not its
-  // throwaway account.
+  // `premiumApi` is taken here for its resolved base URL and its non-local skip
+  // guard; the assertions read the seeded users.
   test('5.2-E2E-API-002 reflects each seeded entitlement state', async ({
     request,
     premiumApi,
@@ -216,9 +213,9 @@ test.describe('billing webhooks reject unauthenticated deliveries uniformly', ()
     request,
     premiumApi,
   }) => {
-    // RevenueCat fires TEST when an operator configures the webhook; a non-200
-    // fails their setup check, so this is the one delivery whose success is
-    // part of the provisioning runbook.
+    // RevenueCat fires TEST when an operator configures the webhook and a non-200
+    // fails their setup check, so this delivery's success is part of the
+    // provisioning runbook.
     const response = await request.post(
       `${premiumApi.apiBaseUrl}${REVENUECAT_WEBHOOK_PATH}`,
       {
@@ -254,8 +251,8 @@ test.describe('on-demand refresh', () => {
     request,
     premiumApi,
   }) => {
-    // Safe on a fresh account only — see the file header on why no seeded user
-    // may be refreshed.
+    // Safe on a fresh account only. See the file header on why no seeded user may
+    // be refreshed.
     const response = await request.post(
       `${premiumApi.apiBaseUrl}${SUBSCRIPTION_REFRESH_PATH}`,
       { headers: premiumApi.headers }
@@ -272,12 +269,11 @@ test.describe('the one-writer rule, end to end over HTTP', () => {
     request,
     premiumApi,
   }) => {
-    // This is Decision 1's rejected-provisional-activation design made
-    // observable. The middle assertion is the point: after a fully valid,
-    // signed Stripe completion, the entitlement is still absent, because the
-    // Stripe rail records and forwards but never writes entitlement state.
-    // That window IS the paid-but-locked mode the story names, and a future
-    // "helpful" provisional activation would turn this test red.
+    // Decision 1's rejected provisional activation, made observable. The middle
+    // assertion is the point: after a fully valid, signed Stripe completion the
+    // entitlement is still absent, because the Stripe rail records and forwards and
+    // never writes entitlement state. That window IS the paid-but-locked mode the
+    // story names, and a future "helpful" provisional activation turns this red.
     const subscriptionId = `sub_${buildUniqueId('api', test.info())}`
     const payload = JSON.stringify({
       id: `evt_${buildUniqueId('api', test.info())}`,
@@ -338,10 +334,9 @@ test.describe('the one-writer rule, end to end over HTTP', () => {
 
 test.describe('webhook secret wiring', () => {
   test('5.2-E2E-API-040 uses the test-only Stripe secret, never a real one', () => {
-    // A guard on the environment rather than the server: if a real secret ever
-    // leaked into the local stack, the fixtures below would sign with one value
-    // while the server verified with another and every webhook test would 401
-    // for a reason unrelated to what it asserts.
+    // A guard on the environment: if a real secret leaked into the local stack, the
+    // fixtures would sign with one value while the server verified with another and
+    // every webhook test would 401 for a reason unrelated to what it asserts.
     expect(buildTestOnlyStripeWebhookSecret().length).toBeGreaterThanOrEqual(32)
     expect(buildTestOnlyStripeWebhookSecret()).toContain('test')
   })

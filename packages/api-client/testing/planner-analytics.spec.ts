@@ -1,13 +1,7 @@
-// Story 5.5 premium 7-day outfit planner analytics wrappers, split from the
-// contract spec on the same line 5.1 drew: `*-contract.spec.ts` asserts
-// published request/response shapes, `*-analytics.spec.ts` asserts the event
-// builders.
-//
-// AC 6: both events use `TelemetryService`, strict property allowlists, HMAC
-// subject ids, and registry set-equality checks. This file is what makes the
-// "strict property allowlists" half of that claim executable rather than
-// merely stated -- until this file existed, `trackPremiumPlannerViewed` and
-// `trackPremiumPlannerDayReshuffled` were called from `apps/api` but never
+// Story 5.5 AC 6: both events use `TelemetryService`, strict property
+// allowlists, HMAC subject ids, and registry set-equality checks. Until this
+// file existed, `trackPremiumPlannerViewed` and
+// `trackPremiumPlannerDayReshuffled` were called from `apps/api` and never
 // exercised directly in this package.
 import { describe, expect, it } from 'vitest'
 

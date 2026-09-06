@@ -4,8 +4,8 @@
 // cover the one thing the rail cannot see: how a rejection is classified.
 // `not_entitled` and `location_not_owned` are both a 403, `conflict` and an
 // unrecognised 409 are both a 409, `disabled` and an unrecognised 503 are
-// both a 503 -- only the server's own message constants tell them apart, and
-// getting that wrong turns "subscribe" into "try again" or the reverse.
+// both a 503; only the server's own message constants tell them apart, and getting
+// that wrong turns "subscribe" into "try again" or the reverse.
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
@@ -160,7 +160,6 @@ describe('web planner client (Story 5.5)', () => {
     expect(result.day.planDate).toBe('2026-09-10')
   })
 
-  /** A malformed (non-JSON) error body falls back to the caller's own message. */
   it('falls back to the developer-facing message on a malformed error body', async () => {
     signIn()
     useMswHandlers(

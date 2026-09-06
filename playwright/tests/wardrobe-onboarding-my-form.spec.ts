@@ -1,20 +1,19 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
-// Story 4.4 Task 8 owner: end-to-end coverage for the "My Form" photo upload
-// path (AC 2, AC 3) reached from the standalone silhouette settings surface
-// (decision 3: reachable outside onboarding). Runs against the real default
-// `HeuristicSilhouettePhotoModerationEngine` (decisions 8-9), not a fixture
-// engine: `wardrobe-silhouette-image-validation.ts` decodes real image bytes
-// before a moderation engine ever runs, so a genuine E2E upload through the
-// browser cannot use the `FIXTURE:<outcome>:` marker convention the API's own
-// integration tests rely on (that marker is not a decodable image). Instead
-// this spec uses two committed fixture PNGs
-// (`playwright/fixtures/wardrobe/silhouette-photo-*.png`) engineered so the
-// real heuristic's border-vs-center contrast measurement deterministically
-// lands on a known verdict: a solid single-colour photo always measures zero
-// contrast distance (`contrast`), and a two-tone photo with a clearly
-// different, non-skin-toned center region always clears both thresholds
-// (`ready`). See the story's Dev Notes for the exact pixel geometry.
+// Story 4.4 AC 2 and AC 3: the "My Form" photo upload path, reached from the
+// standalone silhouette settings surface (decision 3, reachable outside
+// onboarding).
+//
+// This runs against the real default `HeuristicSilhouettePhotoModerationEngine`
+// (decisions 8-9). `wardrobe-silhouette-image-validation.ts` decodes real image
+// bytes before any moderation engine runs, so a genuine browser upload cannot use
+// the `FIXTURE:<outcome>:` marker convention the API's integration tests rely on;
+// that marker is not a decodable image. The two committed fixture PNGs
+// (`playwright/fixtures/wardrobe/silhouette-photo-*.png`) are engineered so the real
+// heuristic's border-vs-center contrast measurement lands on a known verdict: a
+// solid single-colour photo always measures zero contrast distance (`contrast`), and
+// a two-tone photo with a clearly different, non-skin-toned center region always
+// clears both thresholds (`ready`). The story's Dev Notes carry the pixel geometry.
 import path from 'node:path'
 import type { Locator, Page } from '@playwright/test'
 import { expect } from '../support/fixtures/merged-fixtures'
@@ -81,11 +80,10 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
           .getByRole('button', { name: 'Upload a full-body photo', exact: true })
           .click()
         await dialog.getByLabel('My Form photo file').setInputFiles(readyFixturePath)
-        // Not asserting the transient "Processing your photo…" state here:
-        // the real worker can settle before Playwright observes it (a tiny
-        // synthetic fixture image processes in single-digit milliseconds),
-        // which would make this assertion flaky. The terminal ready state
-        // below is what actually matters.
+        // The transient "Processing your photo…" state is not asserted: the real
+        // worker can settle before Playwright observes it, since a tiny synthetic
+        // fixture image processes in single-digit milliseconds. The terminal ready
+        // state below is the claim.
       })
 
       await test.step('The photo reaches ready and becomes the active silhouette mode', async () => {
@@ -182,10 +180,9 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
         })
       })
 
-      // Captures the idempotency key from every upload-url allocation
-      // (fired once per attempt, including the retry) so the "reusing the
-      // same upload attempt" claim in this test's own name is actually
-      // verified below, not just implied by reaching `ready`.
+      // Captures the idempotency key from every upload-url allocation, one per
+      // attempt including the retry, so the "reusing the same upload attempt" claim
+      // in this test's name is verified below. Reaching `ready` alone implies it.
       const allocationIdempotencyKeys: string[] = []
       page.on('request', (request) => {
         if (

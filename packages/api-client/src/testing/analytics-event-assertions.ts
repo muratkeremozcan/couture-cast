@@ -36,6 +36,14 @@ import {
   advisorRecommendationActedPropertiesSchema,
   premiumPlannerViewedPropertiesSchema,
   premiumPlannerDayReshuffledPropertiesSchema,
+  communityCardOpenedPropertiesSchema,
+  communityChallengeParticipatedPropertiesSchema,
+  communityFeedViewedPropertiesSchema,
+  communityPostAllocatedPropertiesSchema,
+  communityPostPublishedPropertiesSchema,
+  communityPostReportedPropertiesSchema,
+  communityPostSubmittedPropertiesSchema,
+  communityPostWithdrawnPropertiesSchema,
   type AnalyticsEventName,
 } from '../types/analytics-events'
 import type { ExpectLike } from './expect-like'
@@ -51,7 +59,7 @@ type EventExpectationOptions = {
   count?: number
 }
 
-const analyticsPropertySchemas = {
+export const analyticsPropertySchemas = {
   ritual_created: ritualCreatedPropertiesSchema,
   wardrobe_upload_started: wardrobeUploadStartedPropertiesSchema,
   alert_received: alertReceivedPropertiesSchema,
@@ -90,6 +98,14 @@ const analyticsPropertySchemas = {
   advisor_recommendation_acted: advisorRecommendationActedPropertiesSchema,
   premium_planner_viewed: premiumPlannerViewedPropertiesSchema,
   premium_planner_day_reshuffled: premiumPlannerDayReshuffledPropertiesSchema,
+  community_feed_viewed: communityFeedViewedPropertiesSchema,
+  community_card_opened: communityCardOpenedPropertiesSchema,
+  community_post_allocated: communityPostAllocatedPropertiesSchema,
+  community_post_submitted: communityPostSubmittedPropertiesSchema,
+  community_post_published: communityPostPublishedPropertiesSchema,
+  community_post_reported: communityPostReportedPropertiesSchema,
+  community_post_withdrawn: communityPostWithdrawnPropertiesSchema,
+  community_challenge_participated: communityChallengeParticipatedPropertiesSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

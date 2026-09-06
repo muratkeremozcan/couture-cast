@@ -1,6 +1,5 @@
 // Learning path Step 12: Cross-surface E2E confidence.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-12-cross-surface-e2e-confidence
-// Step 12 step 2 owner: searchable owner anchor
 import type { AxeResults } from 'axe-core'
 import type axe from 'axe-core'
 import { z } from 'zod'

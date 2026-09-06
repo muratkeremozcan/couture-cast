@@ -5,6 +5,12 @@ import type { GuardianService } from '../modules/guardian/guardian.service'
 import type { TelemetryService } from '../modules/telemetry/telemetry.service'
 import type { WardrobeRetentionService } from '../modules/wardrobe/wardrobe-retention.service'
 import {
+  COMMUNITY_MODERATION_DISPATCH_JOB_NAME,
+  COMMUNITY_STALE_REVIEW_JOB_NAME,
+  COMMUNITY_UPLOAD_EXPIRY_JOB_NAME,
+  COMMUNITY_ERASURE_JOB_NAME,
+} from '../modules/community/community-maintenance.scheduler'
+import {
   ADMIN_JOB_FAILURE_PRUNE_JOB_NAME,
   FEATURE_FLAGS_SYNC_JOB_NAME,
   GUARDIAN_EMANCIPATION_JOB_NAME,
@@ -42,6 +48,17 @@ export type MaintenanceSweeps = {
   guardian: Pick<GuardianService, 'emancipateEligibleTeens'>
   telemetry: Pick<TelemetryService, 'pruneOldTelemetryEvents'>
   wardrobeRetention: Pick<WardrobeRetentionService, 'purgeExpiredAndDeletedGarments'>
+  /**
+   * Story 6.1 community sweeps. Structural rather than a service reference, so
+   * this module routes job names without depending on the community module's
+   * class shapes.
+   */
+  community: {
+    dispatchPending: () => Promise<unknown>
+    sweepStalePendingReview: () => Promise<unknown>
+    sweepExpiredUploads: () => Promise<unknown>
+    sweepErasureRequests: () => Promise<unknown>
+  }
 }
 
 export type MaintenanceProcessorDeps = MaintenanceSweeps & {
@@ -104,6 +121,34 @@ export function createMaintenanceProcessor(deps: MaintenanceProcessorDeps) {
           'telemetry_event_prune_completed',
           'telemetry_event_prune_failed',
           () => deps.telemetry.pruneOldTelemetryEvents()
+        )
+      case COMMUNITY_MODERATION_DISPATCH_JOB_NAME:
+        return run(
+          job.name,
+          'community_moderation_dispatch_completed',
+          'community_moderation_dispatch_failed',
+          () => deps.community.dispatchPending()
+        )
+      case COMMUNITY_STALE_REVIEW_JOB_NAME:
+        return run(
+          job.name,
+          'community_stale_review_sweep_completed',
+          'community_stale_review_sweep_failed',
+          () => deps.community.sweepStalePendingReview()
+        )
+      case COMMUNITY_UPLOAD_EXPIRY_JOB_NAME:
+        return run(
+          job.name,
+          'community_upload_expiry_sweep_completed',
+          'community_upload_expiry_sweep_failed',
+          () => deps.community.sweepExpiredUploads()
+        )
+      case COMMUNITY_ERASURE_JOB_NAME:
+        return run(
+          job.name,
+          'community_erasure_sweep_completed',
+          'community_erasure_sweep_failed',
+          () => deps.community.sweepErasureRequests()
         )
       default:
         // Not thrown: an unknown name is almost always a scheduler left behind

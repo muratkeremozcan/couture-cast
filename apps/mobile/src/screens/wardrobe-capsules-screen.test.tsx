@@ -45,7 +45,7 @@ import WardrobeCapsulesScreen from '../../app/wardrobe-capsules'
 
 /**
  * Base64url-shaped JWT payload, built at runtime (not a literal) so it doesn't
- * look like a credential to secret scanners -- a hardcoded JWT-shaped string
+ * look like a credential to secret scanners; a hardcoded JWT-shaped string
  * here previously tripped gitleaks' generic-api-key rule in CI.
  */
 function fakeAccessToken(userId: string): string {

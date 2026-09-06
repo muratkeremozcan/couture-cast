@@ -1,10 +1,9 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
-// Story 4.4 Task 8 owner: end-to-end coverage for the guided wardrobe onboarding
-// flow (AC 1, AC 3): permission, capture-and-tag one real garment through the
-// existing Story 4.1/4.2 components, the silhouette step, completion redirect,
-// and resuming mid-flow after a reload against the real server-authoritative
-// state machine (decision 3).
+// Story 4.4 AC 1 and AC 3: the guided wardrobe onboarding flow. Permission,
+// capture-and-tag one real garment through the Story 4.1/4.2 components, the
+// silhouette step, completion redirect, and resuming mid-flow after a reload
+// against the real server-authoritative state machine (decision 3).
 import path from 'node:path'
 import { garmentListResponseSchema } from '@couture/api-client/contracts/http'
 import type { Page } from '@playwright/test'
@@ -26,15 +25,13 @@ const garmentFixturePath = path.resolve(
 )
 
 /**
- * Clicks the step's "Continue" button and waits for the onboarding PATCH to
- * resolve successfully. The capture/tagging UI phase covers two distinct
- * server steps (`capture` then `tagging`) sharing one component, so
- * advancing from a captured-and-tagged garment to the silhouette step takes
- * two of these in a row -- the first moves `capture -> tagging`, the second
- * `tagging -> silhouette` (AC1's forward-only state machine, decision 3).
- * Asserting the status here (not just that some response arrived) surfaces a
- * real rejected transition as its own failure instead of an unrelated
- * downstream timeout.
+ * Clicks the step's "Continue" button and waits for the onboarding PATCH to resolve
+ * successfully. The capture/tagging UI phase covers two distinct server steps
+ * (`capture` then `tagging`) sharing one component, so advancing from a
+ * captured-and-tagged garment to the silhouette step takes two of these in a row:
+ * the first moves `capture -> tagging`, the second `tagging -> silhouette` (AC1's
+ * forward-only state machine, decision 3). Asserting the status surfaces a rejected
+ * transition as its own failure instead of an unrelated downstream timeout.
  */
 async function clickContinueAndWaitForAdvance(
   page: Page,
@@ -217,10 +214,9 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
       })
 
       await test.step('The captured garment persisted server-side through the reload', async () => {
-        // Reload while still on the silhouette step keeps the checklist off-screen
-        // (only one step's content renders at a time), so the claim this step
-        // makes has to be verified directly against the real API rather than
-        // through UI text that isn't showing the checklist right now.
+        // A reload on the silhouette step keeps the checklist off-screen, since only
+        // one step's content renders at a time, so this claim is verified against
+        // the real API.
         const accessToken = cleanupState.accessToken
         if (!accessToken) throw new Error('Expected an authenticated test user.')
         const garmentsResponse = await apiRequest({

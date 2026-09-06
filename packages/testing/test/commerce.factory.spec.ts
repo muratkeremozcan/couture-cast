@@ -19,18 +19,12 @@ import {
 } from '../src/factories/commerce.factory.js'
 
 /**
- * Story 5.1 commerce factories.
+ * The defaults encode migration constraints. A drifted fixture fails at the
+ * database with an opaque error; these cases catch it in an assertion first.
  *
- * The defaults in this factory encode migration constraints, so a fixture that
- * drifts fails at the database with an opaque error rather than in an
- * assertion. These cases pin the constraints that are easy to break silently:
- * the `webhook_secret_ref` pattern, the wildcard offer defaults that let a
- * `default-{category}` placeholder slot match at all, and the camelCase to
- * snake_case column mapping every persist function performs.
- *
- * Persistence is asserted against a stubbed Prisma client. These are unit
- * tests of the mapping and the cleanup registration; whether the columns
- * actually exist is the schema suite's job in `packages/db/test`.
+ * Persistence runs against a stubbed Prisma client, so a green run proves the
+ * camelCase to snake_case mapping and the cleanup registration. Whether the
+ * columns exist is the schema suite's job in `packages/db/test`.
  */
 
 type CreateStub = { create: ReturnType<typeof vi.fn> }
@@ -43,8 +37,8 @@ function stubPrisma(): {
   affiliateClick: CreateStub
   affiliateConversion: CreateStub
 } {
-  // Each stub echoes back the row Prisma would have returned, keyed on the id
-  // the fixture chose, so the registry assertions below are meaningful.
+  // Each stub echoes the row back so the registry assertions below can key on
+  // the id the fixture chose.
   const make = (): CreateStub => ({
     create: vi.fn(({ data }: { data: { id: string } }) => Promise.resolve(data)),
   })

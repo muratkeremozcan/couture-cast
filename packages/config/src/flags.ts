@@ -56,7 +56,23 @@ const FEATURE_FLAG_DEFINITIONS = {
     kind: 'boolean',
     defaultValue: false,
   },
-  community_feed_enabled: {
+  // Story 6.1: two kill switches, deliberately separate. Read gates the feed and
+  // the single-post lookup; write gates upload allocate, publish, report and
+  // withdraw. They are split because the beta needs to open reading to a cohort
+  // while posting stays shut, and because closing posting after a moderation
+  // incident must not also dark the feed for everyone already reading it.
+  //
+  // Same defaults-false reasoning as the other social and commerce flags: a
+  // degraded PostHog can never switch public posting or feed reading ON by
+  // accident. The `true` lives only in packages/db/prisma/seeds/feature-flags.ts,
+  // so the feature is on wherever the seed has run and off everywhere else,
+  // production included, until the beta gate in the roadmap is signed. An
+  // authenticated caller receives 503 COMMUNITY_FEED_DISABLED_MESSAGE when off.
+  community_read_enabled: {
+    kind: 'boolean',
+    defaultValue: false,
+  },
+  community_write_enabled: {
     kind: 'boolean',
     defaultValue: false,
   },

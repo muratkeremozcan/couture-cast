@@ -171,7 +171,7 @@ A couture-inspired, minimalist presentation that merges hourly weather intellige
 3. Premium users shall access a 7-day outlook planner with an outfit per day and ability to reshuffle recommendations.
    - Acceptance: Planner available behind Premium paywall; shuffle respects wardrobe availability.
 
-### FR3 — Wardrobe Management _(Phase 2 – Growth)_
+### FR3 — Wardrobe Management _(Phase 3 – Growth)_
 
 **Dependencies:** Enhances FR2 (provides wardrobe data to personalize outfit recommendations)
 
@@ -180,9 +180,9 @@ A couture-inspired, minimalist presentation that merges hourly weather intellige
 2. Users shall assemble and save custom outfit capsules for reuse.
    - Acceptance: Saved outfits can be favorited, renamed, and surfaced in recommendations when relevant.
 
-### FR4 — Community & Social Layer _(Phase 3 – Growth)_
+### FR4 — Community & Social Layer _(Phase 2 – Community Beta)_
 
-**Dependencies:** Requires FR2 (outfit content to share), FR3 (wardrobe for community posts)
+**Dependencies:** Requires FR2 (outfit content to share). FR3 wardrobe-sourced posts are Phase 3; Community Beta ships with direct photo upload.
 
 1. CoutureCast shall host a community feed filtered by location/climate bands with weekly themed challenges.
    - Acceptance: Feed supports post creation, image upload, trending challenge banner, and moderation flags.
@@ -190,10 +190,11 @@ A couture-inspired, minimalist presentation that merges hourly weather intellige
    - Acceptance: Reactions limited to curated palette; abusive content flag routes to moderation queue within 5 minutes.
 3. Community tab highlights top curated looks with click-to-buy CTAs when sponsorship is available.
    - Acceptance: Sponsored content labeled “Partnered”; analytics capture click event.
+   - Scope: the click-to-buy CTA depends on FR5 affiliate infrastructure, which carries the Phase 3 label and was delivered early with Epic 5. Community Beta surfaces the CTA only where a sponsorship is configured; the highlight module itself ships without one.
 4. Users shall export outfit cards to Pinterest, Instagram, Facebook, and TikTok via native share sheets with CoutureCast branding.
    - Acceptance: Exported assets respect luxury design, include optional watermark, and remove personal data; share sheet supports cancellation without data loss.
 
-### FR5 — Commerce & Monetization _(Phase 2 – Growth)_
+### FR5 — Commerce & Monetization _(Phase 3 – Growth)_
 
 **Dependencies:** Requires FR2 (outfit items for affiliate links and Premium features)
 
@@ -224,7 +225,7 @@ A couture-inspired, minimalist presentation that merges hourly weather intellige
 1. Anonymous event tracking shall cover activation steps, forecast views, outfit clicks, community actions, and commerce conversions.
    - Acceptance: Metrics align with success criteria; dashboards accessible to product/marketing.
 2. Moderation tooling shall queue flagged posts, capture action history, and escalate unresolved items at 24-hour SLA.
-   - Acceptance: Moderators can mark resolved, escalate, or ban; audit trail stored for 90 days.
+   - Acceptance: Moderators can mark resolved, escalate, or ban; immutable audit trail retained 12 months. The 90-day figure previously recorded here is superseded; 12 months is the retention floor.
 
 ### FR8 — CoutureCast Jr. Vision Foundation _(Vision)_
 

@@ -1,7 +1,22 @@
 import type { Prisma, PrismaClient } from '@prisma/client'
 import * as ritualFactories from '../../../testing/src/factories/ritual.factory.ts'
 
+import {
+  buildSeededCommunityObjectPath,
+  resolveCommunityStorageCredentials,
+  uploadSeededCommunityObject,
+} from './community-storage.js'
 import { unwrapCjsNamespace } from './interop.js'
+
+/**
+ * Fixed publication clock for seeded community posts (2026-01-01T00:00:00Z).
+ *
+ * The seed is re-run on every `db:reset`, and a wall-clock `new Date()` would
+ * give the same logical row a different `published_at` each time, which moves it
+ * in the `published_at,id` feed ordering and makes any test that pins a page of
+ * the seeded feed flake by construction.
+ */
+const SEEDED_PUBLICATION_EPOCH_MS = Date.UTC(2026, 0, 1)
 import type { SeededGarment } from './wardrobe.js'
 import type { SeededWeather } from './weather.js'
 
@@ -72,32 +87,76 @@ export async function seedRituals(
   await Promise.all(outfitPromises)
 
   const paletteInsights = await prisma.paletteInsights.findMany({ take: 5 })
-  const lookbookPromises = paletteInsights
+  // Storage credentials are resolved once, up front, so a misconfigured
+  // environment fails before any row is written rather than after some of them.
+  const storageCredentials = resolveCommunityStorageCredentials()
+
+  const lookbookPlans = paletteInsights
     .map((palette, idx) => {
       const ownerId = palette.user_id
       if (!ownerId) {
         return null
       }
-      return prisma.lookbookPost.upsert({
-        where: { id: `lookbook-${idx + 1}` },
-        update: {
-          user: { connect: { id: ownerId } },
-          palette_insight: { connect: { id: palette.id } },
-          image_urls: [`https://picsum.photos/seed/lookbook-${idx + 1}/800/600`],
-          climate_band: idx % 2 === 0 ? 'temperate' : 'cold',
-        },
-        create: {
-          id: `lookbook-${idx + 1}`,
-          user_id: ownerId,
-          palette_insight_id: palette.id,
-          image_urls: [`https://picsum.photos/seed/lookbook-${idx + 1}/800/600`],
-          caption: `Look ${idx + 1} — weather-ready layers`,
-          locale: 'en-US',
-          climate_band: idx % 2 === 0 ? 'temperate' : 'cold',
-        },
-      })
+      const postId = `lookbook-${idx + 1}`
+      const objectPath = buildSeededCommunityObjectPath(postId)
+      // Seeded posts are already published, so they need the publication clock
+      // the feed orders by. A published row with a NULL published_at sorts
+      // undefined under the `published_at,id` cursor and the database now
+      // rejects it outright; either way the seeded feed would be unreachable,
+      // which is exactly what the "seeded data makes both positive paths
+      // reachable" acceptance criterion is there to catch.
+      const publishedAt = new Date(SEEDED_PUBLICATION_EPOCH_MS + idx * 60_000)
+
+      return { palette, ownerId, postId, objectPath, publishedAt, idx }
     })
-    .filter(Boolean) as Promise<unknown>[]
+    .filter((plan): plan is NonNullable<typeof plan> => plan !== null)
+
+  // Objects first, rows second, deliberately.
+  //
+  // `CommunityService.buildFeedItems` drops any post whose image cannot be
+  // signed, so a row written ahead of its object is not a partially-seeded post:
+  // it is a post that does not appear in the feed at all, with no error anywhere
+  // to say why. Writing the object first means the only failure mode left is a
+  // loud one.
+  const uploads = await Promise.all(
+    lookbookPlans.map((plan) =>
+      uploadSeededCommunityObject(plan.postId, plan.objectPath, storageCredentials)
+    )
+  )
+
+  const lookbookPromises = lookbookPlans.map((plan, planIndex) => {
+    const upload = uploads[planIndex]
+    const shared = {
+      status: 'published',
+      image_object_path: plan.objectPath,
+      image_content_type: upload?.contentType ?? 'image/png',
+      image_byte_size: upload?.byteSize ?? null,
+      // The seeded alt text is the confirmed alt text; a published post with an
+      // unconfirmed one is the case the story forbids.
+      alt_text_confirmed_at: plan.publishedAt,
+      submitted_at: plan.publishedAt,
+      published_at: plan.publishedAt,
+      climate_band: plan.idx % 2 === 0 ? 'temperate_dry' : 'cold_dry',
+    } as const
+
+    return prisma.lookbookPost.upsert({
+      where: { id: plan.postId },
+      update: {
+        user: { connect: { id: plan.ownerId } },
+        palette_insight: { connect: { id: plan.palette.id } },
+        ...shared,
+      },
+      create: {
+        id: plan.postId,
+        user_id: plan.ownerId,
+        palette_insight_id: plan.palette.id,
+        caption: `Look ${plan.idx + 1} — weather-ready layers`,
+        alt_text: `Look ${plan.idx + 1} styled outfit for seasonal weather`,
+        locale: 'en-US',
+        ...shared,
+      },
+    })
+  }) as Promise<unknown>[]
 
   await Promise.all(lookbookPromises)
 

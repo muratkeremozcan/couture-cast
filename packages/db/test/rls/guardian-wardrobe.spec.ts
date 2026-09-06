@@ -247,32 +247,42 @@ describe.concurrent('guardian-aware RLS policies', () => {
   )
 
   scenarioTest(
-    'keeps social tables self-scoped until community sharing semantics exist',
+    'keeps lookbook posts out of reach of the owner and of a full-access guardian alike',
     async ({ scenario: seeded }) => {
-      await withRole(
-        'authenticated',
-        buildClaims(seeded.teenEmail, 'teen'),
-        async (client) => {
-          const ownPosts = await client.query(
-            'SELECT "id" FROM public."LookbookPost" WHERE "user_id" = $1',
-            [seeded.teenId]
-          )
+      // This test used to assert that the owner could read their own posts and
+      // that a guardian could not. Story 6.1 made LookbookPost API-only -- RLS
+      // on, zero policies, zero grants -- so the owner is refused too, and
+      // guardian consent grants nothing here because there is no policy for it
+      // to satisfy. Full reasoning is on `workerOnlyTables` in harness.ts.
+      //
+      // The owner-facing half of this matrix lives in community-posts.spec.ts;
+      // what this file still owns is the guardian actor, which that file has no
+      // fixtures for.
+      for (const email of [seeded.teenEmail, seeded.guardianFullAccessEmail]) {
+        await withRole('authenticated', buildClaims(email, 'guardian'), async (client) =>
+          expect(
+            client.query('SELECT "id" FROM public."LookbookPost" WHERE "user_id" = $1', [
+              seeded.teenId,
+            ])
+          ).rejects.toMatchObject({ code: '42501' })
+        )
+      }
 
-          expect(ownPosts.rows).toHaveLength(1)
-        }
-      )
-
+      // EngagementEvent went the same way in the same story, and for a sharper
+      // reason: its required `post_id` foreign key made owner-scoped INSERT
+      // rights a post-existence oracle against posts the client cannot read.
+      // The guardian is still denied it, so this test's original intent holds;
+      // what changed is the mechanism, from an empty result to a refusal.
       await withRole(
         'authenticated',
         buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
-        async (client) => {
-          const teenPosts = await client.query(
-            'SELECT "id" FROM public."LookbookPost" WHERE "user_id" = $1',
-            [seeded.teenId]
-          )
-
-          expect(teenPosts.rows).toHaveLength(0)
-        }
+        async (client) =>
+          expect(
+            client.query(
+              'SELECT "id" FROM public."EngagementEvent" WHERE "user_id" = $1',
+              [seeded.teenId]
+            )
+          ).rejects.toMatchObject({ code: '42501' })
       )
     }
   )

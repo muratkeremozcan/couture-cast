@@ -140,8 +140,8 @@ describe('individualTypologyAngle', () => {
 
 describe('classifyDepth: all four ITA band boundaries, both sides', () => {
   it.each([
-    // [ita, expected] — exclusive-lower / inclusive-upper: the boundary
-    // value itself belongs to the LOWER band, never the upper one.
+    // [ita, expected]. Exclusive-lower, inclusive-upper: the boundary value
+    // itself belongs to the LOWER band.
     [ITA_FAIR_MIN + 0.0001, 'fair'],
     [ITA_FAIR_MIN, 'light'],
     [ITA_FAIR_MIN - 0.0001, 'light'],
@@ -252,10 +252,10 @@ describe('classifyUndertone: every band, including the boundaries', () => {
 
 describe('hueAngleInterquartileSpread', () => {
   /**
-   * The property that makes the circular measure a strict improvement rather
-   * than a recalibration: for any sample that does not straddle the 0/360
-   * wrap, deviations from the mean direction are a pure translation of the
-   * inputs, and the interquartile range is translation-invariant.
+   * The property that makes the circular measure a strict improvement: for any
+   * sample that does not straddle the 0/360 wrap, deviations from the mean
+   * direction are a pure translation of the inputs, and the interquartile range
+   * is translation-invariant.
    */
   it('5.4-UTIL-050 matches a plain interquartile range on a sample that does not wrap', () => {
     const angles = [40, 44, 48, 52, 56, 60]

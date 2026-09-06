@@ -1,8 +1,7 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Story 4.4 Task 7 step 1 owner: prove the silhouette-slider and "My Form"
-// Zod schemas parse and reject correctly, mirroring wardrobe-contract.spec.ts's
-// structure.
+// Zod schemas parse and reject correctly.
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { z } from 'zod'
 import {
@@ -409,8 +408,8 @@ describe('Wardrobe Silhouette HTTP Contracts', () => {
 
     it('does not require `error` on the 428 precondition-required envelope', () => {
       // `parseSilhouetteIfMatchHeader` raises a bare `HttpException`, which
-      // Nest serializes with no `error` reason phrase -- unlike the 412
-      // envelope, whose Nest exception class always adds one.
+      // Nest serializes with no `error` reason phrase. The 412 envelope comes
+      // from a Nest exception class, which always adds one.
       const schema = spec.components?.schemas?.['SilhouettePreconditionRequiredError'] as
         | { required?: string[] }
         | undefined

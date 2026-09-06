@@ -1,13 +1,9 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Story 4.4 Task 5 owner: unit-test the web wardrobe onboarding guided flow's
-// bootstrap and step-advance failure paths. Split out of `page.test.tsx`
-// (Claude's TEA test review on PR #120, story 4.4 tasks 8/9): that file had
-// grown past this repo's 1000-line test-file ceiling with 3 independent
-// describe blocks. Verbatim test bodies, no behavior change -- only the file
-// boundary moved, and this file's preamble is trimmed to what only these
-// tests use (no starter-wardrobe/tagging fixtures, no `WardrobeOnboardingPageForTests`
-// poll-interval override, no `captureAndCommitGarment`/`CONFIRM_CHECKBOX_LABEL`).
+// bootstrap and step-advance failure paths. Split out of `page.test.tsx` when that
+// file passed this repo's 1000-line test-file ceiling; the remaining guided-flow
+// paths live in `page.remaining-paths.test.tsx`.
 // @vitest-environment jsdom
 import React from 'react'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'

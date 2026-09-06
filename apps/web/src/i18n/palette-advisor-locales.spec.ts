@@ -8,16 +8,15 @@
 // child out alongside `theme`, so its pinned 5.2 key list keeps meaning exactly what it
 // meant before, and this file owns the palette keys outright.
 //
-// The key set is NOT hand-pinned here. It is derived from the contract itself --
-// `PALETTE_ADVISOR_LOCALE_KEYS` plus every `AdvisorRuleEntry.labelKey` in
-// `ADVISOR_RULES` -- because the failure this spec exists to catch is drift between the
-// rule table and the copy that names its shades. A hand-written list would have to be
-// edited in lockstep with the rule table by the same person who forgot to edit the
-// catalogs, which is not a check at all. Adding a shade to `ADVISOR_RULES` now fails
+// The key set is derived from the contract itself: `PALETTE_ADVISOR_LOCALE_KEYS` plus
+// every `AdvisorRuleEntry.labelKey` in `ADVISOR_RULES`. The failure this spec exists to
+// catch is drift between the rule table and the copy that names its shades, and a
+// hand-written list would have to be edited in lockstep with the rule table by the same
+// person who forgot to edit the catalogs. Adding a shade to `ADVISOR_RULES` now fails
 // here until all ten catalogs carry its label.
 //
 // All non-English values are machine-translation drafts pending human review before
-// release (AC 8 / PRD NFR Localization 1) — the parity checks hold the tree together
+// release (AC 8 / PRD NFR Localization 1). The parity checks hold the tree together
 // until that review lands.
 import { describe, expect, it } from 'vitest'
 import {
@@ -65,7 +64,7 @@ const KEY_PREFIX = 'commerce.premium.palette.'
  * genuinely leave alone: "Blush" is the loanword the beauty industry uses in French,
  * Italian and both Portuguese variants; German writes "Warm", "Neutral" and
  * "Foundation" exactly as English does; and French "Olive" is spelled the same. Nothing
- * here is a shade name left untranslated for convenience -- all forty-four
+ * here is a shade name left untranslated for convenience: all forty-four
  * `ADVISOR_RULES` labels are translated in all ten catalogs, which is what makes
  * Decision 6's "no English shade name reaches a component" true on the copy side too.
  */

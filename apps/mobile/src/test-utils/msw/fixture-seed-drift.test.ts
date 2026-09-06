@@ -12,8 +12,8 @@ import { mockRitualResponse, mockShopThisLook } from './handlers'
  * `garmentCategory` outside the contract's enums looks fine in jsdom and fails
  * only on a device.
  *
- * This is the shape half of the fixture-vs-seed drift guard. The other half --
- * "no Maestro flow may assert a value that exists only in these mocks" -- needs
+ * This is the shape half of the fixture-vs-seed drift guard. The other half,
+ * "no Maestro flow may assert a value that exists only in these mocks", needs
  * the filesystem and lives in `packages/db/test/mock-vs-seed-drift.spec.ts`,
  * next to the seeds whose output it is protecting.
  */

@@ -7,7 +7,9 @@
 
 Thin Turborepo for Couture Cast apps and smoke tests. Keep it lean: shared lint config, root Playwright, and a minimal Maestro sanity.
 
-> **Usage notice:** All rights reserved. No use, reproduction, or distribution without explicit permission from Couture Cast authors.
+> **Usage notice:** Copyright (c) 2024-2026 Murat K Ozcan. All rights reserved.
+> This is publicly visible proprietary source. See [LICENSE](LICENSE). No permission
+> is granted to use, copy, modify, distribute, host, or deploy it.
 
 ## Prerequisites
 

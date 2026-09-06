@@ -40,7 +40,7 @@ describe('Localization Formatters', () => {
 
     it('should format EUR for fr-FR', () => {
       const result = formatCurrency(100, 'fr-FR')
-      // Note: fr-FR puts symbol at the end: '100,00 €'
+      // fr-FR puts the symbol at the end: '100,00 €'
       expect(result).toContain('€')
     })
 

@@ -4,7 +4,7 @@
 // resolves to `../test-utils/mocks/react-native-purchases`); importing the
 // mock file directly yields the same module instance, typed as the mock, so
 // tests drive the exact functions `premium.ts` will lazily import. Poll tests
-// run on fake timers — no wall-clock sleeps anywhere (story test-plan rule).
+// run on fake timers; no wall-clock sleeps anywhere (story test-plan rule).
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Platform } from 'react-native'

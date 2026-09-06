@@ -7,7 +7,7 @@
 // file owns them outright.
 //
 // All non-English values are machine-translation drafts pending human review before
-// release (AC 7) -- the parity checks hold the tree together until that review lands.
+// release (AC 7); the parity checks hold the tree together until that review lands.
 import { describe, expect, it } from 'vitest'
 
 import deDE from '../../assets/locales/de-DE.json'

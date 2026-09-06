@@ -27,7 +27,6 @@ test.describe('Comfort Preferences API – user personalized comfort settings', 
       fallback: 'http://localhost:4000',
     })
 
-    // Sign up a user
     const signupPayload = createTeenSignupPayload(testInfo, 'comfort-e2e-user')
     const signupResponse = await apiRequest({
       method: 'POST',

@@ -1,13 +1,13 @@
 ---
 baseline_commit: e7e94a756051fe3be327818d2244eeb061b15382
-status: review
+status: done
 ---
 
 <!-- markdownlint-disable MD013 MD024 MD036 -->
 
 # Story 5.5: Premium 7-day outfit planner
 
-Status: review
+Status: done
 
 **Story key:** `5-5-premium-7-day-outfit-planner`
 **Epic:** 5, Commerce & Premium Enhancements, Phase 2
@@ -1071,3 +1071,52 @@ $n` re-evaluation semantics under concurrent writers; re-ran both the unit suite
 - `maestro/premium-planner.yaml` (A)
 - `scripts/maestro-flow-durations.json` (M)
 - `_bmad-output/implementation-artifacts/deferred-work.md` (M)
+
+**Post-review fixes on PR #141 — CI gates and defects found after the story moved to review**
+
+These landed in the same squashed commit (`f95c09fa`) after the Task 9/10 sections above were
+written, so they were missing from this File List until 2026-09-05.
+
+- `packages/api-client/src/contracts/http/weather.ts` (M — adds
+  `nullableWeatherConditionSchema`. `planner.ts` had called `.nullable()` directly on the shared
+  `weatherConditionSchema`, and `openapi.ts`'s `preserveNullableEnumValues` post-pass appends
+  `null` into that schema's own `_def.values` array by reference, which added `null` to the
+  condition enum on the unrelated `GET /api/v1/ritual` and `GET /api/v1/weather/{locationKey}`
+  responses and failed Optic's breaking-change check. Same hazard `premium-theme.ts`'s
+  `nullablePremiumThemeKeySchema` documents from story 5.3)
+- `packages/api-client/testing/planner-analytics.spec.ts` (A — `packages/api-client` coverage fell
+  to 98.37% functions against a 99% threshold because story 5.5's own two analytics builders had
+  no dedicated spec, unlike every other event in the package. Carries `5.5-CON-020` through
+  `5.5-CON-027`)
+- `packages/api-client/src/contracts/http/localization.ts` (M — `resolveAcceptLanguage`'s
+  `.split('=')[1] ?? ''` fallback was unreachable, since a parameter only reaches that line after
+  matching `startsWith('q=')`. Rewritten to `.slice(2)` off the pre-trimmed match. Pre-existing and
+  unrelated to this story; surfaced by the workspace-wide coverage percentage)
+- `pact/http/vitest.consumer.config.mts` (M — bounded retry against a PactV4 FFI mock-server
+  timing race, root-caused by reproducing it at roughly a 33% per-run rate with 12 of 14 local
+  cores saturated. A different, unrelated interaction fails each time)
+- `apps/mobile/src/lib/planner.test.ts` (A) and `apps/mobile/src/lib/palette-advisor.test.ts` (A)
+  and `apps/mobile/src/lib/premium-theme.test.ts` (M — `apps/mobile` coverage fell short of the
+  gate at 91.77% statements and 86.08% branches. Direct network-boundary unit tests through MSW
+  took `planner.ts` to 100% statements and 94.59% branches, and the workspace to 92.06% and
+  87.12%)
+- `apps/web/src/lib/planner.test.ts` (A — the same gap on web: every failure-reason branch was
+  reachable only through a full render. Added alongside the `planner-rail.test.tsx` cases for
+  abort-on-close of an in-flight reshuffle, the window-focus refresh, entitlement lapsing
+  mid-reshuffle, and Tab/Shift+Tab wrapping)
+- `apps/web/src/app/components/planner-rail.tsx` (M, a second contrast defect: the
+  unavailable-weather note used `text-neutral-500` against `--theme-card-bg` at 4.35:1, under
+  WCAG's 4.5:1 small-text minimum. Found by `planner.spec.ts`'s real-stack axe scan
+  (`5.5-E2E-02`), fixed with `--theme-card-text` at 8:1 or better in all four premium themes)
+- `apps/web/src/app/components/lookbook-prism-layout.tsx` (M — React error #418 on `/` during the
+  PR burn-in. `isNarrowViewport` used a window-dependent lazy `useState` initializer, so a narrow
+  client disagreed with the server's markup on the first hydration render. Now initializes to
+  `false` and corrects itself in the existing resize effect's mount run)
+- `playwright/tests/premium-subscription.spec.ts` (M — four `5.2-E2E-011` tests waited on the
+  `/api/v1/commerce/subscription` read that Decision 7 removed, and asserted the old always-open
+  rail. Updated to watch the planner URL, expect `403`, and use `ensurePremiumSeedLocation`)
+- `maestro/subflows/absorb-expo-dev-sheet.yaml` (A) and `maestro/subflows/open-settings.yaml` (M)
+  and `maestro/subflows/open-wardrobe-tab.yaml` (M — Android shard 3 failed with
+  `id: wardrobe-screen is visible` false while Expo Go's one-time developer sheet covered the tab
+  bar. This PR's larger bundle pushed the sheet's rise past `open-app.yaml`'s absorb window. The
+  proven absorb sequence is now a shared subflow both tab-navigation subflows call)

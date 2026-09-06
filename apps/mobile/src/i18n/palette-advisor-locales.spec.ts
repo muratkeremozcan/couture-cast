@@ -4,28 +4,20 @@
 // tree.
 //
 // The mobile sibling of `apps/web/src/i18n/palette-advisor-locales.spec.ts`, and the
-// mobile half of AC 8. Both surfaces ship the same hundred keys with the same copy,
-// which is deliberate rather than duplication worth trimming: the consent promise, the
-// sponsored disclosure and the forty-four shade names all describe the same server
-// behaviour, so copy that drifts on one surface fails on that surface's own spec rather
-// than being noticed late by a reader comparing screenshots.
+// mobile half of AC 8. Both surfaces ship the same hundred keys with the same copy: the
+// consent promise, the sponsored disclosure and the forty-four shade names all describe
+// the same server behaviour, so copy that drifts on one surface fails on that surface's
+// own spec.
 //
-// A new feature area gets its own dedicated parity spec rather than an extension of
-// `premium-locales.spec.ts` (Decision 15, the same reasoning 5.3 recorded and 5.2 before
-// it). The two specs are siblings: `premium-locales.spec.ts` now filters this `palette`
+// A new feature area gets its own dedicated parity spec (Decision 15, the same reasoning
+// 5.3 recorded and 5.2 before it). `premium-locales.spec.ts` now filters this `palette`
 // child out alongside `theme`, so its pinned 5.2 key list keeps meaning exactly what it
 // meant before, and this file owns the palette keys outright.
 //
-// The key set is NOT hand-pinned here. It is derived from the contract itself --
-// `PALETTE_ADVISOR_LOCALE_KEYS` plus every `AdvisorRuleEntry.labelKey` in
-// `ADVISOR_RULES` -- because the failure this spec exists to catch is drift between the
-// rule table and the copy that names its shades. A hand-written list would have to be
-// edited in lockstep with the rule table by the same person who forgot to edit the
-// catalogs, which is not a check at all. Adding a shade to `ADVISOR_RULES` now fails
-// here until all ten catalogs carry its label.
+// The key set is derived from the contract itself; `5.4-I18N-MOB-03` records why.
 //
 // All non-English values are machine-translation drafts pending human review before
-// release (AC 8 / PRD NFR Localization 1) — the parity checks hold the tree together
+// release (AC 8 / PRD NFR Localization 1); the parity checks hold the tree together
 // until that review lands.
 import { describe, expect, it } from 'vitest'
 import {
@@ -90,7 +82,7 @@ const KEY_PREFIX = 'commerce.premium.palette.'
  * genuinely leave alone: "Blush" is the loanword the beauty industry uses in French,
  * Italian and both Portuguese variants; German writes "Warm", "Neutral" and
  * "Foundation" exactly as English does; and French "Olive" is spelled the same. Nothing
- * here is a shade name left untranslated for convenience -- all forty-four
+ * here is a shade name left untranslated for convenience; all forty-four
  * `ADVISOR_RULES` labels are translated in all ten catalogs, which is what makes
  * Decision 6's "no English shade name reaches a component" true on the copy side too.
  */

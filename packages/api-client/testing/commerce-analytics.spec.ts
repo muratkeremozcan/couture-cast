@@ -15,11 +15,6 @@ import { DISALLOWED_ANALYTICS_PROPERTY_FIXTURES } from '../src/testing/commerce-
 /**
  * Story 5.1 commerce analytics wrappers.
  *
- * Split from `commerce-contract.spec.ts` on the same line this package already
- * draws for wardrobe: `*-contract.spec.ts` asserts the published request and
- * response shapes, `*-analytics.spec.ts` asserts the event builders. The two
- * are separate concerns and separate owners.
- *
  * Parsing a property schema is NOT the same as exercising the wrapper that
  * feeds it. The wrappers are where distinctId is chosen, where the camelCase
  * event is mapped onto snake_case properties, and where a bad locale region is
@@ -184,10 +179,9 @@ describe('5.1 commerce analytics wrappers', () => {
       for (const forbidden of DISALLOWED_ANALYTICS_PROPERTY_FIXTURES) {
         const field = Object.keys(forbidden)[0] ?? 'unknown'
         it(`5.1-CONTRACT-21 ${event} rejects ${field}`, () => {
-          // The allowlists are `.strict()`, so this is real enforcement rather
-          // than a convention: a caller that attaches a URL, a product title, a
-          // garment id, or a raw user id gets a parse failure at the wrapper
-          // instead of a silent leak into PostHog.
+          // The allowlists are `.strict()`, so a caller that attaches a URL, a
+          // product title, a garment id, or a raw user id gets a parse failure
+          // at the wrapper before anything reaches PostHog.
           expect(() =>
             schema.parse({ ...VALID_PROPERTIES[event], ...forbidden })
           ).toThrow()

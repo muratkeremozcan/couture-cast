@@ -1,34 +1,20 @@
-// Story 5.3 Task 7 owner: the deliberately-deferred Playwright half of the premium
-// theme switcher (`premium-theme-section.tsx`, `apps/web/src/lib/premium-theme.ts`).
-// See `_bmad-output/implementation-artifacts/5-3-premium-theme-switcher.md` Decisions
-// 2, 6, 7, 9, 11, AC 1/2/4/5/6, and `deferred-work.md`'s "Pact interactions and the
-// Playwright spec (Task 7)" entry, which is what this file closes out. 5.3-E2E-010 and
-// 5.3-E2E-011 are reserved by the story's own coverage matrix; 5.3-E2E-012 and
-// 5.3-E2E-013 are minted here because Task 7 was cancelled before those two scenarios
-// (signed-in non-entitled locked state, and the unrecognized-stored-value fallback)
-// were assigned ids of their own.
+// Story 5.3: the Playwright half of the premium theme switcher
+// (`premium-theme-section.tsx`, `apps/web/src/lib/premium-theme.ts`). 5.3-E2E-010 and
+// 5.3-E2E-011 come from the story's own coverage matrix; 5.3-E2E-012 and 5.3-E2E-013
+// are minted here for the two scenarios Task 7 never assigned ids to: the signed-in
+// non-entitled locked state and the unrecognized-stored-value fallback.
 //
-// STRUCTURE MIRRORS `premium-subscription.spec.ts` (Story 5.2, same domain): the same
-// network-first `open*Settings` helper built on `interceptNetworkCall`, the same
-// `log.step` narration, and the same signed-out zero-network-call pattern via
-// `page.route` + `route.fallback()` (an `interceptNetworkCall` promise only resolves
-// once a matching call happens, so it cannot prove the *absence* of one — this is the
-// one place a raw route handler is used instead, exactly as 5.2's own signed-out test
-// does for the subscription endpoint).
-//
-// WRITE-SAFETY DIVERGES FROM 5.2 (read `premium-session.ts`'s doc-comment before
-// touching this file). `PremiumEntitlement` is worker-only, so 5.2's seeded-user
-// fixtures are read-only by construction. `PremiumThemePreference` is different: it is
-// the one row an entitled user can write through the public API, which is the feature
-// under test. The seeded `'active'` user is shared across parallel workers
-// (`PREMIUM_SEED_USERS`, `packages/db/prisma/seeds/commerce.ts`), so the one test that
-// writes a real palette to it runs in its own `describe` block under
-// `test.describe.configure({ mode: 'serial' })` — a standard Playwright API with no
-// prior use in this repo, which is fine; it is the correct tool for "one shared row,
-// one writer at a time." `beforeEach`/`afterEach` both reset the row to Default via a
-// direct `PUT { theme: null }` (never a delete — Decision 8), so a run that crashes
-// mid-test still leaves the fixture clean for the next one, and a fresh checkout with
-// no prior run still starts from a known state.
+// WRITE SAFETY (read `premium-session.ts`'s doc-comment before touching this file).
+// `PremiumEntitlement` is worker-only, so Story 5.2's seeded-user fixtures are
+// read-only by construction. `PremiumThemePreference` is the one row an entitled user
+// can write through the public API, which is the feature under test. The seeded
+// `'active'` user is shared across parallel workers (`PREMIUM_SEED_USERS`,
+// `packages/db/prisma/seeds/commerce.ts`), so the one test that writes a real palette
+// to it runs in its own `describe` block under
+// `test.describe.configure({ mode: 'serial' })`: one shared row, one writer at a time.
+// `beforeEach`/`afterEach` both reset the row to Default via a direct
+// `PUT { theme: null }`, and Decision 8 forbids deleting it, so a run that crashes
+// mid-test still leaves the fixture clean for the next one.
 import type { Locator, Page } from '@playwright/test'
 import type { ApiRequestFixtureParams } from '@seontechnologies/playwright-utils/api-request'
 import { log } from '@seontechnologies/playwright-utils/log'
@@ -73,9 +59,8 @@ function watchThemeCall(
 }
 
 /**
- * Network-first, like the commerce and subscription suites' own `openSettings`: the
- * theme read is registered before the navigation that triggers it, so the spec never
- * races the page.
+ * Network-first: the theme read is registered before the navigation that triggers
+ * it, so the spec never races the page.
  */
 async function openThemeSettings(
   page: Page,
@@ -92,9 +77,8 @@ async function openThemeSettings(
 }
 
 /**
- * The apiRequest fixture is overloaded (classic and operation-based), so the
- * classic parameter shape is referenced directly rather than re-declared
- * (mirrors `capsule-session.ts`'s `ApiRequestFn`).
+ * The apiRequest fixture is overloaded (classic and operation-based), so the classic
+ * parameter shape is referenced directly. Mirrors `capsule-session.ts`.
  */
 type ApiRequestFn = <T = unknown>(
   params: ApiRequestFixtureParams
@@ -104,12 +88,10 @@ async function resetSeededTheme(
   apiRequest: ApiRequestFn,
   session: PremiumSession
 ): Promise<void> {
-  // Direct PUT, not through the UI: this runs in `beforeEach`/`afterEach`, before and
-  // after the one test in the serial block that actually exercises the gallery.
   // `{ theme: null }` upserts to Default; per Decision 8 the row is never deleted.
-  // Asserted rather than fire-and-forget: this row is shared across parallel workers,
-  // so a silently failed reset would leave the next run's first assertion pointing at
-  // the wrong symptom instead of the actual cleanup failure.
+  // The response is asserted because the row is shared across parallel workers: a
+  // silently failed reset would point the next run's first assertion at the wrong
+  // symptom.
   const response = await apiRequest({
     method: 'PUT',
     path: THEME_PATH,
@@ -138,9 +120,8 @@ function paletteState(page: Page, dataTheme: string): Locator {
 
 /**
  * Every `PaletteCard` pins its own `data-theme`, so a card rendering correctly proves
- * nothing about whether the attribute actually reached `<html>`. This is the DOM proof
- * that it did — read via `page.evaluate` rather than a `page.locator('html')` CSS
- * selector, consistent with this suite's resilient-selector convention.
+ * nothing about whether the attribute reached `<html>`. This is the DOM proof that it
+ * did.
  */
 async function htmlDataTheme(page: Page): Promise<string | null> {
   return page.evaluate(() => document.documentElement.getAttribute('data-theme'))
@@ -151,9 +132,9 @@ anonymousTest.describe('Story 5.3 premium theme switcher, signed out', () => {
     '[P0] 5.3-E2E-011 shows the locked upsell signed out with no theme read, +axe',
     async ({ page }) => {
       let themeRequests = 0
-      // playwright-utils deviation: interceptNetworkCall's promise only resolves on a
-      // matching call, so it cannot structurally prove an absence of one; see the file
-      // header for the full rationale.
+      // playwright-utils deviation: `interceptNetworkCall`'s promise resolves only on
+      // a matching call, so it cannot prove the ABSENCE of one. Counting through
+      // `page.route` + `route.fallback()` can.
       await page.route(THEME_URL, async (route) => {
         themeRequests += 1
         await route.fallback()
@@ -173,9 +154,8 @@ anonymousTest.describe('Story 5.3 premium theme switcher, signed out', () => {
       )
       await expect(gallery(page)).toHaveCount(0)
 
-      // Theme reads are not entitlement-gated, but there is still no session to spend a
-      // call on: mirrors the `subscriptionRequests` zero-call assertion in
-      // `premium-subscription.spec.ts`'s own signed-out test.
+      // Theme reads are not entitlement-gated, and there is still no session to spend
+      // a call on.
       expect(themeRequests).toBe(0)
 
       await log.step('Scan the locked settings page for accessibility violations')
@@ -223,8 +203,8 @@ premiumSeededTest.describe(
   'Story 5.3 premium theme switcher, seeded active subscriber (serial write journey)',
   () => {
     premiumSeededTest.use({ premiumSeedUser: 'active' })
-    // See the file header: this row is shared across parallel workers and this is the
-    // one test in the file that writes to it for real, so it runs alone.
+    // This row is shared across parallel workers and this is the one test in the file
+    // that writes to it for real, so it runs alone. See the file header.
     premiumSeededTest.describe.configure({ mode: 'serial' })
 
     premiumSeededTest.beforeEach(async ({ premiumSession, apiRequest }) => {
@@ -277,8 +257,8 @@ premiumSeededTest.describe(
         )
         await expect(paletteState(page, 'autumn_umber')).toHaveText('Selected')
         await expect(page.getByTestId('premium-theme-preview')).toBeVisible()
-        // The one element that pins no palette of its own, so this is the real proof
-        // the attribute write reached the DOM rather than just the wire.
+        // The one element that pins no palette of its own, so this is the proof the
+        // attribute write reached the DOM and not only the wire.
         expect(await htmlDataTheme(page)).toBe('autumn_umber')
 
         await log.step(
@@ -326,34 +306,31 @@ premiumSeededTest.describe(
   'Story 5.3 premium theme switcher, unrecognized stored value',
   () => {
     premiumSeededTest.use({ premiumSeedUser: 'active' })
-    // No serial lock needed here: the GET is fully stubbed below and no real write
-    // touches the shared row, so this is safe to run concurrently with the serial
-    // block above.
+    // No serial lock: the GET is fully stubbed below and no real write touches the
+    // shared row, so this is safe alongside the serial block above.
 
     premiumSeededTest(
       '[P0] 5.3-E2E-013 falls back to Default when the stored theme is not one this build recognizes',
       async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
         /*
-         * ARRANGEMENT NOTE: `PremiumThemeKey` is a real Postgres enum
+         * WHY THE GET IS STUBBED. `PremiumThemeKey` is a real Postgres enum
          * (`jewel_radiance | autumn_umber | winter_metallic`, `schema.prisma:192`), so
-         * the database physically cannot hold a value outside that set — there is no
-         * `INSERT` or migration path in this codebase that produces a genuinely stale
-         * row to seed directly, unlike a nullable free-text column. The server's own
-         * defense against this (`premium-theme.service.ts`'s `isEnumConversionError`
-         * catching Prisma's P2023) only fires against a database that predates a
-         * palette this build still expects, which is not reproducible by seeding
-         * either. Stubbing the GET response is therefore the real code path AC 6
-         * actually protects on the client: `resolvePremiumThemeKey`'s `safeParse`
-         * fallback in `apps/web/src/lib/premium-theme.ts`, exercised exactly as a
-         * response carrying an unrecognized `theme` string would exercise it.
+         * the database physically cannot hold a value outside that set and no `INSERT`
+         * or migration path in this codebase produces a genuinely stale row to seed.
+         * The server's own defense (`premium-theme.service.ts`'s
+         * `isEnumConversionError` catching Prisma's P2023) only fires against a
+         * database that predates a palette this build still expects, which seeding
+         * cannot reproduce either. The stub exercises the client path AC 6 protects:
+         * `resolvePremiumThemeKey`'s `safeParse` fallback in
+         * `apps/web/src/lib/premium-theme.ts`.
          */
         await log.step(
           'Stub the GET with a theme value from a since-deferred palette (see note above)'
         )
-        // Page errors only, not console errors: an unrelated console.error (a failed
-        // asset request, a third-party script, a warning logged at error level) would
-        // fail this test with no defect in the theme fallback. The error-panel and
-        // Default-selected assertions below already prove the fallback itself.
+        // Page errors only. An unrelated console.error (a failed asset request, a
+        // third-party script, a warning logged at error level) would fail this test
+        // with no defect in the theme fallback, and the error-panel and
+        // Default-selected assertions below already prove the fallback.
         const pageErrors: string[] = []
         page.on('pageerror', (error) => {
           pageErrors.push(error.message)
@@ -366,8 +343,8 @@ premiumSeededTest.describe(
             status: 200,
             body: {
               // Spring Bloom is a real named palette (UX spec, "future") that this
-              // build's contract enum does not include — an apt stand-in for "a key
-              // from a palette that no longer exists" / "not yet shipped".
+              // build's contract enum does not include, so it stands in for a key
+              // from a palette that no longer exists.
               data: { theme: 'spring_bloom', isEntitled: true, themesEnabled: true },
             },
           },
@@ -385,7 +362,7 @@ premiumSeededTest.describe(
 
         // `resolvePremiumThemeKey('spring_bloom')` fails the enum `safeParse` and
         // resolves to `null`, which is also the Default card's own `key`, so Default
-        // reads as selected rather than nothing being selected.
+        // reads as selected.
         await expect(paletteOption(page, 'default')).toHaveAttribute(
           'aria-pressed',
           'true'

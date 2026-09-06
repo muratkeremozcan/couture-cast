@@ -13,11 +13,9 @@ import {
 } from '@couture/utils'
 import posthog from 'posthog-js'
 import { pollWebEvents } from '../../lib/events-client'
+import { isCommunityPostVisibleFromWeb } from '../../lib/community'
 import type { ChipCategory } from '../components/chip-navigation'
-import {
-  findLookbookFilterByCardId,
-  type FilterCategory,
-} from '../components/community-lookbook-grid'
+import type { FilterCategory } from '../components/community-lookbook-grid'
 
 export interface ApplyDeepLinkOptions {
   rawParams: Record<string, unknown>
@@ -28,15 +26,26 @@ export interface ApplyDeepLinkOptions {
   setHighlightedCardId: (id: string | undefined) => void
   setLiveAnnouncement: (announcement: string | null) => void
   setIsInvalidDeepLink: (invalid: boolean) => void
+  /** Cancels the community visibility probe when the caller unmounts. */
+  signal?: AbortSignal
 }
 
+/**
+ * Every widget slot lands on the `auto` feed.
+ *
+ * The chip category each scenario selects is unchanged -- it still drives the
+ * hero copy and `data-chip-category`. What changed is the feed filter beside
+ * it: `New`, `Following` and `Brands` were chips with no server behind them,
+ * which the spec's Boundaries forbid, so the only real destination for all
+ * three is the viewer's own climate band.
+ */
 const SCENARIO_DESTINATIONS: Record<
   ReturnType<typeof resolveDeepLinkScenario>,
   { chip: ChipCategory; filter: FilterCategory }
 > = {
-  morning: { chip: 'Personal', filter: 'New' },
-  midday: { chip: 'Community', filter: 'Following' },
-  evening: { chip: 'Sponsored', filter: 'Brands' },
+  morning: { chip: 'Personal', filter: 'auto' },
+  midday: { chip: 'Community', filter: 'auto' },
+  evening: { chip: 'Sponsored', filter: 'auto' },
 }
 
 function handleWidgetDeepLink(slot: DeepLinkSlot, options: ApplyDeepLinkOptions) {
@@ -119,13 +128,19 @@ export async function processWebDeepLink(options: ApplyDeepLinkOptions) {
       invalidDeepLink(options, 'Community card target was not found')
       return
     }
-    const filter = findLookbookFilterByCardId(payload.cardId)
-    if (!filter) {
+    // Asking the server is the only honest way to know whether the target is
+    // visible: the referenced card can sit far outside the first feed page, and
+    // it may have been withdrawn or removed since the notification was sent.
+    // The predecessor here answered `'auto'` for every unknown id, which landed
+    // the reader on an unrelated filter with nothing highlighted and made the
+    // invalid-link branch below unreachable.
+    const isVisible = await isCommunityPostVisibleFromWeb(payload.cardId, options.signal)
+    if (!isVisible) {
       invalidDeepLink(options, 'Community card target was not found')
       return
     }
     options.setChipCategory('Community')
-    options.setActiveTab(filter)
+    options.setActiveTab('auto')
     options.setHighlightedCardId(payload.cardId)
   } else {
     invalidDeepLink(options, 'Deep link target was not found')

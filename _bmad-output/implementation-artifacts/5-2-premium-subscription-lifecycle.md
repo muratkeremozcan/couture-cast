@@ -6,7 +6,7 @@ baseline_commit: 0e22a7c62ebe0de888c18bf8b351924d0032fe8e
 
 # Story 5.2: Premium subscription lifecycle
 
-Status: in-progress
+Status: done
 
 **Story key:** `5-2-premium-subscription-lifecycle` · **Epic:** 5 — Commerce & Premium Enhancements (Phase 2)
 **Baseline commit:** `0183954` (branch tip == `main` after story 5.1, PR #124, and the RLS falsifiability fix, PR #125)

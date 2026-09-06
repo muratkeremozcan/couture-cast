@@ -22,6 +22,7 @@ import { createMobileApiClient } from '../../../apps/mobile/src/lib/api-client'
 import {
   pactEventAuth,
   pactTeenAuth,
+  pactAdminAuth,
   verifyApiHealthInteraction,
   verifyEventsPollInteraction,
   verifyInvalidCursorInteraction,
@@ -94,6 +95,28 @@ import {
   verifyPlannerReshuffleInteraction,
   verifyPlannerReshuffleUnchangedInteraction,
   verifyPlannerReshuffleConflictInteraction,
+  // Story 6.1 community feed by climate band.
+  verifyCommunityFeedInteraction,
+  verifyCommunityFeedBandUnresolvedInteraction,
+  verifyCommunityFeedRemovedContentInteraction,
+  verifyCommunityFeedRejectionInteraction,
+  communityFeedRejections,
+  verifyCommunityPostInteraction,
+  verifyCommunityPostNotFoundInteraction,
+  verifyAllocateCommunityPostInteraction,
+  verifyAllocateCommunityPostReplayInteraction,
+  verifyAllocateCommunityPostMismatchInteraction,
+  verifyPublishCommunityPostInteraction,
+  verifyPublishCommunityPostConflictInteraction,
+  verifyCommunityRateLimitInteraction,
+  communityRateLimitInteractions,
+  verifyReportCommunityPostInteraction,
+  verifyReportCommunityPostRejectionInteraction,
+  communityReportRejections,
+  verifyReportCommunityPostRateLimitInteraction,
+  verifyCreateCommunityChallengeInteraction,
+  verifyCreateCommunityChallengeRejectionInteraction,
+  communityChallengeRejections,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -114,6 +137,18 @@ function createMobileTeenClientForMockServer(mockServer: V3MockServer) {
   return createMobileApiClient({
     baseUrl: mockServer.url,
     accessToken: pactTeenAuth.accessToken,
+  })
+}
+
+/**
+ * Story 6.1: the community challenge routes mount `RolesGuard` with
+ * `@Roles('admin')`, and the guard runs for real in the provider fixture, so
+ * recording that surface honestly needs an actual admin actor.
+ */
+function createMobileAdminClientForMockServer(mockServer: V3MockServer) {
+  return createMobileApiClient({
+    baseUrl: mockServer.url,
+    accessToken: pactAdminAuth.accessToken,
   })
 }
 
@@ -430,4 +465,112 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
   it('rejects a planner reshuffle at a stale version', async () => {
     await verifyPlannerReshuffleConflictInteraction(pact)
   })
+  // Story 6.1: the community feed by climate band. `x-couture-platform` is
+  // passed as a literal per consumer, so this pact records what mobile sends.
+  it('reads the auto-mode community feed', async () => {
+    await verifyCommunityFeedInteraction(pact, createMobileClientForMockServer, 'mobile')
+  })
+
+  it('reads the all-region community feed when the viewer band is unresolved', async () => {
+    await verifyCommunityFeedBandUnresolvedInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('reads a community feed carrying withdrawn and consent-suspended author content', async () => {
+    await verifyCommunityFeedRemovedContentInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it.each(communityFeedRejections)(
+    'preserves the documented community feed rejection envelope that $description',
+    async (rejection) => {
+      await verifyCommunityFeedRejectionInteraction(pact, rejection, 'mobile')
+    }
+  )
+
+  it('resolves one visible community post directly', async () => {
+    await verifyCommunityPostInteraction(pact, createMobileClientForMockServer, 'mobile')
+  })
+
+  it('rejects a community post the caller cannot see', async () => {
+    await verifyCommunityPostNotFoundInteraction(pact, 'mobile')
+  })
+
+  it('allocates a community post upload session', async () => {
+    await verifyAllocateCommunityPostInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('replays a community upload allocation with the same payload', async () => {
+    await verifyAllocateCommunityPostReplayInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('rejects a community upload allocation replayed with a different payload', async () => {
+    await verifyAllocateCommunityPostMismatchInteraction(pact, 'mobile')
+  })
+
+  it('publishes a community post into moderation', async () => {
+    await verifyPublishCommunityPostInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('rejects a community publish whose upload session does not match the post', async () => {
+    await verifyPublishCommunityPostConflictInteraction(pact, 'mobile')
+  })
+
+  it.each(communityRateLimitInteractions)(
+    'preserves the documented community rate-limit envelope that $description',
+    async (interaction) => {
+      await verifyCommunityRateLimitInteraction(pact, interaction, 'mobile')
+    }
+  )
+
+  it('reports a visible community post', async () => {
+    await verifyReportCommunityPostInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it.each(communityReportRejections)(
+    'preserves the documented community report rejection envelope that $description',
+    async (rejection) => {
+      await verifyReportCommunityPostRejectionInteraction(pact, rejection, 'mobile')
+    }
+  )
+
+  it('refuses a community report that exceeds the reporting abuse limit', async () => {
+    await verifyReportCommunityPostRateLimitInteraction(pact, 'mobile')
+  })
+
+  it('creates a Monday-anchored community challenge as an administrator', async () => {
+    await verifyCreateCommunityChallengeInteraction(
+      pact,
+      createMobileAdminClientForMockServer
+    )
+  })
+
+  it.each(communityChallengeRejections)(
+    'preserves the documented community challenge rejection envelope that $description',
+    async (rejection) => {
+      await verifyCreateCommunityChallengeRejectionInteraction(pact, rejection)
+    }
+  )
 })

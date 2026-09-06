@@ -50,7 +50,7 @@ function countingRitualHandler() {
 
 /**
  * The screen reads the announcer through context, so the live region only
- * exists when the provider wraps it -- the same composition `app/_layout.tsx`
+ * exists when the provider wraps it, the same composition `app/_layout.tsx`
  * ships.
  */
 function renderScreen() {

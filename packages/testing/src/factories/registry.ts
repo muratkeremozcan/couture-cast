@@ -35,6 +35,16 @@ export const DEFAULT_FACTORY_REGISTRY_KEYS = [
   // Story 5.5. Owner-only planner cache rows, reachable by the user filter
   // like every other user-keyed key above.
   'plannerDayPlans',
+  // Story 6.1 community posts and challenges. The outbox, alias and report
+  // rows are tracked in their own right rather than swept through the post:
+  // a report survives its post (ON DELETE SET NULL), so deleting the post no
+  // longer takes the report with it, and an untracked report would be left
+  // behind by a run that looked clean.
+  'lookbookPosts',
+  'communityChallenges',
+  'communityModerationOutboxEntries',
+  'communityAliases',
+  'communityPostReports',
 ] as const
 
 export type FactoryRegistryKey = (typeof DEFAULT_FACTORY_REGISTRY_KEYS)[number]

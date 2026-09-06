@@ -20,12 +20,37 @@ import {
   it,
   vi,
 } from 'vitest'
+import type { CommunityFeedItem } from '@couture/api-client/contracts/http'
 import TabOneScreen from '@/app/(tabs)/index'
-import CommunityScreen from '@/app/(tabs)/community'
+import { CommunityScreen } from '@/src/features/community/community-screen'
+import enUS from '@/assets/locales/en-US.json'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { clearRitualMemoryCache } from '@/src/lib/ritual-cache'
 import { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
+
+/** A real 1x1 PNG, so react-native-web's `ImageLoader` resolves without a network hop. */
+const PIXEL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
+function communityPost(overrides: Partial<CommunityFeedItem> = {}): CommunityFeedItem {
+  return {
+    id: 'look-42',
+    caption: 'Layered wool over a merino base for a damp commute.',
+    altText: 'A charcoal wool coat over a cream knit, with black ankle boots.',
+    climateBand: 'temperate_dry',
+    imageAccess: {
+      url: PIXEL,
+      expiresAt: new Date(Date.parse('2026-07-24T18:30:00.000Z')).toISOString(),
+    },
+    publishedAt: '2026-07-23T12:00:00.000Z',
+    createdAt: '2026-07-23T11:00:00.000Z',
+    status: 'published',
+    challengeId: null,
+    author: { displayName: 'Style Explorer A1B2', isSelf: false },
+    ...overrides,
+  }
+}
 
 let mockParams: Record<string, string> = {}
 const mockSetParams = vi.fn()
@@ -83,6 +108,25 @@ describe('Mobile Deep Link Handling (Story 3.7)', () => {
           ],
           nextSince: '2026-07-24T17:29:00.000Z',
         })
+      ),
+      /*
+       * The community deep link resolves against the community API now, not the
+       * event poll. The poll only ever knew about posts whose `lookbook:new`
+       * event was still inside its window, and it could not say whether THIS
+       * viewer is allowed to see the post; the API answers 404 for everything
+       * they may not. The poll handler above stays for the weather-alert cases.
+       */
+      http.get('*/api/v1/community/posts/:postId', ({ params }) =>
+        params.postId === 'look-42'
+          ? HttpResponse.json({ data: communityPost() })
+          : HttpResponse.json(
+              {
+                statusCode: 404,
+                message: 'Community post not found.',
+                error: 'Not Found',
+              },
+              { status: 404 }
+            )
       )
     )
   })
@@ -146,9 +190,16 @@ describe('Mobile Deep Link Handling (Story 3.7)', () => {
 
     await render(<CommunityScreen />)
 
-    await waitFor(() => {
-      expect(screen.getByTestId('highlighted-community-card-look-42')).toBeTruthy()
-    })
+    const highlight = await screen.findByTestId('highlighted-community-card-look-42')
+
+    // The card used to be synthesised from the notification payload, badged with
+    // the hardcoded, untranslated "Community post #look-42". It is the real post
+    // now, with no separate badge, so the raw id must not leak into the render.
+    expect(highlight.textContent).not.toContain('Community post #')
+    expect(highlight.textContent).not.toContain('#look-42')
+    expect(
+      screen.getByTestId('community-card-image-look-42').getAttribute('aria-label')
+    ).toBe(communityPost().altText)
 
     expect(mockCapture).toHaveBeenCalledWith('deep_link_handled', {
       source: 'notification',
@@ -193,15 +244,10 @@ describe('Mobile Deep Link Handling (Story 3.7)', () => {
   })
 
   it('3.7-UNIT-010: CommunityScreen reports a community card that is no longer in the feed', async () => {
+    // The default handler answers 404 for every id but `look-42`, which is the
+    // same answer the API gives for a post this viewer may not see: the two are
+    // deliberately indistinguishable, so a hidden post cannot be probed for.
     mockParams = { source: 'notification', type: 'community', cardId: 'look-99' }
-    server.use(
-      http.get('*/api/v1/events/poll', () =>
-        HttpResponse.json({
-          events: [createCommunityPolledEvent('look-42', 'test-user-id')],
-          nextSince: '2026-07-24T17:29:00.000Z',
-        })
-      )
-    )
 
     await render(<CommunityScreen />)
 
@@ -217,7 +263,10 @@ describe('Mobile Deep Link Handling (Story 3.7)', () => {
   it('3.7-UNIT-011: CommunityScreen reports a community card that could not be loaded', async () => {
     mockParams = { source: 'notification', type: 'community', cardId: 'look-42' }
     server.use(
-      http.get('*/api/v1/events/poll', () => new HttpResponse(null, { status: 503 }))
+      http.get(
+        '*/api/v1/community/posts/:postId',
+        () => new HttpResponse(null, { status: 500 })
+      )
     )
 
     await render(<CommunityScreen />)
@@ -230,39 +279,24 @@ describe('Mobile Deep Link Handling (Story 3.7)', () => {
     })
   })
 
-  it('3.7-UNIT-012: CommunityScreen falls back to generic copy for a card with no locale or climate band', async () => {
+  it('3.7-UNIT-012: CommunityScreen falls back to catalogue copy for a card with no climate band', async () => {
     mockParams = { source: 'notification', type: 'community', cardId: 'look-77' }
     server.use(
-      http.get('*/api/v1/events/poll', () =>
-        HttpResponse.json({
-          events: [
-            {
-              id: 'event-look-77',
-              channel: 'lookbook:new',
-              userId: 'test-user-id',
-              createdAt: '2026-07-30T12:00:00.000Z',
-              payload: {
-                version: '1',
-                timestamp: '2026-07-30T12:00:00.000Z',
-                userId: 'test-user-id',
-                // locale and climateBand are optional on lookbook:new, so the
-                // card has to read sensibly without them.
-                data: { postId: 'look-77' },
-              },
-            },
-          ],
-          nextSince: '2026-07-24T17:29:00.000Z',
-        })
+      http.get('*/api/v1/community/posts/:postId', () =>
+        // `climateBand` is nullable on the published projection, so the card has
+        // to read sensibly without one.
+        HttpResponse.json({ data: communityPost({ id: 'look-77', climateBand: null }) })
       )
     )
 
     await render(<CommunityScreen />)
 
-    await waitFor(() => {
-      expect(screen.getByTestId('highlighted-community-card-look-77')).toBeTruthy()
-    })
-    expect(
-      screen.getByTestId('highlighted-community-card-look-77').textContent
-    ).toContain('All-weather look from the community')
+    await screen.findByTestId('highlighted-community-card-look-77')
+    // Was the English literal "All-weather look from the community", assembled
+    // from a notification payload; it is the card's own band pill now, and every
+    // catalogue carries the string.
+    expect(screen.getByTestId('community-card-climate-pill-look-77').textContent).toBe(
+      enUS.community.band.unclassified
+    )
   })
 })

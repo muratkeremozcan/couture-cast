@@ -60,7 +60,7 @@ describe('safeFindNodeHandle', () => {
    * The only consumer is `AccessibilityInfo.setAccessibilityFocus`, which hands
    * the value straight to a native HostFunction, and a non-number there takes
    * the whole app down with "Exception in HostFunction: Unsupported jsi::Value
-   * kind" — which is exactly what closing the capsule builder did on iOS.
+   * kind", which is exactly what closing the capsule builder did on iOS.
    */
   it.each([
     ['a host object', { __nativeTag: 7 } as unknown as number],

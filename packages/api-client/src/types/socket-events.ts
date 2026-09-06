@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CLIMATE_BANDS } from '@couture/utils'
 
 /** Story 0.5 owner file: shared socket payload schemas.
  * Why this file exists:
@@ -36,13 +37,31 @@ const baseEventSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
     data: dataSchema,
   })
 
+/**
+ * Story 6.1: announces that a post exists; it carries no media URL.
+ *
+ * A URL broadcast over the socket has no expiry and no revocation path, so a
+ * takedown cannot reach one that has already been pushed to a client. The spec
+ * requires expired URLs to be refetched and content to be hidden before its
+ * object is deleted, and neither is possible for a URL delivered this way. The
+ * client resolves the post through `GET /api/v1/community/posts/{postId}`
+ * instead, which mints a fresh signed URL and answers 404 once the post is
+ * hidden.
+ *
+ * `climateBand` is optional because a post can be announced before it is
+ * classified, and it stays null rather than being guessed.
+ */
 export const lookbookNewEventSchema = baseEventSchema(
-  z.object({
-    postId: z.string().min(1),
-    locale: z.string().optional(),
-    climateBand: z.string().optional(),
-    mediaUrls: z.array(z.string().url()).optional(),
-  })
+  z
+    .object({
+      postId: z.string().min(1),
+      locale: z.string().optional(),
+      climateBand: z.enum(CLIMATE_BANDS).optional(),
+    })
+    // Strict so a producer still sending `mediaUrls` fails loudly. A plain
+    // z.object strips unknown keys, which would let that producer believe it
+    // had delivered a media URL while the field was silently dropped.
+    .strict()
 )
 
 export type LookbookNewEvent = BaseEvent<z.infer<typeof lookbookNewEventSchema>['data']>
